@@ -50,3 +50,13 @@ contract groups pass 23 tests with three declared platform skips; service remova
 and two group deadlines still fail. Guest execution is doubled and the full
 workflow is not accepted. Only small verified JSON receipts are retained locally;
 private download URLs and artifact archives are not retained in the repository.
+
+The ecosystem-aware inventory checkpoint regenerates this same development BOM
+with explicit npm ecosystem and manifest properties. Its SHA-256 is
+`c9e0de415080a840dd65908691884f85d7bbe464a85fb16472e579b4f0baf746`.
+It still has seven components, four workspace links, unknown composition and no
+verified source/publisher claim. The official CycloneDX 1.6 schema accepts it
+and both [Python requirement examples](../python-supply-chain.md); three invalid
+mutations fail validation. Receipt `pypi-cyclonedx-schema-1793885089361.json`
+retains exact schema/validator/BOM hashes. Prior BOM hashes above describe their
+historical checkpoints.

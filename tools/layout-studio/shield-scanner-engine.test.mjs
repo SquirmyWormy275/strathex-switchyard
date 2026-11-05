@@ -4,8 +4,9 @@ import { createHash } from "node:crypto";
 import { mkdtemp, readFile, writeFile, symlink, link, rm, realpath } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { scanShieldInputs, shieldActions, shieldEngineVersion, validateShieldRequest, createShieldFileReader } from "./shield-scanner-engine.mjs";
+import { scanShieldInputs, shieldActions, shieldEngineVersion, validateShieldRequest, createShieldFileReader, parsePinnedRequirements, pypiIdentity, pypiStableRelease } from "./shield-scanner-engine.mjs";
 const sha = b => createHash("sha256").update(b).digest("hex");
+import { parseShieldScannerReport } from "./repository-shield.mjs";
 import {scannerFixture} from "./test-support/shield-scanner-fixture.mjs";
 
 test("actual baseline matches secrets, PII and JavaScript defects without returning source excerpts or matched values", async () => {
@@ -69,4 +70,35 @@ test("filesystem reader enforces exact read bounds and refuses symlinks, hardlin
   assert.equal((await read("input", 7)).toString(), "bounded"); await assert.rejects(read("input", 6)); await assert.rejects(read("../input", 7));
   await link(join(root, "input"), join(root, "hard")); await assert.rejects(read("input", 7));
   if (process.platform !== "win32") { await symlink(join(root, "input"), join(root, "symbolic")); await assert.rejects(read("symbolic", 7)); }
+});
+
+
+test("numeric Python requirement pins normalize distribution names and retain declared hashes without resolving an environment", () => {
+  const continuation = String.fromCharCode(92), text = ["# synthetic declarations", "Requests==2.19.1 " + continuation, "  --hash=sha256:" + "b".repeat(64) + " " + continuation, "  --hash=sha256:" + "a".repeat(64), "My___Package.name == 2026.10 # metadata only"].join("\r\n");
+  assert.deepEqual(parsePinnedRequirements(text), [{ ecosystem: "PyPI", name: "requests", version: "2.19.1", declaredSha256: ["a".repeat(64), "b".repeat(64)] }, { ecosystem: "PyPI", name: "my-package-name", version: "2026.10", declaredSha256: [] }]);
+  assert.deepEqual(parsePinnedRequirements("# empty declared input\n"), []);
+  assert.deepEqual(pypiIdentity("PyYAML", "6.0.2"), { ecosystem: "PyPI", name: "pyyaml", version: "6.0.2" });
+  for (const version of ["0", "1.0", "2026.10.2", "1.2.3.4"]) assert.ok(pypiStableRelease(version).length);
+});
+
+test("Python requirement includes, indexes, URLs, editable paths, markers, extras and non-numeric releases never become partial package inventory", () => {
+  const values = ["-r private.txt", "--index-url https://user:NEVER_COPY_SECRET@example.invalid/simple", "-e ../private", "name @ https://example.invalid/source.whl", "name>=1.0", "name[extra]==1.0", "name==1.0; python_version<'3.12'", "name==1.0rc1", "name==1!2.0", "name==1.0.post1", "name==1.0+local", "name==01.0", "name==1.2.3.4.5", "name==1.0\nNAME==1.0", "name==1.0 --hash=sha256:"+"a".repeat(63), "name==1.0 --hash=sha256:"+"a".repeat(64)+" --hash=sha256:"+"a".repeat(64), "name==1.0 " + String.fromCharCode(92), "name==1.0\0"];
+  for (const value of values) assert.throws(() => parsePinnedRequirements("ordinary==1.0\n" + value));
+  assert.throws(() => parsePinnedRequirements("#".repeat(256*1024+1))); assert.throws(() => parsePinnedRequirements("\n".repeat(8193)));
+});
+
+test("Python source inventory matches only its own exact PyPI advisory identity and never turns requirement hashes into artifact verification", async () => {
+  const f = scannerFixture({ action: "shield_supply_chain", files: { "requirements.txt": "Requests==2.19.1 --hash=sha256:"+"a".repeat(64) }, advisory: [{ ecosystem: "npm", name: "requests", version: "2.19.1", advisories: [{ id: "OSV-WRONG-ECOSYSTEM", severity: "critical" }] }, { ecosystem: "PyPI", name: "Requests", version: "2.19.1", advisories: [{ id: "PYSEC-synthetic", severity: "unknown" }] }] }), reads = [];
+  const report = await scanShieldInputs(f.request, { readInput: async (path, maximum) => { reads.push(path); return f.readInput(path, maximum); } });
+  assert.deepEqual(reads, ["rules.json", "advisory.json", "requirements.txt"]); assert.equal(report.outcome, "failed"); assert.equal(report.sbom.schema, "switchyard-lock-inventory/v2"); assert.equal(report.sbom.components[0].ecosystem, "PyPI");
+  assert.deepEqual(report.findings.map(f => f.ruleId), ["PYSEC-synthetic"]); for (const gap of ["license_metadata", "package_source_or_integrity", "python_environment_not_resolved", "advisory_severity_unassessed", "repository_scope_unverified"]) assert.ok(report.gaps.includes(gap));
+  assert.equal(report.gaps.includes("dependency_manifest_missing"), false); assert.equal(report.cycloneDx.components[0].purl, "pkg:pypi/requests@2.19.1"); assert.equal(report.cycloneDx.components[0].hashes, undefined); assert.equal(report.cycloneDx.dependencies, undefined); assert.equal(report.cycloneDx.compositions[0].aggregate, "unknown");
+  const shield = { engine: report.engine, requestSha256: report.requestSha256, request: f.request }; assert.deepEqual(parseShieldScannerReport(JSON.stringify(report), shield, f.request.action), report);
+  for (const mutate of [r => { r.sbom.components[0].requirementsPath = "unselected.env"; }, r => { r.sbom.components[0].name = "Requests"; }, r => { r.sbom.components[0].declaredSha256 = ["a".repeat(63)]; }, r => { r.cycloneDx.components[0].purl = "pkg:npm/requests@2.19.1"; }, r => { r.cycloneDx.components[0].hashes = [{ alg: "SHA-256", content: "a".repeat(64) }]; }]) { const altered = structuredClone(report); mutate(altered); assert.throws(() => parseShieldScannerReport(JSON.stringify(altered), shield, f.request.action)); }
+});
+
+test("mixed npm and Python manifests retain distinct BOM identities; unsupported requirements disclose no source or partial package list", async () => {
+  const lock = JSON.stringify({ lockfileVersion: 3, packages: { "node_modules/shared": { version: "1.0.0", license: "MIT" } } }), report = await scannerFixture({ action: "release_shield", files: { "package-lock.json": lock, "requirements-dev.txt": "shared==1.0.0" }, advisory: [{ ecosystem: "npm", name: "shared", version: "1.0.0", advisories: [] }, { ecosystem: "PyPI", name: "shared", version: "1.0.0", advisories: [] }] }).scan();
+  assert.equal(report.sbom.components.length, 2); assert.deepEqual(report.sbom.components.map(c => c.ecosystem), ["npm", "PyPI"]); assert.equal(new Set(report.cycloneDx.components.map(c => c["bom-ref"])).size, 2); assert.equal(report.outcome, "incomplete");
+  const invalid = await scannerFixture({ action: "shield_supply_chain", files: { "requirements.txt": "ordinary==1.0\n-r NEVER_COPY_SOURCE.txt\n" } }).scan(); assert.deepEqual(invalid.sbom.components, []); assert.ok(invalid.gaps.includes("unsupported_python_requirements")); assert.ok(invalid.gaps.includes("dependency_manifest_missing")); assert.equal(JSON.stringify(invalid).includes("NEVER_COPY_SOURCE"), false);
 });

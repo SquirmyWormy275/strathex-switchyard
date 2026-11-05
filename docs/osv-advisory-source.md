@@ -1,4 +1,4 @@
-# Collect public vulnerability data for exact npm versions
+# Collect public vulnerability data for exact package versions
 
 Switchyard can collect a bounded advisory feed from the fixed public
 [OSV query endpoint](https://google.github.io/osv.dev/post-v1-query/). It sends only
@@ -11,6 +11,10 @@ mise exec node@24.14.0 -- node scripts/collect-osv-advisories.mjs \
   --out=/absolute/path/to/a/new/collection
 ```
 
+For explicitly selected Python distributions, use `--pypi=requests@2.19.1`
+and `--pypi=packaging@25.0` in place of the npm flags. Both flag types may be
+combined. These are timestamped demonstration identities, not recommendations.
+
 The new private output directory contains `advisory.json` and `provenance.json`.
 Existing output is preserved. The provenance binds normalized feed bytes,
 original collection start/finish, query and response hashes, record IDs and
@@ -20,11 +24,14 @@ pagination tokens are not copied into the normalized output.
 ## Exact matching and bounded failure
 
 OSV documents version-query fuzzy matching. The collector independently requires
-the returned npm identity and either an explicit literal affected version or a
-supported stable SemVer interval containing that exact query. It currently accepts
-stable `major.minor.patch` versions, with ordered `introduced`/`fixed` intervals.
-Prereleases, build metadata, other ecosystems and unsupported range boundaries
-fail collection; they are not converted into an empty advisory list.
+the returned ecosystem/name and either an explicit literal affected version or
+a supported interval containing that exact query. npm accepts stable
+`major.minor.patch` releases and `SEMVER` intervals. PyPI accepts the [bounded
+numeric release subset](python-supply-chain.md) and `ECOSYSTEM` intervals, with
+trailing zero components compared equivalently. Only ordered `introduced`/`fixed`
+boundaries are supported. Prereleases, build metadata, other ecosystems and
+unsupported range boundaries fail collection; they are not converted into an
+empty advisory list.
 
 All pages must complete. Repeated pagination, duplicate IDs, unsupported records,
 withdrawals, malformed JSON/UTF-8, redirects, failed requests and oversized data
@@ -95,7 +102,7 @@ authenticated failed/incomplete outcomes, feed retirement and full original-stat
 restoration. Owned source, signing material, packages, staging, release bundle and
 proof checkout were removed; zero model prompts and no keyboard access.
 
-Automatic whole-repository scope, history, wider ecosystems, CVSS assessment,
+Automatic whole-repository scope, automatic history selection, additional ecosystems/full Python semantics, CVSS assessment,
 publisher provenance and ordinary UI source management remain unfinished. A
 successful query with no returned records describes that selected identity at
 that observation time; it does not verify publication, source bytes or complete

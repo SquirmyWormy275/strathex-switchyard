@@ -117,6 +117,7 @@ export function nativeTestOverrides(file, platform = process.platform) {
   if (file === "tools/layout-studio/repository-windows-shield-history.test.mjs") return { timeoutMs: platform === "win32" ? 300_000 : 120_000 };
   if (file === "tools/layout-studio/repository-windows-shield-index.test.mjs") return { timeoutMs: platform === "win32" ? 300_000 : 120_000 };
   if (file === "tools/layout-studio/task-index-inputs.test.mjs") return { timeoutMs: platform === "win32" ? 300_000 : 120_000 };
+  if (["tools/layout-studio/repository-shield-pypi.test.mjs", "tools/layout-studio/repository-windows-shield-pypi.test.mjs"].includes(file)) return { timeoutMs: platform === "win32" ? 300_000 : 120_000 };
   if (file === "tools/layout-studio/repository-shield-osv-source.test.mjs") return { timeoutMs: platform === "win32" ? 300_000 : 120_000 };
   if (file === "tools/layout-studio/repository-shield-ignored-trees.test.mjs") return { timeoutMs: platform === "win32" ? 300_000 : 120_000 };
   if (file === "tools/layout-studio/task-authority-ignored-trees.test.mjs") return { timeoutMs: platform === "win32" ? 300_000 : 120_000 };
@@ -202,6 +203,8 @@ export const requiredGroups = [
   { file: "tools/layout-studio/repository-shield-history.test.mjs", timeoutMs: 120_000, expectedSkipped: process.platform === "linux" ? 0 : 3 },
   { file: "tools/layout-studio/osv-advisory-source.test.mjs" },
   { file: "tools/layout-studio/repository-shield-osv-source.test.mjs", ...nativeTestOverrides("tools/layout-studio/repository-shield-osv-source.test.mjs"), expectedSkipped: process.platform === "linux" ? 0 : 1 },
+  { file: "tools/layout-studio/repository-shield-pypi.test.mjs", ...nativeTestOverrides("tools/layout-studio/repository-shield-pypi.test.mjs"), expectedSkipped: process.platform === "linux" ? 0 : 2 },
+  { file: "tools/layout-studio/repository-windows-shield-pypi.test.mjs", ...nativeTestOverrides("tools/layout-studio/repository-windows-shield-pypi.test.mjs") },
   { file: "tools/layout-studio/shield-input-inventory.test.mjs" },
   { file: "tools/layout-studio/git-index-inputs.test.mjs" },
   { file: "tools/layout-studio/git-history-inputs.test.mjs" },

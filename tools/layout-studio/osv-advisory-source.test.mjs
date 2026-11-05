@@ -8,7 +8,7 @@ const record = (id = "OSV-synthetic-one") => ({ schema_version: "1.9.2", id, mod
 const response = (document, options = {}) => new Response(JSON.stringify(document), { status: 200, headers: { "Content-Type": "application/json" }, ...options });
 test("OSV queries are exact bounded stable npm identities and independently reject fuzzy affected-version matches", () => {
   assert.deepEqual(osvPackageQueries([query]), [query]);
-  for (const input of [[], [query, query], [{ ...query, url: "https://untrusted.invalid" }], [{ ...query, ecosystem: "PyPI" }], [{ ...query, name: "https://untrusted.invalid" }], [{ ...query, version: "1.2" }], [{ ...query, version: "v1.2.3" }], [{ ...query, version: "01.2.3" }], [{ ...query, version: "1.2.3-beta.1" }], [{ ...query, version: "1.2.3+build" }]]) assert.throws(() => osvPackageQueries(input));
+  for (const input of [[], [query, query], [{ ...query, url: "https://untrusted.invalid" }], [{ ...query, ecosystem: "Maven" }], [{ ...query, name: "https://untrusted.invalid" }], [{ ...query, version: "1.2" }], [{ ...query, version: "v1.2.3" }], [{ ...query, version: "01.2.3" }], [{ ...query, version: "1.2.3-beta.1" }], [{ ...query, version: "1.2.3+build" }]]) assert.throws(() => osvPackageQueries(input));
   const actual = normalizeOsvRecord(record(), query, now()); assert.equal(actual.advisory.severity, "unknown"); assert.equal(actual.evidence.affectedVersionEvidence, "stable-semver-range"); assert.equal(JSON.stringify(actual).includes("NEVER_"), false);
   for (const change of [r => r.affected[0].package.name = "another", r => r.affected[0].package.ecosystem = "PyPI", r => r.affected[0].ranges[0].events = [{ introduced: "0" }, { fixed: "1.2.3" }], r => r.affected[0].ranges[0].events = [{ introduced: "2.0.0" }], r => r.affected[0].ranges[0].events = [{ fixed: "2.0.0" }], r => r.affected[0].ranges[0].events = [{ introduced: "1.2.3" }, { fixed: "1.2.3" }], r => r.affected[0].ranges[0].events = [{ introduced: "0" }, { last_affected: "1.2.3" }], r => r.withdrawn = "2026-10-02T00:00:00Z", r => r.schema_version = "2.0.0", r => r.modified = "not-a-time", r => r.modified = "2026-02-30T00:00:00Z", r => r.id = "../bad"]) { const r = record(); change(r); assert.throws(() => normalizeOsvRecord(r, query, now())); }
   const literal = record(); literal.affected[0].versions = ["1.2.3"]; literal.affected[0].ranges = []; assert.equal(normalizeOsvRecord(literal, query, now()).evidence.affectedVersionEvidence, "literal-version");
@@ -40,4 +40,29 @@ test("unassessed OSV severity remains a failing vulnerability with an explicit g
   assert.equal(report.outcome, "failed"); assert.equal(report.findings[0].severity, "unknown"); assert.equal(report.findings[0].dimension, "vulnerabilities"); assert.ok(report.gaps.includes("advisory_severity_unassessed")); assert.equal(report.completeness, "incomplete");
   const shield = { engine: report.engine, requestSha256: report.requestSha256, request: f.request }; assert.deepEqual(parseShieldScannerReport(JSON.stringify(report), shield, f.request.action), report);
   const bad = structuredClone(report); bad.findings[0].dimension = "licenses"; assert.throws(() => parseShieldScannerReport(JSON.stringify(bad), shield, f.request.action));
+});
+
+
+test("PyPI queries normalize names while retaining exact numeric releases and separating ecosystem identities", () => {
+  const python = { ecosystem: "PyPI", name: "Example___Package.name", version: "1.2" };
+  assert.deepEqual(osvPackageQueries([python]), [{ ecosystem: "PyPI", name: "example-package-name", version: "1.2" }]);
+  assert.equal(osvPackageQueries([query, { ...query, ecosystem: "PyPI" }]).length, 2);
+  for (const version of ["1.0rc1", "1!1.2", "2.0.post1", "01.0", "1.2.3.4.5", "1.0+local"]) assert.throws(() => osvPackageQueries([{ ...python, version }]));
+  assert.throws(() => osvPackageQueries([{ ecosystem: "PyPI", name: "Foo_Bar", version: "1" }, { ecosystem: "PyPI", name: "foo-bar", version: "1.0" }]));
+});
+
+test("PyPI affected evidence supports only explicit versions or numeric release ranges and never borrows an npm match", () => {
+  const python = { ecosystem: "PyPI", name: "Example_Package", version: "1.2.0" }, source = record();
+  source.affected = [{ package: { ecosystem: "PyPI", name: "example.package" }, ranges: [{ type: "ECOSYSTEM", events: [{ introduced: "1.2" }, { fixed: "1.3" }] }] }];
+  const result = normalizeOsvRecord(source, python, now()); assert.equal(result.evidence.affectedVersionEvidence, "stable-pypi-release-range"); assert.equal(result.advisory.severity, "unknown");
+  for (const change of [r => { r.affected[0].package.ecosystem = "npm"; }, r => { r.affected[0].ranges[0].type = "SEMVER"; }, r => { r.affected[0].ranges[0].events = [{ introduced: "0" }, { fixed: "1.2" }]; }, r => { r.affected[0].ranges[0].events = [{ introduced: "0" }, { fixed: "2.0rc1" }]; }]) { const altered = structuredClone(source); change(altered); assert.throws(() => normalizeOsvRecord(altered, python, now())); }
+  const literal = structuredClone(source); literal.affected[0].versions = [python.version]; literal.affected[0].ranges = [{ type: "GIT", repo: "https://NEVER_FETCH.invalid", events: [] }]; assert.equal(normalizeOsvRecord(literal, python, now()).evidence.affectedVersionEvidence, "literal-version");
+});
+
+test("mixed public OSV transport binds each exact ecosystem and source hash without installation, credentials or inferred severity", async () => {
+  const queries = [query, { ...query, ecosystem: "PyPI" }], calls = [];
+  const result = await collectOsvAdvisories(queries, { now, fetchImpl: async (url, options) => {
+    const body = JSON.parse(options.body); calls.push({ url, body }); const source = record("OSV-" + body.package.ecosystem); source.affected[0].package.ecosystem = body.package.ecosystem; source.affected[0].ranges[0].type = body.package.ecosystem === "PyPI" ? "ECOSYSTEM" : "SEMVER"; return response({ vulns: [source] });
+  } });
+  assert.equal(calls.length, 2); assert.deepEqual(new Set(calls.map(call => call.body.package.ecosystem)), new Set(["npm", "PyPI"])); assert.equal(result.feed.packages.length, 2); assert.equal(new Set(result.provenance.packages.map(p => p.querySha256)).size, 2); assert.ok(result.feed.packages.every(p => p.advisories[0].severity === "unknown")); assert.equal(result.provenance.authorityGranted, false); assert.equal(result.provenance.unsigned, true); assert.equal(JSON.stringify(result).includes("NEVER_"), false);
 });

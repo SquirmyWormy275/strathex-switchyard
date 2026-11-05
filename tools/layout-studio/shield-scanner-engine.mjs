@@ -39,6 +39,38 @@ function utf8(bytes) { return new TextDecoder("utf-8", { fatal: true }).decode(b
 function json(bytes) { if (bytes.length > 2 * 1024 * 1024) throw Error("Scanner JSON exceeds its bound."); return JSON.parse(utf8(bytes)); }
 const npmName = value => typeof value === "string" && ![".", ".."].includes(value) && /^(?:@[a-z0-9._-]+\/)?[a-z0-9._-]{1,128}$/.test(value);
 const npmVersion = value => typeof value === "string" && /^\d+\.\d+\.\d+(?:-[A-Za-z0-9.-]+)?(?:\+[A-Za-z0-9.-]+)?$/.test(value);
+export function pypiStableRelease(value) {
+  if (typeof value !== "string" || value.length > 32 || !/^(?:0|[1-9]\d*)(?:\.(?:0|[1-9]\d*)){0,3}$/.test(value)) throw Error("Only exact stable numeric Python releases are supported.");
+  const parts = value.split(".").map(Number);
+  if (parts.some(part => !Number.isSafeInteger(part) || part > 2147483647)) throw Error("Python release exceeds the supported numeric bound.");
+  return parts;
+}
+export function pypiIdentity(name, version) {
+  if (typeof name !== "string" || name.length > 128 || !/^[A-Za-z0-9](?:[A-Za-z0-9._-]*[A-Za-z0-9])?$/.test(name)) throw Error("Unsupported literal Python distribution name.");
+  pypiStableRelease(version);
+  return { ecosystem: "PyPI", name: name.toLowerCase().replace(/[-_.]+/g, "-"), version };
+}
+export const isPinnedRequirementsPath = path => typeof path === "string" && /(?:^|\/)requirements(?:[-_.][A-Za-z0-9_-]+)?\.(?:txt|lock)$/i.test(path);
+/** A closed metadata subset, never pip, a resolver, includes or index access. */
+export function parsePinnedRequirements(text) {
+  if (typeof text !== "string" || Buffer.byteLength(text) > 256 * 1024 || /[\0\v\f]/.test(text) || /\r(?!\n)/.test(text)) throw Error("Unsupported bounded Python requirements input.");
+  const lines = text.replace(/\r\n/g, "\n").split("\n"); if (lines.length > 8192) throw Error("Python requirements exceed their line bound.");
+  const components = [], names = new Set(); let pending = "";
+  for (const raw of lines) {
+    let line = raw.replace(/(?:^|\s)#.*$/, "").trim(); if (!line) continue;
+    const continued = line.endsWith("\\"); if (continued) line = line.slice(0, -1).trim();
+    if (!line || line.includes("\\") || pending.length + line.length > 8192) throw Error("Unsupported Python requirements continuation.");
+    pending += (pending ? " " : "") + line;
+    if (continued) continue;
+    const match = /^([A-Za-z0-9][A-Za-z0-9._-]*)[ \t]*==[ \t]*([0-9]+(?:\.[0-9]+){0,3})(?:[ \t]+((?:--hash=sha256:[a-f0-9]{64})(?:[ \t]+--hash=sha256:[a-f0-9]{64})*))?$/.exec(pending);
+    if (!match) throw Error("Requirements outside the exact numeric-pin/hash subset are unsupported.");
+    const identity = pypiIdentity(match[1], match[2]), declaredSha256 = match[3] ? match[3].split(/[ \t]+/).map(value => value.slice(14)).sort() : [];
+    if (names.has(identity.name) || declaredSha256.length > 64 || new Set(declaredSha256).size !== declaredSha256.length || components.length >= 4096) throw Error("Duplicate or excessive Python requirements metadata.");
+    names.add(identity.name); components.push({ ...identity, declaredSha256 }); pending = "";
+  }
+  if (pending) throw Error("Unfinished Python requirements continuation.");
+  return components;
+}
 function npmLocationName(location) {
   scannerPath(location);
   const parts = location.split("/"), index = parts.lastIndexOf("node_modules");
@@ -60,6 +92,14 @@ function workspaceLink(packages, link, cache) {
   const result = { metadata, workspace: { path, lockMetadataSha256: sha(JSON.stringify(metadata)) } };
   cache.set(path, result); return result;
 }
+export function shieldCycloneDxComponent(c) { return { type: "library", "bom-ref": "switchyard:" + sha(`${c.ecosystem}\0${c.lockPath??c.requirementsPath}\0${c.location??c.name}\0${c.name}\0${c.version}`), name: c.name, version: c.version,
+      ...(c.ecosystem === "PyPI" ? { purl: `pkg:pypi/${c.name}@${c.version}` } : {}),
+      ...(c.license ? { licenses: [{ license: { name: c.license } }] } : {}), properties: [
+        { name: "switchyard:ecosystem", value: c.ecosystem },
+        ...(c.ecosystem === "PyPI" ? [{ name: "switchyard:requirements-file", value: c.requirementsPath }, { name: "switchyard:declared-sha256", value: JSON.stringify(c.declaredSha256) }, { name: "switchyard:python-environment", value: "not-resolved" }] : [{ name: "switchyard:lockfile", value: c.lockPath }, { name: "switchyard:package-location", value: c.location }, { name: "switchyard:installed-as", value: c.installedAs }]),
+        ...(c.workspace?[{name:"switchyard:source-kind",value:"workspace-link"},{name:"switchyard:workspace-path",value:c.workspace.path},{name:"switchyard:workspace-lock-metadata-sha256",value:c.workspace.lockMetadataSha256},{name:"switchyard:workspace-source",value:"not-verified"}]:[]),
+        ...(c.integritySha256 ? [{ name: "switchyard:integrity-string-sha256", value: c.integritySha256 }] : [])
+      ] }; }
 function feed(v) { exact(v, ["id", "path", "sha256"]); return { id: identifier(v.id), path: scannerPath(v.path), sha256: digest(v.sha256) }; }
 function indexSource(v) {
   exact(v, ["kind", "path", "objectId", "mode"]);
@@ -104,17 +144,20 @@ function parseAdvisories(bytes) {
   const keys = new Set();
   return array(v.packages, 4096).map(p => {
     exact(p, ["ecosystem", "name", "version", "advisories"]);
-    if (p.ecosystem !== "npm" || typeof p.name !== "string" || !/^(?:@[a-z0-9._-]+\/)?[a-z0-9._-]{1,128}$/.test(p.name) || typeof p.version !== "string" || !/^\d+\.\d+\.\d+(?:-[A-Za-z0-9.-]+)?(?:\+[A-Za-z0-9.-]+)?$/.test(p.version)) throw Error("Unsupported advisory package identity.");
-    const key = `${p.name}@${p.version}`; if (keys.has(key)) throw Error("Duplicate advisory package."); keys.add(key);
+    let identity;
+    if (p.ecosystem === "npm" && npmName(p.name) && npmVersion(p.version)) identity = { ecosystem: "npm", name: p.name, version: p.version };
+    else if (p.ecosystem === "PyPI") identity = pypiIdentity(p.name, p.version);
+    else throw Error("Unsupported advisory package identity.");
+    const key = `${identity.ecosystem}:${identity.name}@${identity.version}`; if (keys.has(key)) throw Error("Duplicate advisory package."); keys.add(key);
     const advisories = array(p.advisories, 32).map(a => { exact(a, ["id", "severity"]); identifier(a.id); if (!["low", "medium", "high", "critical", "unknown"].includes(a.severity)) throw Error("Invalid advisory severity."); return { id: a.id, severity: a.severity }; });
     if (new Set(advisories.map(a => a.id)).size !== advisories.length) throw Error("Duplicate advisory.");
-    return { name: p.name, version: p.version, advisories };
+    return { ...identity, advisories };
   });
 }
 
 /** Input reader must return only witnessed bytes. Reports contain no source excerpts. */
 export async function scanShieldInputs(proposed, { readInput }) {
-  const request = validateShieldRequest(proposed), requested = dimensions[request.action], findings = [], gaps = new Set(["repository_scope_unverified"]), inventory = [], components = [];
+  const request = validateShieldRequest(proposed), requested = dimensions[request.action], findings = [], gaps = new Set(["repository_scope_unverified"]), inventory = [], components = []; let dependencyManifests = 0;
   const readFeed = async f => { const b = await readInput(f.path, 2 * 1024 * 1024); if (sha(b) !== f.sha256) throw Error("Scanner feed changed."); return b; };
   const policy = parseRules(await readFeed(request.scanner)), advisory = request.advisory ? parseAdvisories(await readFeed(request.advisory)) : [];
   const add = finding => { if (findings.length < 512) findings.push(finding); else gaps.add("finding_limit"); };
@@ -132,11 +175,27 @@ export async function scanShieldInputs(proposed, { readInput }) {
         if (findings.length >= 512) { gaps.add("finding_limit"); break; }
       }
     }
-    if (/(?:^|\/)(?:poetry\.lock|uv\.lock|Cargo\.lock|go\.sum|Gemfile\.lock|yarn\.lock|pnpm-lock\.yaml|requirements[^/]*\.txt)$/.test(file.path)) gaps.add("unsupported_dependency_ecosystem");
+    if (/(?:^|\/)(?:poetry\.lock|uv\.lock|Cargo\.lock|go\.sum|Gemfile\.lock|yarn\.lock|pnpm-lock\.yaml)$/.test(file.path)) gaps.add("unsupported_dependency_ecosystem");
+    if (/(?:^|\/)requirements[^/]*\.(?:txt|lock)$/i.test(file.path) && !isPinnedRequirementsPath(file.path)) gaps.add("unsupported_dependency_ecosystem");
+    if (isPinnedRequirementsPath(file.path) && requested.includes("sbom")) {
+      let declared;
+      try { declared = parsePinnedRequirements(text); } catch { gaps.add("unsupported_python_requirements"); continue; }
+      dependencyManifests++; gaps.add("python_environment_not_resolved");
+      if (declared.length) { gaps.add("license_metadata"); gaps.add("package_source_or_integrity"); }
+      for (const component of declared) {
+        if (components.length >= 4096) throw Error("Aggregate dependency inventory exceeds its original component bound.");
+        components.push({ ...component, requirementsPath: file.path });
+        const known = advisory.find(a => a.ecosystem === "PyPI" && a.name === component.name && a.version === component.version);
+        if (!known) gaps.add("advisory_package_coverage");
+        if (known?.advisories.some(a => a.severity === "unknown")) gaps.add("advisory_severity_unassessed");
+        for (const a of known?.advisories ?? []) add({ ruleId: a.id, dimension: "vulnerabilities", severity: a.severity, path: file.path, line: null, fingerprint: sha(`${a.id}\0PyPI\0${file.path}\0${file.sha256}\0${component.name}\0${component.version}`) });
+      }
+    }
     if (file.path.split("/").at(-1) === "package-lock.json" && requested.includes("sbom")) {
       let lock;
       try { lock = json(bytes); } catch { gaps.add("invalid_npm_lock"); continue; }
       if (!object(lock) || ![2, 3].includes(lock.lockfileVersion) || !object(lock.packages) || Object.keys(lock.packages).length > 4096) { gaps.add("unsupported_npm_lock"); continue; }
+      dependencyManifests++;
       const links = new Map(), targets = new Set(), workspaceCache = new Map();
       for (const [location, p] of Object.entries(lock.packages)) if (object(p) && p.link === true) {
         try {
@@ -155,9 +214,10 @@ export async function scanShieldInputs(proposed, { readInput }) {
         if (!installedAs || !object(p) || (raw.link === true && !linked) || (p.link !== undefined && p.link !== false) || !npmVersion(p.version)) { gaps.add("unsupported_npm_package"); continue; }
         const name = p.name ?? installedAs;
         if (!npmName(name)) { gaps.add("unsupported_npm_package"); continue; }
-        const component = { name, installedAs, version: p.version, location, lockPath: file.path, license: typeof p.license === "string" && /^[A-Za-z0-9.+-]{1,80}$/.test(p.license) ? p.license : null, integritySha256: !linked && typeof p.integrity === "string" ? sha(p.integrity) : null, ...(linked ? { workspace: linked.workspace } : {}) };
+        const component = { ecosystem: "npm", name, installedAs, version: p.version, location, lockPath: file.path, license: typeof p.license === "string" && /^[A-Za-z0-9.+-]{1,80}$/.test(p.license) ? p.license : null, integritySha256: !linked && typeof p.integrity === "string" ? sha(p.integrity) : null, ...(linked ? { workspace: linked.workspace } : {}) };
+        if (components.length >= 4096) throw Error("Aggregate dependency inventory exceeds its original component bound.");
         components.push(component);
-        const known = advisory.find(a => a.name === name && a.version === p.version);
+        const known = advisory.find(a => a.ecosystem === "npm" && a.name === name && a.version === p.version);
         if (!known) gaps.add("advisory_package_coverage");
         if (known?.advisories.some(advisory => advisory.severity === "unknown")) gaps.add("advisory_severity_unassessed");
         for (const a of known?.advisories ?? []) add({ ruleId: a.id, dimension: "vulnerabilities", severity: a.severity, path: file.path, line: null, fingerprint: sha(`${a.id}\0${file.path}\0${file.sha256}\0${location}\0${p.version}`) });
@@ -176,22 +236,17 @@ export async function scanShieldInputs(proposed, { readInput }) {
   if (requested.includes("provenance")) gaps.add("publisher_provenance_not_verified");
   if (requested.includes("isolation")) gaps.add("host_isolation_requires_attestation");
   if (requested.includes("vulnerabilities") && !request.advisory) gaps.add("advisory_feed_missing");
-  if (requested.includes("sbom") && !request.files.some(f => f.path.split("/").at(-1) === "package-lock.json")) gaps.add("npm_lock_missing");
+  if (requested.includes("sbom") && dependencyManifests === 0) gaps.add("dependency_manifest_missing");
   const matrix = requested.map(dimension => ({ dimension, status: "incomplete", rules: policy.selected.filter(id => rules[id].dimension === dimension), findings: findings.filter(f => f.dimension === dimension).length }));
   const cycloneDx = { bomFormat: "CycloneDX", specVersion: "1.6", version: 1,
     metadata: { tools: { components: [{ type: "application", name: "switchyard-baseline-scanner", version: "1" }] }, properties: [
       { name: "switchyard:scope", value: request.scope }, { name: "switchyard:repository-scope", value: "unverified" },
       { name: "switchyard:dependency-graph", value: "not-collected" }, { name: "switchyard:publisher-provenance", value: "not-verified" },
-      ...inventory.filter(f=>f.path.split("/").at(-1)==="package-lock.json").map(f=>({name:"switchyard:lockfile:"+f.path,value:"sha256:"+f.sha256}))
+      ...inventory.filter(f=>f.path.split("/").at(-1)==="package-lock.json"||isPinnedRequirementsPath(f.path)).map(f=>({name:"switchyard:dependency-manifest:"+f.path,value:"sha256:"+f.sha256}))
     ] },
-    components: components.map(c => ({ type: "library", "bom-ref": "switchyard:" + sha(`${c.lockPath}\0${c.location}\0${c.name}\0${c.version}`), name: c.name, version: c.version,
-      ...(c.license ? { licenses: [{ license: { name: c.license } }] } : {}), properties: [
-        { name: "switchyard:lockfile", value: c.lockPath }, { name: "switchyard:package-location", value: c.location }, { name: "switchyard:installed-as", value: c.installedAs },
-        ...(c.workspace?[{name:"switchyard:source-kind",value:"workspace-link"},{name:"switchyard:workspace-path",value:c.workspace.path},{name:"switchyard:workspace-lock-metadata-sha256",value:c.workspace.lockMetadataSha256},{name:"switchyard:workspace-source",value:"not-verified"}]:[]),
-        ...(c.integritySha256 ? [{ name: "switchyard:integrity-string-sha256", value: c.integritySha256 }] : [])
-      ] })), compositions: [{ aggregate: "unknown" }]
+    components: components.map(shieldCycloneDxComponent), compositions: [{ aggregate: "unknown" }]
   };
-  const report = { schema: "switchyard-shield-findings/v1", version: 1, engine: shieldEngineVersion, action: request.action, scope: request.scope, requestSha256: sha(JSON.stringify(request)), scanner: request.scanner, advisory: request.advisory, outcome: findings.length ? "failed" : "incomplete", completeness: "incomplete", coverage: matrix, gaps: [...gaps].sort(), inventory, findings, sbom: { schema: "switchyard-npm-lock-inventory/v1", components }, cycloneDx: requested.includes("sbom") ? cycloneDx : null };
+  const report = { schema: "switchyard-shield-findings/v1", version: 1, engine: shieldEngineVersion, action: request.action, scope: request.scope, requestSha256: sha(JSON.stringify(request)), scanner: request.scanner, advisory: request.advisory, outcome: findings.length ? "failed" : "incomplete", completeness: "incomplete", coverage: matrix, gaps: [...gaps].sort(), inventory, findings, sbom: { schema: "switchyard-lock-inventory/v2", components }, cycloneDx: requested.includes("sbom") ? cycloneDx : null };
   if (Buffer.byteLength(JSON.stringify(report)) > 480 * 1024) throw Error("Scanner report exceeds the retained output bound.");
   return report;
 }

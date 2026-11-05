@@ -103,7 +103,8 @@ connects operator-reviewed public trust and exact feed metadata to these pipelin
 results when that policy changes and checks the policy again inside receipt commit.
 Linux [Shield baseline scans](docs/shield-baseline-scanner.md) run pinned code and signed
 rule/advisory data with explicit findings and coverage gaps. The [development SBOM example](docs/evidence/README.md)
-shows standard CycloneDX output and its limits. The [public OSV collector](docs/osv-advisory-source.md)
+shows standard CycloneDX output and its limits. [Exact Python requirements](docs/python-supply-chain.md)
+add declared PyPI inventory with explicit unresolved environment and provenance gaps. The [public OSV collector](docs/osv-advisory-source.md)
 produces unsigned exact-version advisory data for separate signing and review. A [task-bound input preview](docs/scanner-input-inventory.md)
 identifies relevant ignored names and groups build trees before a separate exact
 scan review; its metadata remains incomplete and grants no authority. A separate

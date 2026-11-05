@@ -30,7 +30,7 @@
         "value": "not-verified"
       },
       {
-        "name": "switchyard:lockfile:package-lock.json",
+        "name": "switchyard:dependency-manifest:package-lock.json",
         "value": "sha256:14e618db2aab0afc5a5499228d69408712cfa839ed181d042aabba3f5c203368"
       }
     ]
@@ -38,7 +38,7 @@
   "components": [
     {
       "type": "library",
-      "bom-ref": "switchyard:abc82e791a578be0dd603d5c709d8425af29f0d0cce04045ba4e3c827bc13898",
+      "bom-ref": "switchyard:3af64a4959311ca657696cb182fb3dd391cfc38b6a8a903c422fd7813c3d7784",
       "name": "@strathex/switchyard-companion",
       "version": "0.2.0",
       "licenses": [
@@ -49,6 +49,10 @@
         }
       ],
       "properties": [
+        {
+          "name": "switchyard:ecosystem",
+          "value": "npm"
+        },
         {
           "name": "switchyard:lockfile",
           "value": "package-lock.json"
@@ -81,7 +85,7 @@
     },
     {
       "type": "library",
-      "bom-ref": "switchyard:e457dbdd3331d0f3fb1320d3c568508f9635b03e426e4c2ac9d495cee37650f1",
+      "bom-ref": "switchyard:1710e864557f0370e02dd6a303b68c0fb5a7d99acfc8797873aef54c30e01322",
       "name": "@strathex/switchyard-linux-companion",
       "version": "0.1.0",
       "licenses": [
@@ -92,6 +96,10 @@
         }
       ],
       "properties": [
+        {
+          "name": "switchyard:ecosystem",
+          "value": "npm"
+        },
         {
           "name": "switchyard:lockfile",
           "value": "package-lock.json"
@@ -124,7 +132,7 @@
     },
     {
       "type": "library",
-      "bom-ref": "switchyard:02008812e9f61a283f7c09f37ec2338a867d6fa472f652c8e042e1af66a96904",
+      "bom-ref": "switchyard:569b9030ad2c166e1f71d9b1016a41ba467cfa90574d3671e1c48f4c9d41b33b",
       "name": "@strathex/switchyard-provider-adapter-host",
       "version": "0.1.0",
       "licenses": [
@@ -135,6 +143,10 @@
         }
       ],
       "properties": [
+        {
+          "name": "switchyard:ecosystem",
+          "value": "npm"
+        },
         {
           "name": "switchyard:lockfile",
           "value": "package-lock.json"
@@ -167,7 +179,7 @@
     },
     {
       "type": "library",
-      "bom-ref": "switchyard:d4aed809d0d42f123872e520accae58937f55d4dcee1ff67276f8c0aa1c37587",
+      "bom-ref": "switchyard:e949b3968b4183740b81713286c715749653bdc880335f3188f207ad9a44a66c",
       "name": "@strathex/switchyard-vscode",
       "version": "0.1.0",
       "licenses": [
@@ -178,6 +190,10 @@
         }
       ],
       "properties": [
+        {
+          "name": "switchyard:ecosystem",
+          "value": "npm"
+        },
         {
           "name": "switchyard:lockfile",
           "value": "package-lock.json"
@@ -210,7 +226,7 @@
     },
     {
       "type": "library",
-      "bom-ref": "switchyard:93c07fae6c8e2ebd4288f246990760643f81bb37a295294f0e17287c158455e6",
+      "bom-ref": "switchyard:505aea908f86c7543eacd8f608ab031cf3aa5873988e55ee724063cb81d81b81",
       "name": "@types/node",
       "version": "24.13.3",
       "licenses": [
@@ -221,6 +237,10 @@
         }
       ],
       "properties": [
+        {
+          "name": "switchyard:ecosystem",
+          "value": "npm"
+        },
         {
           "name": "switchyard:lockfile",
           "value": "package-lock.json"
@@ -241,7 +261,7 @@
     },
     {
       "type": "library",
-      "bom-ref": "switchyard:ef22506a380ceece2ccd21ea32d9ff25a8b722003c61eef8be64e67b70fe79c4",
+      "bom-ref": "switchyard:396e3f34daa47445889dbcf14ef4ca3d46cf06f442ac98dfa4ddbacd9a8f9243",
       "name": "typescript",
       "version": "5.9.3",
       "licenses": [
@@ -252,6 +272,10 @@
         }
       ],
       "properties": [
+        {
+          "name": "switchyard:ecosystem",
+          "value": "npm"
+        },
         {
           "name": "switchyard:lockfile",
           "value": "package-lock.json"
@@ -272,7 +296,7 @@
     },
     {
       "type": "library",
-      "bom-ref": "switchyard:2f100964dcf7268c284d40f64f04145082ccb60771e864e266c99bf442a4e2e7",
+      "bom-ref": "switchyard:473f780525414d4a2ea369bb6b63bbadacc169bc38dc6c947fec2bd813d6ee7e",
       "name": "undici-types",
       "version": "7.18.2",
       "licenses": [
@@ -283,6 +307,10 @@
         }
       ],
       "properties": [
+        {
+          "name": "switchyard:ecosystem",
+          "value": "npm"
+        },
         {
           "name": "switchyard:lockfile",
           "value": "package-lock.json"

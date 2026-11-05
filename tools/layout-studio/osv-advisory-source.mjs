@@ -1,44 +1,50 @@
 /** Fixed public OSV transport. Output is unsigned data, never installed trust. */
 import { createHash } from "node:crypto";
-import { shieldEngineVersion } from "./shield-scanner-engine.mjs";
+import { shieldEngineVersion, pypiIdentity, pypiStableRelease } from "./shield-scanner-engine.mjs";
 
 const endpoint = "https://api.osv.dev/v1/query", sha = bytes => createHash("sha256").update(bytes).digest("hex");
 const object = value => value !== null && typeof value === "object" && !Array.isArray(value);
-function stableVersion(value) {
+function stableVersion(value, ecosystem = "npm") {
+  if (ecosystem === "PyPI") return pypiStableRelease(value);
   if (typeof value !== "string" || !/^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/.test(value) || value.length > 32) throw Error("OSV collection currently supports exact stable npm versions only.");
   const parts = value.split(".").map(Number);
   if (parts.some(part => !Number.isSafeInteger(part) || part > 2147483647)) throw Error("OSV version exceeds its supported numeric bound.");
   return parts;
 }
-function compare(left, right) { for (let i = 0; i < 3; i++) if (left[i] !== right[i]) return left[i] < right[i] ? -1 : 1; return 0; }
+function compare(left, right) { for (let i = 0; i < Math.max(left.length,right.length); i++) if ((left[i]??0) !== (right[i]??0)) return (left[i]??0) < (right[i]??0) ? -1 : 1; return 0; }
 export function osvPackageQueries(input) {
-  if (!Array.isArray(input) || !input.length || input.length > 32) throw Error("Collect 1–32 explicitly named exact npm package versions.");
+  if (!Array.isArray(input) || !input.length || input.length > 32) throw Error("Collect 1–32 explicitly named exact npm or numeric-release PyPI versions.");
   const seen = new Set();
   return input.map(value => {
-    if (!object(value) || Object.keys(value).sort().join() !== "ecosystem,name,version" || value.ecosystem !== "npm" || typeof value.name !== "string" || value.name.length > 214 || !/^(?:@[a-z0-9][a-z0-9._-]*\/)?[a-z0-9][a-z0-9._-]*$/.test(value.name)) throw Error("OSV accepts only a literal npm identity; arbitrary URLs, purls, commands and ecosystems are refused.");
-    stableVersion(value.version); const key = value.name + "@" + value.version;
+    if (!object(value) || Object.keys(value).sort().join() !== "ecosystem,name,version") throw Error("OSV accepts only a closed literal package identity.");
+    let query;
+    if(value.ecosystem==="PyPI")query=pypiIdentity(value.name,value.version);
+    else if(value.ecosystem==="npm"&&typeof value.name==="string"&&value.name.length<=214&&/^(?:@[a-z0-9][a-z0-9._-]*\/)?[a-z0-9][a-z0-9._-]*$/.test(value.name))query={ecosystem:"npm",name:value.name,version:value.version};
+    else throw Error("OSV accepts only literal npm/PyPI identities; arbitrary URLs, purls, commands and ecosystems are refused.");
+    const parts=stableVersion(query.version,query.ecosystem);while(parts.length>1&&parts.at(-1)===0)parts.pop();
+    const key=query.ecosystem+":"+query.name+"@"+parts.join(".");
     if (seen.has(key)) throw Error("OSV package queries must be distinct."); seen.add(key);
-    return { ecosystem: "npm", name: value.name, version: value.version };
-  }).sort((a, b) => a.name < b.name ? -1 : a.name > b.name ? 1 : compare(stableVersion(a.version), stableVersion(b.version)));
+    return query;
+  }).sort((a, b) => (a.ecosystem < b.ecosystem ? -1 : a.ecosystem > b.ecosystem ? 1 : 0)|| (a.name < b.name ? -1 : a.name > b.name ? 1 : compare(stableVersion(a.version,a.ecosystem), stableVersion(b.version,b.ecosystem))));
 }
 function timestamp(value) {
   if (typeof value !== "string" || value.length > 40 || !/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(?:\.\d{1,9})?Z$/.test(value) || !Number.isFinite(Date.parse(value))) throw Error("OSV record has no supported modification timestamp.");
   if (new Date(Date.parse(value)).toISOString().slice(0, 19) !== value.slice(0, 19)) throw Error("OSV modification timestamp has an invalid calendar date.");
   return value;
 }
-function rangeContains(range, version) {
-  if (!object(range) || range.type !== "SEMVER" || !Array.isArray(range.events) || !range.events.length || range.events.length > 128) throw Error("OSV affected-version evidence uses an unsupported range.");
-  const query = stableVersion(version); let open, lastFixed, matched = false;
+function rangeContains(range, version, ecosystem) {
+  if (!object(range) || range.type !== (ecosystem==="PyPI"?"ECOSYSTEM":"SEMVER") || !Array.isArray(range.events) || !range.events.length || range.events.length > 128) throw Error("OSV affected-version evidence uses an unsupported range.");
+  const query = stableVersion(version,ecosystem); let open, lastFixed, matched = false;
   for (const event of range.events) {
     if (!object(event) || Object.keys(event).length !== 1) throw Error("OSV range events are ambiguous.");
     if (Object.hasOwn(event, "introduced")) {
       if (open !== undefined) throw Error("OSV range introduces an overlapping interval.");
-      const start = event.introduced === "0" ? null : stableVersion(event.introduced);
+      const start = event.introduced === "0" ? null : stableVersion(event.introduced,ecosystem);
       if (lastFixed && (start === null || compare(start, lastFixed) < 0)) throw Error("OSV range intervals are not ordered.");
       open = { start };
     } else if (Object.hasOwn(event, "fixed")) {
       if (!open) throw Error("OSV range closes no introduced interval.");
-      const fixed = stableVersion(event.fixed);
+      const fixed = stableVersion(event.fixed,ecosystem);
       if (open.start && compare(fixed, open.start) <= 0) throw Error("OSV range has an invalid fixed boundary.");
       matched ||= (!open.start || compare(query, open.start) >= 0) && compare(query, fixed) < 0;
       lastFixed = fixed; open = undefined;
@@ -48,20 +54,23 @@ function rangeContains(range, version) {
   return matched;
 }
 export function normalizeOsvRecord(record, query, observedAt) {
-  osvPackageQueries([query]);
+  query=osvPackageQueries([query])[0];
   if (!object(record) || typeof record.id !== "string" || !/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/.test(record.id) || record.schema_version !== undefined && (typeof record.schema_version !== "string" || !/^1\.\d{1,6}\.\d{1,6}$/.test(record.schema_version)) || record.withdrawn !== undefined || !Array.isArray(record.affected) || !record.affected.length || record.affected.length > 128) throw Error("OSV record identity, version, withdrawal or affected-package contract is unsupported.");
   const modified = timestamp(record.modified);
   if (!Number.isFinite(observedAt) || Date.parse(modified) > observedAt + 300000) throw Error("OSV record modification is ahead of the bounded observation clock.");
   let proof;
   for (const affected of record.affected) {
-    if (!object(affected) || affected.package?.ecosystem !== "npm" || affected.package.name !== query.name) continue;
+    if (!object(affected) || affected.package?.ecosystem !== query.ecosystem) continue;
+    let name=affected.package.name;
+    if(query.ecosystem==="PyPI"){try{name=pypiIdentity(name,query.version).name;}catch{continue;}}
+    if(name!==query.name)continue;
     if (affected.versions !== undefined && (!Array.isArray(affected.versions) || affected.versions.length > 4096 || affected.versions.some(value => typeof value !== "string" || value.length > 128))) throw Error("OSV explicit version evidence exceeds its bound.");
     if (affected.versions?.includes(query.version)) { proof = "literal-version"; break; }
     if (!Array.isArray(affected.ranges) || affected.ranges.length > 32) continue;
-    for (const range of affected.ranges) if (rangeContains(range, query.version)) { proof = "stable-semver-range"; break; }
+    for (const range of affected.ranges) if (rangeContains(range, query.version,query.ecosystem)) { proof = query.ecosystem==="PyPI"?"stable-pypi-release-range":"stable-semver-range"; break; }
     if (proof) break;
   }
-  if (!proof) throw Error("OSV response did not independently establish this exact npm package/version as affected; fuzzy matches are not accepted.");
+  if (!proof) throw Error("OSV response did not independently establish this exact package ecosystem/name/version as affected; fuzzy matches are not accepted.");
   // OSV exposes quantitative vectors. GitHub's database_specific annotations
   // are explicitly unstable; neither is silently converted to a made-up score.
   return { advisory: { id: record.id, severity: "unknown" }, evidence: { id: record.id, modified, recordSha256: sha(JSON.stringify(record)), affectedVersionEvidence: proof, severityAssessment: "not-performed" } };
@@ -94,7 +103,7 @@ export async function collectOsvAdvisories(input, { fetchImpl = globalThis.fetch
   const started = now(), startedAt = new Date(started).toISOString(), deadline = performance.now() + totalTimeoutMs, packages = [], observations = []; let requests = 0, totalBytes = 0;
   for (const query of queries) {
     const advisories = [], records = [], pages = [], ids = new Set(), tokens = new Set(); let next;
-    const base = { package: { name: query.name, ecosystem: "npm" }, version: query.version };
+    const base = { package: { name: query.name, ecosystem: query.ecosystem }, version: query.version };
     do {
       if (++requests > 64 || pages.length >= 8 || deadline - performance.now() < 1) throw Error("OSV collection exceeds its request/page/time bound.");
       const remaining = Math.max(1, Math.min(requestTimeoutMs, Math.floor(deadline - performance.now()))), stop = AbortSignal.any([AbortSignal.timeout(remaining), ...(signal ? [signal] : [])]);

@@ -71,7 +71,7 @@ Public rule/advisory bytes are deliberately included as reviewed inputs; signing
 keys and unrelated installed feed files remain outside the namespace.
 
 The advisory schema is `switchyard-shield-advisories/v1`, version `1`, the same
-engine identity and a `packages` array. Each entry specifies `ecosystem: "npm"`,
+engine identity and a `packages` array. Each entry specifies `ecosystem: "npm"` or `"PyPI"`,
 literal `name`, exact `version` and `advisories` containing only `id`/`severity`.
 An empty advisory list establishes only that feed's explicit observation of that
 exact package version. An absent package/version is a gap, never "no known issues."
@@ -80,6 +80,11 @@ separate [bounded public OSV collector](osv-advisory-source.md) can prepare exac
 stable-version data, with independent supported-range validation and full
 pagination, for separate signing/review. Unknown severity remains a failed
 vulnerability plus an explicit unassessed-severity gap.
+
+[Python exact numeric requirements](python-supply-chain.md) are also supported
+as declared metadata, with explicit unresolved environment/license/artifact gaps.
+The typed dependency inventory uses `switchyard-lock-inventory/v2`, with separate
+ecosystem identities and manifest provenance.
 
 Supply-chain scanning reads npm lockfile versions 2/3, including nested package
 locations, and returns a typed inventory with locked versions, license metadata
