@@ -7,7 +7,7 @@ function fixture() {
   const processes = new Map([[10, { ...common, pid: 10, parentPid: 20, executable: "/native/claude" }], [20, { ...common, pid: 20, parentPid: 1, executable: "/usr/bin/foot" }]]);
   const windows = [{ address: "0x10", pid: 20, mapped: true, hidden: false }], calls = []; let wrongFocus = false;
   const hypr = async (...args) => { calls.push(args); if (args[0] === "clients") return JSON.stringify(windows); if (args[0] === "dispatch") return "ok\n"; if (args[0] === "activewindow") return JSON.stringify({ address: wrongFocus ? "0x11" : "0x10", pid: 20 }); throw new Error("Unexpected compositor command"); };
-  const options = { platform: "linux", uid: 1000, hypr, readProcess: async (pid) => { const value = processes.get(pid); if (!value) throw new Error("Process disappeared"); return structuredClone(value); } };
+  const options = { platform: "linux", uid: 1000, hypr, tmux: { inspect: async () => { throw Error("No synthetic tmux binding"); } }, readProcess: async (pid) => { const value = processes.get(pid); if (!value) throw new Error("Process disappeared"); return structuredClone(value); } };
   const request = { row: { kind: "interactive", pid: 10 }, executable: "/native/claude", repositoryRoot: "/repo", verifySession: async () => {} };
   return { processes, windows, calls, options, request, wrongFocus: () => { wrongFocus = true; } };
 }

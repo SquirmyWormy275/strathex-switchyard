@@ -17,7 +17,11 @@ State queues now span independent stores for the same root/compartment while
 retaining a kernel lease and original deadlines for every transaction; 41 checks
 pass. The restricted Windows test sets its intended SIDs before filtering and
 preserves every later token/Job check; its native confirmation remains pending.
-A separate complete 222-group run at `1701456` is in progress.
+The separate complete run at `1701456` passes all 222 groups: 1,343 tests,
+1,333 passed and ten declared skips, with every child cleanup and owned checkout
+removal verified (`isolated-test-85fb6019-18fd-4d86-9c8e-6ef3b827b074.json`).
+Later tmux source has focused contracts and a real Foot/pane demonstration with a
+synthetic CLI identity; registered Claude/installed API acceptance remains separate.
 
 Windows client source `04d9d6c` passes seven complete groups and 70 assertions
 under unchanged deadlines. Actual native NTFS/broker acceptance remains tied to

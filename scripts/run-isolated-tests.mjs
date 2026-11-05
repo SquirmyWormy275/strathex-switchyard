@@ -266,6 +266,7 @@ export const requiredGroups = [
   // allow bounded process/pipe cleanup without relaxing any assertion or skip.
   { file: "tools/layout-studio/claude-coding.test.mjs", ...nativeTestOverrides("tools/layout-studio/claude-coding.test.mjs") },
   { file: "tools/layout-studio/task-window.test.mjs" },
+  { file: "tools/layout-studio/tmux-task-window.test.mjs" },
   { file: "tools/layout-studio/voice-queue.test.mjs" },
   { file: "tools/layout-studio/owned-process.test.mjs", ...(process.platform !== "linux" ? { expectedSkipped: 1 } : {}) },
   { file: "scripts/b122-commissioning.test.mjs" },
