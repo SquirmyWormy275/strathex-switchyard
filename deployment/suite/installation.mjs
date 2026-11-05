@@ -4,7 +4,7 @@ import { chmod, copyFile, lstat, mkdir, readFile, readdir, rename, rm, rmdir, re
 import { homedir } from "node:os";
 import { join, basename } from "node:path";
 import { randomUUID } from "node:crypto";
-import { verifySuiteRelease, nodeVersion } from "./release.mjs";
+import { suiteReleaseLimits, verifySuiteRelease, nodeVersion } from "./release.mjs";
 import { stableLoader, recoveryLoader, launcherContents } from "./launcher.mjs";
 import { fileDigest, readOwnedFile, replaceOwnedFile } from "./owned-files.mjs";
 import { privateDirectory, privateRead, privateWrite } from "../../tools/layout-studio/private-fs.mjs";
@@ -55,7 +55,7 @@ export function createInstallation({ root = installationRoot(), stateRoot = appl
   async function recoverStage(lease) {
     let v; try { v = JSON.parse(await privateRead(staging)); } catch (e) { if (e.code === "ENOENT") return { stageRecovered: false }; throw e; }
     const safePath = (s) => typeof s === "string" && s.length <= 240 && s.split("/").every((p) => /^[A-Za-z0-9_.-]+$/.test(p) && !/^\.+$/.test(p));
-    if (v.schema !== "switchyard-installation-stage/v1" || !/^[a-f0-9-]{36}$/.test(v.stageId) || !idPattern.test(v.releaseId) || typeof v.source !== "string" || !Array.isArray(v.files) || v.files.length < 1 || v.files.length > 513 || v.files.some((f) => !safePath(f.path) || !idPattern.test(f.sha256) || !Number.isSafeInteger(f.size) || f.size < 0 || f.size > 128 * 1024 * 1024) || new Set(v.files.map((f) => f.path.toLowerCase())).size !== v.files.length) throw new Error("The interrupted stage descriptor is invalid; its files were preserved.");
+    if (v.schema !== "switchyard-installation-stage/v1" || !/^[a-f0-9-]{36}$/.test(v.stageId) || !idPattern.test(v.releaseId) || typeof v.source !== "string" || !Array.isArray(v.files) || v.files.length < 1 || v.files.length > suiteReleaseLimits.files + 1 || v.files.some((f) => !safePath(f.path) || !idPattern.test(f.sha256) || !Number.isSafeInteger(f.size) || f.size < 0 || f.size > 128 * 1024 * 1024) || new Set(v.files.map((f) => f.path.toLowerCase())).size !== v.files.length) throw new Error("The interrupted stage descriptor is invalid; its files were preserved.");
     const stage = join(versions, `.install-${v.stageId}`), files = new Map(v.files.map((f) => [f.path, f])), directories = new Set([""]);
     for (const f of v.files) { const parts = f.path.split("/"); parts.pop(); while (parts.length) { directories.add(parts.join("/")); parts.pop(); } }
     let sourceVerified = false, actual = 0;

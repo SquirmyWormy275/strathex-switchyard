@@ -16,6 +16,11 @@ test("release verification rejects a different adjacent 64-bit file identity bef
 });
 test("suite bundles contain the actual offline backend, frozen frontend and licenses without private data, tests or copied runtimes", () => fixture(async ({ bundle, options }) => {
   const manifest = await verifySuiteRelease(bundle.directory, { expectedId: bundle.id, platform: "linux", checkRuntime: true });
+  for (const name of ["app.mjs", "home.mjs", "shell.mjs", "keyboard-view.mjs", "suite-ui.mjs", "device-ui.mjs"]) {
+    assert.equal(manifest.files.some(file => file.path === `tools/layout-studio/${name}`), false, "Browser-only modules must ship once in the frozen frontend.");
+    assert.ok(manifest.files.some(file => file.path === `frontend/${name}`));
+  }
+  assert.ok(manifest.files.some(file => file.path === "tools/layout-studio/catalog.mjs"), "The readout backend still needs its shared catalog.");
   assert.ok(bundle.bytes < 5 * 1024 * 1024); assert.equal(manifest.integrity, "sha256-content-manifest-not-signed");
   assert.ok(manifest.files.some((f) => f.path.endsWith("mymakercorner/LICENSE"))); assert.ok(manifest.files.some((f) => f.path === "integrations/switchyard_agent.py"));
   for (const name of ["pure-template.svg", "template-faces.json", "pure-template.pdf", "README.md", "ReadMe.txt"]) assert.ok(manifest.files.some((f) => f.path === `third-party/cyber_engineer/${name}`));

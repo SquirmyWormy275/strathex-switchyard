@@ -5,7 +5,7 @@ import { mkdir, readFile, readdir, writeFile, lstat } from "node:fs/promises";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { fixture } from "./test-support/fixture.mjs";
-import { buildSuiteRelease } from "./release.mjs";
+import { buildSuiteRelease, verifySuiteRelease, suiteReleaseLimits } from "./release.mjs";
 import { createInstallation } from "./installation.mjs";
 import { fileDigest } from "./owned-files.mjs";
 import { applicationEnvironment, applicationStatus, launchApplication, stopApplication } from "./application.mjs";
@@ -155,5 +155,30 @@ test("pre-promotion owner loss recovers only verified staging copies and exact i
   await import("node:fs/promises").then(({ rm }) => rm(unrelated));
   const copied = descriptor.files[0].path, complete = await readFile(join(stage, copied)); assert.ok(complete.length > 8); await writeFile(join(stage, copied), complete.subarray(0, 8));
   assert.equal((await install.recover()).stageRecovered, true); assert.deepEqual(await snapshots(paths), before);
+  await assert.rejects(lstat(stage), { code: "ENOENT" }); await assert.rejects(lstat(descriptorPath), { code: "ENOENT" });
+}));
+
+test("interrupted installation recovery accepts the full release file ceiling plus its manifest and preserves unrelated edits", () => installFixture(async ({ root, make, first, options, releaseOptions, paths }) => {
+  const manifest = await verifySuiteRelease(first.directory, { expectedId: first.id, platform: process.platform });
+  const exported = join(root, "large-source"), sourceFiles = [];
+  for (const file of manifest.files) {
+    if (file.path.startsWith("frontend/") || file.path.startsWith("runtime/")) continue;
+    await mkdir(join(exported, file.path, ".."), { recursive: true });
+    await writeFile(join(exported, file.path), await readFile(join(first.directory, file.path))); sourceFiles.push(file.path);
+  }
+  // Add only tiny owned data fixtures; no SDK, runtime or real user data is copied.
+  for (let i = manifest.files.length; i < suiteReleaseLimits.files; i++) {
+    const name = `third_party/model-f-catalog/synthetic-boundary-${i}.json`;
+    await mkdir(join(exported, name, ".."), { recursive: true }); await writeFile(join(exported, name), "{}\n"); sourceFiles.push(name);
+  }
+  const large = await buildSuiteRelease({ ...releaseOptions, sourceRoot: exported, sourceFiles, outputRoot: join(exported, "artifacts/bundles"), sourceCommit: "c".repeat(40) });
+  assert.equal(large.files, suiteReleaseLimits.files);
+  const install = make(); await install.install(first.directory, first.id); const before = await snapshots(paths);
+  await crashUpdate(options, large, "copy");
+  const descriptorPath = join(options.stateRoot, "installation-stage.json"), descriptor = JSON.parse(await readFile(descriptorPath, "utf8"));
+  assert.equal(descriptor.files.length, suiteReleaseLimits.files + 1);
+  const stage = join(options.root, "versions", `.install-${descriptor.stageId}`), unrelated = join(stage, "unrelated.txt"); await writeFile(unrelated, "Preserve unrelated large-stage content");
+  await assert.rejects(install.recover(), /unrelated content/); assert.equal(await readFile(unrelated, "utf8"), "Preserve unrelated large-stage content");
+  await import("node:fs/promises").then(({ rm }) => rm(unrelated)); assert.equal((await install.recover()).stageRecovered, true); assert.deepEqual(await snapshots(paths), before);
   await assert.rejects(lstat(stage), { code: "ENOENT" }); await assert.rejects(lstat(descriptorPath), { code: "ENOENT" });
 }));

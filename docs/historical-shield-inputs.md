@@ -42,8 +42,9 @@ buffers are cleared on success and failure. Historical bytes use a separate
 repository aliases are never created, and physical aliases cannot substitute.
 General Run/pipelines, other Shield actions, nested aliases and control/feed files
 cannot use this channel. Combined index/history requests remain unimplemented
-and refuse explicitly. The Windows historical scanner connection is unfinished;
-an unconnected host refuses instead of using current files.
+and refuse explicitly. The [Windows historical scanner connection](windows-history-staging.md) now passes
+software contracts with the guest doubled; native NTFS/guest/installed acceptance
+remains separate. An unconnected host refuses instead of using current files.
 
 Reports preserve original historical source descriptors, redact values, and bind
 `gitHistoryInputs` in authenticated tool evidence. The report retains

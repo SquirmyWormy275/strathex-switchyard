@@ -3,8 +3,8 @@
 The historical transport is implemented and software-tested. It connects a
 separate private `historyInputs` packet to the native reviewed input stager and
 verifies returned packet/witness hashes. The normal reviewed Windows scanner
-orchestrator connection remains unfinished; native NTFS, guest and installed
-acceptance are separate checks. [Linux historical scanning](historical-shield-inputs.md)
+orchestrator connection now passes software contracts; native NTFS, guest and
+installed acceptance are separate checks. [Linux historical scanning](historical-shield-inputs.md)
 has installed acceptance.
 
 Only Codebase Audit and Release Shield accept this packet. It binds the exact
@@ -49,3 +49,26 @@ validation. It retains only its small JSON receipt and runs before service
 lifecycle checks. It opens no guest/service/volume/account/device and makes no Git
 freshness claim (`sourceGitObserved:false`). Actual execution is pending; portable
 or doubled tests do not substitute for that native result.
+
+The normal host now binds this witness into review, approval and the protected
+execution plan, then repeats the task-bound private history read before tools,
+image, volume or guest preparation. It verifies post-consumption traversal before
+any subsequent stage. Source descriptors and `gitHistoryInputs` are authenticated
+in incomplete receipts. General actions, missing consumers and mixed witnesses
+refuse before orchestration. Catalog/engine/request/feed files cannot use reserved
+Git aliases; ordinary Run/pipeline inputs retain their original physical witnesses.
+
+Six isolated packet/staging/authority/scanner/runner groups pass all 57 tests
+(`isolated-test-5a5fd866-14dc-4ffd-8b7e-c207e8b8de52.json`), every child cleanup
+verified. The reviewed Codebase Audit and Release journeys consume actual Git
+history, ignore deliberately corrupted static alias fixture buffers, find a secret
+removed from the current file, authenticate original provenance and preserve
+index/worktree/HEAD. The guest is doubled. An actual orchestrator contract checks
+that fresh history consumption finishes before tools/storage/guest and that a late
+validation refusal removes copies without starting subsequent stages. These are
+software contracts, not native NTFS or guest acceptance.
+
+The separate ordinary compatibility run passes seven groups/19 checks but retains
+its failed package-size assertion. The [package/recovery correction](suite-release-recovery.md)
+passes 38 isolated checks without raising the size budget; the original failed
+receipt remains failed. Native Windows/guest acceptance is not inferred.

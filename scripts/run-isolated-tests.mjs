@@ -113,6 +113,7 @@ const linuxCompanionTests = ["linux-secret", "linux-isolation", "linux-lifecycle
   }));
 export function nativeTestOverrides(file, platform = process.platform) {
   if (file === "tools/layout-studio/task-history-inputs.test.mjs") return { timeoutMs: platform === "win32" ? 300_000 : 120_000 };
+  if (file === "tools/layout-studio/repository-windows-shield-history.test.mjs") return { timeoutMs: platform === "win32" ? 300_000 : 120_000 };
   if (file === "tools/layout-studio/repository-windows-shield-index.test.mjs") return { timeoutMs: platform === "win32" ? 300_000 : 120_000 };
   if (file === "tools/layout-studio/task-index-inputs.test.mjs") return { timeoutMs: platform === "win32" ? 300_000 : 120_000 };
   if (file === "tools/layout-studio/repository-shield-osv-source.test.mjs") return { timeoutMs: platform === "win32" ? 300_000 : 120_000 };
@@ -208,6 +209,7 @@ export const requiredGroups = [
   { file: "tools/layout-studio/windows-history-staging.test.mjs", ...nativeTestOverrides("tools/layout-studio/windows-history-staging.test.mjs") },
   { file: "tools/layout-studio/windows-index-staging.test.mjs", ...nativeTestOverrides("tools/layout-studio/windows-index-staging.test.mjs") },
   { file: "tools/layout-studio/repository-windows-shield-index.test.mjs", ...nativeTestOverrides("tools/layout-studio/repository-windows-shield-index.test.mjs") },
+  { file: "tools/layout-studio/repository-windows-shield-history.test.mjs", ...nativeTestOverrides("tools/layout-studio/repository-windows-shield-history.test.mjs") },
   { file: "tools/layout-studio/task-index-inputs.test.mjs", ...nativeTestOverrides("tools/layout-studio/task-index-inputs.test.mjs"), expectedSkipped: process.platform === "linux" ? 0 : 1 },
   { file: "tools/layout-studio/ignored-tree-policy.test.mjs" },
   { file: "tools/layout-studio/repository-shield-ignored-trees.test.mjs", ...nativeTestOverrides("tools/layout-studio/repository-shield-ignored-trees.test.mjs"), expectedSkipped: process.platform === "linux" ? 0 : 1 },

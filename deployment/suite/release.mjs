@@ -7,7 +7,8 @@ import { userInfo } from "node:os";
 
 // Full keyboard catalog plus the complete Windows helper/setup source closure.
 // The byte ceiling stays fixed; this bounded inventory allows the added files.
-const schema = "switchyard-suite-release/v1", maxFiles = 640, maxTotal = 128 * 1024 * 1024;
+export const suiteReleaseLimits = Object.freeze({ files: 640, totalBytes: 128 * 1024 * 1024 });
+const schema = "switchyard-suite-release/v1", maxFiles = suiteReleaseLimits.files, maxTotal = suiteReleaseLimits.totalBytes;
 export const nodeVersion = "24.14.0";
 const hash = (data) => createHash("sha256").update(data).digest("hex");
 const required = ["package.json", "tools/layout-studio/serve.mjs", "tools/layout-studio/suite.mjs", "deployment/suite/release.mjs", "deployment/suite/run.mjs", "apps/vscode-extension/src/codex-daemon-status.cjs", "packages/control-plane/src/confirmations.ts", "frontend/index.html"];
@@ -35,7 +36,7 @@ async function walk(root, at = "") {
     if (entry.isDirectory()) found.push(...await walk(root, name));
     else if (entry.isFile()) found.push(name);
     else throw new Error("Release bundles cannot contain links or special files.");
-    if (found.length > maxFiles) throw new Error("The release contains too many files.");
+    if (found.length > maxFiles + 1) throw new Error("The release contains too many files.");
   }
   return found;
 }
@@ -74,7 +75,11 @@ export async function buildSuiteRelease({ sourceRoot, sourceFiles, outputRoot, f
   if (front.schema !== "switchyard-front-end-review/v1" || hash(JSON.stringify(front.files)) !== front.digest) throw new Error("Choose a verified frozen frontend review; preparing a new review is a separate action.");
   if (!Array.isArray(sourceFiles) || !sourceFiles.length || sourceFiles.some((name) => { try { portableName(name); return false; } catch { return true; } })) throw new Error("Provide the explicit tracked source inventory; untracked local files must never enter a bundle.");
   const tracked = new Set(sourceFiles), inputs = new Map(), add = async (from, to = from) => { portableName(to); if (!tracked.has(from)) return; if (inputs.has(to)) throw new Error("A release input was duplicated."); inputs.set(to, await bytes(join(sourceRoot, from))); };
-  for (const name of await walk(join(sourceRoot, "tools/layout-studio"))) if (!name.endsWith(".test.mjs") && !name.endsWith(".pyc") && !name.startsWith("test-support/")) await add(`tools/layout-studio/${name}`);
+  // These browser entry points ship once in the independently verified frozen
+  // frontend. Shared modules (for example catalog.mjs) remain in the backend.
+  const frontendOnly = new Set(["app.mjs", "home.mjs", "shell.mjs", "keyboard-view.mjs", "suite-ui.mjs", "device-ui.mjs"]);
+  if ([...frontendOnly].some(name => !front.files.some(file => file.file === name))) throw new Error("The frozen frontend is missing its browser module closure.");
+  for (const name of await walk(join(sourceRoot, "tools/layout-studio"))) if (!frontendOnly.has(name) && !name.endsWith(".test.mjs") && !name.endsWith(".pyc") && !name.startsWith("test-support/")) await add(`tools/layout-studio/${name}`);
   for (const prefix of ["integrations", "examples/custom-agent", "examples/langchain-agent", "deployment/suite", "third_party/model-f-catalog"]) for (const name of await walk(join(sourceRoot, prefix))) if (!name.endsWith(".test.mjs") && !name.endsWith(".pyc") && !name.startsWith("test-support/")) await add(`${prefix}/${name}`);
   // Only the suite runtime dependency closure, not unrelated entry points.
   for (const name of ["acceptance-evidence", "adapters", "authority", "automation-operation-manifest", "brokers", "budgets", "checkpoints", "command-catalog", "confirmations", "containment-incidents", "containment", "context-packages", "contracts", "council", "dispatch", "execution-cancellation", "execution-control", "git-inspector", "operations", "policy", "receipts", "recipes", "redaction", "runtime", "session-registry", "snapshot-ledger", "snapshot", "store", "voice", "workflow-artifacts"]) await add(`packages/control-plane/src/${name}.ts`);

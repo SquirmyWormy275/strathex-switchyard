@@ -11,6 +11,15 @@ owned fixture/worktree removed. Windows client software at the same PR head
 passes six groups/61 tests with an independently verified artifact digest.
 Neither result substitutes for native Windows NTFS/guest acceptance.
 
+The later immutable `82eb764` full run remains failed at interrupted-install
+recovery: 213/214 groups pass, 1,266 tests pass, one fails and ten skips. Recovery
+now shares the existing release file ceiling plus its manifest; a maximum-size
+crash/recovery regression and all 38 isolated package/installation/runner checks
+pass. Duplicate browser-only backend copies are omitted while frozen assets stay
+intact, keeping the package below its unchanged 5 MiB test budget. Failed receipts
+and exact owned cleanup are retained. Corrected full/installed acceptance is
+pending. [Contract](suite-release-recovery.md).
+
 Selected first-parent history witnessing passes 38 isolated history/index/runner
 checks and installed `40bb3eb` passes six update/fourteen actual witness and
 separate current-file scanner checks. All eleven query probes/two scanners exit,
@@ -18,8 +27,9 @@ full restoration and owned scratch removal pass, with zero prompts or keyboard
 access. Linux historical scanner integration now separately passes five focused
 cases and sixty isolated scanner/history/index/runner checks; installed historical
 scan acceptance passes at `4901cc8`. Windows historical transport passes portable/
-staging contracts, but its normal scanner connection, native acceptance, automatic scope and
-broader history remain unfinished software. [Witness](git-history-inputs.md),
+staging contracts, and its normal scanner connection passes 57 isolated checks
+with the guest doubled. Native acceptance checks remain pending; automatic scope
+and broader history remain unfinished software. [Witness](git-history-inputs.md),
 [scanner connection](historical-shield-inputs.md).
 
 ## Installed application
@@ -410,3 +420,11 @@ late validation precedes guest preparation. Actual NTFS packet staging has an
 independent CI verifier before service lifecycle checks, with a scoped receipt
 and native fault injection; acceptance remains pending. Native Windows guest,
 interactive and installed acceptance remain separate unaccepted checks.
+
+The Windows reviewed historical scanner connection now passes six isolated
+groups/57 checks with child cleanup, including real Git bytes for both Codebase
+Audit and Release Shield, private consumption before tools/storage/guest, late
+refusal cleanup, exact provenance, replay and unchanged original inputs. Its
+normal host/runner/receipt connection is implemented; native NTFS, guest and
+installed Windows acceptance remain pending, separate from the software contract.
+[Contract](windows-history-staging.md).
