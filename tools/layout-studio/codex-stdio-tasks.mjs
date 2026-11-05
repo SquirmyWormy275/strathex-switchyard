@@ -1,5 +1,4 @@
 /** Owned app-server transport for Windows tasks; no model turns or shell requests. */
-import { createHash } from "node:crypto";
 import { homedir } from "node:os";
 import { isAbsolute, join } from "node:path";
 import { realpath } from "node:fs/promises";
@@ -57,7 +56,10 @@ export function createCodexStdioTasks({ store, root = join(process.env.XDG_STATE
   }
   async function use(c, operation) {
     const fence = generation(c), { client, authorize } = await connected(c, fence);
-    await authorize(); const result = await operation(client, authorize); await authorize(); return result;
+    const epoch = client.accountEpoch ?? 0;
+    await authorize(); const result = await operation(client, authorize); await authorize();
+    if (client.closed || (client.accountEpoch ?? 0) !== epoch) throw client.closeReason ?? Object.assign(new Error("The exact native Codex account connection changed during metadata access."), { code: "ACCOUNT_UNCONFIRMED" });
+    return result;
   }
   async function restrictedRoot(client, expectedRoot, authorize) {
     // A different repository may contribute tools/configuration which were not
@@ -79,9 +81,8 @@ export function createCodexStdioTasks({ store, root = join(process.env.XDG_STATE
   return {
     async account(c) {
       return use(c, async (client) => {
-        const { account } = await client.request("account/read", { refreshToken: false });
-        const identified = account?.type === "chatgpt" && typeof account.email === "string" && account.email.trim() && account.email.length <= 320 && !/[\0\r\n]/.test(account.email);
-        return { type: identified ? "chatgpt" : "unavailable", fingerprint: identified ? createHash("sha256").update(JSON.stringify([account.type, account.email.trim().toLowerCase()])).digest("hex") : null, organizationVerified: false };
+        const fingerprint = await client.recheckAccount();
+        return { type: "chatgpt", fingerprint, organizationVerified: false };
       });
     },
     async list(c) {

@@ -2,7 +2,7 @@
 import { spawn } from "node:child_process";
 import { appendAgentObservation } from "./agent-observation.mjs";
 import { EventEmitter } from "node:events";
-import { deniedCodexServerRequest } from "./codex-requests.mjs";
+import { codexAccountBoundary, deniedCodexServerRequest } from "./codex-requests.mjs";
 import { runRestrictedCodexTurn } from "./codex-turn.mjs";
 import { readClaudeDesignLogin } from "./claude-account.mjs";
 import { runRuntimeCommand, runtimeGuardianStopped } from "./runtime-command.mjs";
@@ -90,7 +90,7 @@ function reviewedCodexVersion(hello, name) {
 }
 export class CodexClient extends EventEmitter {
   constructor(executable, cwd, serverNames = [], { spawnProcess = spawn, clientInfo = { name: "switchyard_design", title: "Switchyard design", version: "0.2.0" } } = {}) {
-    super(); this.sequence = 0; this.pending = new Map(); this.buffer = ""; this.closed = false;
+    super(); this.sequence = 0; this.pending = new Map(); this.buffer = ""; this.closed = false; this.accountEpoch = 0;
     this.clientInfo = clientInfo;
     codexDesignConfig(serverNames); this.serverNames = [...serverNames];
     // Generated native MCP entries need a complete parseable transport override;
@@ -110,12 +110,22 @@ export class CodexClient extends EventEmitter {
         if (!m || typeof m !== "object" || Array.isArray(m) || m.method !== undefined && (typeof m.method !== "string" || !m.method.length || m.method.length > 128 || /[\0\r\n]/.test(m.method)) || m.id !== undefined && !(Number.isSafeInteger(m.id) || typeof m.id === "string" && m.id.length > 0 && m.id.length <= 128 && !/[\0\r\n]/.test(m.id)) || m.id === undefined && m.method === undefined) { this.close(); return; }
         if (m.id !== undefined && m.method === undefined) { const pending = this.pending.get(m.id); if (pending) { this.pending.delete(m.id); m.error ? pending.reject(new Error(`Codex rejected ${pending.method}: ${String(m.error.message).slice(0, 400)}`)) : pending.resolve(m.result); } }
         else if (m.id !== undefined && m.method) this.send(deniedCodexServerRequest(m));
-        else this.emit("notification", m);
+        else {
+          if (codexAccountBoundary(m)) {
+            this.accountEpoch++;
+            if (this.accountFingerprint) {
+              this.restrictionsVerified = false;
+              this.close(Object.assign(new Error("The native Codex account changed or became unconfirmed. Saved context was not rerouted."), { code: "ACCOUNT_UNCONFIRMED" }));
+              continue;
+            }
+          }
+          this.emit("notification", m);
+        }
       }
     });
     this.child.on("error", () => this.close()); this.child.on("close", () => this.close()); this.child.stdin.on("error", () => this.close());
   }
-  send(message) { if (this.closed) throw new Error("The Codex connection is closed."); this.child.stdin.write(`${JSON.stringify(message)}\n`); }
+  send(message) { if (this.closed) throw this.closeReason ?? new Error("The Codex connection is closed."); this.child.stdin.write(`${JSON.stringify(message)}\n`); }
   request(method, params) {
     return new Promise((resolve, reject) => {
       const id = ++this.sequence;
@@ -125,9 +135,29 @@ export class CodexClient extends EventEmitter {
     });
   }
   async handshake() { const hello = await this.request("initialize", { clientInfo: this.clientInfo }); try { this.nativeVersion = reviewedCodexVersion(hello, this.clientInfo.name); } catch (error) { this.close(); throw error; } this.send({ method: "initialized", params: {} }); const { config } = await this.request("config/read", { includeLayers: false }); return config; }
-  async initialize() { assertCodexDesignConfig(await this.handshake()); this.accountFingerprint = codexAccountFingerprint((await this.request("account/read", { refreshToken: false })).account); this.restrictionsVerified = true; }
-  async recheckAccount() { if (codexAccountFingerprint((await this.request("account/read", { refreshToken: false })).account) !== this.accountFingerprint) { this.close(); throw new Error("The native Codex login changed. Saved context was not rerouted."); } return this.accountFingerprint; }
-  close() { if (this.closed) return; this.closed = true; this.child.kill(); for (const p of this.pending.values()) p.reject(new Error("Codex disconnected. Your saved draft is preserved.")); this.pending.clear(); this.emit("disconnected"); }
+  async initialize() {
+    assertCodexDesignConfig(await this.handshake());
+    // Only initial read-only metadata may settle once after a startup auth event.
+    // An already pinned connection is never silently rebound or retried.
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const epoch = this.accountEpoch, fingerprint = codexAccountFingerprint((await this.request("account/read", { refreshToken: false })).account);
+      if (this.closed) throw this.closeReason ?? new Error("The Codex connection closed during initialization.");
+      if (epoch === this.accountEpoch) { this.accountFingerprint = fingerprint; this.restrictionsVerified = true; return; }
+    }
+    const error = Object.assign(new Error("The native Codex account did not stabilize before initialization. No task was selected."), { code: "ACCOUNT_UNCONFIRMED" }); this.close(error); throw error;
+  }
+  async recheckAccount() {
+    try {
+      const epoch = this.accountEpoch, fingerprint = codexAccountFingerprint((await this.request("account/read", { refreshToken: false })).account);
+      if (this.closed) throw this.closeReason ?? new Error("The Codex connection is closed.");
+      if (epoch !== this.accountEpoch || fingerprint !== this.accountFingerprint) throw Object.assign(new Error("The native Codex login changed. Saved context was not rerouted."), { code: "ACCOUNT_UNCONFIRMED" });
+      return this.accountFingerprint;
+    } catch (error) {
+      const failure = this.closeReason ?? (error.code === "ACCOUNT_UNCONFIRMED" ? error : Object.assign(new Error("The native Codex account could not be revalidated. Saved context was not rerouted."), { code: "ACCOUNT_UNCONFIRMED" }));
+      this.restrictionsVerified = false; this.close(failure); throw failure;
+    }
+  }
+  close(reason) { if (this.closed) return; this.closed = true; this.closeReason = reason; this.buffer = ""; this.child.kill(); for (const p of this.pending.values()) p.reject(reason ?? new Error("Codex disconnected. Your saved draft is preserved.")); this.pending.clear(); this.emit("disconnected", reason); }
 }
 
 export function createAgentService({ store, runtimeRoot, codexFactory = (exe, cwd, names) => new CodexClient(exe, cwd, names), resolveCli = trustedCli, resolveMcp = readCodexMcpNames, stopChild = stopOwnedChild, readClaudeLogin = readClaudeDesignLogin, command = runRuntimeCommand, guardianStopped = runtimeGuardianStopped, now = () => Date.now() } = {}) {

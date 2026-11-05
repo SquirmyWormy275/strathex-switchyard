@@ -13,21 +13,22 @@ import { stopOwnedChild } from "./owned-process.mjs";
 
 const childSource = `
 const readline=require('node:readline'), settings=JSON.parse(process.argv[1]);
-const send=v=>process.stdout.write(JSON.stringify(v)+'\\n');let started=false;
+const send=v=>process.stdout.write(JSON.stringify(v)+'\\n');let started=false,accountReads=0;
 readline.createInterface({input:process.stdin}).on('line',line=>{
  const m=JSON.parse(line);if(!m.method||m.id===undefined)return;
  let result={};
  switch(m.method){
   case 'initialize':result={userAgent:settings.peerUserAgent??(m.params.clientInfo.name+'/0.166.0 (synthetic fixture)')};break;
   case 'config/read':if(Object.hasOwn(settings,'badFrame')){send(settings.badFrame);return;}for(const [id,method] of [[999,'item/commandExecution/requestApproval'],[1000,'item/fileChange/requestApproval'],[1001,'item/permissions/requestApproval'],[1002,'mcpServer/elicitation/request'],[1003,'item/tool/requestUserInput'],[1004,'item/tool/call'],[1005,'unknown/requestApproval']])send({id,method,params:{command:'never-executed'}});result={config:m.params.cwd?(started&&settings.projectConfigAfterStart||settings.projectConfig||settings.config):settings.config};break;
-  case 'account/read':result={account:{type:'chatgpt',email:'synthetic@example.invalid'}};break;
+  case 'account/read':accountReads++;if(accountReads<=(settings.initialBoundaryReads||0))send({method:'account/updated',params:{authMode:'chatgpt'}});result={account:accountReads>=(settings.accountChangeAfterRead||Infinity)?(settings.unavailableAccount?null:{type:'chatgpt',email:'changed@example.invalid'}):{type:'chatgpt',email:'synthetic@example.invalid'}};break;
   case 'thread/list':result={data:[{id:'synthetic-existing',preview:'never-return-preview',status:{type:'idle'}}]};break;
   case 'thread/read':result={thread:{id:settings.badId?77:m.params.threadId,cwd:settings.wrongRoot||settings.repositoryRoot,status:{type:'idle'},turns:settings.history?[{private:'never-return-history'}]:[]}};break;
   case 'thread/start':case 'thread/resume':started=true;result={thread:{id:m.params.threadId||'synthetic-created',cwd:settings.repositoryRoot,status:{type:'idle'},turns:[]},cwd:settings.repositoryRoot,sandbox:{type:settings.badPermissions?'workspaceWrite':'readOnly'},approvalPolicy:'on-request'};break;
   case 'thread/inject_items':if(settings.failInject){send({id:m.id,error:{message:'Synthetic marker failure'}});return;}break;
   default:send({id:m.id,error:{message:'Unexpected method'}});return;
  }
- send({id:m.id,result});
+ const extras=settings.accountEventOn===m.method?(settings.accountBoundaryFrames||[{method:'account/updated',params:{authMode:'chatgpt'}}]):[];
+ process.stdout.write([{id:m.id,result},...extras].map(v=>JSON.stringify(v)).join('\\n')+'\\n');
 });`;
 async function fixture(fn, overrides = {}) {
   const temporary = await mkdtemp(join(tmpdir(), "cs-")), root = await realpath(temporary), repositoryRoot = join(root, "repo"), keys = new Map(), frames = [], children = [], launches = [];
@@ -69,6 +70,46 @@ test("real stdio framing verifies restricted initialization/account and returns 
   assert.equal(frames.some((m) => m.method === "turn/start"), false); assert.equal(children.length, 1);
   assert.equal((await driver.stopCompartment("personal")).stopped, true); assert.ok(children[0].exitCode !== null || children[0].signalCode !== null);
 }));
+test("initial account enrollment settles only bounded read-only startup metadata before any task exists", async () => {
+  await fixture(async ({ driver, frames }) => {
+    assert.equal((await driver.account("personal")).type, "chatgpt");
+    assert.equal(frames.filter(frame => frame.method === "account/read").length, 3);
+    assert.equal(frames.some(frame => ["thread/start", "turn/start", "account/login/start"].includes(frame.method)), false);
+  }, { initialBoundaryReads: 1 });
+  await fixture(async ({ driver, frames }) => {
+    await assert.rejects(driver.account("personal"), error => error.code === "ACCOUNT_UNCONFIRMED");
+    assert.equal(frames.filter(frame => frame.method === "account/read").length, 2);
+    assert.equal(frames.some(frame => ["thread/start", "turn/start"].includes(frame.method)), false);
+  }, { initialBoundaryReads: 99 });
+});
+test("fresh account reads cannot silently rebase an already pinned connection without a notification", async () => {
+  for (const unavailableAccount of [false, true]) await fixture(async ({ driver, frames }) => {
+    await assert.rejects(driver.account("personal"), error => error.code === "ACCOUNT_UNCONFIRMED");
+    assert.equal(frames.filter(frame => frame.method === "account/read").length, 2);
+    assert.equal(frames.some(frame => ["thread/start", "turn/start"].includes(frame.method)), false);
+  }, { accountChangeAfterRead: 2, unavailableAccount });
+});
+test("post-pin auth notifications reject metadata even after a matching response and retain a partial creation ID", async () => {
+  for (const accountBoundaryFrames of [
+    [{ method: "account/updated", params: { authMode: "chatgpt" } }],
+    [{ method: "account/login/completed", params: { success: true } }],
+    [{ method: "account/login/completed", params: {} }]
+  ]) await fixture(async ({ repositoryRoot, driver, frames }) => {
+    await driver.account("personal");
+    await assert.rejects(driver.read("synthetic-existing", repositoryRoot, "personal"), error => error.code === "ACCOUNT_UNCONFIRMED");
+    assert.equal(frames.some(frame => frame.method === "turn/start"), false);
+  }, { accountEventOn: "thread/read", accountBoundaryFrames });
+  await fixture(async ({ repositoryRoot, driver, frames }) => {
+    await assert.rejects(driver.start(repositoryRoot, "synthetic-task", "personal"), error => error.code === "ACCOUNT_UNCONFIRMED" && error.createdThreadId === "synthetic-created");
+    assert.equal(frames.filter(frame => frame.method === "thread/start").length, 1);
+    assert.equal(frames.some(frame => ["thread/inject_items", "turn/start"].includes(frame.method)), false);
+  }, { accountEventOn: "thread/start" });
+});
+test("rate updates, cancelled login and unsupported server requests cannot masquerade as an account boundary", () => fixture(async ({ repositoryRoot, driver, frames }) => {
+  await driver.account("personal");
+  assert.equal((await driver.read("synthetic-existing", repositoryRoot, "personal")).observation, "idle");
+  assert.ok(frames.some(frame => frame.id === 1777 && frame.error?.code === -32601));
+}, { accountEventOn: "thread/read", accountBoundaryFrames: [{ method: "account/rateLimits/updated", params: {} }, { method: "account/login/completed", params: { success: false } }, { id: 1777, method: "account/updated", params: {} }] }));
 test("malformed native frames close only the owned connection instead of crashing or granting authority", async () => {
   for (const badFrame of [null, [], {}, { id: 1, method: 17 }, { id: 1, method: "" }, { id: { invalid: true }, method: "item/permissions/requestApproval" }]) {
     const frames = [], client = new CodexClient(process.execPath, process.cwd(), [], { spawnProcess: (_, args, options) => {

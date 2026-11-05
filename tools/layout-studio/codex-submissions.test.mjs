@@ -90,6 +90,23 @@ test("failed preparation and uncertain delivery retain distinct local metadata w
     assert.ok(events.every(event => event.provenance === "switchyard-local-lifecycle" && event.taskCompletionVerified === false));
   });
 });
+test("account/connection drift between native completion and reply persistence preserves uncertainty and the original turn ID", async () => {
+  for (const boundary of ["closed", "epoch"]) await fixture(async ({ store, clients, calls, service, input, approve, submit }) => {
+    await store.update("personal", "synthetic-observation", s => { s.observations = [{ id: "text-events", status: "recording", sources: ["agent-events"], exclusions: [], events: [], updatedAt: Date.now() }]; });
+    const review = await approve(), update = store.update, requestId = randomUUID();
+    store.update = async (...args) => {
+      if (args[1] === "coding-text-reply") { const client = clients.at(-1); if (boundary === "closed") client.close(); else client.accountEpoch = (client.accountEpoch ?? 0) + 1; }
+      return update(...args);
+    };
+    await assert.rejects(submit(review, { requestId }), /account\/connection changed/);
+    const state = await store.snapshot("personal"), turn = state.codingTurns[0];
+    assert.equal(turn.status, "outcome-unconfirmed"); assert.equal(turn.failureCode, "ACCOUNT_UNCONFIRMED"); assert.equal(turn.reply, null); assert.equal(turn.turnId, "exact-turn");
+    assert.deepEqual(state.observations[0].events.map(event => event.phase), ["text-request-reserved", "text-identity-bound", "text-outcome-unconfirmed"]);
+    assert.equal((await service.submit("personal", { ...input, requestId, token: review.confirmation.token })).duplicatePrevented, true);
+    assert.equal(calls.filter(call => call.method === "turn/start").length, 1);
+  });
+});
+
 test("changed prompt, account enrollment, login, directory or expiry invalidates exact reviewed text before a model request", async () => {
   for (const change of ["text", "enrollment", "login", "directory", "expiry"]) await fixture(async ({ root, repositoryRoot, store, settings, calls, approve, submit, advance }) => {
     const review = await approve();

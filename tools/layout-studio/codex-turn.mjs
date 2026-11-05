@@ -1,9 +1,11 @@
 /** One exact restricted turn on an exclusive owned connection. No tool authority. */
 import { stopOwnedChild } from "./owned-process.mjs";
+import { codexAccountBoundary } from "./codex-requests.mjs";
 const identity = (v) => typeof v === "string" && /^[A-Za-z0-9_-]{1,128}$/.test(v);
 export function runRestrictedCodexTurn({ client, threadId, text, outputSchema, onStarted = async () => {}, checkCurrent = () => {}, signal, timeoutMs = 120000, maxOutputBytes = 512 * 1024, stopChild = stopOwnedChild } = {}) {
   if (!client || client.closed || client.nativeVersion !== "0.166.0" || client.restrictionsVerified !== true || typeof client.recheckAccount !== "function" || !/^[a-f0-9]{64}$/.test(client.accountFingerprint ?? "") || !identity(threadId) || typeof text !== "string" || !text.trim() || Buffer.byteLength(text) > 1024 * 1024 || !Number.isInteger(timeoutMs) || timeoutMs < 10 || timeoutMs > 120000 || !Number.isInteger(maxOutputBytes) || maxOutputBytes < 128 || maxOutputBytes > 512 * 1024) throw new Error("An exact reviewed native connection and bounded text turn are required.");
   checkCurrent();
+  const accountEpoch = client.accountEpoch ?? 0;
   return new Promise((resolve, reject) => {
     let turnId = null, ready = false, settled = false, stopping = false, completing = false, bufferedBytes = 0, outputBytes = 0;
     const pending = [], messages = [];
@@ -26,10 +28,11 @@ export function runRestrictedCodexTurn({ client, threadId, text, outputSchema, o
         messages.push(event.text);
       } else if (event.kind === "completed") {
         if (event.status !== "completed") { const error = new Error("The exact native turn did not complete. Its task outcome remains unverified."); error.code = "TURN_INCOMPLETE"; error.nativeStatus = event.status; finish(error); }
-        else { completing = true; void (async () => { try { await client.recheckAccount(); checkCurrent(); if (!stopping) finish(null, { threadId, turnId, messages, text: messages.at(-1) ?? "", nativeStatus: "completed", taskCompletionVerified: false }); } catch { await stop("The native account or generation changed before retaining the reply.", "ACCOUNT_UNCONFIRMED"); } })(); }
+        else { completing = true; void (async () => { try { await client.recheckAccount(); checkCurrent(); if (!stopping) finish(null, { threadId, turnId, messages, text: messages.at(-1) ?? "", nativeStatus: "completed", accountEpoch, taskCompletionVerified: false }); } catch { await stop("The native account or generation changed before retaining the reply.", "ACCOUNT_UNCONFIRMED"); } })(); }
       }
     }
     function notification(m) {
+      if (codexAccountBoundary(m)) { void stop("The native Codex account changed or became unconfirmed during this turn. Saved context was preserved.", "ACCOUNT_UNCONFIRMED"); return; }
       if (settled || stopping || m.params?.threadId !== threadId) return;
       let event;
       if (m.method === "item/completed" && m.params.item?.type === "agentMessage") {
@@ -50,7 +53,7 @@ export function runRestrictedCodexTurn({ client, threadId, text, outputSchema, o
         pending.push(event);
       }
     }
-    const disconnected = () => { void stop("The owned native connection closed; completion is unconfirmed.", "DISCONNECTED"); };
+    const disconnected = reason => { void stop(reason?.code === "ACCOUNT_UNCONFIRMED" ? "The native Codex account changed; completion is unconfirmed." : "The owned native connection closed; completion is unconfirmed.", reason?.code === "ACCOUNT_UNCONFIRMED" ? "ACCOUNT_UNCONFIRMED" : "DISCONNECTED"); };
     const aborted = () => { void stop("Cancellation was requested for this owned native turn.", "CANCELLED"); };
     const timer = setTimeout(() => { void stop("The exact native turn exceeded its deadline.", "TURN_TIMEOUT"); }, timeoutMs);
     client.on("notification", notification); client.on("disconnected", disconnected); signal?.addEventListener("abort", aborted, { once: true });

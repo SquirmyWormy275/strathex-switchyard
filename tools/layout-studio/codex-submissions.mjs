@@ -29,7 +29,8 @@ export function createCodexSubmissions({ store, resolveCli = trustedCli, resolve
           if (resumed.thread?.id !== task.sessionId || resumed.thread.cwd !== task.repositoryRoot || resumed.cwd !== task.repositoryRoot || resumed.sandbox?.type !== "readOnly" || resumed.approvalPolicy !== "never" || resumed.modelProvider !== "openai") throw new Error("The resumed native identity, root, first-party provider or permissions did not verify. No model prompt was submitted.");
           await checkRoot(); await client.recheckAccount(); await authorize();
         },
-        async runTurn(options) { return { ...await runRestrictedCodexTurn({ client, threadId: task.sessionId, ...options, stopChild, maxOutputBytes: 32768 }), nativeSessionVerified: true, nativeTurnIdSupported: true }; }
+        async runTurn(options) { return { ...await runRestrictedCodexTurn({ client, threadId: task.sessionId, ...options, stopChild, maxOutputBytes: 32768 }), nativeSessionVerified: true, nativeTurnIdSupported: true }; },
+        assertResultCurrent(result) { if (client.closed || (client.accountEpoch ?? 0) !== result.accountEpoch) throw Object.assign(new Error("The native Codex account/connection changed before reply persistence."), { code: "ACCOUNT_UNCONFIRMED" }); }
       };
     }
   } });

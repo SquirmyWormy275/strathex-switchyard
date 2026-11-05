@@ -1,4 +1,8 @@
 /** Protocol-specific refusal for the restricted native client; no approval grants. */
+export function codexAccountBoundary(message) {
+  return message?.id === undefined && (message?.method === "account/updated" || message?.method === "account/login/completed" && message.params?.success !== false);
+}
+
 export function deniedCodexServerRequest(message) {
   const id = message.id;
   switch (message.method) {

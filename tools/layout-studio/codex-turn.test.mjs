@@ -50,6 +50,32 @@ test("an account change after the exact turn completes cannot retain its reply u
   f.client.recheckAccount = async () => { throw Error("Synthetic login change"); }; f.message("Not retained"); f.complete(); await rejected;
   assert.equal(f.client.closed, true); assert.equal(f.calls.filter((c) => c.method === "turn/start").length, 1);
 });
+test("native auth boundary notifications fence a turn even when its original fingerprint is restored", async () => {
+  for (const method of ["account/updated", "account/login/completed"]) {
+    const f = fixture(), result = f.run(), rejected = assert.rejects(result, error => error.code === "ACCOUNT_UNCONFIRMED" && error.turnId === "turn-1" && error.stopVerified === true);
+    await tick();
+    f.client.emit("notification", { method, params: { authMode: null, success: true } });
+    f.client.accountFingerprint = "a".repeat(64);
+    f.client.emit("notification", { method: "account/updated", params: { authMode: "chatgpt" } });
+    f.message("Restored-login reply must not be retained"); f.complete(); await rejected;
+    assert.equal(f.client.closed, true); assert.equal(f.calls.filter(call => call.method === "turn/start").length, 1); assert.equal(f.client.listenerCount("notification"), 0);
+  }
+});
+test("usage notifications and a cancelled login do not invalidate the pinned native account", async () => {
+  const f = fixture(), result = f.run(); await tick();
+  f.client.emit("notification", { method: "account/rateLimits/updated", params: { rateLimits: {} } });
+  f.client.emit("notification", { method: "account/login/completed", params: { success: false, error: "Synthetic cancelled login" } });
+  f.message("Ready"); f.complete(); assert.equal((await result).text, "Ready"); assert.equal(f.stops, 0);
+});
+test("an account notification during final native revalidation cannot be erased by a later successful read", async () => {
+  const f = fixture(); let reads = 0, enter, release;
+  const entered = new Promise(resolve => { enter = resolve; }), gate = new Promise(resolve => { release = resolve; });
+  f.client.recheckAccount = async () => { if (++reads === 2) { enter(); await gate; } return "a".repeat(64); };
+  const result = f.run(), rejected = assert.rejects(result, error => error.code === "ACCOUNT_UNCONFIRMED"); await tick();
+  f.message("Not retained"); f.complete(); await entered;
+  f.client.emit("notification", { method: "account/updated", params: { authMode: "chatgpt" } }); release(); await rejected;
+  assert.equal(f.calls.filter(call => call.method === "turn/start").length, 1); assert.equal(f.client.closed, true);
+});
 test("generation changes block late content and a noncompleted provider turn never verifies task completion", async () => {
   let active = true; const f = fixture(), result = f.run({ checkCurrent: () => { if (!active) throw Error("Stopped generation"); } }); await tick(); active = false; f.message("Late content"); f.complete();
   await assert.rejects(result, (e) => e.code === "TURN_STOPPED" && e.stopVerified === true);
