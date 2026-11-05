@@ -13,11 +13,13 @@
   "managedHResult": -2146233079,
   "failurePhase": "restricted-primary-token/filtered-token-flag",
   "isTokenRestrictedPassed": true,
-  "historicalFilterFlag": false,
   "childCreated": false,
   "protectedServiceAndContextPreserved": true,
   "nextCorrection": "Use one public CreateRestrictedToken call with the four explicit restricting SIDs and delete every assigned privilege except optional SeChangeNotifyPrivilege. Verify actual primary token, user, medium integrity, SID identities, Administrators deny-only and remaining assigned privileges before resume and after exit. Retain three historical flag observations without treating them as actual SID or privilege proof.",
   "ordinaryAccountAccepted": false,
   "guestAccepted": false,
-  "nativeCorrectionAccepted": false
+  "nativeCorrectionAccepted": false,
+  "historicalFlagObserved": false,
+  "historicalFlagValue": null,
+  "observationLimit": "The phase proves the historical metadata check was entered, not whether its query or value assertion failed. Later03a fails while querying, before any boolean observation."
 }

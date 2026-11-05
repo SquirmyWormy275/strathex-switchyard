@@ -16,6 +16,7 @@ internal static class NativeRestrictedHostProof
 {
     internal static string Phase = "not-started";
     internal static object? CreatorPrivileges;
+    internal static object? TokenReadDiagnostic;
     private static readonly List<bool> HistoricalFilteredFlags = new();
     internal static bool[] HistoricalFilterObservations => HistoricalFilteredFlags.ToArray();
     private static void Require(bool condition) { if (!condition) throw new InvalidOperationException("The restricted host process proof did not verify."); }
@@ -28,10 +29,19 @@ internal static class NativeRestrictedHostProof
     }
     private static IntPtr TokenInformation(SafeAccessTokenHandle token, int kind)
     {
-        _ = GetTokenInformation(token, kind, IntPtr.Zero, 0, out uint size);
-        Require(Marshal.GetLastWin32Error() == 122 && size is >= 4 and <= 65536);
+        bool probed = GetTokenInformation(token, kind, IntPtr.Zero, 0, out uint size);
+        int probeError = probed ? 0 : Marshal.GetLastWin32Error();
+        TokenReadDiagnostic = new { informationClass = kind, stage = "size-probe", succeeded = probed, nativeCode = probeError, bytes = size };
+        if (!probed && probeError != 122) throw new Win32Exception(probeError);
+        Require(!probed && size is >= 4 and <= 65536);
         var buffer = Marshal.AllocHGlobal(checked((int)size));
-        try { Native(GetTokenInformation(token, kind, buffer, size, out uint used)); Require(used <= size); return buffer; }
+        try
+        {
+            bool read = GetTokenInformation(token, kind, buffer, size, out uint used); int readError = read ? 0 : Marshal.GetLastWin32Error();
+            TokenReadDiagnostic = new { informationClass = kind, stage = "read", succeeded = read, nativeCode = readError, bytes = used };
+            if (!read) throw new Win32Exception(readError);
+            Require(used is >= 4 && used <= size); return buffer;
+        }
         catch { Marshal.FreeHGlobal(buffer); throw; }
     }
     private static T ReadToken<T>(SafeAccessTokenHandle token, int kind, Func<IntPtr,T> read)

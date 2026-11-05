@@ -65,7 +65,7 @@ internal static class Program
         }
         catch(Exception error)
         {
-            Console.WriteLine(JsonSerializer.Serialize(new { schema="switchyard-storage-broker-protocol-proof/v1",success=false,errorCategory=error.GetType().Name,nativeCode=error is System.ComponentModel.Win32Exception native?(int?)native.NativeErrorCode:null,errorHResult=error.HResult,nativeExchangeChecks=OperatingSystem.IsWindows()?NativeExchangeProof.CompletedChecks:0,failedCheckPhase=OperatingSystem.IsWindows()?NativeExchangeProof.Phase:null,restrictedHostPhase=OperatingSystem.IsWindows()?NativeRestrictedHostProof.Phase:null,restrictedHostCreatorPrivileges=OperatingSystem.IsWindows()?NativeRestrictedHostProof.CreatorPrivileges:null,restrictedHostHistoricalFilterFlags=OperatingSystem.IsWindows()?NativeRestrictedHostProof.HistoricalFilterObservations:null }));
+            Console.WriteLine(JsonSerializer.Serialize(new { schema="switchyard-storage-broker-protocol-proof/v1",success=false,errorCategory=error.GetType().Name,nativeCode=error is System.ComponentModel.Win32Exception native?(int?)native.NativeErrorCode:null,errorHResult=error.HResult,nativeExchangeChecks=OperatingSystem.IsWindows()?NativeExchangeProof.CompletedChecks:0,failedCheckPhase=OperatingSystem.IsWindows()?NativeExchangeProof.Phase:null,restrictedHostPhase=OperatingSystem.IsWindows()?NativeRestrictedHostProof.Phase:null,restrictedHostCreatorPrivileges=OperatingSystem.IsWindows()?NativeRestrictedHostProof.CreatorPrivileges:null,restrictedHostHistoricalFilterFlags=OperatingSystem.IsWindows()?NativeRestrictedHostProof.HistoricalFilterObservations:null,restrictedHostTokenRead=OperatingSystem.IsWindows()?NativeRestrictedHostProof.TokenReadDiagnostic:null }));
             return 2;
         }
     }

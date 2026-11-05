@@ -330,7 +330,8 @@ as a whole. No ordinary-account/UAC or guest acceptance is inferred.
 ### Actual restrictions and historical token metadata
 
 The next native run at `59a73de` passes public `IsTokenRestricted` but fails the
-separate historical `TokenHasRestrictions` assertion before creating a child.
+separate historical `TokenHasRestrictions` phase before creating a child. Its
+phase alone does not distinguish a failed query from a false-value assertion.
 Its [digest-verified failed receipt](evidence/windows-59a-restricted-failed-summary.json)
 remains failed, with the original protected service/context preserved. Earlier
 31-case exchange and eight-case owner checks do not establish restricted primary
@@ -360,3 +361,19 @@ workflow, runner and verifier groups pass 25 checks with every cleanup verified
 (`isolated-test-ace3199b-6401-426e-b3fe-fc9b90fc7731.json`). This correction still
 requires native Windows execution. It changes no shipped helper/setup commands,
 workstation privileges, accounts or logon settings.
+
+
+The next native `03a6065` attempt reaches the historical observation but returns
+no boolean observations before failing. The previous record inferred a false
+flag too early; that inference is withdrawn. Its digest-verified failed receipt
+(`windows-03a-restricted-owner-failed.json`, archive
+`3c7ba721f35b0d709ce6770442be4206c93d9a3b7dbb87b9696d9aa3bead3e26`,
+artifact `13426377387`, run `42049684276`, execution `b6c892a4e294b638fe93a8d09e9c8427fff96c01`)
+proves failure during the query before child creation. All concrete restrictions
+remain required. The test now records only fixed query stage/class, native error
+and required/returned byte count, separating a native API failure from a managed
+size check without returning token contents or changing the query/deadlines.
+Both managed targets again compile without warnings/errors and all 223 portable
+checks pass, with owned scratch removed
+(`windows-history-native-build-1793891291067.json`). Native validation remains
+unfinished. [Source-bound failed summary](evidence/windows-03a-restricted-failed-summary.json).
