@@ -1,0 +1,60 @@
+/** Disposable Windows CI only: actual host owner/native transport, no guest. */
+import assert from "node:assert/strict";
+import { randomUUID } from "node:crypto";
+import { mkdtemp, writeFile, readFile, rm } from "node:fs/promises";
+import { dirname, join } from "node:path";
+import { tmpdir } from "node:os";
+import { createSuiteStore } from "../tools/layout-studio/suite-store.mjs";
+import { createWindowsStorageNative } from "../tools/layout-studio/windows-storage-native.mjs";
+import { createWindowsBrokerExchanges } from "../tools/layout-studio/windows-broker-exchanges.mjs";
+import { directoryIdentity } from "../tools/layout-studio/private-fs.mjs";
+import { runtimeGuardianStopped } from "../tools/layout-studio/runtime-command.mjs";
+
+export async function verifyWindowsBrokerOwner({ helper, installationId, serviceImageSha256 }) {
+  if (process.platform !== "win32" || process.env.GITHUB_ACTIONS !== "true" || process.env.RUNNER_OS !== "Windows") throw Error("The actual broker-owner proof requires the explicit disposable Windows worker.");
+  const root = await mkdtemp(join(process.env.RUNNER_TEMP || tmpdir(), "sxbo-")), original = await directoryIdentity(root), keys = new Map(), checks = [];
+  const store = createSuiteStore({ root, secrets: { get: async (c,p) => keys.get(c+p), set: async (c,p,v) => { keys.set(c+p,v); } } });
+  await store.initialize("personal"); await store.update("personal", "synthetic-companion", state => { state.mode = "personal-companion"; });
+  const native = createWindowsStorageNative({ store, helperPath: helper, setupPath: join(dirname(helper), "Switchyard.Setup.exe") });
+  let consumerExited = true, phase = "read-only-probe";
+  const service = createWindowsBrokerExchanges({ store, native, consumerStopped: async () => consumerExited }), context = { operationId: randomUUID(), scopeDigest: "a".repeat(64), provider: "codex" }, inputs = { inputManifestSha256: "e".repeat(64) }, authorize = async () => {};
+  try {
+    assert.deepEqual(await service.probe("personal", context, authorize), { status: "available", effectStarted: false });
+    assert.equal((await service.list("personal")).length, 0); checks.push("fresh authenticated native capability creates no exchange owner or disk");
+    phase = "exact-create";
+    const image = await service.prepare("personal", context, authorize, inputs), created = (await store.snapshot("personal")).repositoryWindowsBrokerExchanges[0];
+    assert.equal(created.installation.installationId, installationId); assert.equal(created.installation.serviceImageSha256, serviceImageSha256); assert.equal(created.commands.create.status, "recorded");
+    checks.push("actual native transport settles only the original durable create request");
+    phase = "exact-mounted-mapping";
+    const volume = await image.createVolume(); await volume.assertCurrent();
+    assert.equal(volume.nativeBinding.broker.taskScopeSha256, context.scopeDigest); assert.equal(volume.nativeBinding.broker.inputManifestSha256, inputs.inputManifestSha256);
+    const data = Buffer.from("synthetic host owner data\n"), file = join(volume.root, "synthetic.bin"); await writeFile(file, data, { flag: "wx" }); assert.deepEqual(await readFile(file), data);
+    checks.push("original signed mapping and actual mounted filesystem write/readback verify exact task and input scope");
+    phase = "kernel-consumer-lease";
+    await volume.withConsumer(async () => { assert.equal((await service.cleanup("personal", context.operationId)).cleaned, false); });
+    checks.push("actual consumer kernel lease excludes retirement before any VM exists");
+    phase = "independent-consumer-exit"; consumerExited = false;
+    await assert.rejects(volume.release(), /guest consumer exit/); assert.deepEqual(await readFile(file), data); consumerExited = true;
+    checks.push("unconfirmed guest exit preserves the original mounted exchange");
+    phase = "exact-retirement"; await volume.release();
+    const retired = (await store.snapshot("personal")).repositoryWindowsBrokerExchanges[0];
+    assert.equal(retired.cleanupPending, false); assert.deepEqual(Object.keys(retired.commands), ["create", "attach", "detach", "retire"]);
+    for (const command of Object.values(retired.commands)) assert.equal(command.status, "recorded");
+    checks.push("actual detach and retirement settle all four original effect requests");
+    phase = "duplicate-refusal"; await assert.rejects(service.prepare("personal", context, authorize, inputs), /replay/);
+    assert.equal((await store.snapshot("personal")).repositoryWindowsBrokerExchanges.length, 1); checks.push("retired operation cannot create or transfer another image");
+    phase = "native-exit-and-fixture-retirement";
+    const owners = (await store.snapshot("personal")).windowsStorageNative;
+    assert.ok(owners.length > 0);
+    for (const owner of owners) { assert.equal(owner.stoppedVerified, true); assert.equal(await runtimeGuardianStopped(owner.ownedRuntime, { windowsHelper: helper }), true); }
+    await service.close(); const current = await directoryIdentity(root); assert.equal(current.dev, original.dev); assert.equal(current.ino, original.ino);
+    await rm(root, { recursive: true }); checks.push("every retained native Job guardian independently exited and only the exact synthetic private fixture was removed");
+    assert.equal(checks.length, 8);
+    return { schema: "switchyard-native-broker-owner-proof/v1", success: true, checks, nativeExitVerified: true, fixtureRemoved: true, guestLaunched: false, setupRequested: false, accountCreated: false, ordinaryUserToken: false };
+  } catch (error) {
+    // Keep original native ownership and AEAD facts. The enclosing coordinator
+    // preserves the installation and never replays its failed action.
+    error.hostExchangeProof = { schema: "switchyard-native-broker-owner-proof/v1", success: false, checks, failedPhase: phase, stateDirectory: root, fixtureRemoved: false, guestLaunched: false, setupRequested: false, accountCreated: false };
+    throw error;
+  }
+}

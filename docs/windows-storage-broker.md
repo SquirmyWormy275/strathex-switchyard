@@ -135,3 +135,14 @@ checks. Four archive digests were verified and receipts retained. This accepts
 the protected storage engine and exact removal lifetime; the newer JavaScript
 owner adapter still needs its own native demonstration and the complete guest
 journey remains unaccepted.
+
+The native CI coordinator now also schedules eight checks of the actual
+JavaScript owner and native client against that same disposable service. It
+uses a separate synthetic AEAD store, fixed installed helper/setup paths, an
+exact task/input mapping, a real mounted write/readback, consumer lease and
+exit refusal, original detach/retire and duplicate refusal. All retained Job
+guardians must independently exit before its private fixture is removed. Its
+worker token remains administrative; the separate 31-case proof establishes
+the ordinary restricted-client boundary. Failure preserves the original
+installation and AEAD ownership facts. This new owner proof is pending CI and
+launches no guest, account, setup dialogue or physical-device operation.

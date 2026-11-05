@@ -8,6 +8,15 @@ behind each accepted result.
 
 ## Active backend iteration
 
+Eight actual Windows JavaScript-owner/native-client checks are now scheduled
+after the separate 31-case restricted-client proof. They verify original
+installation/task/input mapping, real mounted write/readback, live kernel
+consumer exclusion, unconfirmed guest-exit refusal, exact retirement, replay
+refusal and independent native exits with fixture removal. They request no
+setup or guest. Linux guard/import checks pass; native execution is pending.
+The complete Linux lane at `a1e71b0` is running from an immutable disposable
+checkout with a short owned home-filesystem fixture parent.
+
 Normal Windows Run now uses protected broker exchanges with exact task/input
 binding and durable per-effect requests. The host lease spans preparation to
 retirement; a consumer kernel lease blocks premature cleanup. Lost replies use
