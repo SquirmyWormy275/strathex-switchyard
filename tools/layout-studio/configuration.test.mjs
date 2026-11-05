@@ -4,12 +4,12 @@ import { once } from "node:events";
 import { spawn } from "node:child_process";
 import { request } from "node:http";
 import { mkdtemp, mkdir, readFile, writeFile, readdir, rm, symlink, chmod } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { tmpdir, homedir, userInfo } from "node:os";
 import { join } from "node:path";
 import { newPlan, parseBoardProfile } from "./model.mjs";
 import { portableProfile, importProfile, proposalContext, reviewProposal, compileConnection } from "./workspace.mjs";
 import { snapshotChoices, importVialSnapshot } from "./vial-snapshot.mjs";
-import { createHostBridge, discoverHost } from "./host.mjs";
+import { createHostBridge, discoverHost, nativeChatgptWindow, focusNativeChatgpt } from "./host.mjs";
 import { createStudioServer } from "./serve.mjs";
 
 function plan() {
@@ -20,6 +20,45 @@ function plan() {
   p.actions.push({ id: "summon", label: "Show ChatGPT", family: "routing", consequence: "navigation", confirmation: false, frequencyPerDay: 0, secondsSaved: 0, binding: { keyId: "one", modifier: "gui_alt" } });
   return p;
 }
+
+function chatgptFocusFixture() {
+  const process = { pid: 123, uid: userInfo().uid, executable: join(homedir(), ".local/lib/chatgpt-visible-voice/native/ChatGPT"), state: "S", startTicks: "12345" };
+  const window = { pid: process.pid, address: "0x123", initialClass: "chatgpt", mapped: true, hidden: false, floating: false }, windows = [window], calls = [];
+  let dispatch = () => {}, active = () => ({ pid: process.pid, address: window.address });
+  const hypr = async (...args) => { calls.push(args); if (args[0] === "clients") return JSON.stringify(windows); if (args[0] === "dispatch") { dispatch(); return "ok\n"; } if (args[0] === "activewindow") return JSON.stringify(active()); throw Error("Unexpected native target command"); };
+  return { process, window, windows, calls, hypr, readProcess: async pid => { assert.equal(pid, 123); return structuredClone(process); }, onDispatch: callback => { dispatch = callback; }, active: callback => { active = callback; } };
+}
+
+test("native ChatGPT focus uses its exact repaired main-window address and process birth without prompting or resuming", async () => {
+  const f = chatgptFocusFixture(); f.windows.push({ ...f.window, address: "0x456", floating: true }); let checks = 0;
+  const result = await focusNativeChatgpt(f.hypr, { readProcess: f.readProcess, assertCurrent: async () => { checks++; } });
+  assert.equal(checks, 3); assert.equal(result.windowFocusVerified, true); assert.equal(result.taskResumptionVerified, false); assert.equal(result.accountVerified, false); assert.equal(result.modelPromptSubmitted, false);
+  assert.deepEqual(f.calls.filter(call => call[0] === "dispatch"), [["dispatch", 'hl.dsp.focus({ window = "address:0x123" })']]);
+});
+
+test("native ChatGPT focus refuses foreign executables or owners, hidden windows, overlays and malformed addresses", async () => {
+  for (const change of [f => { f.process.uid++; }, f => { f.process.executable = "/usr/lib/chatgpt/ChatGPT"; }, f => { f.process.state = "Z"; }, f => { f.process.startTicks = "0"; }, f => { f.window.hidden = true; }, f => { delete f.window.hidden; }, f => { f.window.mapped = false; }, f => { f.window.floating = true; }, f => { f.window.address = '0x123" }); arbitrary'; }]) {
+    const f = chatgptFocusFixture(); change(f); await assert.rejects(focusNativeChatgpt(f.hypr, { readProcess: f.readProcess }), /one native ChatGPT main window/); assert.equal(f.calls.some(call => call[0] === "dispatch"), false);
+  }
+  for (const extra of [{ hidden: false, mapped: true }, { hidden: true, mapped: true }, { hidden: false, mapped: false }]) { const f = chatgptFocusFixture(); f.windows.push({ ...f.window, address: "0x456", ...extra }); await assert.rejects(nativeChatgptWindow(f.hypr, f.readProcess), /one native ChatGPT main window/); }
+});
+
+test("native ChatGPT PID reuse and workspace-policy revocation refuse before focus", async () => {
+  const f = chatgptFocusFixture(); let checks = 0;
+  await assert.rejects(focusNativeChatgpt(f.hypr, { readProcess: f.readProcess, assertCurrent: async () => { if (++checks === 2) f.process.startTicks = "98765"; } }), /changed before focus/);
+  assert.equal(f.calls.some(call => call[0] === "dispatch"), false);
+  const next = chatgptFocusFixture();
+  await assert.rejects(focusNativeChatgpt(next.hypr, { readProcess: next.readProcess, assertCurrent: async () => { throw Error("Selected workspace policy revoked"); } }), /workspace policy revoked/);
+  assert.equal(next.calls.length, 0);
+});
+
+test("native ChatGPT focus cannot upgrade wrong-window readback, process replacement or post-effect policy refusal", async () => {
+  const f = chatgptFocusFixture(); f.active(() => ({ pid: 123, address: "0x456" })); await assert.rejects(focusNativeChatgpt(f.hypr, { readProcess: f.readProcess }), /not verified after focus/);
+  const changed = chatgptFocusFixture(); changed.onDispatch(() => { changed.process.startTicks = "98765"; }); await assert.rejects(focusNativeChatgpt(changed.hypr, { readProcess: changed.readProcess }), /not verified after focus/);
+  const revoked = chatgptFocusFixture(); let checks = 0;
+  await assert.rejects(focusNativeChatgpt(revoked.hypr, { readProcess: revoked.readProcess, assertCurrent: async () => { if (++checks === 3) throw Error("Policy changed after effect"); } }), /Policy changed after effect/);
+  assert.equal(revoked.calls.filter(call => call[0] === "dispatch").length, 1);
+});
 
 test("portable profile migrates legacy plans, excludes environment connections, and rejects future versions", () => {
   const p = plan(); p.localBindings = { credential: "never-portable", path: "/private" };
