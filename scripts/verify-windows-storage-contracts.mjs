@@ -20,6 +20,7 @@ const suites = {
   "index-authority": "tools/layout-studio/task-index-inputs.test.mjs",
   "osv-source": "tools/layout-studio/osv-advisory-source.test.mjs",
   "osv-scanner": "tools/layout-studio/repository-shield-osv-source.test.mjs",
+  "pypi-scanner": "tools/layout-studio/repository-windows-shield-pypi.test.mjs",
   "ignored-tree-policy": "tools/layout-studio/ignored-tree-policy.test.mjs",
   "ignored-tree-authority": "tools/layout-studio/task-authority-ignored-trees.test.mjs",
   "ignored-tree-scanner": "tools/layout-studio/repository-shield-ignored-trees.test.mjs",
@@ -52,7 +53,7 @@ const suites = {
   "run-owner": "tools/layout-studio/windows-reviewed-runner.test.mjs"
 };
 const flags = process.argv.slice(2), suite = flags[1]?.startsWith("--suite=") ? flags[1].slice(8) : undefined;
-if (process.platform !== "win32" || flags.length !== 2 || flags[0] !== "--synthetic" || !Object.hasOwn(suites, suite)) throw Error("Use on Windows: node scripts/verify-windows-storage-contracts.mjs --synthetic --suite=shield-change|shield-codebase|shield-supply-chain|shield-release|shield-clean|inspect-cli|history-windows-scanner|history-bytes|history-staging|history-scanner|history-inputs|history-authority|index-inputs|index-bytes|index-staging|index-scanner|index-authority|osv-source|osv-scanner|ignored-tree-policy|ignored-tree-authority|ignored-tree-scanner|receipt-authority|receipt-authority-state|shield-exceptions|shield-exception-execution|shield-exception-ledger|ignored-authority|ignored-scanner|fixture-invalidation|validation-policy|shield-evidence|shield-policy|shield-recovery|pipeline-recovery|pipeline-policy|pipeline-evidence|fixture-removal|backend-contract|fixture-registry|fixture-maintenance|harness|leases|legacy-images|broker-owner|sandbox-native|sandbox-sessions|reviewed-run|run-owner. No disk, VM, account or keyboard is opened.");
+if (process.platform !== "win32" || flags.length !== 2 || flags[0] !== "--synthetic" || !Object.hasOwn(suites, suite)) throw Error("Use on Windows: node scripts/verify-windows-storage-contracts.mjs --synthetic --suite=shield-change|shield-codebase|shield-supply-chain|shield-release|shield-clean|inspect-cli|history-windows-scanner|history-bytes|history-staging|history-scanner|history-inputs|history-authority|index-inputs|index-bytes|index-staging|index-scanner|index-authority|osv-source|osv-scanner|pypi-scanner|ignored-tree-policy|ignored-tree-authority|ignored-tree-scanner|receipt-authority|receipt-authority-state|shield-exceptions|shield-exception-execution|shield-exception-ledger|ignored-authority|ignored-scanner|fixture-invalidation|validation-policy|shield-evidence|shield-policy|shield-recovery|pipeline-recovery|pipeline-policy|pipeline-evidence|fixture-removal|backend-contract|fixture-registry|fixture-maintenance|harness|leases|legacy-images|broker-owner|sandbox-native|sandbox-sessions|reviewed-run|run-owner. No disk, VM, account or keyboard is opened.");
 assertRequiredTestManifest();
 const groups = Object.hasOwn(windowsStorageScenarioSuites, suite) ? selectWindowsStorageScenario(suite, requiredGroups) : selectWindowsContractGroups([suites[suite]], requiredGroups);
 const result = await runVerification({ groups, outputDirectory: join(process.env.RUNNER_TEMP || tmpdir(), "switchyard-storage-contracts", suite) });

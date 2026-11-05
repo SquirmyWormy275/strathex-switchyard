@@ -14,6 +14,10 @@ concurrency:
 
 jobs:
   verify-native-filesystem:
+    strategy:
+      fail-fast: false
+      matrix:
+        lane: [filesystem, native-setup, restricted-exchange]
     runs-on: windows-2022
     timeout-minutes: 20
     env:
@@ -107,6 +111,7 @@ jobs:
           $proof | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath (Join-Path $env:RUNNER_TEMP 'switchyard-storage-broker-protocol-verification.json') -Encoding utf8
 
       - name: Verify actual NTFS private index bytes and parser refusals
+        if: matrix.lane == 'filesystem'
         shell: pwsh
         timeout-minutes: 4
         run: |
@@ -116,6 +121,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Actual native index packet staging failed; preserve its scoped receipt.' }
 
       - name: Verify actual NTFS private history bytes and parser refusals
+        if: matrix.lane == 'filesystem'
         shell: pwsh
         timeout-minutes: 4
         run: |
@@ -125,6 +131,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Actual native history packet staging failed; preserve its scoped receipt.' }
 
       - name: Verify the exact metadata broker service lifecycle
+        if: matrix.lane == 'filesystem'
         shell: pwsh
         timeout-minutes: 6
         run: |
@@ -136,6 +143,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'The exact protected metadata service did not complete; preserve its ownership evidence.' }
 
       - name: Verify native protected staging and scoped broker removal
+        if: matrix.lane == 'native-setup'
         shell: pwsh
         timeout-minutes: 6
         run: |
@@ -147,6 +155,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'The exact native setup did not settle; preserve its protected staging and original service evidence.' }
 
       - name: Verify bounded storage through a client without volume privilege
+        if: matrix.lane == 'restricted-exchange'
         shell: pwsh
         timeout-minutes: 6
         run: |
@@ -158,6 +167,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'The original bounded exchange remains unconfirmed; preserve its protected journal and image.' }
 
       - name: Verify actual native filesystems and guardians without opening a guest
+        if: matrix.lane == 'filesystem'
         shell: pwsh
         timeout-minutes: 5
         run: |
@@ -169,7 +179,7 @@ jobs:
           Remove-Item -LiteralPath (Split-Path -Parent $node) -Recurse -Force
 
       - name: Retain the bounded native acceptance receipt
-        if: always()
+        if: always() && matrix.lane == 'filesystem'
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: switchyard-windows-filesystem-${{ github.sha }}
@@ -178,7 +188,7 @@ jobs:
           retention-days: 7
 
       - name: Retain only the broker protocol proof
-        if: always()
+        if: always() && matrix.lane == 'filesystem'
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: switchyard-storage-broker-protocol-${{ github.sha }}
@@ -187,7 +197,7 @@ jobs:
           retention-days: 7
 
       - name: Retain only the standalone helper proof
-        if: always()
+        if: always() && matrix.lane == 'filesystem'
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: switchyard-windows-standalone-helper-${{ github.sha }}
@@ -196,7 +206,7 @@ jobs:
           retention-days: 7
 
       - name: Retain only the restricted-client bounded exchange receipt
-        if: always()
+        if: always() && matrix.lane == 'restricted-exchange'
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: switchyard-storage-broker-exchange-${{ github.sha }}
@@ -205,7 +215,7 @@ jobs:
           retention-days: 7
 
       - name: Retain only the native index packet receipt
-        if: always()
+        if: always() && matrix.lane == 'filesystem'
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: switchyard-windows-index-native-${{ github.sha }}
@@ -214,7 +224,7 @@ jobs:
           retention-days: 7
 
       - name: Retain only the native history packet receipt
-        if: always()
+        if: always() && matrix.lane == 'filesystem'
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: switchyard-windows-history-native-${{ github.sha }}
@@ -223,7 +233,7 @@ jobs:
           retention-days: 7
 
       - name: Retain only the scoped broker lifecycle receipt
-        if: always()
+        if: always() && matrix.lane == 'filesystem'
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: switchyard-storage-broker-bootstrap-${{ github.sha }}
@@ -232,7 +242,7 @@ jobs:
           retention-days: 7
 
       - name: Retain only the native setup preflight receipt
-        if: always()
+        if: always() && matrix.lane == 'native-setup'
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: switchyard-native-setup-${{ github.sha }}
@@ -241,7 +251,7 @@ jobs:
           retention-days: 7
 
       - name: Retain only the native setup lifecycle receipt
-        if: always()
+        if: always() && matrix.lane == 'native-setup'
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: switchyard-native-setup-lifecycle-${{ github.sha }}
@@ -255,7 +265,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        suite: [inspect-cli, history-windows-scanner, history-bytes, history-staging, history-scanner, history-inputs, history-authority, index-inputs, index-bytes, index-staging, index-scanner, index-authority, osv-source, osv-scanner, ignored-tree-policy, ignored-tree-authority, ignored-tree-scanner, receipt-authority, receipt-authority-state, shield-exceptions, shield-exception-execution, shield-exception-ledger, ignored-authority, ignored-scanner, fixture-invalidation, validation-policy, shield-evidence, shield-change, shield-codebase, shield-supply-chain, shield-release, shield-clean, shield-recovery, pipeline-recovery, pipeline-policy, pipeline-evidence, fixture-removal, backend-contract, fixture-registry, fixture-maintenance, harness, leases, legacy-images, broker-owner, sandbox-native, sandbox-sessions, reviewed-run, run-owner]
+        suite: [inspect-cli, history-windows-scanner, history-bytes, history-staging, history-scanner, history-inputs, history-authority, index-inputs, index-bytes, index-staging, index-scanner, index-authority, osv-source, osv-scanner, pypi-scanner, ignored-tree-policy, ignored-tree-authority, ignored-tree-scanner, receipt-authority, receipt-authority-state, shield-exceptions, shield-exception-execution, shield-exception-ledger, ignored-authority, ignored-scanner, fixture-invalidation, validation-policy, shield-evidence, shield-change, shield-codebase, shield-supply-chain, shield-release, shield-clean, shield-recovery, pipeline-recovery, pipeline-policy, pipeline-evidence, fixture-removal, backend-contract, fixture-registry, fixture-maintenance, harness, leases, legacy-images, broker-owner, sandbox-native, sandbox-sessions, reviewed-run, run-owner]
     env:
       npm_config_audit: "false"
       npm_config_fund: "false"

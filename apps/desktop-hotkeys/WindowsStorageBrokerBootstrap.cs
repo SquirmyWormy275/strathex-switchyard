@@ -6,9 +6,44 @@ using System.Security.Principal;
 [SupportedOSPlatform("windows")]
 internal static class WindowsStorageBrokerBootstrap
 {
+    // Private child exit diagnostics only. Every nonzero code remains an
+    // unconfirmed setup outcome; it never authorizes replay or broad cleanup.
+    private static int RemovalFailure(string phase) => phase switch
+    {
+        "administrator-manager" => 101,
+        "exchange-preflight" => 102,
+        "service-configuration" => 103,
+        "capture-native-process" => 104,
+        "stop-service" => 105,
+        "native-process-exit" => 106,
+        "exchange-after-exit" => 107,
+        "delete-service-configuration" => 108,
+        "delete-service" => 109,
+        "service-absence" => 110,
+        "service-absence-open" => 111,
+        "service-absence-configuration" => 112,
+        "service-absence-status" => 113,
+        "service-absence-delete-pending" => 114,
+        "service-absence-wait" => 115,
+        "protected-inventory" => 116,
+        "installation-readback" => 117,
+        "retired-journal-removal" => 118,
+        "runtime-removal" => 119,
+        "known-file-removal" => 120,
+        "root-removal" => 121,
+        "service-absence-configuration-required-size" => 122,
+        "service-absence-query-configuration-read" => 123,
+        "service-absence-configuration-returned-size" => 124,
+        "service-absence-configuration-header" => 125,
+        "service-absence-configuration-tag" => 126,
+        "service-absence-environment" => 127,
+        "service-absence-query-configuration-size" => 128,
+        _ when phase.StartsWith("service-absence-configuration-",StringComparison.Ordinal) => 129,
+        _ => 199
+    };
     internal static int Run(string[] arguments)
     {
-        bool attempted=false;
+        bool attempted=false;int failure=3;
         try
         {
             if(arguments.Length!=5||arguments[0] is not ("install-bootstrap" or "remove-bootstrap"))return 2;
@@ -22,8 +57,8 @@ internal static class WindowsStorageBrokerBootstrap
                 if(sourceSha!=brokerSha)return 2;attempted=true;var settings=WindowsStorageBrokerControl.Install(sid,id,sourceSha);return WindowsStorageBrokerControl.IsRunning(settings)?0:3;
             }
             var original=WindowsStorageBrokerInstallation.Load(sid);if(original.InstallationId!=id||original.ServiceImageSha256!=brokerSha)return 2;
-            attempted=true;WindowsStorageBrokerControl.Remove(original);return 0;
+            attempted=true;WindowsStorageBrokerControl.Remove(original, phase => failure=RemovalFailure(phase));return 0;
         }
-        catch{return attempted?3:2;}
+        catch{return attempted?failure:2;}
     }
 }

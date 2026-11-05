@@ -286,3 +286,22 @@ was the low bits of a managed exception HRESULT, not a Win32 API error. The proo
 now distinguishes those codes and names each finite token check; it retains every
 restriction and the original child deadline. The ordinary-account and restricted
 primary-process acceptances remain unproven.
+
+Native CI now assigns filesystem, native setup lifecycle and restricted exchange
+proofs to three independent workers. Each keeps its original per-command and
+20-minute worker bounds; all lanes remain required. The previous repeated native
+setup-removal failures remain failures, with original service/staging ownership
+preserved. They can no longer suppress the restricted-primary-token check.
+Windows Python scanner contracts also receive their own worker. The runner and
+workflow inventory regression passes 21 checks in two independently exited groups
+(`isolated-test-59c30a1e-da6b-48b4-b820-d5393fcd4dc4.json`).
+
+Native setup keeps its closed stdout schema and emits only a fixed failure phase
+and managed child exit code on stderr. Private managed removal failures use
+101–129/199 to identify the existing control stages; every nonzero code remains
+an unconfirmed outcome, with no replay or broad cleanup. Both managed targets
+build warning-free and the portable proof passes all 223 checks with scratch
+removed (`windows-history-native-build-1793885463455.json`). The C++ compile and
+actual native retirement/restricted-process reruns remain unaccepted. This is
+unfinished validation on available CI infrastructure, not a missing account or
+physical device.

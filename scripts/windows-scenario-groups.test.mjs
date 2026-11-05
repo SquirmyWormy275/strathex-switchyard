@@ -41,3 +41,25 @@ test("partial, duplicated, broadened or undeclared contract selections cannot si
   assert.throws(() => windowsScenarioGroups("unknown.test.mjs"));
   assert.throws(() => selectWindowsContractGroups(["ordinary.test.mjs"], [{ file: "ordinary.test.mjs", pattern: "partial" }]));
 });
+
+test("native filesystem, setup and restricted exchange CI lanes preserve every original proof on independent workers", async () => {
+  const workflow = await readFile(new URL("../.github/workflows/switchyard-windows-filesystem.yml", import.meta.url), "utf8");
+  const native = workflow.slice(workflow.indexOf("  verify-native-filesystem:"), workflow.indexOf("  verify-storage-contracts:"));
+  assert.match(native, /lane: \[filesystem, native-setup, restricted-exchange\]/);
+  assert.match(native, /fail-fast: false/);
+  for (const [name, lane] of [
+    ["Verify actual NTFS private index bytes and parser refusals", "filesystem"],
+    ["Verify actual NTFS private history bytes and parser refusals", "filesystem"],
+    ["Verify the exact metadata broker service lifecycle", "filesystem"],
+    ["Verify native protected staging and scoped broker removal", "native-setup"],
+    ["Verify bounded storage through a client without volume privilege", "restricted-exchange"],
+    ["Verify actual native filesystems and guardians without opening a guest", "filesystem"]
+  ]) assert.ok(native.includes(`- name: ${name}\n        if: matrix.lane == '${lane}'\n`));
+  const uploads = [...native.matchAll(/- name: (Retain[^\n]+)\n        if: always\(\) && matrix\.lane == '(filesystem|native-setup|restricted-exchange)'/g)];
+  assert.equal(uploads.length, 9); assert.equal(new Set(uploads.map(row => row[1])).size, 9);
+  assert.match(native, /timeout-minutes: 20/); assert.match(native, /--exchange/);
+  assert.match(workflow, /osv-scanner, pypi-scanner,/);
+  const source = await readFile(new URL("./verify-windows-storage-contracts.mjs", import.meta.url), "utf8");
+  assert.match(source, /"pypi-scanner": "tools\/layout-studio\/repository-windows-shield-pypi\.test\.mjs"/);
+  assert.equal(selectWindowsContractGroups(["tools/layout-studio/repository-windows-shield-pypi.test.mjs"], requiredGroups).length, 1);
+});

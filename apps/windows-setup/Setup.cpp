@@ -17,6 +17,8 @@
 #endif
 
 namespace {
+const char* failurePhase = "native-preflight";
+DWORD managedExitCode = MAXDWORD;
 [[noreturn]] void fail() { throw std::runtime_error("scoped-setup-unconfirmed"); }
 void require(bool value) { if (!value) fail(); }
 std::string ascii(const std::wstring& value) {std::string result;for(wchar_t c:value){require(c<=127);result.push_back(static_cast<char>(c));}return result;}
@@ -104,13 +106,14 @@ DWORD install(HANDLE source,const std::wstring& action,const std::wstring& sid,c
     // The stage name contains only already-validated identity metadata. No
     // caller-selected destination or program path is accepted.
     std::wstring root=programFiles()+L"\\Switchyard.Setup-"+sid+L"-"+id,helper=root+L"\\Switchyard.Hotkeys.exe",cache=root+L"\\runtime";
-    auto parents=pinParents(root);privateDirectory(root);Handle rootPin=pin(root,true);privateDirectory(cache);Handle cachePin=pin(cache,true);
+    failurePhase="protected-stage";auto parents=pinParents(root);privateDirectory(root);Handle rootPin=pin(root,true);privateDirectory(cache);Handle cachePin=pin(cache,true);
     std::string expected=ascii(digest);copyProtected(source,helper,expected);Handle helperPin=pin(helper,false);require(hash(helperPin.value)==expected);
-    DWORD code=managed(helper,action,sid,id,digest,brokerDigest,cache);require(code==0);require(hash(helperPin.value)==expected);helperPin.reset();
+    failurePhase="managed-command";DWORD code=managed(helper,action,sid,id,digest,brokerDigest,cache);managedExitCode=code;require(code==0);failurePhase="helper-readback";require(hash(helperPin.value)==expected);helperPin.reset();
     // Never recurse over runtime or installation state. Unknown files and every
     // failed/uncertain effect remain for exact privileged reconciliation.
-    require(DeleteFileW(helper.c_str()));cachePin.reset();require(RemoveDirectoryW(cache.c_str()));rootPin.reset();require(RemoveDirectoryW(root.c_str()));return 0;
+    failurePhase="stage-helper-removal";require(DeleteFileW(helper.c_str()));cachePin.reset();failurePhase="stage-cache-removal";require(RemoveDirectoryW(cache.c_str()));rootPin.reset();failurePhase="stage-root-removal";require(RemoveDirectoryW(root.c_str()));return 0;
 }
+void diagnostic() {std::string json=std::string("{\"schema\":\"switchyard-native-setup-diagnostic/v1\",\"phase\":\"")+failurePhase+"\",\"managedExitCode\":"+(managedExitCode==MAXDWORD?"null":std::to_string(managedExitCode))+"}\n";DWORD written=0;WriteFile(GetStdHandle(STD_ERROR_HANDLE),json.data(),static_cast<DWORD>(json.size()),&written,nullptr);}
 void result(const char* status,bool started) {std::string json=std::string("{\"schema\":\"switchyard-windows-native-setup/v1\",\"status\":\"")+status+"\",\"effectStarted\":"+(started?"true":"false")+"}\n";DWORD written=0;WriteFile(GetStdHandle(STD_OUTPUT_HANDLE),json.data(),static_cast<DWORD>(json.size()),&written,nullptr);}
 }
 int wmain(int count,wchar_t** arguments) {
@@ -127,5 +130,5 @@ int wmain(int count,wchar_t** arguments) {
             started=true;Handle child(execute.hProcess);require(child.valid()&&WaitForSingleObject(child.value,INFINITE)==WAIT_OBJECT_0);DWORD code=3;require(GetExitCodeProcess(child.value,&code));if(code!=0)fail();
         } else {started=true;install(source.value,action,sid,id,digest,brokerDigest);}
         result("completed",true);return 0;
-    } catch(...) {result(started?"outcome-unconfirmed":"unavailable",started);return started?3:2;}
+    } catch(...) {diagnostic();result(started?"outcome-unconfirmed":"unavailable",started);return started?3:2;}
 }
