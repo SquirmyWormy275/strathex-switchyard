@@ -297,7 +297,7 @@ test("observation and voice expose explicit sources, pause/restart recovery, del
 
 test("Codex design binds an exact returned session, rejects unsafe outputs and never switches providers", () => fixture(async ({ store, root }) => {
   await store.initialize("personal"); await store.initialize("work", "work");
-  await store.update("personal", "mode-select", (s) => { s.mode = "personal-companion"; });
+  await store.update("personal", "mode-select", (s) => { s.mode = "personal-companion"; s.observations = [{ id: "design-observation", status: "recording", sources: ["agent-events"], exclusions: [], events: [], updatedAt: Date.now() }]; });
   const calls = [];
   const fake = new EventEmitter(); fake.closed = false; fake.nativeVersion = "0.166.0"; fake.accountFingerprint = "a".repeat(64); fake.recheckAccount = async () => fake.accountFingerprint; fake.restrictionsVerified = true; fake.initialize = async () => {}; fake.close = () => { fake.closed = true; };
   fake.request = async (method, params) => {
@@ -322,10 +322,14 @@ test("Codex design binds an exact returned session, rejects unsafe outputs and n
     assert.equal(calls.find((c) => c.method === "turn/start").params.sandboxPolicy.type, "readOnly");
     assert.equal((await store.snapshot("personal")).conversations[0].sessionId, "synthetic-thread");
     assert.equal((await store.snapshot("personal")).conversations[0].accountFingerprint, "a".repeat(64));
+    const observed = (await store.snapshot("personal")).observations[0].events;
+    assert.deepEqual(observed.map(e => e.phase), ["design-request-reserved", "design-reply-recorded"]); assert.ok(observed.every(e => e.provenance === "switchyard-local-lifecycle" && e.taskCompletionVerified === false));
+    for (const value of ["Improve the review routine", "A synthetic response", response.sessionId, response.conversationId, "a".repeat(64)]) assert.equal(JSON.stringify(observed).includes(value), false);
     const count = calls.length, previousProposal = (await store.snapshot("personal")).conversations[0].proposal;
     fake.accountFingerprint = "b".repeat(64);
     await assert.rejects(agents.design({ compartment: "personal", provider: "codex", message: "Do not route previous context to this changed login", plan: samplePlan(), conversationId: response.conversationId }), /verified binding/);
     assert.equal(calls.length, count); assert.deepEqual((await store.snapshot("personal")).conversations[0].proposal, previousProposal);
+    assert.deepEqual((await store.snapshot("personal")).observations[0].events.map(e => e.phase), ["design-request-reserved", "design-reply-recorded", "design-request-reserved", "design-request-failed"]);
     await store.update("personal", "synthetic-legacy", (s) => { delete s.conversations[0].accountFingerprint; });
     await assert.rejects(agents.resume("personal", response.conversationId), /legacy conversation/); assert.equal(calls.length, count);
   } finally { agents.close(); }

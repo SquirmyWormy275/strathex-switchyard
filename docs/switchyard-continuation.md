@@ -7,7 +7,7 @@ and [verification](verification.md) distinguishes exact source passes and failur
 
 Work in the existing `feat/switchyard-configuration-loop` checkout and keep
 [draft PR 20](https://github.com/SquirmyWormy275/strathex-switchyard/pull/20)
-updated. Latest published implementation is `2276ac29e7dcc3f9720e2b9490fccb1e678b58f8`; use Git to read the newest checkpoint.
+updated. Latest published implementation is `ea5a0f71b8ade5551aa42d23e8eb06d8cca399d4`; use Git to read the newest checkpoint.
 This checkpoint adds the F77 source protocol audit, omits redundant backend
 HTML/CSS while preserving the frozen frontend, and records newer installed
 metadata evidence. Keep commits on GitHub regularly; do not merge or release.
@@ -37,7 +37,7 @@ existing versioned update and launcher path; do not print its private access URL
 or token. Private verification receipts live outside Git under
 `~/.local/state/strathex-switchyard/runtime-verification/`.
 
-- Normal installed source `2276ac2`, release `f325bc4627b2d9f5de699179414724d69cffddb600a0154b457a0abdaa9d3abd`,
+- Normal installed source `ea5a0f7`, release `7096e4c8e00128ad732937d1e4c5f3b1acc3b3db15b578738d84b27bb550d824`,
   passes six update/seven metadata/privacy checks, including all 54 saved
   workspace identities. Selected sealed state and frozen frontend are preserved,
   with zero provider requests, prompts, new workspaces or HID. Owned bundle and
@@ -82,13 +82,18 @@ or token. Private verification receipts live outside Git under
 
 ## Next executable tasks
 
-1. First-party coding-task lifecycle observation now passes 85 focused checks
-   with explicit local/native provenance and metadata-only source/exclusion/pause
-   fences. Run its gated installed empty-native-task demonstration, verify exact
-   native exit, retire only its owned fixture data, and preserve fresh mode
-   fences. No model prompt or new workspace is needed. Then run the complete
-   immutable 233-group source checkpoint. The previous 232-group pass remains
-   source-bound; the new installed task demonstration remains pending.
+1. The gated installed observation demonstration now passes four actual native
+   checks at `ea5a0f7` after six update/seven metadata checks. One empty Codex task,
+   zero model prompts/new workspaces/HID; retained native metadata process exit,
+   exact proof data/staging removal and definition/selection/frontend restoration
+   verify. Owned bundle/checkout are removed; fresh mode fences remain. Publish
+   this evidence while the complete immutable 233-group `ea5a0f7` run remains
+   active. Its marker is `/tmp/switchyard-broker-full-linux-path.json`; inspect
+   that run before starting another. Configuration request/reply/failure metadata
+   additionally passes 39 software checks with provider doubles and no new model
+   request. Continue broader runtime/external event and exact IDE attachment
+   implementation independently; normal installation of these later hooks is
+   separate from the accepted `ea5a0f7` native task demonstration.
 2. Collect the corrected native Windows token-width run and independent journal
    workers. Verify archive digests/source/merge identities before accepting any
    result. Recent superseded pending runs are cancelled, not passing. Continue

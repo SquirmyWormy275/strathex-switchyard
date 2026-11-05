@@ -1,5 +1,6 @@
 /** Concrete, tool-restricted design adapters. Account state stays with installed CLIs. */
 import { spawn } from "node:child_process";
+import { appendAgentObservation } from "./agent-observation.mjs";
 import { EventEmitter } from "node:events";
 import { deniedCodexServerRequest } from "./codex-requests.mjs";
 import { runRestrictedCodexTurn } from "./codex-turn.mjs";
@@ -130,6 +131,7 @@ export class CodexClient extends EventEmitter {
 }
 
 export function createAgentService({ store, runtimeRoot, codexFactory = (exe, cwd, names) => new CodexClient(exe, cwd, names), resolveCli = trustedCli, resolveMcp = readCodexMcpNames, stopChild = stopOwnedChild, readClaudeLogin = readClaudeDesignLogin, command = runRuntimeCommand, guardianStopped = runtimeGuardianStopped, now = () => Date.now() } = {}) {
+  const observeDesign = (state, provider, id, phase) => appendAgentObservation(state, { provider, subjectId: "design-conversation:" + id, phase, status: "unknown", at: now() });
   const busy = new Set(), clients = new Map(), connecting = new Map(), running = new Map(), generations = new Map(), probes = new Map(), unconfirmed = new Map(), auxiliaryChildren = new Map();
   let closed = false;
   const confirmStop = async (child) => { try { return typeof child?.stop === "function" ? await child.stop() === true : (await stopChild(child)).stopped === true; } catch { return false; } };
@@ -263,7 +265,7 @@ export function createAgentService({ store, runtimeRoot, codexFactory = (exe, cw
       busy.add(key);
       let sessionId = conversation?.sessionId ?? null, accountFingerprint = conversation?.accountFingerprint ?? null, ownedRuntime = null;
       try {
-        await store.update(compartment, "design-draft", (s) => { currentGeneration(compartment, generation); s.conversations = [...s.conversations.filter((c) => c.id !== id), { ...conversation, id, provider, sessionId: conversation?.sessionId ?? null, updatedAt: Date.now(), messages: [...(conversation?.messages ?? []), { role: "user", text: message }].slice(-40), status: "pending" }]; }, { provider });
+        await store.update(compartment, "design-draft", (s) => { currentGeneration(compartment, generation); s.conversations = [...s.conversations.filter((c) => c.id !== id), { ...conversation, id, provider, sessionId: conversation?.sessionId ?? null, updatedAt: Date.now(), messages: [...(conversation?.messages ?? []), { role: "user", text: message }].slice(-40), status: "pending" }]; observeDesign(s, provider, id, "design-request-reserved"); }, { provider });
         currentGeneration(compartment, generation);
         let response;
         if (provider === "codex") {
@@ -322,12 +324,12 @@ export function createAgentService({ store, runtimeRoot, codexFactory = (exe, cw
         } else throw new Error("This provider does not offer a configured design route. No fallback provider was selected.");
         const reviewed = validateDesignResponse(response, plan);
         const saved = { id, provider, sessionId, accountFingerprint, ...(ownedRuntime ? { ownedRuntime, ownedRuntimeStoppedVerified: true } : {}), updatedAt: Date.now(), messages: [...(conversation?.messages ?? []), { role: "user", text: message }, { role: "assistant", text: reviewed.reply }].slice(-40), proposal: reviewed.proposal, workflow: reviewed.workflow };
-        await store.update(compartment, "design-conversation", (s) => { currentGeneration(compartment, generation); s.conversations = [...s.conversations.filter((c) => c.id !== id), saved]; }, { provider });
+        await store.update(compartment, "design-conversation", (s) => { currentGeneration(compartment, generation); s.conversations = [...s.conversations.filter((c) => c.id !== id), saved]; observeDesign(s, provider, id, "design-reply-recorded"); }, { provider });
         return { ...reviewed, conversationId: id, sessionId, provider, ...(ownedRuntime ? { ownedRuntime, ownedRuntimeStoppedVerified: true } : {}), provenance: "provider-returned exact session; design output independently validated" };
       } catch (error) {
         const uncertain = provider === "codex" && error.stopVerified === false ? clients.get(compartment)?.child : null;
         retainUnconfirmed(compartment, uncertain);
-        await store.update(compartment, "design-failure", (s) => { const c = s.conversations.find((c) => c.id === id); if (c) { c.status = "failed"; c.updatedAt = Date.now(); } }).catch(() => {});
+        await store.update(compartment, "design-failure", (s) => { const c = s.conversations.find((c) => c.id === id); if (c) { c.status = "failed"; c.updatedAt = Date.now(); observeDesign(s, provider, id, "design-request-failed"); } }).catch(() => {});
         throw error;
       } finally { const active = running.get(key); const owned = [...(active?.resource?.clients ?? []), ...(active?.child ? [active.child] : [])]; for (const client of owned) if (!(await confirmStop(client))) retainUnconfirmed(compartment, client); busy.delete(key); running.delete(key); }
     },

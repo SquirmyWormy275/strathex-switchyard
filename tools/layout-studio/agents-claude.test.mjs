@@ -43,16 +43,21 @@ async function fixture(fn) {
   finally { settings.guardianVerified = true; await agents.close(); for (const child of children) await stopOwnedChild(child); await rm(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 50 }); }
 }
 test("native Claude design verifies first-party login, exact resume and stable account scope without inheriting provider keys", () => fixture(async ({ store, agents, settings, calls, design }) => {
+  await store.update("personal", "synthetic-observation", s => { s.observations = [{ id: "design-observation", status: "recording", sources: ["agent-events"], exclusions: [], events: [], updatedAt: Date.now() }]; });
   await assert.rejects(agents.design({ compartment: "company", provider: "claude-code", message: "Denied", plan: plan() }), /prohibited/); assert.equal(calls.length, 0);
   const first = await design(), saved = (await store.snapshot("personal")).conversations[0];
   assert.equal(saved.accountFingerprint, claudeAccount(settings.login)); assert.equal(saved.sessionId, first.sessionId);
   const second = await design(first.conversationId); assert.equal(second.sessionId, first.sessionId);
+  const observed = (await store.snapshot("personal")).observations[0].events;
+  assert.deepEqual(observed.map(e => e.phase), ["design-request-reserved", "design-reply-recorded", "design-request-reserved", "design-reply-recorded"]); assert.ok(observed.every(e => e.provider === "claude-code" && e.provenance === "switchyard-local-lifecycle" && e.taskCompletionVerified === false));
+  for (const value of ["Synthetic text only", response.reply, first.sessionId, first.conversationId, claudeAccount(settings.login)]) assert.equal(JSON.stringify(observed).includes(value), false);
   const submits = calls.filter((c) => c.args.includes("-p")); assert.equal(submits.length, 2); assert.ok(submits[1].args.includes("--resume"));
   for (const { args, options } of calls) { assert.equal(options.shell, false); assert.equal(options.env.ANTHROPIC_API_KEY, undefined); assert.equal(options.env.ANTHROPIC_BASE_URL, undefined); if (args.includes("-p")) { assert.equal(args[args.indexOf("--tools") + 1], ""); assert.ok(args.includes("--strict-mcp-config")); } }
   const original = structuredClone((await store.snapshot("personal")).conversations[0].proposal);
   settings.login.email = "changed@example.invalid";
   await assert.rejects(design(first.conversationId), /verified binding/); await assert.rejects(agents.resume("personal", first.conversationId), /account changed/);
   assert.equal(calls.filter((c) => c.args.includes("-p")).length, 2); assert.deepEqual((await store.snapshot("personal")).conversations[0].proposal, original);
+  assert.deepEqual((await store.snapshot("personal")).observations[0].events.slice(-2).map(e => e.phase), ["design-request-reserved", "design-request-failed"]);
 }));
 test("a changed post-turn account or unexpected native session cannot retain an assistant reply or reroute its original identity", () => fixture(async ({ store, settings, calls, design }) => {
   settings.wrongSession = true; await assert.rejects(design(), /different native session/);

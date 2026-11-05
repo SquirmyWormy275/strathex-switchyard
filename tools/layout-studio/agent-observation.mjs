@@ -2,7 +2,7 @@
 import { createHash } from "node:crypto";
 
 const providers = new Set(["codex", "claude-code", "custom-agent"]);
-const phases = new Set(["request-reserved", "identity-bound", "outcome-unconfirmed", "status-observed", "read-only-resume-observed", "owned-stop-observed", "adapter-status-observed"]);
+const phases = new Set(["request-reserved", "identity-bound", "outcome-unconfirmed", "status-observed", "read-only-resume-observed", "owned-stop-observed", "adapter-status-observed", "design-request-reserved", "design-reply-recorded", "design-request-failed"]);
 const statuses = new Set(["active", "idle", "waiting-on-approval", "not-observed", "unreachable", "unknown", "waiting-for-input", "running", "stopped", "done", "error", "failed", "ready", "busy", "waiting", "blocked", "reserved-locally", "provider-turn-finished"]);
 
 export function appendAgentObservation(state, { provider, subjectId, phase, status, at }) {
