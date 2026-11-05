@@ -27,7 +27,8 @@ at `a1e71b0`. The subsequent preparation-race correction passes 73 checks and
 type checking: duplicate calls are fenced before native identity, retired
 capabilities fail before I/O, and a failed pre-effect read releases its unused
 host lease. Native CI is required for that correction. The complete 166-group
-Linux lane is still running at immutable `a1e71b0` with short owned fixtures.
+Linux lane at immutable `a1e71b0` now passes, with the separate race correction
+covered by its 73 focused checks.
 
 ## Accepted native storage
 
@@ -40,17 +41,25 @@ Actual data writes, kernel exhaustion, five mount mutation denials, substituted
 mapping refusal, detach, retirement and independent native exit pass. Earlier
 failed access/removal receipts remain failed.
 
-The newer native JavaScript-owner proof at `b0f29ae` schedules eight checks against
-the same real service/helper: exact task/input mapping, mounted write/readback,
+The native JavaScript-owner proof at `b0f29ae` passes all eight checks against
+the real service/helper: exact task/input mapping, mounted write/readback,
 consumer lease, guest-exit refusal, retirement, replay refusal and native exits.
-Its Windows workflow is running; artifacts are not imported yet. It uses an
-administrative worker token, creates no account and launches no guest or setup.
-A complete native application/guest journey and interactive UAC remain unaccepted.
+Its artifact digest verified; `windows-broker-owner-b0f-native.json` retained.
+It uses an administrative worker token, creates no account and launches no guest
+or setup. The separate 31-check restricted-token proof passes again.
+
+That workflow still fails its later portable contract batch: the timeout inventory
+missed the new owner group, and the enlarged serial batch reached six minutes.
+`windows-storage-contracts-b0f-failed.json` preserves that failure. The timeout
+inventory is corrected and the eight complete contract files now use independent
+Windows jobs with their original isolated per-file bounds. No assertion or
+production deadline changed. Native rerun is pending. A complete native
+application/guest journey and interactive UAC remain unaccepted.
 
 ## Installed Linux and F77
 
-The normal installed application at `3e346c1`, release
-`a68b9876984a82483566d320b98d48c03e496df1a37c1131766bc7fbb160fb4a`,
+The normal installed application at `e1a1f30`, release
+`ed5b058f76ad93ab75dc3e3ebd787291de27b6b1b4165fa0db30d9b9ede59143`,
 passes six update checks and five F77 API checks. Linux uses the pinned runtime's
 existing `hidraw` backend: exact FF60/61 configuration discovery, VIA 9 / Vial 4,
 three 8 × 11 layers and the complete pinned source definition match. Keymap and
@@ -58,14 +67,14 @@ macro hashes match the independent 90-query guarded capture. Case identity,
 ordinary typing, hotplug and physical writes are separate unaccepted checks.
 No unlock, configuration write, flash, reset or electrical command was sent.
 
-Receipts `assignment-legends-1793842045992.json` and
-`installed-f77-readout-1793842177742.json` are retained. Definitions, selection,
+Receipts `assignment-legends-1793843467065.json` and
+`installed-f77-readout-1793843529512.json` are retained. Definitions, selection,
 modes, private endpoint and exact frozen Home were preserved; HID transports
 exited and temporary bundle/checkout were removed. The frontend stays frozen.
 
-The last accepted complete Linux checkpoint, `f8591fe`, passes 165/165 groups:
-1,083 tests, 1,073 passed, ten declared skips. Receipt
-`06f341a4-bc1a-4729-8628-5df92ec427be` retained, every child cleanup verified,
+The last accepted complete Linux checkpoint, `a1e71b0`, passes 166/166 groups:
+1,101 tests, 1,091 passed, ten declared skips. Receipt
+`f2749065-cd67-4d3e-9a10-c78b86b901c6` retained, every child cleanup verified,
 owned fixtures and checkout removed. Installed Run and pipeline demonstrations
 at their earlier exact sources remain recorded in [verification](verification.md).
 
@@ -87,10 +96,9 @@ is authorized by these checkpoints.
 
 ## Continuation
 
-Import the bounded native-owner receipt after its workflow finishes, reconcile
-the complete Linux result and publish its exact counts. Verify the preparation
-race correction on native Windows. Update the normal Linux backend with a clean
-reviewable bundle and verify the frozen Home/private state again. Continue the
+Verify the preparation race correction and separated contract jobs on native
+Windows. The latest normal Linux backend, full Linux checkpoint and native owner
+receipt are now recorded above. Continue the
 independently executable backend requirements above. Keep small source/JSON
 evidence locally, remove successful scratch and publish GitHub checkpoints.
 

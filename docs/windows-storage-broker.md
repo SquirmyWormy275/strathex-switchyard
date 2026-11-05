@@ -144,5 +144,8 @@ exit refusal, original detach/retire and duplicate refusal. All retained Job
 guardians must independently exit before its private fixture is removed. Its
 worker token remains administrative; the separate 31-case proof establishes
 the ordinary restricted-client boundary. Failure preserves the original
-installation and AEAD ownership facts. This new owner proof is pending CI and
-launches no guest, account, setup dialogue or physical-device operation.
+installation and AEAD ownership facts. The eight-check owner proof now passes at `b0f29ae`; its archive digest
+verified and bounded receipt retained. It launches no guest, account, setup
+dialogue or physical-device operation. The later combined contract batch failed
+its Windows-only inventory check and six-minute limit; complete workflow
+acceptance remains pending the corrected, independently bounded contract jobs.
