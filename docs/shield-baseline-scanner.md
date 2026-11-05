@@ -75,7 +75,11 @@ engine identity and a `packages` array. Each entry specifies `ecosystem: "npm"`,
 literal `name`, exact `version` and `advisories` containing only `id`/`severity`.
 An empty advisory list establishes only that feed's explicit observation of that
 exact package version. An absent package/version is a gap, never "no known issues."
-There is no unreviewed online lookup or version-range interpretation.
+The offline scanner performs no online lookup or version-range interpretation. A
+separate [bounded public OSV collector](osv-advisory-source.md) can prepare exact
+stable-version data, with independent supported-range validation and full
+pagination, for separate signing/review. Unknown severity remains a failed
+vulnerability plus an explicit unassessed-severity gap.
 
 Supply-chain scanning reads npm lockfile versions 2/3, including nested package
 locations, and returns a typed inventory with locked versions, license metadata

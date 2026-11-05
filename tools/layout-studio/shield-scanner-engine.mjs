@@ -82,7 +82,7 @@ function parseAdvisories(bytes) {
     exact(p, ["ecosystem", "name", "version", "advisories"]);
     if (p.ecosystem !== "npm" || typeof p.name !== "string" || !/^(?:@[a-z0-9._-]+\/)?[a-z0-9._-]{1,128}$/.test(p.name) || typeof p.version !== "string" || !/^\d+\.\d+\.\d+(?:-[A-Za-z0-9.-]+)?(?:\+[A-Za-z0-9.-]+)?$/.test(p.version)) throw Error("Unsupported advisory package identity.");
     const key = `${p.name}@${p.version}`; if (keys.has(key)) throw Error("Duplicate advisory package."); keys.add(key);
-    const advisories = array(p.advisories, 32).map(a => { exact(a, ["id", "severity"]); identifier(a.id); if (!["low", "medium", "high", "critical"].includes(a.severity)) throw Error("Invalid advisory severity."); return { id: a.id, severity: a.severity }; });
+    const advisories = array(p.advisories, 32).map(a => { exact(a, ["id", "severity"]); identifier(a.id); if (!["low", "medium", "high", "critical", "unknown"].includes(a.severity)) throw Error("Invalid advisory severity."); return { id: a.id, severity: a.severity }; });
     if (new Set(advisories.map(a => a.id)).size !== advisories.length) throw Error("Duplicate advisory.");
     return { name: p.name, version: p.version, advisories };
   });
@@ -135,6 +135,7 @@ export async function scanShieldInputs(proposed, { readInput }) {
         components.push(component);
         const known = advisory.find(a => a.name === name && a.version === p.version);
         if (!known) gaps.add("advisory_package_coverage");
+        if (known?.advisories.some(advisory => advisory.severity === "unknown")) gaps.add("advisory_severity_unassessed");
         for (const a of known?.advisories ?? []) add({ ruleId: a.id, dimension: "vulnerabilities", severity: a.severity, path: file.path, line: null, fingerprint: sha(`${a.id}\0${file.sha256}\0${location}\0${p.version}`) });
         if (!component.license) gaps.add("license_metadata");
         else if (!policy.allowedLicenses.length) gaps.add("license_policy");

@@ -85,12 +85,13 @@ uncertain outcomes remain unchanged. Provider replies do not establish coding-ta
 These checks do not prove a finished keyboard/agent appliance. General coding-task
 controls, physical role shortcut selection in the frontend, platform lifecycle acceptance, profile-library visual acceptance,
 expanded device editing controls, complete device settings and final UI acceptance remain unfinished.
-The complete Linux runner checkpoint at `18e6185` passes 192 groups: 1,187 tests passed and
-ten declared platform skips. Windows filesystem CI passes all 30 native checks,
-including bounded volume disk-full, exact detach and mapping admission. The full
+The complete Linux runner checkpoint at `3cb0897` passes 200 groups: 1,197 tests passed and
+ten declared platform skips. Earlier Windows filesystem CI passes all 30 native checks,
+including bounded volume disk-full, exact detach and mapping admission. An earlier full
 Windows worker/runtime checkpoint passes 261 groups: 1,690 tests passed and 48
-declared skips. The newer Studio Windows Run and separate stop approval pass
-all four native Windows policy jobs with an explicit guest runner double. Linux
+declared skips. Studio Windows Run and separate stop approval have native host contract proofs
+with an explicit guest runner double. [Current Windows results](docs/evidence/windows6a-validation-summary.json)
+retain newer service-removal and group-timeout failures separately. Linux
 also connects separately reviewed local-gate and clean-reproduction recipes to
 the isolated runner and authenticated evidence. An explicit [bounded build workspace](docs/bounded-build-workspace.md)
 lets reviewed recipes build in a disposable writable copy while preserving the live repository;
@@ -102,7 +103,8 @@ connects operator-reviewed public trust and exact feed metadata to these pipelin
 results when that policy changes and checks the policy again inside receipt commit.
 Linux [Shield baseline scans](docs/shield-baseline-scanner.md) run pinned code and signed
 rule/advisory data with explicit findings and coverage gaps. The [development SBOM example](docs/evidence/README.md)
-shows standard CycloneDX output and its limits. A [task-bound input preview](docs/scanner-input-inventory.md)
+shows standard CycloneDX output and its limits. The [public OSV collector](docs/osv-advisory-source.md)
+produces unsigned exact-version advisory data for separate signing and review. A [task-bound input preview](docs/scanner-input-inventory.md)
 identifies relevant ignored names and groups build trees before a separate exact
 scan review; its metadata remains incomplete and grants no authority. The [Windows scanner path](docs/windows-shield.md)
 uses the same pinned engine through reviewed guest execution; its tests double the guest.

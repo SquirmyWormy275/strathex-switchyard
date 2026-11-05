@@ -186,15 +186,26 @@ Linux/Windows-guest-double execution cases pass; ten surrounding input checks,
 thirty-one authority/runner/package cases and type checking pass. Normal installed `03710e9` passes six update/eighteen real checks; native Windows
 policy acceptance remains pending.
 
+The [OSV source collector](osv-advisory-source.md) now normalizes exact stable npm
+queries through a fixed bounded public transport, with full pagination, independent
+affected-version checks and public response hashes. Severity remains unassessed;
+matched vulnerabilities fail with an explicit gap. Five collector cases, two
+real-Linux/Windows-guest-double host journeys and surrounding package/attestation
+checks pass; the four-group isolated source subset passes 21 checks. The real
+CLI collects two public versions without source files or credentials; owned
+scratch is removed. New installed OSV acceptance remains pending.
+
 ## Complete and native checkpoints
 
-Immutable `18e6185` passes all 192 required Linux groups: 1,197 tests,
-1,187 passed and ten declared skips. Receipt
-`isolated-test-2ff9aeb6-bbc7-471c-9a6b-c50aea14fe8a.json` is retained with every
+Immutable `3cb0897` passes all 200 required Linux groups: 1,207 tests,
+1,197 passed and ten declared skips. Receipt
+`isolated-test-1d343e79-2220-4a01-85e4-2ff4a5f5cf78.json` is retained with every
 child cleanup verified; owned fixture parent and checkout are removed. It covers
 connected exceptions, receipt-time authority, cached source-only haptic facts and
-workspace lock inventory. The later metadata preview and scenario split are
-verified separately. Earlier `6a45643` passes 191 groups (1,182 passed/ten skips),
+workspace lock inventory, metadata preview and all eight independent Windows
+scenarios on the Linux host. Later generated-tree exclusions and OSV integration
+are verified separately. Earlier `18e6185` passes 192 groups (1,187 passed/ten
+skips), receipt `isolated-test-2ff9aeb6-bbc7-471c-9a6b-c50aea14fe8a.json`. Earlier `6a45643` passes 191 groups (1,182 passed/ten skips),
 receipt `isolated-test-b0474209-3e04-4603-8ef6-441f439fb5d6.json`.
 The later workspace inventory separately passes fourteen checks in two isolated
 groups (`isolated-test-54ad40b5-a325-4130-9d63-93d5e307d1d6.json`), with child cleanup. Earlier `ace2d22` passes
