@@ -6,6 +6,15 @@ import { userInfo } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { privateDirectory } from "./private-fs.mjs";
+
+/** A closed line protocol avoids loading a JSON/module engine to acquire a lock. */
+export function windowsLockRequest({ path, parentPid, trace = false, nonBlocking = false }) {
+  if (typeof path !== "string" || !path || /[\0\r\n]/u.test(path) || Buffer.byteLength(path, "utf8") > 16384 || !Number.isInteger(parentPid) || parentPid < 1 || parentPid > 2147483647 || typeof trace !== "boolean" || typeof nonBlocking !== "boolean") throw new Error("The private lock request is invalid.");
+  // Reject lone surrogates instead of silently changing the named private path.
+  const bytes = Buffer.from(path, "utf8");
+  if (bytes.toString("utf8") !== path) throw new Error("The private lock path is not valid Unicode.");
+  return `SXSY-LOCK/1\t${parentPid}\t${trace ? 1 : 0}\t${nonBlocking ? 1 : 0}\t${bytes.toString("base64")}\n`;
+}
 export async function withStateLock(root, id, fn, { onProgress, nonBlocking = false } = {}) {
   if (!/^[a-z][a-z0-9-]{0,63}$/.test(id)) throw new Error("Private lock identity is invalid.");
   const directory = join(root, "locks"), path = join(directory, `${id}.lock`);
@@ -20,9 +29,10 @@ export async function withStateLock(root, id, fn, { onProgress, nonBlocking = fa
   let child;
   if (process.platform === "linux") child = spawn("/usr/bin/flock", ["--exclusive", ...(nonBlocking ? ["--nonblock"] : ["--timeout", "10"]), "--conflict-exit-code", "75", path, process.execPath, "-e", 'process.stdout.write("LOCKED\\n"); process.stdin.resume();'], { shell: false, stdio: ["pipe", "pipe", "ignore"] });
   else if (process.platform === "win32") {
+    const request = windowsLockRequest({ path, parentPid: process.pid, trace: Boolean(onProgress), nonBlocking });
     child = spawn(join(process.env.SystemRoot || "C:\\Windows", "System32/WindowsPowerShell/v1.0/powershell.exe"), ["-NoLogo", "-NoProfile", "-NonInteractive", "-File", fileURLToPath(new URL("./state-lock.ps1", import.meta.url))], { shell: false, windowsHide: true, stdio: ["pipe", "pipe", onProgress ? "pipe" : "ignore"] });
     if (onProgress) { let diagnostic = ""; child.stderr.on("data", (b) => { diagnostic = (diagnostic + b.toString()).slice(-1024); let end; while ((end = diagnostic.indexOf("\n")) >= 0) { const line = diagnostic.slice(0, end).trim(); diagnostic = diagnostic.slice(end + 1); if (["lease-entered", "lease-input-read", "lease-request-read", "lease-owner-found", "lease-held"].includes(line) || /^lease-error-[0-9]{1,5}$/.test(line)) onProgress(line); } }); }
-    child.stdin.write(JSON.stringify({ path, parentPid: process.pid, trace: Boolean(onProgress), nonBlocking }) + "\n");
+    child.stdin.write(request);
   } else throw new Error("This platform has no implemented private state lock. No state was changed.");
   onProgress?.("lease-spawned");
   let alive = true, resolveClosed;

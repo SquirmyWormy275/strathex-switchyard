@@ -6,9 +6,23 @@ import { mkdtemp, rm, symlink, readFile, readdir } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createSuiteStore } from "./suite-store.mjs";
-import { withStateLock } from "./state-lock.mjs";
+import { withStateLock, windowsLockRequest } from "./state-lock.mjs";
 import { stopOwnedChild } from "./owned-process.mjs";
 import { applicationEnvironment } from "../../deployment/suite/application.mjs";
+
+test("the Windows kernel-lock wire preserves literal Unicode paths and refuses injection, invalid identities and oversized input", () => {
+  const path = 'C:\\Users\\Synthetic user\\私用\\literal\t$() `";.lock';
+  for (const trace of [false, true]) for (const nonBlocking of [false, true]) {
+    const wire = windowsLockRequest({ path, parentPid: 2147483647, trace, nonBlocking });
+    assert.equal(wire.endsWith("\n"), true); assert.equal(wire.split("\n").length, 2);
+    const [schema, parent, traced, nonblock, encoded] = wire.trimEnd().split("\t");
+    assert.equal(schema, "SXSY-LOCK/1"); assert.equal(parent, "2147483647"); assert.equal(traced, trace ? "1" : "0"); assert.equal(nonblock, nonBlocking ? "1" : "0");
+    assert.equal(Buffer.from(encoded, "base64").toString("utf8"), path); assert.equal(wire.includes("literal"), false);
+  }
+  const good = { path: "C:\\private\\personal.lock", parentPid: 1 };
+  for (const changed of [{ path: "" }, { path: "x\n1" }, { path: "x\r1" }, { path: "x\u00001" }, { path: "x\ud800" }, { path: "界".repeat(5462) }, { parentPid: 0 }, { parentPid: 2147483648 }, { parentPid: 1.5 }, { parentPid: "1" }, { trace: 1 }, { nonBlocking: "false" }]) assert.throws(() => windowsLockRequest({ ...good, ...changed }));
+  assert.ok(windowsLockRequest({ ...good, path: "x".repeat(16384) }).length < 22000);
+});
 
 test("independent store instances serialize initialization and updates without replacing a compartment key or losing writes", async () => {
   const root = await mkdtemp(join(tmpdir(), "switchyard-multi-store-")), keys = new Map(); let created = 0;

@@ -1,0 +1,43 @@
+{
+  "schema": "switchyard-windows-state-lock-validation-summary/v1",
+  "sourceCommit": "59a73de091cb674d9a8e3f3cf8dc6f3d9e826018",
+  "executionCommit": "9f3c93d2ebce037caf4c0628e32fe43fe839962a",
+  "workflowRun": 42039909649,
+  "digestVerified": true,
+  "accepted": {
+    "artifactId": 13420750908,
+    "archiveSha256": "b6db539319db6d3ab01f39ed2c9e1868daf96fa34eb75ed12db3f52f4a31105c",
+    "privateReceipt": "windows-59a-leases.json",
+    "tests": 6,
+    "passed": 5,
+    "declaredSkipped": 1,
+    "childCleanupVerified": true,
+    "scope": "Shared-store serialization, crash release, nonblocking lease ownership and failed transaction recovery; no guest or account."
+  },
+  "failed": [
+    {
+      "artifactId": 13420706649,
+      "archiveSha256": "9faa7e69ca7ad17d44a52865959e84e121bbfe962c5de2b5e7af7e34b0866091",
+      "privateReceipt": "windows-59a-sandbox-native-failed.json",
+      "tests": 8,
+      "passed": 7,
+      "failed": 1,
+      "phase": "First native transport contract: private lock acquisition deadline",
+      "timedOutFile": false,
+      "childCleanupVerified": true
+    },
+    {
+      "artifactId": 13419649389,
+      "archiveSha256": "042358e5ef2ed3eef6ab25d763322ef9eac126dde4bb0cfd48700d4ac8e085ac",
+      "privateReceipt": "windows-59a-ignored-tree-failed.json",
+      "tests": 3,
+      "passed": 2,
+      "failed": 1,
+      "phase": "First ignored-tree authority contract: private lock acquisition deadline",
+      "timedOutFile": false,
+      "childCleanupVerified": true
+    }
+  ],
+  "rootCauseConfirmed": false,
+  "nextNativeValidationPending": true
+}
