@@ -114,4 +114,7 @@ original receipt. Selection/modes/private link/frozen Home are restored; owned
 signing scratch, bundle and proof checkout are removed. Receipts
 `assignment-legends-1793847745744.json` and
 `installed-signed-fixtures-1793847762267.json` retained.
-Complete Shield/scanner execution and frontend controls remain unfinished.
+The separate [baseline scanner](shield-baseline-scanner.md) now runs fixed code
+against reviewed source and explicitly copied public rule/advisory data for all
+four Linux Shield actions. Full repository/history/ecosystem/provenance coverage
+and frontend controls remain unfinished.

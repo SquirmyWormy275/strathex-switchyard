@@ -28,6 +28,14 @@ async function fixture(t, handler) {
   return {root,store,service,create,binding,request,port,calls,effects:()=>effects,stopped:v=>{stopped=v;},authorize:v=>{authorized=v;}};
 }
 const output = async stream => {let text="";for await(const chunk of stream)text+=chunk;return text;};
+test("native zero exit cannot recover a passing pipeline or Shield observation after restart",async t=>{
+  const f=await fixture(t);
+  for(const action of ["pipeline_local_gate","pipeline_clean_reproduction","shield_change_scan","shield_codebase_audit","shield_supply_chain","release_shield"]){
+    const binding={...f.binding,operationId:randomUUID(),action},request={...f.request,operationId:binding.operationId,action,lifecycle:"foreground"},process=await f.port(f.service,binding).start(request);await process.wait();
+    const reopened=f.create(),observed=await f.port(reopened,binding).observeOperation(request);assert.equal(observed.state,"terminal");assert.equal(observed.status,"incomplete");assert.equal(observed.effectDisposition,"committed");assert.equal(observed.evidenceDigest,undefined);assert.equal(observed.toolVersions,undefined);
+  }
+  assert.equal(f.effects(),6);
+});
 test("the runtime supervisor persists exact ownership before acknowledgement and preserves a trusted bounded native result",async t=>{
   let ready=false; const f=await fixture(t,async(stage,{store,options,owner})=>{if(stage==="effect"){const r=(await store.snapshot("personal")).repositoryExecutions[0];assert.equal(r.ownedRuntime.id,owner.id);assert.equal(r.stoppedVerified,false);assert.equal(r.status,"running");assert.equal(options.expectedExecutableSha256,f.request.executableSha256);ready=true;}});
   const process=await f.port().start(f.request), text=output(process.stdout);assert.match(process.supervisorId,/^managed:[a-f0-9]{64}$/);assert.equal((await process.wait()).terminalEvidence,"trusted");assert.equal(await text,"synthetic exact program output");assert.equal(ready,true);

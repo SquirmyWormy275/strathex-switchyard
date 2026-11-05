@@ -15,8 +15,9 @@ import { createRepositoryExecutionStaging } from "./repository-execution-staging
 import { createRepositoryExecutionStops } from "./repository-execution-stop.mjs";
 import { createWindowsRepositoryExecution } from "./repository-windows-execution.mjs";
 import { scopeHash } from "./confirmations.mjs";
-import { connectedExecutionActions, linuxPipelineActions } from "./repository-execution-actions.mjs";
+import { connectedExecutionActions, linuxPipelineActions, linuxShieldActions } from "./repository-execution-actions.mjs";
 import { pipelineEvidence, pipelineDependencies } from "./repository-pipeline.mjs";
+import { validateShieldRecipe, shieldDependencies, shieldReceiptEvidence } from "./repository-shield.mjs";
 const uuid=v=>typeof v==="string"&&/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/.test(v);
 const sha=v=>typeof v==="string"&&/^[a-f0-9]{64}$/.test(v), tokenHash=v=>createHash("sha256").update(v).digest("hex");
 const budget={version:"suite-reviewed-execution/v2",commandClasses:Object.fromEntries(connectedExecutionActions("linux").map(action=>[action,{maxConcurrent:1,timeoutMs:600000,maxAttempts:1,windowMs:3600000,maxClaimsPerWindow:20,maxCostUnitsPerWindow:20,defaultCostUnits:1}]))};
@@ -25,14 +26,14 @@ function proposed(input) {
   if(Object.keys(input).some(k=>!["compartment","requestId","authorityId","manifestPath","manifestSha256","action"].includes(k))||!uuid(input.requestId)||!uuid(input.authorityId)||!connectedExecutionActions("linux").includes(input.action)||!sha(input.manifestSha256)||typeof input.manifestPath!=="string"||!input.manifestPath||input.manifestPath.length>512)throw Error("Review one exact task authority, request UUID and owned host recipe; command/argument/approval fields are not accepted.");
   return {requestId:input.requestId,authorityId:input.authorityId,manifestPath:input.manifestPath,manifestSha256:input.manifestSha256,action:input.action};
 }
-const view=r=>({requestId:r.requestId,authorityId:r.authorityId,taskId:r.taskId,sessionId:r.sessionId,repositoryRoot:r.repositoryRoot,targetSnapshotId:r.targetSnapshotId,action:r.action,manifestPath:r.manifestPath,manifestSha256:r.manifestSha256,recipe:r.recipe,executableIdentity:r.executableIdentity,executionPolicy:r.executionPolicy,scopeDigest:r.scopeDigest,status:r.status,observedStatus:r.observedStatus??null,operationId:r.operationId??null,outcome:r.outcome??null,expiresAt:r.expiresAt,providerTaskCompletionVerified:false});
+const view=r=>({requestId:r.requestId,authorityId:r.authorityId,taskId:r.taskId,sessionId:r.sessionId,repositoryRoot:r.repositoryRoot,targetSnapshotId:r.targetSnapshotId,action:r.action,manifestPath:r.manifestPath,manifestSha256:r.manifestSha256,recipe:r.recipe,executableIdentity:r.executableIdentity,executionPolicy:r.executionPolicy,...(r.shield?{shield:r.shield}:{}),scopeDigest:r.scopeDigest,status:r.status,observedStatus:r.observedStatus??null,operationId:r.operationId??null,outcome:r.outcome??null,expiresAt:r.expiresAt,providerTaskCompletionVerified:false});
 export function createRepositoryExecution({store,authority,stateDirectory,platform=process.platform,isActive=async()=>true,supervisors=createRepositoryExecutionSupervisors({store,isActive}),staging=createRepositoryExecutionStaging({store,stateDirectory:join(stateDirectory,"inputs")}),namespaceFactory=native=>new LinuxBubblewrapRepositoryProcessSupervisor(native,{additionalActions:["run_target"],readOnlyDisposable:true,temporaryBuilds:true,temporaryBytes:executionPolicy.temporaryBytes}),windowsRunner,resolveScannerFixtures,now=Date.now}={}) {
   if(platform==="win32")return createWindowsRepositoryExecution({store,authority,stateDirectory,isActive,now,runner:windowsRunner,resolveScannerFixtures});
   const generations=new Map(),pending=new Map(),seen=new Set(),runtimes=new Map(),recoveryHosts=new Map(),reader=new NodeFileDigestReader({maxFileBytes:128*1024});let closed=false;
   const current=(c,g)=>{if(closed||g!==(generations.get(c)??0))throw Error("This reviewed execution was stopped.");};
   async function exclusive(c,fn){if(pending.has(c))throw Error("Wait for the current execution review or admission.");const g=generations.get(c)??0,p=Promise.resolve().then(()=>fn(g));pending.set(c,p);seen.add(c);try{return await p;}finally{if(pending.get(c)===p)pending.delete(c);}}
   async function update(c,id,action,fn){return store.update(c,action,s=>{const r=s.repositoryExecutionReviews?.find(r=>r.requestId===id);if(!r)throw Error("The protected execution review changed.");return fn(r);});}
-  async function manifest(resolved,proposal) {
+  async function manifest(resolved,proposal,c) {
     if(!resolved.proposed.paths.includes(proposal.manifestPath))throw Error("The recipe manifest itself must belong to this exact task-owned file grant.");
     const read=await reader.read(resolved.task.repositoryRoot,proposal.manifestPath);
     try {
@@ -43,13 +44,15 @@ export function createRepositoryExecution({store,authority,stateDirectory,platfo
       if(linuxPipelineActions.includes(proposal.action)&&Object.entries(recipe.environment).some(([name,value])=>name==="NODE_ENV"&&value!=="test"))throw Error("A connected pipeline cannot select a production NODE_ENV.");
       const witnesses=new Map([...resolved.files.tracked,...resolved.files.untracked].map(f=>[f.path,f]));
       for(const input of recipe.inputFiles)if(!resolved.proposed.paths.includes(input.path)||witnesses.get(input.path)?.digest!==`sha256:${input.sha256}`)throw Error("Every execution input must match this exact task-owned file snapshot.");
-      return {verified,recipe};
+      const shield=await validateShieldRecipe({recipe,repositoryRoot:resolved.task.repositoryRoot,action:proposal.action,resolveFixtures:resolveScannerFixtures?input=>resolveScannerFixtures(c,input):undefined,now});
+      return {verified,recipe,...(shield?{shield}:{})};
     }finally{read.bytes.fill(0);}
   }
   async function runtimeFor(c,review,resolved,g,loaded) {
     const check=async()=>{current(c,g);if(!await isActive(c))throw Error("Select this workspace before executing its reviewed task.");const fresh=await authority.assertCurrent(c,review.authorityId,review.action);if(fresh.record.taskDigest!==review.taskDigest||fresh.record.workspaceDigest!==review.workspaceDigest)throw Error("The execution task/account/workspace scope changed.");const read=await reader.read(review.repositoryRoot,review.manifestPath);try{if(read.digest!==`sha256:${review.manifestSha256}`)throw Error("The exact host recipe changed before execution.");}finally{read.bytes.fill(0);}current(c,g);};
     const journal=repositoryEffectJournal(store,c,{provider:resolved.task.provider,domain:"execution",now});
-    const receiptEvidence=linuxPipelineActions.includes(review.action)?await pipelineEvidence({store,compartment:c,provider:resolved.task.provider,policyVersion:resolved.snapshot.policyVersion,now}):undefined;
+    const rawReceiptEvidence=[...linuxPipelineActions,...linuxShieldActions].includes(review.action)?await pipelineEvidence({store,compartment:c,provider:resolved.task.provider,policyVersion:resolved.snapshot.policyVersion,now}):undefined;
+    const receiptEvidence=rawReceiptEvidence&&linuxShieldActions.includes(review.action)?shieldReceiptEvidence(rawReceiptEvidence):rawReceiptEvidence;
     const payload={schema:"switchyard-execution-checkpoint/v1",scopeDigest:review.scopeDigest,targetSnapshotId:review.targetSnapshotId,manifestSha256:review.manifestSha256,recipe:review.recipe,executionPolicy:review.executionPolicy};
     const checkpointDigest=scopeHash(payload),reference=`suite-execution-checkpoint:${review.requestId}`;
     const checkpointCapture={capture:async({operationId,definition,target})=>{
@@ -68,7 +71,7 @@ export function createRepositoryExecution({store,authority,stateDirectory,platfo
         const sandbox=namespaceFactory(native);
         repositoryRuntime=new RepositoryRuntime(loaded.verified,{processSupervisor:sandbox,temporaryBuilds:true,executionRoots:{prepare:async input=>{const row=(await store.snapshot(c)).repositoryExecutionReviews?.find(r=>r.requestId===review.requestId);if(!row?.operationId)throw Error("Execution staging requires its protected checkpoint operation.");return staging.prepare(c,{operationId:row.operationId,scopeDigest:review.scopeDigest},input,check);}}});
         const broker=new RepositoryRuntimeExecutionBroker({resolve:async root=>{if(root!==review.repositoryRoot)throw Error("The execution repository changed.");return repositoryRuntime;}}),execution=new InMemoryExecutionBroker(context.policy),marker=repositoryRuntimeExecutionRecipe(review.action,resolved.snapshot);
-        const pipeline=receiptEvidence?pipelineDependencies({policy:context.policy,runtime:repositoryRuntime,review,target:resolved.snapshot,receiptEvidence,now,resolveScannerFixtures:resolveScannerFixtures?input=>resolveScannerFixtures(c,input):undefined}):undefined;
+        const pipeline=receiptEvidence?(linuxShieldActions.includes(review.action)?shieldDependencies:pipelineDependencies)({policy:context.policy,runtime:repositoryRuntime,review,target:resolved.snapshot,receiptEvidence,now,resolveScannerFixtures:resolveScannerFixtures?input=>resolveScannerFixtures(c,input):undefined}):undefined;
         execution.register(marker.id,request=>pipeline?pipeline.execute(request):broker.execute(request));
         return {execution,...(pipeline?{recipes:pipeline.recipes,testEnvironment:pipeline.testEnvironment}:{}),executionRecipeFactory:{create:(definition,target)=>definition.action===review.action&&target.id===review.targetSnapshotId?repositoryRuntimeExecutionRecipe(review.action,target):undefined}};
       }});
@@ -94,8 +97,9 @@ export function createRepositoryExecution({store,authority,stateDirectory,platfo
       const proposal=proposed(input);current(c,g);if(platform!=="linux")throw Error("Connected guest execution on this platform is unfinished implementation; no uncontained host substitute was selected.");
       await recoverCompartment(c);const state=await store.snapshot(c);if(state.repositoryExecutionReviews?.some(r=>r.requestId===proposal.requestId))throw Error("This execution request already has a protected review; use its retained result.");
       if((await supervisors.list(c)).some(r=>r.stoppedVerified!==true))throw Error("Stop or independently reconcile the prior owned execution before reviewing another run.");
-      const resolved=await authority.resolve(c,proposal.authorityId,proposal.action),loaded=await manifest(resolved,proposal);current(c,g);
+      const resolved=await authority.resolve(c,proposal.authorityId,proposal.action),loaded=await manifest(resolved,proposal,c);current(c,g);
       const packet={...proposal,taskId:resolved.task.id,sessionId:resolved.task.sessionId,repositoryRoot:resolved.task.repositoryRoot,targetSnapshotId:resolved.snapshot.id,taskDigest:resolved.binding,workspaceDigest:resolved.workspace,recipe:loaded.recipe,executableIdentity:loaded.verified.executableIdentities.get(proposal.action),executionPolicy:{...executionPolicy,workspace:loaded.recipe.workspaceMode==="temporary-build"?"bounded-writable-copy":"read-only-reviewed-snapshot"}};
+      if(loaded.shield)packet.shield=loaded.shield;
       const review={...packet,scopeDigest:scopeHash(["switchyard-execution-review/v1",c,packet]),status:"reviewed",createdAt:now()},host=await runtimeFor(c,review,resolved,g,loaded);
       const confirmation=await host.runtime.confirmations.issue({action:review.action,sessionId:review.sessionId,authorityId:review.authorityId,targetSnapshotId:review.targetSnapshotId,scopeDigest:review.scopeDigest,reason:"Execute only this exact reviewed recipe and task-owned non-production input set in the displayed isolated boundary. No provider permission or live-repository write is granted.",reauthenticated:false});
       await host.check();review.expiresAt=confirmation.record.expiresAt;review.tokenDigest=tokenHash(confirmation.token);
@@ -107,7 +111,7 @@ export function createRepositoryExecution({store,authority,stateDirectory,platfo
       const row=(await store.snapshot(c)).repositoryExecutionReviews?.find(r=>r.requestId===input.requestId);if(!row||row.tokenDigest!==tokenHash(input.token))throw Error("The exact execution approval is unavailable.");
       if(row.status!=="reviewed")return {...(row.outcome??{status:"incomplete",effectDisposition:"ambiguous",summary:"The prior execution outcome is unconfirmed; no replay was attempted."}),replayed:true,providerTaskCompletionVerified:false};
       if(platform!=="linux")throw Error("The guest execution implementation is not connected on this platform.");
-      const resolved=await authority.resolve(c,row.authorityId,row.action),loaded=await manifest(resolved,row);if(resolved.snapshot.id!==row.targetSnapshotId||resolved.binding!==row.taskDigest||resolved.workspace!==row.workspaceDigest||scopeHash(loaded.verified.executableIdentities.get(row.action))!==scopeHash(row.executableIdentity))throw Error("The reviewed execution scope or pinned executable changed.");
+      const resolved=await authority.resolve(c,row.authorityId,row.action),loaded=await manifest(resolved,row,c);if(resolved.snapshot.id!==row.targetSnapshotId||resolved.binding!==row.taskDigest||resolved.workspace!==row.workspaceDigest||scopeHash(loaded.verified.executableIdentities.get(row.action))!==scopeHash(row.executableIdentity)||scopeHash(loaded.shield??null)!==scopeHash(row.shield??null))throw Error("The reviewed execution scope, scanner feeds or pinned executable changed.");
       const host=await runtimeFor(c,row,resolved,g,loaded);await host.check();
       const approved=await host.runtime.confirmations.consume({action:row.action,sessionId:row.sessionId,authorityId:row.authorityId,targetSnapshotId:row.targetSnapshotId,scopeDigest:row.scopeDigest,token:input.token});if(!approved.allowed)throw Error(approved.reason);
       await update(c,row.requestId,"repository-execution-admit",r=>{current(c,g);if(r.status!=="reviewed")throw Error("This execution was already reserved.");r.status="executing";});

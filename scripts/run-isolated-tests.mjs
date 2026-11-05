@@ -167,6 +167,8 @@ export const requiredGroups = [
   { file: "tools/layout-studio/repository-windows-execution-stop.test.mjs", ...nativeTestOverrides("tools/layout-studio/repository-windows-execution-stop.test.mjs") },
   { file: "tools/layout-studio/repository-windows-execution-output.test.mjs", ...nativeTestOverrides("tools/layout-studio/repository-windows-execution-output.test.mjs") },
   { file: "tools/layout-studio/repository-execution.test.mjs", timeoutMs: 240_000, ...nativeTestOverrides("tools/layout-studio/repository-execution.test.mjs"), ...(process.platform !== "linux" ? { expectedSkipped: 1 } : {}) },
+  { file: "tools/layout-studio/shield-scanner-engine.test.mjs" },
+  { file: "tools/layout-studio/repository-shield.test.mjs", timeoutMs: 120_000, expectedSkipped: process.platform === "linux" ? 0 : 2 },
   { file: "tools/layout-studio/repository-pipeline.test.mjs", timeoutMs: 120_000, ...(process.platform !== "linux" ? { expectedSkipped: 5 } : {}) },
   { file: "tools/layout-studio/repository-pipeline-fixtures.test.mjs", timeoutMs: 120_000, ...(process.platform !== "linux" ? { expectedSkipped: 2 } : {}) },
   { file: "tools/layout-studio/task-authority.test.mjs", ...nativeTestOverrides("tools/layout-studio/task-authority.test.mjs") },

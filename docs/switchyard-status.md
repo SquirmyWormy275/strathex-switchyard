@@ -94,12 +94,12 @@ is an implementation contingency for token limits; no coding job was delegated.
 
 ## Latest verification and correction
 
-The complete Linux lane at immutable `66f6416` passes all 173 groups:
-1,132 tests, 1,122 passed and ten declared skips. Receipt
-`3b943d60-cd9d-40f9-ac79-fceab62a645f` retained; every child cleanup verified
-and owned fixtures/checkout removed. It includes namespace quota closure and
-the service-deletion query correction. The newer writable-copy checkpoint
-`50dd23d` is running its separate immutable 175-group lane.
+The complete Linux lane at immutable `50dd23d` passes all 175 groups:
+1,137 tests, 1,127 passed and ten declared skips. Receipt
+`edb2bdd4-aa75-421b-898b-8447cef0a42e` retained; every child cleanup verified
+and owned fixtures/checkout removed. It includes both read-only quota closure
+and bounded writable builds. The prior 173-group `66f6416` receipt is also
+retained (`3b943d60-cd9d-40f9-ac79-fceab62a645f`).
 
 Native Windows `5d398d2`, workflow
 [41960677205](https://github.com/SquirmyWormy275/strathex-switchyard/actions/runs/41960677205),
@@ -148,7 +148,13 @@ the independent 90-query capture; receipts are in verification. Source identity
 does not authenticate the hardware or select its physical case. No unlock,
 configuration write, reset, flash or electrical command was sent.
 
-Complete Shield/scanner execution, exact
+The pinned baseline Shield scanner is implemented for all four Linux actions,
+with fixed heuristic rules, exact npm advisory/license checks, report-hash
+authentication, failed receipts with incomplete coverage, and explicit scope/
+history/permission/provenance gaps. All four actions and the clean incomplete
+case pass actual namespace checks. Installed acceptance is pending. Full Shield
+scope/history/ecosystems/provenance and audited exceptions remain unfinished.
+[Scanner contract](shield-baseline-scanner.md). Exact
 desktop/IDE/terminal attachments and remaining frontend controls are unfinished
 implementation. The frozen UI still needs owner visual review and the remaining
 omakase flows. Continue every independently executable backend requirement.

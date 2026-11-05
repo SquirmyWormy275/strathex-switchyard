@@ -110,6 +110,7 @@ export interface DurableDispatchLifecycle extends CommandOperationCoordinator {
 
 /** A receipt is issued only when a trusted evidence producer provides all fields. */
 export interface DispatchReceiptEvidence {
+  readonly evidenceCompleteness?: "complete" | "incomplete";
   readonly policyVersion: string;
   readonly evidenceDigest: string;
   readonly toolVersions: Readonly<Record<string, string>>;

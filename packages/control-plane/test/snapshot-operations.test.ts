@@ -146,6 +146,18 @@ test("resource leases serialize conflicting work and expire rather than silently
   });
 });
 
+test("partial failed findings retain incomplete receipts and cannot establish a completed gate", async () => {
+  await withStore(async store => {
+    const operations = new OperationSagaStore(store), receipts = new ReceiptLedger(store), coordinator = new DurableOperationCoordinator(operations, receipts);
+    const lease = await coordinator.claim({ action: "shield_change_scan", targetSnapshotId: "snapshot-partial", sessionId: "session-partial", authorityId: "grant-partial" });
+    const result = { action: "shield_change_scan", targetSnapshotId: "snapshot-partial", summary: "Baseline finding with incomplete repository scope", policyVersion: "policy-v1", evidenceDigest: "a".repeat(64), toolVersions: { scanner: "baseline-v1" }, evidenceCompleteness: "incomplete" as const };
+    await assert.rejects(coordinator.recordResult(lease, { ...result, status: "completed" }), /Incomplete evidence/);
+    assert.equal((await operations.get(lease.operationId))?.state, "prepared");
+    const recorded = await coordinator.recordResult(lease, { ...result, status: "failed", effectDisposition: "committed" });
+    const receipt = await receipts.get(recorded.receiptId!); assert.equal(receipt?.result, "failed"); assert.equal(receipt?.completeness, "incomplete"); assert.equal(receipt?.evidenceDigest, result.evidenceDigest);
+  });
+});
+
 test("durable dispatch coordination focuses active work and records a result before completion", async () => {
   await withStore(async (store) => {
     const operations = new OperationSagaStore(store, {

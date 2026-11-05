@@ -120,6 +120,7 @@ export interface DurableOperationClaim {
 }
 
 export interface DurableOperationResult {
+  readonly evidenceCompleteness?: "complete" | "incomplete";
   readonly action: string;
   readonly targetSnapshotId?: string;
   readonly authorityId?: string;
@@ -981,6 +982,7 @@ export class DurableOperationCoordinator {
    * produces a green receipt; it still produces a sanitized audit event.
    */
   async recordResult(lease: DurableCommandOperationLease, result: DurableOperationResult): Promise<{ readonly receiptId?: string }> {
+    if (result.evidenceCompleteness !== undefined && !["complete", "incomplete"].includes(result.evidenceCompleteness) || result.evidenceCompleteness === "incomplete" && result.status === "completed") throw new OperationSagaError("Incomplete evidence cannot establish a completed gate.");
     let operation = await this.requireOperation(lease.operationId);
     if (operation.action !== result.action) throw new OperationSagaError("A dispatch result cannot be recorded against a different operation action.");
     if (result.targetSnapshotId && operation.targetSnapshotId !== result.targetSnapshotId) {
@@ -1036,7 +1038,7 @@ export class DurableOperationCoordinator {
           targetSnapshotId: result.targetSnapshotId,
           ...(result.authorityId ? { authorityId: result.authorityId } : {}),
           result: receiptResultFor(result.status),
-          completeness: result.status === "incomplete" ? "incomplete" : "complete",
+          completeness: result.status === "incomplete" || result.evidenceCompleteness === "incomplete" ? "incomplete" : "complete",
           evidenceDigest: result.evidenceDigest,
           policyVersion: result.policyVersion,
           toolVersions: result.toolVersions,

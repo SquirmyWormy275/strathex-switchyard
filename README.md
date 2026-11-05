@@ -85,7 +85,7 @@ uncertain outcomes remain unchanged. Provider replies do not establish coding-ta
 These checks do not prove a finished keyboard/agent appliance. General coding-task
 controls, physical role shortcut selection in the frontend, platform lifecycle acceptance, profile-library visual acceptance,
 expanded device editing controls, complete device settings and final UI acceptance remain unfinished.
-The complete Linux runner checkpoint at `66f6416` passes 173 groups: 1,122 tests passed and
+The complete Linux runner checkpoint at `50dd23d` passes 175 groups: 1,127 tests passed and
 ten declared platform skips. Windows filesystem CI passes all 30 native checks,
 including bounded volume disk-full, exact detach and mapping admission. The full
 Windows worker/runtime checkpoint passes 261 groups: 1,690 tests passed and 48
@@ -95,10 +95,12 @@ also connects separately reviewed local-gate and clean-reproduction recipes to
 the isolated runner and authenticated evidence. An explicit [bounded build workspace](docs/bounded-build-workspace.md)
 lets reviewed recipes build in a disposable writable copy while preserving the live repository;
 its source/kernel checks and normal installed Run/stop demonstration pass with zero model prompts. The [Windows pipeline path](docs/windows-pipelines.md)
-now uses reviewed guest inputs and authenticated reports with actual signed feeds;
+now uses reviewed guest inputs and authenticated reports with signed feeds;
 native guest execution is doubled in its current tests. [Signed fixture maintenance](docs/signed-fixtures.md)
-now connects operator-reviewed public trust and exact feed metadata to these pipelines;
-it does not establish a completed vulnerability scan. Personal host setup now has reviewed install/remove and a fixed native boundary.
+connects operator-reviewed public trust and exact feed metadata to these pipelines.
+Linux [Shield baseline scans](docs/shield-baseline-scanner.md) run pinned code and signed
+rule/advisory data with explicit findings and coverage gaps. Full Shield scope remains unfinished.
+Personal host setup now has reviewed install/remove and a fixed native boundary.
 The bounded storage service and normal
 task/guest connection are implemented; native complete-journey acceptance remains open. [Verification details](docs/verification.md)
 identify each source checkpoint and practical limit. Interactive Windows acceptance remains open. Current F77 discovery and readout pass; ordinary typing, hotplug and physical writes remain unaccepted. B122
