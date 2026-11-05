@@ -125,3 +125,16 @@ unchanged (`owned-vscode-retirement-1793882075618.json`). Another application
 sharing VS Code's class remains open. After owned editor exit, the source target
 refuses rather than focusing it (`native-vscode-no-fallback-1793882102370.json`).
 No user editor instance is closed. [Receipt hashes and limits](evidence/native-vscode-focus-summary.json).
+
+
+Native Windows client CI at `4fd8c28` retains a failed original 45-second combined
+physical/gateway file despite all seventy reported assertions passing. The
+independent exit deadline was not accepted; its archive digest and cleanup verify
+in [the timeout summary](evidence/windows-client-4fd-timeout-summary.json).
+The complete native focus gateway cases now run from their own required file,
+with every assertion retained and the same 45-second per-child limit. The exact
+client lane includes both files. Eight local runner/client groups pass 87 tests,
+86 passed plus one declared platform skip, with every child cleanup verified
+(`isolated-test-dbc2c702-1e9d-42d8-8a4a-9df1205e1778.json`). New native acceptance
+is pending. The complete required inventory now contains 219 independently run
+groups; earlier full checkpoints retain their original source-bound counts.

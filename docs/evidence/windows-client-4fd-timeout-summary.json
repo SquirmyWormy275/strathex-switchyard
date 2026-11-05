@@ -1,0 +1,30 @@
+{
+  "schema": "switchyard-client-platform-timeout-evidence/v1",
+  "pullRequestHead": "4fd8c287b42e7abdc5d41b5e3169e8f381f2e928",
+  "artifactRevision": "6fc84bb1c4be1905d7e282196aa9df0354d5e08b",
+  "workflowRun": 42029707203,
+  "job": 127252719715,
+  "artifactId": 13415811749,
+  "archiveSha256": "95cc6b1775025103a14ba2c2035e058e6841b3446900f6693779a64a0a0ce9ac",
+  "localReceipt": "windows-client-platform-4fd-failed.json",
+  "receiptSha256": "ee56c0a4f1d4ba543c501ec307ba459caaca0704d79874fedd6cb65c80744e88",
+  "success": false,
+  "totals": {
+    "required": 6,
+    "passed": 5,
+    "failed": 1,
+    "tests": 70,
+    "passedTests": 70,
+    "failedTests": 0,
+    "skippedTests": 0,
+    "cancelledTests": 0,
+    "todoTests": 0
+  },
+  "failedFile": "tools/layout-studio/physical-intent.test.mjs",
+  "originalChildTimeoutMs": 45000,
+  "allReportedAssertionsPassed": true,
+  "independentExitBeforeDeadlineAccepted": false,
+  "allChildCleanupVerified": true,
+  "archiveRetainedLocally": false,
+  "guestAccountOrWindowAcceptanceInferred": false
+}
