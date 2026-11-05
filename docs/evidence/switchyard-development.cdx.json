@@ -1,0 +1,138 @@
+{
+  "bomFormat": "CycloneDX",
+  "specVersion": "1.6",
+  "version": 1,
+  "metadata": {
+    "tools": {
+      "components": [
+        {
+          "type": "application",
+          "name": "switchyard-baseline-scanner",
+          "version": "1"
+        }
+      ]
+    },
+    "properties": [
+      {
+        "name": "switchyard:scope",
+        "value": "reviewed-inputs"
+      },
+      {
+        "name": "switchyard:repository-scope",
+        "value": "unverified"
+      },
+      {
+        "name": "switchyard:dependency-graph",
+        "value": "not-collected"
+      },
+      {
+        "name": "switchyard:publisher-provenance",
+        "value": "not-verified"
+      },
+      {
+        "name": "switchyard:lockfile:package-lock.json",
+        "value": "sha256:14e618db2aab0afc5a5499228d69408712cfa839ed181d042aabba3f5c203368"
+      }
+    ]
+  },
+  "components": [
+    {
+      "type": "library",
+      "bom-ref": "switchyard:93c07fae6c8e2ebd4288f246990760643f81bb37a295294f0e17287c158455e6",
+      "name": "@types/node",
+      "version": "24.13.3",
+      "licenses": [
+        {
+          "license": {
+            "name": "MIT"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "switchyard:lockfile",
+          "value": "package-lock.json"
+        },
+        {
+          "name": "switchyard:package-location",
+          "value": "node_modules/@types/node"
+        },
+        {
+          "name": "switchyard:installed-as",
+          "value": "@types/node"
+        },
+        {
+          "name": "switchyard:integrity-string-sha256",
+          "value": "e13eec962c6820fa4687583a99fca47c3191b20d6bc4f0f84fc99c4f937d98ce"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "switchyard:ef22506a380ceece2ccd21ea32d9ff25a8b722003c61eef8be64e67b70fe79c4",
+      "name": "typescript",
+      "version": "5.9.3",
+      "licenses": [
+        {
+          "license": {
+            "name": "Apache-2.0"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "switchyard:lockfile",
+          "value": "package-lock.json"
+        },
+        {
+          "name": "switchyard:package-location",
+          "value": "node_modules/typescript"
+        },
+        {
+          "name": "switchyard:installed-as",
+          "value": "typescript"
+        },
+        {
+          "name": "switchyard:integrity-string-sha256",
+          "value": "79bf46fcdd3146ff8e3ba693aed2cdb3b989b53e4f239f505504d18cc3a25c3f"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "switchyard:2f100964dcf7268c284d40f64f04145082ccb60771e864e266c99bf442a4e2e7",
+      "name": "undici-types",
+      "version": "7.18.2",
+      "licenses": [
+        {
+          "license": {
+            "name": "MIT"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "switchyard:lockfile",
+          "value": "package-lock.json"
+        },
+        {
+          "name": "switchyard:package-location",
+          "value": "node_modules/undici-types"
+        },
+        {
+          "name": "switchyard:installed-as",
+          "value": "undici-types"
+        },
+        {
+          "name": "switchyard:integrity-string-sha256",
+          "value": "170dd2fdeda45782775d439b367914d0fe7f3ccf7ba8e575511d7c2eb142da22"
+        }
+      ]
+    }
+  ],
+  "compositions": [
+    {
+      "aggregate": "unknown"
+    }
+  ]
+}

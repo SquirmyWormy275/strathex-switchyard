@@ -16,7 +16,7 @@ test("actual baseline matches secrets, PII and JavaScript defects without return
   assert.equal(r.inventory[0].sha256, f.request.files[0].sha256); assert.deepEqual((await f.scan()).findings, r.findings);
 });
 test("all four actions remain non-passing with explicit scope, history, permission and provenance gaps", async () => {
-  for (const action of shieldActions) { const r = await scannerFixture({ action }).scan(); assert.equal(r.outcome, "incomplete"); assert.equal(r.completeness, "incomplete"); assert.ok(r.gaps.includes("repository_scope_unverified")); assert.ok(r.coverage.every(c => c.status === "incomplete"));
+  for (const action of shieldActions) { const r = await scannerFixture({ action }).scan(); assert.equal(r.outcome, "incomplete"); assert.equal(r.completeness, "incomplete"); assert.ok(r.gaps.includes("repository_scope_unverified")); assert.ok(r.coverage.every(c => c.status === "incomplete")); if(["shield_change_scan","shield_codebase_audit"].includes(action))assert.equal(r.cycloneDx,null);
     if (["shield_codebase_audit", "release_shield"].includes(action)) { assert.ok(r.gaps.includes("git_history_not_scanned")); assert.ok(r.gaps.includes("source_permissions_not_witnessed")); }
     if (["shield_supply_chain", "release_shield"].includes(action)) { assert.ok(r.gaps.includes("publisher_provenance_not_verified")); assert.ok(r.gaps.includes("advisory_feed_missing")); }
   }
@@ -30,6 +30,15 @@ test("npm locked inventory checks exact advisory versions and licenses without c
 test("binary, unsupported ecosystems, workspace links and invalid locks cannot establish coverage", async () => {
   const r = await scannerFixture({ action: "release_shield", files: { "image.bin": Buffer.from([0, 255]), "Cargo.lock": "unsupported", "package-lock.json": JSON.stringify({ lockfileVersion: 3, packages: { "node_modules/local": { link: true } } }) } }).scan();
   for (const gap of ["binary_or_non_utf8_input", "unsupported_dependency_ecosystem", "unsupported_npm_package"]) assert.ok(r.gaps.includes(gap)); assert.equal(r.outcome, "incomplete");
+});
+test("aliased npm packages match advisories by their real locked identity and retain distinct reproducible CycloneDX references", async () => {
+  const lock=JSON.stringify({lockfileVersion:3,packages:{"":{},"node_modules/alias":{name:"@example/real",version:"1.0.0",license:"MIT"},"node_modules/parent/node_modules/alias":{name:"@example/real",version:"1.0.0",license:"MIT"}}}),f=scannerFixture({action:"shield_supply_chain",files:{"package-lock.json":lock},advisory:[{ecosystem:"npm",name:"@example/real",version:"1.0.0",advisories:[{id:"GHSA-synthetic-alias",severity:"high"}]}]}),r=await f.scan();
+  assert.equal(r.findings.filter(f=>f.ruleId==="GHSA-synthetic-alias").length,2);assert.equal(r.sbom.components.every(c=>c.name==="@example/real"&&c.installedAs==="alias"),true);assert.equal(r.gaps.includes("advisory_package_coverage"),false);
+  assert.equal(r.cycloneDx.bomFormat,"CycloneDX");assert.equal(r.cycloneDx.specVersion,"1.6");assert.equal(new Set(r.cycloneDx.components.map(c=>c["bom-ref"])).size,2);assert.deepEqual((await f.scan()).cycloneDx,r.cycloneDx);assert.equal(r.cycloneDx.compositions[0].aggregate,"unknown");assert.equal(r.cycloneDx.dependencies,undefined);assert.ok(r.cycloneDx.components.every(c=>c.hashes===undefined));assert.equal(r.completeness,"incomplete");
+});
+test("CycloneDX records an integrity-string hash as metadata without presenting it as downloaded package bytes or a complete graph",async()=>{
+  const integrity="sha512-"+Buffer.alloc(64,2).toString("base64"),lock=JSON.stringify({lockfileVersion:2,packages:{"node_modules/example":{version:"1.0.0",license:"MIT",integrity,resolved:"https://registry.npmjs.org/example/-/example-1.0.0.tgz"}}}),r=await scannerFixture({action:"shield_supply_chain",files:{"package-lock.json":lock}}).scan(),c=r.cycloneDx.components[0];
+  assert.equal(c.properties.find(p=>p.name==="switchyard:integrity-string-sha256").value,sha(integrity));assert.equal(c.hashes,undefined);assert.equal(r.cycloneDx.metadata.properties.find(p=>p.name==="switchyard:publisher-provenance").value,"not-verified");assert.equal(r.cycloneDx.metadata.properties.find(p=>p.name==="switchyard:dependency-graph").value,"not-collected");assert.ok(r.gaps.includes("advisory_feed_missing"));
 });
 test("arbitrary feed patterns, executable fields, rule identifiers and ambiguous inventory are rejected", async () => {
   for (const change of [p => { p.pattern = "(a+)+"; }, p => { p.rules = ["unreviewed.execute"]; }, p => { p.engine = "future"; }, p => { p.rules.push(p.rules[0]); }]) { const f = scannerFixture(); change(f.policy); const b = Buffer.from(JSON.stringify(f.policy)); f.content.set("rules.json", b); f.request.scanner.sha256 = sha(b); await assert.rejects(f.scan()); }

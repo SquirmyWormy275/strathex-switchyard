@@ -94,9 +94,9 @@ export async function scanShieldInputs(proposed, { readInput }) {
         if (!location) continue;
         if (!object(p) || p.link === true || !location.includes("node_modules/") || typeof p.version !== "string" || !/^\d+\.\d+\.\d+(?:-[A-Za-z0-9.-]+)?(?:\+[A-Za-z0-9.-]+)?$/.test(p.version)) { gaps.add("unsupported_npm_package"); continue; }
         try { scannerPath(location); } catch { gaps.add("unsupported_npm_package"); continue; }
-        const name = location.split("node_modules/").at(-1);
-        if (!/^(?:@[a-z0-9._-]+\/)?[a-z0-9._-]{1,128}$/.test(name)) { gaps.add("unsupported_npm_package"); continue; }
-        const component = { name, version: p.version, location, lockPath: file.path, license: typeof p.license === "string" && /^[A-Za-z0-9.+-]{1,80}$/.test(p.license) ? p.license : null, integritySha256: typeof p.integrity === "string" ? sha(p.integrity) : null };
+        const installedAs = location.split("node_modules/").at(-1), name = p.name ?? installedAs;
+        if (typeof name !== "string" || !/^(?:@[a-z0-9._-]+\/)?[a-z0-9._-]{1,128}$/.test(name)) { gaps.add("unsupported_npm_package"); continue; }
+        const component = { name, installedAs, version: p.version, location, lockPath: file.path, license: typeof p.license === "string" && /^[A-Za-z0-9.+-]{1,80}$/.test(p.license) ? p.license : null, integritySha256: typeof p.integrity === "string" ? sha(p.integrity) : null };
         components.push(component);
         const known = advisory.find(a => a.name === name && a.version === p.version);
         if (!known) gaps.add("advisory_package_coverage");
@@ -117,7 +117,19 @@ export async function scanShieldInputs(proposed, { readInput }) {
   if (requested.includes("vulnerabilities") && !request.advisory) gaps.add("advisory_feed_missing");
   if (requested.includes("sbom") && !request.files.some(f => f.path.split("/").at(-1) === "package-lock.json")) gaps.add("npm_lock_missing");
   const matrix = requested.map(dimension => ({ dimension, status: "incomplete", rules: policy.selected.filter(id => rules[id].dimension === dimension), findings: findings.filter(f => f.dimension === dimension).length }));
-  const report = { schema: "switchyard-shield-findings/v1", version: 1, engine: shieldEngineVersion, action: request.action, scope: request.scope, requestSha256: sha(JSON.stringify(request)), scanner: request.scanner, advisory: request.advisory, outcome: findings.length ? "failed" : "incomplete", completeness: "incomplete", coverage: matrix, gaps: [...gaps].sort(), inventory, findings, sbom: { schema: "switchyard-npm-lock-inventory/v1", components } };
+  const cycloneDx = { bomFormat: "CycloneDX", specVersion: "1.6", version: 1,
+    metadata: { tools: { components: [{ type: "application", name: "switchyard-baseline-scanner", version: "1" }] }, properties: [
+      { name: "switchyard:scope", value: request.scope }, { name: "switchyard:repository-scope", value: "unverified" },
+      { name: "switchyard:dependency-graph", value: "not-collected" }, { name: "switchyard:publisher-provenance", value: "not-verified" },
+      ...inventory.filter(f=>f.path.split("/").at(-1)==="package-lock.json").map(f=>({name:"switchyard:lockfile:"+f.path,value:"sha256:"+f.sha256}))
+    ] },
+    components: components.map(c => ({ type: "library", "bom-ref": "switchyard:" + sha(`${c.lockPath}\0${c.location}\0${c.name}\0${c.version}`), name: c.name, version: c.version,
+      ...(c.license ? { licenses: [{ license: { name: c.license } }] } : {}), properties: [
+        { name: "switchyard:lockfile", value: c.lockPath }, { name: "switchyard:package-location", value: c.location }, { name: "switchyard:installed-as", value: c.installedAs },
+        ...(c.integritySha256 ? [{ name: "switchyard:integrity-string-sha256", value: c.integritySha256 }] : [])
+      ] })), compositions: [{ aggregate: "unknown" }]
+  };
+  const report = { schema: "switchyard-shield-findings/v1", version: 1, engine: shieldEngineVersion, action: request.action, scope: request.scope, requestSha256: sha(JSON.stringify(request)), scanner: request.scanner, advisory: request.advisory, outcome: findings.length ? "failed" : "incomplete", completeness: "incomplete", coverage: matrix, gaps: [...gaps].sort(), inventory, findings, sbom: { schema: "switchyard-npm-lock-inventory/v1", components }, cycloneDx: requested.includes("sbom") ? cycloneDx : null };
   if (Buffer.byteLength(JSON.stringify(report)) > 480 * 1024) throw Error("Scanner report exceeds the retained output bound.");
   return report;
 }

@@ -7,19 +7,24 @@ separates unfinished software from exact device/account checks, and
 
 ## Installed pilot
 
-Current installed source is `b6dca0a`, release
-`239f77a0e92b66e4a6a324e6a590f7f553d215aae93ee277fd27ef65b85bd010`.
-Six update and thirteen actual Shield API checks pass: separate one-action
-grants, all four known-failing scans and a clean incomplete case, authenticated
-report hashes, failed receipts with incomplete coverage, exact replay, five
-independent native exits, revocation and separately approved fixture retirement.
-One empty native task, zero model prompts. Receipts
-`assignment-legends-1793853154242.json` and
-`installed-shield-baseline-1793853523201.json` retained. Original selection,
-modes/definitions/private endpoint/frozen Home restored; owned staging, source
-packages, signing keys, bundle and proof checkout removed. Complete Shield
-scope remains unfinished. The initial four-action-grant verifier was correctly
-refused; its failed receipt and separate successful cleanup receipt remain retained.
+Current installed source is `326a9f3`, release
+`dd846e8dc7351b8020f4d24006ce870aa83f35e0ffe6ea9ed6df7744ab4ba709`.
+Six update and eleven actual Shield API checks pass. Exact engine bytes under
+an option-like filename are refused before native execution. The valid failing
+and clean incomplete scans retain exact receipt/coverage/replay, two independent
+native exits, feed revocation/retirement and full restoration. One empty native
+task, zero prompts. Receipts `assignment-legends-1793853690564.json` and
+`installed-shield-baseline-1793853836585.json` retained; owned stages, packages,
+signing keys, bundle and proof checkout removed. Original selection/modes/
+definitions/private endpoint/frozen Home are preserved.
+
+Earlier installed `b6dca0a` passes six update/thirteen actual checks: all four
+known-failing actions, a clean incomplete case and five independently stopped
+guardians. Receipts `assignment-legends-1793853154242.json` and
+`installed-shield-baseline-1793853523201.json` retained, with owned scratch removed.
+The initial four-action-grant verifier was correctly refused; its failed receipt
+and separate successful cleanup receipt remain retained. Complete Shield scope
+remains unfinished. New CycloneDX/alias work is a later source iteration.
 
 Earlier installed `50dd23d` passes six update and ten actual writable-copy
 Run/stop checks with zero prompts and restored original state. Receipts
@@ -99,22 +104,32 @@ remain enforced. Thirty-four agent/submission checks and 23 Suite/package
 regressions pass; real 2.1.317 model execution remains unaccepted. Claude Code
 is an implementation contingency for token limits; no coding job was delegated.
 
+Supply-chain and Release Shield now produce CycloneDX 1.6 BOM data with
+lockfile hashes, location-bound component references and explicit unknown scope/
+graph/provenance. npm aliases match advisories by the real locked name. Nine
+scanner cases and real namespace integration pass. Four generated BOMs, including
+this repository's three external development dependencies, conform to the exact
+official schema; three invalid mutations are rejected. Temporary validator,
+schemas and pip cache were removed without host installs or a copied runtime.
+[Example and limits](evidence/README.md). Installed SBOM acceptance is pending.
+
 Direct Claude window focus now implements fixed Foot and Alacritty ancestry,
 with one exact compositor window per terminal PID. Hidden/unmapped sibling
 windows and changed controlling TTY/process groups refuse focus. Thirty-two
 terminal/Claude/client cases pass (31 passed, one declared Windows skip), five
-package cases and type checking pass. This source extension is not yet installed;
+package cases and type checking pass. This source extension is installed at `326a9f3`;
 Alacritty is absent on the pilot, so its native check remains unaccepted. Tabbed,
 multiplexed, stopped-task, IDE and Windows attachments remain unfinished.
 
 ## Latest verification and correction
 
-The complete Linux lane at immutable `50dd23d` passes all 175 groups:
-1,137 tests, 1,127 passed and ten declared skips. Receipt
-`edb2bdd4-aa75-421b-898b-8447cef0a42e` retained; every child cleanup verified
-and owned fixtures/checkout removed. It includes both read-only quota closure
-and bounded writable builds. The prior 173-group `66f6416` receipt is also
-retained (`3b943d60-cd9d-40f9-ac79-fceab62a645f`).
+The complete Linux lane at immutable `d0a7945` passes all 177 groups:
+1,149 tests, 1,139 passed and ten declared skips. Receipt
+`38061669-ad2e-45d0-a7bb-8babcef4cc44` retained; every child cleanup verified
+and owned fixtures/checkout removed. It includes the baseline Shield, receipt
+completeness and native-recovery non-upgrade implementation. It predates the
+later entrypoint/terminal changes, covered by their focused checks, and the
+current CycloneDX source work. Earlier `50dd23d` passes 175/175 groups.
 
 Native Windows `5d398d2`, workflow
 [41960677205](https://github.com/SquirmyWormy275/strathex-switchyard/actions/runs/41960677205),

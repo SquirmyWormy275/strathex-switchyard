@@ -79,8 +79,14 @@ Supply-chain scanning reads npm lockfile versions 2/3, including nested package
 locations, and returns a typed inventory with locked versions, license metadata
 and integrity-string hashes. It checks exact advisories and the signed simple
 license allowlist. Workspace links, unsupported formats and absent source or
-integrity metadata remain gaps. This inventory is not a claimed CycloneDX export
-or publisher-provenance verification. [npm lockfile reference](https://docs.npmjs.com/cli/v11/configuring-npm/package-lock-json/).
+integrity metadata remain gaps. Supply-chain and Release Shield reports additionally contain a standalone
+CycloneDX 1.6 `cycloneDx` object. Components have distinct location-bound
+references, lockfile hashes, license names and explicit metadata. Aliases match
+advisories by the real locked package name while retaining the installed name.
+The BOM declares aggregate composition `unknown`, repository scope unverified,
+dependency graph not collected and publisher provenance not verified. Integrity
+string hashes are metadata, never claims about downloaded package bytes.
+Change Scan and Codebase Audit return no BOM. [npm lockfile reference](https://docs.npmjs.com/cli/v11/configuring-npm/package-lock-json/).
 
 ## Evidence and limits
 
@@ -98,7 +104,7 @@ findings and a retained output bound. Linked/traversing paths, changed bytes and
 oversized reads fail. Original source/index/HEAD remain unchanged; exact replay
 returns the original result. Native exit precedes owned staging cleanup.
 
-Seven scanner cases cover real matches, redacted reports, all four incomplete
+Nine scanner cases cover real matches, redacted reports, all four incomplete
 matrices, exact npm advisories/licenses, unsupported data, malicious feeds,
 overflow and actual filesystem link/read bounds. Real namespace integration
 exercises all four actions and the clean case, pinned-engine/argument refusal,
@@ -123,5 +129,22 @@ scans, exact failed/incomplete receipt coverage, replay, native exits, revocatio
 package retirement and restoration. Receipts `assignment-legends-1793853154242.json`
 and `installed-shield-baseline-1793853523201.json` retained. Owned source/package/
 signing scratch and proof checkout are removed; one empty task, zero prompts.
-The newer option-filename admission check has separate pending installed acceptance.
+Normal installed `326a9f3` additionally passes six update and eleven narrower
+actual API checks, including the option-filename refusal before execution and
+two valid scans; zero prompts, two independently stopped guardians and full
+restoration. Receipts `assignment-legends-1793853690564.json` and
+`installed-shield-baseline-1793853836585.json` retained; owned scratch removed.
 Use `--one-action` for a narrower changed-code recheck plus the clean case.
+
+The [development-lock example](evidence/switchyard-development.cdx.json) is
+generated from this repository's actual lockfile: three external components,
+with local workspace links left unsupported. It is a schema-conformant example,
+not a complete release inventory or a vulnerability/provenance acceptance.
+Four generated cases, including that real lockfile and scoped aliases, validate
+against the official [CycloneDX 1.6 schema](https://github.com/CycloneDX/specification/blob/1.6/schema/bom-1.6.schema.json);
+three invalid mutations are rejected. Exact schema/tool source hashes are
+retained in `cyclonedx-schema-proof-1793853836585.json`. Temporary validator,
+schemas and download cache are removed; no host package or runtime is installed.
+Installed SBOM acceptance is pending. A focused actual Supply Chain run accepts
+`--synthetic --action=shield_supply_chain` and exercises known-failing and clean
+incomplete versions, both with report-bound BOM hashes.
