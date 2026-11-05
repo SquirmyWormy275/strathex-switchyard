@@ -21,7 +21,7 @@ test("the same pinned account continues its exact conversation while changed fin
     if (action === "m365-design") await update(c, "synthetic-binding-drift", s => { s.conversations[0].sessionId = "66666666-6666-6666-6666-666666666666"; });
     return update(c, action, fn, options);
   };
-  await assert.rejects(f.design(result.conversationId), /binding changed/); assert.equal((await f.store.snapshot("work")).conversations[0].messages.length, 4);
+  await assert.rejects(f.design(result.conversationId, "77777777-7777-7777-7777-777777777777"), /binding changed/); assert.equal((await f.store.snapshot("work")).conversations[0].messages.length, 4);
 });
 test("malformed local credential identities and expiry refuse before any Graph request", async t => {
   const f = await fixture(t);

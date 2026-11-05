@@ -14,9 +14,12 @@ import { agentRoutes, agentMessageSchema, agentResponseSchema, requestMac, respo
 
 function memoryStore() {
   const states = { personal: { id: "personal", policy: "personal", accounts: [], agents: [], observations: [], conversations: [], workflow: { name: "Synthetic", roles: [], steps: [] } }, work: { id: "work", policy: "work", accounts: [], agents: [], observations: [], conversations: [], workflow: { name: "Synthetic", roles: [], steps: [] } } }, secrets = new Map();
-  const pending = new Map(), history = [];
+  const pending = new Map(), history = [], resources = new Set();
   return {
     states, secrets, history,
+    // Symbolic resource port here; account/lifecycle suites exercise real kernel leases.
+    async withResourceLock(kind, id, fn) { const key = kind + ":" + id; if (resources.has(key)) throw Error("Synthetic resource busy"); resources.add(key); try { return await fn({ assert() {} }); } finally { resources.delete(key); } },
+    async tryWithResourceLock(kind, id, fn) { if (resources.has(kind + ":" + id)) return { acquired: false }; return { acquired: true, value: await this.withResourceLock(kind, id, fn) }; },
     async authorize(id, { provider, account } = {}) { const s = states[id]; if (!s || s.policy === "work" && provider && provider !== "microsoft-365-copilot") throw new Error("provider prohibited"); if (account && !s.accounts.includes(account)) throw new Error("account prohibited"); },
     async credential(id, purpose, value, request) { await this.authorize(id, request); if (value === undefined) return secrets.get(`${id}:${purpose}`); secrets.set(`${id}:${purpose}`, value); },
     async snapshot(id) { return structuredClone(states[id]); },

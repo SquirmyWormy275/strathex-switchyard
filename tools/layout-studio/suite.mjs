@@ -384,7 +384,7 @@ export function createSuite({ store = createSuiteStore(), platform = process.pla
         const s = await store.snapshot(compartment);
         // Recovery packets include original index bytes and private ownership
         // records. Explicit recovery routes expose observations, never backups.
-        const { repositoryEffectJournal, repositoryRecoveryJournal, repositoryEffectCheckpoints, repositoryEffects, repositoryCommitReviews, clientLaunches, repositoryExecutions, repositoryExecutionJournal, repositoryExecutionReviews, repositoryExecutionStaging, repositoryExecutionStops, repositoryExecutionStopJournal, repositoryWindowsInputs, repositoryWindowsGuests, repositoryWindowsGuestCommands, repositoryWindowsTools, repositoryWindowsImages, repositoryWindowsBrokerExchanges, repositoryWindowsRuns, windowsStorageNative,windowsStorageReviews,windowsStorageJournal,scannerFixtureReviews,scannerFixtureJournal,shieldExceptionJournal,shieldExceptionReviews,...snapshot } = s;
+        const { repositoryEffectJournal, repositoryRecoveryJournal, repositoryEffectCheckpoints, repositoryEffects, repositoryCommitReviews, clientLaunches, repositoryExecutions, repositoryExecutionJournal, repositoryExecutionReviews, repositoryExecutionStaging, repositoryExecutionStops, repositoryExecutionStopJournal, repositoryWindowsInputs, repositoryWindowsGuests, repositoryWindowsGuestCommands, repositoryWindowsTools, repositoryWindowsImages, repositoryWindowsBrokerExchanges, repositoryWindowsRuns, windowsStorageNative,windowsStorageReviews,windowsStorageJournal,scannerFixtureReviews,scannerFixtureJournal,shieldExceptionJournal,shieldExceptionReviews,copilotRequests,copilotRequestTombstones,...snapshot } = s;
         return { ...snapshot, voice: s.voice.map((v) => ({ ...v, chunks: v.chunks.map(({ audio, ...c }) => ({ ...c, pendingAudio: Boolean(audio) })) })), observationSummaries: s.observations.map(observationSummary) };
       }
       if (path === "/api/suite/profile/save") return store.saveProfile(compartment, body.profile);
@@ -419,13 +419,19 @@ export function createSuite({ store = createSuiteStore(), platform = process.pla
       if (path === "/api/suite/profile/package/import") return store.importProfilePackage(compartment, body.document, body.reviewId);
       if (path === "/api/suite/workflow/save") return store.saveWorkflow(compartment, body.workflow);
       if (path === "/api/suite/copilot/discovery") return copilot.discovery(compartment);
+      if (["/api/suite/copilot/requests", "/api/suite/copilot/requests/review", "/api/suite/copilot/requests/resolve"].includes(path)) {
+        const { workspaceBaseUrl, ...input } = body;
+        const allowed = path.endsWith("/resolve") ? ["compartment", "id", "token"] : path.endsWith("/review") ? ["compartment", "id"] : ["compartment"];
+        if (Object.keys(input).some(key => !allowed.includes(key))) throw Error("Inspect or review only one original Microsoft request; prompt, credential and replay fields are refused.");
+        return path.endsWith("/resolve") ? copilot.resolveRequest(compartment, input) : path.endsWith("/review") ? copilot.reviewRequest(compartment, input.id) : copilot.listRequests(compartment);
+      }
       if (path === "/api/suite/integrations/catalog") return clients.catalog(compartment);
       if (path === "/api/suite/integrations/launches") return clientLaunch.list(compartment);
       if (path === "/api/suite/integrations/launch") { const { workspaceBaseUrl, ...proposal } = body; return clientLaunch.launch(compartment, proposal); }
       if (path === "/api/suite/integrations/recipe") { const { workspaceBaseUrl, ...proposal } = body; return clients.recipe(compartment, proposal); }
       if (path === "/api/suite/copilot/login") return copilot.beginLogin(compartment, body);
       if (path === "/api/suite/copilot/poll") return copilot.pollLogin(compartment, body.loginId);
-      if (path === "/api/suite/design") { await store.authorize(compartment, { provider: body.provider }); return (body.provider === "microsoft-365-copilot" ? copilot : agents).design({ compartment, provider: body.provider, message: body.message, plan: body.plan, conversationId: body.conversationId }); }
+      if (path === "/api/suite/design") { await store.authorize(compartment, { provider: body.provider }); return (body.provider === "microsoft-365-copilot" ? copilot : agents).design({ compartment, provider: body.provider, message: body.message, plan: body.plan, conversationId: body.conversationId, ...(body.provider === "microsoft-365-copilot" ? { requestId: body.requestId } : {}) }); }
       if (path === "/api/suite/design/cancel") return agents.cancel(compartment, body.conversationId);
       if (path === "/api/suite/design/status") return agents.status(compartment, body.conversationId);
       if (path === "/api/suite/conversation/binding/review") return agents.reviewLegacyBinding(compartment, body.conversationId);

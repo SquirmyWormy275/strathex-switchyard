@@ -2,6 +2,8 @@
 import { randomUUID } from "node:crypto";
 import { parsePlan } from "./model.mjs";
 import { designResponseSchema, validateDesignResponse } from "./agents.mjs";
+import { scopeHash } from "./confirmations.mjs";
+import { createCopilotRequests, copilotRequestResource, copilotResponseDigest } from "./copilot-requests.mjs";
 
 const guid = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i;
 export const copilotScopes = ["User.Read", "Sites.Read.All", "Mail.Read", "People.Read.All", "OnlineMeetingTranscript.Read.All", "Chat.Read", "ChannelMessage.Read.All", "ExternalItem.Read.All"];
@@ -14,12 +16,13 @@ function validateCredential(value) {
 
 export function createCopilot({ store, fetcher = fetch, now = () => Date.now(), isActive = async () => true }) {
   const logins = new Map(), busy = new Set(), generations = new Map(), operations = new Set(); let closed = false;
+  const requests = createCopilotRequests({ store, now, isActive: async c => !closed && await isActive(c) });
   function operation(compartment) {
     if (closed) throw new Error("The Microsoft request service is closed.");
     const generation = generations.get(compartment) ?? 0, controller = new AbortController(); let finish;
     const scope = { compartment, generation, signal: controller.signal, done: new Promise(resolve => { finish = resolve; }),
-      assert() { if (closed || generation !== (generations.get(compartment) ?? 0) || controller.signal.aborted) throw new Error("The Microsoft request was stopped. Remote cancellation is unverified; no follow-up or response was accepted."); },
-      async current() { this.assert(); if (!await isActive(compartment)) throw new Error("The Microsoft workspace is no longer active."); await store.authorize(compartment, { provider }); this.assert(); },
+      assert() { this.resourceAssert?.(); if (closed || generation !== (generations.get(compartment) ?? 0) || controller.signal.aborted) throw new Error("The Microsoft request was stopped. Remote cancellation is unverified; no follow-up or response was accepted."); },
+      async current() { this.assert(); if (!await isActive(compartment)) throw new Error("The Microsoft workspace is no longer active."); await store.authorize(compartment, { provider }); await this.requestCheck?.(); this.assert(); },
       abort() { controller.abort(); }, finish() { operations.delete(scope); finish(); }
     };
     operations.add(scope); return scope;
@@ -72,6 +75,7 @@ export function createCopilot({ store, fetcher = fetch, now = () => Date.now(), 
     let c; try { c = JSON.parse(raw); } catch { throw new Error("The local Microsoft credential reference is invalid."); }
     validateCredential(c);
     await store.authorize(compartment, { provider, account: c.account });
+    await requests.assertAvailable(compartment, c.account);
     if (c.expiresAt <= now() + 60000) {
       if (!c.refreshToken) throw new Error("Microsoft sign-in expired. Sign in again with the approved account.");
       const token = await tokenRequest(c.tenantId, { grant_type: "refresh_token", client_id: c.clientId, refresh_token: c.refreshToken, scope: [...copilotScopes, "offline_access"].join(" ") }, scope);
@@ -95,6 +99,9 @@ export function createCopilot({ store, fetcher = fetch, now = () => Date.now(), 
   }
   return {
     stopCompartment,
+    listRequests: c => requests.list(c),
+    reviewRequest: (c, id) => requests.review(c, id),
+    resolveRequest: (c, input) => requests.resolve(c, input),
     async close() { closed = true; const compartments = new Set([...operations].map(scope => scope.compartment)); for (const login of logins.values()) compartments.add(login.compartment); const results = await Promise.all([...compartments].map(stopCompartment)); logins.clear(); return { stopped: true, localRequestsSettled: results.every(row => row.localRequestsSettled), remoteCancellationVerified: false }; },
     async discovery(compartment) { const state = await store.snapshot(compartment); return { id: provider, surface: "Microsoft 365 Copilot Chat · Graph beta or approved web", webUrl: "https://m365.cloud.microsoft/chat", account: state.copilotAccount ?? null, installed: "web route available", api: state.copilotAccount ? "enrolled; capability checked on use" : "not enrolled", capabilities: ["approved-web-launch", "configured-api-conversation", "exact-owned-conversation"], unsupported: ["arbitrary desktop chat observation", "GitHub Copilot equivalence", "verified task completion", "application-only or personal Microsoft accounts"], preview: true, scopes: copilotScopes }; },
     async beginLogin(compartment, { tenantId, clientId, approved }) {
@@ -133,7 +140,7 @@ export function createCopilot({ store, fetcher = fetch, now = () => Date.now(), 
         return { status: "connected", account: c.account };
       } finally { login.polling = false; scope.finish(); }
     },
-    async design({ compartment, message, plan: input, conversationId }) {
+    async design({ compartment, message, plan: input, conversationId, requestId }) {
       await store.authorize(compartment, { provider }); const plan = parsePlan(input);
       if (typeof message !== "string" || !message.trim() || message.length > 12000) throw new Error("Enter a bounded design request.");
       const state = await store.snapshot(compartment), existing = conversationId ? state.conversations.find((c) => c.id === conversationId && c.provider === provider) : null;
@@ -142,11 +149,36 @@ export function createCopilot({ store, fetcher = fetch, now = () => Date.now(), 
       try {
         await scope.current(); const c = await credential(compartment, scope);
         if (existing && existing.account !== c.account) throw new Error("This Microsoft conversation belongs to a different or unverified account. Reconnect its exact approved account; no conversation was continued.");
-        let remoteId = existing?.sessionId;
-        if (!remoteId) remoteId = (await graph(compartment, "/beta/copilot/conversations", {}, c, scope)).value.id;
-        if (!guid.test(remoteId)) throw new Error("Microsoft returned an unsupported conversation identity.");
         const content = { instruction: "Help improve the workflow, then propose physical controls. Do not take external actions or invent capability evidence. Return only JSON matching responseSchema. Use exact supplied key IDs and preserve ordinary typing. Output is a proposal, never permission.", request: message, plan, workflow: state.workflow, responseSchema: designResponseSchema };
-        const r = await graph(compartment, `/beta/copilot/conversations/${remoteId}/chat`, { message: { text: JSON.stringify(content) }, locationHint: { timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone }, contextualResources: { webContext: { isWebEnabled: false } } }, c, scope);
+        const body = { message: { text: JSON.stringify(content) }, locationHint: { timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone }, contextualResources: { webContext: { isWebEnabled: false } } };
+        if (Buffer.byteLength(JSON.stringify(body)) > 1048576) throw new Error("The Microsoft design context exceeds its bounded request size. No request was delivered.");
+        const output = await store.withResourceLock("copilot-request", copilotRequestResource(compartment, c.account, c.clientId), async lease => {
+        scope.resourceAssert = () => lease.assert();
+        try {
+        const assertCurrent = () => { scope.assert(); lease.assert(); }; assertCurrent(); await scope.current();
+        const reserved = await requests.reserve(compartment, { account: c.account, clientId: c.clientId, conversationId: id, sessionId: existing?.sessionId ?? null, scopeDigest: scopeHash(["switchyard-copilot-design/v1", c.account, c.clientId, existing?.id ?? null, body]), requestId }, assertCurrent);
+        const operationId = reserved.row.id; scope.requestId = operationId;
+        if (reserved.reused) {
+          const saved = (await store.snapshot(compartment)).conversations.find(row => row.id === reserved.row.conversationId);
+          if (!saved || saved.account !== c.account || saved.lastCopilotRequestId !== operationId || copilotResponseDigest(saved) !== reserved.row.responseDigest) throw new Error("This exact Microsoft request already completed. Its original response is retained in history; no request was submitted again.");
+          await assertCredential(compartment, c); await scope.current();
+          return { reply: saved.messages.at(-1).text, proposal: saved.proposal, workflow: saved.workflow, ...(saved.limitation ? { limitation: saved.limitation } : {}), provider, conversationId: saved.id, sessionId: saved.sessionId, operationId, requestId: reserved.row.requestId, reused: true, modelPromptSubmitted: false, provenance: "Original exact account-bound private response; no Microsoft request replayed" };
+        }
+        scope.requestStage = "reserved"; scope.requestCheck = () => requests.assertCurrent(compartment, operationId, scope.requestStage);
+        try {
+        let remoteId = existing?.sessionId;
+        if (!remoteId) {
+          await requests.enter(compartment, operationId, "creating", assertCurrent);
+          scope.requestStage = "creating";
+          remoteId = (await graph(compartment, "/beta/copilot/conversations", {}, c, scope)).value.id;
+          if (!guid.test(remoteId)) throw new Error("Microsoft returned an unsupported conversation identity.");
+          await requests.created(compartment, operationId, remoteId, assertCurrent);
+          scope.requestStage = "created";
+        }
+        if (!guid.test(remoteId)) throw new Error("Microsoft returned an unsupported conversation identity.");
+        await requests.enter(compartment, operationId, "submitting", assertCurrent);
+        scope.requestStage = "submitting";
+        const r = await graph(compartment, `/beta/copilot/conversations/${remoteId}/chat`, body, c, scope);
         if (r.value.id !== remoteId || !Array.isArray(r.value.messages)) throw new Error("Microsoft's reply does not match the exact owned conversation.");
         const reply = r.value.messages.filter((m) => typeof m.text === "string").at(-1)?.text;
         if (!reply || reply.length > 64000) throw new Error("Microsoft did not return a bounded conversation response.");
@@ -154,13 +186,23 @@ export function createCopilot({ store, fetcher = fetch, now = () => Date.now(), 
         try { design = validateDesignResponse(JSON.parse(reply.replace(/^```(?:json)?\s*/, "").replace(/\s*```$/, "")), plan); }
         catch { design = { reply, proposal: null, workflow: state.workflow, limitation: "The Chat API does not guarantee a structured response. This reply is displayed as text; no layout change was inferred." }; }
         await assertCredential(compartment, c);
-        await store.update(compartment, "m365-design", (s) => {
-          scope.assert(); const current = s.conversations.find(row => row.id === id);
+        const saved = await store.update(compartment, "m365-design", (s) => {
+          assertCurrent(); requests.assertOwned(s, operationId, "submitting"); const current = s.conversations.find(row => row.id === id);
           if (existing ? !current || current.provider !== provider || current.sessionId !== remoteId || current.account !== c.account : current) throw new Error("The exact Microsoft conversation binding changed before its response could be saved.");
-          s.conversations = [...s.conversations.filter((row) => row.id !== id), { id, provider, sessionId: remoteId, account: r.account, updatedAt: now(), messages: [...(existing?.messages ?? []), { role: "user", text: message }, { role: "assistant", text: design.reply }].slice(-40), proposal: design.proposal, workflow: design.workflow }];
+          const saved = { id, provider, sessionId: remoteId, account: r.account, updatedAt: now(), messages: [...(existing?.messages ?? []), { role: "user", text: message }, { role: "assistant", text: design.reply }].slice(-40), proposal: design.proposal, workflow: design.workflow, limitation: design.limitation ?? null, lastCopilotRequestId: operationId };
+          s.conversations = [...s.conversations.filter((row) => row.id !== id), saved]; return structuredClone(saved);
         }, { provider, account: r.account });
         await scope.current();
-        return { ...design, provider, conversationId: id, sessionId: remoteId, provenance: "Microsoft Graph delegated work account; exact owned conversation; tenant acceptance required" };
+        await requests.complete(compartment, operationId, saved, assertCurrent);
+        scope.requestStage = "completed";
+        return { ...design, provider, conversationId: id, sessionId: remoteId, operationId, requestId: reserved.row.requestId, provenance: "Microsoft Graph delegated work account; exact owned conversation; tenant acceptance required" };
+        } catch (error) {
+          try { await requests.fail(compartment, operationId); } catch { throw new Error("The Microsoft request outcome could not be recorded. Preserve its original delivery facts; no automatic retry is permitted."); }
+          throw error;
+        }
+        } finally { scope.resourceAssert = undefined; scope.requestCheck = undefined; }
+        });
+        await scope.current(); return output;
       } finally { busy.delete(`${compartment}:${id}`); scope.finish(); }
     }
   };

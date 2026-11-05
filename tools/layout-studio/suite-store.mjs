@@ -144,11 +144,11 @@ export function createSuiteStore({ root = join(process.env.XDG_STATE_HOME || (pr
   }
   return {
     async withResourceLock(kind, identity, fn) {
-      if (!["voice-cpu", "repository-effects", "repository-execution", "client-launch", "windows-storage"].includes(kind) || typeof identity !== "string" || identity.length > 1024) throw new Error("Unsupported private resource lease.");
+      if (!["voice-cpu", "repository-effects", "repository-execution", "client-launch", "windows-storage", "copilot-request"].includes(kind) || typeof identity !== "string" || identity.length > 1024) throw new Error("Unsupported private resource lease.");
       return withStateLock(root, `${kind}-${createHash("sha256").update(identity).digest("hex").slice(0, 40)}`, fn);
     },
     async tryWithResourceLock(kind, identity, fn) {
-      if (!["voice-cpu", "repository-effects", "repository-execution", "client-launch"].includes(kind) || typeof identity !== "string" || identity.length > 1024) throw new Error("Unsupported private resource lease.");
+      if (!["voice-cpu", "repository-effects", "repository-execution", "client-launch", "copilot-request"].includes(kind) || typeof identity !== "string" || identity.length > 1024) throw new Error("Unsupported private resource lease.");
       let entered = false;
       try { return { acquired: true, value: await withStateLock(root, `${kind}-${createHash("sha256").update(identity).digest("hex").slice(0, 40)}`, lease => { entered = true; return fn(lease); }, { nonBlocking: true }) }; }
       catch (error) { if (!entered && error.code === "STATE_LOCK_BUSY") return { acquired: false }; throw error; }

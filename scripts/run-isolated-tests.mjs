@@ -112,6 +112,7 @@ const linuxCompanionTests = ["linux-secret", "linux-isolation", "linux-lifecycle
     ...(process.platform !== "linux" && linuxSkippedOnNonLinux.has(name) ? { expectedSkipped: linuxSkippedOnNonLinux.get(name) } : {})
   }));
 export function nativeTestOverrides(file, platform = process.platform) {
+  if (platform === "win32" && ["tools/layout-studio/copilot-account-binding.test.mjs", "tools/layout-studio/copilot-lifecycle.test.mjs", "tools/layout-studio/copilot-requests.test.mjs"].includes(file)) return { timeoutMs: 120_000 };
   if (file === "deployment/suite/inspect.test.mjs") return { timeoutMs: platform === "win32" ? 300_000 : 120_000 };
   if (file === "tools/layout-studio/task-history-inputs.test.mjs") return { timeoutMs: platform === "win32" ? 300_000 : 120_000 };
   if (file === "tools/layout-studio/repository-windows-shield-history.test.mjs") return { timeoutMs: platform === "win32" ? 300_000 : 120_000 };
@@ -142,8 +143,10 @@ export const requiredGroups = [
   { file: "scripts/windows-scenario-groups.test.mjs" },
   { file: "scripts/windows-restricted-owner-report.test.mjs" },
   { file: "scripts/verify-shield-license-host.test.mjs" },
-  { file: "tools/layout-studio/copilot-account-binding.test.mjs" },
-  { file: "tools/layout-studio/copilot-lifecycle.test.mjs" },
+  { file: "scripts/verify-copilot-journal-host.test.mjs" },
+  { file: "tools/layout-studio/copilot-account-binding.test.mjs", ...nativeTestOverrides("tools/layout-studio/copilot-account-binding.test.mjs") },
+  { file: "tools/layout-studio/copilot-lifecycle.test.mjs", ...nativeTestOverrides("tools/layout-studio/copilot-lifecycle.test.mjs") },
+  { file: "tools/layout-studio/copilot-requests.test.mjs", ...nativeTestOverrides("tools/layout-studio/copilot-requests.test.mjs") },
   { file: "scripts/verify-runtime-platform.test.mjs" },
   { file: "deployment/suite/release.test.mjs" },
   { file: "deployment/suite/inspect.test.mjs", ...nativeTestOverrides("deployment/suite/inspect.test.mjs") },

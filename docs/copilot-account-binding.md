@@ -54,7 +54,8 @@ encrypted state and the actual Suite mode/workspace/shutdown composition with
 simulated network responses. Type checking passes. No Microsoft endpoint is
 contacted.
 
-Durable uncertain-effect/restart handling remains unfinished software. Remote
-creation or chat delivery followed by failure must not be represented as
-verified remote cancellation or harmless automatic replay. Approved work tenant,
-license and consent acceptance remain separate unavailable-account checks.
+Durable delivery reservation, account kernel ownership, restart refusal and
+separately reviewed acknowledgement are now implemented in source. Their
+[request/recovery contract](copilot-request-recovery.md) preserves unknown remote
+effects and never turns local acknowledgement into completion. Approved work
+tenant, license and consent acceptance remain separate account checks.

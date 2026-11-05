@@ -42,6 +42,8 @@ Copilot-only policy. Imported layouts never enable providers or recording.
   evidence and the controls still being implemented.
 - [Reviewed native coding text](docs/native-coding-tasks.md): follow an exact task,
   approve bounded text and recover an uncertain turn without automatic retry.
+- [Microsoft work conversations](docs/copilot-request-recovery.md): keep the exact
+  enrolled account and recover a lost reply without silently sending it again.
 - [Mediated repository effects](docs/mediated-repository-effects.md): follow a
   binary file through review, encrypted preservation, the durable policy broker
   and supervised native Git; run its disposable native demonstration.

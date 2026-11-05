@@ -24,5 +24,5 @@ export async function copilotFixture(t, options = {}) {
   };
   api = createCopilot({ store, ...options, fetcher: transport });
   const seed = account => store.update("work", "synthetic-conversation", s => { s.conversations = [{ id: "owned-conversation", provider: "microsoft-365-copilot", sessionId: remoteId, updatedAt: Date.now(), ...(account === undefined ? {} : { account }), messages: [] }]; });
-  return { store, api, transport, credential, setCredential, calls, seed, hook: value => { hook = value; }, design: conversationId => api.design({ compartment: "work", plan, message: "Synthetic design request", conversationId }) };
+  return { store, api, transport, credential, setCredential, calls, seed, hook: value => { hook = value; }, design: (conversationId, requestId) => api.design({ compartment: "work", plan, message: "Synthetic design request", conversationId, requestId }) };
 }

@@ -13,12 +13,14 @@ test("stopping an owned request aborts cooperative transport and never sends the
   assert.equal(signal.aborted, true); assert.equal(result.localDeliveryBlocked, true); assert.equal(result.localRequestsSettled, true); assert.equal(result.remoteCancellationVerified, false);
   assert.equal(f.calls.length, 1); assert.equal((await f.store.snapshot("work")).conversations.length, 0);
 });
-test("late abort-ignoring transport cannot publish or follow up; unsettled local IO is reported honestly and the next generation can work", async t => {
+test("late abort-ignoring transport cannot publish or follow up; the next generation preserves its unresolved delivery until review", async t => {
   const f = await copilotFixture(t), entered = deferred(), release = deferred(); f.hook(async () => { entered.resolve(); await release.promise; });
   const pending = assert.rejects(f.design(), /stopped/); await entered.promise;
   const stopped = await f.api.stopCompartment("work"); assert.equal(stopped.localRequestsSettled, false); assert.equal(stopped.remoteCancellationVerified, false);
   release.resolve(); await pending; assert.equal(f.calls.length, 1); assert.equal((await f.store.snapshot("work")).conversations.length, 0);
-  f.hook(async () => {}); assert.equal((await f.design()).sessionId, remoteId); assert.equal(f.calls.length, 3);
+  f.hook(async () => {}); await assert.rejects(f.design(), /unresolved outcome/); assert.equal(f.calls.length, 1);
+  const id = (await f.api.listRequests("work"))[0].id, review = await f.api.reviewRequest("work", id); await f.api.resolveRequest("work", { id, token: review.confirmation.token });
+  assert.equal((await f.design()).sessionId, remoteId); assert.equal(f.calls.length, 3);
 });
 test("cancellation during a partially read body cannot turn a late body into an accepted conversation", async t => {
   const entered = deferred(), release = deferred(); let pulls = 0;
