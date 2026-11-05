@@ -19,6 +19,8 @@ import { scopeHash } from "./confirmations.mjs";
 import { connectedExecutionActions, linuxPipelineActions, linuxShieldActions } from "./repository-execution-actions.mjs";
 import { pipelineEvidence, pipelineDependencies } from "./repository-pipeline.mjs";
 import { validateShieldRecipe, shieldDependencies, shieldReceiptEvidence } from "./repository-shield.mjs";
+import { shieldIndexPrefix } from "./shield-scanner-engine.mjs";
+import { shieldIndexFiles, shieldIndexStagingBytes } from "./shield-index-inputs.mjs";
 const uuid=v=>typeof v==="string"&&/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/.test(v);
 const sha=v=>typeof v==="string"&&/^[a-f0-9]{64}$/.test(v), tokenHash=v=>createHash("sha256").update(v).digest("hex");
 const budget={version:"suite-reviewed-execution/v2",commandClasses:Object.fromEntries(connectedExecutionActions("linux").map(action=>[action,{maxConcurrent:1,timeoutMs:600000,maxAttempts:1,windowMs:3600000,maxClaimsPerWindow:20,maxCostUnitsPerWindow:20,defaultCostUnits:1}]))};
@@ -45,8 +47,13 @@ export function createRepositoryExecution({store,authority,stateDirectory,platfo
       if(linuxPipelineActions.includes(proposal.action)&&Object.entries(recipe.environment).some(([name,value])=>name==="NODE_ENV"&&value!=="test"))throw Error("A connected pipeline cannot select a production NODE_ENV.");
       const ignored=linuxShieldActions.includes(proposal.action)?(resolved.files.ignored??[]).filter(f=>f.classification==="included"&&resolved.proposed.classifications.includedIgnored?.includes(f.path)):[];
       const witnesses=new Map([...resolved.files.tracked,...resolved.files.untracked,...ignored].map(f=>[f.path,f]));
-      for(const input of recipe.inputFiles)if(!resolved.proposed.paths.includes(input.path)||witnesses.get(input.path)?.digest!==`sha256:${input.sha256}`)throw Error("Every execution input must match this exact task-owned file snapshot.");
-      const shield=await validateShieldRecipe({recipe,repositoryRoot:resolved.task.repositoryRoot,action:proposal.action,resolveFixtures:resolveScannerFixtures?input=>resolveScannerFixtures(c,input):undefined,now});
+      for(const input of recipe.inputFiles){
+        if(input.path.startsWith(shieldIndexPrefix)&&linuxShieldActions.includes(proposal.action))continue;
+        if(!resolved.proposed.paths.includes(input.path)||witnesses.get(input.path)?.digest!==`sha256:${input.sha256}`)throw Error("Every execution input must match this exact task-owned file snapshot.");
+      }
+      const shield=await validateShieldRecipe({recipe,repositoryRoot:resolved.task.repositoryRoot,action:proposal.action,resolveFixtures:resolveScannerFixtures?input=>resolveScannerFixtures(c,input):undefined,resolveIndexInputs:(paths,consume)=>authority.useIndexInputs(c,resolved.record.id,proposal.action,paths,consume),now});
+      const indexed = new Map(shield ? shieldIndexFiles(shield.request).map(file => [file.path, file]) : []);
+      for(const input of recipe.inputFiles)if(input.path.startsWith(shieldIndexPrefix)&&(!indexed.has(input.path)||!resolved.proposed.paths.includes(indexed.get(input.path).source.path)))throw Error("Every reserved scanner input needs an exact witnessed index source in this task-owned grant.");
       return {verified,recipe,...(shield?{shield}:{})};
     }finally{read.bytes.fill(0);}
   }
@@ -71,7 +78,14 @@ export function createRepositoryExecution({store,authority,stateDirectory,platfo
       dependencies:context=>{
         const native={start:async request=>{const row=(await store.snapshot(c)).repositoryExecutionReviews?.find(r=>r.requestId===review.requestId);if(row?.operationId!==request.operationId)throw Error("The protected execution operation changed before native startup.");return supervisors.forOperation(c,{action:review.action,operationId:request.operationId,targetSnapshotId:review.targetSnapshotId,sessionId:review.sessionId,authorityId:review.authorityId,repositoryRoot:review.repositoryRoot,manifestSha256:review.manifestSha256,provider:resolved.task.provider},check).start(request);},recover:async()=>[],observeOperation:async()=>({state:"not_owner",operationId:"unknown",summary:"Use the protected execution inventory."})};
         const sandbox=namespaceFactory(native);
-        repositoryRuntime=new RepositoryRuntime(loaded.verified,{processSupervisor:sandbox,temporaryBuilds:true,executionRoots:{prepare:async input=>{const row=(await store.snapshot(c)).repositoryExecutionReviews?.find(r=>r.requestId===review.requestId);if(!row?.operationId)throw Error("Execution staging requires its protected checkpoint operation.");return staging.prepare(c,{operationId:row.operationId,scopeDigest:review.scopeDigest},input,check);}}});
+        repositoryRuntime=new RepositoryRuntime(loaded.verified,{processSupervisor:sandbox,temporaryBuilds:true,executionRoots:{prepare:async input=>{
+          const row=(await store.snapshot(c)).repositoryExecutionReviews?.find(r=>r.requestId===review.requestId);if(!row?.operationId)throw Error("Execution staging requires its protected checkpoint operation.");
+          const context={operationId:row.operationId,scopeDigest:review.scopeDigest};
+          if(!review.shield?.indexWitness)return staging.prepare(c,context,input,check);
+          try {
+            return await authority.useIndexInputs(c,review.authorityId,review.action,review.shield.indexWitness.rows.map(row=>row.path),(report,bytes)=>staging.prepare(c,context,input,check,{indexBytes:shieldIndexStagingBytes(review.shield,report,bytes)}));
+          } catch(error) { await staging.cleanup(c,row.operationId); throw error; }
+        }}});
         const broker=new RepositoryRuntimeExecutionBroker({resolve:async root=>{if(root!==review.repositoryRoot)throw Error("The execution repository changed.");return repositoryRuntime;}}),execution=new InMemoryExecutionBroker(context.policy),marker=repositoryRuntimeExecutionRecipe(review.action,resolved.snapshot);
         const pipeline=receiptEvidence?(linuxShieldActions.includes(review.action)?shieldDependencies:pipelineDependencies)({policy:context.policy,runtime:repositoryRuntime,review,target:resolved.snapshot,receiptEvidence,now,resolveScannerFixtures:resolveScannerFixtures?input=>resolveScannerFixtures(c,input):undefined,resolveShieldExceptions:resolveShieldExceptions?input=>resolveShieldExceptions(c,input):undefined}):undefined;
         execution.register(marker.id,request=>pipeline?pipeline.execute(request):broker.execute(request));

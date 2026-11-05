@@ -6,6 +6,7 @@ import { dirname, resolve, relative, isAbsolute } from "node:path";
 import { fileURLToPath } from "node:url";
 
 export const shieldEngineVersion = "switchyard-baseline-scanner/1";
+export const shieldIndexPrefix = ".switchyard-index/";
 export const shieldActions = Object.freeze(["shield_change_scan", "shield_codebase_audit", "shield_supply_chain", "release_shield"]);
 const dimensions = {
   shield_change_scan: ["secrets", "pii", "security_defects"],
@@ -58,10 +59,23 @@ function workspaceLink(packages, link, cache) {
   cache.set(path, result); return result;
 }
 function feed(v) { exact(v, ["id", "path", "sha256"]); return { id: identifier(v.id), path: scannerPath(v.path), sha256: digest(v.sha256) }; }
+function indexSource(v) {
+  exact(v, ["kind", "path", "objectId", "mode"]);
+  if (v.kind !== "git-index" || !/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(v.objectId ?? "") || /^0+$/.test(v.objectId) || !["100644", "100755"].includes(v.mode)) throw Error("Invalid exact index source declaration.");
+  const path = scannerPath(v.path);
+  if (path === shieldIndexPrefix.slice(0, -1) || path.startsWith(shieldIndexPrefix)) throw Error("Nested scanner index aliases are refused.");
+  return { kind: "git-index", path, objectId: v.objectId, mode: v.mode };
+}
 export function validateShieldRequest(v) {
   exact(v, ["schema", "version", "action", "scope", "files", "scanner", "advisory"]);
   if (v.schema !== "switchyard-shield-scan/v1" || v.version !== 1 || !shieldActions.includes(v.action) || v.scope !== "reviewed-inputs") throw Error("Unsupported Shield request or scope.");
-  const files = array(v.files, 512).map(f => { exact(f, ["path", "sha256", "size"]); if (!Number.isSafeInteger(f.size) || f.size < 0 || f.size > 2 * 1024 * 1024) throw Error("Scanner file exceeds its bound."); return { path: scannerPath(f.path), sha256: digest(f.sha256), size: f.size }; });
+  const files = array(v.files, 512).map(f => {
+    exact(f, ["path", "sha256", "size", ...(Object.hasOwn(f ?? {}, "source") ? ["source"] : [])]);
+    if (!Number.isSafeInteger(f.size) || f.size < 0 || f.size > 2 * 1024 * 1024) throw Error("Scanner file exceeds its bound.");
+    const path = scannerPath(f.path), source = Object.hasOwn(f, "source") ? indexSource(f.source) : undefined;
+    if (source ? path !== shieldIndexPrefix + source.path : path === shieldIndexPrefix.slice(0, -1) || path.startsWith(shieldIndexPrefix)) throw Error("Index inputs require their exact reserved disposable path and original source identity.");
+    return { path, sha256: digest(f.sha256), size: f.size, ...(source ? { source } : {}) };
+  });
   if (!files.length || files.reduce((n, f) => n + f.size, 0) > 16 * 1024 * 1024 || new Set(files.map(f => f.path.toLowerCase())).size !== files.length) throw Error("Invalid scanner input inventory.");
   const scanner = feed(v.scanner), advisory = v.advisory === null ? null : feed(v.advisory);
   if (advisory && (advisory.id === scanner.id || advisory.path.toLowerCase() === scanner.path.toLowerCase()) || files.some(f => [scanner.path, advisory?.path].includes(f.path))) throw Error("Ambiguous scanner inputs.");
@@ -96,7 +110,7 @@ export async function scanShieldInputs(proposed, { readInput }) {
   const add = finding => { if (findings.length < 512) findings.push(finding); else gaps.add("finding_limit"); };
   for (const file of request.files) {
     const bytes = await readInput(file.path, file.size); if (bytes.length !== file.size || sha(bytes) !== file.sha256) throw Error("Scanner input changed.");
-    inventory.push({ path: file.path, sha256: file.sha256, bytes: file.size });
+    inventory.push({ path: file.path, sha256: file.sha256, bytes: file.size, ...(file.source ? { source: file.source } : {}) });
     let text;
     try { text = utf8(bytes); if (text.includes("\0")) throw Error("binary"); } catch { gaps.add("binary_or_non_utf8_input"); continue; }
     const extension = file.path.split(".").at(-1).toLowerCase();
@@ -104,7 +118,7 @@ export async function scanShieldInputs(proposed, { readInput }) {
       const rule = rules[id]; if (!requested.includes(rule.dimension) || rule.extensions && !rule.extensions.includes(extension)) continue;
       rule.pattern.lastIndex = 0; let match;
       while ((match = rule.pattern.exec(text)) !== null) {
-        add({ ruleId: id, dimension: rule.dimension, severity: rule.severity, path: file.path, line: text.slice(0, match.index).split("\n").length, fingerprint: sha(`${id}\0${file.sha256}\0${match.index}`) });
+        add({ ruleId: id, dimension: rule.dimension, severity: rule.severity, path: file.path, line: text.slice(0, match.index).split("\n").length, fingerprint: sha(`${id}\0${file.path}\0${file.sha256}\0${match.index}`) });
         if (findings.length >= 512) { gaps.add("finding_limit"); break; }
       }
     }
@@ -136,10 +150,10 @@ export async function scanShieldInputs(proposed, { readInput }) {
         const known = advisory.find(a => a.name === name && a.version === p.version);
         if (!known) gaps.add("advisory_package_coverage");
         if (known?.advisories.some(advisory => advisory.severity === "unknown")) gaps.add("advisory_severity_unassessed");
-        for (const a of known?.advisories ?? []) add({ ruleId: a.id, dimension: "vulnerabilities", severity: a.severity, path: file.path, line: null, fingerprint: sha(`${a.id}\0${file.sha256}\0${location}\0${p.version}`) });
+        for (const a of known?.advisories ?? []) add({ ruleId: a.id, dimension: "vulnerabilities", severity: a.severity, path: file.path, line: null, fingerprint: sha(`${a.id}\0${file.path}\0${file.sha256}\0${location}\0${p.version}`) });
         if (!component.license) gaps.add("license_metadata");
         else if (!policy.allowedLicenses.length) gaps.add("license_policy");
-        else if (!policy.allowedLicenses.includes(component.license)) add({ ruleId: "license.disallowed", dimension: "licenses", severity: "high", path: file.path, line: null, fingerprint: sha(`license\0${file.sha256}\0${location}\0${component.license}`) });
+        else if (!policy.allowedLicenses.includes(component.license)) add({ ruleId: "license.disallowed", dimension: "licenses", severity: "high", path: file.path, line: null, fingerprint: sha(`license\0${file.path}\0${file.sha256}\0${location}\0${component.license}`) });
         let registry = false;
         try { const u = new URL(p.resolved); registry = u.protocol === "https:" && u.hostname === "registry.npmjs.org" && !u.username && !u.password && !u.search && !u.hash && /^sha512-[A-Za-z0-9+/]{86}==$/.test(p.integrity); } catch {}
         if (linked) gaps.add("workspace_source_unverified");

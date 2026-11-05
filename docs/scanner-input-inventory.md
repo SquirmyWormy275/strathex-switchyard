@@ -72,6 +72,8 @@ the separate scanner authority review. Existing authority still requires exact c
 whole named ignored roots using explicit directory-identity witnesses; the
 preview does not apply that policy or grant it. Automatic complete-target scan assembly, persisted
 operator-configured general exclusions,
-staged-byte/history scanning and the frontend remain unfinished implementation.
+history scanning and the frontend remain unfinished implementation. A separate
+[explicit Linux staged-input scan](staged-shield-inputs.md) now preserves both
+index and worktree origin; automatic assembly and Windows staging remain unfinished.
 See [explicit ignored scanner inputs](ignored-scanner-inputs.md) for the distinct
 reviewed read-only scan path.

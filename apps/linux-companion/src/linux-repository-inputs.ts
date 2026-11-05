@@ -8,14 +8,19 @@ import { repositoryInputLimits, validateRepositoryInputs } from "../../windows-c
 import type { RepositoryExecutionRootLease, RepositoryExecutionRootProvider } from "../../windows-companion/src/repository-runtime.ts";
 
 const stamp = (s: { dev: number | bigint; ino: number | bigint }) => `${s.dev}:${s.ino}`;
+interface PrivateIndexInput { readonly bytes: Uint8Array; readonly mode: "100644" | "100755" }
 export class LinuxDisposableExecutionRootProvider implements RepositoryExecutionRootProvider {
   private readonly root: string;
   private readonly now: () => number;
-  constructor(stateDirectory: string, { now = Date.now }: { now?: () => number } = {}) { this.root = resolve(stateDirectory, "repository-execution-roots"); this.now = now; }
+  private readonly indexBytes?: ReadonlyMap<string, PrivateIndexInput>;
+  constructor(stateDirectory: string, { now = Date.now, indexBytes }: { now?: () => number; indexBytes?: ReadonlyMap<string, PrivateIndexInput> } = {}) { this.root = resolve(stateDirectory, "repository-execution-roots"); this.now = now; this.indexBytes = indexBytes; }
   async prepare(input: Parameters<RepositoryExecutionRootProvider["prepare"]>[0]): Promise<RepositoryExecutionRootLease> {
     const repositoryRoot = await realpath(input.repositoryRoot);
+    if (this.indexBytes && input.isolation !== "disposable") throw new Error("Private index bytes require disposable scanner staging.");
     if (input.isolation === "repository") return { root: repositoryRoot, isolation: "repository", release: async () => undefined };
     const inputs = validateRepositoryInputs(input.inputFiles);
+    if (this.indexBytes && (!["shield_change_scan", "shield_codebase_audit", "shield_supply_chain", "release_shield"].includes(input.action) || !(this.indexBytes instanceof Map) || !this.indexBytes.size || [...this.indexBytes.keys()].some(path => !path.startsWith(".switchyard-index/") || !inputs.some(file => file.path === path)))) throw new Error("Private index bytes require exact reserved inputs for the pinned Shield path; general execution is refused.");
+    if (this.indexBytes && inputs.some(file => file.path.startsWith(".switchyard-index/") && !this.indexBytes!.has(file.path))) throw new Error("Every reserved input needs its private verified index bytes; worktree substitution is refused.");
     const deadline = this.now() + 30_000;
     const withinDeadline = () => { if (this.now() > deadline) throw new Error("Reviewed execution input staging exceeded its 30-second deadline."); };
     if (process.platform !== "linux") throw new Error("Descriptor-bound disposable input staging requires Linux.");
@@ -37,6 +42,15 @@ export class LinuxDisposableExecutionRootProvider implements RepositoryExecution
       for (const inputFile of inputs) {
         withinDeadline();
         await sourceCurrent();
+        const index = this.indexBytes?.get(inputFile.path);
+        if (index) {
+          if (!(index.bytes instanceof Uint8Array) || index.bytes.byteLength !== inputFile.size || !["100644", "100755"].includes(index.mode) || createHash("sha256").update(index.bytes).digest("hex") !== inputFile.sha256) throw new Error("The exact private index bytes changed before staging.");
+          total += index.bytes.byteLength; if (total > repositoryInputLimits.totalBytes) throw new Error("Reviewed execution inputs exceed their total byte bound.");
+          const destination = join(staging, inputFile.path); await mkdir(dirname(destination), { recursive: true, mode: 0o700 });
+          const output = await open(destination, constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | constants.O_NOFOLLOW, index.mode === "100755" ? 0o700 : 0o600);
+          try { await output.writeFile(index.bytes); await output.sync(); } finally { await output.close(); }
+          await sourceCurrent(); withinDeadline(); continue;
+        }
         const parts = inputFile.path.split("/"), directories: FileHandle[] = []; let directory = source;
         let file: FileHandle | undefined, bytes: Buffer | undefined;
         try {

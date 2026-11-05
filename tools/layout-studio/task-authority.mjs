@@ -98,6 +98,18 @@ export function createTaskAuthority({ store, checkNative, isActive = async () =>
   const scope = (c, result) => scopeHash(["switchyard-task-authority/v1", c, result.binding, result.workspace, result.snapshot.id, result.proposed]);
   const view = record => ({ ...structuredClone(record), status: record.grant.revokedAt ? "revoked" : Date.parse(record.grant.expiresAt) <= now() ? "expired" : "issued", targetCurrentness: "requires-revalidation", nativePermissionsChanged: false, providerTaskCompletionVerified: false, localCommitExecutionImplemented: Boolean(localCommitExecutionImplemented), connectedExecutionActions: [...executionActions] });
   return {
+    async useIndexInputs(c, id, action, selectedPaths, consume) { return exclusive(c, async generation => {
+      if (!linuxShieldActions.includes(action) || typeof consume !== "function" || typeof inspection.useIndexInputs !== "function" || typeof checkNative !== "function") throw Error("Private index input consumption is available only to the connected pinned Shield scanner.");
+      const selected = gitIndexPaths(selectedPaths), initial = await this.assertCurrent(c, id, action), binding = initial.record.taskDigest, workspace = initial.record.workspaceDigest;
+      if (selected.some(path => !initial.record.proposal.paths.includes(path))) throw Error("Every index source must belong to the exact task-owned file grant.");
+      const authorize = async () => {
+        current(c, generation); const fresh = await this.assertCurrent(c, id, action);
+        if (fresh.record.taskDigest !== binding || fresh.record.workspaceDigest !== workspace) throw Error("The reviewed index task or workspace binding changed.");
+      };
+      await checkNative(c, initial.task); await authorize();
+      const result = await inspection.useIndexInputs(c, initial.task, selected, consume, authorize);
+      await authorize(); await checkNative(c, initial.task); await authorize(); return result;
+    }); },
     async indexInputs(c, input) { return exclusive(c, async generation => {
       if (!input || Object.keys(input).some(key => !["taskId", "compartment", "paths"].includes(key)) || !uuid(input.taskId) || input.compartment !== undefined && input.compartment !== c) throw Error("Witness only named index inputs for one exact bound task; commands, object IDs and policies are refused.");
       const selected = gitIndexPaths(input.paths), { state, task } = await access(c, input.taskId, generation), binding = taskDigest(task), workspace = workspaceDigest(state);

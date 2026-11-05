@@ -6,7 +6,7 @@ import { NodeFileDigestReader } from "../../packages/control-plane/src/git-inspe
 import { directoryIdentity } from "./private-fs.mjs";
 import { runtimeGuardianStopped } from "./runtime-command.mjs";
 const identity = s => `${s.dev}:${s.ino}`;
-export function createRepositoryExecutionStaging({store,stateDirectory,guardianStopped=runtimeGuardianStopped,providerFactory=root=>new LinuxDisposableExecutionRootProvider(root)}={}) {
+export function createRepositoryExecutionStaging({store,stateDirectory,guardianStopped=runtimeGuardianStopped,providerFactory=(root,options)=>new LinuxDisposableExecutionRootProvider(root,options)}={}) {
   const leases=new Map(), reader=new NodeFileDigestReader({maxFileBytes:4*1024*1024});
   async function mark(c,id,fn) {return store.update(c,"repository-execution-staging",s=>{const row=s.repositoryExecutionStaging?.find(r=>r.operationId===id);if(!row)throw Error("The execution staging identity changed.");return fn(row);});}
   async function exactContents(row) {
@@ -39,9 +39,9 @@ export function createRepositoryExecutionStaging({store,stateDirectory,guardianS
     leases.delete(`${c}:${operationId}`);await mark(c,operationId,r=>{r.cleanupPending=false;});return {cleaned:true};
   }
   return {
-    async prepare(c,context,input,authorize) {
+    async prepare(c,context,input,authorize,{indexBytes}={}) {
       if(input.isolation!=="disposable"||!input.inputFiles?.length)throw Error("Connected execution requires exact reviewed disposable inputs.");
-      await authorize();const lease=await providerFactory(join(stateDirectory,c)).prepare(input), nativeIdentity=identity(await directoryIdentity(lease.root));
+      await authorize();const lease=await providerFactory(join(stateDirectory,c),{indexBytes}).prepare(input), nativeIdentity=identity(await directoryIdentity(lease.root));
       let saved=false;
       try {
         await store.update(c,"repository-execution-staging-reserve",s=>{

@@ -69,3 +69,14 @@ test("real Linux guardians consume only derived index object IDs, verify their o
   for (const scope of scopes) assert.equal(await runtimeGuardianStopped(scope), true);
   const state = await f.store.snapshot("personal"); assert.ok(state.repositoryProbes.every(p => p.stoppedVerified && p.scratchCleanupPending === false));
 });
+test("private index consumption requires exact Shield-owned sources, clears borrowed bytes and fences revocation during consumption", async t => {
+  const f=await authorityFixture(t,{executionActions:["shield_change_scan"]}),before=await stageDifferent(f),proposal={...f.proposed,actions:["shield_change_scan"]},review=await f.service.review("personal",proposal),grant=await f.service.issue("personal",{...proposal,token:review.confirmation.token});
+  const indexBefore=await readFile(join(f.root,".git/index"));let borrowed;
+  const result=await f.service.useIndexInputs("personal",grant.id,"shield_change_scan",["task.txt"],(report,bytes)=>{borrowed=bytes.get("task.txt");assert.equal(borrowed.toString(),before.staged);assert.equal(report.rows[0].sha256,sha(before.staged));return "private host consumer finished";});
+  assert.equal(result,"private host consumer finished");assert.ok(borrowed.every(n=>n===0));
+  const calls=f.counters().calls;
+  await assert.rejects(f.service.useIndexInputs("personal",grant.id,"local_commit",["task.txt"],()=>{}),/only to the connected/);
+  await assert.rejects(f.service.useIndexInputs("personal",grant.id,"shield_change_scan",[".gitignore"],()=>{}),/task-owned/);assert.equal(f.counters().calls,calls);
+  await assert.rejects(f.service.useIndexInputs("personal",grant.id,"shield_change_scan",["task.txt"],async(_report,bytes)=>{borrowed=bytes.get("task.txt");await f.service.revoke("personal",grant.id);}),/changed/);assert.ok(borrowed.every(n=>n===0));
+  assert.deepEqual(await readFile(join(f.root,".git/index")),indexBefore);assert.ok((await f.store.snapshot("personal")).repositoryProbes.every(p=>p.stoppedVerified&&p.scratchCleanupPending===false));
+});

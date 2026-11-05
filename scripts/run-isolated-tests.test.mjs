@@ -99,6 +99,8 @@ test("only explicitly slow integration or release groups extend the bounded defa
       ["tools/layout-studio/repository-pipeline.test.mjs", 120_000],
       ["tools/layout-studio/repository-temporary-build.test.mjs", 120_000],
       ["tools/layout-studio/repository-shield.test.mjs", 120_000],
+      ["tools/layout-studio/repository-shield-index.test.mjs", 120_000],
+      ["tools/layout-studio/task-index-inputs.test.mjs", process.platform === "win32" ? 300_000 : 120_000],
       ["tools/layout-studio/task-authority-ignored-trees.test.mjs", process.platform === "win32" ? 300_000 : 120_000],
       ["tools/layout-studio/repository-shield-ignored-trees.test.mjs", process.platform === "win32" ? 300_000 : 120_000],
       ["tools/layout-studio/repository-shield-osv-source.test.mjs", process.platform === "win32" ? 300_000 : 120_000],
@@ -128,6 +130,8 @@ test("only explicitly slow integration or release groups extend the bounded defa
     }
     assert.deepEqual(nativeTestOverrides("tools/layout-studio/task-authority.test.mjs", "win32"), { timeoutMs: 240_000 });
     assert.deepEqual(nativeTestOverrides("tools/layout-studio/task-authority.test.mjs", "linux"), {});
+    assert.deepEqual(nativeTestOverrides("tools/layout-studio/task-index-inputs.test.mjs", "win32"), { timeoutMs: 300_000 });
+    assert.deepEqual(nativeTestOverrides("tools/layout-studio/task-index-inputs.test.mjs", "linux"), { timeoutMs: 120_000 });
     assert.deepEqual(nativeTestOverrides("tools/layout-studio/suite.test.mjs", "win32"), { timeoutMs: 120_000 });
     assert.deepEqual(nativeTestOverrides("tools/layout-studio/suite.test.mjs", "linux"), {});
     assert.deepEqual(nativeTestOverrides("tools/layout-studio/repository-recovery.test.mjs", "win32"), { timeoutMs: 120_000 });

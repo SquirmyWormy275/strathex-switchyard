@@ -7,6 +7,7 @@ import { createRepositoryRecipeEvidence } from "../../apps/windows-companion/src
 import { pipelineDependencies } from "./repository-pipeline.mjs";
 import { shieldActions, shieldEngineVersion, validateShieldRequest, scannerPath } from "./shield-scanner-engine.mjs";
 import { evaluateShieldExceptions } from "./shield-exception-ledger.mjs";
+import { resolveShieldIndexWitness } from "./shield-index-inputs.mjs";
 
 const sha = b => createHash("sha256").update(b).digest("hex");
 const engineUrl = new URL("./shield-scanner-engine.mjs", import.meta.url);
@@ -35,13 +36,13 @@ export function shieldReceiptEvidence(factory) {
     }
   };
 }
-export async function validateShieldRecipe({ recipe, repositoryRoot, action, resolveFixtures, now = Date.now }) {
+export async function validateShieldRecipe({ recipe, repositoryRoot, action, resolveFixtures, resolveIndexInputs, now = Date.now }) {
   if (!shieldActions.includes(action)) return undefined;
   if (recipe.cwd !== "." || recipe.workspaceMode === "temporary-build" || recipe.args.length !== 2 || await realpath(recipe.executable) !== await realpath(process.execPath) || Object.keys(recipe.environment).some(k => k !== "NODE_ENV") || recipe.environment.NODE_ENV !== "test") throw Error("Shield requires the pinned Node scanner, two literal inputs, test environment and read-only workspace.");
-  return validateShieldBundle({inputFiles:recipe.inputFiles,enginePath:recipe.args[0],requestPath:recipe.args[1],repositoryRoot,action,resolveFixtures,now});
+  return validateShieldBundle({inputFiles:recipe.inputFiles,enginePath:recipe.args[0],requestPath:recipe.args[1],repositoryRoot,action,resolveFixtures,resolveIndexInputs,now});
 }
 
-export async function validateShieldBundle({inputFiles,enginePath,requestPath,repositoryRoot,action,resolveFixtures,additionalFiles=[],now=Date.now}) {
+export async function validateShieldBundle({inputFiles,enginePath,requestPath,repositoryRoot,action,resolveFixtures,resolveIndexInputs,additionalFiles=[],now=Date.now}) {
   // Node interprets a leading dash as an option before opening its entrypoint.
   // A file containing the right engine bytes named '-e' must never turn the
   // second literal filename into JavaScript evaluated by Node.
@@ -62,7 +63,8 @@ export async function validateShieldBundle({inputFiles,enginePath,requestPath,re
     const actual = fixtures.find(a => a.id === f.id && a.kind === kind);
     if (!actual || actual.contentSha256 !== f.sha256 || actual.toolName !== "switchyard-baseline-scanner" || actual.toolVersion !== "1") throw Error("Shield feed bytes or exact scanner version do not match installed trust.");
   }
-  return { engine: shieldEngineVersion, engineSha256, requestSha256: sha(JSON.stringify(request)), request, feeds: pins(fixtures), scope: "reviewed-inputs", repositoryScopeVerified: false, completeShieldGateAvailable: false };
+  const indexWitness = await resolveShieldIndexWitness(request, resolveIndexInputs);
+  return { engine: shieldEngineVersion, engineSha256, requestSha256: sha(JSON.stringify(request)), request, feeds: pins(fixtures), scope: "reviewed-inputs", repositoryScopeVerified: false, completeShieldGateAvailable: false, ...(indexWitness ? { indexWitness } : {}) };
 }
 
 export function parseShieldScannerReport(output,shield,action) {
@@ -73,7 +75,7 @@ export function parseShieldScannerReport(output,shield,action) {
   const allowedGaps=new Set(["repository_scope_unverified","binary_or_non_utf8_input","finding_limit","unsupported_dependency_ecosystem","invalid_npm_lock","unsupported_npm_lock","unsupported_npm_package","workspace_source_unverified","advisory_severity_unassessed","advisory_package_coverage","license_metadata","license_policy","package_source_or_integrity","git_history_not_scanned","source_permissions_not_witnessed","publisher_provenance_not_verified","host_isolation_requires_attestation","advisory_feed_missing","npm_lock_missing"]);
   if(!Array.isArray(report.gaps)||report.gaps.length>32||new Set(report.gaps).size!==report.gaps.length||!report.gaps.includes("repository_scope_unverified")||report.gaps.some(g=>!allowedGaps.has(g)))throw Error("Invalid Shield coverage gaps.");
   const files=new Map(shield.request.files.map(f=>[f.path,f]));
-  if(!Array.isArray(report.inventory)||report.inventory.length!==files.size||new Set(report.inventory.map(f=>f.path)).size!==files.size||report.inventory.some(f=>!exact(f,["path","sha256","bytes"])||!files.has(f.path)||files.get(f.path).sha256!==f.sha256||files.get(f.path).size!==f.bytes))throw Error("Shield report source inventory changed.");
+  if(!Array.isArray(report.inventory)||report.inventory.length!==files.size||new Set(report.inventory.map(f=>f.path)).size!==files.size||report.inventory.some(f=>!exact(f,["path","sha256","bytes",...(files.get(f.path)?.source?["source"]:[])])||!files.has(f.path)||files.get(f.path).sha256!==f.sha256||files.get(f.path).size!==f.bytes||JSON.stringify(f.source)!==JSON.stringify(files.get(f.path).source)))throw Error("Shield report source inventory changed.");
   if(!Array.isArray(report.findings)||report.findings.length>512||new Set(report.findings.map(f=>f.fingerprint)).size!==report.findings.length||report.findings.some(f=>!exact(f,["ruleId","dimension","severity","path","line","fingerprint"])||!id(f.ruleId)||!required.includes(f.dimension)||(!["low","medium","high","critical"].includes(f.severity)&&!(f.severity==="unknown"&&f.dimension==="vulnerabilities"))||!files.has(f.path)||!digest(f.fingerprint)||(f.line===null?!["vulnerabilities","licenses"].includes(f.dimension):!Number.isSafeInteger(f.line)||f.line<1||f.line>files.get(f.path).size+1))||report.outcome!==(report.findings.length?"failed":"incomplete"))throw Error("Invalid exact Shield findings.");
   if(!Array.isArray(report.coverage)||report.coverage.length!==required.length||new Set(report.coverage.map(c=>c.dimension)).size!==required.length||report.coverage.some(c=>!exact(c,["dimension","status","rules","findings"])||!required.includes(c.dimension)||c.status!=="incomplete"||!Array.isArray(c.rules)||c.rules.length>32||new Set(c.rules).size!==c.rules.length||c.rules.some(r=>!id(r))||c.findings!==report.findings.filter(f=>f.dimension===c.dimension).length))throw Error("Invalid Shield coverage matrix.");
   if(!exact(report.sbom,["schema","components"])||report.sbom.schema!=="switchyard-npm-lock-inventory/v1"||!Array.isArray(report.sbom.components)||report.sbom.components.length>4096)throw Error("Invalid Shield locked inventory.");
@@ -109,6 +111,7 @@ export function shieldDependencies(options) {
       const shieldExceptionEvaluation=await evaluateShieldExceptions(resolveShieldExceptions,{action:request.action,targetSnapshotId:target.id,scannerSourceSha256:shield.engineSha256,findings:report.findings},now());
       const createdAt = new Date(now()).toISOString(), expiresAt = new Date(Math.min(now() + 300000, ...fixtures.map(f => Date.parse(f.expiresAt)),shieldExceptionEvaluation?.expiresAt?Date.parse(shieldExceptionEvaluation.expiresAt):Infinity)).toISOString();
       const binding = { manifestSha256: review.manifestSha256, helperSha256: shield.engineSha256, helperVersion: shieldEngineVersion, resultSha256: sha(result.output), toolVersions: { node: process.versions.node, repositoryExecutable: `sha256:${review.executableIdentity.sha256}`, scanner: shieldEngineVersion, scannerSource: `sha256:${shield.engineSha256}`, scannerRequest: `sha256:${shield.requestSha256}`, ...Object.fromEntries(fixtures.map(f => [`fixture:${f.kind}:${f.id}`, `manifest=sha256:${f.manifestSha256};content=sha256:${f.contentSha256};feed=${f.feedVersion};tool=${f.toolName}@${f.toolVersion}`])) }, scannerFixtureIds: [shield.request.scanner.id], advisoryFixtureIds: shield.request.advisory ? [shield.request.advisory.id] : [], coverage: report.coverage.map(c => ({ dimension: c.dimension, status: "unavailable", fixtureId: shield.request.scanner.id })), policyVersion: request.target.policyVersion, createdAt, expiresAt };
+      if(shield.indexWitness)binding.toolVersions.gitIndexInputs=`sha256:${sha(JSON.stringify(shield.indexWitness))}`;
       if(shieldExceptionEvaluation)binding.toolVersions.shieldExceptions=`sha256:${sha(JSON.stringify(shieldExceptionEvaluation))}`;
       // Authenticate the incomplete observation and report hash. The separate
       // command receipt records findings as failed; no completion proof is issued.

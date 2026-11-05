@@ -37,8 +37,9 @@ This is byte witnessing, not scanning. The response explicitly retains
 `scanPerformed:false`, `authorityGranted:false`, `gateEligible:false` and
 `completeness:"incomplete"`. Selected entries need not differ from HEAD. Working
 files, new files, history and full repository scope remain outside this operation;
-an index change after the response requires another observation. Connecting these
-blobs to reviewed scanner staging on both execution hosts remains unfinished.
+an index change after the response requires another observation. A separate [Linux staged scanner path](staged-shield-inputs.md) now connects
+these blobs to reviewed private staging; the witness operation itself still
+performs no scan. Windows staged-input execution remains unfinished.
 
 Four parser/hash/boundary cases and authenticated task/HTTP, five drift scenarios
 and real Linux guardian checks pass. The real journey witnesses staged bytes
@@ -69,5 +70,5 @@ and `installed-shield-baseline-1793867608531.json` retain all six independently
 verified query exits, two scanner exits, unchanged original index and worktree,
 exact replay/feed retirement and full restoration. Owned repository, signing
 material, packages, staging, bundle and proof checkout were removed; one empty
-task, zero prompts, no keyboard access. Scanner-staging integration remains
-unfinished.
+task, zero prompts, no keyboard access. The separate Linux staged-scan path has
+source checks; its installed acceptance and Windows staging remain unfinished.

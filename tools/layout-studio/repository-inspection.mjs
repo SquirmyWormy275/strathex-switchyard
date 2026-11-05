@@ -80,7 +80,11 @@ export function createRepositoryInspection({ store, command = runRuntimeCommand,
     async observe(c, task, authorize = async () => {}) { return this.capture(c, task, {}, authorize, { metadataOnly: true }); },
     async scannerInputs(c, task, authorize = async () => {}) { return this.capture(c, task, {}, authorize, { scannerInventory: true }); },
     async indexInputs(c, task, paths, authorize = async () => {}) { return this.capture(c, task, {}, authorize, { indexPaths: gitIndexPaths(paths) }); },
-    async capture(c, task, classifications, authorize = async () => {}, { metadataOnly = false, scannerInventory = false, indexPaths } = {}) {
+    async useIndexInputs(c, task, paths, consume, authorize = async () => {}) {
+      if (typeof consume !== "function") throw Error("A private index consumer is required.");
+      return this.capture(c, task, {}, authorize, { indexPaths: gitIndexPaths(paths), consumeIndex: consume });
+    },
+    async capture(c, task, classifications, authorize = async () => {}, { metadataOnly = false, scannerInventory = false, indexPaths, consumeIndex } = {}) {
       const selectedIndexPaths = indexPaths === undefined ? undefined : gitIndexPaths(indexPaths);
       const excludedTrees = ignoredTreeRoots(classifications.excludedIgnoredTrees ?? []), excludedQuery = excludedTrees.length ? ignoredTreeQuery(excludedTrees) : undefined;
       const generation = generations.get(c) ?? 0, resource = { controller: new AbortController(), clients: new Set() }; seen.add(c);
@@ -96,7 +100,7 @@ export function createRepositoryInspection({ store, command = runRuntimeCommand,
       for (const [path, identity] of cleanup) if ((await Promise.all(old.filter(p => p.scratch === path).map(p => guardianStopped(p.ownedRuntime)))).every(Boolean)) await cleanScratch(c, path, identity);
       await check(); const executable = await resolveGit(); await check();
       const members = running.get(c) ?? new Set(); members.add(resource); running.set(c, members);
-      let fileCount = 0, totalBytes = 0, scratch, scratchIdentity;
+      let fileCount = 0, totalBytes = 0, scratch, scratchIdentity; const indexCopies = new Map();
       const digests = new NodeFileDigestReader({ maxFileBytes: 4 * 1024 * 1024 });
       const digestReader = {
         async digest(root, path) {
@@ -140,11 +144,16 @@ export function createRepositoryInspection({ store, command = runRuntimeCommand,
           const blobs = await runner.run(gitIndexBatchQuery, task.repositoryRoot, allowedBatchInput);
           allowedBatchInput = undefined;
           if (blobs.exitCode) throw Error("The exact selected index blobs are unavailable; no filters or network fallback were used.");
-          const rows = await witnessGitIndexBatch(blobs.stdout, entries);
+          const rows = await witnessGitIndexBatch(blobs.stdout, entries, consumeIndex ? (row, bytes) => { indexCopies.set(row.path, Buffer.from(bytes)); } : undefined);
           const after = await runner.run(gitIndexListingQuery), finalHead = await runner.run(["rev-parse", "HEAD"]);
           if (after.exitCode || finalHead.exitCode || after.stdout !== before.stdout || finalHead.stdout !== head.stdout) throw Error("The Git index or repository revision changed during input witnessing; inspect again.");
           await check(); await verifyRepositoryIdentity(task);
-          return { ...gitIndexWitnessReport({ head: head.stdout.trim(), listing: before.stdout, rows, observedAt: new Date(now()).toISOString() }), repositoryRoot: task.repositoryRoot, observationOnly: true };
+          const report = { ...gitIndexWitnessReport({ head: head.stdout.trim(), listing: before.stdout, rows, observedAt: new Date(now()).toISOString() }), repositoryRoot: task.repositoryRoot, observationOnly: true };
+          if (!consumeIndex) return report;
+          const consumed = await consumeIndex(report, indexCopies);
+          const consumedIndex = await runner.run(gitIndexListingQuery), consumedHead = await runner.run(["rev-parse", "HEAD"]);
+          if (consumedIndex.exitCode || consumedHead.exitCode || consumedIndex.stdout !== before.stdout || consumedHead.stdout !== head.stdout) throw Error("The Git index or revision changed while preparing private scanner inputs.");
+          await check(); await verifyRepositoryIdentity(task); return consumed;
         }
         if (scannerInventory) {
           const root = await runner.run(["rev-parse", "--show-toplevel"]), head = await runner.run(["rev-parse", "HEAD"]);
@@ -199,6 +208,7 @@ export function createRepositoryInspection({ store, command = runRuntimeCommand,
         if (snapshot.repositoryRoot !== task.repositoryRoot) throw new Error("Git did not verify the exact bound repository root.");
         return { snapshot, files: { tracked: inspection?.trackedFiles ?? [], untracked: inspection?.untrackedFiles ?? [], ignored: inspection?.ignoredFiles ?? [] } };
       } finally {
+        for (const bytes of indexCopies.values()) bytes.fill(0); indexCopies.clear();
         const stops = await Promise.all([...resource.clients].map(client => client.stop().catch(() => false)));
         if (!stops.every(Boolean)) throw new Error("Owned repository guardian exit is unconfirmed; protected recovery state and scratch were retained.");
         if (scratch) {

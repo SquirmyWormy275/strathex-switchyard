@@ -125,8 +125,14 @@ The task-bound [index byte witness](git-index-inputs.md) now verifies selected
 staged blobs against original Git object identities and SHA-256 without returning
 source, granting authority or claiming a scan. Four isolated groups pass all 25
 checks, including task/account/index/HEAD drift and real Linux guardian exits.
-Installed witness acceptance passes at `4a6627a`; connection to scanner staging
-remains unfinished.
+Installed witness acceptance passes at `4a6627a`. A separate
+[explicit Linux staged scan](staged-shield-inputs.md) now connects the reader to
+private disposable copies, preserves both staged/worktree provenance and
+authenticates its index witness. Six focused cases, four isolated groups/26
+scanner and exception checks, four groups/37 task/runner/stager checks and eight
+groups/fourteen ordinary host scanner checks pass; every child cleanup verifies.
+Index drift during preparation removes owned copies and starts no scanner.
+Installed staged-scan acceptance and Windows index staging remain unfinished.
 
 
 | Area | Implemented behavior and evidence | Practical limit |
