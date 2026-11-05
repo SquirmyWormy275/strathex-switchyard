@@ -48,6 +48,18 @@ Windows store now uses [short-lived keyless lock helpers](private-state-locking.
 to avoid repeated PowerShell startup without caching keys or extending existing
 budgets. Native verification of the new worker and diagnostic remains pending.
 
+Native source `0740791` now passes both default-store lease files: 16 tests and
+one declared platform skip, with digest-verified artifacts and cleanup. The
+restricted owner still fails, but the new diagnostic now preserves its actual
+child exit: `0xC0000142` (`STATUS_DLL_INIT_FAILED`), with no owner result file.
+That is an initialization failure, not evidence that a token decoder failed.
+The earlier metadata/exchange/original-owner checks remain partial. A separate
+filesystem-lane bootstrap reaches an unconfirmed removal outcome at
+`service-absence-configuration-header`; it preserves its original installation.
+Neither failure is blocked by absent hardware or accounts.
+[Restricted-child evidence](evidence/windows-restricted-owner-074-failure-summary.json),
+[native lease evidence](evidence/windows-keyless-leases-074-summary.json).
+
 ## Prior component evidence
 
 PR head `bd77ec4`, merge execution `b5295a6`, passes the actual Windows native

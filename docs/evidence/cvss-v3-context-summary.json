@@ -1,0 +1,50 @@
+{
+  "schema": "switchyard-cvss-v3-context-summary/v1",
+  "independentReferenceReceipt": "cvss-v3-context-reference-1793921008011.json",
+  "independentlyEqualCases": 899880,
+  "perVersionCases": 449940,
+  "referenceSources": [
+    {
+      "version": "3.0",
+      "source": "https://www.first.org/_/cvsscalc30.js",
+      "sourceSha256": "b67022a4162c381bd1bb52e840f9a035cca3b1b7a310e4c515474e3552b615e7",
+      "cohorts": {
+        "all-base-and-temporal": 259200,
+        "all-effective-environmental": 69984,
+        "environmental-inheritance": 111456,
+        "environmental-temporal-rounding": 9300
+      },
+      "resultSha256": "29e4838b28b5329991d52b1010c1cdbaa3a4ae62786fdea9637ba25b9d15e387"
+    },
+    {
+      "version": "3.1",
+      "source": "https://www.first.org/_/cvsscalc31.js",
+      "sourceSha256": "900a7d9c44872824bbdb0b21bc60db5b732eb09baaa45d32c298fb02a28f8350",
+      "cohorts": {
+        "all-base-and-temporal": 259200,
+        "all-effective-environmental": 69984,
+        "environmental-inheritance": 111456,
+        "environmental-temporal-rounding": 9300
+      },
+      "resultSha256": "5d75f9d4e8d020ad600d59824f704d65abd7df2a3c9921fb36b46722f4ed8ddf"
+    }
+  ],
+  "referenceCodeShipped": false,
+  "externalIoExposedToReference": false,
+  "initialFailedReceiptRetained": "cvss-v3-context-reference-1793920946562.json",
+  "initialCorrection": "CVSS3.0 context calculations retain its reference ceiling and arithmetic order; CVSS3.1 uses the stable integer rounding. Base-only scores remain unchanged.",
+  "focusedReceipt": "isolated-test-708fa7c4-8adc-45e7-afdc-4de33d386e64.json",
+  "focusedGroups": 8,
+  "focusedChecks": 56,
+  "typecheckPassed": true,
+  "collectorVersion": "switchyard-osv-collector/3",
+  "baseSeverityReduced": false,
+  "localEnvironmentVerified": false,
+  "newNetworkQueriesFromCollectorSupport": 0,
+  "installedNativeAcceptance": false,
+  "remaining": [
+    "CVSS2 and CVSS4 methods",
+    "verification of advisory-supplied metrics against local environment",
+    "broader vulnerability and publisher coverage"
+  ]
+}

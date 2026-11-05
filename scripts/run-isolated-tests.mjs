@@ -213,6 +213,7 @@ export const requiredGroups = [
   { file: "tools/layout-studio/repository-shield-index.test.mjs", timeoutMs: 120_000, expectedSkipped: process.platform === "linux" ? 0 : 3 },
   { file: "tools/layout-studio/repository-shield-history.test.mjs", timeoutMs: 120_000, expectedSkipped: process.platform === "linux" ? 0 : 3 },
   { file: "tools/layout-studio/cvss-v3-base.test.mjs" },
+  { file: "tools/layout-studio/cvss-v3-metrics.test.mjs" },
   { file: "tools/layout-studio/osv-advisory-source.test.mjs" },
   { file: "tools/layout-studio/repository-shield-osv-source.test.mjs", ...nativeTestOverrides("tools/layout-studio/repository-shield-osv-source.test.mjs"), expectedSkipped: process.platform === "linux" ? 0 : 1 },
   { file: "tools/layout-studio/repository-shield-pypi.test.mjs", ...nativeTestOverrides("tools/layout-studio/repository-shield-pypi.test.mjs"), expectedSkipped: process.platform === "linux" ? 0 : 2 },

@@ -35,8 +35,16 @@
   "kernelHandleReleasedBetweenTransactions": true,
   "callbackAutomaticallyReplayed": false,
   "portableProtocolChildrenDoubled": true,
-  "nativeWindowsAcceptance": false,
+  "nativeWindowsAcceptance": true,
   "frontendChanged": false,
   "hardwareOpened": false,
-  "note": "Native Windows remains required. The original coordinator privacy projection omitted the new restricted-child diagnostic; the shared tested projection now retains only bounded exit/phase/count fields."
+  "note": "Native Windows remains required. The original coordinator privacy projection omitted the new restricted-child diagnostic; the shared tested projection now retains only bounded exit/phase/count fields.",
+  "nativeFollowup": {
+    "prHead": "074079170f62133754b329f26452ad94ea332923",
+    "receipt": "windows-keyless-leases-074-native.json",
+    "groups": 2,
+    "passedTests": 16,
+    "declaredSkips": 1,
+    "wholeWorkflowAccepted": false
+  }
 }

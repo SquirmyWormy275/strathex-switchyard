@@ -43,7 +43,7 @@ They cover serialized mutations, separate paths, nested nonblocking refusal,
 privacy, callback/progress failures, helper loss, malformed acquisition/release,
 idle retirement, shutdown and capacity. These doubles establish protocol behavior;
 actual Windows file-sharing and parent-loss behavior must pass native CI through
-the default store path. No native Windows acceptance is claimed by this document.
+the default store path. Native Windows source `0740791` now passes both complete lease files: 16 tests and one declared Linux-only skip, with every child and process-tree cleanup verified. This executes actual kernel sharing, parent-loss and detached-owner release through the default pooled store path. It does not accept the wider Windows workflow, which retains separate storage-removal and restricted-owner failures. [Native lease evidence](evidence/windows-keyless-leases-074-summary.json).
 
 Nine focused groups pass 85 checks with every process-tree termination and child cleanup verified; typecheck passes. [Software evidence](evidence/keyless-windows-leases-summary.json).
 
