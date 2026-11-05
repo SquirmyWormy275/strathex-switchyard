@@ -7,7 +7,18 @@ host. [Verification](verification.md) retains accepted and failed checkpoints.
 
 ## Installed application
 
-Latest installed source `03710e9`, release
+Latest installed source `adbd10a`, release
+`04ea52b98e1081f56db0405fc7eec69e7030b3c8094c22245828629ab1046008`,
+passes six update/fourteen actual OSV source and Supply Chain checks. Fresh exact
+public package/version queries, original collection freshness, separate operator
+trust, authenticated failed unknown-severity findings, incomplete clean comparison,
+two independently verified scanner exits, replay, retirement and full restoration
+pass. Receipts `assignment-legends-1793866214773.json` and
+`installed-shield-baseline-1793866400136.json` retained; owned source/signing/
+packages/staging/bundle/proof checkout removed. One empty task, zero prompts;
+no keyboard access. See the [source contract and limits](osv-advisory-source.md).
+
+Earlier installed source `03710e9`, release
 `043592fe7c3987cb7b161ce047fb3c2e8b41e5b0da0b717937c50904018efdd8`,
 passes six update/eighteen actual inventory, generated-tree policy and ignored-
 secret scan checks. The 80 MiB tree stays present during scanning; generated
@@ -193,7 +204,9 @@ matched vulnerabilities fail with an explicit gap. Five collector cases, two
 real-Linux/Windows-guest-double host journeys and surrounding package/attestation
 checks pass; the four-group isolated source subset passes 21 checks. The real
 CLI collects two public versions without source files or credentials; owned
-scratch is removed. New installed OSV acceptance remains pending.
+scratch is removed. Installed `adbd10a` passes six update/fourteen source and
+scan checks with two verified scanner exits, full restoration and owned scratch
+removed; zero prompts.
 
 ## Complete and native checkpoints
 

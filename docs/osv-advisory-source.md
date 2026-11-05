@@ -87,7 +87,13 @@ mise exec node@24.14.0 -- node scripts/verify-shield-host.mjs \
 It fetches fresh source data, preserves its original freshness clock, signs and
 installs the exact bytes under separate operator approvals, and scans synthetic
 lockfiles with those package identities. It submits no model prompt or project
-source to OSV. Installed acceptance of this new source remains pending.
+source to OSV. Installed source `adbd10a` passes six update checks and fourteen
+actual source/scan checks with two independently verified native scanner exits.
+Receipts `assignment-legends-1793866214773.json` and
+`installed-shield-baseline-1793866400136.json` retain the public source hashes,
+authenticated failed/incomplete outcomes, feed retirement and full original-state
+restoration. Owned source, signing material, packages, staging, release bundle and
+proof checkout were removed; zero model prompts and no keyboard access.
 
 Automatic whole-repository scope, history, wider ecosystems, CVSS assessment,
 publisher provenance and ordinary UI source management remain unfinished. A
