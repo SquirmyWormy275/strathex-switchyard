@@ -13,7 +13,7 @@ const exact = (v, keys) => v && typeof v === "object" && !Array.isArray(v) && Ob
 const states = { create: "created", attach: "mounted", detach: "detached", retire: "retired" };
 
 export function createWindowsBrokerExchanges({ store, platform = process.platform, helper, native = createWindowsStorageNative({ store, platform, ...(helper ? { helperPath: helper } : {}) }), consumerStopped = async () => false, isActive = async () => true, now = Date.now } = {}) {
-  const resources = new Map(), seen = new Set(); let closed = false, held;
+  const resources = new Map(), seen = new Set(), preparing = new Set(); let closed = false, held;
   const key = (c, id) => `${c}:${id}`;
   const get = async (c, id) => (await store.snapshot(c))[field]?.find(r => r.operationId === id);
   const update = (c, id, action, fn) => store.update(c, action, s => {
@@ -21,6 +21,10 @@ export function createWindowsBrokerExchanges({ store, platform = process.platfor
     if (!row || row.schema !== schema) throw Error("The original protected broker ownership changed.");
     return fn(row);
   });
+  function leaseFor(c, id) {
+    if (!held?.lease || held.key !== key(c, id)) throw Error("The original broker ownership lease expired; no native operation was started.");
+    held.lease.assert(); return held.lease;
+  }
   async function acquire(c, id) {
     if (held) { if (held.key !== key(c, id)) throw Error("Reconcile the original broker exchange before another operation."); if (!held.lease) throw Error("Wait for the original host lease acquisition."); held.lease.assert(); return held; }
     let ready, failed, release;
@@ -105,20 +109,20 @@ export function createWindowsBrokerExchanges({ store, platform = process.platfor
     return proof(observed, "inspect", false);
   }
   async function mapping(c, id, check) {
-    held?.lease?.assert(); await check(); const row = valid(await get(c, id));
+    leaseFor(c, id); await check(); const row = valid(await get(c, id));
     if (!row.cleanupPending || row.retirementStarted || row.commands.attach?.status !== "recorded") throw Error("This exchange has no current original mounted lease.");
     const binding = await client(row, check), result = await native.exchangeBinding(binding, { installation: row.installation, operationId: id, taskScopeSha256: row.scopeDigest, inputManifestSha256: row.inputManifestSha256 }, { check });
     if (result.nativeExitVerified !== true) throw Error("The mapping observer exit is unconfirmed.");
     const mapped = validateWindowsExchangeBinding(result.binding, id);
     if (!mapped.broker || Object.entries({ ...row.installation, taskScopeSha256: row.scopeDigest, inputManifestSha256: row.inputManifestSha256 }).some(([k, v]) => mapped.broker[k] !== v)) throw Error("The exact protected broker mapping scope changed.");
-    await check(); held.lease.assert(); return mapped;
+    await check(); leaseFor(c, id); return mapped;
   }
   async function cleanupOwned(c, id) {
     const initial = await get(c, id); if (!initial?.cleanupPending) { await release(c, id); return { cleaned: true }; }
     if (resources.get(key(c, id))?.busy) return { cleaned: false };
     await acquire(c, id);
     try {
-      const current = async () => { held.lease.assert(); if (!await consumerStopped(c, id)) throw Error("The original guest consumer exit is unconfirmed; preserve its exchange."); };
+      const current = async () => { leaseFor(c, id); if (!await consumerStopped(c, id)) throw Error("The original guest consumer exit is unconfirmed; preserve its exchange."); };
       await current(); let row = valid(await get(c, id)); const binding = await client(row, current);
       for (const verb of Object.keys(states)) if (row.commands[verb]?.status === "reserved") { await lookup(c, row, verb, binding, current); row = valid(await get(c, id)); }
       if (Object.values(row.commands).some(cmd => cmd.status === "reserved")) return { cleaned: false };
@@ -173,28 +177,37 @@ export function createWindowsBrokerExchanges({ store, platform = process.platfor
     async prepare(c, context, authorize, inputs) {
       context = structuredClone(context); inputs = structuredClone(inputs);
       if (!exact(context, ["operationId", "provider", "scopeDigest"]) || !uuid(context.operationId) || !digest(context.scopeDigest) || !["codex", "claude-code"].includes(context.provider) || !exact(inputs, ["inputManifestSha256"]) || !digest(inputs.inputManifestSha256) || typeof authorize !== "function") throw Error("Bind the original broker exchange to one exact task and reviewed input manifest.");
-      await access(c, context.provider, authorize); seen.add(c);
-      const id = context.operationId; await acquire(c, id);
-      if (await get(c, id)) { if (!(await get(c, id)).cleanupPending) await release(c, id); throw Error("The original broker exchange is retained; no operation replay."); }
-      const resource = { busy: true, controller: new AbortController() }; resources.set(key(c, id), resource);
-      const check = async () => { held.lease.assert(); if (resource.controller.signal.aborted) throw Error("The original broker exchange was stopped."); await access(c, context.provider, authorize); held.lease.assert(); };
-      let reserved = false;
+      const id = context.operationId, owner = key(c, id);
+      if (preparing.has(owner) || resources.has(owner)) throw Error("The original broker exchange is retained or busy; no operation replay.");
+      preparing.add(owner);
       try {
-        const binding = await client(null, check), capability = await native.probeExchange(binding, { check });
-        if (capability.status !== "available" || capability.effectStarted !== false || capability.nativeExitVerified !== true) throw Error("The protected exchange service is unavailable; no image was requested.");
-        await check();
-        await store.update(c, "windows-broker-owner-reserve", s => {
-          const rows = s[field] ?? []; if (rows.some(r => r.operationId === id || r.cleanupPending)) throw Error("Reconcile the retained original exchange before another operation.");
-          if (rows.filter(r => r.cleanupPending).length >= 32) throw Error("The retained broker inventory is full.");
-          s[field] = [...rows.slice(-31), { schema, ...context, inputManifestSha256: inputs.inputManifestSha256, clientSid: binding.clientSid, ownerScope: binding.ownerScope, installation: capability.installation, commands: {}, status: "preparing", cleanupPending: true, at: now() }];
-        }); reserved = true;
-        await effect(c, id, "create", binding, check); await update(c, id, "windows-broker-created", row => { row.status = "created"; }); await check();
-        return { operationId: id, attached: false, exchangeQuotaEnforced: false, sandboxEnforced: false, createVolume: () => volume(c, id, check), release: () => cleanup(c, id) };
+        await access(c, context.provider, authorize); seen.add(c); await acquire(c, id);
+        if (await get(c, id)) { if (!(await get(c, id)).cleanupPending) await release(c, id); throw Error("The original broker exchange is retained; no operation replay."); }
+        const resource = { busy: true, controller: new AbortController() }; resources.set(owner, resource);
+        const check = async () => { leaseFor(c, id); if (resource.controller.signal.aborted) throw Error("The original broker exchange was stopped."); await access(c, context.provider, authorize); leaseFor(c, id); };
+        let reserved = false;
+        try {
+          const binding = await client(null, check), capability = await native.probeExchange(binding, { check });
+          if (capability.status !== "available" || capability.effectStarted !== false || capability.nativeExitVerified !== true) throw Error("The protected exchange service is unavailable; no image was requested.");
+          await check();
+          await store.update(c, "windows-broker-owner-reserve", s => {
+            const rows = s[field] ?? []; if (rows.some(r => r.operationId === id || r.cleanupPending)) throw Error("Reconcile the retained original exchange before another operation.");
+            s[field] = [...rows.slice(-31), { schema, ...context, inputManifestSha256: inputs.inputManifestSha256, clientSid: binding.clientSid, ownerScope: binding.ownerScope, installation: capability.installation, commands: {}, status: "preparing", cleanupPending: true, at: now() }];
+          }); reserved = true;
+          await effect(c, id, "create", binding, check); await update(c, id, "windows-broker-created", row => { row.status = "created"; }); await check();
+          return { operationId: id, attached: false, exchangeQuotaEnforced: false, sandboxEnforced: false, createVolume: () => volume(c, id, check), release: () => cleanup(c, id) };
+        } catch (error) {
+          const row = await get(c, id); if (reserved || row) await update(c, id, "windows-broker-outcome-unconfirmed", saved => { saved.status = "outcome-unconfirmed"; }).catch(() => {});
+          else { resources.delete(owner); await release(c, id); }
+          throw error;
+        } finally { resource.busy = false; }
       } catch (error) {
-        const row = await get(c, id); if (reserved || row) await update(c, id, "windows-broker-outcome-unconfirmed", saved => { saved.status = "outcome-unconfirmed"; }).catch(() => {});
-        else { resources.delete(key(c, id)); await release(c, id); }
+        // An acquisition/read failure before a resource exists cannot have
+        // dispatched this attempt's native effect. Retained facts stay intact;
+        // do not strand an unowned host lock after a read-only failure.
+        if (!resources.has(owner)) await release(c, id);
         throw error;
-      } finally { resource.busy = false; }
+      } finally { preparing.delete(owner); }
     },
     cleanup,
     async recover(c) { seen.add(c); let cleaned = true; for (const row of (await store.snapshot(c))[field] ?? []) if (!(await cleanup(c, row.operationId)).cleaned) cleaned = false; return { cleaned, cleanupPending: !cleaned }; },

@@ -1,733 +1,98 @@
 # Switchyard implementation and acceptance
 
-This branch is a partial implementation of the complete Rev2 handover. The F77
-is the pilot device, not a scope limit. The [requirement ledger](switchyard-requirements.md)
-separates unfinished implementation from checks needing hardware or accounts;
-[verification](verification.md) identifies the exact source and practical limits
-behind each accepted result.
-
-## Active backend iteration
-
-Eight actual Windows JavaScript-owner/native-client checks are now scheduled
-after the separate 31-case restricted-client proof. They verify original
-installation/task/input mapping, real mounted write/readback, live kernel
-consumer exclusion, unconfirmed guest-exit refusal, exact retirement, replay
-refusal and independent native exits with fixture removal. They request no
-setup or guest. Linux guard/import checks pass; native execution is pending.
-The complete Linux lane at `a1e71b0` is running from an immutable disposable
-checkout with a short owned home-filesystem fixture parent.
-
-Normal Windows Run now uses protected broker exchanges with exact task/input
-binding and durable per-effect requests. The host lease spans preparation to
-retirement; a consumer kernel lease blocks premature cleanup. Lost replies use
-read-only original result lookup, with no effect resend or Run-outcome upgrade.
-Unavailable service stages nothing, including for privileged users. Existing
-direct images retain their cleanup path. Snapshot privacy and the required
-isolated/native inventories include this owner. Seventy focused owner/runner/
-HTTP/privacy/package/inventory checks pass; type checking passes. Full native
-normal-app/guest and interactive UAC acceptance remain open.
-
-Native workflow `41948972575` at `1f4e8e5` passes completely: all thirty
-filesystem checks, 112 compiled portable checks, sixteen protected-file checks,
-both six-plus-thirteen setup/service lifecycles and the complete 31-check
-restricted-client volume proof. Four archive digests verified and JSON receipts
-retained (`windows-{exchange,filesystem}-1f4-native.json`,
-`windows-native-setup-1f4-lifecycle.json`, `windows-broker-1f4-protocol.json`).
-The exchange receipt independently verifies native exit. No interactive
-Sandbox/UAC or new normal-app adapter acceptance is inferred.
-
-Normal installed `3e346c1` now passes six update checks and five actual F77
-read-only API checks. Complete keymap and macro hashes match the independent
-guarded capture; current protected source reconciliation passes without profile
-adoption. Definitions, selection, modes, private link and frozen Home preserved.
-No HID transport remains; bundle and disposable checkout removed. Receipts
-`assignment-legends-1793842045992.json` and
-`installed-f77-readout-1793842177742.json` retained. Two earlier proof-script
-failures remain retained (unsupported selection route; mismatched hash encoding);
-they sent no configuration command. Physical typing/hotplug/write acceptance
-remains open.
-
-Service removal now closes each observation handle before waiting for SCM
-delete completion and accepts only the original stopped configuration while
-pending. Actual absence still requires Win32 1060 within the original bound;
-other errors, running/replaced services and timeout preserve the installation.
-The helper compiles with zero warnings/errors and scratch was removed. Native
-CI is required; no removal or volume pass is claimed from compilation. See
-[Microsoft’s delete lifetime contract](https://learn.microsoft.com/en-us/windows/win32/api/winsvc/nf-winsvc-deleteservice).
-
-Current F77 discovery and read-only configuration capture pass with the Linux
-`hidraw` backend already shipped by the pinned runtime. The libusb backend
-reported zero usage fields and silently hid its configuration interface. No
-permission, driver or desktop change was required. VIA 9 / Vial 4 reports three
-8 × 11 layers; the complete definition and UID match the pinned F77 source.
-Classic and Ultra Compact remain separate case choices. Ninety read/query
-reports, no unlock/configuration/flash/reset/electrical command. Protected live
-snapshot and `f77-live-readout-1793841566987.json` retained; installed-app
-update and readout are now accepted at the separate receipt above. The platform-backend regression passes along
-with all eighteen device tests. Typing, hotplug and physical writes remain open.
-
-Complete Linux `f8591fe` passes 165/165 groups: 1,083 tests, 1,073 passed and ten
-declared skips. Receipt `06f341a4-bc1a-4729-8628-5df92ec427be` retained; all child
-cleanup verified, temporary fixtures and disposable checkout removed. Native
-Windows rerun `41946814568` stops at exact service removal: original service
-exit passes, SCM absence does not. Its new bounded result identifies phase
-`service-absence`. The volume proof was not reached; the ACL correction remains
-unaccepted. Investigate the original service handle/delete lifetime.
-
-Native `f2285b8` passes both setup/service lifecycles (six plus thirteen checks
-each) and all 106 portable crypto/journal/fact checks on Windows. Four downloaded
-archive digests verified; receipts retained. The actual exchange fails its first
-restricted-client filesystem write. The attach call inherited the read-only image
-ACL; it now supplies a separate disk-only client read/write descriptor, retaining
-read-only backing file and mount point. The expanded 31-check native rerun is
-pending; the failed exchange remains failed.
-
-Original result lookup is now read-only and installation/task/input/request bound;
-it cannot reserve or resend a missing effect. The native transport and mapping
-validator are connected to this contract. Both C# targets compile without
-warnings, all 112 portable checks pass, 51 related setup/suite/release and 33
-Sandbox backend checks pass, and type checking passes. Normal Run factory/guest
-consumer integration remains unfinished. Claude Code is a contingency for token
-limits; no delegated coding job was launched.
-
-Protected broker mapping now has a read-only native entry: fresh signed mounted
-state, exact task/input/installation journal and image facts, then pinned native
-UUID/footer/mount/extent/capacity/ACL verification. A changed directory cannot
-substitute for it. Both C# targets compile without warnings and all 106 portable
-checks pass. The expanded 24-case native volume/mapping proof remains pending;
-normal Run/guest connection is unfinished.
-
-Complete Linux `4f995d4` passes 165/165 groups: 1,078 tests, 1,068 passed and ten
-declared skips, receipt `6a95e3e7-0b5d-4ac4-8cca-56a0a95a0c06`. Every child cleanup
-verified; short home-filesystem fixture parent and disposable checkout removed.
-The prior failed quota/socket/runtime receipts remain retained. Native Windows
-engine workflow `41942299398` passed 83 compiled crypto/journal and 29 protected-file/
-restricted-client checks, then failed service removal after four lifecycle checks.
-Both archive digests were verified; failed receipt retained. The volume proof was
-not reached. Native removal phase diagnostics are now added without effect retry.
-
-Exchange image/mount facts now have 23 compiled corruption and substitution
-checks. Retirement validates original metadata before known-file removal; unknown
-or damaged records remain preserved. Both C# targets build without warnings.
-
-Normal installed `819840a` passes six update and six host setup API checks,
-receipt `installed-windows-storage-api-1793837324149.json`. Windows setup is
-correctly unavailable on Linux; arbitrary selectors, unauthenticated requests
-and Work evidence access are refused. Definitions, mode, private link and frozen
-Home are unchanged. Bundle staging and the proof checkout were removed.
-
-The exchange journal passes 37 compiled fault checks, including reservation and
-final-acknowledgement loss, duplicate refusal, damaged chains and image changes.
-Its protected-file port derives fixed installation/UUID paths and exclusively
-creates flushed/readback immutable records. Native System-service acceptance and the normal task/guest connection remain
-unfinished.
-
-The closed exchange wire now passes thirty compiled crypto/parser checks and
-keeps its fixed 64 MiB limit, exact task/input/operation scope and fresh signed
-challenge separate from durable effect authority. Its native engine and service transport are implemented and compile without
-warnings; the new restricted-client Windows acceptance is pending. The
-normal Run/guest-consumer connection remains unfinished. Metadata still reports
-no complete volume broker. See the [storage boundary](windows-storage-broker.md).
-
-Complete Linux `cba5e2b` passes 163/163 groups: 1,062 tests, 1,052 passed and ten
-declared skips. Receipt `26d8a535-ec4e-45ea-b47c-2db8d3bdb7e7` retained; every
-child cleanup verified and the disposable worktree removed. Installed normal
-`25f9fe6` passes six update and eight pipeline checks with zero prompts, three
-independent guardian exits, restored state and removed staging/checkout.
-Windows standalone acceptance and all 32 crypto/protected-file checks pass. The
-metadata service passes six lifecycle and thirteen restricted-client/pipe/cache
-checks at `f4ba916`. The native protected installer repeats those checks at
-`d7872fb`; digest-verified receipts are retained. These were disposable Windows
-workers, with no interactive UAC acceptance or volume authorization inferred.
-
-Personal host setup now has authenticated inspect/list/review/apply routes,
-fixed hash-pinned native transport, one-use review, atomic pre-effect budget,
-guarded receipts, exact guardian exit and conservative uncertain-outcome
-recovery. Fifty-five focused transport/controller/suite/package/inventory checks pass.
-Work/task permissions cannot authorize setup; ordinary snapshots omit private
-records. The frontend remains frozen. Privileged bounded-volume operations,
-interactive UAC and the application-to-native setup journey remain separate
-unfinished implementation or acceptance checks as described in the
-[Windows contract](windows-reviewed-run.md#personal-host-setup-api).
-
-A later `d7872fb` filesystem pass failed while re-observing a stopped guardian,
-after verified image detach. The Windows exit observer previously treated any
-live process with that PID as the original guardian. Commit `21038f6` compares
-original creation time and Job emptiness; its new native regression and all thirty
-filesystem checks pass in workflow `41938283517`. Three archive digests were
-verified and receipts retained. The failed receipt remains failed and retained.
-
-Linux hosted run `41924141682` exposed a stop-readiness race: a durable running
-owner could become visible before its exact in-memory stop controller. The
-controller now registers before that write; acknowledgement still follows the
-write and final authorization guard. A deterministic regression suspends the
-writer after commit and checks cancellability without early acknowledgement.
-Pipeline stop tests now wait on the actual durable-ready transition instead of
-guessing a ten-second startup time. Production and group deadlines are unchanged.
-
-Windows broker protected-file creation/readback is now implemented with an
-Administrators/System owner, exact protected ACLs, client read-only code/metadata,
-private signing-key storage, no reparse traversal and bounded handle reads.
-The expanded proof compiles with zero warnings; all sixteen crypto/parser cases
-still pass and scratch was removed. Sixteen actual Windows file/low-privilege
-checks now pass at `366d409`, workflow `41924140253`, alongside all sixteen
-crypto/parser and thirty existing filesystem checks. The broker archive digest
-was verified and `windows-broker-protected-files-366.json` retained. They use a restricted version of the existing worker token,
-create no account or service, and remove their new nonce directory. At that historical checkpoint, privileged service/pipe/setup integration was
-unfinished; its later acceptance is recorded above. Volume integration remains
-unfinished.
-
-Complete Linux `5fd0186` passes 163/163 groups: 1,060 tests, 1,050 passed and ten
-declared skips. Receipt `b145a682-ed06-4a35-9f23-0218999afab9` retained, every child
-cleanup verified and the disposable worktree removed. The installed Run
-regression also passes all ten checks with zero prompts and cleanup, receipt
-`installed-repository-execution-1793829941630.json`. All six native Windows
-policy/authority/host-stop jobs pass at `a50a205`, workflow `41920825404`.
-
-The closed Windows broker metadata wire contract now binds an installation,
-owner/image scope, request and fresh nonce to P-256/SHA-256 authentication.
-Sixteen compiled crypto/parser checks, zero-warning helper build, six Linux
-guards and four package checks pass; scratch removed. Native wire CI is pending.
-The privileged service/pipe/setup/volume integration remains unfinished software;
-the protocol alone cannot establish a protected installation or perform effects.
-
-Installed `5fd0186` now passes all eight expanded pipeline checks, including a
-separately approved stop before the program response arrives, exact duplicate
-receipts, unchanged admission, three independently exited guardians, removed
-staging and restored definitions/selection/modes/private link. Zero prompts.
-Receipt `installed-repository-pipeline-1793829793401.json`; six update checks in
-`assignment-legends-1793829389543.json`; bundle staging removed.
-
-The first pending-stop validation exhausted its 15-second readiness observation
-wait. Failed receipt `installed-repository-pipeline-1793829551182.json` and small
-synthetic evidence were preserved, native exits verified and state restored.
-The retry measured 38.7 seconds of full scope revalidation/native readiness.
-The validator now allows 120 seconds within its existing HTTP deadline; no
-production command/approval/process/stop deadline changed. Native Windows
-host-stop job `126894160666` passes at `a50a205`.
-
-The focused native Windows matrix now also runs the complete task-authority and
-host-stop files. This directly checks the ordinary factory's grant path and the
-new immutable-admission stop logic without waiting for the full release lane.
-Each file retains its existing isolated harness bound; guest/account/device
-execution remains doubled or unopened. The expanded matrix is pending CI.
-
-The installed `c7525a0` pipeline journey passes seven checks with one empty native
-Codex task and zero prompts: both actions, exact authenticated receipts and
-duplicate refusal, two independently exited guardians, unchanged original
-repository and restored definitions/selection/modes/private link. Receipt
-`installed-repository-pipeline-1793829048435.json`; six update checks pass in
-`assignment-legends-1793828922235.json`. Staging and the bundle were removed.
-
-Exact stop now accepts a live foreground pipeline before its program response
-exists. A protected immutable admission binds the original action/operation/
-target/scope independently from later program settlement. Prior outcome-bound
-records retain their recovery rules. Seventeen Run/pipeline/stop cases and 28
-harness/package/stop cases pass; type checking passes. Expanded installed stop
-acceptance is pending. Frontend remains frozen.
-
-Linux local-gate and clean-reproduction actions now share the normal reviewed
-execution route. Exact task grants, foreground bounded namespaces, typed reports
-and host-authenticated evidence precede passing receipts. Four actual namespace
-cases pass, including incomplete reports, key/input substitution, cancellation,
-native exit and cleanup; existing authority/Run contracts pass 14/14 and type
-checking passes. The installed pipeline journey is being prepared. Windows
-pipeline/scanner/advisory/writable-build connections remain unfinished.
-
-Complete Linux `8931c7d` passes 162/162 groups: 1,053 tests, 1,043 passed and ten
-declared skips. Receipt `bb82e1f0-7800-465f-b462-b58cf3e3fcda` retained;
-every child cleanup verified and the disposable worktree removed. Actual Windows
-prerequisite query and all 30 native filesystem checks pass at `e7a8e67`, workflow
-`41916832172`; digest-verified `windows-storage-preflight-e7a-native.json` retained.
-Normal Windows factory/client and all four policy jobs also pass at `8931c7d`.
-
-The normal suite now exposes connected Run authority on both Linux and Windows,
-and passes the trusted platform through to the execution factory. The previous
-Windows policy tests exercised the adapter but missed the ordinary factory's
-Linux-only grant list. A normal route-level grant check now covers that entry,
-one-use approval, unsupported actions and Work rejection. Authority, suite and
-physical-intent files pass 33/33 locally. The Windows client startup lane passed
-at `1a0fa33`; the new factory check awaits its native rerun.
-
-Windows Run now observes the Sandbox command interface and storage privilege
-before staging inputs/tools/images. Native metadata uses query-only token access,
-bounded reads and unchanged privilege readback; missing prerequisites settle the
-consumed operation as unavailable. It neither enables privileges nor performs
-setup. Thirty local contracts, zero-warning helper build, six Linux guards and
-type checking pass; build scratch removed. Actual token query is pending native
-CI, and normal-user privileged setup/broker remains unfinished software.
-
-All four complete Windows policy files pass in workflow `41914612230` at
-`cdd86cb`. The separate Windows client check exposed eager optional-helper
-loading when opening an empty workspace. Recovery now checks encrypted ownership
-under its kernel lease before loading native ports. Existing ownership remains
-fail-closed. The runner, suite and physical-intent files pass 35/35 locally;
-native client rerun is pending.
-
-Windows status now reads the two validated output streams through bounded
-hashed descriptors and checks the exact operation directory before/after reads.
-It redacts credential forms; changed bytes or a substituted root make current
-output unavailable without rewriting the original Run result. Failed diagnostics
-stay separate from successful artifacts, including duplicate exit-code readback.
-Thirteen policy/stop/output cases and the combined 66-check
-policy/inventory/backend/package group pass locally; type checking passes.
-
-The first focused Windows policy run at `63cb7cf` hit the four-minute whole-file
-harness limit after four completed cases. Its verified failed receipt is
-`windows-policy-63cb-failed.json`, with child cleanup verified. All cases are now
-in complete policy/recovery/stop/output files, explicitly represented in the
-required inventory and run as separate Windows jobs with five-minute file
-bounds. No assertion or production deadline was waived. All four native jobs
-subsequently passed at `cdd86cb`.
-
-Complete Linux `45e9eb6` passes 159/159 groups: 1,045 tests, 1,035 passed and ten
-declared skips. Receipt `3424729b-c961-45aa-ad4d-f3c5359a5982` was retained;
-every child cleanup verified and the worktree was removed. Normal installed
-source `45e9eb6`, release `011271c786007a49ce2a6558e8596b83fb20d59b6be422bbac83b57b87844a9b`,
-passes six preservation checks and all ten actual Linux Run checks with zero
-prompts. Receipts `assignment-legends-1793824727363.json` and
-`installed-repository-execution-1793824944140.json`. Frozen frontend/private
-link/definitions/modes remain intact, and the temporary bundle was removed.
-
-Failed Windows programs now retain only bounded verified stdout/stderr after
-exact native/VM exit, with the actual exit code and a separate diagnostic root.
-They stay failed; declared build artifacts cannot leave the guest on this path.
-The related 47-case group passes 46 with one declared platform skip; type
-checking passes. The actual compiled formatter passes four exit-code cases;
-the helper builds without warnings/errors and six Linux guards pass. Scratch
-was removed after retaining `windows-failure-results-build-20261104.json`.
-Actual VM/Job acceptance and normal Windows privileged setup remain separate.
-
-The Studio Windows platform factory now connects reviewed Run and separately
-approved exact stop to the shared task/policy/checkpoint/budget/receipt boundary.
-Eleven admission/stop/restart cases pass with real Git inspection and encrypted
-ledgers, using an explicit Windows runner double. A separate 41-check
-platform/package group passes, including the existing actual Linux host broker.
-The immutable Run admission, eventual program result and storage retirement are
-separate. An unrecorded uncertain stop cannot become a passing result from exit
-alone. [Windows Run contract](windows-reviewed-run.md).
-
-Complete Linux `6e82937` passes 158/158 groups: 1,034 tests, 1,024 passed and ten
-declared skips; receipt `0b7c5d8e-711c-417a-ba9b-8e2cb7896ba8`. Every child cleanup
-verified and the worktree was removed. The earlier all-platform invocation on
-Linux remains failed in the checkpoint archive. Corrected Windows workflow
-41904474050 at `9cfb922` passes the fault step and all 30 native filesystem checks;
-its digest-verified JSON receipt is `windows-runner-9cfb-native.json`. The short
-Windows workflow and Linux/client lanes also pass at `6e82937`.
-
-Normal Windows privileged setup and broader action/device/attachment work remain
-unfinished software. Actual supported-host VM execution and physical/account
-acceptance remain separate checks. The frontend remains frozen.
-
-The host-only Windows Run runner now connects selected-file staging, exact
-worker/runtime links, bounded-volume handoff, managed sessions, backend output
-validation and independent cleanup. It holds a kernel lease through preparation
-and execution; another process must acquire the same lease before recovery can
-touch the guest. Completion requires fresh independent native/VM exit. Original
-backend observations, Run results and storage retirement remain separate.
-Nine orchestration cases pass; the combined manifest/lock/privacy/release group
-passes 43/43 and type checking passes. Native Windows runner/probe checks are
-pending. Studio policy/admission wiring and personal-host privileged setup remain
-unfinished software; supported interactive VM acceptance is a separate check.
-[Run contract](windows-reviewed-run.md).
-
-The Windows host now durably hands one original fixed-capacity image into a
-writable-volume lifecycle. Native Windows workflow 41896980735 at `a8690328`
-passes actual host-service creation, mounted readback, non-replay/consumer fences
-and cleanup of changed disposable guest data, alongside its ownership fault
-checks. Local storage/suite/runner checks pass 53/53. Original image identities,
-footer, exact detach and independent native/guest exit remain cleanup fences.
-
-Native Sandbox startup now requires that exact bounded volume binding; a
-read-only configuration-validation verb uses the same native checks without
-starting a VM. Fifty focused storage/transport/session/runner cases, four release
-checks, type checking, a zero-warning/error helper build and six Linux guards
-pass. Native mapping acceptance is pending CI. The higher backend and isolation wrapper now consume the trusted bounded
-volume lease while holding both consumer locks, validate plain output descendants
-and preserve exclusive native-owner retirement. Their related group passes
-43 checks with one declared platform skip; type checking passes. The Studio
-Windows Run adapter and personal-host privileged setup remain unfinished
-software. Supported interactive Windows VM acceptance remains a separate check.
-
-Complete Windows `72c5f96` passes 261/261 groups: 1,738 tests, 1,690 passed and
-48 declared skips. Its bounded archive was SHA-256 verified and only receipt
-`d2b0aa0e-67a1-4f55-bf55-d21daf5fab91` retained. That checkpoint predates the
-image/volume ownership work. The frontend remains frozen; no browser was reloaded.
-
-The Linux reviewed Run service now passes actual task-input → policy/checkpoint/
-budget → Bubblewrap → owned guardian → terminal-result checks. It preserves the
-original admission result, releases terminal budget claims, and removes only
-unchanged, independently stopped input copies. Atomic tool replacement during
-readiness cannot substitute the reviewed executable descriptor. The API,
-shutdown/restart boundaries and evidence exclusions are described in the
-[execution contract](reviewed-task-execution.md). The frontend is unchanged.
-
-Normal installed source `f5dd3be` passed ten checks with one actual empty
-Codex task and zero prompts. Actual output confirmed denied host files,
-credentials and loopback, a read-only workspace and 64 MiB temporary filesystem.
-The terminal receipt, separate exact-stop receipt and duplicate admissions
-matched. A third, freshly reviewed Run started after the stopped Run; all three
-native guardians independently exited and unchanged input copies were removed.
-Definitions, selection, keyboard-only validation state and the private link were
-restored. Receipt: `installed-repository-execution-1793816998155.json`.
-
-Complete local Linux source at `0151e69` passes 151/151 groups: 967 tests,
-957 passed and ten declared platform skips. Receipt:
-`9a24b1ab-23b8-44d5-9569-a444d2ff1ca0`. The disposable checkout was removed after
-its complete receipt and exited children were verified. Full `26b78c2` also
-passes 151/151 groups (968 tests, 958 passed, ten skips), receipt
-`8c5bf46c-45aa-402e-b153-7191f1778a3b`. Full `6c92229` passes 152/152 groups:
-973 tests, 963 passed and ten declared skips, receipt
-`82350ba4-6f30-4839-bddc-7fa318809380`. Both temporary checkouts were removed
-after their complete receipts and all exited children were verified. Complete
-`0aeae75` also passes 152/152 groups (973 tests, 963 passed, ten skips), receipt
-`ca301375-e244-4718-b78a-4b514094d07d`; its temporary checkout was removed after
-all child cleanup verified. Ubuntu release CI at `0aeae75` passes, including the actual namespace
-preflight with Ubuntu's packaged scoped bwrap AppArmor profile. No workstation
-policy, namespace restriction or guardian no-new-privs setting was weakened.
-
-The full `c5059dd` Linux run passes 152/153 groups: 979 tests, 968 passed, one
-failed and ten declared skips. Receipt `1f131ceb-d88e-4d87-a191-1402fab793f2` is
-preserved as failed; all children exited and its temporary checkout was removed.
-The failure was an actual application-stop race: `/proc/<pid>/stat` returned
-`ESRCH` after the authenticated process exited between checks. Stop now accepts
-that exact exit observation alongside `ENOENT`; generation/birth checks remain.
-All five application cases pass, including deterministic ESRCH/ENOENT reads
-after a real authenticated fixture shutdown. Complete corrected `e9dd9ae` passes
-154/154 groups: 988 tests, 978 passed and ten declared platform skips. Receipt
-`0dfaddc5-3caf-4538-8ff4-3d4d563f6ad8` was retained and its disposable checkout
-removed after every child exit and cleanup was verified.
-
-Reviewed per-run stop has a separate approval, budget, operation and receipt,
-with exact-handle ownership, duplicate rejection and receipt-only recovery.
-Windows CI at `0151e69` exposed its deadline being spent on repeated kernel-lock
-helper startups before the effect. Admission now uses one authenticated journal
-transaction; the same 15-second deadline and final scope check remain. A failed
-admission write cannot deliver a stop or leave a partially started claim. Native
-Windows backend acceptance of this correction passes at `dbe62bb`. The short Windows client lane
-at `26b78c2` passed 42 assertions but exceeded the suite group's 45-second harness
-limit before its last case. That group now receives 120 seconds on Windows;
-no assertion or production deadline was removed. Its corrected short Windows
-client lane passes at `0aeae75`.
-
-Native Windows reviewed-input staging is implemented separately from guest
-execution. The fixed C# reader pins NTFS directory/file handles, refuses reparse
-points and writable source handles, hashes only explicitly selected bytes, and
-sets/readbacks a private inherited DACL on a new owned directory. The host
-records readiness before acknowledgement, verifies the complete copied tree,
-refuses replay and preserves unknown owners/replacement files. Cleanup requires
-independent native and trusted consumer exit. Four software boundary cases and
-four release-closure cases pass; the helper compiles with zero warnings/errors
-and rejects this mode on Linux before filesystem effects. The small build
-scratch directory was removed, with source/assembly hashes retained in
-`windows-reviewed-inputs-build-20261104.json`; no runtime was copied. Actual NTFS,
-ACL, junction, sharing and cleanup acceptance passes all six checks at `dbe62bb`,
-run 41866977914. Its 785-byte artifact was imported, SHA-256 verified and parsed;
-only `windows-reviewed-inputs-dbe62bb-native.json` was retained, not a runtime or
-archive. This confirms filesystem staging, not VM execution.
-[Input contract](reviewed-execution-inputs.md).
-
-The failed installed `0151e69` proof remains preserved, including its encrypted
-workspace and synthetic inputs; it exposed the subsequently corrected dispatch
-scope reuse. New Run requests bind their own protected review digest, while
-same-request duplicates and legacy operation scopes retain no-replay behavior.
-The Windows Sandbox backend now consumes exact native input capabilities,
-requires the selected catalog, binds source/operation/manifest, holds a kernel
-consumer lease and maps the reviewed copy read-only. Readiness persists the exact
-new guest ID before recipe acknowledgement; exit evidence must match its VM,
-operation and configuration. Unknown guest exit preserves the exchange and
-blocks extraction/restart replacement. Thirty-three mapping/staging/installation
-cases and four packaged-closure checks pass. The default process-only runner
-cannot supply that proof. [Guest mapping contract](windows-reviewed-guest-mapping.md).
-The fixed native Sandbox CLI transport now implements closed metadata/list/
-start/stop/connect/login-probe/worker verbs with protected readiness, native exit,
-exact VM scope and non-replay tombstones. It separates the guest exit code from
-the CLI exit code. The new C# helper builds with zero warnings/errors; build
-scratch was removed after retaining `windows-sandbox-cli-build-20261104.json`.
-Five native-transport faults, 26 final transport/manifest/package cases, type
-checking and the delayed-recipe mapping checks pass. Actual no-VM native metadata
-acceptance is now in CI, pending. [Native command contract](windows-sandbox-native-commands.md).
-The managed guest lifecycle coordinator is now implemented and software-tested:
-exact creation, guest acknowledgement, viewer/login readiness, one worker,
-deadline/mode cancellation, owned VM stop and receipt-preserving restart recovery.
-It never substitutes a viewer PID or adopts a foreign singleton. A pending
-unconfirmed start remains unknown even when inventory is empty; only its exact
-acknowledged nonce or explicit native no-effect evidence permits reconciliation.
-The worker now supports explicit host shutdown ownership while preserving legacy
-request defaults, avoiding result loss from racing guest self-shutdown. Seven
-lifecycle cases and the combined 57-case boundary/inventory check pass; package
-imports and type checking pass. The compiled worker parser passes five actual
-checks with zero-warning/error build; scratch was removed and hashes retained in
-`windows-guest-worker-lifecycle-build-20261104.json`. [Lifecycle contract](windows-managed-guest-lifecycle.md).
-The embedded guest worker now builds into the existing helper and stages as one
-exact, private NTFS hard link without copying a runtime. Protected ownership,
-native/consumer exit fences, no replay and foreign-data preservation pass 44
-focused cases with snapshot/runner checks. Both input and tool staging now
-release their in-process slot after independently verified late exit. Six actual
-compiled entry/guard checks pass with zero warnings/errors; source/assembly
-hashes were retained and scratch removed. Native Windows link/renamed-entry
-acceptance is now included in CI, pending. [Tool contract](windows-guest-tools.md).
-One host-pinned Node runtime now stages beside that worker as a second exact
-hard link. Requests cannot supply tool paths; copied trusted configuration,
-independent source hashes/identities, native write-sharing prevention and
-interrupted two-link cleanup pass 47 focused cases. The updated helper compiles
-without warnings/errors and Linux native-only guards pass; scratch was removed
-after `windows-node-tools-build-20261104.json` retained source/assembly hashes.
-Actual Windows Node version/identity/sharing acceptance is in CI, pending.
-The Studio Windows Run adapter, bounded writable
-exchange, broader build outputs and remaining action connections are unfinished
-implementation, not hardware blocks. The coordinator explicitly reports no
-exchange filesystem quota. Actual VM startup/login/worker/stop/restart acceptance
-remains a separate supported-Windows-host check. Complete Windows verification at `dbe62bb`
-passed backend, native NTFS, helper, Job Object, fresh-runtime and suite packaging,
-then stopped on the runner's hard five-minute validator rejecting the explicitly
-declared eight-minute execution group. That exact exception and upfront timeout
-preflight are now tested; other groups retain the five-minute cap. The early Windows backend harness
-now allows 20 minutes for the expanded encrypted lifecycle cases; individual
-effect deadlines and final backend failure gate remain unchanged. Complete
-corrected Windows acceptance remains pending. Native Windows CI now continues independent helper checks
-after a backend failure, then requires that backend outcome in an unconditional
-final gate; a failed backend still makes the release verification fail. Complete
-corrected Windows release verification now passes at `c5059dd`, run 41872535770,
-including backend, native filesystem/guardian checks, optional-runtime acceptance
-and the complete packaged release. Seven real input/metadata checks were imported
-after verifying their archive digest; only `windows-reviewed-inputs-c505-native.json`
-was retained. Newer worker/Node/image changes have separate pending native checks.
-The bounded full-verification archive was also downloaded and digest-verified;
-only its JSON receipt was retained. It records 259/259 groups, 1,720 tests,
-1,672 passed and 48 declared skips: `c4e345be-cb3f-4188-8542-3ce9fbc63ec3`.
-
-The bounded Windows exchange image constructor is now implemented: a new exact
-private file, fixed 64 MiB virtual capacity, 63 MiB FAT16 partition, operation-bound
-VHD footer, native read-only header verification and no mount/attach effect.
-Fourteen compiled corruption/format checks and an independent read-only fsck
-pass; the helper builds without warnings/errors. Build/probe/specification
-scratch was removed after retaining source/assembly hashes. A separate short
-Windows filesystem workflow now runs the native input, worker, Node and image
-journeys without waiting for the full release lane. [Exchange contract](windows-bounded-exchange.md).
-Durable image ownership, attach/mount/detach/recovery, actual disk-full validation
-and the Studio adapter remain unfinished implementation; image creation grants
-neither a writable exchange lease nor execution protections.
-
-The first short Windows filesystem run at `332aa8a` passed all 11 actual native
-input, embedded-worker and Node checks, then failed image header validation.
-The overall job remains failed; its digest-verified small JSON receipt is
-preserved as `windows-filesystem-332aa8a-failed.json`. The reader now emits closed
-field/numeric diagnostics for that software discrepancy. Exact read-only image
-inspection is implemented separately, binding original file identity, bytes,
-private DACL and detached metadata without changing the directory ACL. The
-updated C# build has no warnings/errors, all five Linux mode guards pass and
-16 staging/package cases pass. Native inspection/header acceptance is pending;
-the immutable Node/worker checks are confirmed individually, not an accepted
-complete image or VM path.
-The diagnostic rerun at `f5dd3be` identifies the VHD UUID byte-order comparison:
-the native reader returns the persisted opaque network-order bytes, while CLR
-GUID formatting reverses its first fields. The comparator now checks the exact
-original bytes instead. No alternative UUID/capacity is accepted; corrected
-native acceptance remains pending.
-
-Corrected `899c78e` now passes all 16 actual native Windows filesystem checks,
-including image UUID/capacity/type, detached state and fresh immutable readback.
-The small archive was downloaded and digest-verified; only
-`windows-filesystem-899c78e-native.json` was retained. Detached image ownership
-is now implemented separately: protected reservation before ACK, exact full/
-footer hashes and identities, one outstanding image per compartment, no replay,
-consumer/native exit fences, fresh native inspection before cleanup, scope
-revocation and late-exit reconciliation. Eight image fault cases plus the
-combined 43-case ownership/snapshot/runner check pass; four package checks and
-type checking pass. Its actual native service journey is now in CI, pending.
-Writable-volume ownership/attach/mount/detach/recovery and the Studio Run adapter
-remain unfinished; the detached lease grants no execution protection.
-
-The detached ownership service now passes all 19 actual native Windows checks
-at `e589c4f`, run 41889645807. The same immutable source passes all 156 Linux
-groups: 1,004 tests, 994 passed and ten declared platform skips. Receipt
-`71ff7517-e62b-4fbc-87c6-be7aa3d3deac` was retained; all children were verified
-cleaned/exited and the temporary checkout was removed.
-
-The exact native volume attach/inspect/detach mode is now implemented. It binds
-the original image and mount directory, derives its device from the VHD handle,
-verifies the single exact partition extent and mounted capacity, and requires
-fresh detached image/tag/footer readback before reporting cleanup. It enables
-only an existing assigned manage-volume privilege in that helper's token.
-Six Linux entry guards, four package checks and a zero-warning/error build pass;
-build scratch was removed. Native CI now includes actual fixed-capacity disk-full
-and detach checks, pending. Durable writable-volume handoff/restart ownership,
-trusted guest mapping, normal Windows privilege setup and Studio Run connection
-remain implementation work; no guest or workstation disk was opened locally.
-
-## Current pilot
-
-The normal installed command is `~/.local/bin/switchyard`. Source development uses
-`mise exec node@24.14.0 -- npm run layout:studio`. Keep the printed private link
-local; it contains access credentials. The frontend is frozen for review and its
-exact digest/private link have survived the backend updates.
-
-Published source `f5dd3be` is installed as release
-`3b3b7883ab312dd486cf165180ff9e057020c8a933e2d1dbf2584ada2f4b688e`: 484 files,
-4,779,454 bytes. Six normal update checks pass (assignment-legends-1793816639962.json).
-Current plus one rollback occupy about 12 MiB, bundle staging is empty, and no
-extra Node/.NET/Python/model runtime was copied. Definitions, modes, keyboard
-configuration, native ChatGPT voice/overlay repair and the private link remain
-preserved.
-
-## Accepted evidence
-
-- Complete Linux source: 147/147 groups, 950 tests, 940 passed and ten declared
-  platform skips; receipt 99c53747-2954-4709-ba97-b646bf07d43f. The additional
-  Windows metadata probe is explicitly skipped on Linux. Type checking passes.
-- Normal installed reviewed commit: seven checks with one actual empty Codex
-  task, zero prompts, exact binary bytes/author, preserved unowned edit, shared
-  index reconciliation and durable duplicate/receipt readback. Receipt
-  installed-repository-commit-1793784076954.json.
-- Normal installed metadata recovery: eight checks after a deliberate native
-  lost-readback fault. One commit, unchanged original outcomes, separate recovery
-  approval/receipt, 36 independently stopped Git guardians and 13 retained
-  inspection guardians. Receipt installed-repository-recovery-1793787873360.json.
-- Distinct client launch: five versioned recipes and eight ownership/lifecycle
-  tests. Five actual Python/Gio private-bus cases passed again with exact native
-  URL hash witnesses, without opening a browser. The normal installed Linux API
-  then passed six checks with one actual fixed GitHub Copilot homepage request,
-  no prompt or repository/session selection, independent helper exit and
-  duplicate/scope rejection. Current witness proof:
-  installed-client-launch-1793790877401.json. Validation records/staging were
-  removed and keyboard-only validation mode/selection restored. The external
-  browser was not closed; visual page/account/plan acceptance is not claimed.
-- Complete corrected Windows release: 250/250 groups at PR head cda0327,
-  1,657 tests, 1,615 passed and 42 reviewed skips. Run
-  [41807554404](https://github.com/SquirmyWormy275/strathex-switchyard/actions/runs/41807554404),
-  receipt 6fa0410b-85ba-4dd5-a7f9-69b7b112767f. Its tested merge commit has exactly
-  the same source tree. Bounded artifact 13313323640 was downloaded and SHA-256
-  verified; no archive/installer bundle was retained locally. This predates the
-  newer retained-ownership/recovery/client-launch source.
-
-## Windows client verification
-
-Current source 7012333 passes all 60 checks in six native Windows boundary
-groups, including shared reviewed-input validation, exact role routing and actual
-Windows PowerShell WinRT/AsTask metadata without URI activation. Run
-[41826311362](https://github.com/SquirmyWormy275/strathex-switchyard/actions/runs/41826311362),
-receipt c04c5387-af12-480c-87f3-84015b127275. Tested merge commit 7074fdf has the
-exact same source tree. Artifact 13319542094 (1,573 bytes) was downloaded in memory
-and SHA-256 verified; only client-platform-windows-7012333.json remains privately.
-No archive or runtime copy was retained. Windows guest input staging remains
-unfinished; these checks do not accept an interactive URI/account/window.
-
-The published role source 15cd19b passes all 47 checks in five native Windows
-client groups, including actual Windows PowerShell WinRT/AsTask metadata without
-URI activation. Run [41823579833](https://github.com/SquirmyWormy275/strathex-switchyard/actions/runs/41823579833),
-receipt 9097bbd9-ec2b-4dc3-ae9d-8619c6fc4993. Its tested merge commit f4c37b2 has
-exactly the same source tree. Bounded artifact 13317249676 (1,424 bytes) was
-downloaded and SHA-256 verified; the complete receipt is retained privately as
-client-platform-windows-15cd19b.json. No ZIP or installer/runtime was retained.
-
-The earlier WinRT source ea96ffe passed 41 checks after correcting native UTF-8
-startup and the fixed Utility module; the original 40/41 timeout remains in the
-verification history. The 15-second metadata deadline was preserved. These are
-accepted software/native metadata checks, not interactive Windows URI, account,
-window or device acceptance. The complete newer Windows release remains pending. Run 41823818569 at source
-38eb56d has passed backend, native helper build, owner-loss, optional-runtime and
-suite packaging steps; complete bundle verification was still running at the
-last check. The newer 7012333 full run is queued behind it. Track fresh runs after
-subsequent documentation checkpoints; do not relabel queueing as a hardware block.
-
-## Complete Windows failure corrected in the native boundary test
-
-Complete run 41823818569 at 38eb56d reached all groups but failed the client group:
-its Python-only negative test tried `python` in the deliberately restricted
-copied-source PATH. Nine other client cases, including native WinRT metadata,
-passed. Receipt b7410441-17c0-494d-930b-a8363d0df29f preserves that failure.
-The negative test now invokes each platform's actual fixed helper: Windows
-PowerShell on Windows and system Python/Gio on Linux. Four malformed requests
-must fail before broker activation. No test was skipped, no ambient PATH added
-and no script policy changed. Six focused groups pass locally (60 tests, 59
-passed plus the declared native Windows metadata skip), receipt
-286739b9-26e1-4100-8a8c-ef4d2165655c. Fresh Windows/full acceptance is pending.
-
-## Client roles and physical intent connection
-
-Exact `client-surface` role bindings now connect summon to the fixed HTTPS
-transport, with a fresh local binding identity and recipe digest. The Linux CLI
-and Windows hotkey sender attach an invocation UUID. The protected launch record
-binds that UUID to its exact role, so retries do not launch again and rebinding
-cannot reuse an old result. Binding changes before native acknowledgement reject
-the request; late changes retain an uncertain outcome. Client bindings accept no
-prompt/context or invented session and do not change the active conversation.
-Work dispatch follows the persisted active workspace and permits only Microsoft
-work Copilot, regardless of a caller's Personal compartment field.
-
-Five focused groups pass: 47 tests, 46 passed and the one declared native Windows
-metadata skip on Linux; receipt f0d42bbb-0858-4b23-9ae0-bcc08b1409c0. Six physical
-intent cases include authenticated HTTP, actual gateway receipt correlation,
-stale/late role changes and synthetic Work-only routing. Native client responses
-in these cases are fixtures, not browser/account acceptance. The changed Windows C# sender compiles from isolated tracked sources; its actual
-dispatch method sent two authenticated HTTP packets with distinct matching UUIDs
-on Linux/.NET 8.0.30 (native-hotkey-dispatch-20261104-034142.json). No build files
-were retained. The normal installed role demonstration then passed seven checks
-at 15cd19b (installed-client-launch-1793792795748.json): one real fixed homepage
-request through a temporary workflow role and the actual CLI physical-intent
-gateway, matching invocation/receipt, no duplicate helper, zero prompts and
-independently verified exit. It restored validation definitions, keyboard-only
-mode and selection and removed only its own successful launch record. A small
-private dated definition backup remains. No physical key, browser visual/account
-or interactive Windows acceptance is claimed. Fresh native Windows source
-acceptance remains pending.
-
-## Reviewed disposable execution inputs
-
-The older Linux execution-root provider copied an entire repository, potentially
-including ignored credentials. It now requires exact host-pinned non-production
-input paths, SHA-256 values and sizes. Descriptor-bound reads, bounded buffers,
-source/staging identities and replacement-preserving cleanup enforce the file
-boundary; unselected files are not copied. The namespace no longer mounts the
-host's whole `/etc`. Old disposable pins without reviewed inputs fail closed and
-need deliberate repinning. See [the input contract](reviewed-execution-inputs.md).
-
-Nineteen focused Linux/runtime checks and type checking pass. The final complete
-Linux run passes all 147 groups (950 tests: 940 passed, ten declared platform
-skips; receipt 99c53747-2954-4709-ba97-b646bf07d43f). A real Bubblewrap
-proof passed three checks (repository-inputs-native-1793793697536.json): exactly
-one file staged; host home, host `/etc/passwd`, unselected synthetic credentials,
-ambient credential variables and a live host loopback listener inaccessible;
-original files unchanged and temporary staging removed. No runtime was copied.
-This is an execution prerequisite, not completion of general execution effects,
-Windows guest staging, output disk quotas or the frozen frontend connection.
-
-## Work still required
-
-General execution effects, exact native desktop/IDE/terminal attachment, remaining
-controller controls and the accumulated frontend/guided role controls remain
-implementation work. An API launch request does not establish a provider
-account, native conversation, task completion, exact resume, submission or
-mediation. Microsoft work Copilot remains distinct from GitHub Copilot; no
-personal fallback or employer approval is inferred.
-
-Installed discovery again returned zero configuration interfaces; latest receipt
-device-enumeration-1793793796030.json. No HID interface was opened or written. Actual F77/B122 identity, typing/unlock/hot-plug, physical
-transactions, printer/cap fit, interactive Windows accounts/windows, microphone
-and approved tenant behavior require their actual environments. No flash/reset,
-bootloader, solenoid operation, public release, merge or license change occurred.
-
-## Next executable work
-
-1. Connect host-pinned general execution recipes to the task authority, durable
-   operation/budget and owned-guardian paths, reusing the reviewed input provider.
-   Finish the bounded Windows writable exchange, Studio
-   execution adapter and broader output/restart recovery; the
-   older direct process-group launcher is not the desktop readiness/exit protocol.
-2. Complete exact native desktop/IDE/terminal attachments and the remaining
-   source-verified controller controls, without substituting homepage launch for
-   session identity or inferring electrical capabilities.
-3. Check fresh Windows CI for each new native change and continue integrated
-   acceptance. Preserve the frozen frontend until its review resumes; its task,
-   role, recovery and controller controls remain unfinished implementation.
-
-## Preserved implementation history
-
-The previous append-only status log is preserved in full, in order, across
-[history part 1](switchyard-status-history-1.md) and
-[history part 2](switchyard-status-history-2.md). Their byte-for-byte concatenation
-matches the original 137,472-byte log; SHA-256: `43ac555a5b970cf4e918af5578b09396309ce858e7872257fc1eb9231cca87f0`.
-Relative documentation links retain their original directory. This page is the
-current entry point; older pending statements in the history are superseded by
-the explicit source/receipt evidence above.
+Switchyard is a partial implementation of the full October 29 Rev2 handover.
+The F77 is the pilot, not a scope limit. The [requirement ledger](switchyard-requirements.md)
+tracks implementation separately from hardware/account acceptance; [verification](verification.md)
+records exact source checkpoints and receipts.
+
+## Current backend
+
+Normal Windows Run now uses the protected System storage service for new
+exchanges. The desktop client does not elevate or enable volume privilege.
+A read-only capability check precedes staging; unavailable service consumes
+that operation as unavailable, with no direct-volume fallback. Each image binds
+the original installation, task and reviewed input manifest. Stable effect UUIDs
+are protected before dispatch; lost replies use read-only lookup and never
+resend an absent/reserved effect. Original uncertain Run outcomes stay uncertain.
+
+A kernel host lease excludes setup through preparation and retirement. A separate
+consumer lease prevents cleanup before a guest exists; independent original
+guest/native exit is still required for detach and retirement. Only the exact
+native-derived disk directory is admitted to the backend. Existing direct images
+keep their original cleanup port. Private ownership is omitted from snapshots.
+See the [storage contract](windows-storage-broker.md).
+
+The connection passes seventy owner/runner/HTTP/privacy/package/inventory checks
+at `a1e71b0`. The subsequent preparation-race correction passes 73 checks and
+type checking: duplicate calls are fenced before native identity, retired
+capabilities fail before I/O, and a failed pre-effect read releases its unused
+host lease. Native CI is required for that correction. The complete 166-group
+Linux lane is still running at immutable `a1e71b0` with short owned fixtures.
+
+## Accepted native storage
+
+Complete Windows workflow [41948972575](https://github.com/SquirmyWormy275/strathex-switchyard/actions/runs/41948972575)
+at `1f4e8e5` passes all thirty filesystem checks, 112 compiled portable checks,
+sixteen protected-file checks, both service/setup lifecycles and 31 restricted-client
+exchange checks. Four archive digests verified; JSON receipts retained. The
+restricted token has Administrators deny-only and no volume-management privilege.
+Actual data writes, kernel exhaustion, five mount mutation denials, substituted
+mapping refusal, detach, retirement and independent native exit pass. Earlier
+failed access/removal receipts remain failed.
+
+The newer native JavaScript-owner proof at `b0f29ae` schedules eight checks against
+the same real service/helper: exact task/input mapping, mounted write/readback,
+consumer lease, guest-exit refusal, retirement, replay refusal and native exits.
+Its Windows workflow is running; artifacts are not imported yet. It uses an
+administrative worker token, creates no account and launches no guest or setup.
+A complete native application/guest journey and interactive UAC remain unaccepted.
+
+## Installed Linux and F77
+
+The normal installed application at `3e346c1`, release
+`a68b9876984a82483566d320b98d48c03e496df1a37c1131766bc7fbb160fb4a`,
+passes six update checks and five F77 API checks. Linux uses the pinned runtime's
+existing `hidraw` backend: exact FF60/61 configuration discovery, VIA 9 / Vial 4,
+three 8 × 11 layers and the complete pinned source definition match. Keymap and
+macro hashes match the independent 90-query guarded capture. Case identity,
+ordinary typing, hotplug and physical writes are separate unaccepted checks.
+No unlock, configuration write, flash, reset or electrical command was sent.
+
+Receipts `assignment-legends-1793842045992.json` and
+`installed-f77-readout-1793842177742.json` are retained. Definitions, selection,
+modes, private endpoint and exact frozen Home were preserved; HID transports
+exited and temporary bundle/checkout were removed. The frontend stays frozen.
+
+The last accepted complete Linux checkpoint, `f8591fe`, passes 165/165 groups:
+1,083 tests, 1,073 passed, ten declared skips. Receipt
+`06f341a4-bc1a-4729-8628-5df92ec427be` retained, every child cleanup verified,
+owned fixtures and checkout removed. Installed Run and pipeline demonstrations
+at their earlier exact sources remain recorded in [verification](verification.md).
+
+## Remaining implementation and external checks
+
+Windows pipelines, scanner/advisory application connections, writable build
+preparation, exact desktop/IDE/terminal attachments and the remaining frontend
+controls are unfinished implementation. The task requirement remains the full
+suite. Claude Code is only a token-limit contingency; no delegated coding job
+was launched.
+
+Interactive Windows Sandbox/UAC and device/account/focus checks need an authorized
+Windows host. Approved Microsoft tenant acceptance remains unavailable; no work
+laptop or tenant is probed. The connected F77 still needs typing/hotplug and
+separately authorized physical transactions. B122 hardware and all 27 physical
+acceptance gates remain unaccepted. Microphone UI, printing/cap fit and independent
+assessment remain separate checks. No public release, merge or licensing change
+is authorized by these checkpoints.
+
+## Continuation
+
+Import the bounded native-owner receipt after its workflow finishes, reconcile
+the complete Linux result and publish its exact counts. Verify the preparation
+race correction on native Windows. Update the normal Linux backend with a clean
+reviewable bundle and verify the frozen Home/private state again. Continue the
+independently executable backend requirements above. Keep small source/JSON
+evidence locally, remove successful scratch and publish GitHub checkpoints.
+
+Historical notes: [archive 3](switchyard-status-history-3.md),
+[archive 2](switchyard-status-history-2.md), [archive 1](switchyard-status-history-1.md).

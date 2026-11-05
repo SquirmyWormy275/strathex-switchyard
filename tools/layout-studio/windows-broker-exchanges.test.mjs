@@ -15,11 +15,11 @@ async function fixture(t) {
   const store = createSuiteStore({ root, secrets: { get: async (c,p) => keys.get(c+p), set: async (c,p,v) => { keys.set(c+p,v); } } });
   await store.initialize("personal"); await store.update("personal", "fixture", s => { s.mode = "personal-companion"; });
   const clientSid = "S-1-5-21-1-2-3-1001", ownerScope = sha(clientSid), installation = { installationId: randomUUID(), ownerScope, serviceImageSha256: "b".repeat(64) };
-  let exited = true, consumer = true, active = true, available = true, lost = null, reserve = null, wrongMapping = false;
+  let exited = true, consumer = true, active = true, available = true, lost = null, reserve = null, wrongMapping = false, onIdentity = async () => {};
   const p = (state, effectStarted) => ({ state, effectStarted, attached: state === "mounted", mounted: state === "mounted", detachedVerified: ["created","detached","retired"].includes(state), exchangeQuotaEnforced: state === "mounted", virtualBytes: 67108864, backingBytes: 67109376, sandboxEnforced: false });
   const native = {
     reconcile: async () => ({ stopped: exited }),
-    identity: async ({ check }) => { await check(); reads.push("identity"); return { clientSid, ownerScope, helperSha256: "c".repeat(64), setupSha256: "d".repeat(64) }; },
+    identity: async ({ check }) => { await check(); reads.push("identity"); await onIdentity(); return { clientSid, ownerScope, helperSha256: "c".repeat(64), setupSha256: "d".repeat(64) }; },
     probeExchange: async (_binding, { check }) => { await check(); reads.push("probe"); return { status: available ? "available" : "unavailable", installation, effectStarted: false, nativeExitVerified: true }; },
     exchange: async (_binding, request, { check }) => {
       await check(); assert.deepEqual(request.installation, installation); const row = (await store.snapshot("personal"))[field].find(r => r.operationId === request.operationId);
@@ -51,7 +51,7 @@ async function fixture(t) {
     for (const s of services) { for (const r of (await store.snapshot("personal"))[field] ?? []) await s.cleanup("personal", r.operationId); await s.close(); }
     await rm(root, { recursive: true, force: true });
   });
-  return { store, service, create, context, input, effects, reads, records, volumes, authorize, prepare: () => service.prepare("personal", context, authorize, input), lost: v => { lost = v; }, reserved: v => { reserve = v; }, exited: v => { exited = v; }, consumer: v => { consumer = v; }, active: v => { active = v; }, available: v => { available = v; }, wrongMapping: v => { wrongMapping = v; } };
+  return { onIdentity: fn => { onIdentity = fn; }, store, service, create, context, input, effects, reads, records, volumes, authorize, prepare: () => service.prepare("personal", context, authorize, input), lost: v => { lost = v; }, reserved: v => { reserve = v; }, exited: v => { exited = v; }, consumer: v => { consumer = v; }, active: v => { active = v; }, available: v => { available = v; }, wrongMapping: v => { wrongMapping = v; } };
 }
 
 test("one exact broker exchange is durably reserved, transferred once and retired only after original guest exit", async t => {
@@ -137,4 +137,26 @@ test("capability probing is read-only and a stopped exact scope cannot reserve a
   const f = await fixture(t); assert.deepEqual(await f.service.probe("personal", f.context, f.authorize), { status: "available", effectStarted: false });
   assert.deepEqual(f.effects, []); assert.equal((await f.service.list("personal")).length, 0);
   f.active(false); await assert.rejects(f.service.probe("personal", f.context, f.authorize), /active Personal/); assert.deepEqual(f.effects, []);
+});
+
+test("duplicate preparations are fenced before native identity while the first exact owner is still discovering its installation", async t => {
+  const f = await fixture(t); let entered, release;
+  const ready = new Promise(r => { entered = r; }), hold = new Promise(r => { release = r; });
+  f.onIdentity(async () => { entered(); await hold; });
+  const first = f.prepare(); await ready;
+  await assert.rejects(f.prepare(), /retained or busy/); assert.deepEqual(f.reads, ["identity"]); assert.deepEqual(f.effects, []);
+  release(); const image = await first; await image.release(); assert.deepEqual(f.effects, ["create", "retire"]);
+});
+test("a retired capability refuses stale access before touching native identity or another operation's host lease", async t => {
+  const f = await fixture(t), volume = await (await f.prepare()).createVolume(); await volume.release();
+  const reads = f.reads.length; await assert.rejects(volume.assertCurrent(), /lease expired/); assert.equal(f.reads.length, reads);
+  assert.equal((await f.service.list("personal"))[0].cleanupPending, false);
+});
+
+test("a failed ownership read after kernel acquisition releases only the unused host lease without dispatching a native effect", async t => {
+  const f = await fixture(t), original = f.store.snapshot; let snapshots = 0;
+  f.store.snapshot = async (...args) => { if (++snapshots === 2) throw Error("Synthetic ownership read failure"); return original(...args); };
+  await assert.rejects(f.prepare(), /ownership read failure/); f.store.snapshot = original;
+  assert.deepEqual(f.effects, []); assert.deepEqual(f.reads, []);
+  assert.equal(await f.store.withResourceLock("windows-storage", "primary-personal-host", async lease => { lease.assert(); return true; }), true);
 });
