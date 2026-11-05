@@ -74,5 +74,10 @@ that restart cannot upgrade native program success. Existing Run, parser,
 checkpoint/budget, output, stop, recovery and package regressions remain required.
 Twenty-seven existing recovery/stop/output/Suite regressions also pass.
 Focused Windows CI jobs run complete evidence, policy and recovery files under
-their declared isolated bounds. Actual guest/account acceptance and frontend
-controls remain separate work. No work laptop or Microsoft tenant is probed.
+their declared isolated bounds. At `5d398d2`, native Windows workflow
+[41960677205](https://github.com/SquirmyWormy275/strathex-switchyard/actions/runs/41960677205)
+passes all sixteen jobs. Pipeline policy (two cases), evidence (three cases)
+and recovery (one case) artifact digests and every child cleanup verify;
+`windows-pipeline-{policy,evidence,recovery}-5d3.json` receipts are retained.
+These native OS checks still use an explicit guest double. Actual guest/account
+acceptance and frontend controls remain separate work. No work laptop or Microsoft tenant is probed.

@@ -3,7 +3,13 @@
 Claude coding tasks are separate from configuration conversations, Codex tasks
 and Claude Desktop. This backend uses the installed native CLI's supported
 `auth status --json` and `agents --json --all --cwd` contracts. Actual acceptance
-used **2.1.308 on Linux**. Windows uses the same argument-based process path;
+used **2.1.308 on Linux**. The restricted designer/text adapters also review
+**2.1.317**: its installed flags and metadata contract are checked, and a
+one-use text approval binds the exact detected native version. Switching between
+these supported versions needs a new approval; unreviewed versions still refuse.
+Eight real metadata checks on 2.1.317 verify nine independently exited guardians
+with no prompt/task creation. Current-version model replies are covered by
+explicit synthetic processes; a real 2.1.317 model turn remains unaccepted. Windows uses the same argument-based process path;
 native Windows CLI/account acceptance remains pending. The frozen morning
 frontend does not expose this task panel yet.
 

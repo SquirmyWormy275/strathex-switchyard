@@ -118,3 +118,12 @@ test("oversized saved designer context rejects before any native request and doe
   await assert.rejects(design("large"), /exceeds 512 KiB/); assert.equal(calls.length, 0);
   assert.equal((await design()).reply, response.reply);
 }));
+
+test("reviewed Claude 2.1.317 preserves the restricted designer contract and refuses a version change before retaining its reply", () => fixture(async ({ settings, design, calls, store }) => {
+  settings.version = "2.1.317 (Claude Code)";
+  const result = await design(); assert.equal(result.reply, response.reply);
+  const print = calls.find(c => c.args.includes("-p")); assert.equal(print.args[print.args.indexOf("--tools") + 1], ""); assert.ok(print.args.includes("--safe-mode") && print.args.includes("--strict-mcp-config"));
+  settings.afterDesign = () => { settings.version = "2.1.308 (Claude Code)"; };
+  await assert.rejects(design(result.conversationId), /version changed/);
+  assert.equal((await store.snapshot("personal")).conversations[0].messages.filter(m => m.role === "assistant").length, 1);
+}));

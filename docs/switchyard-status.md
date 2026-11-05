@@ -7,6 +7,24 @@ records exact source checkpoints and receipts.
 
 ## Current backend
 
+Claude's restricted designer and task text now support the installed 2.1.317
+alongside reviewed 2.1.308. One-use text approvals bind the exact native version;
+a change between supported versions requires a new review. The original
+account/session, tools-disabled/plan and cancellation boundaries remain enforced.
+Thirty-four agent/submission checks and 23 Suite/package regressions pass, with
+type checking. Eight actual metadata checks verify nine independently exited
+native commands without a prompt, task creation or external-session stop.
+A real 2.1.317 model turn remains unaccepted; Claude remains a token-limit
+contingency for implementation, with no delegated coding job launched.
+
+Native Windows `5d398d2` now passes all sixteen jobs. The six pipeline
+policy/evidence/recovery cases have digest-verified artifacts and child cleanup;
+`windows-pipeline-{policy,evidence,recovery}-5d3.json` receipts are retained.
+They exercise real Windows task/Git/crypto/lease boundaries with an explicit guest
+double. The separate service lifecycle also passes at that source; the earlier
+`25bd26c` service-absence failure remains failed. The later stopped-PID correction
+still has its own pending native checkpoint.
+
 The native removal observer no longer demands PID zero from a stopped SCM
 entry: that PID is not valid under the Windows API contract. The already captured
 original process handle still supplies independent exit proof. Initial pending

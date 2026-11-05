@@ -29,9 +29,11 @@ export async function readClaudeMetadata(executable, operation, cwd, { command =
     else { const error = new Error("The owned Claude metadata probe guardian has not verified exit. No replacement was launched."); error.ownedClient = client; throw error; }
   }
 }
+export const reviewedClaudeVersions = Object.freeze(["2.1.308", "2.1.317"]);
 export async function readClaudeDesignLogin(executable, cwd, options = {}) {
   const version = (await readClaudeMetadata(executable, "version", cwd, options)).trim();
-  if (version !== "2.1.308 (Claude Code)") throw new Error("This Claude adapter requires its reviewed native version (2.1.308). Saved context was preserved.");
+  const nativeVersion = reviewedClaudeVersions.find(value => version === `${value} (Claude Code)`);
+  if (!nativeVersion) throw new Error(`This Claude adapter requires its reviewed native version (${reviewedClaudeVersions.join(" or ")}). Saved context was preserved.`);
   let value; try { value = JSON.parse(await readClaudeMetadata(executable, "account", cwd, options)); } catch (error) { if (error instanceof SyntaxError) throw new Error("Claude returned an unsupported login status. No context was submitted."); throw error; }
-  options.checkCurrent?.(); return { version: "2.1.308", fingerprint: claudeAccount(value) };
+  options.checkCurrent?.(); return { version: nativeVersion, fingerprint: claudeAccount(value) };
 }

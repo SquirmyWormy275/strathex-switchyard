@@ -31,13 +31,13 @@ const command = async (exe, args, options) => {
   return runRuntimeCommand(exe, args, { ...options, onGuardianReady: async (frame) => { frames.push(guardianScope(frame)); await options.onGuardianReady(frame); } });
 };
 const service = createClaudeCoding({ store, command });
-let failure;
+let failure, nativeVersion;
 try {
   const installed = await api("coding/claude/discovery"); assert.equal(installed.available, true); assert.equal(installed.permitted, true); checks.push("normal installed Claude discovery verifies the native supported version and account");
   assert.equal((await service.discovery("personal")).available, true); checks.push("actual native version and first-party account verified through supervised commands");
   const rows = await service.inventory("personal", { repositoryRoot: await realpath(fileURLToPath(new URL("../", import.meta.url))) }); assert.ok(Array.isArray(rows)); checks.push("actual native inventory queried for the exact repository without exposing session content");
   const executable = await trustedCli("claude-code"), repositoryRoot = await realpath(fileURLToPath(new URL("../", import.meta.url))), metadataOptions = { command, resource: metadataResource, authorize: () => store.authorize("personal", { provider: "claude-code" }) };
-  assert.match((await readClaudeDesignLogin(executable, repositoryRoot, metadataOptions)).fingerprint, /^[a-f0-9]{64}$/);
+  const login = await readClaudeDesignLogin(executable, repositoryRoot, metadataOptions); nativeVersion = login.version; assert.match(login.fingerprint, /^[a-f0-9]{64}$/);
   assert.ok(Array.isArray(claudeInventory(JSON.parse(await readClaudeMetadata(executable, "inventory", repositoryRoot, metadataOptions)), repositoryRoot))); assert.equal(metadataResource.clients.size, 0); checks.push("shared designer/task metadata probes verify real login and inventory and release all owned resources");
   assert.ok(frames.length >= 6); assert.equal(frames.length, commands.length); assert.equal(new Set(frames.map((f) => f.id)).size, frames.length);
   for (const frame of frames) assert.equal(await runtimeGuardianStopped(frame), true); checks.push("every distinct recorded native guardian independently verified stopped");
@@ -47,5 +47,5 @@ try {
 } catch (error) { failure = error; }
 finally { try { for (const client of metadataResource.clients) { client.close(); assert.equal(await client.stop(), true, "A shared metadata guardian has not verified exit."); } await service.close(); } catch (error) { failure ??= error; } await rm(root, { recursive: true, force: true }); keys.clear(); }
 const path = join(homedir(), ".local/state/strathex-switchyard/runtime-verification", `installed-claude-commands-${Date.now()}.json`);
-await privateWrite(path, JSON.stringify({ schema: "switchyard-installed-claude-commands/v1", at: new Date().toISOString(), applicationRelease: expectedRelease, checks, guardians: frames, nativeCommandCount: commands.length, temporaryStateRemoved: true, modelPromptSubmitted: false, backgroundTaskStarted: false, externalSessionsStopped: false, failure: failure?.message ?? null }, null, 2)+"\n");
-console.log(JSON.stringify({ receipt: path, checks: checks.length, nativeCommandCount: commands.length, modelPromptSubmitted: false, temporaryStateRemoved: true, failure: failure?.message ?? null })); if (failure) throw failure;
+await privateWrite(path, JSON.stringify({ schema: "switchyard-installed-claude-commands/v1", at: new Date().toISOString(), applicationRelease: expectedRelease, nativeVersion, checks, guardians: frames, nativeCommandCount: commands.length, temporaryStateRemoved: true, modelPromptSubmitted: false, backgroundTaskStarted: false, externalSessionsStopped: false, failure: failure?.message ?? null }, null, 2)+"\n");
+console.log(JSON.stringify({ receipt: path, nativeVersion, checks: checks.length, nativeCommandCount: commands.length, modelPromptSubmitted: false, temporaryStateRemoved: true, failure: failure?.message ?? null })); if (failure) throw failure;

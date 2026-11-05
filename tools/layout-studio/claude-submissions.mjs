@@ -4,7 +4,7 @@ import { runOwnedNativeCommand, guardianScope } from "./owned-native-command.mjs
 import { verifiedClaudeTaskReply } from "./claude-task-result.mjs";
 import { scopeHash } from "./confirmations.mjs";
 import { trustedCli } from "./agents.mjs";
-import { readClaudeDesignLogin, readClaudeMetadata } from "./claude-account.mjs";
+import { readClaudeDesignLogin, readClaudeMetadata, reviewedClaudeVersions } from "./claude-account.mjs";
 import { claudeInventory } from "./claude-coding.mjs";
 import { verifyRepositoryIdentity } from "./coding-task-identity.mjs";
 import { createReviewedTaskText } from "./reviewed-task-text.mjs";
@@ -24,7 +24,7 @@ export function createClaudeSubmissions({ store, resolveCli = trustedCli, stopCh
   const canRecoverTask = task => task?.nativeTransport === "owned-print" && task.nativeIdentityVerified === false && task.status === "creation-uncertain";
   return createReviewedTaskText({ store, stopChild, now, adapter: {
     verifySavedStop: reconcileSaved,
-    provider: "claude-code", nativeVersion: "2.1.308", launchPolicy: "tools-disabled/plan", permissions: "native tools disabled; plan mode; permission prompts denied",
+    provider: "claude-code", nativeVersion: reviewedClaudeVersions.join("|"), launchPolicy: "tools-disabled/plan", permissions: "native tools disabled; plan mode; permission prompts denied",
     submitAction: "submit_claude_text", resolveAction: "resolve_claude_text",
     reviewReason: "Send this exact text under this task's original verified Claude account. For a reserved new task, the first reply must verify its requested UUID before native creation is accepted; later turns resume that exact conversation. Stopped background tasks use their existing UUID. Safe mode, an empty tool/MCP set and denied permission prompts remain enforced. No execution authority, other provider or attached terminal is selected.",
     canRecoverTask,
@@ -42,8 +42,11 @@ export function createClaudeSubmissions({ store, resolveCli = trustedCli, stopCh
       await reconcileSaved(compartment, authorize);
       const executable = await resolveCli("claude-code"); await authorize();
       const options = { command, guardianStopped, stopChild, resource, authorize, checkCurrent: current };
+      let nativeVersion;
       async function login() {
         await authorize(); const login = await readClaudeDesignLogin(executable, task.repositoryRoot, options); await authorize();
+        if (nativeVersion !== undefined && login.version !== nativeVersion) throw new Error("The exact reviewed Claude native version changed. No task context was submitted or redirected.");
+        nativeVersion ??= login.version;
         if (login.fingerprint !== task.accountFingerprint) throw new Error("The native Claude account changed. No task context was redirected.");
       }
       async function stoppedSession() {
@@ -59,6 +62,7 @@ export function createClaudeSubmissions({ store, resolveCli = trustedCli, stopCh
       }
       await login(); await stoppedSession(); await login();
       return {
+        version: nativeVersion,
         async prepareTurn() { await login(); await stoppedSession(); await login(); },
         async runTurn({ recovery, text, signal, checkCurrent, onContainment, onContainmentStopped }) {
           await authorize(); await verifyRepositoryIdentity(task);

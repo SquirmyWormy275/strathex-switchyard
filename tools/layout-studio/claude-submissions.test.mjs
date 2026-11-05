@@ -156,3 +156,12 @@ test("missing native history during explicit recovery preserves uncertainty with
     const prints = calls.filter(c => c.args.includes("-p")); assert.equal(prints.length, 1); assert.equal(prints[0].args.at(-2), "--resume"); assert.equal(prints[0].args.includes("--session-id"), false); await assert.rejects(service.reviewRecovery("personal", input), /previous uncertain outcome/);
   } finally { await suite.close(); }
 }));
+
+test("the exact reviewed native version binds a Claude approval even when both versions are supported", () => fixture(async ({ settings, calls, review, submit, store }) => {
+  const old = await review(); assert.equal(old.scope.nativeVersion, "2.1.308");
+  settings.version = "2.1.317 (Claude Code)";
+  await assert.rejects(submit(old), /scope|approval|confirm/i); assert.equal(calls.some(c => c.args.includes("-p")), false);
+  const current = await review(); assert.equal(current.scope.nativeVersion, "2.1.317");
+  const result = await submit(current); assert.equal(result.reply, "Ready"); assert.equal(result.nativeVersion, "2.1.317");
+  assert.equal((await store.snapshot("personal")).codingTurns[0].nativeVersion, "2.1.317");
+}));

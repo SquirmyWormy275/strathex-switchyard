@@ -315,7 +315,9 @@ export function createAgentService({ store, runtimeRoot, codexFactory = (exe, cw
             if (result.status !== "completed" || result.exitCode !== 0 || value?.type !== "result" || value.subtype !== "success" || value.is_error !== false || !value.structured_output || !Array.isArray(value.permission_denials ?? []) || (value.permission_denials ?? []).length) throw new Error();
           } catch { throw new Error("Claude Code could not produce a verified proposal. Check its sign-in and account limits; the current layout and exact conversation were preserved."); }
           if (value.session_id !== sessionId) throw new Error("Claude returned a different native session. Saved context was preserved; no replacement was submitted.");
-          if ((await claudeLogin(compartment, executable, cwd, generation)).fingerprint !== accountFingerprint) throw new Error("The native Claude login changed before retaining the reply. Saved context was preserved.");
+          const afterLogin = await claudeLogin(compartment, executable, cwd, generation);
+          if (afterLogin.fingerprint !== accountFingerprint) throw new Error("The native Claude login changed before retaining the reply. Saved context was preserved.");
+          if (afterLogin.version !== login.version) throw new Error("The native Claude version changed before retaining the reply. Saved context was preserved.");
           response = value.structured_output;
         } else throw new Error("This provider does not offer a configured design route. No fallback provider was selected.");
         const reviewed = validateDesignResponse(response, plan);

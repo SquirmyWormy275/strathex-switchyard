@@ -55,16 +55,16 @@ export function createReviewedTaskText({ store, adapter, stopChild = stopOwnedCh
       await store.claimSession(c, { provider, sessionId: task.sessionId }); await authorize();
       const latest = await store.snapshot(c); if (taskDigest(taskIn(latest, taskId, recovery)) !== taskDigest(task)) throw new Error("The exact task binding changed before review or submission.");
       if (recovery) adapter.validateRecovery?.(task, latest);
-      return await operation({ task, native, current, authorize, resource, state: latest });
+      return await operation({ task, native, nativeVersion: typeof native.version === "string" ? native.version : adapter.nativeVersion, current, authorize, resource, state: latest });
     } finally {
       const stopped = await dispose(c, resource); running.delete(key);
       if (!stopped) throw new Error("Owned native process exit is unconfirmed. Saved request identities remain; no automatic retry is allowed.");
     }
   }
-  function reviewed(c, task, state, text, recovery = false) {
+  function reviewed(c, task, state, text, recovery = false, nativeVersion = adapter.nativeVersion) {
     return { action: adapter.submitAction, sessionId: task.sessionId,
       targetSnapshotId: scopeHash([`${provider}-reviewed-text/v1`, c, taskDigest(task), recovery ? "recover-exact-native-session" : "continue"]),
-      scopeDigest: scopeHash([text, state.policy, state.mode, state.accounts, adapter.permissions, adapter.nativeVersion]) };
+      scopeDigest: scopeHash([text, state.policy, state.mode, state.accounts, adapter.permissions, nativeVersion]) };
   }
   const active = (c, id) => [...running.entries()].some(([key, r]) => key.startsWith(`${c}:`) && r.requestId === id);
   const view = (t) => ({ ...t, provider: t.provider ?? "codex", taskCompletionVerified: false, provenance: "Owned restricted native text turn; provider completion does not verify its coding task" });
@@ -75,10 +75,10 @@ export function createReviewedTaskText({ store, adapter, stopChild = stopOwnedCh
   }
   async function reviewText(c, { taskId, text }, recovery = false) {
       text = prompt(text);
-      return use(c, taskId, async ({ task, state, current }) => {
-        const confirmation = await suiteConfirmations(store, c, provider, now).issue({ ...reviewed(c, task, state, text, recovery),
+      return use(c, taskId, async ({ task, state, current, nativeVersion }) => {
+        const confirmation = await suiteConfirmations(store, c, provider, now).issue({ ...reviewed(c, task, state, text, recovery, nativeVersion),
           reason: recovery ? adapter.recoveryReason : adapter.reviewReason, reauthenticated: false }); current();
-        return { status: "requires-confirmation", confirmation, scope: { operation: recovery ? "recover-exact-native-session" : "continue", taskId, sessionId: task.sessionId, nativeIdentityVerified: task.nativeIdentityVerified !== false, label: task.label, repositoryRoot: task.repositoryRoot, repositoryIdentity: task.repositoryIdentity, text, accountFingerprint: task.accountFingerprint, permissions: adapter.permissions }, modelPromptSubmitted: false, taskCompletionVerified: false };
+        return { status: "requires-confirmation", confirmation, scope: { nativeVersion, operation: recovery ? "recover-exact-native-session" : "continue", taskId, sessionId: task.sessionId, nativeIdentityVerified: task.nativeIdentityVerified !== false, label: task.label, repositoryRoot: task.repositoryRoot, repositoryIdentity: task.repositoryIdentity, text, accountFingerprint: task.accountFingerprint, permissions: adapter.permissions }, modelPromptSubmitted: false, taskCompletionVerified: false };
       }, null, recovery);
   }
   async function submitText(c, { taskId, text, requestId, token }, recovery = false) {
@@ -87,11 +87,11 @@ export function createReviewedTaskText({ store, adapter, stopChild = stopOwnedCh
       await store.authorize(c, { provider });
       const previous = (await store.snapshot(c)).codingTurns?.find((t) => t.id === requestId);
       if (previous) { if (!belongs(previous) || previous.taskId !== taskId || previous.promptSha256 !== scopeHash(text) || (previous.operation ?? "continue") !== operation) throw new Error("This request UUID already names different reviewed text or another task."); return { ...view(previous), duplicatePrevented: true }; }
-      return use(c, taskId, async ({ task, native, state, current, authorize, resource }) => {
-        const decision = await suiteConfirmations(store, c, provider, now).consume({ ...reviewed(c, task, state, text, recovery), token }); if (!decision.allowed) throw new Error(decision.reason);
+      return use(c, taskId, async ({ task, native, state, current, authorize, resource, nativeVersion }) => {
+        const decision = await suiteConfirmations(store, c, provider, now).consume({ ...reviewed(c, task, state, text, recovery, nativeVersion), token }); if (!decision.allowed) throw new Error(decision.reason);
         resource.requestId = requestId;
         const reserved = await store.update(c, "coding-text-reserve", (s) => {
-          current(); if (taskDigest(taskIn(s, taskId, recovery)) !== taskDigest(task) || reviewed(c, task, s, text, recovery).scopeDigest !== reviewed(c, task, state, text, recovery).scopeDigest) throw new Error("The reviewed task or workspace policy changed before submission.");
+          current(); if (taskDigest(taskIn(s, taskId, recovery)) !== taskDigest(task) || reviewed(c, task, s, text, recovery, nativeVersion).scopeDigest !== reviewed(c, task, state, text, recovery, nativeVersion).scopeDigest) throw new Error("The reviewed task or workspace policy changed before submission.");
           s.codingTurns ??= [];
           const duplicate = s.codingTurns.find((t) => t.id === requestId);
           if (duplicate) { if (!belongs(duplicate) || duplicate.taskId !== taskId || duplicate.promptSha256 !== scopeHash(text) || (duplicate.operation ?? "continue") !== operation) throw new Error("This request UUID already names different reviewed text or another task."); return false; }
@@ -99,7 +99,7 @@ export function createReviewedTaskText({ store, adapter, stopChild = stopOwnedCh
           const cutoff = now() - (s.policy === "work" ? 7 : 30) * 86400000;
           s.codingTurns = s.codingTurns.filter((t) => unresolved.has(t.status) || t.ownedRuntime && t.ownedRuntimeStoppedVerified !== true || t.updatedAt >= cutoff);
           if (s.codingTurns.length >= 32 || Buffer.byteLength(JSON.stringify(s)) > 3 * 1024 * 1024) throw new Error("Review or delete older completed text turns before sending more. Saved context was preserved.");
-          s.codingTurns.push({ schema: "switchyard-coding-text-turn/v1", id: requestId, provider, operation, taskId, sessionId: task.sessionId, taskDigest: taskDigest(task), accountFingerprint: task.accountFingerprint, prompt: text, promptSha256: scopeHash(text), status: "reserved", turnId: null, reply: null, createdAt: now(), updatedAt: now(), taskCompletionVerified: false }); return true;
+          s.codingTurns.push({ schema: "switchyard-coding-text-turn/v1", id: requestId, provider, nativeVersion, operation, taskId, sessionId: task.sessionId, taskDigest: taskDigest(task), accountFingerprint: task.accountFingerprint, prompt: text, promptSha256: scopeHash(text), status: "reserved", turnId: null, reply: null, createdAt: now(), updatedAt: now(), taskCompletionVerified: false }); return true;
         }, { provider });
         if (!reserved) return { ...view((await store.snapshot(c)).codingTurns.find((t) => t.id === requestId)), duplicatePrevented: true };
         let attempted = false;
