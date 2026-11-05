@@ -35,5 +35,12 @@
   "focusedLinuxChecks": 31,
   "packagingReceipt": "isolated-test-39d1f147-ec04-470b-997c-9cc51f933489.json",
   "packagingChecks": 5,
-  "correctedWindowsAcceptancePending": true
+  "correctedWindowsAcceptancePending": false,
+  "correctedNativeFollowup": {
+    "source": "3319f922d17e70ec30eaf3422cff5599262cb08c",
+    "receipt": "windows-policy-authority-3319-native.json",
+    "groups": 3,
+    "checks": 31,
+    "allOriginalBoundsPreserved": true
+  }
 }

@@ -133,5 +133,15 @@ separate authority file completes ten passing subtests, then exceeds its origina
 admission-state regressions now live beside receipt-state checks in an existing
 independent child; authority CI includes the whole child. All cases stay required,
 with both 240-second child limits and the 12-minute CI step unchanged. Linux
-follow-up selection/state groups pass 31 checks; corrected native Windows
-acceptance is pending. [Windows evidence](evidence/windows-authority-9dc-timeout-summary.json).
+follow-up selection/state groups pass 31 checks; the corrected native Windows
+authority/state cohort subsequently passes the same three groups/31 checks, with
+all original bounds retained. [Windows evidence](evidence/windows-authority-9dc-timeout-summary.json).
+
+The normal installed `3319f922` backend also passes six update/seven privacy and
+16 actual native Supply Chain checks through the fresh permission-read path.
+One empty task submits zero model prompts; finding and clean cases retain their
+failed/incomplete scope. Both scanners exit independently, exact feed/signing
+scratch is retired, and only the new proof workspace is reversibly archived with
+its encrypted native identity and OS key preserved. App exit/restart, all original
+54 workspace identities and the private link/Home are verified; checkout/bundle
+are removed. [Installed evidence](evidence/installed-fresh-protected-reads-summary.json).
