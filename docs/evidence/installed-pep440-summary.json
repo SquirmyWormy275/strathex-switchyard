@@ -1,0 +1,74 @@
+{
+  "schema": "switchyard-installed-pep440-summary/v1",
+  "sourceCommit": "ccd1bc1d68ae8d66be279a5c36fac93cc0b3a584",
+  "backendVersionImplementationCommit": "8a39473cda233776dacdbdeace5070bdf6b4b48e",
+  "applicationRelease": "9f631c25ecf00259940e6bdacce31a13e9bc83ce3792f4c31a44b430747a2fc9",
+  "normalUpdateReceipt": "assignment-legends-1793912799187.json",
+  "normalUpdateChecks": 6,
+  "metadataReceipt": "installed-copilot-journal-metadata-1793912799374.json",
+  "metadataChecks": 7,
+  "demonstrations": [
+    {
+      "action": "shield_supply_chain",
+      "receipt": "installed-shield-baseline-1793912963152.json",
+      "receiptSha256": "7ceb952c7f8635b2e2076c20a42487a3ee8ebf4a5f8c6f40ee66b1f1c5e5533c",
+      "checks": 16,
+      "nativeScannerProcessesIndependentlyExited": 2,
+      "findingCase": {
+        "status": "failed",
+        "findings": 1
+      },
+      "cleanCase": {
+        "status": "incomplete",
+        "findings": 0
+      },
+      "sourceAndSigningScratchRemoved": true,
+      "validationRestored": true
+    },
+    {
+      "action": "release_shield",
+      "receipt": "installed-shield-baseline-1793913091358.json",
+      "receiptSha256": "df654b89624ec5bcf71b3d363f9eaea2123f2d6794d0b0315ab7d67e46c5cbbc",
+      "checks": 16,
+      "nativeScannerProcessesIndependentlyExited": 2,
+      "findingCase": {
+        "status": "failed",
+        "findings": 1
+      },
+      "cleanCase": {
+        "status": "incomplete",
+        "findings": 0
+      },
+      "sourceAndSigningScratchRemoved": true,
+      "validationRestored": true
+    }
+  ],
+  "modelPromptsSubmitted": 0,
+  "publicAdvisoryQueriesMade": 0,
+  "nativeEmptyTasksCreated": 2,
+  "nativeScannerProcessesIndependentlyExited": 4,
+  "keyboardOpened": false,
+  "microphoneOpened": false,
+  "accountLoginOrLogoutPerformed": false,
+  "completeShieldAccepted": false,
+  "literalVersionRetained": true,
+  "equivalentSignedAdvisoryMatched": true,
+  "packageUrlCaseFoldedAndEncoded": true,
+  "duplicateExecutionSuppressed": true,
+  "feedRetirementInvalidatesHistoricalReceipts": true,
+  "syntheticFeedQuotaReleased": true,
+  "cleanupReceipt": "pep440-success-cleanup-1793913117843.json",
+  "cleanupReceiptSha256": "8b8e923942d62ecec3285c99f2025ec27646347c5ab1d987a34b9db9fa690e5f",
+  "ownedSyntheticWorkspacesReversiblyArchived": 2,
+  "encryptedRecoveryBytes": 634684,
+  "nativeIdentitiesAndOsCredentialsPreserved": true,
+  "originalActiveWorkspaceInventory": 54,
+  "originalWorkspacesRemoved": 0,
+  "applicationRestartIndependentlyVerified": true,
+  "privateLinkPreserved": true,
+  "homeSha256": "20ba0095a6b9650046df34541872aa7e0a7cdc7db5182f065abb009127c6c130",
+  "frontendDigest": "24100ef601b810efb0cda95e4fe0842d2944560734b02c4cf482c25e19150543",
+  "checkoutCleanupReceipt": "installed-pep440-checkout-cleanup-1793913257719.json",
+  "ownedCheckoutAndBundleRemoved": true,
+  "earlierFailedAttemptRemainsFailed": true
+}

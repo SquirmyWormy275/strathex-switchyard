@@ -132,3 +132,16 @@ This command is an acceptance procedure; an installed pass is recorded separatel
 from software tests and native source-fixture execution.
 
 [Software receipt, reference hashes and native source-fixture limits](evidence/pep440-summary.json).
+
+The corrected installed `ccd1bc1d` source passes this procedure for both actions:
+six normal update/seven metadata checks and 16 installed checks per action. Four
+real scanner processes exit independently; the finding case fails and the clean
+case remains incomplete. Two empty tasks submit zero model prompts. Public
+queries, account changes, keyboard and microphone access stay at zero. Exact
+synthetic packages and signing scratch are removed; new proof workspaces are
+reversibly archived with encrypted native identities/credentials preserved. The
+original 54 workspaces and private link/Home are retained, the app restart is
+verified, and the owned checkout/bundle are removed.
+[Installed receipts](evidence/installed-pep440-summary.json).
+The [earlier verifier failure](evidence/pep440-first-installed-failed-summary.json)
+remains a failed attempt; its legacy npm-name assertion was corrected separately.
