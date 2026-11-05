@@ -109,6 +109,9 @@ identifies relevant ignored names and groups build trees before a separate exact
 scan review; its metadata remains incomplete and grants no authority. A separate
 [index byte witness](docs/git-index-inputs.md) verifies explicitly named staged
 blobs without returning source text or treating that observation as a scan.
+The installed [read-only inspector](docs/inspect-cli.md) exposes these readers as
+`switchyard inspect`; start with `switchyard inspect --help`. It creates no tasks, grants,
+prompts or scans.
 The [history witness](docs/git-history-inputs.md) verifies bounded raw commit,
 tree and selected old blob identities without disclosing source or messages.
 [Linux historical scans](docs/historical-shield-inputs.md) now inspect reviewed

@@ -41,4 +41,8 @@ process. The owned failed checkout, dependency aliases and fixture parent were
 removed after diagnosis, with receipt
 `failed-full-history-install-cleanup-1793875722780.json`. The failed full receipt's
 SHA-256 is `b4f30c2d391219f30c604b735249d1ebbe7677cd72e65ea40eb51f456613d4f1`.
-A corrected complete checkpoint and installed packaging acceptance remain pending.
+Installed `13635bb` passes six normal update/thirteen historical-scan/API checks
+with both scanner exits, exact frozen frontend, full restoration and owned scratch
+removed (`assignment-legends-1793875875539.json`,
+`installed-shield-baseline-1793876047390.json`). Zero prompts or keyboard access.
+A corrected complete checkpoint remains pending.

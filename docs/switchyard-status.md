@@ -34,7 +34,17 @@ and broader history remain unfinished software. [Witness](git-history-inputs.md)
 
 ## Installed application
 
-Latest installed source `4901cc8`, release
+Latest installed source `13635bb`, release
+`81367973a693738830be3a97cbc3edc165329ca4fc8a4c33f748586d809e1539`,
+passes six update/thirteen actual historical-scan/API compatibility checks after
+the Windows connection and package/recovery changes. Both scanner exits, original
+Git provenance, replay/feed retirement and full restoration pass. Receipts
+`assignment-legends-1793875875539.json` and
+`installed-shield-baseline-1793876047390.json`; owned source/signing/packages/
+staging/bundle/proof checkout removed. One empty task, zero prompts, no keyboard
+access, exact frozen frontend. Corrected complete Linux run remains in progress.
+
+Earlier installed source `4901cc8`, release
 `ffd440981ebb02b4ffb887c94a8f7951a47608244a5bd5e9f3553de86cf7c471`,
 passes six update/thirteen actual historical-scan/API checks. The scanner detects
 a secret removed from current source, authenticates original commit/blob identity,
@@ -428,3 +438,9 @@ refusal cleanup, exact provenance, replay and unchanged original inputs. Its
 normal host/runner/receipt connection is implemented; native NTFS, guest and
 installed Windows acceptance remain pending, separate from the software contract.
 [Contract](windows-history-staging.md).
+
+The closed [installed inspector](inspect-cli.md) now exposes bound task metadata
+and existing inventory/index/history readers without authority, prompts, scans or
+endpoint disclosure. Ten CLI/gateway/privacy tests and three isolated groups/32
+checks pass with child cleanup and type checking; the stable-launcher installed
+journey is implemented with acceptance pending. UI remains frozen.

@@ -112,6 +112,7 @@ const linuxCompanionTests = ["linux-secret", "linux-isolation", "linux-lifecycle
     ...(process.platform !== "linux" && linuxSkippedOnNonLinux.has(name) ? { expectedSkipped: linuxSkippedOnNonLinux.get(name) } : {})
   }));
 export function nativeTestOverrides(file, platform = process.platform) {
+  if (file === "deployment/suite/inspect.test.mjs") return { timeoutMs: platform === "win32" ? 300_000 : 120_000 };
   if (file === "tools/layout-studio/task-history-inputs.test.mjs") return { timeoutMs: platform === "win32" ? 300_000 : 120_000 };
   if (file === "tools/layout-studio/repository-windows-shield-history.test.mjs") return { timeoutMs: platform === "win32" ? 300_000 : 120_000 };
   if (file === "tools/layout-studio/repository-windows-shield-index.test.mjs") return { timeoutMs: platform === "win32" ? 300_000 : 120_000 };
@@ -140,6 +141,7 @@ export const requiredGroups = [
   { file: "scripts/windows-scenario-groups.test.mjs" },
   { file: "scripts/verify-runtime-platform.test.mjs" },
   { file: "deployment/suite/release.test.mjs" },
+  { file: "deployment/suite/inspect.test.mjs", ...nativeTestOverrides("deployment/suite/inspect.test.mjs") },
   { file: "deployment/suite/application.test.mjs" },
   { file: "deployment/suite/runtime-maintenance.test.mjs" },
   { file: "deployment/suite/connection-restoration.test.mjs" },
