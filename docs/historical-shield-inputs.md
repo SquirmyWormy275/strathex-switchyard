@@ -77,5 +77,16 @@ mise exec node@24.14.0 -- node scripts/verify-shield-host.mjs \
   --synthetic --action=shield_codebase_audit --historical-scan
 ```
 
-Its installed acceptance is pending. It creates only a synthetic repository and
+The first installed `82eb764` journey retains failed receipt
+`installed-shield-baseline-1793874504741.json`. Both actual scanner runs completed:
+the historical-only secret was found with exact provenance and the current clean
+comparison remained incomplete. The overall verifier then incorrectly attempted
+to read a deliberately virtual history alias from the original repository. Its
+original-state restoration and both scanner exits passed; the verifier now skips
+both private Git alias namespaces while retaining checks of actual current files.
+The failed outcome remains failed. Exact synthetic fixture/trust retirement,
+sixteen retained query exits, two scanner exits, owned source/signing/package/
+staging and proof-checkout cleanup verify in
+`failed-history-proof-cleanup-1793874565999.json`. Corrected installed acceptance
+is pending. It creates only a synthetic repository and
 one empty native task, submits no model prompts and opens no keyboard.
