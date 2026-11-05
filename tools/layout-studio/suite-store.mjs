@@ -174,7 +174,7 @@ export function createSuiteStore({ root = join(process.env.XDG_STATE_HOME || (pr
       if (entries.some(entry => !entry.isFile() || entry.isSymbolicLink())) throw new Error("A workspace entry is not an ordinary sealed file. Preserve the original data; no partial workspace list was returned.");
       return entries.map(entry => entry.name.replace(/\.sealed\.json$/, "")).sort().map(id => ({ id }));
     },
-    async snapshot(id) { const s = await read(id); permit(s); prune(s); return { ...s, mode: s.mode ?? "keyboard-only", policyRules: templates[s.policy] }; },
+    async snapshot(id, request = {}) { const s = await read(id); permit(s, request); prune(s); return { ...s, mode: s.mode ?? "keyboard-only", policyRules: templates[s.policy] }; },
     async authorize(id, request) { const s = await read(id); return permit(s, request); },
     async claimSession(id, { provider, sessionId }) {
       if (!["codex", "claude-code"].includes(provider) || typeof sessionId !== "string" || !/^[A-Za-z0-9_-]{1,128}$/.test(sessionId)) throw new Error("External session ownership requires a supported provider and exact session ID.");

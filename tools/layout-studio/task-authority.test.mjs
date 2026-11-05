@@ -22,6 +22,32 @@ test("normal Windows suite authority routes distinguish exact reviewed grants fr
   await assert.rejects(suite.handle("/api/suite/coding/authority/review",{...body,compartment:"work"}));
 });
 
+test("fresh permission-bound authority reads still reject revocation between the initial record and admission", async t => {
+  const f = await fixture(t), review = await f.service.review("personal", f.proposed), grant = await f.service.issue("personal", { ...f.proposed, token: review.confirmation.token });
+  const snapshot = f.store.snapshot.bind(f.store); let providerReads = 0, revoke = false;
+  f.store.snapshot = async (c, request) => {
+    if (request?.provider) { providerReads++; if (revoke) { revoke = false; await f.service.revoke(c, grant.id); } }
+    return snapshot(c, request);
+  };
+  assert.equal((await f.service.assertCurrent("personal", grant.id)).record.id, grant.id); assert.equal(providerReads, 1);
+  const before = f.counters().calls; revoke = true;
+  await assert.rejects(f.service.assertCurrent("personal", grant.id), /exact task authority/);
+  assert.equal(f.counters().calls, before); assert.equal(providerReads, 2);
+  assert.ok((await snapshot("personal")).taskAuthorities.find(r => r.id === grant.id).grant.revokedAt);
+});
+
+test("fresh authority admission refuses provider replacement before using an earlier binding", async t => {
+  const f = await fixture(t), review = await f.service.review("personal", f.proposed), grant = await f.service.issue("personal", { ...f.proposed, token: review.confirmation.token });
+  const snapshot = f.store.snapshot.bind(f.store); let replace = true;
+  f.store.snapshot = async (c, request) => {
+    if (request?.provider && replace) { replace = false; await f.store.update(c, "synthetic-provider-change", s => { Object.assign(s.codingSessions.find(task => task.id === f.task.id), { provider: "claude-code", nativeTransport: "owned-print", nativeIdentityVerified: true }); }); }
+    return snapshot(c, request);
+  };
+  const before = f.counters().calls;
+  await assert.rejects(f.service.assertCurrent("personal", grant.id), /provider binding changed/);
+  assert.equal(f.counters().calls, before);
+});
+
 test("task authority binds real Git contents to one reviewed task/plan, consumes approval once and detects later edits", async t => {
   const f = await fixture(t), beforeHead = await f.run("rev-parse", "HEAD");
   const review = await f.service.review("personal", f.proposed);

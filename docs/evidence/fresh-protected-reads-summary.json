@@ -1,0 +1,80 @@
+{
+  "schema": "switchyard-fresh-protected-read-summary/v1",
+  "sourceParentCommit": "d446ae0064264461ba6d2675487395cbb4011d79",
+  "sourceSha256": {
+    "tools/layout-studio/suite-store.mjs": "8a2f8c3d16d1a0dc42cbda4c595d38eccb3ab212cea6ceb3cfa3378d87a240ab",
+    "tools/layout-studio/task-authority.mjs": "0b3b8103d5ee3f26bceb93ca39d75cb4ab4a82b0173edde6c6e53cd87010047d"
+  },
+  "behaviorReceipts": [
+    {
+      "receipt": "isolated-test-11a6fbde-f8df-4d0e-86c1-f6dcf6d640ea.json",
+      "sha256": "24f6439c4b8104259d1a0d80139b87280b39eb449ece990088e74c1597bf6db4",
+      "groups": 3,
+      "checks": 33
+    },
+    {
+      "receipt": "isolated-test-457e664b-922b-4dc2-bcb7-31f5ce4a78a8.json",
+      "sha256": "f58122483720298d14a8a49933df544136b4474faf2ab974692daf72ee810589",
+      "groups": 4,
+      "checks": 29
+    },
+    {
+      "receipt": "isolated-test-5922aed9-1ee0-4b4d-b44f-262aabd6e814.json",
+      "sha256": "d9806ec85f93ccbda2b8c79e0e0f3e3ee2a825a72186dcc0f65fecdfe886e2e9",
+      "groups": 2,
+      "checks": 8
+    }
+  ],
+  "distinctGroups": 9,
+  "distinctChecks": 70,
+  "allChildCleanup": true,
+  "typecheckPassed": true,
+  "keysCached": false,
+  "freshSnapshotPermissionChecked": true,
+  "grantRevocationBetweenReadsRefused": true,
+  "validProviderSubstitutionRefused": true,
+  "missingCredentialRefused": true,
+  "initialTestFixtureFailureReceipt": "isolated-test-4ff60db6-3c71-474a-af74-e767e3ac9843.json",
+  "pairedFixtureFilesystem": "btrfs",
+  "pairedBaselineCommit": "d446ae0064264461ba6d2675487395cbb4011d79",
+  "beforeProfile": "protected-read-profile-baseline-fs-1793913981007.json",
+  "beforeProfileSha256": "430c2a94ccd48c0efdb18503bdd60f8e8e7067a826b18fe838223afca9fdc8c1",
+  "afterProfile": "protected-read-profile-after-fs-1793913986473.json",
+  "afterProfileSha256": "1a42a278e58beb152475964fc3c54934b20aeb9891fed75b1d7355e98292c02f",
+  "snapshotReadsBeforeAndAfter": 1039,
+  "separateAuthorizationReadsBefore": 777,
+  "separateAuthorizationReadsAfter": 28,
+  "explicitProtectedReadsBefore": 1816,
+  "explicitProtectedReadsAfter": 1067,
+  "fullTargetCapturesBeforeAndAfter": 10,
+  "gitProbeReadyRecordsBeforeAndAfter": 120,
+  "gitProbeExitRecordsBeforeAndAfter": 120,
+  "gitProbeGuardianDoubled": true,
+  "actualScannerExitVerified": true,
+  "applyMsBefore": 4073,
+  "applyMsAfter": 3857,
+  "overlappingDurations": true,
+  "universalPerformanceClaim": false,
+  "earlierTimeoutRootCauseProven": false,
+  "originalBoundFileResults": [
+    {
+      "file": "tools/layout-studio/repository-shield.test.mjs",
+      "ms": 35042,
+      "boundMs": 120000,
+      "passed": true
+    },
+    {
+      "file": "tools/layout-studio/repository-pipeline.test.mjs",
+      "ms": 27523,
+      "boundMs": 120000,
+      "passed": true
+    }
+  ],
+  "deadlinesRaised": false,
+  "checksWaived": false,
+  "ownedComparisonCleanupReceipt": "protected-read-comparison-cleanup-1793914411056.json",
+  "ownedComparisonWorktreeFixturesAndAliasRemoved": true,
+  "newSdkInstalled": false,
+  "completeCurrentLinuxRunPassed": false,
+  "newSourceInstalledAcceptance": false
+}

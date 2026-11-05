@@ -67,10 +67,12 @@ export function createTaskAuthority({ store, checkNative, isActive = async () =>
   if (!Array.isArray(executionActions) || new Set(executionActions).size!==executionActions.length || executionActions.some(a => !connectedExecutionActions("linux").includes(a))) throw new Error("Choose only execution actions connected by this host implementation.");
   const generations = new Map(), pending = new Set(), seen = new Set(); let closed = false;
   const current = (c, generation) => { if (closed || generation !== (generations.get(c) ?? 0)) throw new Error("This task authority operation was stopped."); };
-  async function access(c, id, generation) {
+  async function access(c, id, generation, expectedProvider) {
     current(c, generation); if (!await isActive(c)) throw new Error("Select this workspace before reviewing task authority.");
-    const state = await store.snapshot(c), task = taskIn(state, id);
-    await store.authorize(c, { provider: task.provider }); current(c, generation);
+    const state = await store.snapshot(c, expectedProvider ? { provider: expectedProvider } : undefined), task = taskIn(state, id);
+    if (expectedProvider) { if (task.provider !== expectedProvider) throw new Error("The exact native provider binding changed. Review again."); }
+    else await store.authorize(c, { provider: task.provider });
+    current(c, generation);
     if (state.policy !== "personal" || state.mode !== "personal-companion") throw new Error("Local task authority requires the permitted Personal companion workspace.");
     await verifyRepositoryIdentity(task); return { state, task };
   }
@@ -78,7 +80,7 @@ export function createTaskAuthority({ store, checkNative, isActive = async () =>
     const { state, task } = await access(c, proposed.taskId, generation), binding = taskDigest(task), workspace = workspaceDigest(state);
     if (typeof checkNative !== "function") throw new Error("The native task identity verifier is unavailable.");
     await checkNative(c, task);
-    const authorize = async () => { const fresh = await access(c, task.id, generation); if (taskDigest(fresh.task) !== binding || workspaceDigest(fresh.state) !== workspace) throw new Error("The exact task, account or workspace policy changed. Review again."); };
+    const authorize = async () => { const fresh = await access(c, task.id, generation, task.provider); if (taskDigest(fresh.task) !== binding || workspaceDigest(fresh.state) !== workspace) throw new Error("The exact task, account or workspace policy changed. Review again."); };
     await authorize(); const result = await inspection.capture(c, task, proposed.classifications, authorize); await authorize(); await checkNative(c, task); await authorize();
     const { snapshot, files } = result;
     if (snapshot.completeness !== "complete") throw new Error("The repository snapshot is incomplete. Classify every untracked/ignored input and keep files within supported inspection bounds before reviewing authority.");
@@ -103,7 +105,7 @@ export function createTaskAuthority({ store, checkNative, isActive = async () =>
       if(!input||Object.keys(input).some(key=>!["taskId","compartment","paths","depth"].includes(key))||!uuid(input.taskId)||input.compartment!==undefined&&input.compartment!==c)throw Error("Witness only named bounded history inputs for one bound task; arbitrary commits, refs, commands and policies are refused.");
       const selected=historySelection(input.paths,input.depth),{state,task}=await access(c,input.taskId,generation),binding=taskDigest(task),workspace=workspaceDigest(state);
       if(typeof checkNative!=="function"||typeof inspection.historyInputs!=="function")throw Error("The native history input verifier is unavailable.");
-      const authorize=async()=>{const fresh=await access(c,task.id,generation);if(taskDigest(fresh.task)!==binding||workspaceDigest(fresh.state)!==workspace)throw Error("The exact task, account or workspace changed during history witnessing.");};
+      const authorize=async()=>{const fresh=await access(c,task.id,generation,task.provider);if(taskDigest(fresh.task)!==binding||workspaceDigest(fresh.state)!==workspace)throw Error("The exact task, account or workspace changed during history witnessing.");};
       await checkNative(c,task);await authorize();const result=await inspection.historyInputs(c,task,selected.paths,selected.depth,authorize);await authorize();await checkNative(c,task);await authorize();return{...result,taskId:task.id,provider:task.provider,nativePermissionsChanged:false};
     });},
     async useHistoryInputs(c,id,action,paths,depth,consume){return exclusive(c,async generation=>{
@@ -130,7 +132,7 @@ export function createTaskAuthority({ store, checkNative, isActive = async () =>
       const selected = gitIndexPaths(input.paths), { state, task } = await access(c, input.taskId, generation), binding = taskDigest(task), workspace = workspaceDigest(state);
       if (typeof checkNative !== "function" || typeof inspection.indexInputs !== "function") throw Error("The native index input verifier is unavailable.");
       const authorize = async () => {
-        const fresh = await access(c, task.id, generation);
+        const fresh = await access(c, task.id, generation, task.provider);
         if (taskDigest(fresh.task) !== binding || workspaceDigest(fresh.state) !== workspace) throw Error("The exact task, account or workspace changed during index input witnessing.");
       };
       await checkNative(c, task); await authorize();
@@ -143,7 +145,7 @@ export function createTaskAuthority({ store, checkNative, isActive = async () =>
       const { state, task } = await access(c, input.taskId, generation), binding = taskDigest(task), workspace = workspaceDigest(state);
       if (typeof checkNative !== "function" || typeof inspection.scannerInputs !== "function") throw Error("The native scanner inventory verifier is unavailable.");
       const authorize = async () => {
-        const fresh = await access(c, task.id, generation);
+        const fresh = await access(c, task.id, generation, task.provider);
         if (taskDigest(fresh.task) !== binding || workspaceDigest(fresh.state) !== workspace) throw Error("The exact task, account or workspace changed during scanner inventory.");
       };
       await checkNative(c, task); await authorize();
@@ -161,7 +163,7 @@ export function createTaskAuthority({ store, checkNative, isActive = async () =>
     async assertCurrent(c, id, action = "local_commit") {
       const generation = generations.get(c) ?? 0, s = await store.snapshot(c), record = s.taskAuthorities?.find(r => r.id === id);
       if (!record) throw new Error("That scoped task authority is unavailable.");
-      const { state, task } = await access(c, record.taskId, generation), decision = await ledger(state, now).evaluate({ authorityId: id, repositoryRoot: record.grant.repositoryRoot, sessionId: record.grant.sessionId, taskId: record.taskId, planRevision: record.grant.planRevision, action });
+      const { state, task } = await access(c, record.taskId, generation, taskIn(s, record.taskId).provider), decision = await ledger(state, now).evaluate({ authorityId: id, repositoryRoot: record.grant.repositoryRoot, sessionId: record.grant.sessionId, taskId: record.taskId, planRevision: record.grant.planRevision, action });
       if (!decision.allowed || taskDigest(task) !== record.taskDigest || workspaceDigest(state) !== record.workspaceDigest) throw new Error("The exact task authority, native binding, account or workspace policy changed.");
       current(c, generation); return { task, record: structuredClone(record) };
     },

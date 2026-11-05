@@ -98,3 +98,27 @@ mise exec node@24.14.0 -- node scripts/verify-task-authority-host.mjs --syntheti
 It uses a disposable Git repository, checks replay and changed-target rejection,
 revokes the grant and restores workspace selection/keyboard-only mode. An
 uncertain result retains its exact protected records and staging for recovery.
+
+## Fresh protected reads
+
+Repository admission can check provider permission within the same freshly
+opened, authenticated workspace snapshot. The already reviewed provider is pinned
+across later reads. A different provider, unavailable compartment key or revoked
+grant refuses admission; keys are read again on each access. Initial record lookup
+still precedes a fresh permission-bound read, and the ledger evaluates that fresh
+state before an effect. Target recapture, per-query checks and durable guardian
+ready/exit records remain in place.
+
+Nine focused groups pass 70 checks, including revocation between record lookup and
+admission, a locally valid provider substitution, unavailable keys, private index/
+history and ignored inputs, actual scanner/pipeline behavior and packaging.
+On one paired Btrfs synthetic fixture, explicit snapshot/authorization reads drop
+from 1,816 to 1,067; target captures stay at ten and ready/exit records at 120 each.
+The Git query guardian is doubled in this fixture; the real scanner exit is
+verified. Apply takes 4.073 then 3.857 seconds in these samples. This is a local
+measurement, not a general speed guarantee or proof of the earlier timeout cause.
+
+The two previously timed-out files pass separately at 35.042 and 27.523 seconds
+under their original 120-second bounds. Earlier failed full runs remain failed;
+a complete new-source Linux run and installed acceptance are separate checks.
+[Exact hashes, receipts and cleanup](evidence/fresh-protected-reads-summary.json).

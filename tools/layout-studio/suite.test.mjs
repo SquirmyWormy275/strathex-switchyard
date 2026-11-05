@@ -20,6 +20,23 @@ async function fixture(fn) {
   try { await fn({ root, store, keys, secrets }); } finally { await rm(root, { recursive: true, force: true }); }
 }
 
+test("permission-bound snapshots use fresh authenticated state and never cache an unavailable compartment key", () => fixture(async ({ root, store, keys, secrets }) => {
+  await store.initialize("personal"); await store.initialize("work", "work");
+  await store.update("personal", "mode-select", s => { s.mode = "personal-companion"; });
+  const saved = keys.get("personal:storage-key"), get = secrets.get; let reads = 0;
+  secrets.get = async (id, purpose) => { if (purpose === "storage-key") reads++; return get(id, purpose); };
+  const before = await readFile(join(root, "personal.sealed.json"));
+  assert.equal((await store.snapshot("personal", { provider: "codex" })).policy, "personal"); assert.equal(reads, 1);
+  await assert.rejects(store.snapshot("work", { provider: "codex" }), /provider is prohibited/);
+  await assert.rejects(store.snapshot("personal", { account: "not-enrolled" }), /not enrolled/);
+  assert.deepEqual(await readFile(join(root, "personal.sealed.json")), before);
+  await store.update("personal", "synthetic-policy-change", s => { s.policy = "work"; s.mode = "managed-companion"; });
+  await assert.rejects(store.snapshot("personal", { provider: "codex" }), /provider is prohibited/);
+  keys.delete("personal:storage-key");
+  await assert.rejects(store.snapshot("personal", { provider: "microsoft-365-copilot" }), /key is unavailable/);
+  keys.set("personal:storage-key", saved);
+}));
+
 test("independent compartment encryption rejects swapping and tampering, with provider/account/export/recording boundaries", () => fixture(async ({ root, store, keys }) => {
   await assert.rejects(store.initialize("invalid", "constructor"), /Choose Personal/);
   await assert.rejects(store.initialize("invalid", ["work"]), /Choose Personal/);
