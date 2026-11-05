@@ -14,11 +14,12 @@ export async function verifyWindowsBrokerOwner({ helper, installationId, service
   if (process.platform !== "win32" || process.env.GITHUB_ACTIONS !== "true" || process.env.RUNNER_OS !== "Windows") throw Error("The actual broker-owner proof requires the explicit disposable Windows worker.");
   const root = await mkdtemp(join(process.env.RUNNER_TEMP || tmpdir(), "sxbo-")), original = await directoryIdentity(root), keys = new Map(), checks = [];
   const store = createSuiteStore({ root, secrets: { get: async (c,p) => keys.get(c+p), set: async (c,p,v) => { keys.set(c+p,v); } } });
-  await store.initialize("personal"); await store.update("personal", "synthetic-companion", state => { state.mode = "personal-companion"; });
   const native = createWindowsStorageNative({ store, helperPath: helper, setupPath: join(dirname(helper), "Switchyard.Setup.exe") });
-  let consumerExited = true, phase = "read-only-probe";
+  let consumerExited = true, phase = "private-state-initialize";
   const service = createWindowsBrokerExchanges({ store, native, consumerStopped: async () => consumerExited }), context = { operationId: randomUUID(), scopeDigest: "a".repeat(64), provider: "codex" }, inputs = { inputManifestSha256: "e".repeat(64) }, authorize = async () => {};
   try {
+    await store.initialize("personal"); await store.update("personal", "synthetic-companion", state => { state.mode = "personal-companion"; });
+    phase = "read-only-probe";
     assert.deepEqual(await service.probe("personal", context, authorize), { status: "available", effectStarted: false });
     assert.equal((await service.list("personal")).length, 0); checks.push("fresh authenticated native capability creates no exchange owner or disk");
     phase = "exact-create";
@@ -54,7 +55,7 @@ export async function verifyWindowsBrokerOwner({ helper, installationId, service
   } catch (error) {
     // Keep original native ownership and AEAD facts. The enclosing coordinator
     // preserves the installation and never replays its failed action.
-    error.hostExchangeProof = { schema: "switchyard-native-broker-owner-proof/v1", success: false, checks, failedPhase: phase, stateDirectory: root, fixtureRemoved: false, guestLaunched: false, setupRequested: false, accountCreated: false };
+    error.hostExchangeProof = { schema: "switchyard-native-broker-owner-proof/v1", success: false, checks, failedPhase: phase, failureCategory: ["Error", "AssertionError", "TypeError", "RangeError"].includes(error.name) ? error.name : "Error", stateDirectory: root, fixtureRemoved: false, guestLaunched: false, setupRequested: false, accountCreated: false };
     throw error;
   }
 }

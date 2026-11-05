@@ -12,7 +12,33 @@ checks: a working interactive Windows Sandbox run and normal-user UAC still
 require an authorized Windows host. Metadata retains `brokerImplemented:false`
 until that complete native journey is accepted.
 
-## Current host evidence
+## Current verification limits
+
+Source `3319f92`, native workflow `42118172704`, is **not accepted** as a complete
+filesystem/restricted-owner journey. Its restricted .NET client passes 13 metadata
+and 31 exchange checks, and the original JavaScript owner passes eight checks.
+The actual restricted primary-token child then fails during its bounded owner
+journey. Token creation and pre-start verification reached that phase, but the
+original failure did not capture the child's exit code or result phase. The last
+successful token read is not evidence that this later failure was a token decoder
+failure. Source `1f06765` repeats the same failure phase.
+
+The Windows historical scanner file also reaches its original 300-second bound
+after one passing case; the Shield recovery file fails its private state-lock
+wait. These remain unfinished verification/implementation work, with no hardware
+or account blocker and no increased deadlines or waived assertions.
+[Original digest-verified failures](evidence/windows-filesystem-3319-failures-summary.json).
+
+The test-only parent now captures the original child's wait/exit and bounded
+phase/category/check-count metadata before enforcing its existing successful-exit
+assertion. It excludes private result paths and text. The owner also retains
+initialization failures within its protected failure record. Actual child token,
+privilege, job, exit and owner assertions remain mandatory. Both managed targets
+compile with the existing SDK, 223 portable checks pass, and three isolated
+contract/package groups pass 26 checks. Native execution of this diagnostic is
+still pending; it is not a repair acceptance.
+
+## Prior component evidence
 
 PR head `bd77ec4`, merge execution `b5295a6`, passes the actual Windows native
 component job. Digest-verified evidence covers thirteen restricted metadata
@@ -393,8 +419,9 @@ observations in addition to the boolean observations and all concrete security
 checks. Both managed targets compile without warnings/errors and 223 portable
 checks pass; three isolated runner/selector/report groups pass 25 checks with
 every cleanup verified. Receipts are `windows-history-native-build-1793898737394.json`
-and `isolated-test-ef01f9d9-9abd-4eab-bb63-7b1637cc8a73.json`. Corrected native
-execution remains pending on available CI.
+and `isolated-test-ef01f9d9-9abd-4eab-bb63-7b1637cc8a73.json`. The corrected reader later reaches restricted child execution at `3319f92`,
+which fails during the child owner journey as recorded above; this partial
+progress does not accept the complete native journey.
 
 ### Queue native proofs independently
 
@@ -410,6 +437,5 @@ cancelled result is never accepted as a pass.
 This uses [GitHub's documented job-level matrix concurrency](https://docs.github.com/en/actions/how-tos/write-workflows/choose-when-workflows-run/control-workflow-concurrency).
 The workflow/runner inventory checks pass 22 cases in two isolated groups, with
 both child cleanups verified
-(`isolated-test-5765093e-c5c7-4cae-b147-a300397d844c.json`). Native execution of
-the queued token-query diagnostic remains pending; queue changes cannot supply
-the missing native evidence.
+(`isolated-test-5765093e-c5c7-4cae-b147-a300397d844c.json`). Native execution later supplied the child-journey failure above; queue changes
+do not supply acceptance of that remaining boundary.

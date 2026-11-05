@@ -17,6 +17,7 @@ internal static class NativeRestrictedHostProof
     internal static string Phase = "not-started";
     internal static object? CreatorPrivileges;
     internal static object? TokenReadDiagnostic;
+    internal static object? ChildExitDiagnostic;
     private static readonly List<bool> HistoricalFilteredFlags = new();
     private static readonly List<uint> HistoricalFilterBytes = new();
     internal static bool[] HistoricalFilterObservations => HistoricalFilteredFlags.ToArray();
@@ -255,7 +256,21 @@ internal static class NativeRestrictedHostProof
                                     VerifyToken(childToken, user);
                                     Native(ResumeThread(thread) != uint.MaxValue);
                                     Phase = "bounded-owner-journey";
-                                    Require(WaitForSingleObject(child, 90000) == 0); Native(GetExitCodeProcess(child, out uint code)); Require(code == 0);
+                                    uint wait = WaitForSingleObject(child, 90000);
+                                    ChildExitDiagnostic = new { waitResult = wait, resultAvailable = File.Exists(resultPath) };
+                                    Require(wait == 0); Native(GetExitCodeProcess(child, out uint code));
+                                    ChildExitDiagnostic = new { waitResult = wait, exitCode = code, resultAvailable = File.Exists(resultPath) };
+                                    // A failing owned child can report its bounded phase before
+                                    // the strict exit assertion. Never emit its private paths.
+                                    if (File.Exists(resultPath))
+                                    {
+                                        using var diagnostic = JsonDocument.Parse(ReadBounded(resultPath)); var diagnosticReport = diagnostic.RootElement;
+                                        Require(diagnosticReport.GetProperty("schema").GetString() == "switchyard-restricted-host-result/v1" && diagnosticReport.GetProperty("nonce").GetString() == nonce);
+                                        var diagnosticOwner = diagnosticReport.GetProperty("owner");
+                                        string? SafeLabel(string name) => diagnosticOwner.TryGetProperty(name, out var item) && item.ValueKind == JsonValueKind.String && item.GetString() is string text && text.Length is > 0 and <= 80 && text.All(c => char.IsAsciiLetterOrDigit(c) || c == '-') ? text : null;
+                                        ChildExitDiagnostic = new { waitResult = wait, exitCode = code, resultAvailable = true, childReportedSuccess = diagnosticReport.GetProperty("success").GetBoolean(), ownerReportedSuccess = diagnosticOwner.TryGetProperty("success", out var success) && success.ValueKind == JsonValueKind.True, completedChecks = diagnosticOwner.TryGetProperty("checks", out var checks) && checks.ValueKind == JsonValueKind.Array ? checks.GetArrayLength() : 0, failedPhase = SafeLabel("failedPhase"), failureCategory = SafeLabel("failureCategory") };
+                                    }
+                                    Require(code == 0);
                                     VerifyToken(childToken, user);
                                 }
                                 Phase = "independent-owned-tree-exit";

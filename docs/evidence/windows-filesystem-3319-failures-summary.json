@@ -1,0 +1,51 @@
+{
+  "schema": "switchyard-windows-filesystem-failure-summary/v1",
+  "prHead": "3319f922d17e70ec30eaf3422cff5599262cb08c",
+  "executionMergeLabel": "2e597ad4b72d6a9fa5f02ccc15ba264633755512",
+  "runId": 42118172704,
+  "success": false,
+  "accepted": false,
+  "failures": [
+    {
+      "jobId": 127563252840,
+      "suite": "restricted-exchange",
+      "artifactId": 13458360783,
+      "archiveSha256": "262a9d28610a2ed004ebd8c3a6147f6925c6e800d97127ca5a4d9e60d83c7d30",
+      "receipt": "windows-restricted-exchange-3319-failed.json",
+      "restrictedClientChecks": 13,
+      "restrictedExchangeChecks": 31,
+      "hostOwnerChecks": 8,
+      "restrictedHostPhase": "bounded-owner-journey",
+      "failureCategory": "InvalidOperationException",
+      "originalChildExitCodeNotCaptured": true,
+      "originalProtectedInstallationPreserved": true
+    },
+    {
+      "jobId": 127563255910,
+      "suite": "history-windows-scanner",
+      "artifactId": 13458043413,
+      "archiveSha256": "8e4cd4473d10ca617d5cb455002606b6d3bcef162eabf942b2d1c7511b480a71",
+      "receipt": "windows-history-scanner-3319-failed.json",
+      "timeoutMs": 300139,
+      "boundMs": 300000,
+      "oneCompletedPassingSubtestMs": 271652,
+      "noFinalTestPlan": true,
+      "allChildCleanup": true
+    },
+    {
+      "jobId": 127563256233,
+      "suite": "shield-recovery",
+      "artifactId": 13456784229,
+      "archiveSha256": "0b7fddbfbbd73803f394a0a84e68901afba4f78f72726b4dddfaaed8ce929ed2",
+      "receipt": "windows-shield-recovery-3319-failed.json",
+      "failedTests": 1,
+      "failure": "Private state lock timed out. Existing data was preserved.",
+      "allChildCleanup": true
+    }
+  ],
+  "allArchivesDigestVerified": true,
+  "hardwareOrAccountBlocked": false,
+  "boundsIncreased": false,
+  "assertionsWaived": false,
+  "scope": "These are original failed native Windows CI results. Passing authority/client jobs and earlier partial broker checks do not accept these failing journeys. Restricted-child phase diagnostics are added separately; root causes and native acceptance remain open."
+}

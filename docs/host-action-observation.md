@@ -70,4 +70,4 @@ the two real isolated scanner cases, verifies duplicate suppression and receipt
 retirement metadata, then stops recording and returns to keyboard-only. It
 submits no model prompt or public advisory query. Successful proof workspaces
 retain their encrypted native identity/audit evidence through the normal owned
-archive procedure. Installed acceptance must be recorded separately from tests.
+archive procedure. The normal installed source `7c44f05` passes six update, seven privacy and 18 native journey checks. Two actual isolated scans produce eight private lifecycle events, preserve duplicate suppression and retire both receipts. Both native scanner owners independently exit. One newly created proof workspace is reversibly archived with its encrypted native identity and OS credential preserved; all original 54 workspaces, selection, private link and frozen Home are restored after verified app stop/restart. Its bundle, checkout and temporary helpers are retired. [Installed evidence](evidence/installed-host-action-observation-summary.json).

@@ -1,0 +1,29 @@
+{
+  "schema": "switchyard-restricted-owner-diagnostic-summary/v1",
+  "purpose": "Retain bounded original child exit and failure phase before the unchanged successful-exit assertion",
+  "buildReceipt": "windows-index-native-build-1793919399652.json",
+  "managedTargetsCompiled": 2,
+  "reusedSdk": "8.0.424",
+  "newSdkInstalled": false,
+  "portableCheckCounts": {
+    "checks": 16,
+    "exchangeProtocolChecks": 30,
+    "exchangeJournalChecks": 43,
+    "exchangeFactsChecks": 23,
+    "indexInputChecks": 49,
+    "historyInputChecks": 62
+  },
+  "portableChecksTotal": 223,
+  "focusedReceipt": "isolated-test-bd1cbf61-3c37-4881-81ae-5680b1e663e1.json",
+  "groups": 3,
+  "checks": 26,
+  "ownedScratchRemoved": true,
+  "assertionsWaived": false,
+  "deadlinesIncreased": false,
+  "nativeWindowsDiagnosticAccepted": false,
+  "sourceSha256": {
+    "deployment/windows/test-support/storage-broker-protocol/NativeRestrictedHostProof.cs": "624209883dab639351624494f9c38b983a604bd9e264ea9c4e6d71cb5529cf81",
+    "deployment/windows/test-support/storage-broker-protocol/Program.cs": "88bf2201d7914017d46030531574ea37dbb61c4449b450edd4c329e2dafb6a6d",
+    "scripts/windows-broker-owner-proof.mjs": "078046b5f5edebfd0fb4bcf7f680fc0ff81420c835e9b4bc31129d966e04bbca"
+  }
+}
