@@ -289,3 +289,10 @@ inventory checks pass locally, including the authenticated HTTP route, lost
 receipt-write recovery, admission failure and a scope change immediately before
 receipt commit. Native setup and service proofs are separate evidence; the full
 application review-to-UAC journey and volume effects are not accepted.
+
+The normal reviewed Run caller selects `full_sandbox` for its fixed `run_target`
+recipe, as required by the backend's closed profile contract. It remains a
+one-shot reviewed-input execution with networking/clipboard disabled and no
+persistent-volume mapping. The earlier `quarantine`/`run_target` combination was
+rejected before dispatch; the correction passes actual backend profile checks
+with an explicit guest double, not a live Windows guest acceptance.

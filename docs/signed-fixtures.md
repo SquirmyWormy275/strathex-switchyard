@@ -83,7 +83,7 @@ keep the pipeline incomplete even when its program exits zero.
 
 Seventeen registry tests cover actual files, P-256 signatures, aggregate quota,
 concurrent allocation, linked/replaced paths, partial removal and lost replies.
-Fifteen Suite-controller tests cover real encrypted persistence/kernel leases, HTTP
+Eleven maintenance and four independently grouped removal tests cover real encrypted persistence/kernel leases, HTTP
 authorization, Work rejection, private snapshot omission, expiry, substitution,
 revocation, cancellation, lost acknowledgements and exact budget ownership.
 Both pipeline actions and revoked/changed-feed cases pass through actual Linux
@@ -97,8 +97,20 @@ selection/private link/Home and removal of only the synthetic package/key/source
 scratch. The repeatable [pilot verifier](../scripts/verify-fixtures-host.mjs)
 creates a fresh validation compartment and requests no model/account or hardware.
 Native Windows registry/controller checks now have separate focused CI jobs
-under their existing isolated bounds; current acceptance is pending. The new
+under their existing isolated bounds; the registry passes all seventeen cases on native Windows at `403e0c9`
+(digest-verified `windows-fixture-registry-403.json`, child cleanup verified).
+The combined controller file exceeded its original 120-second bound after
+thirteen passing cases. Its digest-verified failed receipt remains
+`windows-fixture-maintenance-failed-403.json`. Maintenance and removal now run
+independently under the same original bound, with all fifteen cases retained;
+native rerun is pending. The new
 quota/removal implementation passes 88 combined controller, registry, service,
 HTTP/privacy, harness and package checks plus two additional linked/legacy
-registry cases, with type checking. Its installed demonstration is pending.
+registry cases, with type checking. Normal installed `403e0c9` passes six update and eleven API checks: quota
+includes the manifest, revocation retains its allocation, separately approved
+removal frees it, retired IDs/history survive and repeat approval returns the
+original receipt. Selection/modes/private link/frozen Home are restored; owned
+signing scratch, bundle and proof checkout are removed. Receipts
+`assignment-legends-1793847745744.json` and
+`installed-signed-fixtures-1793847762267.json` retained.
 Complete Shield/scanner execution and frontend controls remain unfinished.

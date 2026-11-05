@@ -962,3 +962,21 @@ test("a failed program still cannot release diagnostic bytes before independent 
  const setup=await fixture(context),inputs=await reviewedInputFixture(setup),exchange=await reviewedExchangeFixture(setup,inputs.lease.operationId),backend=createBackend(setup,failedGuestProgram(),[],{requireReviewedInputs:true,requireBoundedExchange:true});
  const result=await backend.run({...await sandboxRequest(setup),operationId:inputs.lease.operationId,reviewedInputs:inputs.lease,reviewedExchange:exchange.lease});assert.equal(result.status,"failed");assert.equal(result.diagnosticRoot,undefined);assert.match(result.summary,/guest exit remains unconfirmed/i);assert.equal((await readdir(setup.destinationRoot)).length,0);await access(join(exchange.lease.root,"result-manifest.json"));
 });
+
+test("the reviewed Run recipe uses its supported full-sandbox profile and rejects quarantine before guest dispatch", async context => {
+  const setup = await fixture(context), inputs = await reviewedInputFixture(setup); let launches = 0;
+  const inner = successfulRunner(async spec => {
+    const xml = await readFile(spec.args[0]!, "utf8");
+    assert.match(xml, /<Networking>Disable<\/Networking>/); assert.match(xml, /<ClipboardRedirection>Disable<\/ClipboardRedirection>/);
+    assert.match(xml, /<MemoryInMB>4096<\/MemoryInMB>/); assert.doesNotMatch(xml, /persistent|<LogonCommand>/);
+  });
+  const runner: WindowsSandboxProcessRunner = { async run(...args) {
+    launches++; const identity = { schema: "switchyard-windows-sandbox-guest/v1" as const, sandboxId: "12345678-1234-4567-8123-123456789abc", ...args[0].reviewedGuest! };
+    await args[3]!(identity); return { ...await inner.run(...args), guestSessionExit: { ...identity, stopped: true } };
+  } };
+  const backend = createBackend(setup, runner, [], { requireReviewedInputs: true });
+  const base = { ...await sandboxRequest(setup), recipeId: "run_target", operationId: inputs.lease.operationId, reviewedInputs: inputs.lease };
+  const invalid = await backend.execute({ ...base, profile: "quarantine" }); assert.equal(invalid.status, "blocked"); assert.match(invalid.summary, /recipe\/profile mismatch/); assert.equal(launches, 0);
+  const valid = await backend.execute({ ...base, profile: "full_sandbox" }); assert.equal(valid.status, "completed", valid.summary); assert.equal(launches, 1);
+  const receipt = JSON.parse(await readFile(valid.receiptPath!, "utf8")); assert.equal(receipt.profile, "full_sandbox"); assert.equal(receipt.recipeId, "run_target"); assert.equal(receipt.guestExitVerified, true);
+});

@@ -53,7 +53,7 @@ async function fixture(t, { broker = false } = {}) {
   const backendFactory = options => ({ execute: async request => {
     if (broker) assert.deepEqual(options.allowedTaskRoots, [root, stateDirectory, request.reviewedExchange.nativeBinding.stagingRoot]);
     else assert.deepEqual(options.allowedTaskRoots, [root, stateDirectory]);
-    calls.push("backend"); assert.equal(options.requireReviewedInputs,true); assert.equal(options.requireBoundedExchange,true); assert.equal(options.runner.operationId,request.operationId); assert.equal(request.reviewedInputs.operationId,request.operationId); assert.equal(request.reviewedExchange.operationId,request.operationId); assert.equal(request.expectedHelperSha256,identities.helperSha256); assert.equal(request.expectedRecipeCatalogSha256,sha(catalog));
+    calls.push("backend"); assert.equal(request.profile,"full_sandbox"); assert.equal(request.recipeId,"run_target"); assert.equal(options.requireReviewedInputs,true); assert.equal(options.requireBoundedExchange,true); assert.equal(options.runner.operationId,request.operationId); assert.equal(request.reviewedInputs.operationId,request.operationId); assert.equal(request.reviewedExchange.operationId,request.operationId); assert.equal(request.expectedHelperSha256,identities.helperSha256); assert.equal(request.expectedRecipeCatalogSha256,sha(catalog));
     await options.effectGuard.check(); guestExited = false; await hook("backend"); enter();
     if (hold) await new Promise(resolve=>{request.signal.addEventListener("abort",resolve,{once:true});if(request.signal.aborted)resolve();});
     guestExited = !unknownExit; return {status:request.signal.aborted?"cancelled":"completed",summary:"Synthetic backend result",receiptPath:join(stage,"synthetic-receipt.json")};

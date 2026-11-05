@@ -7,6 +7,21 @@ records exact source checkpoints and receipts.
 
 ## Current backend
 
+A Windows Run caller/profile mismatch is corrected: `run_target` now uses the
+backend's supported `full_sandbox` profile. Its fixed deny-network, read-only
+input and bounded-exchange controls remain; no persistent volumes are selected.
+The actual backend profile/guest-exit contract and complete runner file pass
+51 checks with an explicit guest double; type checking passes. This is software
+validation, not a live Windows guest journey.
+
+Native `403e0c9` passes all seventeen fixture registry cases; artifact digest and
+child cleanup verified. The fifteen-case maintenance file hit its original
+120-second bound after thirteen passes. Its failed receipt is preserved.
+Maintenance and removal now have separate inventory groups and native matrix
+jobs under the same 120-second bound, retaining all cases. The new required
+Linux inventory has 169 groups; the ongoing complete 168-group run remains tied
+to immutable `403e0c9`. Native profile/split acceptance is pending.
+
 Aggregate signed-fixture storage and separately reviewed removal are implemented.
 Each compartment reserves manifest plus content bytes atomically before copying,
 with a 64 MiB/32-allocation bound. Unknown and revoked allocations keep consuming
@@ -15,7 +30,11 @@ changed files remain preserved. Partial deletion needs a fresh approval and neve
 upgrades the original uncertain request. Immutable IDs and audit history survive
 cleanup. The change passes 88 combined checks, two additional linked/legacy
 registry cases and type checking; installed and focused native Windows checks
-are pending. [Contract](signed-fixtures.md).
+are separate. Normal installed `403e0c9` passes six update and eleven actual API
+checks, including quota accounting and separately approved removal/replay, with
+original workspace/private endpoint/frozen Home restored and owned source,
+signing scratch, bundle and proof checkout removed. Native Windows checks remain
+pending. [Contract](signed-fixtures.md).
 
 The Suite now exposes separately reviewed signed scanner/advisory trust,
 installation and revocation, with compartment-local AEAD journals, one-use
@@ -90,7 +109,14 @@ application/guest journey and interactive UAC remain unaccepted.
 
 ## Installed Linux and F77
 
-Normal installed `27e0eb3`, release
+Current installed source is `403e0c9`, release
+`c41ad33e45fd0e1accd5b4b0cad0f6b0abb0b7d6729f2c5c2fd7536fb51101aa`.
+Receipts `assignment-legends-1793847745744.json` (six update checks) and
+`installed-signed-fixtures-1793847762267.json` (eleven API checks) verify the
+new quota/removal journey and complete restoration described above. The complete
+168-group Linux lane is running from this immutable source in a separate checkout.
+
+Previous installed `27e0eb3`, release
 `6fdc54437d76707a04ff4daa303565df3e145bc1314aff49b61dd89fec0e3193`,
 passes six update and ten signed-fixture API checks. A fresh synthetic Personal
 compartment enrolled its public key, imported/read back its signed package,
