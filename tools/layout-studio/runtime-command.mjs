@@ -9,13 +9,9 @@ import { desktopEnvironment, windowsHelperTemporaryEnvironment } from "./process
 const nativeHelper = fileURLToPath(new URL("../../runtime/hotkeys/Switchyard.Hotkeys.exe", import.meta.url));
 export async function runtimeGuardianStopped(frame, { windowsHelper = nativeHelper } = {}) {
   if (frame?.schema !== "switchyard-runtime-command/v1" || !/^[a-f0-9-]{36}$/.test(frame.id) || !Number.isSafeInteger(frame.guardianPid) || frame.guardianPid < 1 || !/^[0-9]+$/.test(frame.birth ?? "") || frame.containment !== (process.platform === "linux" ? "owned-linux-session" : "windows-job")) throw new Error("The interrupted runtime guardian scope is invalid; preserve its stage.");
-  try {
-    process.kill(frame.guardianPid, 0);
-    if (process.platform !== "linux") return false;
-    const text = await readFile(`/proc/${frame.guardianPid}/stat`, "utf8"), fields = text.slice(text.lastIndexOf(") ") + 2).split(" ");
-    if (fields[0] !== "Z") return false;
-  } catch (error) { if (!["ESRCH", "ENOENT"].includes(error.code)) return false; }
   if (process.platform === "linux") {
+    try {process.kill(frame.guardianPid,0);const text=await readFile(`/proc/${frame.guardianPid}/stat`,"utf8"),fields=text.slice(text.lastIndexOf(") ")+2).split(" ");if(fields[0]!=="Z")return false;}
+    catch(error){if(!["ESRCH","ENOENT"].includes(error.code))return false;}
     for (const name of await readdir("/proc")) {
       if (!/^\d+$/.test(name)) continue;
       try { const text = await readFile(`/proc/${name}/stat`, "utf8"), fields = text.slice(text.lastIndexOf(") ") + 2).split(" "); if (fields[0] !== "Z" && (+fields[2] === frame.guardianPid || +fields[3] === frame.guardianPid)) return false; }
@@ -28,10 +24,10 @@ export async function runtimeGuardianStopped(frame, { windowsHelper = nativeHelp
   let output = "", error = false;
   child.stdin.on("error", () => {}); child.stdout.on("data", b => { output += b; if (output.length > 2048) { error = true; child.stdin.end(); } });
   const ended = new Promise(resolve => { child.once("error", () => resolve(null)); child.once("close", resolve); });
-  child.stdin.end(JSON.stringify({ schema: frame.schema, id: frame.id }) + "\n");
+  child.stdin.end(JSON.stringify({ schema: frame.schema, id: frame.id, guardianPid:frame.guardianPid, birth:frame.birth }) + "\n");
   let timer; const code = await Promise.race([ended, new Promise(resolve => { timer = setTimeout(() => resolve(null), 5000); })]); clearTimeout(timer);
   if (code !== 0 || error) { await stopOwnedChild(child); return false; }
-  try { const value = JSON.parse(output); return value.schema === frame.schema && value.id === frame.id && value.containment === "windows-job" && value.activeProcesses === 0; } catch { return false; }
+  try { const value = JSON.parse(output); return value.schema === frame.schema && value.id === frame.id && value.containment === "windows-job" && value.guardianPid===frame.guardianPid && value.birth===frame.birth && value.guardianExited===true && value.activeProcesses === 0; } catch { return false; }
 }
 export async function runRuntimeCommand(executable, args, { timeout = 120000, env, cwd = process.cwd(), maxOutputBytes = 524288, inputText, inputBytes, captureStderrBytes = 0, detailed = false, expectedExecutableSha256, linuxExecutable, signal, onGuardianChild = () => {}, onGuardianReady = async () => {}, windowsHelper = fileURLToPath(new URL("../../runtime/hotkeys/Switchyard.Hotkeys.exe", import.meta.url)) } = {}) {
   if (!["linux", "win32"].includes(process.platform) || !Number.isSafeInteger(timeout) || timeout < 1 || timeout > 600000 || !Number.isSafeInteger(maxOutputBytes) || maxOutputBytes < 1 || maxOutputBytes > 524288 || !Array.isArray(args) || args.length > 256 || args.some(a=>typeof a!=="string" || a.length>8192 || /[\0\r\n]/.test(a))) throw new Error("Choose a supported, bounded runtime operation.");

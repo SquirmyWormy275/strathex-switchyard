@@ -40,10 +40,14 @@ internal static class RuntimeCommandRunner
         {
             using var request = JsonDocument.Parse(ReadLineBounded(Console.In).GetAwaiter().GetResult() ?? throw NativeError());
             string id = request.RootElement.GetProperty("id").GetString() ?? "";
-            if (request.RootElement.GetProperty("schema").GetString() != Schema || !Guid.TryParseExact(id, "D", out _)) throw NativeError();
+            int guardianPid=request.RootElement.GetProperty("guardianPid").GetInt32();string birth=request.RootElement.GetProperty("birth").GetString()??"";
+            if (request.RootElement.GetProperty("schema").GetString() != Schema || !Guid.TryParseExact(id, "D", out _)||guardianPid<1||!long.TryParse(birth,System.Globalization.NumberStyles.None,System.Globalization.CultureInfo.InvariantCulture,out long expectedBirth)||expectedBirth<1) throw NativeError();
+            bool guardianExited;
+            try{using var process=Process.GetProcessById(guardianPid);guardianExited=process.StartTime.ToUniversalTime().Ticks!=expectedBirth||process.HasExited;}
+            catch(ArgumentException){guardianExited=true;}
             using SafeJobHandle job = OpenJobObjectW(4, false, JobName(id));
             if (job.IsInvalid && Marshal.GetLastWin32Error() != 2) throw NativeError();
-            Write(new { schema = Schema, id, activeProcesses = job.IsInvalid ? 0 : ActiveProcesses(job), containment = "windows-job" });
+            Write(new { schema = Schema, id, guardianPid,birth,guardianExited,activeProcesses = job.IsInvalid ? 0 : ActiveProcesses(job), containment = "windows-job" });
             return 0;
         }
         catch { return 2; }
