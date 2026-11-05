@@ -167,6 +167,14 @@ HTTP/drift/cleanup cases and thirty-four surrounding contracts pass, with type
 checking. Normal installed `bfb7f1d` passes six update/sixteen inventory/scan checks. Consequential snapshot
 limits and separate scanner reviews remain unchanged.
 
+An explicit [ignored generated-tree policy](ignored-build-tree-policy.md) now
+binds named whole ignored directories to Shield-only authority using distinct
+directory-policy fingerprints. Selected secret bytes remain exact; excluded
+contents are uninspected. Three policy/filesystem, three authority and two actual
+Linux/Windows-guest-double execution cases pass; ten surrounding input checks,
+thirty-one authority/runner/package cases and type checking pass. New installed
+and native Windows policy acceptance remain pending.
+
 ## Complete and native checkpoints
 
 Immutable `18e6185` passes all 192 required Linux groups: 1,197 tests,

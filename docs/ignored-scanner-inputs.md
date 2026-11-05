@@ -13,6 +13,11 @@ relevant ignored names and group build trees without hashing their contents or
 granted scan authority. It remains incomplete and separate from the following
 consequential review.
 
+For an existing ignored dependency/build tree, the separate
+[explicit generated-tree policy](ignored-build-tree-policy.md) can exclude whole
+named ignored roots while keeping selected secret-file bytes exact. It is
+Shield-only, reviewed and represented as directory policy evidence.
+
 The task-authority proposal accepts `classifications.includedIgnored`. Each
 listed path must also appear in the proposal's owned `paths`. It must actually
 be ignored in the captured Git inventory; unknown, missing, incorrectly
@@ -83,8 +88,8 @@ mise exec node@24.14.0 -- node scripts/verify-shield-host.mjs \
 This adds an explicitly ignored synthetic secret to the known-failing request;
 the clean request still declares only its own selected inputs. Both remain
 incomplete for full repository coverage. Metadata-only relevant-name discovery and grouped build-tree hints are now
-implemented as an incomplete preview. Automatic complete scan assembly, persisted
-operator policy, scalable consequential build-tree snapshots and Git history are
+implemented as an incomplete preview. Automatic complete scan assembly, general persisted
+operator policy, automatic complete-target assembly and Git history are
 still unfinished. Existing bounded inspection refuses unsupported or oversized
 inputs rather than skipping them into a green result. [Current evidence](verification.md)
 separates those implementation gaps from unavailable host/account checks.

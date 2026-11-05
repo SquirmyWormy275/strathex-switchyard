@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { createHash, randomUUID } from "node:crypto";
-import { mkdir, writeFile, readFile } from "node:fs/promises";
+import { mkdir, writeFile, readFile, open } from "node:fs/promises";
 import { join } from "node:path";
 import { authorityFixture } from "./task-authority-fixture.mjs";
 import { createRepositoryExecution } from "../repository-execution.mjs";
@@ -13,7 +13,7 @@ import { scopeHash } from "../confirmations.mjs";
 const sha = value => createHash("sha256").update(value).digest("hex");
 
 // Real task/Git/crypto/kernel boundaries; the Windows guest runner is doubled.
-export async function windowsExecutionFixture(t, { action = "run_target", pipelineReport = "complete", signedFeeds = false, shield = false, clean = false, ignoredSecrets = false, workspaceLock = false, exceptions = false, resolveScannerFixtures } = {}) {
+export async function windowsExecutionFixture(t, { action = "run_target", pipelineReport = "complete", signedFeeds = false, shield = false, clean = false, ignoredSecrets = false, workspaceLock = false, ignoredBuildTree = false, exceptions = false, resolveScannerFixtures } = {}) {
   const f = await authorityFixture(t, { executionActions: connectedExecutionActions("win32") }), prerequisites = { helperSha256: "c".repeat(64), recipeRuntime: { path: "C:\\owned\\node.exe", sha256: "b".repeat(64) }, nodeVersion: "24.14.0" };
   const sample=shield?scannerFixture({action,files:{...(ignoredSecrets?{".env":"-----BEGIN PRIVATE KEY-----\nsynthetic ignored secret"}:{}),"app.js":clean||ignoredSecrets?"const ordinary=1;":"-----BEGIN PRIVATE KEY-----\neval(untrusted);","package-lock.json":JSON.stringify({lockfileVersion:3,packages:{...(workspaceLock?{"packages/local":{name:"@synthetic/local",version:"2.0.0",license:"MIT",scripts:{install:"NEVER_EXECUTE_WORKSPACE_SCRIPT"}},"node_modules/local-alias":{resolved:"packages/local",link:true}}:{}),"node_modules/synthetic":{version:"1.0.0",license:"MIT"}}})},advisory:[...(workspaceLock?[{ecosystem:"npm",name:"@synthetic/local",version:"2.0.0",advisories:[]}]:[]),{ecosystem:"npm",name:"synthetic",version:"1.0.0",advisories:clean?[]:[{id:"GHSA-synthetic-only",severity:"high"}]}]}):undefined;
   if(sample)sample.content.set("request.json",Buffer.from(JSON.stringify(sample.request)));
@@ -21,8 +21,9 @@ export async function windowsExecutionFixture(t, { action = "run_target", pipeli
   const input = (path, bytes) => ({ path, sha256: sha(bytes), size: bytes.length, classification: "non-production" });
   const bytes = Buffer.from(JSON.stringify({ schema: "switchyard-windows-reviewed-run/v1", version: 1, recipeId: action, catalogPath: "guest.json", catalogSha256: sha(catalog), inputFiles: [input("program.mjs", program), input("guest.json", catalog),...(sample?[...sample.content].map(([path,b])=>input(path,b)):[])] }));
   for (const [path, body] of [["run.json",bytes],["guest.json",catalog],["program.mjs",program],...(sample?[...sample.content]:[])]) await writeFile(join(f.root,path),body);
-  if(ignoredSecrets){assert.equal(shield,true);await writeFile(join(f.root,".gitignore"),"cache.txt\n.env\n");}
-  const grantInput = { ...f.proposed, paths: ["task.txt", "run.json", "guest.json", "program.mjs",...(sample?[...sample.content.keys()]:[])], classifications: { includedUntracked: ["run.json", "guest.json", "program.mjs",...(sample?[...sample.content.keys()].filter(path=>!ignoredSecrets||path!==".env"):[])], ...(ignoredSecrets?{includedIgnored:[".env"]}:{}) }, actions: [action] }, approved = await f.service.review("personal",grantInput), grant = await f.service.issue("personal",{...grantInput,token:approved.confirmation.token});
+  if(ignoredSecrets||ignoredBuildTree){assert.equal(shield,true);await writeFile(join(f.root,".gitignore"),"cache.txt\n"+(ignoredSecrets?".env\n":"")+(ignoredBuildTree?"node_modules/\n":""));}
+  if(ignoredBuildTree){await mkdir(join(f.root,"node_modules"));const file=await open(join(f.root,"node_modules/large.bin"),"wx");try{await file.truncate(80*1024*1024);}finally{await file.close();}}
+  const grantInput = { ...f.proposed, paths: ["task.txt", "run.json", "guest.json", "program.mjs",...(sample?[...sample.content.keys()]:[])], classifications: { includedUntracked: ["run.json", "guest.json", "program.mjs",...(sample?[...sample.content.keys()].filter(path=>!ignoredSecrets||path!==".env"):[])], ...(ignoredSecrets?{includedIgnored:[".env"]}:{}), ...(ignoredBuildTree?{excludedIgnoredTrees:["node_modules"]}:{}) }, actions: [action] }, approved = await f.service.review("personal",grantInput), grant = await f.service.issue("personal",{...grantInput,token:approved.confirmation.token});
   let fixtures, fixtureResolver = resolveScannerFixtures;
   if (signedFeeds||shield) {
     fixtures = createScannerFixtures({ store: f.store, stateDirectory: join(f.stage, "signed-fixtures"), now: f.now }); f.onCleanup(() => fixtures.close());

@@ -9,6 +9,7 @@ import { runOwnedNativeCommand } from "./owned-native-command.mjs";
 import { runRuntimeCommand, runtimeGuardianStopped } from "./runtime-command.mjs";
 import { verifyRepositoryIdentity } from "./coding-task-identity.mjs";
 import { shieldInventoryQueries, buildShieldInputInventory } from "./shield-input-inventory.mjs";
+import { ignoredTreeRoots, ignoredTreeQuery, assertIgnoredTreeListing, ignoredTreeWitness } from "./ignored-tree-policy.mjs";
 
 const queries = new Set([
   ["rev-parse", "--show-toplevel"], ["remote", "get-url", "origin"], ["branch", "--show-current"],
@@ -78,6 +79,7 @@ export function createRepositoryInspection({ store, command = runRuntimeCommand,
     async observe(c, task, authorize = async () => {}) { return this.capture(c, task, {}, authorize, { metadataOnly: true }); },
     async scannerInputs(c, task, authorize = async () => {}) { return this.capture(c, task, {}, authorize, { scannerInventory: true }); },
     async capture(c, task, classifications, authorize = async () => {}, { metadataOnly = false, scannerInventory = false } = {}) {
+      const excludedTrees = ignoredTreeRoots(classifications.excludedIgnoredTrees ?? []), excludedQuery = excludedTrees.length ? ignoredTreeQuery(excludedTrees) : undefined;
       const generation = generations.get(c) ?? 0, resource = { controller: new AbortController(), clients: new Set() }; seen.add(c);
       const check = async () => { if (closed || generation !== (generations.get(c) ?? 0) || resource.controller.signal.aborted) throw new Error("Repository inspection was stopped."); await authorize(); };
       await check(); await store.authorize(c, { provider: task.provider }); await verifyRepositoryIdentity(task);
@@ -104,7 +106,7 @@ export function createRepositoryInspection({ store, command = runRuntimeCommand,
       };
       const start = now();
       const runner = { async run(args, cwd = task.repositoryRoot) {
-        await check(); if (now() - start > 45000 || !queries.has(JSON.stringify(args)) || cwd !== task.repositoryRoot) throw new Error("Only bounded exact-root Git inspection queries are permitted.");
+        await check(); if (now() - start > 45000 || (!queries.has(JSON.stringify(args)) && JSON.stringify(args) !== JSON.stringify(excludedQuery)) || cwd !== task.repositoryRoot) throw new Error("Only bounded exact-root Git inspection queries are permitted.");
         let readyPersisted = false;
         const result = await runOwnedNativeCommand({ executable, args: ["--no-pager", "-c", "core.fsmonitor=false", "-c", "core.untrackedCache=false", "-c", "protocol.allow=never", ...args], cwd,
           env: inspectionEnvironment(scratch), timeout: 10000, maxOutputBytes: 262144, captureStderrBytes: 4096, signal: resource.controller.signal, resource, command, guardianStopped,
@@ -152,10 +154,29 @@ export function createRepositoryInspection({ store, command = runRuntimeCommand,
           await check(); await verifyRepositoryIdentity(task); return observed;
         }
         const included = new Set(classifications.includedUntracked), excluded = new Set(classifications.excludedUntracked), includedIgnored = new Set(classifications.includedIgnored ?? []), ignored = new Set(classifications.excludedIgnored);
+        const excludedWitnesses = [];
+        if (excludedTrees.length) {
+          const listing = await runner.run(shieldInventoryQueries.ignored);
+          if (listing.exitCode) throw Error("The exact ignored generated-tree inventory is unavailable.");
+          assertIgnoredTreeListing(listing.stdout, excludedTrees);
+          for (const path of excludedTrees) excludedWitnesses.push(await ignoredTreeWitness(task.repositoryRoot, path, check));
+        }
         let inspection;
-        const inspector = new GitCliInspector({ runner, digestReader, classifyUntracked: p => included.has(p) ? "included" : excluded.has(p) ? "excluded" : "unknown", classifyIgnored: p => includedIgnored.has(p) ? "included" : ignored.has(p) ? "excluded" : "unknown" });
-        const factory = new TargetSnapshotFactory({ async inspect(root) { inspection = await inspector.inspect(root); inspection.canonicalRemote = safeRemote(inspection.canonicalRemote); return inspection; } }, { clock: () => new Date(now()).toISOString() });
-        const snapshot = await factory.capture({ targetHint: task.repositoryRoot, policyVersion: "switchyard-task-local-authority/v1", environment: { toolVersions: { node: process.versions.node }, values: { gitContract: "fixed-read-only-guardian/v1" } } });
+        const scopedRunner = excludedQuery ? { run: (args, cwd) => runner.run(JSON.stringify(args) === JSON.stringify(["ls-files", "--others", "--ignored", "--exclude-standard", "-z"]) ? excludedQuery : args, cwd) } : runner;
+        const inspector = new GitCliInspector({ runner: scopedRunner, digestReader, classifyUntracked: p => included.has(p) ? "included" : excluded.has(p) ? "excluded" : "unknown", classifyIgnored: p => includedIgnored.has(p) ? "included" : ignored.has(p) ? "excluded" : "unknown" });
+        const factory = new TargetSnapshotFactory({ async inspect(root) {
+          inspection = await inspector.inspect(root); inspection.canonicalRemote = safeRemote(inspection.canonicalRemote);
+          if (excludedTrees.length) {
+            if (inspection.trackedFiles.some(file => excludedTrees.some(root => file.path === root || file.path.startsWith(root + "/")))) throw Error("An excluded generated tree contains tracked data; review its exact files instead.");
+            const listing = await runner.run(shieldInventoryQueries.ignored);
+            if (listing.exitCode) throw Error("The ignored generated-tree inventory changed during inspection.");
+            assertIgnoredTreeListing(listing.stdout, excludedTrees);
+            for (const original of excludedWitnesses) if (JSON.stringify(await ignoredTreeWitness(task.repositoryRoot, original.path, check)) !== JSON.stringify(original)) throw Error("An excluded generated-tree identity changed during target capture.");
+            inspection.ignoredFiles = [...inspection.ignoredFiles, ...excludedWitnesses];
+          }
+          return inspection;
+        } }, { clock: () => new Date(now()).toISOString() });
+        const snapshot = await factory.capture({ targetHint: task.repositoryRoot, policyVersion: excludedTrees.length ? "switchyard-task-shield-ignored-trees/v1" : "switchyard-task-local-authority/v1", environment: { toolVersions: { node: process.versions.node }, values: { gitContract: "fixed-read-only-guardian/v1", ...(excludedTrees.length ? { ignoredTreePolicy: "explicit-directory-identity-not-source-bytes/v1" } : {}) } } });
         await check(); await verifyRepositoryIdentity(task);
         if (snapshot.repositoryRoot !== task.repositoryRoot) throw new Error("Git did not verify the exact bound repository root.");
         return { snapshot, files: { tracked: inspection?.trackedFiles ?? [], untracked: inspection?.untrackedFiles ?? [], ignored: inspection?.ignoredFiles ?? [] } };

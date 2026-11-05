@@ -1,7 +1,8 @@
 /** Read-only preparation hints. These names never constitute a scan or grant. */
 import { scopeHash } from "./confirmations.mjs";
+import { ignoredBuildTreeNames } from "./ignored-tree-policy.mjs";
 
-const buildTrees = Object.freeze(["node_modules", ".venv", "venv", ".tox", "__pycache__", ".mypy_cache", ".pytest_cache", ".cache", "dist", "build", "target", "coverage"]);
+const buildTrees = ignoredBuildTreeNames;
 const secretNames = Object.freeze([".env", ".env.*", ".npmrc", ".pypirc", "credentials.json", "credentials.*.json", "*.pem", "*.key", "*.p12", "*.pfx"]);
 export const shieldInventoryQueries = Object.freeze({
   tracked: Object.freeze(["ls-files", "-z"]),

@@ -5,6 +5,7 @@ import { scopeHash, suiteConfirmations } from "./confirmations.mjs";
 import { verifyRepositoryIdentity } from "./coding-task-identity.mjs";
 import { createRepositoryInspection } from "./repository-inspection.mjs";
 import { connectedExecutionActions, linuxShieldActions } from "./repository-execution-actions.mjs";
+import { ignoredTreeRoots } from "./ignored-tree-policy.mjs";
 const uuid = v => typeof v === "string" && /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/.test(v);
 const taskDigest = t => scopeHash([t.id, t.provider, t.sessionId, t.repositoryRoot, t.repositoryIdentity, t.accountFingerprint, t.status, t.nativeTransport, t.nativeIdentityVerified, t.launchPolicy]);
 const workspaceDigest = s => scopeHash([s.id, s.policy, s.mode, s.modeSelectedAt ?? null, s.accounts, s.taskAuthorityEpoch ?? 0]);
@@ -25,12 +26,14 @@ function proposal(input, executionActions = []) {
   const actions = input.actions ?? ["local_commit"];
   if (!Array.isArray(actions) || !actions.length || actions.length > 2 || new Set(actions).size !== actions.length || actions.some(a => !["local_commit", ...executionActions].includes(a))) throw new Error("Only host-mediated local commit and explicitly connected execution actions are available in this route.");
   const classifications = input.classifications ?? {};
-  if (!classifications || typeof classifications !== "object" || Array.isArray(classifications) || Object.keys(classifications).some(key => !["includedUntracked", "excludedUntracked", "includedIgnored", "excludedIgnored"].includes(key))) throw Error("Use only the closed file classification fields.");
+  if (!classifications || typeof classifications !== "object" || Array.isArray(classifications) || Object.keys(classifications).some(key => !["includedUntracked", "excludedUntracked", "includedIgnored", "excludedIgnored", "excludedIgnoredTrees"].includes(key))) throw Error("Use only the closed file classification fields.");
   const includedUntracked = paths(classifications.includedUntracked ?? [], "included untracked files"), excludedUntracked = paths(classifications.excludedUntracked ?? [], "excluded untracked files"), includedIgnored = paths(classifications.includedIgnored ?? [], "read-only ignored scanner inputs"), excludedIgnored = paths(classifications.excludedIgnored ?? [], "excluded ignored files");
   const all = [...includedUntracked, ...excludedUntracked, ...includedIgnored, ...excludedIgnored];
   if (new Set(all.map(p => process.platform === "win32" ? p.toLowerCase() : p)).size !== all.length) throw new Error("Every untracked or ignored path needs exactly one classification.");
   if (includedIgnored.length && (actions.some(action => !linuxShieldActions.includes(action)) || includedIgnored.some(p => !ownedPaths.includes(p)))) throw Error("Ignored files may be explicitly owned only as read-only inputs to the pinned Shield scanner; commit, Run and pipeline authority are refused.");
-  return { taskId: input.taskId, planRevision: input.planRevision, paths: ownedPaths, lifetimeMinutes, actions: [...actions].sort(), classifications: { includedUntracked, excludedUntracked, ...(includedIgnored.length ? { includedIgnored } : {}), excludedIgnored } };
+  const excludedIgnoredTrees = ignoredTreeRoots(classifications.excludedIgnoredTrees ?? []);
+  if (excludedIgnoredTrees.length && (actions.some(action => !linuxShieldActions.includes(action)) || [...all, ...ownedPaths].some(path => excludedIgnoredTrees.some(root => { const p = path.toLowerCase(), r = root.toLowerCase(); return p === r || p.startsWith(r + "/"); })))) throw Error("Generated-tree exclusions are explicit Shield-only policy outside every owned or individually classified path; commit, Run and pipeline authority are refused.");
+  return { taskId: input.taskId, planRevision: input.planRevision, paths: ownedPaths, lifetimeMinutes, actions: [...actions].sort(), classifications: { includedUntracked, excludedUntracked, ...(includedIgnored.length ? { includedIgnored } : {}), excludedIgnored, ...(excludedIgnoredTrees.length ? { excludedIgnoredTrees } : {}) } };
 }
 function taskIn(s, id) {
   const t = s.codingSessions?.find(t => t.id === id);
@@ -84,7 +87,7 @@ export function createTaskAuthority({ store, checkNative, isActive = async () =>
     const tracked = new Set(files.tracked.map(f => f.path)), included = new Set([...files.untracked, ...files.ignored.filter(f => selectedIgnored.includes(f.path))].filter(f => f.classification === "included").map(f => f.path));
     if (proposed.paths.some(p => !tracked.has(p) && !included.has(p))) throw new Error("Each task-owned file must be tracked or explicitly included in this exact snapshot.");
     const actualUntracked = new Set(files.untracked.map(f => f.path)), actualIgnored = new Set(files.ignored.map(f => f.path));
-    if ([...proposed.classifications.includedUntracked, ...proposed.classifications.excludedUntracked].some(p => !actualUntracked.has(p)) || [...selectedIgnored, ...proposed.classifications.excludedIgnored].some(p => !actualIgnored.has(p))) throw new Error("A reviewed input classification no longer matches the actual repository.");
+    if ([...proposed.classifications.includedUntracked, ...proposed.classifications.excludedUntracked].some(p => !actualUntracked.has(p)) || [...selectedIgnored, ...proposed.classifications.excludedIgnored, ...(proposed.classifications.excludedIgnoredTrees ?? [])].some(p => !actualIgnored.has(p))) throw new Error("A reviewed input classification no longer matches the actual repository.");
     return { task, binding, workspace, snapshot, proposed, files };
   }
   async function exclusive(c, fn) {
@@ -134,7 +137,7 @@ export function createTaskAuthority({ store, checkNative, isActive = async () =>
     async review(c, input) { return exclusive(c, async generation => {
       const result = await capture(c, proposal(input, executionActions), generation); current(c, generation);
       const confirmation = await suiteConfirmations(store, c, result.task.provider, now).issue({ action: "issue_task_authority", sessionId: result.task.sessionId, targetSnapshotId: result.snapshot.id, scopeDigest: scope(c, result),
-        reason: "Authorize only the displayed connected host actions for these literal files, plan revision, native task/account and repository snapshot. Explicitly included ignored files are read-only inputs to the pinned Shield scanner, never commit or general execution inputs. Provider tools and native permissions stay unchanged. Every effect still needs its separate exact review.", reauthenticated: false });
+        reason: "Authorize only the displayed connected host actions for these literal files, plan revision, native task/account and repository snapshot. Explicitly included ignored files are read-only inputs to the pinned Shield scanner, never commit or general execution inputs. Provider tools and native permissions stay unchanged. Every effect still needs its separate exact review." + (result.proposed.classifications.excludedIgnoredTrees?.length ? " The displayed ignored generated trees are excluded by explicit Shield-only policy: their directory identities are witnessed, their contents are not scanned or hashed, and this cannot establish a complete security pass." : ""), reauthenticated: false });
       current(c, generation); return { status: "requires-confirmation", confirmation, scope: { ...result.proposed, provider: result.task.provider, sessionId: result.task.sessionId, accountFingerprint: result.task.accountFingerprint, repositoryRoot: result.task.repositoryRoot, repositoryIdentity: result.task.repositoryIdentity, targetSnapshot: result.snapshot, allowedActions: result.proposed.actions }, nativePermissionsChanged: false };
     }); },
     async issue(c, input) { return exclusive(c, async generation => {

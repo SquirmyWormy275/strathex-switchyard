@@ -67,10 +67,11 @@ mise exec node@24.14.0 -- node scripts/verify-shield-host.mjs \
 ```
 
 The verifier removes its own large sparse build fixture after inspection, before
-the separate scanner authority review. Existing authority still requires exact
-classified file hashes and refuses enormous excluded inputs; this preview does
-not loosen that boundary. Automatic complete-target scan assembly, persisted
-operator-configured exclusions, scalable consequential build-tree snapshots,
+the separate scanner authority review. Existing authority still requires exact classified file hashes. A separate
+[reviewed generated-tree policy](ignored-build-tree-policy.md) can now exclude
+whole named ignored roots using explicit directory-identity witnesses; the
+preview does not apply that policy or grant it. Automatic complete-target scan assembly, persisted
+operator-configured general exclusions,
 staged-byte/history scanning and the frontend remain unfinished implementation.
 See [explicit ignored scanner inputs](ignored-scanner-inputs.md) for the distinct
 reviewed read-only scan path.

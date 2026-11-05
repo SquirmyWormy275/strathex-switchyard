@@ -201,3 +201,11 @@ supports `--synthetic --action=shield_supply_chain --workspace-lock`; normal ins
 full restoration. Receipts `assignment-legends-1793862128657.json` and
 `installed-shield-baseline-1793862282934.json` retained; owned scratch removed,
 one empty task and zero prompts.
+
+
+[Explicit ignored generated-tree policy](ignored-build-tree-policy.md) now allows
+Shield-only grants to omit whole named ignored build/dependency trees from byte
+hashing. Their verified directory identities and declared exclusions bind the
+reviewed target; selected ignored secret files remain exact byte inputs. Both
+execution hosts keep excluded roots outside staging and preserve incomplete
+security coverage. This is separate from the non-authoritative input preview.

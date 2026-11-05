@@ -112,6 +112,8 @@ const linuxCompanionTests = ["linux-secret", "linux-isolation", "linux-lifecycle
     ...(process.platform !== "linux" && linuxSkippedOnNonLinux.has(name) ? { expectedSkipped: linuxSkippedOnNonLinux.get(name) } : {})
   }));
 export function nativeTestOverrides(file, platform = process.platform) {
+  if (file === "tools/layout-studio/repository-shield-ignored-trees.test.mjs") return { timeoutMs: platform === "win32" ? 300_000 : 120_000 };
+  if (file === "tools/layout-studio/task-authority-ignored-trees.test.mjs") return { timeoutMs: platform === "win32" ? 300_000 : 120_000 };
   if (file === "tools/layout-studio/repository-shield-workspaces.test.mjs") return { timeoutMs: platform === "win32" ? 300_000 : 120_000 };
   if (file === "tools/layout-studio/repository-receipt-authority.test.mjs") return { timeoutMs: platform === "win32" ? 300_000 : 120_000 };
   if (file === "tools/layout-studio/receipt-authority-state.test.mjs" && platform === "win32") return { timeoutMs: 240_000 };
@@ -190,6 +192,9 @@ export const requiredGroups = [
   { file: "tools/layout-studio/repository-execution.test.mjs", timeoutMs: 240_000, ...nativeTestOverrides("tools/layout-studio/repository-execution.test.mjs"), ...(process.platform !== "linux" ? { expectedSkipped: 1 } : {}) },
   { file: "tools/layout-studio/shield-scanner-engine.test.mjs" },
   { file: "tools/layout-studio/shield-input-inventory.test.mjs" },
+  { file: "tools/layout-studio/ignored-tree-policy.test.mjs" },
+  { file: "tools/layout-studio/repository-shield-ignored-trees.test.mjs", ...nativeTestOverrides("tools/layout-studio/repository-shield-ignored-trees.test.mjs"), expectedSkipped: process.platform === "linux" ? 0 : 1 },
+  { file: "tools/layout-studio/task-authority-ignored-trees.test.mjs", ...nativeTestOverrides("tools/layout-studio/task-authority-ignored-trees.test.mjs") },
   { file: "tools/layout-studio/repository-shield-workspaces.test.mjs", ...nativeTestOverrides("tools/layout-studio/repository-shield-workspaces.test.mjs"), expectedSkipped: process.platform === "linux" ? 0 : 1 },
   { file: "tools/layout-studio/repository-shield.test.mjs", timeoutMs: 120_000, expectedSkipped: process.platform === "linux" ? 0 : 2 },
   { file: "tools/layout-studio/repository-pipeline.test.mjs", timeoutMs: 120_000, ...(process.platform !== "linux" ? { expectedSkipped: 5 } : {}) },
