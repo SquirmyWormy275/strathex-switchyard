@@ -38,8 +38,7 @@ revocation. The authenticated gateway adds real encrypted-state checks for saved
 selection and mode changes before/after effect. Six surrounding isolated groups
 pass 65 checks; the final four-group gateway/package subset passes 38, with every
 child cleanup verified and owned scratch removed. Type checking passes. These
-demonstrations exercise current source; normal installed-release acceptance of
-this later correction remains separate.
+demonstrations exercise current source; normal installed acceptance now passes as recorded below.
 
 
 For normal installed-release acceptance, the bounded pilot verifier is:
@@ -49,7 +48,7 @@ mise exec node@24.14.0 -- node scripts/verify-native-focus-host.mjs --synthetic
 ```
 
 It requires a ready installed app containing this exact source, an already open
-repaired native main window and an initially keyboard-only selected workspace.
+repaired native main window and a selected Personal workspace without active user work.
 It mutually authenticates the saved app before sending its bearer. A fixed empty
 validation workspace is independently checked before use; an existing populated
 workspace is preserved. It proves unauthenticated and keyboard-only refusal,
@@ -58,4 +57,17 @@ validation workspace to keyboard-only and restores the original selection,
 Personal definitions, private endpoint and frozen Home. The small encrypted
 validation audit and JSON receipt are retained. It creates no native coding task,
 feed, scanner fixture, prompt, credential account, keyboard or microphone access.
-Actual installed acceptance for this later correction is being collected.
+Normal installed `b82f056`, release
+`a6c095ec81436d03fc136e7f6da73977c842e9cabb57ceb33f15a202daa11416`,
+passes six update and all five focus/API/restoration checks. Receipt
+`installed-native-main-window-1793881005201.json` verifies one mapped main window,
+zero floating overlays, exact original selection/definitions/mode/private endpoint
+and frozen Home restoration. The disposable package and proof checkout are
+removed; no prompt, coding task, keyboard or microphone access. The first installed
+attempt retains failed `installed-native-main-window-1793880918796.json`: its
+verifier unnecessarily assumed the original Personal workspace was keyboard-only.
+It stopped before any workspace mutation. Exact owned checkout cleanup and
+unchanged failed outcome are recorded in
+`failed-native-focus-installed-cleanup-1793881033321.json`. The corrected verifier
+checks actual active work and independently settles every retained guardian
+before selecting its empty fixture; it preserves the original mode.

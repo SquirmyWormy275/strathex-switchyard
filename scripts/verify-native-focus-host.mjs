@@ -11,6 +11,7 @@ import { createSuiteStore } from "../tools/layout-studio/suite-store.mjs";
 import { privateRead, privateWrite } from "../tools/layout-studio/private-fs.mjs";
 import { endpointIdentity, requestInstance } from "../tools/layout-studio/instance.mjs";
 import { nativeChatgptWindow, runHypr } from "../tools/layout-studio/host.mjs";
+import { runtimeGuardianStopped } from "../tools/layout-studio/runtime-command.mjs";
 
 if (process.platform !== "linux" || process.argv.length !== 3 || process.argv[2] !== "--synthetic") throw Error("Use on the pilot: node scripts/verify-native-focus-host.mjs --synthetic. Open the repaired native main window first.");
 const installed = await applicationStatus(); assert.equal(installed.status, "ready");
@@ -30,9 +31,14 @@ let baseline, failure, stage = "installed-source-binding";
 try {
   for (const path of ["tools/layout-studio/host.mjs", "tools/layout-studio/native-process.mjs", "tools/layout-studio/task-window.mjs", "tools/layout-studio/suite.mjs"]) assert.equal(hash(await readFile(join(installationRoot(), "versions", installed.build, path))), hash(await readFile(new URL("../" + path, import.meta.url))));
   checks.push("normal installed release contains the exact native target and active-policy source");
+  stage = "original-workspace-preflight";
   const original = await nativeChatgptWindow(), active = await api("snapshot", { compartment: selected });
-  assert.equal(active.mode, "keyboard-only", "Preserve the user's existing companion session.");
+  assert.equal(active.policy, "personal", "Preserve an active Work environment.");
   assert.equal(active.observations.some(row => row.status === "recording") || active.voice.some(row => row.status === "recording") || active.conversations.some(row => row.status === "pending") || (active.codingTurns ?? []).some(row => ["submitting", "submitted", "cancellation-requested"].includes(row.status)), false, "Preserve active user work.");
+  const guardians = new Map();
+  function retained(value) { if (!value || typeof value !== "object") return; if (value.ownedRuntime?.schema === "switchyard-runtime-command/v1") guardians.set(value.ownedRuntime.id, value.ownedRuntime); for (const child of Object.values(value)) retained(child); }
+  retained(await store.snapshot(selected));
+  for (const guardian of guardians.values()) assert.equal(await runtimeGuardianStopped(guardian), true, "Preserve an existing owned native process.");
   stage = "empty-validation-workspace";
   await api("compartment/create", { compartment, policy: "personal" }); const candidate = await store.snapshot(compartment);
   assert.equal(candidate.mode, "keyboard-only"); assert.equal(candidate.profile, null); assert.equal(candidate.workflow.roles.length, 0);

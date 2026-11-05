@@ -32,5 +32,20 @@
   "keyboardOpened": false,
   "accountAccepted": false,
   "conversationAccepted": false,
-  "taskResumptionAccepted": false
+  "taskResumptionAccepted": false,
+  "installedAcceptance": {
+    "sourceCommit": "b82f0564b69368053eed4d8e9971ce9bb699e3b2",
+    "applicationRelease": "a6c095ec81436d03fc136e7f6da73977c842e9cabb57ceb33f15a202daa11416",
+    "updateChecks": 6,
+    "focusChecks": 5,
+    "updateReceipt": "assignment-legends-1793880918634.json",
+    "focusReceipt": "installed-native-main-window-1793881005201.json",
+    "focusReceiptSha256": "62402d104a6255927b283d8d7f3ed5c1eb8d2ee9a12586433909fbc24f42c407",
+    "validationRestored": true,
+    "mappedMainWindows": 1,
+    "mappedFloatingOverlays": 0,
+    "modelPromptsSubmitted": 0,
+    "disposableBundleRemoved": true,
+    "proofCheckoutRemoved": true
+  }
 }

@@ -37,7 +37,17 @@ and broader history remain unfinished software. [Witness](git-history-inputs.md)
 
 ## Installed application
 
-Latest installed source `bd77ec4`, release
+Latest installed source `b82f056`, release
+`a6c095ec81436d03fc136e7f6da73977c842e9cabb57ceb33f15a202daa11416`,
+passes six update/five actual native main-window focus/API/restoration checks.
+One repaired main window and zero floating overlays verify; original selection,
+Personal definitions/mode, private endpoint and frozen Home restore. The package
+and proof checkout are removed; no prompt, task, keyboard or microphone access.
+Receipt `installed-native-main-window-1793881005201.json`. The initial verifier
+mode-precondition failure remains failed with exact cleanup; correction checks
+actual active work instead of changing original mode. [Contract](native-client-focus.md).
+
+Earlier installed source `bd77ec4`, release
 `34a37d55e05f9f75a185f170c801c357e26506883362d24d49dedf332b4e5bf8`,
 passes six update/sixteen CLI/API and separate current-file scan checks. All four
 inspector commands run through the normal stable launcher in the actual selected
