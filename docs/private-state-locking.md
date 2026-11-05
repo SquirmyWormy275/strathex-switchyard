@@ -62,3 +62,22 @@ original bounds. [Exact source/artifact summary](evidence/windows-470-state-lock
 Earlier failures remain failed and their precise startup cause is not proven by
 a later pass. The whole workflow, actual guest and ordinary-account acceptance
 remain separate.
+
+Linux now runs the fixed `/usr/bin/cat` pipe reader under `/usr/bin/flock`
+instead of starting Node for each lease. The readiness line can be echoed only
+after the kernel grants the lock. An open input pipe holds it; pipe EOF retires
+the reader after normal completion or abrupt parent loss. There is no shell,
+lease reuse or deadline change. Held nonblocking probes, independent store
+serialization, failed mutations, detached-owner crash release and a forcibly
+lost lock owner all remain covered. A lost owner invalidates the original lease
+before a new writer can be accepted through it.
+
+Three isolated Suite/commit/lock groups pass 28 checks with cleanup verified
+(`isolated-test-0bab35ff-6d9c-4a70-8ac8-13788fdeb4eb.json`). The commit group
+finishes in 43,621 ms under its unchanged 45,000 ms bound; its prior timeout
+remains failed. Thirty local lease acquisitions observed median 51.99 ms before
+and 7.05 ms after, with both owned fixtures removed
+(`linux-lock-latency-before-1793899173770.json` and
+`linux-lock-latency-after-1793899235545.json`). This is a local measurement under
+changing workstation load, not a universal benchmark or proof of the earlier
+full-run failure's cause. A fresh full-suite run remains required.

@@ -27,7 +27,9 @@ export async function withStateLock(root, id, fn, { onProgress, nonBlocking = fa
   if (!named.isFile() || named.isSymbolicLink() || (process.platform !== "win32" && (named.uid !== userInfo().uid || (named.mode & 0o077)))) throw new Error("Private lock ownership or permissions are invalid.");
   onProgress?.("lease-file");
   let child;
-  if (process.platform === "linux") child = spawn("/usr/bin/flock", ["--exclusive", ...(nonBlocking ? ["--nonblock"] : ["--timeout", "10"]), "--conflict-exit-code", "75", path, process.execPath, "-e", 'process.stdout.write("LOCKED\\n"); process.stdin.resume();'], { shell: false, stdio: ["pipe", "pipe", "ignore"] });
+  // cat can echo readiness only after flock grants the kernel lease. Its open
+  // input pipe keeps that lease alive; EOF also retires it after parent loss.
+  if (process.platform === "linux") child = spawn("/usr/bin/flock", ["--exclusive", ...(nonBlocking ? ["--nonblock"] : ["--timeout", "10"]), "--conflict-exit-code", "75", path, "/usr/bin/cat"], { shell: false, stdio: ["pipe", "pipe", "ignore"] });
   else if (process.platform === "win32") {
     const request = windowsLockRequest({ path, parentPid: process.pid, trace: Boolean(onProgress), nonBlocking });
     child = spawn(join(process.env.SystemRoot || "C:\\Windows", "System32/WindowsPowerShell/v1.0/powershell.exe"), ["-NoLogo", "-NoProfile", "-NonInteractive", "-File", fileURLToPath(new URL("./state-lock.ps1", import.meta.url))], { shell: false, windowsHide: true, stdio: ["pipe", "pipe", onProgress ? "pipe" : "ignore"] });
@@ -39,6 +41,7 @@ export async function withStateLock(root, id, fn, { onProgress, nonBlocking = fa
   const closed = new Promise((resolve) => { resolveClosed = resolve; });
   child.once("close", () => { alive = false; resolveClosed(); });
   child.stdin.on("error", () => {});
+  if (process.platform === "linux") child.stdin.write("LOCKED\n");
   try {
     await new Promise((resolve, reject) => {
       let output = ""; const timer = setTimeout(() => { child.kill(); reject(new Error("Private state lock timed out. Existing data was preserved.")); }, 15000);

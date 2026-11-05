@@ -54,6 +54,20 @@ test("kernel lock releases after its owner crashes and a separate process can ac
     assert.equal(probed, false);
     const exited = once(child, "close"); child.kill("SIGKILL"); await exited;
     let entered = false; await withStateLock(root, "personal", async () => { entered = true; }); assert.equal(entered, true);
+    if (process.platform === "linux") {
+      await assert.rejects(withStateLock(root, "lost", async lease => {
+        const children = (await readFile(`/proc/self/task/${process.pid}/children`, "utf8")).trim().split(/\s+/u).filter(Boolean), owners = [];
+        for (const pid of children) {
+          let args; try { args = (await readFile(`/proc/${pid}/cmdline`)).toString().split("\0"); } catch { continue; }
+          if (args[0] === "/usr/bin/flock" && args.includes(join(root, "locks/lost.lock"))) owners.push(Number(pid));
+        }
+        assert.equal(owners.length, 1); process.kill(owners[0], "SIGTERM");
+        let lost = false;
+        for (let i = 0; i < 100; i++) { try { lease.assert(); } catch { lost = true; break; } await new Promise(resolve => setTimeout(resolve, 10)); }
+        assert.equal(lost, true); lease.assert();
+      }), /lock was lost/);
+      let reacquired = false; await withStateLock(root, "lost", async lease => { lease.assert(); reacquired = true; }); assert.equal(reacquired, true);
+    }
   } finally { child.stdin.end(); if (child.exitCode === null) child.kill(); await rm(root, { recursive: true, force: true }); }
 });
 
