@@ -113,7 +113,7 @@ mise exec node@24.14.0 -- node scripts/verify-shield-host.mjs --synthetic
 ```
 
 It creates a fresh validation compartment/repository, separately installs synthetic
-public feeds, exercises all four failed gates and one clean incomplete result,
+public feeds, issues separate one-action grants, exercises all four failed gates and one clean incomplete result,
 checks duplicates/exit/cleanup, retires synthetic packages and restores the original
 selection, modes, definitions, private endpoint and frozen Home. Installed
 acceptance of this iteration is pending.
