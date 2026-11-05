@@ -93,3 +93,11 @@ mise exec node@24.14.0 -- node scripts/verify-shield-host.mjs \
 
 The distinct `--index-inputs` demonstration verifies read-only witnessing and a
 separate worktree scan; it does not establish staged-scan acceptance.
+
+Installed Linux compatibility at `112efdc` also passes six normal update and
+thirteen actual staged/worktree API checks after the Windows host connection.
+Receipts `assignment-legends-1793871636105.json` and
+`installed-shield-baseline-1793871799715.json` retain both scanner exits, authenticated
+provenance, replay/feed retirement and full restoration. Owned source/signing/
+packages/staging/bundle/proof checkout are removed; one empty task, zero prompts,
+no keyboard access. This Linux run does not accept native Windows execution.

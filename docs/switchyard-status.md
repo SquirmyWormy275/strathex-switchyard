@@ -7,7 +7,17 @@ host. [Verification](verification.md) retains accepted and failed checkpoints.
 
 ## Installed application
 
-Latest installed source `11d8cc7`, release
+Latest installed source `112efdc`, release
+`408086bab7911cc60170fed4576414ad04356aaca45f735fe49591377dc10462`,
+passes six normal update/thirteen actual Linux staged/worktree compatibility
+checks after connecting the Windows host path. Both scanner exits, authenticated
+Git provenance, replay/feed retirement and full restoration pass. Receipts
+`assignment-legends-1793871636105.json` and
+`installed-shield-baseline-1793871799715.json` retained; owned source/signing/packages/staging/
+bundle/proof checkout removed. One empty task, zero prompts, no keyboard access.
+Native Windows acceptance remains separate.
+
+Earlier installed source `11d8cc7`, release
 `1f5e9a2c6e90991850030ac7d316b35c90ed14ef12e7012c179e34697e20f522`,
 passes six update/thirteen actual staged and worktree scanner API checks. The
 real pinned scanner finds a secret only in the index, retains original Git

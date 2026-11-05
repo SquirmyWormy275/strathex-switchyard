@@ -72,3 +72,11 @@ freshness or a guest scan. Its Windows CI acceptance remains pending.
 See [the installed Linux staged-scan path](staged-shield-inputs.md) for the already
 connected implementation and [index byte witnessing](git-index-inputs.md) for the
 distinct read-only task-bound operation.
+
+Installed Linux compatibility at `112efdc` also passes six normal update and
+thirteen actual staged/worktree API checks after the Windows host connection.
+Receipts `assignment-legends-1793871636105.json` and
+`installed-shield-baseline-1793871799715.json` retain both scanner exits, authenticated
+provenance, replay/feed retirement and full restoration. Owned source/signing/
+packages/staging/bundle/proof checkout are removed; one empty task, zero prompts,
+no keyboard access. This Linux run does not accept native Windows execution.
