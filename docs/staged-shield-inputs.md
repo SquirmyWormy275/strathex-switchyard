@@ -58,7 +58,9 @@ This is explicit input assembly, not automatic coverage of every change or
 relevant history. Unsupported data is refused, and clean results still remain
 incomplete. No passing Release Shield gate is introduced.
 
-Windows staged-input execution remains unfinished implementation. Its existing
+Windows staged-input execution remains unfinished implementation. Its [native
+transport foundation](windows-index-staging.md) now compiles and passes 49
+portable packet checks, but the reviewed host connection is still unfinished. Its existing
 reviewed guest path refuses requests requiring an index resolver; it does not
 silently scan worktree bytes under an index label. Ordinary Windows worktree
 scanner checks remain separate from native guest/account acceptance.

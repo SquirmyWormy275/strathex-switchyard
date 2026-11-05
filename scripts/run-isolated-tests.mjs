@@ -198,6 +198,7 @@ export const requiredGroups = [
   { file: "tools/layout-studio/repository-shield-osv-source.test.mjs", ...nativeTestOverrides("tools/layout-studio/repository-shield-osv-source.test.mjs"), expectedSkipped: process.platform === "linux" ? 0 : 1 },
   { file: "tools/layout-studio/shield-input-inventory.test.mjs" },
   { file: "tools/layout-studio/git-index-inputs.test.mjs" },
+  { file: "tools/layout-studio/windows-index-inputs.test.mjs" },
   { file: "tools/layout-studio/task-index-inputs.test.mjs", ...nativeTestOverrides("tools/layout-studio/task-index-inputs.test.mjs"), expectedSkipped: process.platform === "linux" ? 0 : 1 },
   { file: "tools/layout-studio/ignored-tree-policy.test.mjs" },
   { file: "tools/layout-studio/repository-shield-ignored-trees.test.mjs", ...nativeTestOverrides("tools/layout-studio/repository-shield-ignored-trees.test.mjs"), expectedSkipped: process.platform === "linux" ? 0 : 1 },

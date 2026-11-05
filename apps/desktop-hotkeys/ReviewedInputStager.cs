@@ -152,20 +152,24 @@ internal static partial class ReviewedInputStager
     public static int Run()
     {
         var handles = new List<SafeFileHandle>();
+        ReviewedIndexInputs.Packet? indexPacket = null;
         try
         {
             Console.InputEncoding = new UTF8Encoding(false, true);
             Console.OutputEncoding = new UTF8Encoding(false, true);
             var text = new StringBuilder(); int character;
             while ((character = Console.In.Read()) != -1 && character != '\n') { if (character == '\r' || text.Length >= 524288) throw Invalid(); text.Append((char)character); }
+            if (Encoding.UTF8.GetByteCount(text.ToString()) > 524288) throw Invalid();
             using var document = JsonDocument.Parse(text.ToString()); var request = document.RootElement;
-            Exact(request, "schema", "operationId", "sourceRoot", "sourceIdentity", "stagingRoot", "stagingIdentity", "inputFiles", "inputManifestSha256");
+            bool withIndex = request.TryGetProperty("indexInputs", out var indexInputs);
+            Exact(request, withIndex ? new[] { "schema", "operationId", "sourceRoot", "sourceIdentity", "stagingRoot", "stagingIdentity", "inputFiles", "inputManifestSha256", "indexInputs" } : new[] { "schema", "operationId", "sourceRoot", "sourceIdentity", "stagingRoot", "stagingIdentity", "inputFiles", "inputManifestSha256" });
             if (request.GetProperty("schema").GetString() != Schema || !Guid.TryParseExact(request.GetProperty("operationId").GetString(), "D", out var operation)) throw Invalid();
             string sourceRoot = Absolute(request.GetProperty("sourceRoot")), stageRoot = Absolute(request.GetProperty("stagingRoot"));
             if (sourceRoot.Equals(stageRoot, StringComparison.OrdinalIgnoreCase) || Inside(sourceRoot, stageRoot) || Inside(stageRoot, sourceRoot) || Path.GetFileName(stageRoot) != "inputs-" + operation.ToString("D")) throw Invalid();
             var inputs = Inputs(request.GetProperty("inputFiles"));
             string manifestDigest = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(request.GetProperty("inputFiles").GetRawText()))).ToLowerInvariant();
             if (request.GetProperty("inputManifestSha256").GetString() != manifestDigest) throw Invalid();
+            if (withIndex) indexPacket = ReviewedIndexInputs.Read(indexInputs, inputs.ToDictionary(file => file.Path, file => (file.Sha256, file.Size), StringComparer.Ordinal));
             var sourceHandle = PinDirectories(sourceRoot, handles);
             var stageHandle = PinDirectories(stageRoot, handles, WriteDac | ReadControl);
             var sourceIdentity = Information(sourceHandle, true); var stagingIdentity = Information(stageHandle, true);
@@ -177,28 +181,34 @@ internal static partial class ReviewedInputStager
             {
                 if (timer.ElapsedMilliseconds > 30000) throw Invalid();
                 string source = Path.Combine(sourceRoot, file.Path.Replace('/', Path.DirectorySeparatorChar)), destination = Path.Combine(stageRoot, file.Path.Replace('/', Path.DirectorySeparatorChar));
-                var parents = new List<SafeFileHandle>(); byte[]? bytes = null;
+                var parents = new List<SafeFileHandle>(); byte[]? bytes = null; FileStream? input = null;
                 try
                 {
-                    PinDirectories(Path.GetDirectoryName(source)!, parents);
-                    using var input = new FileStream(Open(source, false), FileAccess.Read);
-                    var before = Information(input.SafeFileHandle, false);
-                    if ((((ulong)before.SizeHigh << 32) | before.SizeLow) != (ulong)file.Size) throw Invalid();
-                    bytes = new byte[file.Size]; input.ReadExactly(bytes);
-                    if (input.ReadByte() != -1 || Convert.ToHexString(SHA256.HashData(bytes)).ToLowerInvariant() != file.Sha256 || timer.ElapsedMilliseconds > 30000) throw Invalid();
+                    if (indexPacket != null && indexPacket.Files.TryGetValue(file.Path, out var indexed)) bytes = indexed;
+                    else
+                    {
+                        PinDirectories(Path.GetDirectoryName(source)!, parents);
+                        input = new FileStream(Open(source, false), FileAccess.Read);
+                        var before = Information(input.SafeFileHandle, false);
+                        if ((((ulong)before.SizeHigh << 32) | before.SizeLow) != (ulong)file.Size) throw Invalid();
+                        bytes = new byte[file.Size]; input.ReadExactly(bytes);
+                        if (input.ReadByte() != -1) throw Invalid();
+                    }
+                    if (bytes.Length != file.Size || Convert.ToHexString(SHA256.HashData(bytes)).ToLowerInvariant() != file.Sha256 || timer.ElapsedMilliseconds > 30000) throw Invalid();
                     string directory = Path.GetDirectoryName(destination)!; Directory.CreateDirectory(directory);
                     PinDirectories(directory, parents);
                     using (var output = new FileStream(destination, FileMode.CreateNew, FileAccess.Write, FileShare.None)) { output.Write(bytes); output.Flush(flushToDisk: true); }
                     total += bytes.Length;
                 }
-                finally { if (bytes != null) CryptographicOperations.ZeroMemory(bytes); foreach (var parent in parents.AsEnumerable().Reverse()) parent.Dispose(); }
+                finally { if (bytes != null) CryptographicOperations.ZeroMemory(bytes); input?.Dispose(); foreach (var parent in parents.AsEnumerable().Reverse()) parent.Dispose(); }
             }
             if (!Matches(Information(sourceHandle, true), request.GetProperty("sourceIdentity")) || !Matches(Information(stageHandle, true), request.GetProperty("stagingIdentity"))) throw Invalid();
-            Console.WriteLine(JsonSerializer.Serialize(new { schema = Schema, operationId = operation.ToString("D"), sourceIdentity = Identity(sourceIdentity), stagingIdentity = Identity(stagingIdentity), inputManifestSha256 = manifestDigest, files = inputs.Length, bytes = total, privateAclReadbackVerified = true, classification = "reviewed-non-production-bytes", sandboxEnforced = false }));
+            if (indexPacket == null) Console.WriteLine(JsonSerializer.Serialize(new { schema = Schema, operationId = operation.ToString("D"), sourceIdentity = Identity(sourceIdentity), stagingIdentity = Identity(stagingIdentity), inputManifestSha256 = manifestDigest, files = inputs.Length, bytes = total, privateAclReadbackVerified = true, classification = "reviewed-non-production-bytes", sandboxEnforced = false }));
+            else Console.WriteLine(JsonSerializer.Serialize(new { schema = Schema, operationId = operation.ToString("D"), sourceIdentity = Identity(sourceIdentity), stagingIdentity = Identity(stagingIdentity), inputManifestSha256 = manifestDigest, files = inputs.Length, bytes = total, privateAclReadbackVerified = true, classification = "reviewed-non-production-bytes", sandboxEnforced = false, indexPacketSha256 = indexPacket.Digest, indexWitnessSha256 = indexPacket.WitnessDigest }));
             return 0;
         }
         catch { Console.Error.WriteLine("Exact reviewed Windows input staging failed. Preserve partial owned staging for verification."); return 2; }
-        finally { foreach (var handle in handles.AsEnumerable().Reverse()) handle.Dispose(); }
+        finally { indexPacket?.Dispose(); foreach (var handle in handles.AsEnumerable().Reverse()) handle.Dispose(); }
     }
 
     // Link only this exact running helper image. The same image embeds the

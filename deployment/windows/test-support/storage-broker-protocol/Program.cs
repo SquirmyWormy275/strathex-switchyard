@@ -49,7 +49,7 @@ internal static class Program
             Refuses(()=>WindowsStorageBrokerProtocol.Reply(binding,request,changed.RootElement,key));
             using var wrongCurve=ECDsa.Create(ECCurve.NamedCurves.nistP384);
             Refuses(()=>WindowsStorageBrokerProtocol.Reply(binding,request,storage.RootElement,wrongCurve));
-            int exchangeProtocolChecks=ExchangeProtocolProof.Run(),exchangeJournalChecks=ExchangeJournalProof.Run(),exchangeFactsChecks=ExchangeFactsProof.Run(),protectedFilesChecks=0,nativeServiceChecks=0,nativeExchangeChecks=0;
+            int exchangeProtocolChecks=ExchangeProtocolProof.Run(),exchangeJournalChecks=ExchangeJournalProof.Run(),exchangeFactsChecks=ExchangeFactsProof.Run(),indexInputChecks=ReviewedIndexProof.Run(),protectedFilesChecks=0,nativeServiceChecks=0,nativeExchangeChecks=0;
             if(args.Length>0)
             {
                 if(!OperatingSystem.IsWindows()||args.Length!=1)throw new InvalidOperationException("Choose only the explicit disposable Windows proof.");
@@ -58,7 +58,7 @@ internal static class Program
                 else if(args[0]=="--native-exchange")nativeExchangeChecks=NativeExchangeProof.Run();
                 else throw new InvalidOperationException("The native proof flag is not recognized.");
             }
-            Console.WriteLine(JsonSerializer.Serialize(new {schema="switchyard-storage-broker-protocol-proof/v1",success=true,checks,exchangeProtocolChecks,exchangeJournalChecks,exchangeFactsChecks,protectedFilesChecks,nativeServiceChecks,nativeExchangeChecks,serviceInstalled=false,volumeOpened=nativeExchangeChecks>0,guestLaunched=false}));
+            Console.WriteLine(JsonSerializer.Serialize(new {schema="switchyard-storage-broker-protocol-proof/v1",success=true,checks,exchangeProtocolChecks,exchangeJournalChecks,exchangeFactsChecks,indexInputChecks,protectedFilesChecks,nativeServiceChecks,nativeExchangeChecks,serviceInstalled=false,volumeOpened=nativeExchangeChecks>0,guestLaunched=false}));
             return 0;
         }
         catch(Exception error)

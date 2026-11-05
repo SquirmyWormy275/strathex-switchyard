@@ -343,3 +343,11 @@ subset; no deadlines or assertions were waived. Every child cleanup verifies,
 and failed-checkpoint owned fixtures/checkout are removed with separate cleanup
 receipt `failed-full-index-inventory-cleanup-1793868621389.json`. A new complete
 208-group checkpoint is running against `11d8cc7`; acceptance remains pending.
+
+The [Windows index transport foundation](windows-index-staging.md) now builds
+with zero warnings/errors and passes 49 new portable parser/hash/boundary checks
+alongside all 112 previous checks, using the existing offline SDK. Four isolated
+JS transport/runner/selector/package groups pass all 27 checks; child cleanup and
+type checking pass. Owned build scratch is removed. The 320 KiB raw subset keeps
+the original complete 512 KiB stdin bound; Windows host connection, actual NTFS
+packet staging and reviewed staged scans remain unfinished/unaccepted.
