@@ -136,3 +136,12 @@ test("concurrent authority enrollment cannot admit two keys under the same activ
   assert.equal(results.filter(r => r.status === "fulfilled").length, 1); assert.equal(results.filter(r => r.status === "rejected").length, 1);
   assert.equal((await setup.registry.listTrust()).filter(r => r.authorityId === policy.authorityId && r.status === "active").length, 1);
 });
+
+
+test("public trust enrollment rejects a matching signing private key before writing or exposing it as trust metadata", async context => {
+  const setup = await fixture(context), { installedAt: _at, installedBy: _by, status: _status, ...policy } = (await setup.registry.listTrust())[0]!;
+  const secret = setup.keys.privateKey.export({ type: "pkcs8", format: "pem" }).toString();
+  await assert.rejects(setup.registry.installTrust({ ...policy, authorityId: "secret-must-not-be-enrolled", publicKeyPem: secret }, "operator"), /only a public key PEM block/);
+  assert.equal((await setup.registry.listTrust()).length, 1);
+  assert.equal(JSON.stringify(await setup.store.readEntries()).includes("PRIVATE KEY"), false);
+});

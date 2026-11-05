@@ -10,17 +10,19 @@ function verified(entries) {
   }
   return structuredClone(entries);
 }
-export function repositoryEffectJournal(store, compartment, { now = Date.now, provider, domain = "effects" } = {}) {
-  if (!["effects", "recovery", "execution", "execution-stop", "storage"].includes(domain)) throw new Error("Unsupported protected repository journal domain.");
-  const field = domain === "effects" ? "repositoryEffectJournal" : domain === "recovery" ? "repositoryRecoveryJournal" : domain === "execution" ? "repositoryExecutionJournal" : domain === "execution-stop" ? "repositoryExecutionStopJournal" : "windowsStorageJournal";
+export function repositoryEffectJournal(store, compartment, { now = Date.now, provider, domain = "effects", guard } = {}) {
+  const fields = { effects: "repositoryEffectJournal", recovery: "repositoryRecoveryJournal", execution: "repositoryExecutionJournal", "execution-stop": "repositoryExecutionStopJournal", storage: "windowsStorageJournal", fixtures: "scannerFixtureJournal" };
+  if (!Object.hasOwn(fields, domain)) throw new Error("Unsupported protected repository journal domain.");
+  const field = fields[domain];
   const journal = {
     filePath: `suite-aead:${compartment}:repository-${domain}`, hasAuthenticatedProtection: true,
     async readEntries() { return verified((await store.snapshot(compartment))[field] ?? []); },
     async verifyChain() { await journal.readEntries(); return true; },
     async transaction(fn) {
       return store.update(compartment, "repository-effect-journal", async state => {
+        await guard?.(state);
         state[field] = verified(state[field] ?? []);
-        return fn({
+        const result = await fn({
           readEntries: async () => structuredClone(state[field]),
           append: async (kind, payload) => {
             const previous = state[field].at(-1);
@@ -30,6 +32,7 @@ export function repositoryEffectJournal(store, compartment, { now = Date.now, pr
             state[field].push(entry); return structuredClone(entry);
           }
         });
+        await guard?.(state); return result;
       }, { provider });
     },
     async append(kind, payload) { return journal.transaction(t => t.append(kind, payload)); }

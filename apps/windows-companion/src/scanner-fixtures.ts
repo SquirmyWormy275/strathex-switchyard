@@ -74,8 +74,11 @@ export interface InstalledScannerFixture { readonly id: string; readonly kind: S
  */
 export class DurableScannerFixtureRegistry implements ScannerFixtureResolver {
   private readonly packageRoot: string;
-  constructor(private readonly store: ProtectedJsonStore, stateDirectory: string, private readonly now: () => Date = () => new Date()) {
+  private readonly store: ProtectedJsonStore;
+  private readonly now: () => Date;
+  constructor(store: ProtectedJsonStore, stateDirectory: string, now: () => Date = () => new Date()) {
     if (!boundedAbsolute(stateDirectory)) throw new Error("Scanner fixture state directory must be fixed and absolute.");
+    this.store = store; this.now = now;
     this.packageRoot = resolve(stateDirectory, "scanner-fixtures");
   }
 
@@ -94,7 +97,7 @@ export class DurableScannerFixtureRegistry implements ScannerFixtureResolver {
     await this.store.append(trustRevokeKind, { authorityId: identifier(authorityId, "scanner authority"), keyId: digest(keyId, "scanner key"), reason: bounded(reason, "scanner trust revocation", 512), revokedBy: bounded(revokedBy, "scanner trust operator", 160) });
   }
 
-  async installFixture(manifestPath: string, installedBy: string, expectedManifestSha256?: string): Promise<InstalledScannerFixture> {
+  private async selectedPackage(manifestPath: string, expectedManifestSha256?: string) {
     if (expectedManifestSha256 !== undefined && !digestPattern.test(expectedManifestSha256)) throw new Error("The reviewed scanner fixture manifest digest is invalid.");
     const source = await concreteFile(manifestPath, maximumManifestBytes, "scanner fixture manifest");
     if (expectedManifestSha256 !== undefined && sha256(source.bytes) !== expectedManifestSha256) throw new Error("The signed scanner fixture changed after review; approve its exact current manifest before installation.");
@@ -103,6 +106,16 @@ export class DurableScannerFixtureRegistry implements ScannerFixtureResolver {
     const contentSource = await concreteFile(resolve(sourceRoot, manifest.contentFile), maximumContentBytes, "scanner fixture content");
     if (!inside(sourceRoot, contentSource.path)) throw new Error("Scanner fixture content resolves outside its signed package boundary.");
     await this.verifyManifest(manifest, source.bytes, sourceRoot, this.now(), contentSource.bytes);
+    return { source, manifest, contentSource };
+  }
+
+  async inspectFixture(manifestPath: string) {
+    const { source, manifest, contentSource } = await this.selectedPackage(manifestPath);
+    return { sourcePath: source.path, manifestSha256: sha256(source.bytes), contentBytes: contentSource.bytes.byteLength, manifest };
+  }
+
+  async installFixture(manifestPath: string, installedBy: string, expectedManifestSha256?: string): Promise<InstalledScannerFixture> {
+    const { source, manifest, contentSource } = await this.selectedPackage(manifestPath, expectedManifestSha256);
     const destination = resolve(this.packageRoot, manifest.id);
     if (!inside(this.packageRoot, destination)) throw new Error("Scanner fixture identity escaped host state.");
     if ((await this.fixtures()).some((item) => item.id === manifest.id)) throw new Error("Scanner fixture identity is already installed and cannot be replaced in place.");
@@ -233,10 +246,17 @@ export function createScannerFixtureAdministration(options: Readonly<{ registry:
   };
 }
 
+export function inspectScannerFixtureTrust(value: unknown, now: Date = new Date()): ScannerFixtureTrustPolicy { return validateTrust(value, now); }
+
 function parseTrust(bytes: Uint8Array, now: Date): ScannerFixtureTrustPolicy { let value: unknown; try { value = JSON.parse(Buffer.from(bytes).toString("utf8")); } catch { throw new Error("Scanner fixture trust policy is not JSON."); } return validateTrust(value, now); }
 function validateTrust(value: unknown, now: Date, allowExpired = false): ScannerFixtureTrustPolicy {
   if (!record(value) || !exact(value, ["schema", "version", "authorityId", "keyId", "publicKeyPem", "allowedKinds", "expiresAt"]) || value.schema !== "sxsy-b122.scanner-fixture-trust" || value.version !== 1 || !Array.isArray(value.allowedKinds) || value.allowedKinds.length < 1 || value.allowedKinds.length > 2 || !value.allowedKinds.every(kind)) throw new Error("Scanner fixture trust policy schema is invalid.");
-  const publicKeyPem = bounded(value.publicKeyPem, "scanner public key", 16_384); const key = createPublicKey(publicKeyPem);
+  const suppliedKey = bounded(value.publicKeyPem, "scanner public key", 16_384);
+  // createPublicKey also accepts private PEM input. Public trust metadata must
+  // never retain a signing secret or expose it through list/export operations.
+  if (!/^-----BEGIN PUBLIC KEY-----\r?\n[A-Za-z0-9+/=\r\n]+-----END PUBLIC KEY-----\r?\n?$/.test(suppliedKey)) throw new Error("Scanner fixture trust accepts only a public key PEM block; signing secrets must remain outside installed trust metadata.");
+  const key = createPublicKey(suppliedKey);
+  const publicKeyPem = key.export({ type: "spki", format: "pem" }).toString();
   if (key.asymmetricKeyType !== "ec" || key.asymmetricKeyDetails?.namedCurve !== "prime256v1") throw new Error("Scanner fixture trust requires ECDSA P-256.");
   const keyId = sha256(key.export({ type: "spki", format: "der" })); if (keyId !== digest(value.keyId, "scanner key")) throw new Error("Scanner fixture trust key ID is invalid.");
   const expiresAt = time(value.expiresAt, "scanner trust expiry"); if (!allowExpired && Date.parse(expiresAt) <= now.getTime()) throw new Error("Scanner fixture trust policy is expired.");

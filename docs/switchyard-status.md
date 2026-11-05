@@ -7,6 +7,18 @@ records exact source checkpoints and receipts.
 
 ## Current backend
 
+The Suite now exposes separately reviewed signed scanner/advisory trust,
+installation and revocation, with compartment-local AEAD journals, one-use
+approvals, exact manifest pins, guarded receipts and kernel ownership. HTTP
+policy/privacy, changed/expired source, cancellation and lost-acknowledgement
+checks pass. Both Linux pipeline actions now bind verified signed feed metadata;
+revoked/changed feeds keep results incomplete. Seven actual namespace pipeline
+checks and 59 combined controller/registry/HTTP/privacy/harness/package checks
+pass; type checking passes. The package includes the actual registry and runs
+under normal Node flags. Installed demonstration and native Windows controller
+acceptance are pending. [Fixture boundary](signed-fixtures.md) records the
+remaining aggregate quota, removal, Shield execution and frontend work.
+
 Normal Windows Run now uses the protected System storage service for new
 exchanges. The desktop client does not elevate or enable volume privilege.
 A read-only capability check precedes staging; unavailable service consumes
@@ -26,11 +38,21 @@ The connection passes seventy owner/runner/HTTP/privacy/package/inventory checks
 at `a1e71b0`. The subsequent preparation-race correction passes 73 checks and
 type checking: duplicate calls are fenced before native identity, retired
 capabilities fail before I/O, and a failed pre-effect read releases its unused
-host lease. Native CI is required for that correction. The complete 166-group
+host lease. Its sixteen-case owner file now passes on native Windows. The complete 166-group
 Linux lane at immutable `a1e71b0` now passes, with the separate race correction
 covered by its 73 focused checks.
 
 ## Accepted native storage
+
+The corrected workflow at `fc1fc27` now passes all nine jobs, including every
+independently bounded contract file. Eight contract archive digests verified;
+all downloaded contract children independently exited. The owner file passes
+sixteen checks, the Run owner seventeen and the harness seventeen. The actual
+JavaScript owner repeats eight native checks, alongside 31 restricted-client
+and thirty filesystem checks. Their archive digests also verified; small JSON
+receipts retained. This supersedes the earlier combined-batch failure without
+changing its failed outcome or any production/per-file deadline. The newer
+fixture controller is a separate pending native checkpoint.
 
 Complete Windows workflow [41948972575](https://github.com/SquirmyWormy275/strathex-switchyard/actions/runs/41948972575)
 at `1f4e8e5` passes all thirty filesystem checks, 112 compiled portable checks,
@@ -84,11 +106,13 @@ The signed scanner/advisory registry now pins the reviewed manifest across the
 user-presence prompt, refusing even another valid signed package substituted
 before installation. Authority enrollment checks and append share one protected
 transaction, so concurrent approvals cannot introduce two active keys under one
-authority identity. Seven actual filesystem/cryptographic registry tests and type
-checking pass. This hardens the existing companion administration; connecting it
-to the normal Suite's compartment API and pipelines remains implementation work.
+authority identity. Eight actual filesystem/cryptographic registry tests and type
+checking pass. The normal Suite's compartment API and Linux pipeline connection
+are now implemented above; their installed and native Windows acceptance remain
+separate pending checks.
 
-Windows pipelines, scanner/advisory application connections, writable build
+Windows pipelines, complete Shield/scanner execution, aggregate fixture quota/
+removal, writable build
 preparation, exact desktop/IDE/terminal attachments and the remaining frontend
 controls are unfinished implementation. The task requirement remains the full
 suite. Claude Code is only a token-limit contingency; no delegated coding job

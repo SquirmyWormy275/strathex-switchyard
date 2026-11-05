@@ -1,34 +1,14 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import {createHash,randomUUID} from "node:crypto";
+import {randomUUID} from "node:crypto";
 import {writeFile,readFile,access} from "node:fs/promises";
 import {join} from "node:path";
-import {authorityFixture} from "./test-support/task-authority-fixture.mjs";
-import {createRepositoryExecution} from "./repository-execution.mjs";
-import {connectedExecutionActions} from "./repository-execution-actions.mjs";
+import {fixture,awaitNativeReady} from "./test-support/repository-pipeline-fixture.mjs";
 import {runtimeGuardianStopped} from "./runtime-command.mjs";
 import {DurableBudgetManager} from "../../packages/control-plane/src/budgets.ts";
 import {repositoryEffectJournal} from "./repository-effect-journal.mjs";
-const sha=value=>createHash("sha256").update(value).digest("hex"),linux={skip:process.platform!=="linux"};
+const linux={skip:process.platform!=="linux"};
 
-async function fixture(t,{action="pipeline_local_gate",report="complete",hold=false}={}){
- const f=await authorityFixture(t,{executionActions:connectedExecutionActions("linux")});
- let acknowledgeReady;const nativeReady=new Promise(resolve=>{acknowledgeReady=resolve;}),update=f.store.update;
- f.store.update=async(...args)=>{const result=await update(...args);if(args[1]==="repository-execution-ready")acknowledgeReady();return result;};
- const dimensions=["correctness",...(action==="pipeline_clean_reproduction"?["reproduction"]:[]),"isolation","production_data","ambient_credentials"],body={schema:"sxsy-b122.linux-repository-recipe-result",version:1,coverage:dimensions.map(dimension=>({dimension,status:report==="unavailable"&&dimension==="correctness"?"unavailable":"covered",fixtureId:"approved:synthetic-program"})),scannerFixtureIds:[],advisoryFixtureIds:[]};
- const program=`import assert from 'node:assert/strict';import{readFile,writeFile,access}from'node:fs/promises';import net from'node:net';
- assert.equal(await readFile('input.txt','utf8'),'reviewed non-production input');assert.equal(process.env.HOME,undefined);assert.equal(process.env.NODE_ENV,'test');await assert.rejects(access(${JSON.stringify(join(f.root,"task.txt"))}));await assert.rejects(writeFile('input.txt','forbidden'));await writeFile('/tmp/pipeline-output','temporary');
- await new Promise((resolve,reject)=>{const s=net.connect(443,'1.1.1.1');s.once('error',()=>{s.destroy();resolve();});s.once('connect',()=>{s.destroy();reject(Error('Unexpected network'));});s.setTimeout(1000,()=>{s.destroy();reject(Error('Unconfirmed network denial'));});});
- ${hold?"setInterval(()=>{},1000);":report==="malformed"?"process.stdout.write('untyped program output');":`process.stdout.write(${JSON.stringify(JSON.stringify(body))});`}`;
- await writeFile(join(f.root,"program.mjs"),program);await writeFile(join(f.root,"input.txt"),"reviewed non-production input");
- const inputs=[["program.mjs",program],["input.txt","reviewed non-production input"]].map(([path,bytes])=>({path,sha256:sha(bytes),size:Buffer.byteLength(bytes),classification:"non-production"}));
- const manifest={schema:"sxsy-b122.repository-runtime",version:1,repositoryRoot:f.root,allowedHttpsUrls:[],recipes:{[action]:{kind:"process",executable:process.execPath,args:["program.mjs"],cwd:".",environment:{NODE_ENV:"test"},lifecycle:"foreground",isolation:"disposable",timeoutMs:hold?15000:5000,maxOutputBytes:8192,inputFiles:inputs}}};
- const bytes=JSON.stringify(manifest);await writeFile(join(f.root,"pipeline.json"),bytes);
- const grantInput={...f.proposed,paths:["task.txt","program.mjs","input.txt","pipeline.json"],classifications:{includedUntracked:["program.mjs","input.txt","pipeline.json"]},actions:[action]},approval=await f.service.review("personal",grantInput),grant=await f.service.issue("personal",{...grantInput,token:approval.confirmation.token});
- const execution=createRepositoryExecution({store:f.store,authority:f.service,stateDirectory:join(f.stage,"execution")});f.onCleanup(()=>execution.close());
- return {...f,execution,grant,grantInput,nativeReady,proposed:{requestId:randomUUID(),authorityId:grant.id,manifestPath:"pipeline.json",manifestSha256:sha(bytes),action}};
-}
-async function awaitNativeReady(f,running){await Promise.race([f.nativeReady,running.then(result=>{throw Error(`The pipeline returned ${result.status} before durable native readiness.`);})]);assert.equal((await f.store.snapshot("personal")).repositoryExecutions?.[0]?.status,"running");}
 
 test("both connected pipeline actions run actual isolated inputs and earn exact authenticated receipts without changing a provider task",linux,async t=>{
  for(const action of ["pipeline_local_gate","pipeline_clean_reproduction"]){

@@ -117,7 +117,7 @@ export function nativeTestOverrides(file, platform = process.platform) {
   if (platform === "win32" && ["repository-windows-execution", "repository-windows-execution-recovery", "repository-windows-execution-stop", "repository-windows-execution-output"].some(name => file === `tools/layout-studio/${name}.test.mjs`)) return { timeoutMs: 300_000 };
   if (file === "tools/layout-studio/windows-exchange-images.test.mjs") return { timeoutMs: platform === "win32" ? 240_000 : 120_000 };
   if (file === "tools/layout-studio/repository-recovery.test.mjs") return { timeoutMs: 120_000 };
-  const protectedNativeGroups = ["claude-coding", "agents-claude", "conversation-bindings", "codex-submissions", "claude-submissions", "windows-reviewed-inputs", "windows-sandbox-native", "windows-sandbox-sessions", "windows-guest-tools", "windows-exchange-images", "windows-broker-exchanges", "windows-reviewed-runner", "repository-windows-execution"].map((name) => `tools/layout-studio/${name}.test.mjs`);
+  const protectedNativeGroups = ["claude-coding", "agents-claude", "conversation-bindings", "codex-submissions", "claude-submissions", "windows-reviewed-inputs", "windows-sandbox-native", "windows-sandbox-sessions", "windows-guest-tools", "windows-exchange-images", "windows-broker-exchanges", "scanner-fixtures", "windows-reviewed-runner", "repository-windows-execution"].map((name) => `tools/layout-studio/${name}.test.mjs`);
   return platform === "win32" && protectedNativeGroups.includes(file) ? { timeoutMs: 120_000 } : {};
 }
 export const requiredGroups = [
@@ -146,6 +146,7 @@ export const requiredGroups = [
   { file: "tools/layout-studio/repository-execution-stop.test.mjs" },
   { file: "tools/layout-studio/windows-reviewed-inputs.test.mjs", ...nativeTestOverrides("tools/layout-studio/windows-reviewed-inputs.test.mjs") },
   { file: "tools/layout-studio/windows-storage-native.test.mjs" },
+  { file: "tools/layout-studio/scanner-fixtures.test.mjs", ...nativeTestOverrides("tools/layout-studio/scanner-fixtures.test.mjs") },
   { file: "tools/layout-studio/windows-broker-exchanges.test.mjs", ...nativeTestOverrides("tools/layout-studio/windows-broker-exchanges.test.mjs") },
   { file: "tools/layout-studio/windows-storage-setup.test.mjs" },
   { file: "tools/layout-studio/windows-sandbox-native.test.mjs", ...nativeTestOverrides("tools/layout-studio/windows-sandbox-native.test.mjs") },
@@ -160,6 +161,7 @@ export const requiredGroups = [
   { file: "tools/layout-studio/repository-windows-execution-output.test.mjs", ...nativeTestOverrides("tools/layout-studio/repository-windows-execution-output.test.mjs") },
   { file: "tools/layout-studio/repository-execution.test.mjs", timeoutMs: 240_000, ...nativeTestOverrides("tools/layout-studio/repository-execution.test.mjs"), ...(process.platform !== "linux" ? { expectedSkipped: 1 } : {}) },
   { file: "tools/layout-studio/repository-pipeline.test.mjs", timeoutMs: 120_000, ...(process.platform !== "linux" ? { expectedSkipped: 5 } : {}) },
+  { file: "tools/layout-studio/repository-pipeline-fixtures.test.mjs", timeoutMs: 120_000, ...(process.platform !== "linux" ? { expectedSkipped: 2 } : {}) },
   { file: "tools/layout-studio/task-authority.test.mjs", ...nativeTestOverrides("tools/layout-studio/task-authority.test.mjs") },
   { file: "tools/layout-studio/devices.test.mjs" },
   { file: "tools/layout-studio/xwhatsit-expansion.test.mjs" },

@@ -16,7 +16,7 @@ export async function pipelineEvidence({store,compartment,provider,policyVersion
   try{return new HostReceiptEvidenceFactory({authenticationKey:key,policyVersion,exactVersions:{suite:"switchyard-reviewed-pipeline/v1"},clock:()=>new Date(now())});}finally{key.fill(0);}
 }
 
-export function pipelineDependencies({policy,runtime,review,target,receiptEvidence,now}) {
+export function pipelineDependencies({policy,runtime,review,target,receiptEvidence,now,resolveScannerFixtures}) {
   const metadata = new InMemoryTestEnvironmentBroker(policy);
   const recipe = {version:"switchyard-reviewed-pipeline/v1",repositoryRoot:review.repositoryRoot,gates:[{name:review.action,executable:review.recipe.executable,args:review.recipe.args,timeoutMs:review.recipe.timeoutMs}],productionHostPatterns:["prod","localhost","127.0.0.1","::1"],allowedDevelopmentHosts:[],environmentAllowlist:[]};
   return {
@@ -33,7 +33,7 @@ export function pipelineDependencies({policy,runtime,review,target,receiptEviden
       try {
         if(control.signal.aborted)return {status:control.reason()==="deadline"?"timed_out":control.reason()==="cancelled"?"cancelled":"unavailable",effectDisposition:"not_started",summary:"The exact pipeline was cancelled, expired or could not verify durable control before execution."};
         const resolver={resolve:async root=>{if(root!==review.repositoryRoot)throw Error("The pipeline repository changed.");return {execute:(action,options)=>runtime.execute(action,{...options,signal:control.signal})};},list:async()=>[{canonicalRepositoryRoot:review.repositoryRoot,expectedSha256:review.manifestSha256,status:"active"}]};
-        const fixtures={resolve:async({scannerFixtureIds,advisoryFixtureIds})=>{if(scannerFixtureIds.length||advisoryFixtureIds.length)throw Error("Scanner and advisory fixtures are not connected to this pipeline route.");return [];}};
+        const fixtures={resolve:async input=>{if(!input.scannerFixtureIds.length&&!input.advisoryFixtureIds.length)return [];if(typeof resolveScannerFixtures!=="function")throw Error("Scanner and advisory fixtures are not connected to this pipeline route.");return resolveScannerFixtures(input);}};
         const runner=new LinuxHostValidatedRepositoryRecipeRunner(resolver,receiptEvidence,fixtures,()=>new Date(now()));
         return await new SandboxedRepositoryExecutionBroker(resolver,runner).execute(request);
       } finally {control.dispose();}

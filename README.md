@@ -92,7 +92,9 @@ Windows worker/runtime checkpoint passes 261 groups: 1,690 tests passed and 48
 declared skips. The newer Studio Windows Run and separate stop approval pass
 all four native Windows policy jobs with an explicit guest runner double. Linux
 also connects separately reviewed local-gate and clean-reproduction recipes to
-the isolated runner and authenticated evidence. Personal host setup now has reviewed install/remove and a fixed native boundary.
+the isolated runner and authenticated evidence. [Signed fixture maintenance](docs/signed-fixtures.md)
+now connects operator-reviewed public trust and exact feed metadata to these pipelines;
+it does not establish a completed vulnerability scan. Personal host setup now has reviewed install/remove and a fixed native boundary.
 The bounded storage service and normal
 task/guest connection are implemented; native complete-journey acceptance remains open. [Verification details](docs/verification.md)
 identify each source checkpoint and practical limit. Interactive Windows acceptance remains open. Current F77 discovery and readout pass; ordinary typing, hotplug and physical writes remain unaccepted. B122
