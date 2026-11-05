@@ -21,6 +21,14 @@ protected checkpoint bind that permission to the manifest/task/target; a raw
 request cannot override it. Omitting the field keeps the Suite's read-only
 workspace. Explicit `read-only` is also supported by this connected Linux path.
 
+Bubblewrap must provide `--overlay-src`, `--overlay`, sized tmpfs and user-namespace
+disabling. This workstation's 0.13.1 passes the native boundary checks. Ubuntu
+24.04's older distribution package lacks the overlay API; release CI builds
+[upstream 0.13.1](https://github.com/containers/bubblewrap/releases/tag/v0.13.1)
+from the official checksum-pinned archive only on its disposable worker. The
+scoped AppArmor policy and kernel limits stay in place; an unsupported helper
+does not permit a weaker execution path.
+
 The runtime and namespace host must enable the extension. A manifest alone cannot
 make a legacy/direct host runtime writable or substitute host execution when
 isolation is unavailable. This extension is Linux-specific; Windows retains its

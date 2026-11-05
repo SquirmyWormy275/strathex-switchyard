@@ -141,15 +141,25 @@ source bytes, graph, whole-repository scope and provenance remain unverified.
 
 ## Complete and native checkpoints
 
-Immutable `82bd9b3` passes all 188 required Linux groups: 1,185 tests,
-1,175 passed and ten declared skips. Receipt
-`isolated-test-028adfa5-e6df-40ae-8931-85c79fd9c6ab.json` is retained with every
+Immutable `6a45643` passes all 191 required Linux groups: 1,192 tests,
+1,182 passed and ten declared skips. Receipt
+`isolated-test-b0474209-3e04-4603-8ef6-441f439fb5d6.json` is retained with every
 child cleanup verified; owned fixture parent and checkout are removed. It covers
-connected exceptions and source-policy receipt races. Earlier `ace2d22` passes
+connected exceptions, receipt-time authority and cached source-only haptic facts.
+The later workspace inventory separately passes fourteen checks in two isolated
+groups (`isolated-test-54ad40b5-a325-4130-9d63-93d5e307d1d6.json`), with child cleanup. Earlier `ace2d22` passes
 185 groups (1,166 passed/ten skips), receipt
 `isolated-test-3f42aecd-3967-4c0c-bda3-67b9b7d268ef.json`, with owned scratch removed.
-The later outcome/deadline and task-authority guards have their focused/installed
-checks separately; the new haptic source assessment is later still.
+The earlier `82bd9b3` complete checkpoint remains retained: 188 groups,
+1,175 passed/ten skips, receipt `isolated-test-028adfa5-e6df-40ae-8931-85c79fd9c6ab.json`.
+
+The GitHub Linux release run at `6a45643` [failed](https://github.com/SquirmyWormy275/strathex-switchyard/actions/runs/41982439206)
+when Ubuntu 24.04's Bubblewrap refused `--overlay-src`; its failed result is
+retained. CI now builds upstream 0.13.1 from the official SHA-256-pinned archive
+on its disposable worker, preserving the fixed path, scoped AppArmor policy,
+namespace restrictions and unchanged bounded-build tests. Source checksum
+verification passes locally; the fresh native CI run remains unaccepted. No host
+package, executable, policy or sysctl was changed on this workstation.
 
 Native Windows `5d398d2`, workflow
 [41960677205](https://github.com/SquirmyWormy275/strathex-switchyard/actions/runs/41960677205),

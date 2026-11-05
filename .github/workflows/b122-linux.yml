@@ -39,11 +39,30 @@ jobs:
       - name: Install Linux host prerequisites
         run: |
           sudo apt-get update
-          sudo apt-get install --yes --no-install-recommends apparmor-profiles apparmor-utils bubblewrap dbus-x11 espeak-ng gnome-keyring libsecret-tools pipewire-bin policykit-1 shellcheck unzip util-linux xz-utils zip
+          sudo apt-get install --yes --no-install-recommends apparmor-profiles apparmor-utils bubblewrap build-essential dbus-x11 espeak-ng gnome-keyring libcap-dev libsecret-tools libselinux1-dev meson ninja-build pipewire-bin pkg-config policykit-1 shellcheck unzip util-linux xz-utils zip
           test "$(realpath "$(command -v bwrap)")" = /usr/bin/bwrap
           test "$(realpath "$(command -v secret-tool)")" = /usr/bin/secret-tool
           test "$(realpath "$(command -v flock)")" = /usr/bin/flock
           test "$(realpath "$(command -v espeak-ng)")" = /usr/bin/espeak-ng
+
+      - name: Build checksum-pinned Bubblewrap overlay support on the disposable runner
+        run: |
+          # Ubuntu 24.04's package predates the overlay API used by bounded builds.
+          # Official release/checksum: https://github.com/containers/bubblewrap/releases/tag/v0.13.1
+          bwrap_stage=$(mktemp -d "$RUNNER_TEMP/switchyard-bwrap.XXXXXXXX")
+          trap 'rm -rf -- "$bwrap_stage"' EXIT
+          curl --fail --location --proto '=https' --tlsv1.2 --max-time 120 https://github.com/containers/bubblewrap/releases/download/v0.13.1/bubblewrap-0.13.1.tar.xz --output "$bwrap_stage/source.tar.xz"
+          echo "0e85c8702248b8dd64144f594147553650cdd0e4c951690345faace79c217c4d  $bwrap_stage/source.tar.xz" | sha256sum --check --strict
+          mkdir "$bwrap_stage/source"
+          tar --extract --xz --file "$bwrap_stage/source.tar.xz" --directory "$bwrap_stage/source" --strip-components=1 --no-same-owner --no-same-permissions
+          meson setup "$bwrap_stage/build" "$bwrap_stage/source" --prefix=/usr -Dman=disabled -Dbash_completion=disabled -Dzsh_completion=disabled -Dselinux=enabled
+          meson compile -C "$bwrap_stage/build"
+          sudo install --mode=0755 "$bwrap_stage/build/bwrap" /usr/bin/bwrap
+          test "$(/usr/bin/bwrap --version)" = 'bubblewrap 0.13.1'
+          /usr/bin/bwrap --help > "$bwrap_stage/help"
+          for option in --overlay-src --overlay --size --disable-userns --assert-userns-disabled; do
+            grep --fixed-strings --quiet -- "$option " "$bwrap_stage/help"
+          done
 
       - name: Install locked dependencies
         run: npm ci --ignore-scripts
@@ -63,6 +82,7 @@ jobs:
         run: |
           npm run typecheck
           npm run catalog:check
+          node scripts/export-development-sbom.mjs --check
           npm run catalog:export -- --dir "$RUNNER_TEMP/switchyard-standard-configurations"
           for test_file in \
             packages/protocol/test/*.test.ts \
