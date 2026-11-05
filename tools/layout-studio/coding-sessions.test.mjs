@@ -22,6 +22,23 @@ async function fixture(fn) {
 }
 const existing = (repositoryRoot) => ({ sessionId: "synthetic-thread", repositoryRoot, label: "Local task label" });
 
+test("opt-in Codex lifecycle metadata records local reservation and exact status transitions without prompt, label or repository content", () => fixture(async ({ store, service, repositoryRoot, stateRoot, idle }) => {
+  await store.update("personal", "synthetic-observation", s => { s.observations = [{ id: "observed", status: "recording", sources: ["agent-events"], exclusions: [], events: [], updatedAt: Date.now() }]; });
+  const request = { requestId: randomUUID(), repositoryRoot, label: "PRIVATE_LABEL_NOT_IN_OBSERVATIONS" }, task = await service.create("personal", request);
+  let events = (await store.snapshot("personal")).observations[0].events; assert.deepEqual(events.map(e => e.phase), ["request-reserved", "identity-bound"]);
+  await service.status("personal", task.id); await service.status("personal", task.id); events = (await store.snapshot("personal")).observations[0].events; assert.equal(events.length, 3);
+  idle(); await service.status("personal", task.id); events = (await store.snapshot("personal")).observations[0].events; assert.equal(events.length, 4); assert.equal(events.at(-1).status, "idle"); assert.equal(events.at(-1).provenance, "native-provider-status-observation");
+  for (const value of [request.label, repositoryRoot, task.id, task.sessionId, task.accountFingerprint]) assert.equal(JSON.stringify(events).includes(value), false);
+  assert.ok(events.every(e => e.taskCompletionVerified === false && e.timeSavingMeasured === false)); assert.equal((await store.snapshot("other-client")).observations.length, 0);
+  assert.equal((await readFile(join(stateRoot, "personal.sealed.json"), "utf8")).includes("subjectDigest"), false);
+  await store.update("personal", "synthetic-pause", s => { s.observations[0].status = "paused"; }); await service.status("personal", task.id); assert.equal((await store.snapshot("personal")).observations[0].events.length, 4);
+}));
+test("uncertain Codex creation contributes only local uncertainty metadata without inventing a verified native identity", () => fixture(async ({ store, service, repositoryRoot, failStart }) => {
+  await store.update("personal", "synthetic-observation", s => { s.observations = [{ id: "observed", status: "recording", sources: ["agent-events"], exclusions: [], events: [], updatedAt: Date.now() }]; }); failStart();
+  await assert.rejects(service.create("personal", { requestId: randomUUID(), repositoryRoot, label: "Uncertain" }), /Creation is uncertain/);
+  const events = (await store.snapshot("personal")).observations[0].events; assert.deepEqual(events.map(e => e.phase), ["request-reserved", "outcome-unconfirmed"]); assert.ok(events.every(e => e.provenance === "switchyard-local-lifecycle" && !e.taskCompletionVerified));
+}));
+
 test("dedicated native task creators release the writer before registration and never resume an attached client implicitly", () => fixture(async ({ service, options, repositoryRoot, calls }) => {
   let writer = false, closed = 0;
   const owned = createCodingSessions({ ...options, taskDriverFactory: () => ({ start: async () => { writer = true; return { threadId: "synthetic-created-thread" }; }, close: async () => { writer = false; closed++; return [{ stopped: true }]; } }) });

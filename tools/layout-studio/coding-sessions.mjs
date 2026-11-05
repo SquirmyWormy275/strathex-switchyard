@@ -1,4 +1,5 @@
 /** Exact coding-task identities, separate from keyboard configuration conversations. */
+import { appendAgentObservation } from "./agent-observation.mjs";
 import { createRequire } from "node:module";
 import { randomUUID } from "node:crypto";
 import { lstat, realpath } from "node:fs/promises";
@@ -62,6 +63,7 @@ export function createCodingSessions({ store, resolveCli = trustedCli, platform 
     if (value.id !== sessionId || value.repositoryRoot !== root || !states.includes(value.observation)) throw new Error("The provider did not verify the exact thread and working directory.");
     return { status: value.observation, observedAt: now(), provenance: "Codex exact app-server runtime; idle/not-observed is not verified task completion", completionVerified: false };
   }
+  const observe = (state, task, phase) => appendAgentObservation(state, { provider: "codex", subjectId: task.id, phase, status: task.observation?.status, at: now() });
   function view(task) {
     const fresh = Boolean(task.observation && now() - task.observation.observedAt >= 0 && now() - task.observation.observedAt <= 30000);
     return { ...task, observation: fresh ? task.observation : { status: "stale", observedAt: task.observation?.observedAt ?? null, provenance: "Refresh this exact binding; no runtime state inferred", completionVerified: false }, capabilities: { sessionIdentifiable: Boolean(task.sessionId), observable: Boolean(task.sessionId), focusable: false, launchable: false, resumable: task.status === "registered" && task.launchPolicy === "read-only/on-request" && task.nativeTransport !== "owned-stdio", textReviewAvailable: task.status === "registered" && task.nativeTransport === "owned-stdio", controllable: false, cancellable: false, mediated: false }, accountScope: { type: "local ChatGPT login fingerprint", organizationVerified: false } };
@@ -88,7 +90,7 @@ export function createCodingSessions({ store, resolveCli = trustedCli, platform 
         if (existing) { if (existing.repositoryRoot !== root || existing.accountFingerprint !== login.fingerprint || existing.repositoryIdentity && (existing.repositoryIdentity.device !== identity.device || existing.repositoryIdentity.inode !== identity.inode)) throw new Error("This saved binding changed its working directory or local login. Review it deliberately."); existing.repositoryIdentity ??= identity; existing.observation = observation; return { ...view(existing), duplicatePrevented: true }; }
         if (s.codingSessions.length >= 64) throw new Error("Saved coding-task limit reached. Existing bindings are preserved.");
         const task = { schema: "switchyard-coding-session/v1", id: randomUUID(), provider: "codex", label: label.trim(), repositoryRoot: root, repositoryIdentity: identity, sessionId, accountFingerprint: login.fingerprint, status: "registered", createdAt: now(), observation };
-        s.codingSessions.push(task); return view(task);
+        s.codingSessions.push(task); observe(s, task, "identity-bound"); return view(task);
       }, { provider: "codex" });
     },
     async create(compartment, { requestId, repositoryRoot, label }) {
@@ -102,7 +104,7 @@ export function createCodingSessions({ store, resolveCli = trustedCli, platform 
         if (found) { if (found.provider !== "codex" || found.repositoryRoot !== root || found.accountFingerprint !== login.fingerprint) throw new Error("This request identity already names a different task or login."); return { task: view(found), duplicate: true }; }
         if (s.codingSessions.length >= 64) throw new Error("Saved coding-task limit reached.");
         const task = { schema: "switchyard-coding-session/v1", id: requestId, provider: "codex", label: label.trim(), repositoryRoot: root, repositoryIdentity: identity, ...(taskDriverFactory ? { nativeTransport: "owned-stdio" } : {}), sessionId: null, accountFingerprint: login.fingerprint, launchPolicy: "read-only/on-request", status: "creating", createdAt: now(), observation: null };
-        s.codingSessions.push(task); return { duplicate: false };
+        s.codingSessions.push(task); observe(s, task, "request-reserved"); return { duplicate: false };
       }, { provider: "codex" });
       if (reserved.duplicate) return { ...reserved.task, duplicatePrevented: true };
       let createdThreadId;
@@ -117,9 +119,9 @@ export function createCodingSessions({ store, resolveCli = trustedCli, platform 
         if (current.fingerprint !== login.fingerprint) throw new Error("The local login changed while creating the task.");
         await store.claimSession(compartment, { provider: "codex", sessionId });
         await verifyRepositoryIdentity({ repositoryRoot: root, repositoryIdentity: identity });
-        return store.update(compartment, "coding-create-bind", (s) => { assertGeneration(compartment, generation); const task = s.codingSessions.find((t) => t.id === requestId); task.status = "registered"; task.observation = observation; return { ...view(task), modelPromptSubmitted: false }; }, { provider: "codex" });
+        return store.update(compartment, "coding-create-bind", (s) => { assertGeneration(compartment, generation); const task = s.codingSessions.find((t) => t.id === requestId); task.status = "registered"; task.observation = observation; observe(s, task, "identity-bound"); return { ...view(task), modelPromptSubmitted: false }; }, { provider: "codex" });
       } catch (error) {
-        await store.update(compartment, "coding-create-uncertain", (s) => { const task = s.codingSessions.find((t) => t.id === requestId), knownId = createdThreadId ?? error.createdThreadId; if (!task.sessionId && typeof knownId === "string" && thread.test(knownId)) task.sessionId = knownId; task.status = "creation-uncertain"; }).catch(() => {});
+        await store.update(compartment, "coding-create-uncertain", (s) => { const task = s.codingSessions.find((t) => t.id === requestId), knownId = createdThreadId ?? error.createdThreadId; if (!task.sessionId && typeof knownId === "string" && thread.test(knownId)) task.sessionId = knownId; task.status = "creation-uncertain"; observe(s, task, "outcome-unconfirmed"); }).catch(() => {});
         throw new Error(`${error.message} Creation is uncertain; this request will not launch another thread automatically.`);
       }
     },
@@ -132,7 +134,7 @@ export function createCodingSessions({ store, resolveCli = trustedCli, platform 
       const observation = await exact(task.sessionId, task.repositoryRoot, compartment);
       if ((await account(compartment)).fingerprint !== login.fingerprint) throw new Error("The local login changed during task observation.");
       await verifyRepositoryIdentity(task);
-      return store.update(compartment, "coding-session-status", (s) => { const current = s.codingSessions.find((t) => t.id === id); if (current.sessionId !== task.sessionId || current.repositoryRoot !== task.repositoryRoot || current.accountFingerprint !== task.accountFingerprint) throw new Error("The exact task binding changed during observation."); current.observation = observation; if (["creating", "creation-uncertain"].includes(current.status)) current.status = "registered"; return view(current); }, { provider: "codex" });
+      return store.update(compartment, "coding-session-status", (s) => { const current = s.codingSessions.find((t) => t.id === id); if (current.sessionId !== task.sessionId || current.repositoryRoot !== task.repositoryRoot || current.accountFingerprint !== task.accountFingerprint) throw new Error("The exact task binding changed during observation."); current.observation = observation; if (["creating", "creation-uncertain"].includes(current.status)) current.status = "registered"; observe(s, current, "status-observed"); return view(current); }, { provider: "codex" });
     },
     async resume(compartment, id) {
       await store.authorize(compartment, { provider: "codex" });
@@ -157,7 +159,7 @@ export function createCodingSessions({ store, resolveCli = trustedCli, platform 
             const current = s.codingSessions.find((t) => t.id === id);
             if (current.sessionId !== task.sessionId || current.repositoryRoot !== task.repositoryRoot || current.accountFingerprint !== task.accountFingerprint) throw new Error("The saved task binding changed during resume.");
             current.observation = { status: result.observation, observedAt: now(), provenance: "Exact Codex app-server thread resumed with read-only/on-request permissions; task completion unverified", completionVerified: false };
-            current.lastResume = { at: now(), status: "acknowledged" };
+            current.lastResume = { at: now(), status: "acknowledged" }; observe(s, current, "read-only-resume-observed");
             return { ...view(current), effect: "runtime-resumed", modelPromptSubmitted: false, windowFocusVerified: false };
           }, { provider: "codex" });
         } catch (error) {

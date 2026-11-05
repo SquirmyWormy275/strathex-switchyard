@@ -1,4 +1,5 @@
 /** Actual Claude Code CLI inventory and owned background sessions; no title matching. */
+import { appendAgentObservation } from "./agent-observation.mjs";
 import { randomUUID } from "node:crypto";
 import { claudeAccount } from "./claude-account.mjs";
 export { claudeAccount } from "./claude-account.mjs";
@@ -83,6 +84,7 @@ export function createClaudeCoding({ store, resolveCli = trustedCli, run, comman
     const status = !row ? "not-observed" : row.state === "stopped" ? "stopped" : row.state === "failed" ? "error" : row.state === "done" ? "provider-turn-finished" : row.state === "blocked" || row.processStatus === "waiting" ? row.waitingFor === "permission prompt" ? "waiting-on-approval" : "waiting-for-input" : row.state === "working" || row.processStatus === "busy" ? "active" : row.processStatus === "idle" ? "idle" : "unknown";
     return { status, observedAt: now(), providerState: row?.state ?? null, processStatus: row?.processStatus ?? null, processId: row?.pid ?? null, processStartedAt: row?.pid ? row.startedAt : null, sessionKind: row?.kind ?? null, provenance: "Claude Code native CLI inventory; provider turn state is not independent task-completion evidence", completionVerified: false };
   }
+  const observe = (state, task, phase) => appendAgentObservation(state, { provider: "claude-code", subjectId: task.id, phase, status: task.observation?.status, at: now() });
   function view(t) {
     const fresh = t.observation && now() - t.observation.observedAt >= 0 && now() - t.observation.observedAt <= 30000;
     const focused = fresh && t.lastWindowFocus?.status === "verified" && t.lastWindowFocus.sessionId === t.sessionId && t.lastWindowFocus.processId === t.observation.processId && t.lastWindowFocus.processStartedAt === t.observation.processStartedAt && now() - t.lastWindowFocus.at >= 0 && now() - t.lastWindowFocus.at <= 30000;
@@ -149,7 +151,7 @@ export function createClaudeCoding({ store, resolveCli = trustedCli, run, comman
         if (found) { if (found.repositoryRoot !== root || found.accountFingerprint !== login || found.backgroundId !== row.backgroundId || found.repositoryIdentity && (found.repositoryIdentity.device !== identity.device || found.repositoryIdentity.inode !== identity.inode)) throw new Error("This saved Claude task changed its exact local context."); found.repositoryIdentity ??= identity; found.observation = observation(row); return { ...view(found), duplicatePrevented: true }; }
         if (s.codingSessions.length >= 64) throw new Error("Saved coding-task limit reached.");
         const task = { schema: "switchyard-coding-session/v1", id: randomUUID(), provider: "claude-code", label: label.trim(), repositoryRoot: root, repositoryIdentity: identity, accountFingerprint: login, sessionId, backgroundId: row.backgroundId, startedAt: row.startedAt, status: "registered", createdAt: now(), observation: observation(row) };
-        s.codingSessions.push(task); return view(task);
+        s.codingSessions.push(task); observe(s, task, "identity-bound"); return view(task);
       }, { provider: "claude-code" });
     },
     async createText(c, { requestId, repositoryRoot, label }) {
@@ -161,7 +163,7 @@ export function createClaudeCoding({ store, resolveCli = trustedCli, run, comman
         if (found) { if (found.provider !== "claude-code" || found.nativeTransport !== "owned-print" || found.repositoryRoot !== root || found.accountFingerprint !== login || found.label !== label.trim() || found.repositoryIdentity?.device !== identity.device || found.repositoryIdentity?.inode !== identity.inode) throw new Error("This request already names another task, account or directory identity."); return { ...view(found), duplicatePrevented: true }; }
         if (s.codingSessions.length >= 64) throw new Error("Saved coding-task limit reached.");
         const task = { schema: "switchyard-coding-session/v1", id: requestId, provider: "claude-code", label: label.trim(), repositoryRoot: root, repositoryIdentity: identity, accountFingerprint: login, sessionId: randomUUID(), backgroundId: null, nativeTransport: "owned-print", nativeIdentityVerified: false, launchPolicy: "tools-disabled/plan", status: "registered", createdAt: now(), observation: { status: "reserved-locally", observedAt: now(), completionVerified: false, provenance: "Requested UUID only; native conversation creation requires its first reviewed reply" } };
-        s.codingSessions.push(task); return { ...view(task), modelPromptSubmitted: false, nativeConversationCreated: false };
+        s.codingSessions.push(task); observe(s, task, "request-reserved"); return { ...view(task), modelPromptSubmitted: false, nativeConversationCreated: false };
       }, { provider: "claude-code" });
     },
     async create(c, { requestId, repositoryRoot, label }) {
@@ -171,7 +173,7 @@ export function createClaudeCoding({ store, resolveCli = trustedCli, run, comman
         s.codingSessions ??= []; const found = s.codingSessions.find((t) => t.id === requestId);
         if (found) { if (found.provider !== "claude-code" || found.repositoryRoot !== root || found.accountFingerprint !== login) throw new Error("This request identity already names another task or local account."); return view(found); }
         if (s.codingSessions.length >= 64) throw new Error("Saved coding-task limit reached.");
-        s.codingSessions.push({ schema: "switchyard-coding-session/v1", id: requestId, provider: "claude-code", label: label.trim(), repositoryRoot: root, repositoryIdentity: identity, accountFingerprint: login, sessionId: null, backgroundId: null, launchPolicy: "tools-disabled/plan", status: "creating", createdAt: now(), observation: null }); return null;
+        s.codingSessions.push({ schema: "switchyard-coding-session/v1", id: requestId, provider: "claude-code", label: label.trim(), repositoryRoot: root, repositoryIdentity: identity, accountFingerprint: login, sessionId: null, backgroundId: null, launchPolicy: "tools-disabled/plan", status: "creating", createdAt: now(), observation: null }); observe(s, taskIn(s, requestId), "request-reserved"); return null;
       }, { provider: "claude-code" });
       if (reserved) return { ...reserved, duplicatePrevented: true };
       try {
@@ -187,10 +189,10 @@ export function createClaudeCoding({ store, resolveCli = trustedCli, run, comman
         if (await account(c, generation) !== login) throw new Error("The local Claude login changed during creation.");
         await verifyRepositoryIdentity({ repositoryRoot: root, repositoryIdentity: identity });
         await store.claimSession(c, { provider: "claude-code", sessionId: row.sessionId }); current(c, generation);
-        return store.update(c, "claude-create-bind", (s) => { const t = taskIn(s, requestId); t.status = "registered"; t.observation = observation(row); return { ...view(t), modelPromptSubmitted: false }; }, { provider: "claude-code" });
+        return store.update(c, "claude-create-bind", (s) => { const t = taskIn(s, requestId); t.status = "registered"; t.observation = observation(row); observe(s, t, "identity-bound"); return { ...view(t), modelPromptSubmitted: false }; }, { provider: "claude-code" });
       } catch (e) {
         const rejected = e.code === "CLAUDE_WORKSPACE_TRUST_REQUIRED" && e.noEffectVerified === true;
-        await store.update(c, "claude-create-uncertain", (s) => { const t = taskIn(s, requestId); if (rejected && !t.sessionId && !t.backgroundId) { t.status = "creation-rejected"; t.noEffectVerified = true; t.creationRejection = "native-workspace-trust-required"; } else t.status = "creation-uncertain"; }).catch(() => {});
+        await store.update(c, "claude-create-uncertain", (s) => { const t = taskIn(s, requestId); if (rejected && !t.sessionId && !t.backgroundId) { t.status = "creation-rejected"; t.noEffectVerified = true; t.creationRejection = "native-workspace-trust-required"; } else t.status = "creation-uncertain"; if (!rejected) observe(s, t, "outcome-unconfirmed"); }).catch(() => {});
         throw new Error(`${e.message} ${rejected ? "The native workspace gate rejected creation before a job identity was returned; native trust settings were preserved." : "Creation is uncertain; this request will not create another background session automatically."}`);
       }
     },
@@ -202,7 +204,7 @@ export function createClaudeCoding({ store, resolveCli = trustedCli, run, comman
         return { ...view(saved), observation: { status: saved.nativeIdentityVerified ? "saved-conversation" : saved.status === "creation-uncertain" ? "creation-unconfirmed" : "reserved-locally", observedAt: now(), completionVerified: false, provenance: "Protected local reviewed-turn record; no live provider activity or task completion is inferred" } };
       }
       const { task, row } = await exact(c, id);
-      return store.update(c, "claude-coding-status", (s) => { const t = taskIn(s, id); if (t.sessionId !== task.sessionId || t.backgroundId !== task.backgroundId || t.accountFingerprint !== task.accountFingerprint) throw new Error("The saved Claude task changed during observation."); t.observation = observation(row); if (row?.sessionId) { t.sessionId = row.sessionId; t.startedAt = row.startedAt; t.status = "registered"; } return view(t); }, { provider: "claude-code" });
+      return store.update(c, "claude-coding-status", (s) => { const t = taskIn(s, id); if (t.sessionId !== task.sessionId || t.backgroundId !== task.backgroundId || t.accountFingerprint !== task.accountFingerprint) throw new Error("The saved Claude task changed during observation."); t.observation = observation(row); if (row?.sessionId) { t.sessionId = row.sessionId; t.startedAt = row.startedAt; t.status = "registered"; } observe(s, t, "status-observed"); return view(t); }, { provider: "claude-code" });
     },
     async reviewStop(c, id) {
       const { task, row } = await exact(c, id);
@@ -228,7 +230,7 @@ export function createClaudeCoding({ store, resolveCli = trustedCli, run, comman
         await execute(c, ["stop", task.backgroundId], task.repositoryRoot, generation);
         const after = (await inventory(c, task.repositoryRoot, generation)).find((r) => r.backgroundId === task.backgroundId);
         if (!after || after.sessionId !== task.sessionId || after.state !== "stopped" || after.pid !== null) throw new Error("Claude did not read back the exact stopped session; its stop remains uncertain.");
-        return store.update(c, "claude-owned-stop", (s) => { const t = taskIn(s, id); t.observation = observation(after); t.lastStop = { at: now(), status: "provider-reported-stopped" }; return { ...view(t), effect: "provider-reported-stopped", taskCompletionVerified: false }; }, { provider: "claude-code" });
+        return store.update(c, "claude-owned-stop", (s) => { const t = taskIn(s, id); t.observation = observation(after); t.lastStop = { at: now(), status: "provider-reported-stopped" }; observe(s, t, "owned-stop-observed"); return { ...view(t), effect: "provider-reported-stopped", taskCompletionVerified: false }; }, { provider: "claude-code" });
       } catch (e) { await store.update(c, "claude-stop-uncertain", (s) => { taskIn(s, id).lastStop = { at: now(), status: "uncertain" }; }).catch(() => {}); throw e; }
     },
     stopCompartment: cleanupCompartment,

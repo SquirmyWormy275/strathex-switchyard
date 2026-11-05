@@ -163,6 +163,7 @@ export const requiredGroups = [
   { file: "tools/layout-studio/catalog.test.mjs" },
   { file: "tools/layout-studio/catalog-identity.test.mjs" },
   { file: "tools/layout-studio/haptic-capabilities.test.mjs" },
+  { file: "tools/layout-studio/agent-observation.test.mjs" },
   { file: "tools/layout-studio/readout-profiles.test.mjs" },
   { file: "tools/layout-studio/configuration.test.mjs", ...(process.platform !== "linux" ? { expectedSkipped: 1 } : {}) },
   { file: "tools/layout-studio/suite.test.mjs", ...nativeTestOverrides("tools/layout-studio/suite.test.mjs") },

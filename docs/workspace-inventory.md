@@ -44,5 +44,9 @@ node scripts/verify-copilot-journal-host.mjs --read-only-metadata
 ```
 
 It creates no workspace and submits no provider request or keyboard transaction.
-Actual installed acceptance for the new route remains separate until its receipt
-is recorded in [verification](verification.md).
+Normal installed source `2276ac2`, release `f325bc46…`, now passes six update
+and seven actual metadata/privacy checks. All 54 saved pilot identities appear;
+selected sealed bytes, definitions/mode/readouts, endpoint and frozen Home stay
+unchanged. The owned bundle/checkout are removed, with zero provider requests,
+model prompts, new workspaces or keyboard access.
+[Exact receipts](evidence/installed-copilot-journal-summary.json).

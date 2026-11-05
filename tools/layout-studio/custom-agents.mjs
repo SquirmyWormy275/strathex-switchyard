@@ -1,4 +1,5 @@
 /** Scoped event/action bridge. No plugin code or commands are loaded in the suite. */
+import { appendAgentObservation } from "./agent-observation.mjs";
 import { randomBytes, randomUUID } from "node:crypto";
 import { agentIntents, agentRoutes, agentMessageSchema, agentResponseSchema, requestMac, responseMac, sameMac } from "../../integrations/agent-protocol.mjs";
 
@@ -43,7 +44,7 @@ export function createCustomAgents({ store, now = () => Date.now() }) {
             for (const command of a.commands) if (["queued", "claimed"].includes(command.status)) { command.status = command.status === "queued" ? "cancelled-before-claim" : "uncertain-session-ended"; command.provenance = "session identity changed; never automatically re-delivered; external outcome unverified"; }
           }
           a.protocolVersion = 2; a.lastSeen = now(); a.sessionId = body.sessionId; a.reportedStatus = event.status; a.provenance = "authenticated adapter self-report; not verified task completion";
-          for (const o of s.observations) if (o.status === "recording" && o.sources.includes("agent-events")) { if (o.events.length >= 2000) { o.status = "paused"; o.limitReached = true; } else { o.events.push({ kind: "status", provenance: "authenticated-agent-self-report", at: now() }); o.updatedAt = now(); } }
+          appendAgentObservation(s, { provider: "custom-agent", subjectId: `${a.id}:${body.sessionId}`, phase: "adapter-status-observed", status: event.status, at: now() });
           return { accepted: true, provenance: a.provenance };
         }
         if (path === agentRoutes.poll) {

@@ -7,7 +7,7 @@ and [verification](verification.md) distinguishes exact source passes and failur
 
 Work in the existing `feat/switchyard-configuration-loop` checkout and keep
 [draft PR 20](https://github.com/SquirmyWormy275/strathex-switchyard/pull/20)
-updated. Source-audit implementation is published at `0cc9e76c30c541851b78685ec5f305592612526b`; use Git to read the newest checkpoint.
+updated. Latest published implementation is `2276ac29e7dcc3f9720e2b9490fccb1e678b58f8`; use Git to read the newest checkpoint.
 This checkpoint adds the F77 source protocol audit, omits redundant backend
 HTML/CSS while preserving the frozen frontend, and records newer installed
 metadata evidence. Keep commits on GitHub regularly; do not merge or release.
@@ -37,16 +37,16 @@ existing versioned update and launcher path; do not print its private access URL
 or token. Private verification receipts live outside Git under
 `~/.local/state/strathex-switchyard/runtime-verification/`.
 
-- Previous installed journal-metadata source `514bf68`, release `86bdffe016ceb5c021b3f30ce01197a4e5a3e5041419a955efd5d0b6f133f0a9`,
-  passes six normal-update and six journal API/privacy checks. Selected sealed
-  state and frozen frontend are preserved, with zero prompts, Microsoft requests,
-  new workspaces or HID. Its owned bundle/checkout were removed. Exact receipts
-  are in the [installed summary](evidence/installed-copilot-journal-summary.json).
-- A fresh immutable **232-group Linux run at `514bf68` is active**. Its owned
-  checkout/fixtures are recorded in the private temporary marker
-  `/tmp/switchyard-broker-full-linux-path.json`; the small driver is
-  `/tmp/switchyard-broker-full-linux.py`. Inspect process/receipt state before
-  starting another full run. The driver removes owned scratch only after a pass.
+- Normal installed source `2276ac2`, release `f325bc4627b2d9f5de699179414724d69cffddb600a0154b457a0abdaa9d3abd`,
+  passes six update/seven metadata/privacy checks, including all 54 saved
+  workspace identities. Selected sealed state and frozen frontend are preserved,
+  with zero provider requests, prompts, new workspaces or HID. Owned bundle and
+  checkout are removed. [Receipts](evidence/installed-copilot-journal-summary.json).
+- The immutable **232-group Linux run at `514bf68` passes**: 1,401 tests,
+  1,391 passed and ten declared skips. Every child cleanup verifies, and owned
+  fixtures/dependency aliases/checkout/marker are removed. No full run is active.
+  [Exact summary](evidence/linux-514-complete-summary.json). Later F77 audit and
+  workspace inventory changes have separate focused and installed evidence.
 - The prior `0cfe82c` run failed: 209/230 groups accepted and 21 deadline failures,
   with all child cleanup verified. Its owned checkout/fixtures are removed and
   its failed receipt retained. [Exact summary](evidence/linux-0cfe-timeout-summary.json).
@@ -54,7 +54,7 @@ or token. Private verification receipts live outside Git under
   Twenty-eight Suite/commit/lock tests pass under original bounds, including
   owner loss; the previously timed-out commit file finishes in 43,621 ms.
   [Contract and receipts](private-state-locking.md). The latest complete accepted
-  run is still the earlier 225-group `4700d9a` checkpoint.
+  run is the 232-group `514bf68` checkpoint.
 - Copilot durable uncertainty/recovery has 90 surrounding software checks and
   later final-message handling passes 44 checks. Exact echoed requests and
   absent/non-text final messages remain unconfirmed, without automatic resend.
@@ -82,20 +82,20 @@ or token. Private verification receipts live outside Git under
 
 ## Next executable tasks
 
-1. Finish normal installed acceptance for complete workspace inventory. The old
-   32-entry truncation hid existing protected identities; all 54 fixture entries
-   and the new bounded metadata route now pass 31 surrounding checks. The updated
-   read-only journal verifier includes inventory without creating a workspace or
-   contacting a provider. The F77 source-audit installed check is already accepted
-   with owned cleanup at `0cc9e76c`. Continue exact IDE/task attachment work after
-   this setup repair; process ancestry alone cannot select an exact IDE tab.
-2. Collect the active 232-group result. Preserve failures honestly; verify exact
-   owned child exit before removing task fixtures/aliases/checkouts. Diagnose
-   failures without raising deadlines or affecting unrelated workstation jobs.
-3. Collect the corrected native Windows token-width run and independent journal
-   workers. Verify artifact SHA-256 and source/merge identities before accepting
-   results. Continue fixing executable software failures and remaining ledger
-   implementation while external hardware/account checks remain separately open.
+1. First-party coding-task lifecycle observation now passes 85 focused checks
+   with explicit local/native provenance and metadata-only source/exclusion/pause
+   fences. Run its gated installed empty-native-task demonstration, verify exact
+   native exit, retire only its owned fixture data, and preserve fresh mode
+   fences. No model prompt or new workspace is needed. Then run the complete
+   immutable 233-group source checkpoint. The previous 232-group pass remains
+   source-bound; the new installed task demonstration remains pending.
+2. Collect the corrected native Windows token-width run and independent journal
+   workers. Verify archive digests/source/merge identities before accepting any
+   result. Recent superseded pending runs are cancelled, not passing. Continue
+   executable fixes while the latest source waits for CI capacity.
+3. Continue exact IDE/task attachments through a supported extension connection.
+   Process ancestry alone cannot select an exact IDE terminal tab. Preserve
+   explicit unsupported behavior and continue other independent ledger work.
 
 Then continue the remaining ledger requirements, including full scanner scope,
 additional input semantics and exact IDE/task attachments. These three tasks are

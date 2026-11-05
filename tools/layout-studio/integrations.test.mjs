@@ -13,7 +13,7 @@ import { switchyardAgent } from "../../integrations/agent-sdk.mjs";
 import { agentRoutes, agentMessageSchema, agentResponseSchema, requestMac, responseMac, sameMac } from "../../integrations/agent-protocol.mjs";
 
 function memoryStore() {
-  const states = { personal: { id: "personal", policy: "personal", accounts: [], agents: [], observations: [], conversations: [], workflow: { name: "Synthetic", roles: [], steps: [] } }, work: { id: "work", policy: "work", accounts: [], agents: [], observations: [], conversations: [], workflow: { name: "Synthetic", roles: [], steps: [] } } }, secrets = new Map();
+  const states = { personal: { id: "personal", policy: "personal", mode: "personal-companion", accounts: [], agents: [], observations: [], conversations: [], workflow: { name: "Synthetic", roles: [], steps: [] } }, work: { id: "work", policy: "work", accounts: [], agents: [], observations: [], conversations: [], workflow: { name: "Synthetic", roles: [], steps: [] } } }, secrets = new Map();
   const pending = new Map(), history = [], resources = new Set();
   return {
     states, secrets, history,

@@ -40,6 +40,16 @@ test("Claude's actual versioned inventory distinguishes process state from task 
   assert.throws(() => claudeAccount({ loggedIn: true, authMethod: "api_key", apiProvider: "firstParty", email: "a", orgId: "b" }), /supported first-party/);
 });
 
+test("opt-in Claude metadata preserves local versus provider provenance, excludes content and records only changed status polls", () => fixture(async ({ store, service, input, rows, repositoryRoot }) => {
+  await store.update("personal", "synthetic-observation", s => { s.observations = [{ id: "observed", status: "recording", sources: ["agent-events"], exclusions: [], events: [], updatedAt: Date.now() }]; });
+  const task = await service.create("personal", input()); await service.status("personal", task.id); await service.status("personal", task.id);
+  let events = (await store.snapshot("personal")).observations[0].events; assert.equal(events.length, 3); assert.deepEqual(events.map(e => e.phase), ["request-reserved", "identity-bound", "status-observed"]);
+  rows[0].state = "done"; await service.status("personal", task.id); events = (await store.snapshot("personal")).observations[0].events; assert.equal(events.at(-1).status, "provider-turn-finished"); assert.equal(events.at(-1).taskCompletionVerified, false);
+  for (const value of [task.label, repositoryRoot, task.id, task.sessionId, task.accountFingerprint, "private provider name"]) assert.equal(JSON.stringify(events).includes(value), false);
+  await store.update("personal", "synthetic-exclusion", s => { s.observations[0].exclusions = ["claude"]; }); rows[0].state = "working"; await service.status("personal", task.id); assert.equal((await store.snapshot("personal")).observations[0].events.length, 4);
+  assert.equal((await store.snapshot("other")).observations.length, 0);
+}));
+
 test("a replacement repository cannot inherit an exact Claude task, stop review or interactive focus", () => fixture(async ({ root, repositoryRoot, service, calls, input }) => {
   const task = await service.create("personal", input()); assert.match(task.repositoryIdentity.inode, /^[1-9]\d*$/);
   await rename(repositoryRoot, join(root, "preserved-original")); await mkdir(join(repositoryRoot, ".git"), { recursive: true }); calls.length = 0;
