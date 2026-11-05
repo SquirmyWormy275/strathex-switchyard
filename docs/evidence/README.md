@@ -42,3 +42,11 @@ The updated seven-component artifact separately passes the unmodified official
 schema, with three invalid mutations rejected. Receipt
 `cyclonedx-workspace-schema-proof-1793861912692.json` retains exact source hashes;
 temporary tooling is removed and no host package is installed.
+
+
+The [native Windows checkpoint summary](windows6a-validation-summary.json) keeps
+exact artifact IDs/digests and child outcomes at source `6a45643`. Eight focused
+contract groups pass 23 tests with three declared platform skips; service removal
+and two group deadlines still fail. Guest execution is doubled and the full
+workflow is not accepted. Only small verified JSON receipts are retained locally;
+private download URLs and artifact archives are not retained in the repository.

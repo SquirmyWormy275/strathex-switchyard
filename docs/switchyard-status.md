@@ -7,7 +7,18 @@ host. [Verification](verification.md) retains accepted and failed checkpoints.
 
 ## Installed application
 
-Latest installed source `7dc9196`, release
+Latest installed source `bfb7f1d`, release
+`ed8745bae60c75c3b82487eaf2cc6e9300a1b0988e6df1ad99bc6a5701d9fa25`,
+passes six update and sixteen actual inventory/ignored-secret scan checks. The
+preview groups an 80 MiB sparse build fixture, exposes no source bytes, creates
+no grant or receipt, and leaves prior maintenance evidence unchanged. Every
+preview probe exits before separate exact scan review; two scanner exits and
+original-state restoration pass. Receipts `assignment-legends-1793863080369.json`
+and `installed-shield-baseline-1793863236319.json` retained; all owned source/
+signing/package/staging/bundle/proof checkout removed. One empty task, zero prompts.
+The earlier failed verifier and exact cleanup are retained separately.
+
+Earlier installed source `7dc9196`, release
 `413aaebca22a4f4336af2202481386376802dd390f524d660708823839297014`,
 passes six update and fourteen actual workspace Supply Chain API checks. Known
 vulnerable and clean versions retain non-passing report-bound BOMs, exact replay,
@@ -153,7 +164,7 @@ tracked/new paths, relevant ignored secret-file names and grouped build trees.
 It hashes no source bytes, grants no authority and remains incomplete; unknown
 ignored paths/build-tree contents stay uninspected. Four focused parser/real-Git/
 HTTP/drift/cleanup cases and thirty-four surrounding contracts pass, with type
-checking. Installed preview acceptance remains pending. Consequential snapshot
+checking. Normal installed `bfb7f1d` passes six update/sixteen inventory/scan checks. Consequential snapshot
 limits and separate scanner reviews remain unchanged.
 
 ## Complete and native checkpoints
@@ -191,7 +202,12 @@ Native Windows `5d398d2`, workflow
 passes all sixteen jobs. The six pipeline contract cases have verified archive
 digests and child cleanup. Guest execution is explicitly doubled. Registry,
 maintenance/removal and the 34-case backend contract also pass at their recorded
-sources. Current native CI remains queued; no newer pass is inferred.
+sources. Newer `6a45643` passes eight digest-verified contract groups: 23 tests passed and
+three platform skips, with child cleanup. These cover exceptions, ignored inputs,
+receipt-time authority and policy invalidation; the guest is doubled. Its full
+filesystem workflow fails service-removal configuration readback, and Shield
+policy/stop files hit their 300-second group deadlines. All three failures are
+retained. [Exact artifact evidence](evidence/windows6a-validation-summary.json).
 
 Later service-removal failures remain failed. The `238592b` receipt identifies
 `service-absence-query-configuration`. The correction preserves Win32 errors,

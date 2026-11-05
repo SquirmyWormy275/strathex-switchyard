@@ -48,7 +48,16 @@ required an empty receipt journal despite three legitimate feed-maintenance
 receipts. That failed outcome is retained in
 `installed-shield-baseline-1793862918331.json`; original user state was restored,
 no scanner program or model prompt ran. The verifier now compares the journal
-before/after inventory. Fresh installed acceptance remains pending.
+before/after inventory. Exact synthetic cleanup passes with seven independently exited preview probes,
+retired public packages/trust, restored original state and removed source/signing/
+sparse build fixture (`failed-inventory-proof-cleanup-1793863016294.json`).
+
+Normal installed `bfb7f1d` then passes six update and sixteen actual preview/scan
+checks. Receipts `assignment-legends-1793863080369.json` and
+`installed-shield-baseline-1793863236319.json` retain the unchanged prior journal,
+no granted inventory authority, exact native probe exits, later separate ignored-
+secret scans, two scanner exits and full restoration. Owned source/signing/
+packages/staging/bundle/proof checkout are removed; one empty task, zero prompts.
 
 For a synthetic installed demonstration after updating to this source, run:
 
