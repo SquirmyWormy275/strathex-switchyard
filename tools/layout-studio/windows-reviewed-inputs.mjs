@@ -9,6 +9,7 @@ import { runRuntimeCommand, runtimeGuardianStopped } from "./runtime-command.mjs
 import { privateDirectory, directoryIdentity } from "./private-fs.mjs";
 import { scopeHash } from "./confirmations.mjs";
 import { buildWindowsIndexPacket, windowsIndexRequest } from "./windows-index-inputs.mjs";
+import { buildWindowsHistoryPacket, windowsHistoryRequest } from "./windows-history-inputs.mjs";
 
 const schema = "switchyard-windows-reviewed-inputs/v1";
 const uuid = value => typeof value === "string" && /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/.test(value);
@@ -95,10 +96,12 @@ export function createWindowsReviewedInputs({ store, stateDirectory, platform = 
       if(platform!=="win32")throw Error("Native reviewed Windows input staging requires Windows; no host-copy substitute was selected.");
       if(!context||Object.keys(context).some(key=>!["operationId","scopeDigest","provider"].includes(key))||Object.keys(input).some(key=>!["repositoryRoot","sourceIdentity","inputFiles"].includes(key))||!uuid(context.operationId)||!/^[a-f0-9]{64}$/.test(context.scopeDigest??"")||!["codex","claude-code"].includes(context.provider)||typeof authorize!=="function")throw Error("Bind exact Windows input staging to its protected task operation and review.");
       const inputFiles=validateRepositoryInputs(input.inputFiles),sourceIdentity=structuredClone(input.sourceIdentity),generation=generations.get(c)??0,key=`${c}:${context.operationId}`;
-      let indexPacket;
+      let indexPacket,historyPacket;
       if(indexOptions!==undefined){
-        if(!indexOptions||Object.keys(indexOptions).sort().join()!=="action,indexBytes,indexWitness")throw Error("Use only the exact private Windows index staging contract.");
-        indexPacket=buildWindowsIndexPacket({...indexOptions,inputFiles});
+        const fields=indexOptions&&Object.keys(indexOptions).sort().join();
+        if(fields==="action,indexBytes,indexWitness")indexPacket=buildWindowsIndexPacket({...indexOptions,inputFiles});
+        else if(fields==="action,historyBytes,historyWitness")historyPacket=buildWindowsHistoryPacket({...indexOptions,inputFiles});
+        else throw Error("Use only one exact private Windows Git input staging contract.");
       }
       if(resources.has(key)||[...resources.values()].some(resource=>resource.compartment===c))throw Error("This workspace already has an owned Windows input operation; wait for its exact result.");
       const resource={compartment:c,controller:new AbortController(),clients:new Set(),done:null};resources.set(key,resource);seen.add(c);
@@ -117,7 +120,7 @@ export function createWindowsReviewedInputs({ store, stateDirectory, platform = 
             try {await store.update(c,"windows-inputs-reserve",state=>{const all=state.repositoryWindowsInputs??[],retained=all.filter(row=>row.cleanupPending);state.repositoryWindowsInputs=[...retained,...all.filter(row=>!retained.includes(row)).slice(-16)];if(state.repositoryWindowsInputs.length>=32||state.repositoryWindowsInputs.some(row=>row.operationId===context.operationId)||all.some(row=>row.stoppedVerified!==true&&["reserved","staging","outcome-unconfirmed"].includes(row.status))||retained.reduce((sum,row)=>sum+row.totalBytes,0)+totalBytes>64*1024*1024)throw Error("The protected Windows input inventory or byte quota is full or changed.");state.repositoryWindowsInputs.push({schema,...structuredClone(context),path:root,sourceIdentity,stagingIdentity,inputFiles,inputManifestSha256,totalBytes,status:"reserved",cleanupPending:true,at:now()});});reserved=true;}
             catch(error){if(same(identity(await directoryIdentity(root)),stagingIdentity)&&!(await readdir(root)).length)await rmdir(root);throw error;}
             const request={schema,operationId:context.operationId,sourceRoot:input.repositoryRoot,sourceIdentity,stagingRoot:root,stagingIdentity,inputFiles,inputManifestSha256};
-            const privateInput=indexPacket?windowsIndexRequest(request,indexPacket):undefined;
+            const privateInput=indexPacket?windowsIndexRequest(request,indexPacket):historyPacket?windowsHistoryRequest(request,historyPacket):undefined;
             const result=await runOwnedNativeCommand({executable:helper,args:["--stage-reviewed-inputs"],cwd:root,env:{},text:privateInput?.text??JSON.stringify(request),resource,signal:resource.controller.signal,timeout:45000,maxOutputBytes:4096,captureStderrBytes:1024,command,guardianStopped,
               onReady:async scope=>{owner=scope;await current();await update(c,context.operationId,"windows-inputs-native-ready",row=>{row.ownedRuntime=scope;row.status="staging";row.stoppedVerified=false;});await current();readyApproved=true;},
               onStopped:async scope=>{if(!await guardianStopped(scope))throw Error("The native input reader exit remains unconfirmed.");await update(c,context.operationId,"windows-inputs-native-exit",row=>{if(row.ownedRuntime&&row.ownedRuntime.id!==scope.id)throw Error("The exact input reader guardian changed.");row.ownedRuntime??=scope;row.stoppedVerified=true;})}
@@ -125,7 +128,7 @@ export function createWindowsReviewedInputs({ store, stateDirectory, platform = 
             await current();
             if(result.status!=="completed"||result.exitCode!==0)throw Error("The native Windows reader rejected this exact staging operation; preserve its recorded ownership.");
             const proof=JSON.parse(result.stdout),fields=["schema","operationId","sourceIdentity","stagingIdentity","inputManifestSha256","files","bytes","privateAclReadbackVerified","classification","sandboxEnforced"];
-            if(privateInput){fields.push("indexPacketSha256","indexWitnessSha256");if(proof.indexPacketSha256!==privateInput.packetSha256||proof.indexWitnessSha256!==privateInput.witnessSha256)throw Error("The exact native Windows index packet or original witness digest changed.");}
+            if(privateInput){const prefix=historyPacket?"history":"index",packetField=prefix+"PacketSha256",witnessField=prefix+"WitnessSha256";fields.push(packetField,witnessField);if(proof[packetField]!==privateInput.packetSha256||proof[witnessField]!==privateInput.witnessSha256)throw Error("The exact native Windows Git packet or original witness digest changed.");}
             if(Object.keys(proof).sort().join()!==fields.sort().join()||proof.schema!==schema||proof.operationId!==context.operationId||!same(proof.sourceIdentity,sourceIdentity)||!same(proof.stagingIdentity,stagingIdentity)||proof.inputManifestSha256!==inputManifestSha256||proof.files!==inputFiles.length||proof.bytes!==totalBytes||proof.privateAclReadbackVerified!==true||proof.classification!=="reviewed-non-production-bytes"||proof.sandboxEnforced!==false)throw Error("The exact native Windows staging proof did not verify.");
             await verifyTree(root,inputFiles,stagingIdentity);
             await current();await update(c,context.operationId,"windows-inputs-staged",row=>{row.status="staged";row.proof=proof;});

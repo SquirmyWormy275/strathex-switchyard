@@ -100,7 +100,7 @@ jobs:
           $result = & .\.tools\dotnet\dotnet.exe $assembly --native-files
           if ($LASTEXITCODE -ne 0) { throw 'An authenticated broker metadata boundary failed.' }
           $proof = $result | ConvertFrom-Json
-          if ($proof.success -ne $true -or $proof.checks -ne 16 -or $proof.exchangeProtocolChecks -ne 30 -or $proof.exchangeJournalChecks -ne 43 -or $proof.exchangeFactsChecks -ne 23 -or $proof.indexInputChecks -ne 49 -or $proof.protectedFilesChecks -ne 16 -or $proof.serviceInstalled -ne $false -or $proof.volumeOpened -ne $false -or $proof.guestLaunched -ne $false) { throw 'The exact broker proof result did not verify.' }
+          if ($proof.success -ne $true -or $proof.checks -ne 16 -or $proof.exchangeProtocolChecks -ne 30 -or $proof.exchangeJournalChecks -ne 43 -or $proof.exchangeFactsChecks -ne 23 -or $proof.indexInputChecks -ne 49 -or $proof.historyInputChecks -ne 62 -or $proof.protectedFilesChecks -ne 16 -or $proof.serviceInstalled -ne $false -or $proof.volumeOpened -ne $false -or $proof.guestLaunched -ne $false) { throw 'The exact broker proof result did not verify.' }
           $proof | Add-Member -NotePropertyName sourceCommit -NotePropertyValue (& git rev-parse HEAD)
           $proof | Add-Member -NotePropertyName protocolSourceSha256 -NotePropertyValue ((Get-FileHash '.\apps\desktop-hotkeys\WindowsStorageBrokerProtocol.cs' -Algorithm SHA256).Hash.ToLowerInvariant())
           $proof | Add-Member -NotePropertyName assemblySha256 -NotePropertyValue ((Get-FileHash $assembly -Algorithm SHA256).Hash.ToLowerInvariant())
@@ -114,6 +114,15 @@ jobs:
           $helper = Join-Path $env:RUNNER_TEMP 'switchyard-windows-hotkeys/Switchyard.Hotkeys.exe'
           & node --experimental-transform-types scripts/verify-windows-index-native.mjs --synthetic "--helper=$helper"
           if ($LASTEXITCODE -ne 0) { throw 'Actual native index packet staging failed; preserve its scoped receipt.' }
+
+      - name: Verify actual NTFS private history bytes and parser refusals
+        shell: pwsh
+        timeout-minutes: 4
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $helper = Join-Path $env:RUNNER_TEMP 'switchyard-windows-hotkeys/Switchyard.Hotkeys.exe'
+          & node --experimental-transform-types scripts/verify-windows-history-native.mjs --synthetic "--helper=$helper"
+          if ($LASTEXITCODE -ne 0) { throw 'Actual native history packet staging failed; preserve its scoped receipt.' }
 
       - name: Verify the exact metadata broker service lifecycle
         shell: pwsh
@@ -204,6 +213,15 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
+      - name: Retain only the native history packet receipt
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: switchyard-windows-history-native-${{ github.sha }}
+          path: ${{ runner.temp }}/switchyard-windows-history-native.json
+          if-no-files-found: error
+          retention-days: 7
+
       - name: Retain only the scoped broker lifecycle receipt
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
@@ -237,7 +255,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        suite: [history-scanner, history-inputs, history-authority, index-inputs, index-bytes, index-staging, index-scanner, index-authority, osv-source, osv-scanner, ignored-tree-policy, ignored-tree-authority, ignored-tree-scanner, receipt-authority, receipt-authority-state, shield-exceptions, shield-exception-execution, shield-exception-ledger, ignored-authority, ignored-scanner, fixture-invalidation, validation-policy, shield-evidence, shield-policy, shield-recovery, pipeline-recovery, pipeline-policy, pipeline-evidence, fixture-removal, backend-contract, fixture-registry, fixture-maintenance, harness, leases, legacy-images, broker-owner, sandbox-native, sandbox-sessions, reviewed-run, run-owner]
+        suite: [history-bytes, history-staging, history-scanner, history-inputs, history-authority, index-inputs, index-bytes, index-staging, index-scanner, index-authority, osv-source, osv-scanner, ignored-tree-policy, ignored-tree-authority, ignored-tree-scanner, receipt-authority, receipt-authority-state, shield-exceptions, shield-exception-execution, shield-exception-ledger, ignored-authority, ignored-scanner, fixture-invalidation, validation-policy, shield-evidence, shield-policy, shield-recovery, pipeline-recovery, pipeline-policy, pipeline-evidence, fixture-removal, backend-contract, fixture-registry, fixture-maintenance, harness, leases, legacy-images, broker-owner, sandbox-native, sandbox-sessions, reviewed-run, run-owner]
     env:
       npm_config_audit: "false"
       npm_config_fund: "false"

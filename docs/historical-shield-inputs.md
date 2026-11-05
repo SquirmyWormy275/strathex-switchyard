@@ -87,6 +87,12 @@ both private Git alias namespaces while retaining checks of actual current files
 The failed outcome remains failed. Exact synthetic fixture/trust retirement,
 sixteen retained query exits, two scanner exits, owned source/signing/package/
 staging and proof-checkout cleanup verify in
-`failed-history-proof-cleanup-1793874565999.json`. Corrected installed acceptance
-is pending. It creates only a synthetic repository and
+`failed-history-proof-cleanup-1793874565999.json`. Corrected installed `4901cc8`, release
+`ffd440981ebb02b4ffb887c94a8f7951a47608244a5bd5e9f3553de86cf7c471`,
+passes six update/thirteen actual historical-scan/API checks. Both scanner exits,
+exact provenance, replay/feed retirement and full restoration verify. Receipts
+`assignment-legends-1793874653637.json` and
+`installed-shield-baseline-1793874824975.json` are retained. Owned source/signing/
+packages/staging/bundle/proof checkout removed; one empty task, zero prompts,
+no keyboard access. It creates only a synthetic repository and
 one empty native task, submits no model prompts and opens no keyboard.

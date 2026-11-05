@@ -17,13 +17,24 @@ separate current-file scanner checks. All eleven query probes/two scanners exit,
 full restoration and owned scratch removal pass, with zero prompts or keyboard
 access. Linux historical scanner integration now separately passes five focused
 cases and sixty isolated scanner/history/index/runner checks; installed historical
-scan acceptance is pending. Windows historical staging, automatic scope and
+scan acceptance passes at `4901cc8`. Windows historical transport passes portable/
+staging contracts, but its normal scanner connection, native acceptance, automatic scope and
 broader history remain unfinished software. [Witness](git-history-inputs.md),
 [scanner connection](historical-shield-inputs.md).
 
 ## Installed application
 
-Latest installed source `40bb3eb`, release
+Latest installed source `4901cc8`, release
+`ffd440981ebb02b4ffb887c94a8f7951a47608244a5bd5e9f3553de86cf7c471`,
+passes six update/thirteen actual historical-scan/API checks. The scanner detects
+a secret removed from current source, authenticates original commit/blob identity,
+and retains partial coverage. Both scanner exits, replay/feed retirement and full
+restoration pass. Receipts `assignment-legends-1793874653637.json` and
+`installed-shield-baseline-1793874824975.json`; owned source/signing/packages/
+staging/bundle/proof checkout removed, one empty task/zero prompts/no keyboard
+access. Earlier installed verifier failure and exact cleanup remain recorded.
+
+Earlier installed source `40bb3eb`, release
 `cb74c174ae8fa881d9be19bdb2d735bbf6bb845c910630da18c9facdf8645c3c`,
 passes six update/fourteen actual history-witness and separate current-file scan
 checks. Receipts `assignment-legends-1793873715840.json` and

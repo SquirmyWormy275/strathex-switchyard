@@ -18,6 +18,7 @@
     <Compile Include="../../../../apps/desktop-hotkeys/WindowsStorageBrokerExchangeEngine.cs" Link="WindowsStorageBrokerExchangeEngine.cs" />
     <Compile Include="../../../../apps/desktop-hotkeys/ReviewedInputStager.cs" Link="ReviewedInputStager.cs" />
     <Compile Include="../../../../apps/desktop-hotkeys/ReviewedIndexInputs.cs" Link="ReviewedIndexInputs.cs" />
+    <Compile Include="../../../../apps/desktop-hotkeys/ReviewedHistoryInputs.cs" Link="ReviewedHistoryInputs.cs" />
     <Compile Include="../../../../apps/desktop-hotkeys/BoundedExchangeVolume.cs" Link="BoundedExchangeVolume.cs" />
     <Compile Include="../../../../apps/desktop-hotkeys/BoundedExchangeImage.cs" Link="BoundedExchangeImage.cs" />
     <Compile Include="../../../../apps/desktop-hotkeys/BrokerExchangeImage.cs" Link="BrokerExchangeImage.cs" />
