@@ -6,13 +6,23 @@ import { withStateLock } from "./state-lock.mjs";
 export { privateDirectory, privateRead, privateWrite } from "./private-fs.mjs";
 import { lstat, readdir } from "node:fs/promises";
 import { homedir } from "node:os";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { importProfile } from "./workspace.mjs";
 import { reconcileWorkflow } from "./workflow.mjs";
 import { createPortablePackage, packageDefinition, portableDefinitionDigest, preparePortableImport } from "./portable-package.mjs";
 
 const idPattern = /^[a-z][a-z0-9-]{0,47}$/;
+// Stores may share the same private files in one host process. Queue their
+// state transactions together before opening separate platform lock helpers.
+// Every transaction still acquires its own kernel lease for cross-process safety.
+const mutationQueues = new Map();
+async function serializeState(root, id, fn) {
+  const path = resolve(root), key = (process.platform === "win32" ? path.toLowerCase() : path) + "\0" + id;
+  const previous = mutationQueues.get(key) ?? Promise.resolve();
+  const pending = previous.catch(() => {}).then(fn); mutationQueues.set(key, pending);
+  try { return await pending; } finally { if (mutationQueues.get(key) === pending) mutationQueues.delete(key); }
+}
 const templates = {
   personal: { providers: ["codex", "claude-code", "native-chatgpt", "native-vscode", "custom-agent", "local-transcription", "github-copilot", "claude-desktop", "cursor", "figma"], accounts: [], export: true, recording: true, crossCompartment: false, retentionDays: 30 },
   work: { providers: ["microsoft-365-copilot"], accounts: [], export: false, recording: false, crossCompartment: false, retentionDays: 7 }
@@ -65,7 +75,6 @@ export function platformSecrets({ root }) {
 
 export function createSuiteStore({ root = join(process.env.XDG_STATE_HOME || (process.platform === "win32" ? process.env.LOCALAPPDATA || homedir() : join(homedir(), ".local/state")), "strathex-switchyard/suite"), secrets, clock = () => Date.now() } = {}) {
   secrets ??= platformSecrets({ root: join(root, "credentials") });
-  const queues = new Map();
   const validate = (id) => { if (!idPattern.test(id)) throw new Error("Compartment identity is invalid."); };
   const path = (id) => join(root, `${id}.sealed.json`);
   async function key(id, create = false) {
@@ -96,10 +105,7 @@ export function createSuiteStore({ root = join(process.env.XDG_STATE_HOME || (pr
   }
   async function mutate(id, fn) {
     validate(id);
-    const previous = queues.get(id) ?? Promise.resolve();
-    const pending = previous.catch(() => {}).then(() => withStateLock(root, id, async (lease) => { const state = await read(id); const result = await fn(state); lease.assert(); await write(id, state); return result; }));
-    queues.set(id, pending);
-    try { return await pending; } finally { if (queues.get(id) === pending) queues.delete(id); }
+    return serializeState(root, id, () => withStateLock(root, id, async (lease) => { const state = await read(id); const result = await fn(state); lease.assert(); await write(id, state); return result; }));
   }
   function permit(state, { provider, account, operation, destination } = {}) {
     const policy = templates[state.policy];
@@ -150,7 +156,7 @@ export function createSuiteStore({ root = join(process.env.XDG_STATE_HOME || (pr
     async selection(value) { const selected = join(root, "active-compartment.json"); if (value === undefined) { try { const s = JSON.parse(await privateRead(selected)); validate(s.id); return s.id; } catch (error) { if (error.code === "ENOENT") return "personal"; throw error; } } validate(value); await read(value); await privateWrite(selected, JSON.stringify({ id: value })); return value; },
     async initialize(id = "personal", policy) {
       validate(id); if (policy !== undefined && (typeof policy !== "string" || !Object.hasOwn(templates, policy))) throw new Error("Choose Personal or Copilot-only Work policy.");
-      return withStateLock(root, id, async (lease) => {
+      return serializeState(root, id, () => withStateLock(root, id, async (lease) => {
         await privateDirectory(root);
         let exists = false; try { await lstat(path(id)); exists = true; } catch (e) { if (e.code !== "ENOENT") throw e; }
         if (exists) { const existing = await read(id); if (policy !== undefined && existing.policy !== policy) throw new Error("The stored compartment policy differs; it cannot be silently replaced."); return { id, policy: existing.policy }; }
@@ -159,7 +165,7 @@ export function createSuiteStore({ root = join(process.env.XDG_STATE_HOME || (pr
         lease.assert();
         await write(id, { schema: "switchyard-suite-state/v1", id, policy, mode: "keyboard-only", accounts: [], profile: null, workflow: { name: "My workflow", steps: [], roles: [] }, conversations: [], observations: [], voice: [], agents: [], audit: [] });
         return { id, policy };
-      });
+      }));
     },
     async list() {
       await privateDirectory(root);

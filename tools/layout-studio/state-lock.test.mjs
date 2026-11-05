@@ -43,6 +43,19 @@ test("kernel lock releases after its owner crashes and a separate process can ac
   } finally { child.stdin.end(); if (child.exitCode === null) child.kill(); await rm(root, { recursive: true, force: true }); }
 });
 
+test("a failed state transaction cannot poison another store instance or publish its uncommitted fields", async () => {
+  const root = await mkdtemp(join(tmpdir(), "switchyard-store-failed-queue-")), keys = new Map();
+  const secrets = { get: async (id, purpose) => keys.get(`${id}:${purpose}`), set: async (id, purpose, value) => { keys.set(`${id}:${purpose}`, value); } };
+  const a = createSuiteStore({ root, secrets }), b = createSuiteStore({ root, secrets });
+  try {
+    await a.initialize("personal");
+    const failed = a.update("personal", "synthetic-uncommitted", state => { state.uncommitted = true; throw Error("synthetic transaction refusal"); });
+    const next = b.update("personal", "synthetic-next", state => { assert.equal(state.uncommitted, undefined); state.committed = true; });
+    await assert.rejects(failed, /transaction refusal/); await next;
+    const state = await a.snapshot("personal"); assert.equal(state.uncommitted, undefined); assert.equal(state.committed, true); assert.equal(state.audit.length, 1);
+  } finally { await rm(root, { recursive: true, force: true }); }
+});
+
 test("nonblocking resource probes distinguish a held kernel lease from callback failures and retain the normal owner", async () => {
   const root = await mkdtemp(join(tmpdir(), "switchyard-resource-probe-")), secrets = { get: async () => undefined, set: async () => {} };
   const a = createSuiteStore({ root, secrets }), b = createSuiteStore({ root, secrets }); let called = false;
