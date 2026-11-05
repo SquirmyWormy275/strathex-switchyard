@@ -85,3 +85,13 @@ synthetic Python BOMs validate against the official CycloneDX 1.6 schema; three
 invalid mutations are rejected. Receipt `pypi-cyclonedx-schema-1793885089361.json`
 binds the three schema hashes, validator versions and exact BOM bytes. This is
 format validation, not publisher or security acceptance.
+
+The normal installed source `8108738` now passes six update checks and both
+16-check Supply Chain/Release demonstrations. Each affected scan reports ten
+matching advisory identities as failed; each comparison remains incomplete. All
+four native scanner exits, feed retirement and original-state restoration verify.
+Owned source, signing material, packages, staging, bundle and proof checkout were
+removed. See the [retained summary](evidence/installed-pypi-summary.json) for exact
+release, receipt identities and limits. Temporary schema tooling was also removed
+(`pypi-schema-tool-cleanup-1793885199709.json`); the initial schema/installer
+failures remain recorded separately.

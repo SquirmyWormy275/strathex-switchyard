@@ -5,15 +5,20 @@ The F77 is the connected pilot, not a scope limit. The [requirement ledger](swit
 separates unfinished software from checks requiring an exact device, account or
 host. [Verification](verification.md) retains accepted and failed checkpoints.
 
-The latest complete Linux checkpoint is immutable `c735516`: 218/218 groups,
-1,316 tests, 1,306 passed and ten declared skips. Every child cleanup verifies;
-owned fixtures, dependency aliases and checkout are removed
-(`isolated-test-cb4f8300-cb00-40c6-8844-67f7030d6ee8.json`). Later VS Code navigation
-passes focused source and normal installed demonstrations; its latest-source full
-run remains separate. Native Windows staging/broker and all five independently
-scheduled Shield software scenarios have digest-verified evidence. Guest/account
-acceptance remains separate. [Native summary](evidence/windows-bd77-native-summary.json),
-[scenario summary](evidence/windows-869-shield-scenarios-summary.json).
+The latest accepted complete Linux checkpoint is immutable `d43721f`: 218/218
+groups, 1,324 tests, 1,314 passed and ten declared skips, with every child cleanup
+and owned fixture/alias/worktree removal verified. Later Python source `8108738`
+passes 52 focused checks and both normal installed Supply Chain/Release
+journeys (six update plus 16 and 16 scan checks); its separate complete Linux run
+is still in progress. [Python evidence](evidence/installed-pypi-summary.json).
+
+Windows client source `04d9d6c` passes seven complete groups and 70 assertions
+under unchanged deadlines. Actual native NTFS/broker acceptance remains tied to
+its named historical sources; recent native setup removal and restricted token
+failures remain failed. CI now runs filesystem, setup and restricted exchange on
+independent workers, preserving all original checks/bounds. Actual guest,
+ordinary-account, work-tenant and physical acceptance remain separate. See the
+[verification ledger](verification.md) for exact artifacts and pending software.
 
 The later immutable `82eb764` full run remains failed at interrupted-install
 recovery: 213/214 groups pass, 1,266 tests pass, one fails and ten skips. Recovery
