@@ -277,3 +277,12 @@ All exact comparisons, recognized pending native codes and original absence/
 stop/exit deadlines stay unchanged. The helper compiles with zero warnings;
 112 portable protocol/journal/fact checks pass using the existing SDK. Native
 service-removal acceptance still requires a fresh worker result.
+
+The next native restricted-owner attempt, source `4fd8c28`, failed during
+`restricted-primary-token` verification before creating a child. Its [digest-verified
+failure summary](evidence/windows-4fd-restricted-token-failed-summary.json) retains
+the original failure and protected installation. The old diagnostic value 5385
+was the low bits of a managed exception HRESULT, not a Win32 API error. The proof
+now distinguishes those codes and names each finite token check; it retains every
+restriction and the original child deadline. The ordinary-account and restricted
+primary-process acceptances remain unproven.

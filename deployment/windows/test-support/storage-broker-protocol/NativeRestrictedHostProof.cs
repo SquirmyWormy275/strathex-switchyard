@@ -53,17 +53,25 @@ internal static class NativeRestrictedHostProof
     }
     private static void VerifyToken(SafeAccessTokenHandle token, string user)
     {
+        string stage = Phase;
+        Phase = stage + "/same-user";
         Require(User(token) == user);
+        Phase = stage + "/primary-kind";
         Require(ReadToken(token, 8, pointer => Marshal.ReadInt32(pointer)) == 1); // TokenPrimary
+        Phase = stage + "/medium-integrity";
         Require(ReadToken(token, 25, pointer => new SecurityIdentifier(Marshal.ReadIntPtr(pointer)).Value) == "S-1-16-8192");
+        Phase = stage + "/restriction-flags";
         Require(IsTokenRestricted(token) && ReadToken(token, 21, pointer => Marshal.ReadInt32(pointer)) != 0);
+        Phase = stage + "/restricting-sid-count";
         var restrictions = ReadToken(token, 11, pointer =>
         {
             int count = Marshal.ReadInt32(pointer); Require(count == 4); var result = new HashSet<string>(StringComparer.Ordinal);
             for (int i = 0; i < count; i++) result.Add(new SecurityIdentifier(Marshal.PtrToStructure<SidAttributes>(IntPtr.Add(pointer, (IntPtr.Size == 8 ? 8 : 4) + i * Marshal.SizeOf<SidAttributes>())).Sid).Value);
             return result;
         });
+        Phase = stage + "/restricting-sid-identities";
         Require(restrictions.SetEquals(new[] { user, "S-1-1-0", "S-1-5-11", "S-1-5-32-545" }));
+        Phase = stage + "/administrators-deny-only";
         bool disabledAdmin = ReadToken(token, 2, pointer =>
         {
             int count = Marshal.ReadInt32(pointer); Require(count is >= 1 and <= 1024);
@@ -76,6 +84,7 @@ internal static class NativeRestrictedHostProof
             return found;
         });
         Require(disabledAdmin);
+        Phase = stage + "/volume-privilege-absent";
         Native(LookupPrivilegeValueW(null, "SeManageVolumePrivilege", out long volume));
         ReadToken(token, 3, pointer =>
         {
@@ -83,6 +92,7 @@ internal static class NativeRestrictedHostProof
             for (int i = 0; i < count; i++) { var privilege = Marshal.PtrToStructure<Privilege>(IntPtr.Add(pointer, 4 + i * Marshal.SizeOf<Privilege>())); Require(privilege.Low != unchecked((uint)volume) || privilege.High != unchecked((int)(volume >> 32))); }
             return true;
         });
+        Phase = stage;
     }
     internal static object Run()
     {

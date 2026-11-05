@@ -138,3 +138,10 @@ client lane includes both files. Eight local runner/client groups pass 87 tests,
 (`isolated-test-dbc2c702-1e9d-42d8-8a4a-9df1205e1778.json`). New native acceptance
 is pending. The complete required inventory now contains 219 independently run
 groups; earlier full checkpoints retain their original source-bound counts.
+
+The independent Windows client rerun at `04d9d6c` passed all seven required
+groups and 70 assertions, with every child cleanup verified. The [retained
+summary](evidence/windows-04d-client-summary.json) binds the exact archive digest.
+Both complete focus/physical-intent files keep their original deadlines. This
+software contract result complements the actual Linux desktop demonstrations;
+it does not establish native Windows desktop interaction.
