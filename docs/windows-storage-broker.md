@@ -379,6 +379,23 @@ checks pass, with owned scratch removed
 unfinished. [Source-bound failed summary](evidence/windows-03a-restricted-failed-summary.json).
 
 
+Native source `a87f048` now identifies the query failure precisely: information
+class 21 requests a one-byte buffer, but the general reader requires at least
+four bytes. It fails that managed size guard before any boolean observation or
+child creation. The [failed source-bound summary](evidence/windows-a87-restricted-failed-summary.json)
+retains the original failure and protected installation.
+
+The test-only historical reader now accepts an exact one-byte or four-byte
+result and decodes that width without an over-read. Other widths, unexpected
+probe success and changed returned lengths refuse. Every other token reader
+retains its original bounds. Successful reports must include three exact width
+observations in addition to the boolean observations and all concrete security
+checks. Both managed targets compile without warnings/errors and 223 portable
+checks pass; three isolated runner/selector/report groups pass 25 checks with
+every cleanup verified. Receipts are `windows-history-native-build-1793898737394.json`
+and `isolated-test-ef01f9d9-9abd-4eab-bb63-7b1637cc8a73.json`. Corrected native
+execution remains pending on available CI.
+
 ### Queue native proofs independently
 
 Each Windows native matrix lane now has its own per-ref concurrency group; each

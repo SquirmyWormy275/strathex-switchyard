@@ -1,0 +1,22 @@
+{
+  "schema": "switchyard-installed-copilot-journal-summary/v1",
+  "sourceCommit": "1877f27197cea0f6e9178b6e9bc8ace404682f2c",
+  "release": "e5993034f3cabc5d2d254ca7f8f62c21a02d6e801c9f397490727feada38a6a9",
+  "updateReceipt": "assignment-legends-1793895792934.json",
+  "updateChecks": 6,
+  "metadataReceipt": "installed-copilot-journal-metadata-1793895793602.json",
+  "metadataChecks": 6,
+  "cleanupReceipt": "installed-copilot-journal-cleanup-1793895967301.json",
+  "selectedStatePreserved": true,
+  "requestJournalsHiddenFromGenericSnapshot": true,
+  "unauthenticatedRequestsRefused": true,
+  "invalidAndReplayFieldsRefused": true,
+  "frozenHomeSha256": "20ba0095a6b9650046df34541872aa7e0a7cdc7db5182f065abb009127c6c130",
+  "ownedBundleAndCheckoutRemoved": true,
+  "workspaceCreated": false,
+  "microsoftRequestsMade": 0,
+  "modelPromptsSubmitted": 0,
+  "keyboardOpened": false,
+  "microphoneOpened": false,
+  "tenantAccepted": false
+}

@@ -18,7 +18,9 @@ internal static class NativeRestrictedHostProof
     internal static object? CreatorPrivileges;
     internal static object? TokenReadDiagnostic;
     private static readonly List<bool> HistoricalFilteredFlags = new();
+    private static readonly List<uint> HistoricalFilterBytes = new();
     internal static bool[] HistoricalFilterObservations => HistoricalFilteredFlags.ToArray();
+    internal static uint[] HistoricalFilterWidths => HistoricalFilterBytes.ToArray();
     private static void Require(bool condition) { if (!condition) throw new InvalidOperationException("The restricted host process proof did not verify."); }
     private static void Native(bool condition) { if (!condition) throw new Win32Exception(Marshal.GetLastWin32Error()); }
     private static byte[] ReadBounded(string path)
@@ -47,6 +49,28 @@ internal static class NativeRestrictedHostProof
     private static T ReadToken<T>(SafeAccessTokenHandle token, int kind, Func<IntPtr,T> read)
     {
         IntPtr buffer = TokenInformation(token, kind); try { return read(buffer); } finally { Marshal.FreeHGlobal(buffer); }
+    }
+    private static bool ReadHistoricalFilter(SafeAccessTokenHandle token)
+    {
+        // Native Windows can return this historical BOOLEAN as one byte. Do not
+        // read a DWORD beyond that buffer or relax any other token decoder.
+        const int kind = 21;
+        bool probed = GetTokenInformation(token, kind, IntPtr.Zero, 0, out uint size);
+        int probeError = probed ? 0 : Marshal.GetLastWin32Error();
+        TokenReadDiagnostic = new { informationClass = kind, stage = "size-probe", succeeded = probed, nativeCode = probeError, bytes = size };
+        if (!probed && probeError != 122) throw new Win32Exception(probeError);
+        Require(!probed && size is 1 or 4);
+        var buffer = Marshal.AllocHGlobal(checked((int)size));
+        try
+        {
+            bool read = GetTokenInformation(token, kind, buffer, size, out uint used); int readError = read ? 0 : Marshal.GetLastWin32Error();
+            TokenReadDiagnostic = new { informationClass = kind, stage = "read", succeeded = read, nativeCode = readError, bytes = used };
+            if (!read) throw new Win32Exception(readError);
+            Require(used == size);
+            bool value = size == 1 ? Marshal.ReadByte(buffer) != 0 : Marshal.ReadInt32(buffer) != 0;
+            HistoricalFilterBytes.Add(used); return value;
+        }
+        finally { Marshal.FreeHGlobal(buffer); }
     }
     private static string User(SafeAccessTokenHandle token) => ReadToken(token, 1, pointer => new SecurityIdentifier(Marshal.ReadIntPtr(pointer)).Value);
     private static (bool Assigned, bool Enabled) PrivilegeState(SafeAccessTokenHandle token, string name)
@@ -77,7 +101,7 @@ internal static class NativeRestrictedHostProof
         // Historical filter metadata is not the actual restricting SID list.
         // Observe it without substituting it for the public restriction proof.
         Phase = stage + "/historical-filter-observation";
-        HistoricalFilteredFlags.Add(ReadToken(token, 21, pointer => Marshal.ReadInt32(pointer)) != 0);
+        HistoricalFilteredFlags.Add(ReadHistoricalFilter(token));
         Phase = stage + "/restricting-sid-count";
         var restrictions = ReadToken(token, 11, pointer =>
         {
@@ -240,7 +264,7 @@ internal static class NativeRestrictedHostProof
                                 Require(report.GetProperty("schema").GetString() == "switchyard-restricted-host-result/v1" && report.GetProperty("nonce").GetString() == nonce && report.GetProperty("success").GetBoolean());
                                 var owner = report.GetProperty("owner"); Require(owner.GetProperty("success").GetBoolean() && owner.GetProperty("checks").GetArrayLength() == 8 && owner.GetProperty("nativeExitVerified").GetBoolean() && owner.GetProperty("fixtureRemoved").GetBoolean() && !owner.GetProperty("ordinaryUserToken").GetBoolean());
                                 Phase = "complete";
-                                return new { schema = "switchyard-restricted-host-process-proof/v1", success = true, processCreationApi = "CreateProcessAsUserW", creatorPrivileges = CreatorPrivileges, creatorQuotaRestoredVerified = true, restrictingSidListVerified = true, restrictingSidCount = 4, primaryTokenVerified = true, sameUserVerified = true, mediumIntegrityVerified = true, administratorsDenyOnlyVerified = true, volumePrivilegeAbsentVerified = true, onlyTraversePrivilegeAssignedVerified = true, historicalFilteredFlags = HistoricalFilteredFlags.ToArray(), tokenRecheckedAfterExit = true, treeExitVerified = true, hostOwnerChecks = 8, hostOwner = owner.Clone(), ordinaryUserAccountAccepted = false, guestLaunched = false, accountCreated = false };
+                                return new { schema = "switchyard-restricted-host-process-proof/v1", success = true, processCreationApi = "CreateProcessAsUserW", creatorPrivileges = CreatorPrivileges, creatorQuotaRestoredVerified = true, restrictingSidListVerified = true, restrictingSidCount = 4, primaryTokenVerified = true, sameUserVerified = true, mediumIntegrityVerified = true, administratorsDenyOnlyVerified = true, volumePrivilegeAbsentVerified = true, onlyTraversePrivilegeAssignedVerified = true, historicalFilteredFlags = HistoricalFilteredFlags.ToArray(), historicalFilterBytes = HistoricalFilterBytes.ToArray(), tokenRecheckedAfterExit = true, treeExitVerified = true, hostOwnerChecks = 8, hostOwner = owner.Clone(), ordinaryUserAccountAccepted = false, guestLaunched = false, accountCreated = false };
                             }
                             finally
                             {
