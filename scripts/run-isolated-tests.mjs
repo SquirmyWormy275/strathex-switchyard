@@ -151,6 +151,7 @@ export const requiredGroups = [
   { file: "scripts/workflow-capture.test.mjs" },
   { file: "scripts/codex-thread-status.test.mjs" },
   { file: "scripts/codex-daemon-status.test.mjs", ...(process.platform === "win32" ? { expectedSkipped: 2 } : {}) },
+  { file: "scripts/verify-tmux-focus-host.test.mjs" },
   { file: "tools/layout-studio/model.test.mjs" },
   { file: "tools/layout-studio/catalog.test.mjs" },
   { file: "tools/layout-studio/catalog-identity.test.mjs" },

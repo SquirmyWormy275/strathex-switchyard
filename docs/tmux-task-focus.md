@@ -66,3 +66,33 @@ tmux session ID. Its failed receipt remains failed; the corrected fixture
 disables environment expansion. The earlier detached prototype also retired
 without a UI acceptance claim. No user terminal configuration, launcher,
 keyboard mapping, provider account or model conversation was changed.
+
+The normal installed `c2fe4d8` update passes six preservation checks and exposes
+the new tmux capability. Its real native account discovery passes. The live
+session check is blocked specifically by Claude's native workspace-trust dialog;
+no approval or model prompt is injected. This is an owner trust decision, not
+an unavailable account or missing pane implementation. The [installed boundary
+summary](evidence/installed-tmux-trust-boundary-summary.json) retains the failure
+and exact release/receipts.
+
+```sh
+mise exec node@24.14.0 -- node scripts/verify-tmux-focus-host.mjs \
+  --synthetic --repository=/absolute/trusted/git/repository
+```
+
+The verifier opens only an empty tools-disabled, hook-disabled, plan-mode native
+session, authenticates the installed listener, pins source bytes and preserves
+its workspace. Native trust remains deliberate. Unsupported arguments refuse
+before application/account state access; both guard/runner groups pass all 18
+checks with child cleanup. An initial omitted manifest entry remains a failed
+prototype.
+
+One earlier verifier prototype failed cleanup verification before restoring
+selection. Manual recovery disabled its validation workspace and selected
+Personal; its exact prior selection was not recoverable because the prototype
+had not retained it. That failure remains failed. The revised verifier records
+selection and process witnesses, waits independently for native exit, and restores
+workspace/focus even when another cleanup step fails. Its latest trust refusal
+verifies exact restoration, four process exits and owned socket/directory removal.
+The disposable build checkout and bundle are removed. All checks remain zero
+prompts, with no terminal text or trust override.
