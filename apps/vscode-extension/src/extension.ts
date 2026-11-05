@@ -13,7 +13,7 @@ import type { CodexLocalThreadBinding, CodexLocalThreadObservation } from "./ope
 const { readCodexDaemonThreads, readExactCodexDaemonThread, startCodexDaemonThread, persistBoundCodexThread, readBoundCodexThreads } = require("./codex-daemon-status.cjs") as {
   readCodexDaemonThreads(socketPath: string): Promise<readonly CodexLocalThreadObservation[]>;
   readExactCodexDaemonThread(socketPath: string, threadId: string): Promise<CodexLocalThreadObservation>;
-  startCodexDaemonThread(socketPath: string, repositoryRoot: string, taskId: string): Promise<Readonly<{ threadId: string }>>;
+  startCodexDaemonThread(socketPath: string, repositoryRoot: string, taskId: string, options: { readOnly: true }): Promise<Readonly<{ threadId: string }>>;
   persistBoundCodexThread(binding: CodexLocalThreadBinding): Promise<CodexLocalThreadBinding>;
   readBoundCodexThreads(): Promise<readonly CodexLocalThreadBinding[]>;
 };
@@ -44,7 +44,8 @@ export function activate(context: vscode.ExtensionContext): void {
         for (const result of exact) if (result.status === "fulfilled") joined.set(result.value.id, result.value);
         return [...joined.values()];
       },
-      startCodexThread: (repositoryRoot, taskId) => startCodexDaemonThread(codexSocket, repositoryRoot, taskId),
+      startCodexThread: (repositoryRoot, taskId) => startCodexDaemonThread(codexSocket, repositoryRoot, taskId, { readOnly: true }),
+      codexSocketPath: codexSocket,
       persistCodexBinding: (binding) => persistBoundCodexThread(binding),
       readCodexBindings: () => readBoundCodexThreads(),
       codexExecutable: installedCodexExecutable(),

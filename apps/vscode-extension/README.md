@@ -66,3 +66,13 @@ it never rounds a Windows file identity through an unsafe JavaScript number.
 
 Run `npm run build:vscode` before packaging; it emits the CommonJS extension
 entry point at `dist/apps/vscode-extension/src/extension.js` named by the extension manifest. The VSIX contains the exact compiled control-plane and protocol modules used by the extension's untrusted-response validators; it has no runtime dependency on repository source files.
+## Exact terminal targeting and Codex launch
+
+Shift Terminal preserves the selected VS Code terminal object across picker and
+authorization delays. The local Codex command pins an explicit Unix endpoint,
+returned session UUID, repository and read-only/on-request policy. Local thread
+registration remains separate from verified account/task execution authority.
+Read the [targeting contract and real API demonstration](../../docs/ide-terminal-selection.md)
+before trying the opt-in disposable native check. Production task attachment and
+native TUI acceptance remain unfinished; the [verification ledger](../../docs/verification.md)
+separates source checks, actual demonstrations and remaining work.

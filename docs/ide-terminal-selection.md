@@ -45,3 +45,31 @@ The harness's earlier launcher/scope/readiness failures remain failed receipts.
 This validates the compiled helper through a disposable source fixture; it does
 not claim production extension installation or a coding-task attachment journey.
 [Exact evidence and source hashes](evidence/native-vscode-terminal-summary.json).
+
+The older `startBoundCodexThread` command now uses the same exact-object reveal
+helper. Its App Server thread creation always requests and verifies the exact
+directory plus `read-only` / `on-request`; a returned ID survives a failed
+permission readback. The CLI resumes only that returned UUID at the explicitly
+configured Unix socket and root with the same permission flags. Names, recent
+session selectors, remote URLs and ambiguous/overlong socket paths refuse.
+The installed CLI and [official CLI reference](https://learn.chatgpt.com/docs/cli/reference)
+confirm explicit `unix://PATH` endpoints; [App Server documentation](https://learn.chatgpt.com/docs/app-server)
+describes creation and exact-ID resume as separate operations from a model turn.
+
+The launcher rechecks open workspace, window focus, controller lifetime, directory
+inode and executable identity across its asynchronous boundaries. Persisted and
+registered acknowledgements must retain the exact thread/task/root binding.
+Failed creation or later context drift preserves the returned native ID in the
+local warning and prevents a terminal launch. The existing local task-binding
+metadata message remains; no user request or model turn is submitted by creation.
+Thread registration alone does not establish account, native process attachment,
+target authority or verified completion.
+
+Four isolated groups pass 147 checks, including twelve asynchronous refusal cases,
+strict daemon permission/directory responses and partial identity retention.
+Typecheck and extension build pass. A help-only run of the real installed Codex
+0.166 CLI accepts the generated flags and exits; it opens no daemon connection,
+native task or model request. Native TUI attachment remains an outstanding
+integration check, separate from unavailable hardware/account checks and the
+broader unfinished Studio-to-IDE task integration.
+[Exact parser/software evidence](evidence/native-codex-cli-parser-summary.json).

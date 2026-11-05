@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { mkdir, mkdtemp, readFile, realpath, rm, stat, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, realpath, rename, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -1180,10 +1180,11 @@ test("Linux Codex start binds the App Server thread ID, task, repository, and ex
     idFactory: sequenceFactory(),
     resolveGitRoots: async () => [{ gitRoot: root }],
     codexExecutable: process.execPath,
-    startCodexThread: async (repositoryRoot, taskId) => { assert.equal(repositoryRoot, root); assert.equal(taskId, "task-7"); return { threadId: "thread-created" }; },
+    codexSocketPath: "/synthetic/control.sock",
+    startCodexThread: async (repositoryRoot, taskId) => { assert.equal(repositoryRoot, root); assert.equal(taskId, "task-7"); return { threadId: "019a36f0-1345-7345-b123-123456789abc" }; },
     persistCodexBinding: async (binding) => { saved = binding; return binding; },
     readCodexBindings: async () => saved ? [saved] : [],
-    observeCodexThreads: async (boundThreadIds) => { assert.deepEqual(boundThreadIds, ["thread-created"]); return [{ id: "thread-created", observation: "active" }]; }
+    observeCodexThreads: async (boundThreadIds) => { assert.deepEqual(boundThreadIds, ["019a36f0-1345-7345-b123-123456789abc"]); return [{ id: "019a36f0-1345-7345-b123-123456789abc", observation: "active" }]; }
   });
   try {
     await controller.start();
@@ -1194,11 +1195,11 @@ test("Linux Codex start binds the App Server thread ID, task, repository, and ex
     }];
     vscode.input("task-7");
     await vscode.invoke("sxsy-b122.startBoundCodexThread");
-    assert.equal(saved?.threadId, "thread-created");
+    assert.equal(saved?.threadId, "019a36f0-1345-7345-b123-123456789abc");
     assert.equal(saved?.taskId, "task-7");
     assert.equal(saved?.targetSnapshotId, "a".repeat(64));
-    assert.deepEqual(vscode.terminalOptions.at(-1)?.shellArgs, ["resume", "--remote", "unix://", "thread-created"]);
-    assert.equal(bridge.registered.at(-1)?.metadata["sxsy-b122.codex.threadId"], "thread-created");
+    assert.deepEqual(vscode.terminalOptions.at(-1)?.shellArgs, ["resume", "--remote", "unix:///synthetic/control.sock", "--sandbox", "read-only", "--ask-for-approval", "on-request", "--cd", root, "019a36f0-1345-7345-b123-123456789abc"]);
+    assert.equal(bridge.registered.at(-1)?.metadata["sxsy-b122.codex.threadId"], "019a36f0-1345-7345-b123-123456789abc");
     assert.deepEqual(bridge.registered.at(-1)?.capabilities, ["registered"]);
     await vscode.invoke("sxsy-b122.showManagedSessions");
     const rows = vscode.quickPickSurfaces.at(-1)?.items ?? [];
@@ -1206,6 +1207,47 @@ test("Linux Codex start binds the App Server thread ID, task, repository, and ex
   } finally {
     await controller.stop();
     await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("Linux Codex terminal launch fences asynchronous context/native identity drift and preserves partial creation identity", { skip: process.platform !== "linux" }, async () => {
+  for (const drift of ["workspace", "window-focus", "directory", "executable", "named-session", "before-start", "persistence", "bad-persisted-id", "partial-start", "registration", "substituted-registry", "invalid-socket"] as const) {
+    const stage = await mkdtemp(join(tmpdir(), "sxsy-codex-drift-")), root = join(stage, "repository"), cli = join(stage, "codex");
+    await mkdir(root); await writeFile(cli, "#!/bin/sh\nexit 0\n", { mode: 0o700 });
+    const vscode = new FakeVscode([], [root]), bridge = new FakeBridge(); let starts = 0, saved = false;
+    const id = "019a36f0-1345-7345-b123-123456789abc";
+    const controller = new ManagedSessionController(vscode.api, new FakeContext(), bridge, {
+      idFactory: sequenceFactory(), resolveGitRoots: async () => [{ gitRoot: root }], codexExecutable: cli,
+      codexSocketPath: drift === "invalid-socket" ? "/invalid/%socket" : "/synthetic/control.sock",
+      startCodexThread: async () => {
+        starts++;
+        if (drift === "workspace") vscode.workspaceFolders = [];
+        if (drift === "window-focus") vscode.focused = false;
+        if (drift === "directory") { await rename(root, root + "-old"); await mkdir(root); }
+        if (drift === "executable") await writeFile(cli, "#!/bin/sh\nexit 23\n");
+        if (drift === "partial-start") throw Object.assign(new Error("Synthetic native policy readback refused"), { createdThreadId: id });
+        return { threadId: drift === "named-session" ? "same-name" : id };
+      },
+      persistCodexBinding: async binding => { saved = true; if (drift === "persistence") vscode.focused = false; return drift === "bad-persisted-id" ? { ...binding, threadId: "019a36f0-1345-7345-b123-123456789abd" } : binding; }
+    });
+    try {
+      await controller.start();
+      const register = bridge.registerSession.bind(bridge);
+      bridge.registerSession = async session => {
+        const isThread = session.metadata["sxsy-b122.kind"] === "codex-app-server-thread";
+        if (drift === "registration" && isThread) vscode.workspaceFolders = [];
+        const result = await register(session);
+        return drift === "substituted-registry" && isThread && result.ok ? { ok: true, value: { ...result.value, taskId: "different-task" } } : result;
+      };
+      if (drift === "before-start") vscode.api.window.showInputBox = async () => { vscode.workspaceFolders = []; return "task-drift"; };
+      else vscode.input("task-drift");
+      await vscode.invoke("sxsy-b122.startBoundCodexThread");
+      assert.equal(starts, drift === "before-start" || drift === "invalid-socket" ? 0 : 1, drift);
+      assert.equal(saved, ["persistence", "bad-persisted-id", "registration", "substituted-registry"].includes(drift), drift);
+      assert.equal(vscode.createdTerminals.length, 0, drift);
+      assert.ok(vscode.warnings.length > 0, drift);
+      if (starts > 0) assert.match(vscode.warnings.at(-1)!, /after Codex created/, "the returned native identity must survive refusal without suggesting another creation");
+    } finally { await controller.stop(); await rm(stage, { recursive: true, force: true }); }
   }
 });
 

@@ -7,6 +7,7 @@ import { createServer } from "node:net";
 import { chordCommands, chordFor, type B122Control, type B122Modifier, type ChordCommand } from "./commands.ts";
 import { codexLocalThreadItems, operatorSessionItems, type CodexLocalThreadBinding, type CodexLocalThreadObservation } from "./operator-status.ts";
 import { revealExactTerminal } from "./terminal-focus.ts";
+import { codexTerminalConnectionArguments, codexTerminalResumeArguments } from "./codex-terminal.ts";
 import { commandFor } from "../../../packages/control-plane/src/command-catalog.ts";
 import { authorityBroadcastReviewScopeDigest, type WorkflowArtifact } from "../../../packages/control-plane/src/workflow-artifacts.ts";
 import {
@@ -155,6 +156,7 @@ export interface ManagedSessionControllerOptions {
   /** Optional read-only local Codex daemon observation; never changes companion capability. */
   readonly observeCodexThreads?: (boundThreadIds: readonly string[]) => Promise<readonly CodexLocalThreadObservation[]>;
   readonly startCodexThread?: (repositoryRoot: string, taskId: string) => Promise<Readonly<{ threadId: string }>>;
+  readonly codexSocketPath?: string;
   readonly persistCodexBinding?: (binding: CodexLocalThreadBinding) => Promise<CodexLocalThreadBinding>;
   readonly readCodexBindings?: () => Promise<readonly CodexLocalThreadBinding[]>;
   readonly codexExecutable?: string;
@@ -248,6 +250,7 @@ export class ManagedSessionController {
   private readonly resolveGitRoots: () => Promise<readonly GitRootRegistration[]>;
   private readonly observeCodexThreads: (boundThreadIds: readonly string[]) => Promise<readonly CodexLocalThreadObservation[]>;
   private readonly startCodexThread?: (repositoryRoot: string, taskId: string) => Promise<Readonly<{ threadId: string }>>;
+  private readonly codexSocketPath?: string;
   private readonly persistCodexBinding?: (binding: CodexLocalThreadBinding) => Promise<CodexLocalThreadBinding>;
   private readonly readCodexBindings: () => Promise<readonly CodexLocalThreadBinding[]>;
   private readonly codexExecutable?: string;
@@ -313,6 +316,7 @@ export class ManagedSessionController {
     this.persistCodexBinding = options.persistCodexBinding;
     this.readCodexBindings = options.readCodexBindings ?? (async () => []);
     this.codexExecutable = options.codexExecutable;
+    this.codexSocketPath = options.codexSocketPath;
     const openExternal = options.openExternal ?? (async () => false);
     this.openExternal = async (url) => { this.assertAdmissionActive(); return openExternal(url); };
     const executeCommand = options.executeCommand ?? (async (command: string) => {
@@ -564,7 +568,7 @@ export class ManagedSessionController {
 
   /** Start one Codex thread first, then persist exactly the ID returned by App Server. */
   private async startBoundCodexThread(): Promise<void> {
-    if (process.platform !== "linux" || !this.startCodexThread || !this.persistCodexBinding || !this.codexExecutable) {
+    if (process.platform !== "linux" || !this.startCodexThread || !this.persistCodexBinding || !this.codexExecutable || !this.codexSocketPath) {
       await this.vscode.window.showWarningMessage("SXSY-B122 task-bound Codex requires Linux, the local App Server, and a Codex CLI in a supported user or system location.");
       return;
     }
@@ -595,16 +599,28 @@ export class ManagedSessionController {
     const executable = await realpath(this.codexExecutable);
     const executableInfo = await stat(executable);
     if (!executableInfo.isFile() || (executableInfo.mode & 0o111) === 0) throw new Error("The reviewed Codex executable is unavailable.");
+    codexTerminalConnectionArguments(root, this.codexSocketPath);
+    const imageIdentity = (value: typeof executableInfo) => [value.dev, value.ino, value.size, value.mode, value.mtimeMs, value.ctimeMs].join(":");
+    const assertContextCurrent = async () => {
+      this.assertAdmissionActive();
+      if (!this.vscode.window.state.focused || !(this.vscode.workspace.workspaceFolders ?? []).some(folder => samePath(resolve(folder.uri.fsPath), requested)) || !this.gitRoots.some(candidate => samePath(candidate.gitRoot, root))) throw new Error("The original focused Codex workspace is no longer current.");
+      const fresh = await lstat(requested);
+      if (!fresh.isDirectory() || fresh.isSymbolicLink() || fresh.dev !== link.dev || fresh.ino !== link.ino || !samePath(await realpath(requested), root)) throw new Error("The exact Codex repository directory changed during terminal preparation.");
+      if (!samePath(await realpath(this.codexExecutable!), executable) || imageIdentity(await stat(executable)) !== imageIdentity(executableInfo)) throw new Error("The reviewed Codex executable changed during terminal preparation.");
+      this.assertAdmissionActive();
+      if (!this.vscode.window.state.focused || !(this.vscode.workspace.workspaceFolders ?? []).some(folder => samePath(resolve(folder.uri.fsPath), requested))) throw new Error("The original focused Codex workspace changed during validation.");
+    };
     const before = await this.bridge.listSessions().catch(() => undefined);
     const candidates = before?.ok ? before.value.filter((session) => session.provider === "codex" && session.taskId === taskId
       && session.workspaceRoot && samePath(session.workspaceRoot, root) && session.targetSnapshotId && /^[a-f0-9]{64}$/.test(session.targetSnapshotId)) : [];
     const source = candidates.length === 1 ? candidates[0] : undefined;
     let threadId: string | undefined;
     try {
-      this.assertAdmissionActive();
+      await assertContextCurrent();
       const started = await this.startCodexThread(root, taskId);
       threadId = started.threadId;
-      if (!/^[A-Za-z0-9_-]{1,128}$/.test(threadId)) throw new Error("Codex returned an invalid thread ID.");
+      const shellArgs = codexTerminalResumeArguments(threadId, root, this.codexSocketPath);
+      await assertContextCurrent();
       const after = source ? await this.bridge.listSessions().catch(() => undefined) : undefined;
       const target = source && after?.ok && after.value.some((session) => session.id === source.id && session.provider === "codex"
         && session.taskId === taskId && session.targetSnapshotId === source.targetSnapshotId
@@ -613,8 +629,10 @@ export class ManagedSessionController {
         threadId, taskId, sessionId: `codex-thread:${threadId}`, repositoryRoot: root,
         targetSnapshotId: target, createdAt: this.now()
       };
-      this.assertAdmissionActive();
-      await this.persistCodexBinding(binding);
+      await assertContextCurrent();
+      const persisted = await this.persistCodexBinding(binding);
+      if (["threadId", "taskId", "sessionId", "repositoryRoot", "targetSnapshotId", "createdAt"].some(key => persisted[key as keyof CodexLocalThreadBinding] !== binding[key as keyof CodexLocalThreadBinding])) throw new Error("The persisted Codex binding did not acknowledge the exact thread, task and repository.");
+      await assertContextCurrent();
       const session: ExtensionManagedSession = {
         ...this.makeSession(binding.sessionId, "codex", "vscode_terminal", "unknown", {
           "sxsy-b122.kind": "codex-app-server-thread",
@@ -625,15 +643,20 @@ export class ManagedSessionController {
         ...(target ? { targetSnapshotId: target } : {})
       };
       const registered = await this.bridge.registerSession(session, "terminal").catch(() => undefined);
-      this.assertAdmissionActive();
-      if (registered?.ok) this.sessions.set(session.id, registered.value);
+      await assertContextCurrent();
+      if (registered?.ok) {
+        const value = registered.value;
+        if (value.id !== session.id || value.provider !== "codex" || value.taskId !== taskId || !value.workspaceRoot || !samePath(value.workspaceRoot, root) || value.targetSnapshotId !== session.targetSnapshotId || value.metadata["sxsy-b122.codex.threadId"] !== threadId) throw new Error("The registry returned a different Codex thread, task or repository binding.");
+        this.sessions.set(session.id, value);
+      }
       const terminal = this.vscode.window.createTerminal({
         name: `SXSY Codex · ${taskId}`, cwd: root, shellPath: executable,
-        shellArgs: ["resume", "--remote", "unix://", threadId]
+        shellArgs
       });
-      terminal.show();
+      await revealExactTerminal(this.vscode.window, terminal, assertContextCurrent);
       await this.vscode.window.showInformationMessage(`SXSY-B122 opened Codex thread ${threadId} for task ${taskId}; target ${target ?? "unverified"}. Its runtime status does not imply a verified Switchyard outcome.`);
     } catch (error) {
+      if (!threadId && error instanceof Error && "createdThreadId" in error && typeof error.createdThreadId === "string" && /^[A-Za-z0-9_-]{1,128}$/.test(error.createdThreadId)) threadId = error.createdThreadId;
       await this.vscode.window.showWarningMessage(`SXSY-B122 Codex thread start stopped${threadId ? ` after Codex created ${threadId}` : ""}: ${error instanceof Error ? error.message : "unknown error"}`);
     }
   }

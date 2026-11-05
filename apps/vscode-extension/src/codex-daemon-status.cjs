@@ -169,17 +169,20 @@ async function resumeExactCodexDaemonThread(socketPath, threadId, repositoryRoot
 }
 
 async function startCodexDaemonThread(socketPath, repositoryRoot, taskId, options = {}) {
+  if (options.readOnly !== undefined && options.readOnly !== true) throw new Error("Task-bound Codex threads require read-only/on-request permissions.");
   if (typeof repositoryRoot !== "string" || !isAbsolute(repositoryRoot) || /[\0\r\n]/.test(repositoryRoot) || repositoryRoot.length > 4096) {
     throw new Error("Codex thread requires an exact absolute repository root.");
   }
   if (typeof taskId !== "string" || !/^[A-Za-z0-9_.:-]{1,128}$/.test(taskId)) throw new Error("Codex thread requires a bounded task ID.");
   return requestCodexDaemon(socketPath, {
-    id: 2, method: "thread/start", params: { cwd: repositoryRoot, serviceName: "strathex-switchyard", ...(options.readOnly ? { sandbox: "read-only", approvalPolicy: "on-request" } : {}) }
+    id: 2, method: "thread/start", params: { cwd: repositoryRoot, serviceName: "strathex-switchyard", sandbox: "read-only", approvalPolicy: "on-request" }
   }, (result) => {
     const thread = result?.thread;
-    if (!thread || typeof thread.id !== "string" || !/^[A-Za-z0-9_-]{1,128}$/.test(thread.id)
-      || (thread.cwd !== undefined && thread.cwd !== repositoryRoot)) {
+    if (!thread || typeof thread.id !== "string" || !/^[A-Za-z0-9_-]{1,128}$/.test(thread.id)) {
       throw new Error("Codex did not return an exact started thread identity.");
+    }
+    if (thread.cwd !== repositoryRoot || result.cwd !== repositoryRoot || result.sandbox?.type !== "readOnly" || result.approvalPolicy !== "on-request") {
+      const error = new Error("Codex thread creation did not verify the exact directory and read-only/on-request permissions."); error.createdThreadId = thread.id; throw error;
     }
     return Object.freeze({ threadId: thread.id });
   }, {

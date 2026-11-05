@@ -22,7 +22,7 @@ test("daemon inventory, exact thread scope and local login metadata keep bounded
   const directory = await mkdtemp(join(tmpdir(), "sxsy-codex-daemon-"));
   const path = join(directory, "control.sock");
   const methods = [];
-  let rejectInjection = false, badResume = false;
+  let rejectInjection = false, badResume = false, badStart;
   const upgradedSockets = new Set();
   const server = createServer();
   server.on("upgrade", (request, socket) => {
@@ -49,7 +49,10 @@ test("daemon inventory, exact thread scope and local login metadata keep bounded
           { id: "exact-active", name: "private title", status: { type: "active", activeFlags: [] } },
           { id: "exact-stored", preview: "private prompt", status: { type: "notLoaded" } }
         ], nextCursor: null } }));
-        else if (message.method === "thread/start") { if (rejectInjection) { assert.equal(message.params.sandbox, "read-only"); assert.equal(message.params.approvalPolicy, "on-request"); } socket.write(textFrame({ id: 2, result: { thread: { id: "created-thread", cwd: message.params.cwd } } })); }
+        else if (message.method === "thread/start") {
+          assert.equal(message.params.sandbox, "read-only"); assert.equal(message.params.approvalPolicy, "on-request");
+          socket.write(textFrame({ id: 2, result: { thread: { id: "created-thread", cwd: badStart === "thread-cwd" ? "/other" : message.params.cwd }, cwd: badStart === "cwd" ? "/other" : message.params.cwd, sandbox: { type: badStart === "sandbox" ? "workspaceWrite" : "readOnly" }, approvalPolicy: badStart === "approval" ? "never" : "on-request" } }));
+        }
         else if (message.method === "thread/read") socket.write(textFrame({ id: 2, result: { thread: { id: message.params.threadId, cwd: "/exact/repository", status: { type: "idle" } } } }));
         else if (message.method === "account/read") { assert.equal(message.params.refreshToken, false); socket.write(textFrame({ id: 2, result: { account: { type: "chatgpt", email: "synthetic@example.invalid" } } })); }
         else if (message.method === "thread/resume") {
@@ -81,6 +84,13 @@ test("daemon inventory, exact thread scope and local login metadata keep bounded
     const account = await readCodexDaemonAccount(path); assert.equal(account.type, "chatgpt"); assert.match(account.fingerprint, /^[a-f0-9]{64}$/); assert.equal(account.organizationVerified, false); assert.equal(JSON.stringify(account).includes("synthetic@"), false);
     const resumed = await resumeExactCodexDaemonThread(path, "created-thread", "/exact/repository"); assert.equal(resumed.id, "created-thread"); assert.equal(resumed.modelPromptSubmitted, false);
     badResume = true; await assert.rejects(resumeExactCodexDaemonThread(path, "created-thread", "/exact/repository"), /read-only permissions/);
+    for (badStart of ["thread-cwd", "cwd", "sandbox", "approval"]) {
+      await assert.rejects(startCodexDaemonThread(path, "/exact/repository", "task-7"), error => error.createdThreadId === "created-thread" && /read-only\/on-request/.test(error.message));
+      assert.equal(methods.at(-1), "thread/start", "refused permission readback must not inject metadata or issue another request");
+    }
+    badStart = undefined;
+    const before = methods.length;
+    await assert.rejects(startCodexDaemonThread(path, "/exact/repository", "task-7", { readOnly: false }), /require read-only/); assert.equal(methods.length, before);
     rejectInjection = true;
     await assert.rejects(startCodexDaemonThread(path, "/exact/repository", "task-7", { readOnly: true }), (error) => error.createdThreadId === "created-thread" && /did not persist/.test(error.message));
   } finally {
