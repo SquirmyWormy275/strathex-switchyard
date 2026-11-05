@@ -322,3 +322,12 @@ Complete immutable Linux `adbd10a` now passes all 205 required groups: 1,212
 passed tests and ten declared skips, every child cleanup verified. Receipt
 `isolated-test-c4c0c525-33d5-4ed8-9ebf-8784cee9e487.json` retained; owned fixture
 parent and detached checkout removed. Later index work is separately tested.
+
+Later immutable `4a6627a` retains a failed 207-group checkpoint: 206 groups and
+1,223 tests pass, one deadline-inventory guard fails and ten declared skips.
+Receipt `isolated-test-72711a93-699d-4602-b263-91b5055f79e7.json` stays failed.
+The guard now declares exactly the new group bounds and passes in the 37-check
+subset; no deadlines or assertions were waived. Every child cleanup verifies,
+and failed-checkpoint owned fixtures/checkout are removed with separate cleanup
+receipt `failed-full-index-inventory-cleanup-1793868621389.json`. A new complete
+208-group checkpoint is running against `11d8cc7`; acceptance remains pending.
