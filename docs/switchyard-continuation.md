@@ -7,7 +7,7 @@ and [verification](verification.md) distinguishes exact source passes and failur
 
 Work in the existing `feat/switchyard-configuration-loop` checkout and keep
 [draft PR 20](https://github.com/SquirmyWormy275/strathex-switchyard/pull/20)
-updated. Last published base for this checkpoint is `514bf685d5f103911fab6702613fe422d5bdc6a3`.
+updated. Source-audit implementation is published at `0cc9e76c30c541851b78685ec5f305592612526b`; use Git to read the newest checkpoint.
 This checkpoint adds the F77 source protocol audit, omits redundant backend
 HTML/CSS while preserving the frozen frontend, and records newer installed
 metadata evidence. Keep commits on GitHub regularly; do not merge or release.
@@ -37,7 +37,7 @@ existing versioned update and launcher path; do not print its private access URL
 or token. Private verification receipts live outside Git under
 `~/.local/state/strathex-switchyard/runtime-verification/`.
 
-- Installed source `514bf68`, release `86bdffe016ceb5c021b3f30ce01197a4e5a3e5041419a955efd5d0b6f133f0a9`,
+- Previous installed journal-metadata source `514bf68`, release `86bdffe016ceb5c021b3f30ce01197a4e5a3e5041419a955efd5d0b6f133f0a9`,
   passes six normal-update and six journal API/privacy checks. Selected sealed
   state and frozen frontend are preserved, with zero prompts, Microsoft requests,
   new workspaces or HID. Its owned bundle/checkout were removed. Exact receipts
@@ -71,7 +71,10 @@ or token. Private verification receipts live outside Git under
   No direct haptic state/control route is exposed in their audited VIA/Vial
   handlers, setting tables or keyboard extensions. This does not authenticate
   running firmware or establish electrical limits. Five focused groups pass
-  46 checks. [Audit and limits](solenoid-capability-audit.md).
+  46 checks. Normal installed release `f49d611e…` passes six update/four cached
+  checks, with no HID/control operation and all owned scratch removed.
+  [Installed summary](evidence/installed-haptic-protocol-summary.json),
+  [audit and limits](solenoid-capability-audit.md).
 - Real Claude/tmux registered navigation remains blocked at the CLI's workspace
   trust dialog. Do not retry with an override or prompt. Latest refusal restores
   workspace/focus and retires its owned processes/socket/cache; earlier recovery
@@ -79,8 +82,10 @@ or token. Private verification receipts live outside Git under
 
 ## Next executable tasks
 
-1. Finish the source-audit installed cached-readout check through the normal
-   updater, verify exact state preservation and retire its owned bundle/checkout.
+1. The source-audit installed cached-readout check now passes six update/four
+   actual API checks at `0cc9e76c`; exact state/frontend preservation and owned
+   bundle/checkout removal verify. Record its evidence while continuing the
+   remaining exact IDE/task attachment implementation.
 2. Collect the active 232-group result. Preserve failures honestly; verify exact
    owned child exit before removing task fixtures/aliases/checkouts. Diagnose
    failures without raising deadlines or affecting unrelated workstation jobs.

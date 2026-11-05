@@ -99,5 +99,9 @@ package exceeded the existing 5 MiB test budget; its
 [failed receipt summary](evidence/haptic-protocol-packaging-failed-summary.json)
 remains failed. Removing duplicate backend HTML/CSS keeps their original verified
 frozen-frontend copies and restores the package budget without changing it.
-Source JSON and all runtime state remain intact. Cached-readout installed
-acceptance for this additional audit remains separate.
+Source JSON and all runtime state remain intact. Normal installed source
+`0cc9e76c`, release `f49d611e…`, now passes six update/four cached-readout API
+checks, preserving the original profile/workflow/mode/transactions/readout,
+selection, private endpoint and frozen frontend. No HID or electrical operation
+is performed. The owned bundle/checkout are removed.
+[Exact installed summary](evidence/installed-haptic-protocol-summary.json).
