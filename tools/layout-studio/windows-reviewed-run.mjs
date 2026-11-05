@@ -3,7 +3,7 @@ import { createHash } from "node:crypto";
 import { validateRepositoryInputs } from "../../apps/windows-companion/src/repository-inputs.ts";
 import { NodeFileDigestReader } from "../../packages/control-plane/src/git-inspector.ts";
 
-import { connectedExecutionActions, windowsPipelineActions } from "./repository-execution-actions.mjs";
+import { connectedExecutionActions, windowsPipelineActions, windowsShieldActions } from "./repository-execution-actions.mjs";
 
 export const windowsReviewedRunSchema = "switchyard-windows-reviewed-run/v1";
 const digest = value => typeof value === "string" && /^[a-f0-9]{64}$/.test(value);
@@ -54,7 +54,7 @@ export function parseWindowsRunCatalog(bytes, manifest, recipeRuntimeSha256) {
       || /^(?:SystemRoot|WINDIR|TEMP|TMP|NODE_OPTIONS|NODE_PATH)$/i.test(name) || names.has(name.toLowerCase())) throw Error("The guest environment cannot override fixed entries, inject Node startup options or include credentials.");
     names.add(name.toLowerCase()); scalar(value, 8192, false);
   }
-  if (windowsPipelineActions.includes(manifest.recipeId) && recipe.environment.NODE_ENV !== "test") throw Error("A reviewed Windows pipeline requires the exact non-production NODE_ENV=test environment.");
+  if ([...windowsPipelineActions,...windowsShieldActions].includes(manifest.recipeId) && recipe.environment.NODE_ENV !== "test") throw Error("A reviewed Windows pipeline requires the exact non-production NODE_ENV=test environment.");
   if (!Array.isArray(recipe.artifacts) || recipe.artifacts.length > 128 || recipe.artifacts.some(path => !relative(path)) || new Set(recipe.artifacts.map(path => path.toLowerCase())).size !== recipe.artifacts.length) throw Error("Select only bounded, distinct guest artifact paths.");
   return structuredClone(recipe);
 }

@@ -17,8 +17,8 @@ test("normal Windows suite authority routes distinguish exact reviewed grants fr
   const body={...f.proposed,actions:["run_target"]},review=await suite.handle("/api/suite/coding/authority/review",body);
   assert.deepEqual(review.scope.allowedActions,["run_target"]);assert.ok(nativeChecks>=2);
   await assert.rejects(suite.handle("/api/suite/coding/authority/issue",{...body,token:randomUUID()}));
-  const grant=await suite.handle("/api/suite/coding/authority/issue",{...body,token:review.confirmation.token});assert.deepEqual(grant.connectedExecutionActions,["run_target","pipeline_local_gate","pipeline_clean_reproduction"]);assert.deepEqual(grant.proposal.actions,["run_target"]);assert.equal(grant.nativePermissionsChanged,false);
-  for(const action of ["debug_target","shield_change_scan","venv"]) await assert.rejects(suite.handle("/api/suite/coding/authority/review",{...body,actions:[action]}),/explicitly connected/);
+  const grant=await suite.handle("/api/suite/coding/authority/issue",{...body,token:review.confirmation.token});assert.deepEqual(grant.connectedExecutionActions,["run_target","pipeline_local_gate","pipeline_clean_reproduction","shield_change_scan","shield_codebase_audit","shield_supply_chain","release_shield"]);assert.deepEqual(grant.proposal.actions,["run_target"]);assert.equal(grant.nativePermissionsChanged,false);
+  for(const action of ["debug_target","launch_web_app","venv"]) await assert.rejects(suite.handle("/api/suite/coding/authority/review",{...body,actions:[action]}),/explicitly connected/);
   await assert.rejects(suite.handle("/api/suite/coding/authority/review",{...body,compartment:"work"}));
 });
 

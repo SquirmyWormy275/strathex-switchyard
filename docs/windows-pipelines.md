@@ -81,3 +81,8 @@ and recovery (one case) artifact digests and every child cleanup verify;
 `windows-pipeline-{policy,evidence,recovery}-5d3.json` receipts are retained.
 These native OS checks still use an explicit guest double. Actual guest/account
 acceptance and frontend controls remain separate work. No work laptop or Microsoft tenant is probed.
+
+The separate [Windows Shield path](windows-shield.md) now uses the shared exact
+native-output reader with a pinned scanner and closed findings contract.
+Pipeline coverage reports cannot substitute for scanner execution or a complete
+Shield gate.

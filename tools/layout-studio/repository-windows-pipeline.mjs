@@ -32,20 +32,26 @@ export function windowsPipelineDependencies(policy, review, target) {
     return { ...result, environment: { ...result.environment, environment: { NODE_ENV: "test", SXSY_TEST_MODE: "1", SXSY_NETWORK: "deny" } } };
   } } };
 }
-export async function attestWindowsPipeline({ store, compartment, stateDirectory, review, request, result, receiptEvidence, resolveScannerFixtures, guard, now }) {
-  const incomplete = summary => ({ status: "incomplete", effectDisposition: "committed", summary });
-  if (!windowsPipelineActions.includes(request.action) || request.action !== review.action || request.operationId !== review.operationId) return incomplete("The Windows pipeline result has no exact reviewed action/operation binding.");
-  if (result.status !== "completed") return { status: result.status, summary: result.summary };
-  try {
+/** Read only the exact already-exited native result's authenticated output bytes. */
+export async function readAttestedWindowsReport({store,compartment,stateDirectory,review,request,result,guard}) {
     await guard(); const native = (await store.snapshot(compartment)).repositoryWindowsRuns?.find(row => row.operationId === request.operationId);
     if (!native || native.nativeExitVerified !== true || native.scopeDigest !== review.scopeDigest || native.action !== request.action || scopeHash(native.result) !== scopeHash(result) || result.programExitCode !== 0 || result.diagnosticRoot || !Array.isArray(result.validatedOutputs) || result.validatedOutputs.length > 256 || !digest(result.resultManifestSha256) || result.recipeCatalogSha256 !== review.catalogSha256 || result.sandboxHelperSha256 !== review.executableIdentity.helperSha256) throw Error("The original Windows guest exit, catalog, helper or result did not verify.");
     const parent = join(stateDirectory, "windows", compartment, "results", request.operationId), root = result.resultRoot;
     if (typeof root !== "string" || relative(parent, root) !== basename(root) || !/^sandbox-[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/.test(basename(root))) throw Error("The original Windows report directory changed.");
     const records = result.validatedOutputs.filter(file => file.path === "process.stdout.txt"), before = await directoryIdentity(root);
     if (records.length !== 1 || !digest(records[0].sha256) || !Number.isSafeInteger(records[0].size) || records[0].size < 1 || records[0].size > review.recipe.maxOutputBytes) throw Error("The Windows pipeline report is absent, oversized or ambiguous.");
-    const read = await new NodeFileDigestReader({ maxFileBytes: 524288 }).read(root, "process.stdout.txt"); let parsed, output;
-    try { if (read.bytes.length !== records[0].size || read.digest !== `sha256:${records[0].sha256}`) throw Error("The original report bytes changed after validated extraction."); parsed = report(read.bytes, request.action); output = new TextDecoder("utf-8", { fatal: true }).decode(read.bytes); } finally { read.bytes.fill(0); }
+    const read = await new NodeFileDigestReader({ maxFileBytes: 524288 }).read(root, "process.stdout.txt"); let output;
+    try { if (read.bytes.length !== records[0].size || read.digest !== `sha256:${records[0].sha256}`) throw Error("The original report bytes changed after validated extraction."); output = new TextDecoder("utf-8", { fatal: true }).decode(read.bytes); } finally { read.bytes.fill(0); }
     const after = await directoryIdentity(root); if (before.dev !== after.dev || before.ino !== after.ino) throw Error("The report directory changed during inspection.");
+    return output;
+}
+
+export async function attestWindowsPipeline({ store, compartment, stateDirectory, review, request, result, receiptEvidence, resolveScannerFixtures, guard, now }) {
+  const incomplete = summary => ({ status: "incomplete", effectDisposition: "committed", summary });
+  if (!windowsPipelineActions.includes(request.action) || request.action !== review.action || request.operationId !== review.operationId) return incomplete("The Windows pipeline result has no exact reviewed action/operation binding.");
+  if (result.status !== "completed") return { status: result.status, summary: result.summary };
+  try {
+    const output=await readAttestedWindowsReport({store,compartment,stateDirectory,review,request,result,guard}),parsed=report(Buffer.from(output,"utf8"),request.action);
     const observedAt = new Date(now()); if (!Number.isFinite(observedAt.getTime())) throw Error("The Windows pipeline evidence clock is invalid.");
     const requested = [...parsed.scannerFixtureIds.map(id => [id, "scanner"]), ...parsed.advisoryFixtureIds.map(id => [id, "advisory"])];
     if (requested.length && typeof resolveScannerFixtures !== "function") throw Error("Signed fixtures are unavailable for this Windows pipeline.");

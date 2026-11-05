@@ -6,6 +6,9 @@ import { requiredGroups, runVerification, assertRequiredTestManifest } from "./r
 const suites = {
   "backend-contract": "apps/windows-companion/test/windows-sandbox.test.ts",
   "fixture-registry": "apps/windows-companion/test/scanner-fixtures.test.ts",
+  "shield-evidence": "tools/layout-studio/windows-shield-evidence.test.mjs",
+  "shield-policy": "tools/layout-studio/repository-windows-shield.test.mjs",
+  "shield-recovery": "tools/layout-studio/repository-windows-shield-recovery.test.mjs",
   "pipeline-recovery": "tools/layout-studio/repository-windows-pipeline-recovery.test.mjs",
   "pipeline-policy": "tools/layout-studio/repository-windows-pipeline.test.mjs",
   "pipeline-evidence": "tools/layout-studio/windows-pipeline-evidence.test.mjs",
@@ -21,7 +24,7 @@ const suites = {
   "run-owner": "tools/layout-studio/windows-reviewed-runner.test.mjs"
 };
 const flags = process.argv.slice(2), suite = flags[1]?.startsWith("--suite=") ? flags[1].slice(8) : undefined;
-if (process.platform !== "win32" || flags.length !== 2 || flags[0] !== "--synthetic" || !Object.hasOwn(suites, suite)) throw Error("Use on Windows: node scripts/verify-windows-storage-contracts.mjs --synthetic --suite=pipeline-recovery|pipeline-policy|pipeline-evidence|fixture-removal|backend-contract|fixture-registry|fixture-maintenance|harness|leases|legacy-images|broker-owner|sandbox-native|sandbox-sessions|reviewed-run|run-owner. No disk, VM, account or keyboard is opened.");
+if (process.platform !== "win32" || flags.length !== 2 || flags[0] !== "--synthetic" || !Object.hasOwn(suites, suite)) throw Error("Use on Windows: node scripts/verify-windows-storage-contracts.mjs --synthetic --suite=shield-evidence|shield-policy|shield-recovery|pipeline-recovery|pipeline-policy|pipeline-evidence|fixture-removal|backend-contract|fixture-registry|fixture-maintenance|harness|leases|legacy-images|broker-owner|sandbox-native|sandbox-sessions|reviewed-run|run-owner. No disk, VM, account or keyboard is opened.");
 assertRequiredTestManifest();
 const groups = requiredGroups.filter(group => group.file === suites[suite]);
 if (groups.length !== 1) throw Error("The complete Windows storage contract is absent or ambiguous in the required inventory.");

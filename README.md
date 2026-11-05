@@ -85,7 +85,7 @@ uncertain outcomes remain unchanged. Provider replies do not establish coding-ta
 These checks do not prove a finished keyboard/agent appliance. General coding-task
 controls, physical role shortcut selection in the frontend, platform lifecycle acceptance, profile-library visual acceptance,
 expanded device editing controls, complete device settings and final UI acceptance remain unfinished.
-The complete Linux runner checkpoint at `d0a7945` passes 177 groups: 1,139 tests passed and
+The complete Linux runner checkpoint at `8e83371` passes 177 groups: 1,143 tests passed and
 ten declared platform skips. Windows filesystem CI passes all 30 native checks,
 including bounded volume disk-full, exact detach and mapping admission. The full
 Windows worker/runtime checkpoint passes 261 groups: 1,690 tests passed and 48
@@ -100,7 +100,9 @@ native guest execution is doubled in its current tests. [Signed fixture maintena
 connects operator-reviewed public trust and exact feed metadata to these pipelines.
 Linux [Shield baseline scans](docs/shield-baseline-scanner.md) run pinned code and signed
 rule/advisory data with explicit findings and coverage gaps. The [development SBOM example](docs/evidence/README.md)
-shows standard CycloneDX output and its limits. Full Shield scope remains unfinished.
+shows standard CycloneDX output and its limits. The [Windows scanner path](docs/windows-shield.md)
+uses the same pinned engine through reviewed guest execution; its tests double the guest.
+Full Shield scope remains unfinished.
 Personal host setup now has reviewed install/remove and a fixed native boundary.
 The bounded storage service and normal
 task/guest connection are implemented; native complete-journey acceptance remains open. [Verification details](docs/verification.md)

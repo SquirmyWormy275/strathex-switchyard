@@ -1,203 +1,96 @@
 # Switchyard implementation and acceptance
 
 Switchyard remains a partial implementation of the full October 29 Rev2 handover.
-The F77 is the pilot, not a scope limit. The [requirement ledger](switchyard-requirements.md)
-separates unfinished software from exact device/account checks, and
-[verification](verification.md) records accepted and failed source checkpoints.
+The F77 is the connected pilot, not a scope limit. The [requirement ledger](switchyard-requirements.md)
+separates unfinished software from checks requiring an exact device, account or
+host. [Verification](verification.md) retains accepted and failed checkpoints.
 
-## Installed pilot
+## Installed application
 
-Current installed source is `326a9f3`, release
-`dd846e8dc7351b8020f4d24006ce870aa83f35e0ffe6ea9ed6df7744ab4ba709`.
-Six update and eleven actual Shield API checks pass. Exact engine bytes under
-an option-like filename are refused before native execution. The valid failing
-and clean incomplete scans retain exact receipt/coverage/replay, two independent
-native exits, feed revocation/retirement and full restoration. One empty native
-task, zero prompts. Receipts `assignment-legends-1793853690564.json` and
-`installed-shield-baseline-1793853836585.json` retained; owned stages, packages,
-signing keys, bundle and proof checkout removed. Original selection/modes/
-definitions/private endpoint/frozen Home are preserved.
+Installed source `8e83371`, release
+`bfcbc28da24980f712872357c42416bd4203c1c65394ff2adc52b58e3e076e60`,
+passes six update and eleven actual Supply Chain API checks. Known-vulnerable
+and clean incomplete versions return report-bound CycloneDX hashes, protected
+failed/incomplete receipts, exact replay and two independently verified native
+exits. Feed retirement and original selection/modes/definitions/private endpoint/
+frozen Home restoration pass. One empty native task, zero model prompts.
 
-Earlier installed `b6dca0a` passes six update/thirteen actual checks: all four
-known-failing actions, a clean incomplete case and five independently stopped
-guardians. Receipts `assignment-legends-1793853154242.json` and
-`installed-shield-baseline-1793853523201.json` retained, with owned scratch removed.
-The initial four-action-grant verifier was correctly refused; its failed receipt
-and separate successful cleanup receipt remain retained. Complete Shield scope
-remains unfinished. New CycloneDX/alias work is a later source iteration.
+Receipts `assignment-legends-1793854523011.json` and
+`installed-shield-baseline-1793854727077.json` are retained. Owned source,
+staging, packages, signing keys, bundle and proof checkout are removed. The
+application runs independently of the repository; its frontend remains frozen.
 
-Earlier installed `50dd23d` passes six update and ten actual writable-copy
-Run/stop checks with zero prompts and restored original state. Receipts
-`assignment-legends-1793851542323.json` and
-`installed-repository-execution-1793851723364.json` retained; owned scratch removed.
+Earlier installed `b6dca0a` exercises all four Shield actions and a clean case
+through thirteen actual checks. `326a9f3` passes eleven narrower checks, including
+refusal of exact engine bytes under a Node-option filename before execution.
+`50dd23d` passes ten actual bounded writable-copy Run/stop checks. Their separate
+receipts and cleanup facts remain in verification and history; no model prompts.
 
-Previous installed source `3ec0549`, release
-`a170fa2163dd28062afd6ec24f65beb85fe1a0a791c09b4559f0607c3b8f8ce8`,
-passes six update and eight native metadata checks. Claude 2.1.317 version,
-first-party login and exact repository inventory pass through nine independently
-stopped guardians. No prompt, background task or external session stop was
-submitted. Receipts `assignment-legends-1793849251592.json` and
-`installed-claude-commands-1793849314893.json` retained. Selection, modes,
-definitions, private endpoint and exact frozen Home are preserved; owned bundle,
-proof checkout and temporary metadata state are removed. The frontend stays frozen.
+## Backend capabilities
 
-Earlier installed `403e0c9` passes six update and eleven fixture API checks:
-atomic manifest/content accounting, revocation retaining quota, separately
-approved exact removal, released quota, immutable IDs/history and duplicate
-original receipt. Original workspace/private endpoint/Home were restored; only
-owned synthetic packages/signing scratch were removed. Receipts
-`assignment-legends-1793847745744.json` and
-`installed-signed-fixtures-1793847762267.json` retained. [Fixture contract](signed-fixtures.md).
+| Area | Implemented behavior and evidence | Practical limit |
+| --- | --- | --- |
+| Linux execution | Exact task grants, reviews, checkpoints, budgets, native guardians and replay. Run and both pipelines use read-only snapshots or explicitly approved writable copies sharing a 64 MiB overlay/temporary filesystem quota. Actual build, ENOSPC, input preservation and stop/exit checks pass. [Contract](bounded-build-workspace.md). | Filesystem bound, not a process-memory claim. Generated files are ephemeral; no new artifact write-back. |
+| Windows execution | Run and both pipelines connect exact catalogs, the protected LocalSystem storage broker, reviewed operator setup, result/ownership validation and non-upgrading recovery. [Storage](windows-storage-broker.md), [pipelines](windows-pipelines.md). | Complete interactive app/guest/UAC journey remains unaccepted; the latest service-removal correction still needs native verification. |
+| Shield baseline | Fixed heuristic scanner, signed public rule/advisory inputs, exact npm advisories/licenses, redacted findings and non-passing coverage. All four Linux actions pass actual namespace checks. The new Windows connection passes task/Git/crypto/receipt/recovery software checks with an explicit guest double. [Linux/shared scanner](shield-baseline-scanner.md), [Windows](windows-shield.md). | Full repository/ignored-secret/history scope, broader ecosystems, publisher provenance and audited expiring exceptions remain unfinished. No baseline result passes complete Shield. |
+| SBOM | Supply Chain/Release produce CycloneDX 1.6 inventories, exact lockfile hashes, stable component references and real npm alias names. Four generated examples conform to the official schema; temporary validation tooling is removed. [Example and limits](evidence/README.md). | Workspace links unsupported; scope and dependency graph/provenance explicitly unverified. |
+| Signed feeds | Operator-selected public trust, exact package approvals, AEAD journals, guarded receipts, 64 MiB/32-allocation aggregate reservations and separately reviewed exact removal. Unknown/revoked allocations retain quota; unfamiliar contents and original uncertain outcomes remain preserved. [Contract](signed-fixtures.md). | Provenance alone never establishes scanner coverage or a security result. |
+| Native agents | Exact account/directory/session bindings, reviewed text, cancellation, uncertain-outcome recovery and owned command guardians. Claude 2.1.308/2.1.317 designer/text approval binds the exact version; actual 2.1.317 metadata passes without prompts. [Bindings](claude-task-bindings.md). | Current-version real model execution remains unaccepted. Claude Code is only an implementation contingency; no coding job was delegated. |
+| Direct terminal focus | Foot/Alacritty fixed ancestry, current user, foreground CLI, PID birth/TTY/group checks and one exact compositor window with readback. Hidden/unmapped sibling windows refuse focus. Thirty-two surrounding cases pass (31 passed, one declared skip); five package checks and type checking pass. | Alacritty is absent, so its native check remains unaccepted. Tabbed/multiplexed, IDE, stopped-task and Windows attachments remain unfinished. No terminal or desktop config is installed. |
 
-## Current backend
+The new Windows Shield source connects separate policy/recovery/evidence CI
+jobs. Its shared report parser refuses changed request/feed/source identities,
+findings, counts, gaps and BOM completeness. Fifteen focused negative attestation
+cases pass. Windows policy/recovery and the actual Linux scanner pass five cases
+in three independently exited groups; every child cleanup verifies. Existing
+Run/authority files pass 35, pipeline/evidence five and final package/inventory/
+evidence 27. These tests do not launch a VM, create an account or touch a keyboard.
 
-Linux recipes now have an explicit `temporary-build` permission for a writable
-overlay copy of reviewed inputs. The overlay and `/tmp` share one 64 MiB kernel
-quota; original staged/live bytes remain unchanged. Hidden setup storage is not
-mapped into the task, root/dev remain read-only and further user namespaces are
-disabled. A host must enable this mode; imported JSON cannot enable a direct
-fallback. Review/checkpoint bind the displayed permission. Actual build, quota,
-input preservation, both pipeline receipts, replay and cancellation/exit checks
-pass. The new group/harness checks pass 22 cases, existing runtime/guardian/
-inventory 37, and build/Run/Suite/package 33; type checking passes. The installed
-Run/stop journey above also passes. [Build workspace contract](bounded-build-workspace.md).
+## Complete and native checkpoints
 
-The Linux namespace now remounts its generated root and device filesystem
-read-only and disables/asserts nested user namespaces. A fresh actual test found
-that the earlier `/tmp` quota did not cover regular-file writes under `/`,
-`/etc` or `/dev`; those paths now refuse writes. The default temporary mount is
-64 MiB, and the real guardian/namespace proof fills it across several files to
-ENOSPC, refuses nested namespace creation and verifies the host namespace limit
-is unchanged. Thirty-one namespace/runtime/guardian/inventory cases, thirty
-actual pipeline/Suite/package regressions and type checking pass. Installed
-read-only `d2c413d` and writable-copy `50dd23d` journeys both pass.
-
-Windows Run uses the protected LocalSystem storage service for new exchanges;
-there is no privilege-enabling or direct-volume fallback in normal Run. Exact
-installation/task/input mapping, stable effect IDs, read-only lost-result lookup,
-kernel leases and independent guest/native exit govern creation through retirement.
-Legacy assets retain their original cleanup port. Run now selects the supported
-full-sandbox profile with read-only inputs, no persistent volumes and disabled
-network/clipboard. [Storage](windows-storage-broker.md), [Run](windows-reviewed-run.md).
-
-Windows local gate and clean reproduction connect task grants, exact Node
-catalogs, checkpoints/budgets, owned guest/storage and freshly authenticated
-reports. Signed feed hashes/versions bind without exposing signing keys or feed
-files to the guest. Lost observations cannot be upgraded from native program
-success or replayed on recovery. The source passes 35 policy/evidence/parser/
-harness/package cases, 22 Run/owner cases, one lost-observation/restart case and
-27 existing recovery/stop/output/Suite regressions, with type checking. Guest
-execution is explicitly doubled. [Pipeline contract](windows-pipelines.md).
-
-Signed fixture maintenance has compartment-local AEAD journals, one-use approval,
-exact manifest pins and guarded receipts. A 64 MiB/32-allocation aggregate bound
-reserves manifest plus content bytes before copying. Uncertain and revoked
-allocations retain quota. Separate removal pins the original directory/files and
-hashes; unfamiliar files stay preserved, partial deletion needs fresh approval,
-and immutable IDs/audit history survive. The implementation passes 88 combined
-checks plus two linked/legacy cases. Complete Shield execution remains unfinished.
-
-Claude designer/task text accepts explicitly reviewed 2.1.308 and 2.1.317.
-Approval binds the exact version; switching between supported versions requires
-fresh approval. Account/session, tools-disabled/plan and cancellation checks
-remain enforced. Thirty-four agent/submission checks and 23 Suite/package
-regressions pass; real 2.1.317 model execution remains unaccepted. Claude Code
-is an implementation contingency for token limits; no coding job was delegated.
-
-Supply-chain and Release Shield now produce CycloneDX 1.6 BOM data with
-lockfile hashes, location-bound component references and explicit unknown scope/
-graph/provenance. npm aliases match advisories by the real locked name. Nine
-scanner cases and real namespace integration pass. Four generated BOMs, including
-this repository's three external development dependencies, conform to the exact
-official schema; three invalid mutations are rejected. Temporary validator,
-schemas and pip cache were removed without host installs or a copied runtime.
-[Example and limits](evidence/README.md). Installed SBOM acceptance is pending.
-
-Direct Claude window focus now implements fixed Foot and Alacritty ancestry,
-with one exact compositor window per terminal PID. Hidden/unmapped sibling
-windows and changed controlling TTY/process groups refuse focus. Thirty-two
-terminal/Claude/client cases pass (31 passed, one declared Windows skip), five
-package cases and type checking pass. This source extension is installed at `326a9f3`;
-Alacritty is absent on the pilot, so its native check remains unaccepted. Tabbed,
-multiplexed, stopped-task, IDE and Windows attachments remain unfinished.
-
-## Latest verification and correction
-
-The complete Linux lane at immutable `d0a7945` passes all 177 groups:
-1,149 tests, 1,139 passed and ten declared skips. Receipt
-`38061669-ad2e-45d0-a7bb-8babcef4cc44` retained; every child cleanup verified
-and owned fixtures/checkout removed. It includes the baseline Shield, receipt
-completeness and native-recovery non-upgrade implementation. It predates the
-later entrypoint/terminal changes, covered by their focused checks, and the
-current CycloneDX source work. Earlier `50dd23d` passes 175/175 groups.
+Immutable `8e83371` passes all 177 required Linux groups: 1,153 tests,
+1,143 passed and ten declared skips. Receipt
+`e62a9f97-1739-46e2-ace5-c806b79262da` is retained with every child cleanup
+verified; owned fixture parent and checkout are removed. It includes bounded
+builds, baseline Shield, entrypoint closure, direct-terminal checks and CycloneDX.
+The newer Windows Shield source has 180 Linux groups; its complete run is pending.
 
 Native Windows `5d398d2`, workflow
 [41960677205](https://github.com/SquirmyWormy275/strathex-switchyard/actions/runs/41960677205),
-passes all sixteen jobs. Six pipeline policy/evidence/recovery cases have
-verified archive digests and child cleanup, with small
-`windows-pipeline-{policy,evidence,recovery}-5d3.json` receipts retained.
-Native registry, split maintenance/removal and the 34-case backend contract also
-pass at their recorded sources. Interactive guest/UAC/account acceptance is separate.
+passes all sixteen jobs. The six pipeline contract cases have verified archive
+digests and child cleanup. Guest execution is explicitly doubled. Registry,
+maintenance/removal and the 34-case backend contract also pass at their recorded
+sources. Current native CI remains queued; no newer pass is inferred.
 
-The later `14aae78` native service-removal run fails specifically during
-`service-absence-configuration`, after the original delete was accepted.
-Digest-verified `windows-service-removal-14a-configuration-failed.json` is retained.
-The correction rechecks full original configuration before deletion, then allows
-only an absent original registry environment during deletion polling; present
-metadata still must match. It still requires stopped SCM state and error 1060
-before removing files, with the same ten-second bound. Finer query/environment
-phases preserve any further failure. Both actual C# targets compile without
-warnings and 112 portable checks pass; fresh native acceptance is pending.
-Stopped PIDs are not used as exit proof; the captured original process handle is.
+Later service-removal failures remain failed. The `238592b` receipt identifies
+`service-absence-query-configuration`. The correction preserves Win32 errors,
+allows only recognized deletion-pending metadata during bounded polling and
+still requires a fresh OpenService error 1060 before file removal. Both actual
+C# targets compile warning-free and 112 portable checks pass using the existing
+SDK; fresh native lifecycle acceptance remains pending. Stopped SCM PIDs are not
+used as exit proof; the original captured process handle is.
 
-The later `238592b` native failure identifies the configuration query itself.
-Native query failures now retain their Win32 code. Only recognized missing,
-key-deleted or delete-pending errors after the original accepted deletion cause
-another bounded observation; any present mismatch, access denial or unknown
-handle error still preserves the installation. A pending query never establishes
-absence: only a new OpenService error 1060 does. Both actual C# targets compile
-with zero warnings and 112 portable checks pass; fresh native acceptance is pending.
+## F77 and remaining acceptance
 
-Earlier accepted complete Linux `403e0c9`: 168/168 groups, 1,121 tests,
-1,111 passed and ten declared skips. Receipt
-`13be1a30-2e93-4b87-8a94-9a1953285b9f` retained with all child cleanup verified.
-The `5d398d2` lane attempted 172 groups: 171 passed; its sole failure was a stale
-authority capability assertion expecting only Run. Receipt
-`43d14c61-5e5b-4f96-96b7-35795fa88afa` remains failed. The test now distinguishes
-the exact Run-only grant from all three connected capabilities, while retaining
-unsupported-action and Work denials; all nine authority cases pass. Every child
-cleanup verified and failed checkout/fixtures are removed. The corrected complete
-172-group rerun at `238592b` and the later 173-group lane both pass; no assertion, platform skip or deadline was waived.
+The F77 passes guarded read-only discovery and full definition/keymap/macro/
+settings readout: VIA 9, Vial 4, three 8 × 11 layers and pinned `wcass:f77`
+source definition. Installed readout at `e1a1f30` matches the independent 90-query
+capture. Source identity does not authenticate hardware or select a physical case.
+No unlock, configuration write, reset, flash or electrical command was sent.
 
-## F77 and remaining work
+The frozen UI still needs owner visual review and remaining omakase/role/device
+controls. Remaining software also includes full Shield scope/coverage and exact
+additional client/IDE attachments. Continue independently executable requirements.
 
-The connected F77 passes guarded read-only discovery and complete definition,
-keymap/macro/settings readout: Linux hidraw, VIA 9 / Vial 4, three 8 × 11 layers
-and pinned source definition `wcass:f77`. Installed readout at `e1a1f30` matches
-the independent 90-query capture; receipts are in verification. Source identity
-does not authenticate the hardware or select its physical case. No unlock,
-configuration write, reset, flash or electrical command was sent.
+Actual Windows Sandbox/UAC, approved Microsoft tenant/account behavior, microphone
+UI and device/focus checks need their exact environments. No work laptop or tenant
+is probed. Alacritty is not installed. F77 typing/hotplug and separately authorized
+physical transactions, B122 hardware/all 27 physical gates, print/cap fit and
+independent assessment remain unaccepted. No public release, merge, licensing
+change or firmware operation is authorized by these checkpoints.
 
-The pinned baseline Shield scanner is implemented for all four Linux actions,
-with fixed heuristic rules, exact npm advisory/license checks, report-hash
-authentication, failed receipts with incomplete coverage, and explicit scope/
-history/permission/provenance gaps. All four actions and the clean incomplete
-case pass actual namespace checks. Normal installed acceptance above also passes. Full Shield
-scope/history/ecosystems/provenance and audited exceptions remain unfinished.
-[Scanner contract](shield-baseline-scanner.md). Exact
-desktop/IDE/terminal attachments and remaining frontend controls are unfinished
-implementation. The frozen UI still needs owner visual review and the remaining
-omakase flows. Continue every independently executable backend requirement.
-
-Actual Windows Sandbox/UAC, Microsoft tenant/account and device/focus checks need
-their exact authorized environments. The work laptop/tenant is not probed.
-F77 typing/hotplug and separately authorized physical transactions, B122 hardware
-and all 27 physical gates remain unaccepted. Microphone UI, print/cap fit and
-independent assessment remain separate. No public release, merge or licensing
-change is authorized by these checkpoints.
-
-Keep source and small JSON evidence locally, remove successful scratch and
-publish regular checkpoints. Preserve the Dvorak/Omarchy setup and the frozen
-frontend. Historical notes: [archive 4](switchyard-status-history-4.md),
-[archive 3](switchyard-status-history-3.md), [archive 2](switchyard-status-history-2.md),
-[archive 1](switchyard-status-history-1.md).
+Keep source and small JSON receipts, remove successful scratch and publish regular
+GitHub checkpoints. Preserve the Dvorak/Omarchy setup and frozen frontend.
+Detailed history: [5](switchyard-status-history-5.md), [4](switchyard-status-history-4.md),
+[3](switchyard-status-history-3.md), [2](switchyard-status-history-2.md),
+[1](switchyard-status-history-1.md).

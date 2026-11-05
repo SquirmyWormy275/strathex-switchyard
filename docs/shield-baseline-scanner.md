@@ -4,7 +4,9 @@ Switchyard can execute a pinned, dependency-free scanner over explicitly reviewe
 non-production input files. All four Linux Shield actions connect to the normal
 task grant, one-use execution approval, checkpoint, budget, namespace, native
 ownership and protected receipt path. This is an implemented baseline scanner;
-full Shield acceptance remains unfinished.
+full Shield acceptance remains unfinished. The [Windows path](windows-shield.md)
+now implements the same scanner/input/feed and non-passing receipt contract
+through reviewed guest execution; its current tests explicitly double the guest.
 
 The scanner finds private-key markers, GitHub/AWS token shapes, email addresses,
 JavaScript dynamic-code calls and selected insecure path/TLS/container patterns.
@@ -145,6 +147,11 @@ against the official [CycloneDX 1.6 schema](https://github.com/CycloneDX/specifi
 three invalid mutations are rejected. Exact schema/tool source hashes are
 retained in `cyclonedx-schema-proof-1793853836585.json`. Temporary validator,
 schemas and download cache are removed; no host package or runtime is installed.
-Installed SBOM acceptance is pending. A focused actual Supply Chain run accepts
+Normal installed `8e83371` passes six update and eleven actual Supply Chain
+checks with known-vulnerable and clean incomplete versions, report-bound BOM
+hashes, two independent native exits, feed retirement and full restoration.
+Receipts `assignment-legends-1793854523011.json` and
+`installed-shield-baseline-1793854727077.json` retained; owned signing/source/
+package/staging/bundle/proof scratch removed. Zero prompts. A focused run accepts
 `--synthetic --action=shield_supply_chain` and exercises known-failing and clean
 incomplete versions, both with report-bound BOM hashes.
