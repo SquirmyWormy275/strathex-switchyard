@@ -41,8 +41,7 @@ scanner and integration groups passed and every cleanup verified. The fixed
 runner, workflow, CLI guard and engine pass 42 checks in four isolated groups
 (`isolated-test-a36853c4-cfd3-4110-a308-23c245b7955b.json`), with every cleanup
 verified. Type checking and the deterministic development BOM check pass. Native
-Windows execution of the new license worker and installed-app acceptance remain
-separate checks.
+Windows execution of the new license worker remains a separate check.
 
 The installed verifier accepts a standalone exact action:
 
@@ -55,3 +54,12 @@ node scripts/verify-shield-host.mjs --synthetic \
 no prompt and opens no keyboard. It uses a new disposable synthetic repository
 and separately approved signed fixture data, then verifies retirement and
 restoration. Invalid or combined flags refuse before installed state access.
+
+
+Normal installed source `402dd7e`, release `55d42108…`, now passes six update
+checks, 14 Supply Chain and 14 Release checks. Four actual scanner exits verify
+required-license failures, permitted but unselected alternatives, unsupported
+exception gaps, authenticated incomplete coverage, signed-feed retirement and
+original state/frozen Home restoration. All owned source/signing/packages/
+staging/bundle/checkout are removed; zero prompts or keyboard access.
+[Source-bound installed evidence](evidence/installed-license-summary.json).

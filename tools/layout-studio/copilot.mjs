@@ -6,6 +6,11 @@ import { designResponseSchema, validateDesignResponse } from "./agents.mjs";
 const guid = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i;
 export const copilotScopes = ["User.Read", "Sites.Read.All", "Mail.Read", "People.Read.All", "OnlineMeetingTranscript.Read.All", "Chat.Read", "ChannelMessage.Read.All", "ExternalItem.Read.All"];
 const provider = "microsoft-365-copilot";
+const credentialFields = ["tenantId", "clientId", "account", "accessToken", "refreshToken", "expiresAt"];
+function validateCredential(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value) || Object.keys(value).some(key => !credentialFields.includes(key)) || !guid.test(value.tenantId) || !guid.test(value.clientId) || typeof value.account !== "string" || value.account.slice(0, 37) !== value.tenantId + ":" || !guid.test(value.account.slice(37)) || typeof value.accessToken !== "string" || !value.accessToken || value.accessToken.length > 16000 || value.refreshToken !== undefined && (typeof value.refreshToken !== "string" || !value.refreshToken || value.refreshToken.length > 16000) || !Number.isSafeInteger(value.expiresAt) || value.expiresAt <= 0) throw new Error("The local Microsoft credential binding is invalid. Reconnect the approved account deliberately.");
+  return value;
+}
 
 export function createCopilot({ store, fetcher = fetch, now = () => Date.now() }) {
   const logins = new Map(), busy = new Set();
@@ -20,12 +25,13 @@ export function createCopilot({ store, fetcher = fetch, now = () => Date.now() }
   }
   const tokenRequest = (tenant, data) => request(`https://login.microsoftonline.com/${tenant}/oauth2/v2.0/token`, { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: new URLSearchParams(data).toString() });
   async function verifyCredential(compartment, token, binding) {
+    if (typeof token.access_token !== "string" || !token.access_token || token.access_token.length > 16000 || !Number.isSafeInteger(Number(token.expires_in)) || Number(token.expires_in) < 1 || Number(token.expires_in) > 604800) throw new Error("Microsoft credential response is invalid.");
     const me = await request("https://graph.microsoft.com/v1.0/me?$select=id,displayName", { headers: { Authorization: `Bearer ${token.access_token}` } });
     if (!me.ok || !guid.test(me.body.id)) throw new Error("Microsoft could not verify this delegated work account.");
     const account = `${binding.tenantId}:${me.body.id}`;
     if (binding.account && account !== binding.account) throw new Error("The refreshed Microsoft account changed. Re-enroll deliberately; no fallback account was used.");
     const credential = { tenantId: binding.tenantId, clientId: binding.clientId, account, accessToken: token.access_token, refreshToken: token.refresh_token ?? binding.refreshToken, expiresAt: now() + Number(token.expires_in) * 1000 };
-    if (typeof credential.accessToken !== "string" || credential.accessToken.length > 16000 || !Number.isFinite(credential.expiresAt)) throw new Error("Microsoft credential response is invalid.");
+    validateCredential(credential);
     await store.credential(compartment, "m365-token", JSON.stringify(credential), { provider });
     await store.update(compartment, "m365-account-enroll", (s) => { s.accounts = [account]; s.copilotAccount = { account, tenantId: binding.tenantId, displayName: String(me.body.displayName ?? "Work account").slice(0, 120), surface: "Microsoft Graph Copilot Chat beta" }; }, { provider });
     return credential;
@@ -35,7 +41,7 @@ export function createCopilot({ store, fetcher = fetch, now = () => Date.now() }
     const raw = await store.credential(compartment, "m365-token", undefined, { provider });
     if (!raw) throw new Error("Enroll an approved Microsoft 365 work account first. No personal provider will be used.");
     let c; try { c = JSON.parse(raw); } catch { throw new Error("The local Microsoft credential reference is invalid."); }
-    if (!guid.test(c.tenantId) || !guid.test(c.clientId)) throw new Error("The local Microsoft tenant/client binding is invalid.");
+    validateCredential(c);
     await store.authorize(compartment, { provider, account: c.account });
     if (c.expiresAt <= now() + 60000) {
       if (!c.refreshToken) throw new Error("Microsoft sign-in expired. Sign in again with the approved account.");
@@ -45,9 +51,16 @@ export function createCopilot({ store, fetcher = fetch, now = () => Date.now() }
     }
     return c;
   }
-  async function graph(compartment, path, body) {
-    const c = await credential(compartment);
+  async function assertCredential(compartment, c) {
+    await store.authorize(compartment, { provider, account: c.account });
+    const raw = await store.credential(compartment, "m365-token", undefined, { provider });
+    let current; try { current = validateCredential(JSON.parse(raw)); } catch { throw new Error("The pinned Microsoft sign-in is unavailable or changed. No alternate credential was used."); }
+    if (credentialFields.some(key => current[key] !== c[key]) || c.expiresAt <= now()) throw new Error("The pinned Microsoft sign-in changed or expired. The old response cannot be accepted; no alternate credential was used.");
+  }
+  async function graph(compartment, path, body, c) {
+    await assertCredential(compartment, c);
     const response = await request(`https://graph.microsoft.com${path}`, { method: "POST", headers: { Authorization: `Bearer ${c.accessToken}`, "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    await assertCredential(compartment, c);
     if (!response.ok) throw new Error(`Microsoft 365 Copilot returned HTTP ${response.status}. Check this tenant's license, Graph preview availability and all documented delegated permissions. The layout is preserved; no personal provider was used.`);
     return { value: response.body, account: c.account };
   }
@@ -82,18 +95,25 @@ export function createCopilot({ store, fetcher = fetch, now = () => Date.now() }
       if (conversationId && !existing) throw new Error("That exact Microsoft conversation is not owned by this compartment.");
       const id = existing?.id ?? randomUUID(); if (busy.has(`${compartment}:${id}`)) throw new Error("This Microsoft conversation already has a pending request."); busy.add(`${compartment}:${id}`);
       try {
+        const c = await credential(compartment);
+        if (existing && existing.account !== c.account) throw new Error("This Microsoft conversation belongs to a different or unverified account. Reconnect its exact approved account; no conversation was continued.");
         let remoteId = existing?.sessionId;
-        if (!remoteId) remoteId = (await graph(compartment, "/beta/copilot/conversations", {})).value.id;
+        if (!remoteId) remoteId = (await graph(compartment, "/beta/copilot/conversations", {}, c)).value.id;
         if (!guid.test(remoteId)) throw new Error("Microsoft returned an unsupported conversation identity.");
         const content = { instruction: "Help improve the workflow, then propose physical controls. Do not take external actions or invent capability evidence. Return only JSON matching responseSchema. Use exact supplied key IDs and preserve ordinary typing. Output is a proposal, never permission.", request: message, plan, workflow: state.workflow, responseSchema: designResponseSchema };
-        const r = await graph(compartment, `/beta/copilot/conversations/${remoteId}/chat`, { message: { text: JSON.stringify(content) }, locationHint: { timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone }, contextualResources: { webContext: { isWebEnabled: false } } });
+        const r = await graph(compartment, `/beta/copilot/conversations/${remoteId}/chat`, { message: { text: JSON.stringify(content) }, locationHint: { timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone }, contextualResources: { webContext: { isWebEnabled: false } } }, c);
         if (r.value.id !== remoteId || !Array.isArray(r.value.messages)) throw new Error("Microsoft's reply does not match the exact owned conversation.");
         const reply = r.value.messages.filter((m) => typeof m.text === "string").at(-1)?.text;
         if (!reply || reply.length > 64000) throw new Error("Microsoft did not return a bounded conversation response.");
         let design;
         try { design = validateDesignResponse(JSON.parse(reply.replace(/^```(?:json)?\s*/, "").replace(/\s*```$/, "")), plan); }
         catch { design = { reply, proposal: null, workflow: state.workflow, limitation: "The Chat API does not guarantee a structured response. This reply is displayed as text; no layout change was inferred." }; }
-        await store.update(compartment, "m365-design", (s) => { s.conversations = [...s.conversations.filter((c) => c.id !== id), { id, provider, sessionId: remoteId, account: r.account, updatedAt: now(), messages: [...(existing?.messages ?? []), { role: "user", text: message }, { role: "assistant", text: design.reply }].slice(-40), proposal: design.proposal, workflow: design.workflow }]; }, { provider, account: r.account });
+        await assertCredential(compartment, c);
+        await store.update(compartment, "m365-design", (s) => {
+          const current = s.conversations.find(row => row.id === id);
+          if (existing ? !current || current.provider !== provider || current.sessionId !== remoteId || current.account !== c.account : current) throw new Error("The exact Microsoft conversation binding changed before its response could be saved.");
+          s.conversations = [...s.conversations.filter((row) => row.id !== id), { id, provider, sessionId: remoteId, account: r.account, updatedAt: now(), messages: [...(existing?.messages ?? []), { role: "user", text: message }, { role: "assistant", text: design.reply }].slice(-40), proposal: design.proposal, workflow: design.workflow }];
+        }, { provider, account: r.account });
         return { ...design, provider, conversationId: id, sessionId: remoteId, provenance: "Microsoft Graph delegated work account; exact owned conversation; tenant acceptance required" };
       } finally { busy.delete(`${compartment}:${id}`); }
     }

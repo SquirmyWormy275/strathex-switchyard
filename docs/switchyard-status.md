@@ -5,12 +5,13 @@ The F77 is the connected pilot, not a scope limit. The [requirement ledger](swit
 separates unfinished software from checks requiring an exact device, account or
 host. [Verification](verification.md) retains accepted and failed checkpoints.
 
-The latest accepted complete Linux checkpoint is immutable `c2fe4d8`: 223/223
-groups, 1,350 tests, 1,340 passed and ten declared skips. Every child cleanup
-and owned fixture/dependency-alias/worktree removal verifies. The later complete
-run at `4700d9a` is in progress; it is not accepted evidence. CVSS source
-`7e252a1` additionally passes both normal installed Supply Chain/Release
-journeys (six update plus 16 and 16 checks), with all owned scratch removed.
+The latest accepted complete Linux checkpoint is immutable `4700d9a`: 225/225
+groups, 1,355 tests, 1,345 passed and ten declared skips. Every child cleanup
+and owned fixture/dependency-alias/worktree removal verifies
+(`isolated-test-4057ed5a-1702-44c7-a9f6-34eee6f0604b.json`). Later license and
+Copilot changes have separate focused/installed evidence, not a complete newer
+run. CVSS source `7e252a1` also passes both normal installed Supply Chain/Release
+journeys with all owned scratch removed.
 [Severity evidence](evidence/installed-cvss-summary.json).
 
 Shared state queues retain an independent kernel lease and original deadlines
@@ -61,13 +62,19 @@ and broader history remain unfinished software. [Witness](git-history-inputs.md)
 
 ## Installed application
 
-Current installed source is `c2fe4d8`, release
-`b6098cc95540382582ce2c35216c97742cd8b8797c0b58d33bf1c24fbd6098a6`.
-The normal update passes; real Claude/tmux navigation reaches native workspace
-trust without submitting a prompt. Latest refusal restores exact workspace/focus
-and retires all four owned processes, socket and cache. Account availability
-verifies, but registered session navigation remains unaccepted. Earlier failed
-cleanup and manual recovery's unprovable original selection remain recorded.
+Current installed source is `402dd7e`, release
+`55d42108e755139ba94871a19b15181b2706c8764b7c86393e7ef6327ac18fbe`.
+Six normal update, 14 Supply Chain and 14 Release checks verify actual declared
+license findings, unselected alternatives, unsupported exceptions, four scanner
+exits, signed-feed retirement and restoration. All owned source/signing/packages/
+staging/bundle/checkout are removed; zero prompts or keyboard access.
+[Installed license evidence](evidence/installed-license-summary.json).
+
+Earlier installed source `c2fe4d8` reaches native Claude workspace trust without
+submitting a prompt. Account availability verifies, but registered tmux session
+navigation remains unaccepted. Latest refusal restores exact workspace/focus
+and retires all four owned processes, socket and cache. Earlier failed cleanup
+and manual recovery's unprovable original selection remain recorded.
 [Installed trust boundary](evidence/installed-tmux-trust-boundary-summary.json).
 
 Earlier installed native source `dd0cad1` passes six update/five VS Code/five
