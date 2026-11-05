@@ -1,83 +1,46 @@
-# Serialize private state across store instances
+# Short-lived Windows lock helpers
 
-Independent store objects can address the same sealed compartment files in one
-host process. Initialization and mutations now share a process-local queue keyed
-by normalized private root and compartment. Each transaction still obtains its
-own platform kernel lock, re-reads state, checks the lease before writing and
-waits for helper exit. The queue is removed when its last transaction settles.
+Every protected mutation still holds an exclusive kernel file lock. Each state
+read still retrieves its compartment key and authenticates fresh encrypted bytes.
+Switchyard does not cache decrypted state or credentials.
 
-This prevents same-process store instances from competing to start lock helpers
-for the same state. It does not replace cross-process locking, reuse a lease
-between transactions or change the existing 15-second acquisition deadline.
-Resource locks and nonblocking probes retain their existing kernel behavior.
-Callback failure cannot publish uncommitted fields or poison the next instance's
-transaction.
+Windows can now reuse a keyless PowerShell worker for successive leases on one
+validated lock path. Repeated repository inspections previously started a fresh
+PowerShell process for every small journal update. Reuse removes that repeated
+startup while preserving a separate kernel-handle acquisition and release for
+each transaction. Native performance and boundary acceptance remain separate
+from the portable protocol tests.
 
-The motivating [Windows failure](evidence/windows-c8b-state-lock-failed-summary.json)
-hit that acquisition deadline during the existing initialization/concurrent-write
-journey. The child exited within its original test deadline and cleanup verified;
-the result remains failed. A competing cold helper startup is a plausible
-contributor, not an established root cause. The shared queue removes that
-competition without weakening the kernel boundary.
+The worker receives the existing bounded path/PID request through a private pipe.
+It checks the original parent's process identity, then accepts only sequenced
+`ACQUIRE` and `RELEASE` commands. A callback begins only after the matching lock
+acknowledgement. A release acknowledgement is sent only after disposing the
+kernel handle. Unknown, stale, oversized or missing replies fail closed.
 
-Four isolated store/lock/Suite/scanner groups pass all 41 checks, with cleanup
-verified (`isolated-test-924a833e-560c-41f5-aabd-32408b16b6f7.json`). These include
-independent stores retaining one compartment key and all twelve writes,
-cross-process crash release, held-resource probes, failed transaction recovery
-and detached pipe ownership. The digest-verified native Windows `59a73de` lease group now passes five tests
-and one declared platform skip, with cleanup verified. The earlier failure
-remains failed; the full native workflow is not accepted.
+The helper sees no compartment contents, key, account, provider request or
+command output. Its idle period holds no file lock. One second after its last
+transaction it exits; at most 64 helpers and 64 pending uses per path are allowed.
+Different paths keep distinct helpers. Nonblocking probes refuse a locally busy
+path immediately, or retain the native sharing-error result from another owner.
+They never invoke the protected callback on an unconfirmed lease.
 
+The original 15-second acquisition budget includes startup and lock acquisition;
+the native sharing wait remains bounded at ten seconds. Release acknowledgement
+has a two-second bound. Helpers receive EOF on parent loss, and an explicitly
+closed or failed worker is independently awaited before replacement. No PID-file
+deletion, inherited old lease or automatic callback replay is used. If a helper
+dies, the transaction's lease assertion fails. An uncertain release remains a
+failure even if the callback has already returned a result.
 
-The same source still has two [separate lock acquisition failures](evidence/windows-59a-state-lock-summary.json)
-in the first Sandbox transport and ignored-tree authority cases. Each hits the
-unchanged 15-second acquisition limit; the file itself exits within its bound
-and cleanup verifies. This is available-CI software validation, separate from
-actual guest/device/account acceptance. Module startup is a plausible contributor,
-not a confirmed diagnosis.
+Linux retains its existing `flock`/pipe lease. The Windows storage-contract
+`leases` cohort requires both complete state-lock and keyless-pool test files;
+their existing child and workflow limits remain unchanged.
 
-Windows lock acquisition now uses a closed five-field ASCII line rather than
-importing PowerShell Utility and parsing JSON. A canonical base64 UTF-8 path
-preserves literal Unicode, tabs and shell punctuation; neither side evaluates
-text. Requests are bounded to 22,000 characters and 16 KiB path bytes, with
-strict PID/boolean/version/encoding validation. The helper uses only language
-and .NET operations, with module autoload disabled. It still owns the exclusive
-kernel file handle until pipe closure, checks the original parent's birth and
-exit, retains sharing-error-only retries/nonblocking behavior, and keeps both
-the ten-second contention and 15-second acquisition bounds. No warm-up,
-background lease reuse or retry of a failed transaction is introduced.
+Portable tests execute real independently exited child-process protocol doubles.
+They cover serialized mutations, separate paths, nested nonblocking refusal,
+privacy, callback/progress failures, helper loss, malformed acquisition/release,
+idle retirement, shutdown and capacity. These doubles establish protocol behavior;
+actual Windows file-sharing and parent-loss behavior must pass native CI through
+the default store path. No native Windows acceptance is claimed by this document.
 
-Four isolated Suite/lock/Sandbox/ignored-authority groups pass 36 checks with
-every cleanup verified (`isolated-test-9c07dacc-b24e-49be-91d9-a7a1e54c6e91.json`).
-Linux exercises real kernel locks and the closed request's Unicode/injection/
-size boundaries. Windows must still execute its native parser and lock journey;
-these Linux checks do not establish the startup failure's cause or repair.
-
-
-Native Windows `4700d9a` now passes all three corresponding groups, with archive
-digests and every child cleanup verified: eight Sandbox transport tests, three
-ignored-tree authority tests, and six lease tests plus one declared platform
-skip. This executes the actual new parser and kernel-lock helper under the
-original bounds. [Exact source/artifact summary](evidence/windows-470-state-lock-summary.json).
-Earlier failures remain failed and their precise startup cause is not proven by
-a later pass. The whole workflow, actual guest and ordinary-account acceptance
-remain separate.
-
-Linux now runs the fixed `/usr/bin/cat` pipe reader under `/usr/bin/flock`
-instead of starting Node for each lease. The readiness line can be echoed only
-after the kernel grants the lock. An open input pipe holds it; pipe EOF retires
-the reader after normal completion or abrupt parent loss. There is no shell,
-lease reuse or deadline change. Held nonblocking probes, independent store
-serialization, failed mutations, detached-owner crash release and a forcibly
-lost lock owner all remain covered. A lost owner invalidates the original lease
-before a new writer can be accepted through it.
-
-Three isolated Suite/commit/lock groups pass 28 checks with cleanup verified
-(`isolated-test-0bab35ff-6d9c-4a70-8ac8-13788fdeb4eb.json`). The commit group
-finishes in 43,621 ms under its unchanged 45,000 ms bound; its prior timeout
-remains failed. Thirty local lease acquisitions observed median 51.99 ms before
-and 7.05 ms after, with both owned fixtures removed
-(`linux-lock-latency-before-1793899173770.json` and
-`linux-lock-latency-after-1793899235545.json`). This is a local measurement under
-changing workstation load, not a universal benchmark or proof of the earlier
-full-run failure's cause. A fresh full-suite run remains required.
+Nine focused groups pass 85 checks with every process-tree termination and child cleanup verified; typecheck passes. [Software evidence](evidence/keyless-windows-leases-summary.json).

@@ -1,6 +1,16 @@
 /** Validate CI proof claims only. This cannot create a token, grant trust or accept a guest/account. */
 import assert from "node:assert/strict";
 const object = value => value !== null && typeof value === "object" && !Array.isArray(value);
+/** Retain the bounded child diagnostic through the coordinator's privacy projection. */
+export function storageBrokerFailureEvidence(value) {
+  if (!object(value) || value.schema !== "switchyard-storage-broker-protocol-proof/v1" || value.success !== false) return undefined;
+  const fields = ["schema", "success", "errorCategory", "nativeCode", "errorHResult", "nativeExchangeChecks", "failedCheckPhase", "restrictedHostPhase", "restrictedHostCreatorPrivileges", "restrictedHostHistoricalFilterFlags", "restrictedHostHistoricalFilterBytes", "restrictedHostTokenRead"];
+  const result = Object.fromEntries(fields.filter(key => Object.hasOwn(value, key)).map(key => [key, structuredClone(value[key])]));
+  const child = value.restrictedHostChildExit;
+  const types = { waitResult: "uint", exitCode: "uint", resultAvailable: "boolean", childReportedSuccess: "boolean", ownerReportedSuccess: "boolean", completedChecks: "count", failedPhase: "label", failureCategory: "label" };
+  if (object(child) && Object.hasOwn(child, "waitResult") && Object.hasOwn(child, "resultAvailable") && Object.entries(child).every(([key, item]) => Object.hasOwn(types, key) && (types[key] === "boolean" ? typeof item === "boolean" : types[key] === "label" ? item === null || typeof item === "string" && /^[A-Za-z0-9-]{1,80}$/.test(item) : Number.isSafeInteger(item) && item >= 0 && item <= (types[key] === "count" ? 8 : 0xffffffff)))) result.restrictedHostChildExit = structuredClone(child);
+  return result;
+}
 const verified = ["success", "primaryTokenVerified", "sameUserVerified", "mediumIntegrityVerified", "administratorsDenyOnlyVerified", "volumePrivilegeAbsentVerified", "onlyTraversePrivilegeAssignedVerified", "tokenRecheckedAfterExit", "treeExitVerified", "creatorQuotaRestoredVerified", "restrictingSidListVerified"];
 export function verifyRestrictedOwnerReport(result) {
   assert.equal(result?.success, true); const proof = result.nativeRestrictedHostProof;

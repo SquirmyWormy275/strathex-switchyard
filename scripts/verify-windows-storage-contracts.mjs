@@ -48,7 +48,7 @@ const suites = {
   "fixture-removal": "tools/layout-studio/scanner-fixture-removal.test.mjs",
   "fixture-maintenance": "tools/layout-studio/scanner-fixtures.test.mjs",
   harness: "scripts/run-isolated-tests.test.mjs",
-  leases: "tools/layout-studio/state-lock.test.mjs",
+  leases: ["tools/layout-studio/state-lock.test.mjs", "tools/layout-studio/keyless-lease-pool.test.mjs"],
   "legacy-images": "tools/layout-studio/windows-exchange-images.test.mjs",
   "broker-owner": "tools/layout-studio/windows-broker-exchanges.test.mjs",
   "sandbox-native": "tools/layout-studio/windows-sandbox-native.test.mjs",
@@ -59,7 +59,7 @@ const suites = {
 const flags = process.argv.slice(2), suite = flags[1]?.startsWith("--suite=") ? flags[1].slice(8) : undefined;
 if (process.platform !== "win32" || flags.length !== 2 || flags[0] !== "--synthetic" || !Object.hasOwn(suites, suite)) throw Error("Use on Windows: node scripts/verify-windows-storage-contracts.mjs --synthetic --suite=shield-change|shield-codebase|shield-supply-chain|shield-release|shield-clean|inspect-cli|history-windows-scanner|history-bytes|history-staging|history-scanner|history-inputs|history-authority|index-inputs|index-bytes|index-staging|index-scanner|index-authority|osv-source|osv-scanner|pypi-scanner|ignored-tree-policy|ignored-tree-authority|ignored-tree-scanner|receipt-authority|receipt-authority-state|shield-exceptions|shield-exception-execution|shield-exception-ledger|ignored-authority|ignored-scanner|fixture-invalidation|validation-policy|shield-evidence|shield-policy|shield-recovery|pipeline-recovery|pipeline-policy|pipeline-evidence|fixture-removal|backend-contract|fixture-registry|fixture-maintenance|harness|leases|legacy-images|broker-owner|sandbox-native|sandbox-sessions|reviewed-run|run-owner. No disk, VM, account or keyboard is opened.");
 assertRequiredTestManifest();
-const groups = Object.hasOwn(windowsStorageScenarioSuites, suite) ? selectWindowsStorageScenario(suite, requiredGroups) : selectWindowsContractGroups([suites[suite]], requiredGroups);
+const groups = Object.hasOwn(windowsStorageScenarioSuites, suite) ? selectWindowsStorageScenario(suite, requiredGroups) : selectWindowsContractGroups(Array.isArray(suites[suite]) ? suites[suite] : [suites[suite]], requiredGroups);
 const result = await runVerification({ groups, outputDirectory: join(process.env.RUNNER_TEMP || tmpdir(), "switchyard-storage-contracts", suite) });
 console.log(JSON.stringify({ suite, success: result.receipt.success, runId: result.receipt.runId, totals: result.receipt.totals, guestLaunched: false, accountOpened: false, keyboardOpened: false }));
 for (const child of result.receipt.children.filter(child => !child.success)) console.log(JSON.stringify({ file: child.file, exitCode: child.exitCode, timeout: child.timeout, diagnostic: child.failureDiagnostic }));

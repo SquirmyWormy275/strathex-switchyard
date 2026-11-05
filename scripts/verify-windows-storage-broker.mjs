@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /** Install only this exact metadata bootstrap on a disposable elevated CI host. */
 import assert from "node:assert/strict";
-import { verifyRestrictedOwnerReport } from "./windows-restricted-owner-report.mjs";
+import { verifyRestrictedOwnerReport, storageBrokerFailureEvidence } from "./windows-restricted-owner-report.mjs";
 import {createHash,randomUUID} from "node:crypto";
 import {readFile,mkdtemp,rm} from "node:fs/promises";
 import {join,isAbsolute} from "node:path";
@@ -16,7 +16,7 @@ const [helper,dotnet,assembly]=names.map((name,i)=>flags[i+1].slice(name.length)
 const evidence={schema:"switchyard-windows-storage-broker-bootstrap-proof/v1",sourceCommit:process.env.GITHUB_SHA??null,installationId,helperSha256,checks,volumeOpened:false,guestLaunched:false,accountCreated:false,normalUserSetupAccepted:false,nativeSetupUsed:Boolean(setup),exchangeRequested:exchange};let failure;
 async function owned(executable,args,{inputText,environment=desktopEnvironment()}={}){
  const result=await runRuntimeCommand(executable,args,{windowsHelper:helper,expectedExecutableSha256:sha(await readFile(executable)),env:environment,inputText,detailed:true,captureStderrBytes:2048,timeout:120000,maxOutputBytes:65536,onGuardianReady:async frame=>{owners.push(frame);await save();}});
- if(result.exitCode!==0){evidence.commandFailure={exitCode:result.exitCode,status:result.status,diagnostic:(result.stderr??"").split(/\r?\n/)[0].slice(0,512)};if(executable===dotnet&&args[0]===assembly){try{const parsed=JSON.parse(result.stdout);if(parsed.schema==="switchyard-storage-broker-protocol-proof/v1"&&parsed.success===false)evidence.commandFailure.proof=Object.fromEntries(["schema","success","errorCategory","nativeCode","errorHResult","nativeExchangeChecks","failedCheckPhase","restrictedHostPhase","restrictedHostCreatorPrivileges","restrictedHostHistoricalFilterFlags","restrictedHostHistoricalFilterBytes","restrictedHostTokenRead"].map(key=>[key,parsed[key]]));}catch{}}}
+ if(result.exitCode!==0){evidence.commandFailure={exitCode:result.exitCode,status:result.status,diagnostic:(result.stderr??"").split(/\r?\n/)[0].slice(0,512)};if(executable===dotnet&&args[0]===assembly){try{const parsed=JSON.parse(result.stdout);const proof=storageBrokerFailureEvidence(parsed);if(proof)evidence.commandFailure.proof=proof;}catch{}}}
  const exited=await runtimeGuardianStopped(owners.at(-1),{windowsHelper:helper});if(!exited){evidence.ownershipFailure={command:executable===helper?args[0]:executable===dotnet?"compiled-proof":"identity-observation",scope:owners.at(-1),exitCode:result.exitCode,status:result.status};await save();}
  assert.equal(exited,true,"The exact proof command has no independently verified exit.");assert.equal(result.exitCode,0,"A bootstrap proof command failed.");return result.stdout;
 }

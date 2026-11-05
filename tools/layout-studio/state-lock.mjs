@@ -6,6 +6,16 @@ import { userInfo } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { privateDirectory } from "./private-fs.mjs";
+import { createKeylessLeasePool } from "./keyless-lease-pool.mjs";
+
+let windowsLeases;
+function reusableWindowsLeases() {
+  return windowsLeases ??= createKeylessLeasePool({ spawnWorker(path) {
+    const child = spawn(join(process.env.SystemRoot || "C:\\Windows", "System32/WindowsPowerShell/v1.0/powershell.exe"), ["-NoLogo", "-NoProfile", "-NonInteractive", "-File", fileURLToPath(new URL("./state-lock.ps1", import.meta.url)), "-Reusable"], { shell: false, windowsHide: true, stdio: ["pipe", "pipe", "pipe"] });
+    child.stdin.write(windowsLockRequest({ path, parentPid: process.pid }));
+    return child;
+  } });
+}
 
 /** A closed line protocol avoids loading a JSON/module engine to acquire a lock. */
 export function windowsLockRequest({ path, parentPid, trace = false, nonBlocking = false }) {
@@ -26,16 +36,12 @@ export async function withStateLock(root, id, fn, { onProgress, nonBlocking = fa
   const named = await lstat(path);
   if (!named.isFile() || named.isSymbolicLink() || (process.platform !== "win32" && (named.uid !== userInfo().uid || (named.mode & 0o077)))) throw new Error("Private lock ownership or permissions are invalid.");
   onProgress?.("lease-file");
+  if (process.platform === "win32") return reusableWindowsLeases().withLease(path, fn, { nonBlocking, onProgress });
   let child;
   // cat can echo readiness only after flock grants the kernel lease. Its open
   // input pipe keeps that lease alive; EOF also retires it after parent loss.
   if (process.platform === "linux") child = spawn("/usr/bin/flock", ["--exclusive", ...(nonBlocking ? ["--nonblock"] : ["--timeout", "10"]), "--conflict-exit-code", "75", path, "/usr/bin/cat"], { shell: false, stdio: ["pipe", "pipe", "ignore"] });
-  else if (process.platform === "win32") {
-    const request = windowsLockRequest({ path, parentPid: process.pid, trace: Boolean(onProgress), nonBlocking });
-    child = spawn(join(process.env.SystemRoot || "C:\\Windows", "System32/WindowsPowerShell/v1.0/powershell.exe"), ["-NoLogo", "-NoProfile", "-NonInteractive", "-File", fileURLToPath(new URL("./state-lock.ps1", import.meta.url))], { shell: false, windowsHide: true, stdio: ["pipe", "pipe", onProgress ? "pipe" : "ignore"] });
-    if (onProgress) { let diagnostic = ""; child.stderr.on("data", (b) => { diagnostic = (diagnostic + b.toString()).slice(-1024); let end; while ((end = diagnostic.indexOf("\n")) >= 0) { const line = diagnostic.slice(0, end).trim(); diagnostic = diagnostic.slice(end + 1); if (["lease-entered", "lease-input-read", "lease-request-read", "lease-owner-found", "lease-held"].includes(line) || /^lease-error-[0-9]{1,5}$/.test(line)) onProgress(line); } }); }
-    child.stdin.write(request);
-  } else throw new Error("This platform has no implemented private state lock. No state was changed.");
+  else throw new Error("This platform has no implemented private state lock. No state was changed.");
   onProgress?.("lease-spawned");
   let alive = true, resolveClosed;
   const closed = new Promise((resolve) => { resolveClosed = resolve; });

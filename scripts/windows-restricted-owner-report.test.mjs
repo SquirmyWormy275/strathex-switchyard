@@ -1,10 +1,19 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { verifyRestrictedOwnerReport } from "./windows-restricted-owner-report.mjs";
+import { verifyRestrictedOwnerReport, storageBrokerFailureEvidence } from "./windows-restricted-owner-report.mjs";
 function sample() { return { success: true, nativeRestrictedHostProof: {
   schema: "switchyard-restricted-host-process-proof/v1", success: true, processCreationApi: "CreateProcessAsUserW", creatorPrivileges: { quotaAssigned: true, quotaEnabled: false, assignPrimaryAssigned: false, assignPrimaryEnabled: false, impersonateAssigned: true, impersonateEnabled: true }, creatorQuotaRestoredVerified: true, restrictingSidListVerified: true, restrictingSidCount: 4, primaryTokenVerified: true, sameUserVerified: true, mediumIntegrityVerified: true, administratorsDenyOnlyVerified: true, volumePrivilegeAbsentVerified: true, onlyTraversePrivilegeAssignedVerified: true, historicalFilteredFlags: [false, false, false], historicalFilterBytes: [1, 1, 1], tokenRecheckedAfterExit: true, treeExitVerified: true, hostOwnerChecks: 8,
   hostOwner: { schema: "switchyard-native-broker-owner-proof/v1", success: true, checks: Array.from({ length: 8 }, (_, i) => "synthetic independently verified boundary " + i), nativeExitVerified: true, fixtureRemoved: true, ordinaryUserToken: false, guestLaunched: false, setupRequested: false, accountCreated: false }, ordinaryUserAccountAccepted: false, guestLaunched: false, accountCreated: false
 } }; }
+test("the actual coordinator projection retains bounded failed-child evidence and excludes private paths or arbitrary fields", () => {
+  const child = { waitResult: 0, exitCode: 2, resultAvailable: true, childReportedSuccess: false, ownerReportedSuccess: false, completedChecks: 0, failedPhase: "private-state-initialize", failureCategory: "Error" };
+  const input = { schema: "switchyard-storage-broker-protocol-proof/v1", success: false, restrictedHostPhase: "bounded-owner-journey", restrictedHostChildExit: child, privatePath: "NEVER_RETAIN" };
+  const result = storageBrokerFailureEvidence(input); assert.deepEqual(result.restrictedHostChildExit, child); assert.equal(JSON.stringify(result).includes("NEVER_RETAIN"), false);
+  result.restrictedHostChildExit.exitCode = 99; assert.equal(child.exitCode, 2);
+  for (const invalid of [{ ...child, stateDirectory: "NEVER_RETAIN" }, { ...child, failedPhase: "/NEVER_RETAIN" }, { ...child, completedChecks: 9 }, { ...child, waitResult: -1 }, { ...child, exitCode: 1.5 }, { ...child, resultAvailable: "true" }]) assert.equal(storageBrokerFailureEvidence({ ...input, restrictedHostChildExit: invalid }).restrictedHostChildExit, undefined);
+  assert.deepEqual(storageBrokerFailureEvidence({ schema: input.schema, success: false, restrictedHostChildExit: { waitResult: 258, resultAvailable: false } }).restrictedHostChildExit, { waitResult: 258, resultAvailable: false });
+  for (const invalid of [null, [], { ...input, success: true }, { ...input, schema: "untrusted" }]) assert.equal(storageBrokerFailureEvidence(invalid), undefined);
+});
 test("historical filter metadata is observational while every actual token, privilege, exit and owner boundary remains mandatory", () => {
   const result = sample(); assert.equal(verifyRestrictedOwnerReport(result), result.nativeRestrictedHostProof); result.nativeRestrictedHostProof.historicalFilteredFlags = [true, false, true]; result.nativeRestrictedHostProof.historicalFilterBytes = [4, 1, 4]; assert.equal(verifyRestrictedOwnerReport(result), result.nativeRestrictedHostProof);
   for (const key of ["success", "primaryTokenVerified", "sameUserVerified", "mediumIntegrityVerified", "administratorsDenyOnlyVerified", "volumePrivilegeAbsentVerified", "onlyTraversePrivilegeAssignedVerified", "tokenRecheckedAfterExit", "treeExitVerified", "creatorQuotaRestoredVerified", "restrictingSidListVerified"]) { const result = sample(); result.nativeRestrictedHostProof[key] = false; assert.throws(() => verifyRestrictedOwnerReport(result)); }

@@ -38,6 +38,16 @@ compile with the existing SDK, 223 portable checks pass, and three isolated
 contract/package groups pass 26 checks. Native execution of this diagnostic is
 still pending; it is not a repair acceptance.
 
+The new child diagnostic initially failed to survive the coordinator's privacy
+projection. That projection now shares a tested bounded schema: child wait/exit,
+booleans, a maximum eight completed checks and fixed phase/category labels are
+retained; private paths, arbitrary keys and malformed values are omitted. Nine
+focused groups pass 85 checks including this projection, protocol ownership,
+package/application contracts and the corrected history fixture. The default
+Windows store now uses [short-lived keyless lock helpers](private-state-locking.md)
+to avoid repeated PowerShell startup without caching keys or extending existing
+budgets. Native verification of the new worker and diagnostic remains pending.
+
 ## Prior component evidence
 
 PR head `bd77ec4`, merge execution `b5295a6`, passes the actual Windows native

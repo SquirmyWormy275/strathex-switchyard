@@ -1,3 +1,4 @@
+param([switch]$Reusable)
 $ErrorActionPreference = 'Stop'
 $utf8 = [Text.UTF8Encoding]::new($false)
 $inputPipe = [IO.StreamReader]::new([Console]::OpenStandardInput(), $utf8)
@@ -31,6 +32,51 @@ if (-not [IO.Path]::IsPathRooted($path)) { throw 'An absolute private lock path 
 $parent = [Diagnostics.Process]::GetProcessById($parentPidValue)
 $parentStart = $parent.StartTime
 if ($null -ne $tracePipe) { $tracePipe.WriteLine('lease-owner-found') }
+if ($Reusable) {
+    # This worker holds only one validated path. Every lease opens and closes
+    # its own kernel handle; no compartment bytes, credentials or keys enter it.
+    function Read-LeaseCommand {
+        $text = [Text.StringBuilder]::new()
+        while ($true) {
+            $character = $inputPipe.Read()
+            if ($character -lt 0) { if ($text.Length -ne 0) { throw 'Incomplete private lease command.' }; return $null }
+            if ($character -eq 10) { return $text.ToString() }
+            if ($character -lt 32 -or $character -gt 126 -or $text.Length -ge 64) { throw 'Invalid private lease command.' }
+            [void]$text.Append([char]$character)
+        }
+    }
+    $sequence = 0
+    try {
+        $outputPipe.WriteLine('READY')
+        while ($null -ne ($command = Read-LeaseCommand)) {
+            if ($parent.HasExited -or $parent.StartTime -ne $parentStart) { throw 'Lock owner exited.' }
+            if ($command -cnotmatch '^ACQUIRE ([1-9][0-9]{0,9}) ([01])$') { throw 'Invalid private lease acquisition.' }
+            $next = 0
+            if (-not [int]::TryParse($Matches[1], [ref]$next) -or $sequence -eq [int]::MaxValue -or $next -ne ($sequence + 1)) { throw 'Invalid private lease sequence.' }
+            $sequence = $next; $tryOnly = $Matches[2] -ceq '1'
+            $deadline = [DateTime]::UtcNow.AddSeconds(10); $held = $null
+            try {
+                while ($null -eq $held) {
+                    if ($parent.HasExited -or $parent.StartTime -ne $parentStart) { throw 'Lock owner exited.' }
+                    try { $held = [IO.File]::Open($path, [IO.FileMode]::OpenOrCreate, [IO.FileAccess]::ReadWrite, [IO.FileShare]::None) }
+                    catch [IO.IOException] {
+                        $nativeError = $_.Exception.HResult -band 0xffff
+                        if ($nativeError -notin @(32, 33)) { throw }
+                        if ($tryOnly) { break }
+                        if ([DateTime]::UtcNow -ge $deadline) { throw 'Private state is busy.' }; [Threading.Thread]::Sleep(25)
+                    }
+                }
+                if ($null -eq $held) { $outputPipe.WriteLine('BUSY ' + $sequence); continue }
+                $outputPipe.WriteLine('LOCKED ' + $sequence)
+                $release = Read-LeaseCommand
+                if ($null -eq $release) { break }
+                if ($release -cne ('RELEASE ' + $sequence)) { throw 'Invalid private lease release.' }
+            } finally { if ($null -ne $held) { $held.Dispose(); $held = $null } }
+            $outputPipe.WriteLine('RELEASED ' + $sequence)
+        }
+    } finally { $parent.Dispose(); $inputPipe.Dispose(); $outputPipe.Dispose(); if ($null -ne $tracePipe) { $tracePipe.Dispose() } }
+    exit 0
+}
 $deadline = [DateTime]::UtcNow.AddSeconds(10)
 $held = $null
 try {
