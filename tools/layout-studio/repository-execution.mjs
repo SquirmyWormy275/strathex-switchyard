@@ -19,8 +19,9 @@ import { scopeHash } from "./confirmations.mjs";
 import { connectedExecutionActions, linuxPipelineActions, linuxShieldActions } from "./repository-execution-actions.mjs";
 import { pipelineEvidence, pipelineDependencies } from "./repository-pipeline.mjs";
 import { validateShieldRecipe, shieldDependencies, shieldReceiptEvidence } from "./repository-shield.mjs";
-import { shieldIndexPrefix } from "./shield-scanner-engine.mjs";
+import { shieldIndexPrefix, shieldHistoryPrefix } from "./shield-scanner-engine.mjs";
 import { shieldIndexFiles, shieldIndexStagingBytes } from "./shield-index-inputs.mjs";
+import { shieldHistoryFiles, shieldHistoryStagingBytes } from "./shield-history-inputs.mjs";
 const uuid=v=>typeof v==="string"&&/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/.test(v);
 const sha=v=>typeof v==="string"&&/^[a-f0-9]{64}$/.test(v), tokenHash=v=>createHash("sha256").update(v).digest("hex");
 const budget={version:"suite-reviewed-execution/v2",commandClasses:Object.fromEntries(connectedExecutionActions("linux").map(action=>[action,{maxConcurrent:1,timeoutMs:600000,maxAttempts:1,windowMs:3600000,maxClaimsPerWindow:20,maxCostUnitsPerWindow:20,defaultCostUnits:1}]))};
@@ -48,12 +49,12 @@ export function createRepositoryExecution({store,authority,stateDirectory,platfo
       const ignored=linuxShieldActions.includes(proposal.action)?(resolved.files.ignored??[]).filter(f=>f.classification==="included"&&resolved.proposed.classifications.includedIgnored?.includes(f.path)):[];
       const witnesses=new Map([...resolved.files.tracked,...resolved.files.untracked,...ignored].map(f=>[f.path,f]));
       for(const input of recipe.inputFiles){
-        if(input.path.startsWith(shieldIndexPrefix)&&linuxShieldActions.includes(proposal.action))continue;
+        if((input.path.startsWith(shieldIndexPrefix)||input.path.startsWith(shieldHistoryPrefix))&&linuxShieldActions.includes(proposal.action))continue;
         if(!resolved.proposed.paths.includes(input.path)||witnesses.get(input.path)?.digest!==`sha256:${input.sha256}`)throw Error("Every execution input must match this exact task-owned file snapshot.");
       }
-      const shield=await validateShieldRecipe({recipe,repositoryRoot:resolved.task.repositoryRoot,action:proposal.action,resolveFixtures:resolveScannerFixtures?input=>resolveScannerFixtures(c,input):undefined,resolveIndexInputs:(paths,consume)=>authority.useIndexInputs(c,resolved.record.id,proposal.action,paths,consume),now});
-      const indexed = new Map(shield ? shieldIndexFiles(shield.request).map(file => [file.path, file]) : []);
-      for(const input of recipe.inputFiles)if(input.path.startsWith(shieldIndexPrefix)&&(!indexed.has(input.path)||!resolved.proposed.paths.includes(indexed.get(input.path).source.path)))throw Error("Every reserved scanner input needs an exact witnessed index source in this task-owned grant.");
+      const shield=await validateShieldRecipe({recipe,repositoryRoot:resolved.task.repositoryRoot,action:proposal.action,resolveFixtures:resolveScannerFixtures?input=>resolveScannerFixtures(c,input):undefined,resolveIndexInputs:(paths,consume)=>authority.useIndexInputs(c,resolved.record.id,proposal.action,paths,consume),resolveHistoryInputs:(paths,depth,consume)=>authority.useHistoryInputs(c,resolved.record.id,proposal.action,paths,depth,consume),now});
+      const indexed = new Map(shield ? [...shieldIndexFiles(shield.request),...shieldHistoryFiles(shield.request)].map(file => [file.path, file]) : []);
+      for(const input of recipe.inputFiles)if((input.path.startsWith(shieldIndexPrefix)||input.path.startsWith(shieldHistoryPrefix))&&(!indexed.has(input.path)||!resolved.proposed.paths.includes(indexed.get(input.path).source.path)))throw Error("Every reserved scanner input needs an exact witnessed index source in this task-owned grant.");
       return {verified,recipe,...(shield?{shield}:{})};
     }finally{read.bytes.fill(0);}
   }
@@ -81,6 +82,10 @@ export function createRepositoryExecution({store,authority,stateDirectory,platfo
         repositoryRuntime=new RepositoryRuntime(loaded.verified,{processSupervisor:sandbox,temporaryBuilds:true,executionRoots:{prepare:async input=>{
           const row=(await store.snapshot(c)).repositoryExecutionReviews?.find(r=>r.requestId===review.requestId);if(!row?.operationId)throw Error("Execution staging requires its protected checkpoint operation.");
           const context={operationId:row.operationId,scopeDigest:review.scopeDigest};
+          if(review.shield?.historyWitness){
+            try{return await authority.useHistoryInputs(c,review.authorityId,review.action,review.shield.historyWitness.paths,review.shield.historyWitness.requestedDepth,(report,bytes)=>staging.prepare(c,context,input,check,{historyBytes:shieldHistoryStagingBytes(review.shield,report,bytes)}));}
+            catch(error){await staging.cleanup(c,row.operationId);throw error;}
+          }
           if(!review.shield?.indexWitness)return staging.prepare(c,context,input,check);
           try {
             return await authority.useIndexInputs(c,review.authorityId,review.action,review.shield.indexWitness.rows.map(row=>row.path),(report,bytes)=>staging.prepare(c,context,input,check,{indexBytes:shieldIndexStagingBytes(review.shield,report,bytes)}));
@@ -118,7 +123,7 @@ export function createRepositoryExecution({store,authority,stateDirectory,platfo
       if(loaded.shield)packet.shield=loaded.shield;
       if(validationActions.includes(proposal.action))packet.validationPolicyDigest=validationPolicyDigest(await store.snapshot(c));
       const review={...packet,scopeDigest:scopeHash(["switchyard-execution-review/v1",c,packet]),status:"reviewed",createdAt:now()},host=await runtimeFor(c,review,resolved,g,loaded);
-      const confirmation=await host.runtime.confirmations.issue({action:review.action,sessionId:review.sessionId,authorityId:review.authorityId,targetSnapshotId:review.targetSnapshotId,scopeDigest:review.scopeDigest,reason:"Execute only this exact reviewed recipe and task-owned non-production input set in the displayed isolated boundary. No provider permission or live-repository write is granted."+(review.shield?.indexWitness?" This scan also includes the displayed staged Git versions, separately from working files.":""),reauthenticated:false});
+      const confirmation=await host.runtime.confirmations.issue({action:review.action,sessionId:review.sessionId,authorityId:review.authorityId,targetSnapshotId:review.targetSnapshotId,scopeDigest:review.scopeDigest,reason:"Execute only this exact reviewed recipe and task-owned non-production input set in the displayed isolated boundary. No provider permission or live-repository write is granted."+(review.shield?.indexWitness?" This scan also includes the displayed staged Git versions, separately from working files.":"")+(review.shield?.historyWitness?" This scan also includes the displayed bounded first-parent historical versions; broader history coverage remains incomplete.":""),reauthenticated:false});
       await host.check();review.expiresAt=confirmation.record.expiresAt;review.tokenDigest=tokenHash(confirmation.token);
       await store.update(c,"repository-execution-review",s=>{const rows=s.repositoryExecutionReviews??[],held=rows.filter(r=>["executing","running","outcome-unconfirmed"].includes(r.status)||r.status==="reviewed"&&Date.parse(r.expiresAt)>now());s.repositoryExecutionReviews=[...held,...rows.filter(r=>!held.includes(r)).slice(-16)];if(s.repositoryExecutionReviews.length>=64)throw Error("The protected execution review inventory is full.");s.repositoryExecutionReviews.push(review);},{provider:resolved.task.provider});
       return {status:"requires-confirmation",review:view(review),confirmation,budget:budget.commandClasses[proposal.action]};

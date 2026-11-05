@@ -196,6 +196,7 @@ export const requiredGroups = [
   { file: "tools/layout-studio/repository-execution.test.mjs", timeoutMs: 240_000, ...nativeTestOverrides("tools/layout-studio/repository-execution.test.mjs"), ...(process.platform !== "linux" ? { expectedSkipped: 1 } : {}) },
   { file: "tools/layout-studio/shield-scanner-engine.test.mjs" },
   { file: "tools/layout-studio/repository-shield-index.test.mjs", timeoutMs: 120_000, expectedSkipped: process.platform === "linux" ? 0 : 3 },
+  { file: "tools/layout-studio/repository-shield-history.test.mjs", timeoutMs: 120_000, expectedSkipped: process.platform === "linux" ? 0 : 3 },
   { file: "tools/layout-studio/osv-advisory-source.test.mjs" },
   { file: "tools/layout-studio/repository-shield-osv-source.test.mjs", ...nativeTestOverrides("tools/layout-studio/repository-shield-osv-source.test.mjs"), expectedSkipped: process.platform === "linux" ? 0 : 1 },
   { file: "tools/layout-studio/shield-input-inventory.test.mjs" },

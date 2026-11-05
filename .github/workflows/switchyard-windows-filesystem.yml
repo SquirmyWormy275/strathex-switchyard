@@ -237,7 +237,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        suite: [history-inputs, history-authority, index-inputs, index-bytes, index-staging, index-scanner, index-authority, osv-source, osv-scanner, ignored-tree-policy, ignored-tree-authority, ignored-tree-scanner, receipt-authority, receipt-authority-state, shield-exceptions, shield-exception-execution, shield-exception-ledger, ignored-authority, ignored-scanner, fixture-invalidation, validation-policy, shield-evidence, shield-policy, shield-recovery, pipeline-recovery, pipeline-policy, pipeline-evidence, fixture-removal, backend-contract, fixture-registry, fixture-maintenance, harness, leases, legacy-images, broker-owner, sandbox-native, sandbox-sessions, reviewed-run, run-owner]
+        suite: [history-scanner, history-inputs, history-authority, index-inputs, index-bytes, index-staging, index-scanner, index-authority, osv-source, osv-scanner, ignored-tree-policy, ignored-tree-authority, ignored-tree-scanner, receipt-authority, receipt-authority-state, shield-exceptions, shield-exception-execution, shield-exception-ledger, ignored-authority, ignored-scanner, fixture-invalidation, validation-policy, shield-evidence, shield-policy, shield-recovery, pipeline-recovery, pipeline-policy, pipeline-evidence, fixture-removal, backend-contract, fixture-registry, fixture-maintenance, harness, leases, legacy-images, broker-owner, sandbox-native, sandbox-sessions, reviewed-run, run-owner]
     env:
       npm_config_audit: "false"
       npm_config_fund: "false"

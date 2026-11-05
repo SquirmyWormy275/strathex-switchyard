@@ -11,15 +11,29 @@ owned fixture/worktree removed. Windows client software at the same PR head
 passes six groups/61 tests with an independently verified artifact digest.
 Neither result substitutes for native Windows NTFS/guest acceptance.
 
-Selected first-parent history witnessing now passes 38 isolated history/index/
-runner checks. Actual raw commit links, reconstructed tree hashes, selected old
-blob bytes and eleven real native exits verify without source/message disclosure
-or repository writes. Historical scanning remains unfinished; installed history
-witness acceptance is pending. [Contract](git-history-inputs.md).
+Selected first-parent history witnessing passes 38 isolated history/index/runner
+checks and installed `40bb3eb` passes six update/fourteen actual witness and
+separate current-file scanner checks. All eleven query probes/two scanners exit,
+full restoration and owned scratch removal pass, with zero prompts or keyboard
+access. Linux historical scanner integration now separately passes five focused
+cases and sixty isolated scanner/history/index/runner checks; installed historical
+scan acceptance is pending. Windows historical staging, automatic scope and
+broader history remain unfinished software. [Witness](git-history-inputs.md),
+[scanner connection](historical-shield-inputs.md).
 
 ## Installed application
 
-Latest installed source `112efdc`, release
+Latest installed source `40bb3eb`, release
+`cb74c174ae8fa881d9be19bdb2d735bbf6bb845c910630da18c9facdf8645c3c`,
+passes six update/fourteen actual history-witness and separate current-file scan
+checks. Receipts `assignment-legends-1793873715840.json` and
+`installed-shield-baseline-1793873865290.json` retain three immutable commits,
+two versions, eleven independently stopped query probes, two scanner exits and
+full restoration. Owned repository/signing/packages/staging/bundle/proof checkout
+removed; one empty task, zero prompts, no keyboard access. This witness journey
+does not claim historical scanner acceptance.
+
+Earlier installed source `112efdc`, release
 `408086bab7911cc60170fed4576414ad04356aaca45f735fe49591377dc10462`,
 passes six normal update/thirteen actual Linux staged/worktree compatibility
 checks after connecting the Windows host path. Both scanner exits, authenticated
@@ -367,8 +381,10 @@ and failed-checkpoint owned fixtures/checkout are removed with separate cleanup
 receipt `failed-full-index-inventory-cleanup-1793868621389.json`. Later immutable `11d8cc7` passes the complete
 208-group checkpoint: 1,231 tests pass and ten declared skips. Every child
 cleanup verifies; receipt `isolated-test-10ea941c-1736-4c0a-8e11-c83a4bd24a3d.json`
-retained, owned fixtures and checkout removed. Later Windows transport work
-remains separately tested.
+retained, owned fixtures and checkout removed. Later immutable `112efdc` passes
+all 211 required groups, 1,246 tests and ten declared skips with child cleanup
+and owned fixtures/checkout removed (`isolated-test-be48daaa-a8c9-4e7d-9772-9977e8201458.json`).
+Native Windows acceptance remains separate.
 
 The [Windows index transport foundation](windows-index-staging.md) now builds
 with zero warnings/errors and passes 49 new portable parser/hash/boundary checks

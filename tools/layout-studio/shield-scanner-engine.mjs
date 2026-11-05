@@ -7,6 +7,8 @@ import { fileURLToPath } from "node:url";
 
 export const shieldEngineVersion = "switchyard-baseline-scanner/1";
 export const shieldIndexPrefix = ".switchyard-index/";
+export const shieldHistoryPrefix = ".switchyard-history/";
+export const shieldReservedPath = path => [shieldIndexPrefix,shieldHistoryPrefix].some(prefix=>path===prefix.slice(0,-1)||path?.startsWith(prefix));
 export const shieldActions = Object.freeze(["shield_change_scan", "shield_codebase_audit", "shield_supply_chain", "release_shield"]);
 const dimensions = {
   shield_change_scan: ["secrets", "pii", "security_defects"],
@@ -63,8 +65,14 @@ function indexSource(v) {
   exact(v, ["kind", "path", "objectId", "mode"]);
   if (v.kind !== "git-index" || !/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(v.objectId ?? "") || /^0+$/.test(v.objectId) || !["100644", "100755"].includes(v.mode)) throw Error("Invalid exact index source declaration.");
   const path = scannerPath(v.path);
-  if (path === shieldIndexPrefix.slice(0, -1) || path.startsWith(shieldIndexPrefix)) throw Error("Nested scanner index aliases are refused.");
+  if (shieldReservedPath(path)) throw Error("Nested scanner index aliases are refused.");
   return { kind: "git-index", path, objectId: v.objectId, mode: v.mode };
+}
+function historySource(v){
+  exact(v,["kind","path","commit","objectId","mode","depth"]);
+  if(v.kind!=="git-history"||![v.commit,v.objectId].every(value=>typeof value==="string"&&/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(value)&&!/^0+$/.test(value))||v.commit.length!==v.objectId.length||!["100644","100755"].includes(v.mode)||!Number.isSafeInteger(v.depth)||v.depth<1||v.depth>6)throw Error("Invalid exact historical source declaration.");
+  const path=scannerPath(v.path);if(shieldReservedPath(path)||path.length>384||path.split("/").length>28)throw Error("Historical source paths exceed their exact bounds.");
+  return{kind:"git-history",path,commit:v.commit,objectId:v.objectId,mode:v.mode,depth:v.depth};
 }
 export function validateShieldRequest(v) {
   exact(v, ["schema", "version", "action", "scope", "files", "scanner", "advisory"]);
@@ -72,11 +80,13 @@ export function validateShieldRequest(v) {
   const files = array(v.files, 512).map(f => {
     exact(f, ["path", "sha256", "size", ...(Object.hasOwn(f ?? {}, "source") ? ["source"] : [])]);
     if (!Number.isSafeInteger(f.size) || f.size < 0 || f.size > 2 * 1024 * 1024) throw Error("Scanner file exceeds its bound.");
-    const path = scannerPath(f.path), source = Object.hasOwn(f, "source") ? indexSource(f.source) : undefined;
-    if (source ? path !== shieldIndexPrefix + source.path : path === shieldIndexPrefix.slice(0, -1) || path.startsWith(shieldIndexPrefix)) throw Error("Index inputs require their exact reserved disposable path and original source identity.");
+    const path = scannerPath(f.path), source = Object.hasOwn(f, "source") ? (f.source?.kind==="git-history"?historySource(f.source):indexSource(f.source)) : undefined;
+    if (source ? path !== (source.kind==="git-history"?shieldHistoryPrefix+source.commit+"/":shieldIndexPrefix) + source.path : shieldReservedPath(path)) throw Error("Index inputs require their exact reserved disposable path and original source identity.");
     return { path, sha256: digest(f.sha256), size: f.size, ...(source ? { source } : {}) };
   });
   if (!files.length || files.reduce((n, f) => n + f.size, 0) > 16 * 1024 * 1024 || new Set(files.map(f => f.path.toLowerCase())).size !== files.length) throw Error("Invalid scanner input inventory.");
+  const history=files.filter(file=>file.source?.kind==="git-history");
+  if(history.length&&(!["shield_codebase_audit","release_shield"].includes(v.action)||history.length>48||new Set(history.map(file=>file.source.path)).size>8||new Set(history.map(file=>file.source.depth)).size!==1||files.some(file=>file.source?.kind==="git-index")))throw Error("Historical scans require one bounded depth and a separate Codebase Audit or Release scope; mixed index/history requests are not connected.");
   const scanner = feed(v.scanner), advisory = v.advisory === null ? null : feed(v.advisory);
   if (advisory && (advisory.id === scanner.id || advisory.path.toLowerCase() === scanner.path.toLowerCase()) || files.some(f => [scanner.path, advisory?.path].includes(f.path))) throw Error("Ambiguous scanner inputs.");
   return { schema: v.schema, version: 1, action: v.action, scope: v.scope, files, scanner, advisory };
@@ -161,7 +171,7 @@ export async function scanShieldInputs(proposed, { readInput }) {
       }
     }
   }
-  if (requested.includes("history")) gaps.add("git_history_not_scanned");
+  if (requested.includes("history")) gaps.add(request.files.some(file=>file.source?.kind==="git-history")?"git_history_partially_scanned":"git_history_not_scanned");
   if (requested.includes("permissions")) gaps.add("source_permissions_not_witnessed");
   if (requested.includes("provenance")) gaps.add("publisher_provenance_not_verified");
   if (requested.includes("isolation")) gaps.add("host_isolation_requires_attestation");

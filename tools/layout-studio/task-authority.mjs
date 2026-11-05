@@ -106,6 +106,13 @@ export function createTaskAuthority({ store, checkNative, isActive = async () =>
       const authorize=async()=>{const fresh=await access(c,task.id,generation);if(taskDigest(fresh.task)!==binding||workspaceDigest(fresh.state)!==workspace)throw Error("The exact task, account or workspace changed during history witnessing.");};
       await checkNative(c,task);await authorize();const result=await inspection.historyInputs(c,task,selected.paths,selected.depth,authorize);await authorize();await checkNative(c,task);await authorize();return{...result,taskId:task.id,provider:task.provider,nativePermissionsChanged:false};
     });},
+    async useHistoryInputs(c,id,action,paths,depth,consume){return exclusive(c,async generation=>{
+      if(!["shield_codebase_audit","release_shield"].includes(action)||typeof consume!=="function"||typeof inspection.useHistoryInputs!=="function"||typeof checkNative!=="function")throw Error("Private history bytes require the connected Codebase Audit or Release Shield path.");
+      const selected=historySelection(paths,depth),initial=await this.assertCurrent(c,id,action),binding=initial.record.taskDigest,workspace=initial.record.workspaceDigest;
+      if(selected.paths.some(path=>!initial.record.proposal.paths.includes(path)))throw Error("Every historical source path must belong to the exact task-owned file grant.");
+      const authorize=async()=>{current(c,generation);const fresh=await this.assertCurrent(c,id,action);if(fresh.record.taskDigest!==binding||fresh.record.workspaceDigest!==workspace)throw Error("The reviewed history task or workspace binding changed.");};
+      await checkNative(c,initial.task);await authorize();const result=await inspection.useHistoryInputs(c,initial.task,selected.paths,selected.depth,consume,authorize);await authorize();await checkNative(c,initial.task);await authorize();return result;
+    });},
     async useIndexInputs(c, id, action, selectedPaths, consume) { return exclusive(c, async generation => {
       if (!linuxShieldActions.includes(action) || typeof consume !== "function" || typeof inspection.useIndexInputs !== "function" || typeof checkNative !== "function") throw Error("Private index input consumption is available only to the connected pinned Shield scanner.");
       const selected = gitIndexPaths(selectedPaths), initial = await this.assertCurrent(c, id, action), binding = initial.record.taskDigest, workspace = initial.record.workspaceDigest;

@@ -109,6 +109,10 @@ identifies relevant ignored names and groups build trees before a separate exact
 scan review; its metadata remains incomplete and grants no authority. A separate
 [index byte witness](docs/git-index-inputs.md) verifies explicitly named staged
 blobs without returning source text or treating that observation as a scan.
+The [history witness](docs/git-history-inputs.md) verifies bounded raw commit,
+tree and selected old blob identities without disclosing source or messages.
+[Linux historical scans](docs/historical-shield-inputs.md) now inspect reviewed
+first-parent versions, retaining incomplete scope and original Git provenance.
 [Explicit staged scans](docs/staged-shield-inputs.md) inspect both index and
 worktree copies: Linux has installed acceptance; the Windows reviewed connection
 has software checks with native staging/guest acceptance kept separate.

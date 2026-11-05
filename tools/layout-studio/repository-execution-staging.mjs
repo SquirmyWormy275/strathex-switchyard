@@ -39,9 +39,9 @@ export function createRepositoryExecutionStaging({store,stateDirectory,guardianS
     leases.delete(`${c}:${operationId}`);await mark(c,operationId,r=>{r.cleanupPending=false;});return {cleaned:true};
   }
   return {
-    async prepare(c,context,input,authorize,{indexBytes}={}) {
+    async prepare(c,context,input,authorize,{indexBytes,historyBytes}={}) {
       if(input.isolation!=="disposable"||!input.inputFiles?.length)throw Error("Connected execution requires exact reviewed disposable inputs.");
-      await authorize();const lease=await providerFactory(join(stateDirectory,c),{indexBytes}).prepare(input), nativeIdentity=identity(await directoryIdentity(lease.root));
+      await authorize();const lease=await providerFactory(join(stateDirectory,c),{indexBytes,historyBytes}).prepare(input), nativeIdentity=identity(await directoryIdentity(lease.root));
       let saved=false;
       try {
         await store.update(c,"repository-execution-staging-reserve",s=>{

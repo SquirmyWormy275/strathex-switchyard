@@ -82,11 +82,15 @@ export function createRepositoryInspection({ store, command = runRuntimeCommand,
     async scannerInputs(c, task, authorize = async () => {}) { return this.capture(c, task, {}, authorize, { scannerInventory: true }); },
     async indexInputs(c, task, paths, authorize = async () => {}) { return this.capture(c, task, {}, authorize, { indexPaths: gitIndexPaths(paths) }); },
     async historyInputs(c, task, paths, depth, authorize = async () => {}) { return this.capture(c, task, {}, authorize, { history: historySelection(paths, depth) }); },
+    async useHistoryInputs(c,task,paths,depth,consume,authorize=async()=>{}) {
+      if(typeof consume!=="function")throw Error("A private history consumer is required.");
+      return this.capture(c,task,{},authorize,{history:historySelection(paths,depth),consumeHistory:consume});
+    },
     async useIndexInputs(c, task, paths, consume, authorize = async () => {}) {
       if (typeof consume !== "function") throw Error("A private index consumer is required.");
       return this.capture(c, task, {}, authorize, { indexPaths: gitIndexPaths(paths), consumeIndex: consume });
     },
-    async capture(c, task, classifications, authorize = async () => {}, { metadataOnly = false, scannerInventory = false, indexPaths, consumeIndex, history } = {}) {
+    async capture(c, task, classifications, authorize = async () => {}, { metadataOnly = false, scannerInventory = false, indexPaths, consumeIndex, history, consumeHistory } = {}) {
       const selectedIndexPaths = indexPaths === undefined ? undefined : gitIndexPaths(indexPaths);
       const selectedHistory = history === undefined ? undefined : historySelection(history.paths, history.depth), historyQueries = new Set();
       const excludedTrees = ignoredTreeRoots(classifications.excludedIgnoredTrees ?? []), excludedQuery = excludedTrees.length ? ignoredTreeQuery(excludedTrees) : undefined;
@@ -103,7 +107,7 @@ export function createRepositoryInspection({ store, command = runRuntimeCommand,
       for (const [path, identity] of cleanup) if ((await Promise.all(old.filter(p => p.scratch === path).map(p => guardianStopped(p.ownedRuntime)))).every(Boolean)) await cleanScratch(c, path, identity);
       await check(); const executable = await resolveGit(); await check();
       const members = running.get(c) ?? new Set(); members.add(resource); running.set(c, members);
-      let fileCount = 0, totalBytes = 0, scratch, scratchIdentity; const indexCopies = new Map();
+      let fileCount = 0, totalBytes = 0, scratch, scratchIdentity; const blobCopies = new Map();
       const digests = new NodeFileDigestReader({ maxFileBytes: 4 * 1024 * 1024 });
       const digestReader = {
         async digest(root, path) {
@@ -146,15 +150,19 @@ export function createRepositoryInspection({ store, command = runRuntimeCommand,
           await read(["rev-parse","--show-toplevel"]);const head=(await read(["rev-parse","HEAD"])).trim(),shallowText=await read(["rev-parse","--is-shallow-repository"]);
           if(!/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(head)||!["true\n","false\n"].includes(shallowText))throw Error("Exact history repository metadata is unavailable.");
           const revisionQuery=historyRevisionQuery(selectedHistory.depth);historyQueries.add(JSON.stringify(revisionQuery));
-          const listed=historyCommitList(await read(revisionQuery),head,selectedHistory);allowedBatchInput=historyCommitInput(listed.commits);
+          const revisionText=await read(revisionQuery),listed=historyCommitList(revisionText,head,selectedHistory);allowedBatchInput=historyCommitInput(listed.commits);
           const rawCommits=await runner.run(gitIndexBatchQuery,task.repositoryRoot,allowedBatchInput);allowedBatchInput=undefined;if(rawCommits.exitCode)throw Error("Raw history commit objects are unavailable.");
           const commits=witnessHistoryCommits(rawCommits.stdout,listed.commits),shallow=shallowText==="true\n",stopping=verifyHistoryChain(commits,listed,shallow),versions=[],absent=[],trees=[];
           for(const commit of commits){const args=historyTreeQuery(commit.commit,selectedHistory.paths);historyQueries.add(JSON.stringify(args));const found=historyTreeEntries(await read(args),commit.commit,selectedHistory.paths,commit.tree);versions.push(...found.versions);absent.push({commit:commit.commit,paths:found.absent});trees.push({commit:commit.commit,objects:found.treeObjects,sha256:found.treeWitnessSha256});}
           const objectIds=[...new Set(versions.map(version=>version.objectId))],entries=objectIds.map((objectId,i)=>({path:`history-blob-${i}`,mode:"100644",objectId}));let blobs=[];
-          if(entries.length){allowedBatchInput=gitIndexBatchInput(entries);const result=await runner.run(gitIndexBatchQuery,task.repositoryRoot,allowedBatchInput);allowedBatchInput=undefined;if(result.exitCode)throw Error("Selected historical blob bytes are unavailable.");blobs=(await witnessGitIndexBatch(result.stdout,entries)).map(({objectId,size,sha256})=>({objectId,size,sha256}));}
-          const finalHead=(await read(["rev-parse","HEAD"])).trim(),finalShallow=await read(["rev-parse","--is-shallow-repository"]);
-          if(finalHead!==head||finalShallow!==shallowText)throw Error("The repository revision or shallow boundary changed during historical witnessing.");
-          await check();await verifyRepositoryIdentity(task);return{...historyWitnessReport({head,selection:selectedHistory,commits,shallow,stopping,versions,absent,blobs,trees,observedAt:new Date(now()).toISOString()}),repositoryRoot:task.repositoryRoot,observationOnly:true};
+          if(entries.length){allowedBatchInput=gitIndexBatchInput(entries);const result=await runner.run(gitIndexBatchQuery,task.repositoryRoot,allowedBatchInput);allowedBatchInput=undefined;if(result.exitCode)throw Error("Selected historical blob bytes are unavailable.");blobs=(await witnessGitIndexBatch(result.stdout,entries,consumeHistory?(row,bytes)=>{blobCopies.set(row.objectId,Buffer.from(bytes));}:undefined)).map(({objectId,size,sha256})=>({objectId,size,sha256}));}
+          const finalRevisions=await read(revisionQuery),finalShallow=await read(["rev-parse","--is-shallow-repository"]);
+          if(finalRevisions!==revisionText||finalShallow!==shallowText)throw Error("The repository revision or shallow boundary changed during historical witnessing.");
+          await check();await verifyRepositoryIdentity(task);const report={...historyWitnessReport({head,selection:selectedHistory,commits,shallow,stopping,versions,absent,blobs,trees,observedAt:new Date(now()).toISOString()}),repositoryRoot:task.repositoryRoot,observationOnly:true};
+          if(!consumeHistory)return report;
+          const consumed=await consumeHistory(report,blobCopies);await check();
+          if(await read(revisionQuery)!==revisionText||await read(["rev-parse","--is-shallow-repository"])!==shallowText)throw Error("The historical revision or shallow boundary changed while preparing private scanner inputs.");
+          await check();await verifyRepositoryIdentity(task);return consumed;
         }
         if (selectedIndexPaths) {
           const root = await runner.run(["rev-parse", "--show-toplevel"]), head = await runner.run(["rev-parse", "HEAD"]), before = await runner.run(gitIndexListingQuery);
@@ -164,13 +172,13 @@ export function createRepositoryInspection({ store, command = runRuntimeCommand,
           const blobs = await runner.run(gitIndexBatchQuery, task.repositoryRoot, allowedBatchInput);
           allowedBatchInput = undefined;
           if (blobs.exitCode) throw Error("The exact selected index blobs are unavailable; no filters or network fallback were used.");
-          const rows = await witnessGitIndexBatch(blobs.stdout, entries, consumeIndex ? (row, bytes) => { indexCopies.set(row.path, Buffer.from(bytes)); } : undefined);
+          const rows = await witnessGitIndexBatch(blobs.stdout, entries, consumeIndex ? (row, bytes) => { blobCopies.set(row.path, Buffer.from(bytes)); } : undefined);
           const after = await runner.run(gitIndexListingQuery), finalHead = await runner.run(["rev-parse", "HEAD"]);
           if (after.exitCode || finalHead.exitCode || after.stdout !== before.stdout || finalHead.stdout !== head.stdout) throw Error("The Git index or repository revision changed during input witnessing; inspect again.");
           await check(); await verifyRepositoryIdentity(task);
           const report = { ...gitIndexWitnessReport({ head: head.stdout.trim(), listing: before.stdout, rows, observedAt: new Date(now()).toISOString() }), repositoryRoot: task.repositoryRoot, observationOnly: true };
           if (!consumeIndex) return report;
-          const consumed = await consumeIndex(report, indexCopies);
+          const consumed = await consumeIndex(report, blobCopies);
           const consumedIndex = await runner.run(gitIndexListingQuery), consumedHead = await runner.run(["rev-parse", "HEAD"]);
           if (consumedIndex.exitCode || consumedHead.exitCode || consumedIndex.stdout !== before.stdout || consumedHead.stdout !== head.stdout) throw Error("The Git index or revision changed while preparing private scanner inputs.");
           await check(); await verifyRepositoryIdentity(task); return consumed;
@@ -228,7 +236,7 @@ export function createRepositoryInspection({ store, command = runRuntimeCommand,
         if (snapshot.repositoryRoot !== task.repositoryRoot) throw new Error("Git did not verify the exact bound repository root.");
         return { snapshot, files: { tracked: inspection?.trackedFiles ?? [], untracked: inspection?.untrackedFiles ?? [], ignored: inspection?.ignoredFiles ?? [] } };
       } finally {
-        for (const bytes of indexCopies.values()) bytes.fill(0); indexCopies.clear();
+        for (const bytes of blobCopies.values()) bytes.fill(0); blobCopies.clear();
         const stops = await Promise.all([...resource.clients].map(client => client.stop().catch(() => false)));
         if (!stops.every(Boolean)) throw new Error("Owned repository guardian exit is unconfirmed; protected recovery state and scratch were retained.");
         if (scratch) {

@@ -100,6 +100,7 @@ test("only explicitly slow integration or release groups extend the bounded defa
       ["tools/layout-studio/repository-temporary-build.test.mjs", 120_000],
       ["tools/layout-studio/repository-shield.test.mjs", 120_000],
       ["tools/layout-studio/repository-shield-index.test.mjs", 120_000],
+      ["tools/layout-studio/repository-shield-history.test.mjs", 120_000],
       ["tools/layout-studio/repository-windows-shield-index.test.mjs", process.platform === "win32" ? 300_000 : 120_000],
       ["tools/layout-studio/task-index-inputs.test.mjs", process.platform === "win32" ? 300_000 : 120_000],
       ["tools/layout-studio/task-history-inputs.test.mjs", process.platform === "win32" ? 300_000 : 120_000],
