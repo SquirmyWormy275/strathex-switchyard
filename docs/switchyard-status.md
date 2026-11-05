@@ -341,8 +341,11 @@ Receipt `isolated-test-72711a93-699d-4602-b263-91b5055f79e7.json` stays failed.
 The guard now declares exactly the new group bounds and passes in the 37-check
 subset; no deadlines or assertions were waived. Every child cleanup verifies,
 and failed-checkpoint owned fixtures/checkout are removed with separate cleanup
-receipt `failed-full-index-inventory-cleanup-1793868621389.json`. A new complete
-208-group checkpoint is running against `11d8cc7`; acceptance remains pending.
+receipt `failed-full-index-inventory-cleanup-1793868621389.json`. Later immutable `11d8cc7` passes the complete
+208-group checkpoint: 1,231 tests pass and ten declared skips. Every child
+cleanup verifies; receipt `isolated-test-10ea941c-1736-4c0a-8e11-c83a4bd24a3d.json`
+retained, owned fixtures and checkout removed. Later Windows transport work
+remains separately tested.
 
 The [Windows index transport foundation](windows-index-staging.md) now builds
 with zero warnings/errors and passes 49 new portable parser/hash/boundary checks
