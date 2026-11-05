@@ -100,9 +100,12 @@ internal static class WindowsStorageBrokerControl
         using(var service=OpenServiceW(manager,settings.ServiceName,0x10025))
         {
             if(service.IsInvalid)throw Invalid();VerifyConfiguration(service,settings);var status=ReadStatus(service);SafeProcessHandle? process=null;
+            // QueryServiceStatusEx does not define a PID for STOPPED or pending
+            // states. Never open a stale/recycled PID from such an observation.
+            if(status.State!=1&&status.State!=4)throw Invalid();
             try
             {
-                if(status.Pid>0)
+                if(status.State==4&&status.Pid>0)
                 {
                     phase?.Invoke("capture-native-process");
                     process=OpenProcess(0x101000,false,status.Pid);if(process.IsInvalid)throw Invalid();var image=new StringBuilder(4096);uint length=4096;
@@ -126,17 +129,21 @@ internal static class WindowsStorageBrokerControl
             // is not absence. Close this observation handle before waiting, and
             // never accept another configuration, a running service or timeout.
             bool absent;
+            phase?.Invoke("service-absence-open");
             using(var observed=OpenServiceW(manager,settings.ServiceName,5))
             {
                 int error=Marshal.GetLastWin32Error();absent=observed.IsInvalid&&error==1060;
                 if(!observed.IsInvalid)
                 {
-                    VerifyConfiguration(observed,settings);var remaining=ReadStatus(observed);
-                    if(remaining.State!=1||remaining.Pid!=0)throw Invalid();
+                    phase?.Invoke("service-absence-configuration");VerifyConfiguration(observed,settings);
+                    phase?.Invoke("service-absence-status");var remaining=ReadStatus(observed);
+                    // The independently captured original process has exited.
+                    // STOPPED's dwProcessId is never a valid exit observation.
+                    if(remaining.State!=1)throw Invalid();
                 }
                 else if(!absent&&error!=1072)throw new Win32Exception(error);
             }
-            if(absent)break;if(Environment.TickCount64>=absentDeadline)throw Invalid();Thread.Sleep(50);
+            if(absent)break;phase?.Invoke("service-absence-wait");if(Environment.TickCount64>=absentDeadline)throw Invalid();Thread.Sleep(50);
         }
         phase?.Invoke("protected-inventory");string[] expected={WindowsStorageBrokerInstallation.Executable,WindowsStorageBrokerInstallation.Configuration,WindowsStorageBrokerInstallation.PrivateKey};
         if(WindowsStorageBrokerDiagnostic.Read(settings)!=null)expected=expected.Append(WindowsStorageBrokerDiagnostic.FileName).ToArray();

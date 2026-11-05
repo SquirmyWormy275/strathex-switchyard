@@ -149,3 +149,19 @@ verified and bounded receipt retained. It launches no guest, account, setup
 dialogue or physical-device operation. The later combined contract batch failed
 its Windows-only inventory check and six-minute limit; complete workflow
 acceptance remains pending the corrected, independently bounded contract jobs.
+
+### Stopped-service observations
+
+Removal independently captures and waits for the original running service process.
+The later stopped-service poll does not use `dwProcessId`: [Microsoft documents
+that field as invalid when stopped](https://learn.microsoft.com/en-us/windows/win32/api/winsvc/nf-winsvc-queryservicestatusex).
+Initial pending states are preserved instead of opening a potentially stale PID.
+A valid stopped original entry remains pending until SCM reports error 1060;
+error 1072 also remains pending. The existing ten-second absence bound is unchanged.
+The finer `service-absence-{open,configuration,status,wait}` phases distinguish
+future failures without exposing private files or relaxing identity checks.
+
+The `25bd26c` native removal failure remains failed. The PID-contract correction
+compiles the actual helper and linked proof without warnings and passes 112
+portable checks; this Linux compilation does not establish native removal
+acceptance. Its fresh Windows lifecycle result remains pending.

@@ -7,6 +7,15 @@ records exact source checkpoints and receipts.
 
 ## Current backend
 
+The native removal observer no longer demands PID zero from a stopped SCM
+entry: that PID is not valid under the Windows API contract. The already captured
+original process handle still supplies independent exit proof. Initial pending
+states are preserved, and finer open/configuration/status/wait phases locate any
+remaining deletion failure. Both actual C# targets compile with zero warnings
+and 112 portable checks pass; source-only scratch is removed. The failed native
+`25bd26c` outcome remains failed and a fresh lifecycle result is pending. The
+original ten-second absence deadline is unchanged.
+
 Windows local gate and clean reproduction now connect exact task grants,
 reviewed Node catalogs, checkpoints/budgets, the existing owned guest/storage
 path and freshly authenticated pipeline reports. Signed feed versions/hashes are
