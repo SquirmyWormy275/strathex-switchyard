@@ -58,8 +58,10 @@ test("native filesystem, setup and restricted exchange CI lanes preserve every o
   const uploads = [...native.matchAll(/- name: (Retain[^\n]+)\n        if: always\(\) && matrix\.lane == '(filesystem|native-setup|restricted-exchange)'/g)];
   assert.equal(uploads.length, 9); assert.equal(new Set(uploads.map(row => row[1])).size, 9);
   assert.match(native, /timeout-minutes: 20/); assert.match(native, /--exchange/);
-  assert.match(workflow, /osv-scanner, pypi-scanner,/);
+  assert.match(workflow, /osv-scanner, pypi-scanner, license-scanner,/);
   const source = await readFile(new URL("./verify-windows-storage-contracts.mjs", import.meta.url), "utf8");
   assert.match(source, /"pypi-scanner": "tools\/layout-studio\/repository-windows-shield-pypi\.test\.mjs"/);
   assert.equal(selectWindowsContractGroups(["tools/layout-studio/repository-windows-shield-pypi.test.mjs"], requiredGroups).length, 1);
+  assert.match(source, /"license-scanner": "tools\/layout-studio\/repository-windows-shield-licenses\.test\.mjs"/);
+  assert.equal(selectWindowsContractGroups(["tools/layout-studio/repository-windows-shield-licenses.test.mjs"], requiredGroups).length, 1);
 });

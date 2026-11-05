@@ -21,6 +21,7 @@ const suites = {
   "osv-source": "tools/layout-studio/osv-advisory-source.test.mjs",
   "osv-scanner": "tools/layout-studio/repository-shield-osv-source.test.mjs",
   "pypi-scanner": "tools/layout-studio/repository-windows-shield-pypi.test.mjs",
+  "license-scanner": "tools/layout-studio/repository-windows-shield-licenses.test.mjs",
   "ignored-tree-policy": "tools/layout-studio/ignored-tree-policy.test.mjs",
   "ignored-tree-authority": "tools/layout-studio/task-authority-ignored-trees.test.mjs",
   "ignored-tree-scanner": "tools/layout-studio/repository-shield-ignored-trees.test.mjs",

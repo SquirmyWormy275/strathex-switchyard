@@ -5,23 +5,27 @@ The F77 is the connected pilot, not a scope limit. The [requirement ledger](swit
 separates unfinished software from checks requiring an exact device, account or
 host. [Verification](verification.md) retains accepted and failed checkpoints.
 
-The latest accepted complete Linux checkpoint is immutable `8108738`: 221/221
-groups, 1,335 tests, 1,325 passed and ten declared skips, with every child cleanup
-and owned fixture/alias/worktree removal verified. Later CVSS source `7e252a1`
-passes 57 focused checks and both normal installed Supply Chain/Release journeys
-(six update plus 16 and 16 scan checks). All 5,184 base vectors match FIRST's
-independent reference; unsupported metrics stay unknown. Owned proof/tooling
-scratch is removed. [Severity evidence](evidence/installed-cvss-summary.json).
+The latest accepted complete Linux checkpoint is immutable `c2fe4d8`: 223/223
+groups, 1,350 tests, 1,340 passed and ten declared skips. Every child cleanup
+and owned fixture/dependency-alias/worktree removal verifies. The later complete
+run at `4700d9a` is in progress; it is not accepted evidence. CVSS source
+`7e252a1` additionally passes both normal installed Supply Chain/Release
+journeys (six update plus 16 and 16 checks), with all owned scratch removed.
+[Severity evidence](evidence/installed-cvss-summary.json).
 
-State queues now span independent stores for the same root/compartment while
-retaining a kernel lease and original deadlines for every transaction; 41 checks
-pass. The restricted Windows test sets its intended SIDs before filtering and
-preserves every later token/Job check; its native confirmation remains pending.
-The separate complete run at `1701456` passes all 222 groups: 1,343 tests,
-1,333 passed and ten declared skips, with every child cleanup and owned checkout
-removal verified (`isolated-test-85fb6019-18fd-4d86-9c8e-6ef3b827b074.json`).
-Later tmux source has focused contracts and a real Foot/pane demonstration with a
-synthetic CLI identity; registered Claude/installed API acceptance remains separate.
+Shared state queues retain an independent kernel lease and original deadlines
+per transaction; the native Windows `59a73de` lease group now passes five tests
+and one declared skip. Separate cold lock failures remain failed. The next
+Windows helper removes module/JSON loading from acquisition and preserves the
+original bounds; 36 local checks pass, native confirmation pending.
+[Lock evidence](private-state-locking.md).
+
+The restricted Windows primary-process check remains failed before child creation.
+Its concrete token restrictions pass up to a historical metadata query; no
+boolean flag was observed in `03a6065`. The earlier false-flag inference is
+withdrawn. Fixed class/stage/native-error/size diagnostics compile warning-free
+and pass all 223 portable checks; native retesting remains required on available
+CI infrastructure. [Exact failed result](evidence/windows-03a-restricted-failed-summary.json).
 
 Windows client source `04d9d6c` passes seven complete groups and 70 assertions
 under unchanged deadlines. Actual native NTFS/broker acceptance remains tied to
@@ -55,15 +59,19 @@ and broader history remain unfinished software. [Witness](git-history-inputs.md)
 
 ## Installed application
 
-Latest installed source `dd0cad1`, release
-`c50a7624c39c2866c59e2c7275c0e7156f5142a73543360751468fcd8309f805`,
-passes six update/five exact VS Code/five repaired ChatGPT focus checks through
-the normal authenticated installed gateway. Original selection, definitions/mode,
-private endpoint and frozen Home restore. The owned editor unit exits; its
-separate profile/extensions, package and proof checkout are removed with user
-settings unchanged. Class-only fallback refuses after the owned editor closes,
-while the other existing editor remains open. Zero prompts/no device access.
-[Digest summary](evidence/native-vscode-focus-summary.json).
+Current installed source is `c2fe4d8`, release
+`b6098cc95540382582ce2c35216c97742cd8b8797c0b58d33bf1c24fbd6098a6`.
+The normal update passes; real Claude/tmux navigation reaches native workspace
+trust without submitting a prompt. Latest refusal restores exact workspace/focus
+and retires all four owned processes, socket and cache. Account availability
+verifies, but registered session navigation remains unaccepted. Earlier failed
+cleanup and manual recovery's unprovable original selection remain recorded.
+[Installed trust boundary](evidence/installed-tmux-trust-boundary-summary.json).
+
+Earlier installed native source `dd0cad1` passes six update/five VS Code/five
+repaired ChatGPT checks with restoration and exact owned editor/profile
+retirement; no user editor or settings are changed.
+[Native focus evidence](evidence/native-vscode-focus-summary.json).
 
 Earlier installed source `b82f056`, release
 `a6c095ec81436d03fc136e7f6da73977c842e9cabb57ceb33f15a202daa11416`,

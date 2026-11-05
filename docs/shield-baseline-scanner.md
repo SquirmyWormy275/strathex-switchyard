@@ -218,3 +218,10 @@ hashing. Their verified directory identities and declared exclusions bind the
 reviewed target; selected ignored secret files remain exact byte inputs. Both
 execution hosts keep excluded roots outside staging and preserve incomplete
 security coverage. This is separate from the non-authoritative input preview.
+
+
+Declared npm licenses now support bounded AND/OR obligations and alternatives.
+Required disallowed terms fail; a permitted alternative stays unselected, and
+unsupported exceptions/references stay unknown. This is declaration/policy
+analysis, not license-text, SPDX-list or legal verification.
+[Contract and reproduction](npm-license-declarations.md).

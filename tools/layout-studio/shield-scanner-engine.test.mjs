@@ -4,10 +4,47 @@ import { createHash } from "node:crypto";
 import { mkdtemp, readFile, writeFile, symlink, link, rm, realpath } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { scanShieldInputs, shieldActions, shieldEngineVersion, validateShieldRequest, createShieldFileReader, parsePinnedRequirements, pypiIdentity, pypiStableRelease } from "./shield-scanner-engine.mjs";
+import { scanShieldInputs, shieldActions, shieldEngineVersion, validateShieldRequest, createShieldFileReader, parsePinnedRequirements, pypiIdentity, pypiStableRelease, npmLicenseDeclaration } from "./shield-scanner-engine.mjs";
 const sha = b => createHash("sha256").update(b).digest("hex");
 import { parseShieldScannerReport } from "./repository-shield.mjs";
 import {scannerFixture} from "./test-support/shield-scanner-fixture.mjs";
+
+test("license declaration AND/OR precedence, grouping and case-insensitive policy preserve required obligations without choosing a branch", () => {
+  for (const [value, allowed, expression, choice] of [
+    ["MIT", true, "MIT", false], ["mit", true, "mit", false], ["( MIT OR GPL-3.0-only )", true, "MIT OR GPL-3.0-only", true],
+    ["MIT AND GPL-3.0-only", false, "MIT AND GPL-3.0-only", false], ["MIT OR Apache-2.0 AND GPL-3.0-only", true, "MIT OR Apache-2.0 AND GPL-3.0-only", true],
+    ["(MIT OR Apache-2.0) AND GPL-3.0-only", false, "(MIT OR Apache-2.0) AND GPL-3.0-only", true], ["MIT AND(Apache-2.0 OR GPL-3.0-only)", true, "MIT AND (Apache-2.0 OR GPL-3.0-only)", true],
+    ["GPL-2.0+", false, "GPL-2.0+", false]
+  ]) {
+    const result = npmLicenseDeclaration(value, ["MIT", "Apache-2.0"]); assert.deepEqual(result, { expression, allowed, choice }); assert.equal(npmLicenseDeclaration(result.expression)?.expression, result.expression);
+  }
+  assert.equal(npmLicenseDeclaration("GPL-2.0+", ["GPL-2.0-only"]).allowed, false, "No inferred equivalence or later-version approval");
+  assert.equal(npmLicenseDeclaration("GPL-2.0+", ["gpl-2.0+"]).allowed, true);
+  const long = Array(64).fill("MIT").join(" OR "); assert.equal(npmLicenseDeclaration(long, ["MIT"]).expression, long);
+});
+test("unsupported or malicious license syntax cannot obtain a partial permitted branch", () => {
+  for (const value of [null, {}, ["MIT"], "", "NONE", "NOASSERTION", "MIT WITH Classpath-exception-2.0", "MIT OR GPL-2.0-only WITH Classpath-exception-2.0", "LicenseRef-private", "MIT OR LicenseRef-private", "DocumentRef-other:LicenseRef-private", "SEE LICENSE IN LICENSE", "MIT or Apache-2.0", "MIT AND", "OR MIT", "MIT MIT", "()", "(MIT", "MIT)", "MIT+OR Apache-2.0", "MIT\nOR Apache-2.0", "MIT\0", "MIT;globalThis.NEVER_EXECUTE=1", "(".repeat(17) + "MIT" + ")".repeat(17), "x".repeat(81), Array(65).fill("MIT").join(" OR ")]) assert.equal(npmLicenseDeclaration(value, ["MIT"]), null, String(value));
+});
+test("license policy remains a unique literal-identifier allowlist instead of accepting expressions, exception semantics or case aliases", async () => {
+  for (const allowedLicenses of [["MIT", "mit"], ["MIT OR GPL-3.0-only"], ["MIT WITH Unknown"], ["GPL+arbitrary"], ["NONE"], ["LicenseRef-private"]]) {
+    const f = scannerFixture({ action: "shield_supply_chain" }); f.policy.allowedLicenses = allowedLicenses;
+    const bytes = Buffer.from(JSON.stringify(f.policy)); f.content.set(f.request.scanner.path, bytes); f.request.scanner.sha256 = sha(bytes);
+    await assert.rejects(f.scan(), /license policy/);
+  }
+});
+test("actual npm lock scans distinguish a permitted alternative, required disallowed license and unsupported exception with exact BOM/report binding", async () => {
+  const licenses = { choice: "(MIT OR GPL-3.0-only)", required: "MIT AND GPL-3.0-only", unsupported: "MIT OR GPL-2.0-only WITH Classpath-exception-2.0", precedence: "MIT OR Apache-2.0 AND GPL-3.0-only" };
+  const lock = JSON.stringify({ lockfileVersion: 3, packages: Object.fromEntries(Object.entries(licenses).map(([name, license]) => ["node_modules/" + name, { version: "1.0.0", license }])) });
+  const f = scannerFixture({ action: "shield_supply_chain", files: { "package-lock.json": lock } }), report = await f.scan();
+  assert.equal(report.outcome, "failed"); assert.equal(report.completeness, "incomplete"); assert.equal(report.findings.filter(f => f.ruleId === "license.disallowed").length, 1);
+  assert.ok(report.gaps.includes("license_choice_not_selected")); assert.ok(report.gaps.includes("license_metadata"));
+  assert.deepEqual(report.sbom.components.map(c => c.license), ["MIT OR GPL-3.0-only", "MIT AND GPL-3.0-only", null, "MIT OR Apache-2.0 AND GPL-3.0-only"]);
+  const shield = { engine: shieldEngineVersion, request: f.request, requestSha256: sha(JSON.stringify(f.request)) };
+  assert.equal(parseShieldScannerReport(JSON.stringify(report), shield, f.request.action).outcome, "failed");
+  const changed = structuredClone(report); changed.sbom.components[0].license = "MIT OR GPL-3.0-only WITH Unknown"; assert.throws(() => parseShieldScannerReport(JSON.stringify(changed), shield, f.request.action));
+  const mismatched = structuredClone(report); mismatched.cycloneDx.components[0].licenses[0].license.name = "MIT"; assert.throws(() => parseShieldScannerReport(JSON.stringify(mismatched), shield, f.request.action));
+  assert.equal(report.cycloneDx.components[0].licenses[0].license.name, "MIT OR GPL-3.0-only", "Declared text, not an SPDX-list validation claim or selected legal license");
+});
 
 test("actual baseline matches secrets, PII and JavaScript defects without returning source excerpts or matched values", async () => {
   const token = "ghp_" + "X".repeat(36), email = "synthetic-person@example.invalid", f = scannerFixture({ files: { "app.js": `const token='${token}';\nconst person='${email}';\neval(input);\n-----BEGIN PRIVATE KEY-----` } }), r = await f.scan();

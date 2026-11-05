@@ -6,6 +6,42 @@ import { dirname, resolve, relative, isAbsolute } from "node:path";
 import { fileURLToPath } from "node:url";
 
 export const shieldEngineVersion = "switchyard-baseline-scanner/1";
+
+/** Bounded AND/OR declaration syntax, not license-list or legal verification. */
+export function npmLicenseDeclaration(value, allowedLicenses = []) {
+  if (typeof value !== "string" || !value || value.length > 512 || /[^A-Za-z0-9.()+ \t-]/.test(value)) return null;
+  const tokens = []; let offset = 0;
+  while (offset < value.length) {
+    if (/[ \t]/.test(value[offset])) { offset++; continue; }
+    const match = /^(?:[A-Za-z0-9][A-Za-z0-9.-]{0,79}\+?|[()])/.exec(value.slice(offset));
+    if (!match || tokens.length >= 128) return null;
+    if (["AND", "OR"].includes(match[0]) && (offset > 0 && !/[ \t()]/.test(value[offset - 1]) || offset + match[0].length < value.length && !/[ \t()]/.test(value[offset + match[0].length]))) return null;
+    tokens.push(match[0]); offset += match[0].length;
+  }
+  let cursor = 0, atoms = 0, choice = false;
+  const atom = depth => {
+    if (depth > 16) throw Error("License expression nesting exceeds its bound.");
+    const token = tokens[cursor++];
+    if (token === "(") { const result = disjunction(depth + 1); if (tokens[cursor++] !== ")") throw Error("Unclosed license expression."); return result; }
+    if (!token || ["AND", "OR", "WITH", "(", ")", "NONE", "NOASSERTION"].includes(token) || /^(?:LicenseRef-|DocumentRef-)/i.test(token) || ++atoms > 64) throw Error("Unsupported license declaration.");
+    return { atom: token };
+  };
+  const conjunction = depth => { let result = atom(depth); while (tokens[cursor] === "AND") { cursor++; result = { op: "AND", left: result, right: atom(depth) }; } return result; };
+  const disjunction = depth => { let result = conjunction(depth); while (tokens[cursor] === "OR") { cursor++; choice = true; result = { op: "OR", left: result, right: conjunction(depth) }; } return result; };
+  try {
+    const tree = disjunction(0); if (cursor !== tokens.length) return null;
+    const render = (node, parent = 0) => {
+      if (node.atom) return node.atom;
+      const precedence = node.op === "AND" ? 2 : 1;
+      const text = `${render(node.left, precedence)} ${node.op} ${render(node.right, precedence)}`;
+      return precedence < parent ? `(${text})` : text;
+    };
+    const expression = render(tree); if (expression.length > 512) return null;
+    const allowed = new Set(allowedLicenses.map(id => id.toLowerCase()));
+    const evaluate = node => node.atom ? allowed.has(node.atom.toLowerCase()) : node.op === "AND" ? evaluate(node.left) && evaluate(node.right) : evaluate(node.left) || evaluate(node.right);
+    return { expression, allowed: evaluate(tree), choice };
+  } catch { return null; }
+}
 export const shieldIndexPrefix = ".switchyard-index/";
 export const shieldHistoryPrefix = ".switchyard-history/";
 export const shieldReservedPath = path => [shieldIndexPrefix,shieldHistoryPrefix].some(prefix=>path===prefix.slice(0,-1)||path?.startsWith(prefix));
@@ -135,7 +171,7 @@ function parseRules(bytes) {
   const v = json(bytes); exact(v, ["schema", "version", "engine", "rules", "allowedLicenses"]);
   if (v.schema !== "switchyard-shield-rules/v1" || v.version !== 1 || v.engine !== shieldEngineVersion) throw Error("Unsupported scanner rule feed.");
   const selected = array(v.rules, 32); if (!selected.length || new Set(selected).size !== selected.length || selected.some(id => !Object.hasOwn(rules, id))) throw Error("Unsupported or duplicate scanner rule.");
-  const allowedLicenses = array(v.allowedLicenses, 128); if (new Set(allowedLicenses).size !== allowedLicenses.length || allowedLicenses.some(s => typeof s !== "string" || !/^[A-Za-z0-9.+-]{1,80}$/.test(s))) throw Error("Unsupported license policy.");
+  const allowedLicenses = array(v.allowedLicenses, 128); if (allowedLicenses.some(s => typeof s !== "string" || !/^[A-Za-z0-9.-]{1,80}\+?$/.test(s) || npmLicenseDeclaration(s)?.expression !== s) || new Set(allowedLicenses.map(s => s.toLowerCase())).size !== allowedLicenses.length) throw Error("Unsupported license policy.");
   return { selected, allowedLicenses };
 }
 function parseAdvisories(bytes) {
@@ -214,7 +250,8 @@ export async function scanShieldInputs(proposed, { readInput }) {
         if (!installedAs || !object(p) || (raw.link === true && !linked) || (p.link !== undefined && p.link !== false) || !npmVersion(p.version)) { gaps.add("unsupported_npm_package"); continue; }
         const name = p.name ?? installedAs;
         if (!npmName(name)) { gaps.add("unsupported_npm_package"); continue; }
-        const component = { ecosystem: "npm", name, installedAs, version: p.version, location, lockPath: file.path, license: typeof p.license === "string" && /^[A-Za-z0-9.+-]{1,80}$/.test(p.license) ? p.license : null, integritySha256: !linked && typeof p.integrity === "string" ? sha(p.integrity) : null, ...(linked ? { workspace: linked.workspace } : {}) };
+        const license = npmLicenseDeclaration(p.license, policy.allowedLicenses);
+        const component = { ecosystem: "npm", name, installedAs, version: p.version, location, lockPath: file.path, license: license?.expression ?? null, integritySha256: !linked && typeof p.integrity === "string" ? sha(p.integrity) : null, ...(linked ? { workspace: linked.workspace } : {}) };
         if (components.length >= 4096) throw Error("Aggregate dependency inventory exceeds its original component bound.");
         components.push(component);
         const known = advisory.find(a => a.ecosystem === "npm" && a.name === name && a.version === p.version);
@@ -223,7 +260,8 @@ export async function scanShieldInputs(proposed, { readInput }) {
         for (const a of known?.advisories ?? []) add({ ruleId: a.id, dimension: "vulnerabilities", severity: a.severity, path: file.path, line: null, fingerprint: sha(`${a.id}\0${file.path}\0${file.sha256}\0${location}\0${p.version}`) });
         if (!component.license) gaps.add("license_metadata");
         else if (!policy.allowedLicenses.length) gaps.add("license_policy");
-        else if (!policy.allowedLicenses.includes(component.license)) add({ ruleId: "license.disallowed", dimension: "licenses", severity: "high", path: file.path, line: null, fingerprint: sha(`license\0${file.path}\0${file.sha256}\0${location}\0${component.license}`) });
+        else if (!license.allowed) add({ ruleId: "license.disallowed", dimension: "licenses", severity: "high", path: file.path, line: null, fingerprint: sha(`license\0${file.path}\0${file.sha256}\0${location}\0${component.license}`) });
+        if (license?.choice && license.allowed) gaps.add("license_choice_not_selected");
         let registry = false;
         try { const u = new URL(p.resolved); registry = u.protocol === "https:" && u.hostname === "registry.npmjs.org" && !u.username && !u.password && !u.search && !u.hash && /^sha512-[A-Za-z0-9+/]{86}==$/.test(p.integrity); } catch {}
         if (linked) gaps.add("workspace_source_unverified");

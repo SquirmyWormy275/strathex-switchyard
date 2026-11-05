@@ -1,6 +1,10 @@
 import {createHash} from "node:crypto";
 import {scanShieldInputs,shieldEngineVersion} from "../shield-scanner-engine.mjs";
 const sha=b=>createHash("sha256").update(b).digest("hex");
+export function licenseDeclarationsFixture({ action } = {}) {
+  const declarations = { choice: "(MIT OR GPL-3.0-only)", required: "MIT AND GPL-3.0-only", unsupported: "MIT OR GPL-2.0-only WITH Classpath-exception-2.0", precedence: "MIT OR Apache-2.0 AND GPL-3.0-only" };
+  return scannerFixture({ action, files: { "app.js": "const ordinary = 1;", "package-lock.json": JSON.stringify({ lockfileVersion: 3, packages: Object.fromEntries(Object.entries(declarations).map(([name, license]) => ["node_modules/" + name, { version: "1.0.0", license }])) }) }, advisory: Object.keys(declarations).map(name => ({ ecosystem: "npm", name, version: "1.0.0", advisories: [] })) });
+}
 export function pinnedRequirementsFixture({ action, clean = false } = {}) {
   return scannerFixture({ action, files: { "app.js": "const ordinary = 1;", "requirements.txt": "# declared metadata only\nMixed_Name==1.2.0 \\\n  --hash=sha256:" + "a".repeat(64) + "\n" }, advisory: [
     { ecosystem: "npm", name: "mixed-name", version: "1.2.0", advisories: [{ id: "GHSA-other-ecosystem", severity: "high" }] },
