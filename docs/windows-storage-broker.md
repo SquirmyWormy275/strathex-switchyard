@@ -24,7 +24,7 @@ user account setup. [Digest summary](evidence/windows-bd77-native-summary.json).
 
 A new test-only `NativeRestrictedHostProof` addresses that first gap. It creates
 one same-user Node child with a restricted primary token through
-[CreateProcessAsUserW](https://learn.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-createprocessasuserw),
+[CreateProcessWithTokenW](https://learn.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-createprocesswithtokenw),
 rather than inferring child identity from thread impersonation. The actual child
 token is inspected before resume and after exit: same user, primary type,
 Administrators deny-only, medium integrity and no assigned volume-management
@@ -47,7 +47,25 @@ still pass using the existing SDK (`windows-history-native-build-1793879927476.j
 owned build scratch is removed. Three isolated runner/selector/owner groups pass
 38 checks, including closed context/changed executable and non-disposable child
 refusal, with every cleanup verified (`isolated-test-b8d1adb6-f004-4b92-934f-4dda9e7180e1.json`).
-Actual Windows execution of this new restricted-process proof remains pending.
+The first actual `869aa9e` run fails before child creation: `CreateProcessAsUserW`
+returns Win32 error 1314 at `create-restricted-child`. The preceding thirteen
+metadata, 31 restricted .NET exchanges and eight CI-worker JS owner checks pass;
+they do not upgrade the failed restricted-process proof. The original service,
+ownership and owned context remain preserved, without retry. Archive digest and
+small failed receipt verify in the [failure summary](evidence/windows-restricted-owner-869-failed-summary.json).
+
+The corrected harness makes a single explicit `CreateProcessWithTokenW` call,
+requiring the caller's existing enabled impersonation privilege. It supplies the
+bounded outer-guardian environment explicitly, loads no profile, creates no new
+logon session, and retains creation-time Job assignment plus all actual child-token
+checks. There is no elevated-child fallback, privilege grant or account change.
+Creator privilege-presence flags and exact failure phase are bounded diagnostics.
+Both targets again compile warning-free and all 223 portable checks pass with
+owned scratch removed (`windows-history-native-build-1793880640423.json`). A local
+compiler declaration error in the first correction attempt remains failed in
+`restricted-host-build-failed-1793880635213.json`; no native code ran and its exact
+build scratch was removed before the corrected build.
+Actual Windows execution of the corrected restricted-process proof is pending.
 Even a passing result will not establish interactive/UAC, a separate ordinary-user
 account/profile, Windows Sandbox guest isolation or physical acceptance.
 

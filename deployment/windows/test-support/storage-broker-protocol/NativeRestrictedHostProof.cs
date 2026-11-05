@@ -15,6 +15,7 @@ using Microsoft.Win32.SafeHandles;
 internal static class NativeRestrictedHostProof
 {
     internal static string Phase = "not-started";
+    internal static object? CreatorPrivileges;
     private static void Require(bool condition) { if (!condition) throw new InvalidOperationException("The restricted host process proof did not verify."); }
     private static void Native(bool condition) { if (!condition) throw new Win32Exception(Marshal.GetLastWin32Error()); }
     private static byte[] ReadBounded(string path)
@@ -36,6 +37,20 @@ internal static class NativeRestrictedHostProof
         IntPtr buffer = TokenInformation(token, kind); try { return read(buffer); } finally { Marshal.FreeHGlobal(buffer); }
     }
     private static string User(SafeAccessTokenHandle token) => ReadToken(token, 1, pointer => new SecurityIdentifier(Marshal.ReadIntPtr(pointer)).Value);
+    private static (bool Assigned, bool Enabled) PrivilegeState(SafeAccessTokenHandle token, string name)
+    {
+        Native(LookupPrivilegeValueW(null, name, out long expected));
+        return ReadToken(token, 3, pointer =>
+        {
+            int count = Marshal.ReadInt32(pointer); Require(count is >= 0 and <= 256);
+            for (int i = 0; i < count; i++)
+            {
+                var privilege = Marshal.PtrToStructure<Privilege>(IntPtr.Add(pointer, 4 + i * Marshal.SizeOf<Privilege>()));
+                if (privilege.Low == unchecked((uint)expected) && privilege.High == unchecked((int)(expected >> 32))) return ((privilege.Attributes & 4) == 0, (privilege.Attributes & 2) != 0);
+            }
+            return (false, false);
+        });
+    }
     private static void VerifyToken(SafeAccessTokenHandle token, string user)
     {
         Require(User(token) == user);
@@ -82,6 +97,10 @@ internal static class NativeRestrictedHostProof
         Native(OpenProcessToken(new IntPtr(-1), 0x8b, out var source));
         using (source)
         {
+            var quota = PrivilegeState(source, "SeIncreaseQuotaPrivilege");
+            var assign = PrivilegeState(source, "SeAssignPrimaryTokenPrivilege");
+            var impersonate = PrivilegeState(source, "SeImpersonatePrivilege");
+            CreatorPrivileges = new { quotaAssigned = quota.Assigned, quotaEnabled = quota.Enabled, assignPrimaryAssigned = assign.Assigned, assignPrimaryEnabled = assign.Enabled, impersonateAssigned = impersonate.Assigned, impersonateEnabled = impersonate.Enabled };
             string user = User(source); IntPtr admin = IntPtr.Zero, medium = IntPtr.Zero, deleted = IntPtr.Zero;
             try
             {
@@ -104,7 +123,7 @@ internal static class NativeRestrictedHostProof
                         using var job = CreateJobObjectW(IntPtr.Zero, null); Native(!job.IsInvalid);
                         var limits = new ExtendedLimits { Basic = new BasicLimits { Flags = 0x2000 } };
                         Native(SetInformationJobObject(job, 9, ref limits, (uint)Marshal.SizeOf<ExtendedLimits>()));
-                        IntPtr attributes = IntPtr.Zero, jobs = IntPtr.Zero; bool initialized = false;
+                        IntPtr attributes = IntPtr.Zero, jobs = IntPtr.Zero, environment = IntPtr.Zero; bool initialized = false;
                         try
                         {
                             IntPtr size = IntPtr.Zero; _ = InitializeProcThreadAttributeList(IntPtr.Zero, 1, 0, ref size); Require(size.ToInt64() is > 0 and <= 65536);
@@ -112,8 +131,23 @@ internal static class NativeRestrictedHostProof
                             jobs = Marshal.AllocHGlobal(IntPtr.Size); Marshal.WriteIntPtr(jobs, job.DangerousGetHandle());
                             Native(UpdateProcThreadAttribute(attributes, 0, new IntPtr(0x2000d), jobs, new IntPtr(IntPtr.Size), IntPtr.Zero, IntPtr.Zero));
                             var startup = new StartupInfoEx { Info = new StartupInfo { Size = Marshal.SizeOf<StartupInfoEx>() }, Attributes = attributes };
-                            Phase = "create-restricted-child";
-                            Native(CreateProcessAsUserW(restricted, node, new StringBuilder(string.Join(' ', new[] { node, script, context }.Select(Quote))), IntPtr.Zero, IntPtr.Zero, false, 0x4 | 0x8000000 | 0x80000, IntPtr.Zero, repository, ref startup, out var process));
+                            var variables = new SortedDictionary<string,string>(StringComparer.OrdinalIgnoreCase);
+                            // The outer guardian supplies this bounded allowlisted
+                            // environment; WithToken must receive it explicitly.
+                            foreach (System.Collections.DictionaryEntry entry in Environment.GetEnvironmentVariables())
+                            {
+                                string name = (string)entry.Key, text = (string)entry.Value!;
+                                Require(name.Length is > 0 and <= 128 && name.IndexOfAny(new[] { '\0', '=' }) < 0 && text.Length <= 8192 && !text.Contains('\0'));
+                                variables.Add(name, text);
+                            }
+                            Require(variables.Count is > 0 and <= 64);
+                            environment = Marshal.StringToHGlobalUni(string.Join('\0', variables.Select(entry => entry.Key + "=" + entry.Value)) + "\0\0");
+                            string command = string.Join(' ', new[] { node, script, context }.Select(Quote)); Require(command.Length < 1024);
+                            Phase = "creator-impersonation-privilege"; Require(impersonate.Assigned && impersonate.Enabled);
+                            Phase = "create-restricted-child-with-token";
+                            // Fixed API choice, no retry/fallback or alternate
+                            // credentials. No profile load or new logon session.
+                            Native(CreateProcessWithTokenW(restricted, 0, node, new StringBuilder(command), 0x4 | 0x8000000 | 0x80000 | 0x400, environment, repository, ref startup, out var process));
                             using var child = new SafeFileHandle(process.Process, true); using var thread = new SafeFileHandle(process.Thread, true);
                             try
                             {
@@ -134,7 +168,7 @@ internal static class NativeRestrictedHostProof
                                 Require(report.GetProperty("schema").GetString() == "switchyard-restricted-host-result/v1" && report.GetProperty("nonce").GetString() == nonce && report.GetProperty("success").GetBoolean());
                                 var owner = report.GetProperty("owner"); Require(owner.GetProperty("success").GetBoolean() && owner.GetProperty("checks").GetArrayLength() == 8 && owner.GetProperty("nativeExitVerified").GetBoolean() && owner.GetProperty("fixtureRemoved").GetBoolean() && !owner.GetProperty("ordinaryUserToken").GetBoolean());
                                 Phase = "complete";
-                                return new { schema = "switchyard-restricted-host-process-proof/v1", success = true, primaryTokenVerified = true, sameUserVerified = true, mediumIntegrityVerified = true, administratorsDenyOnlyVerified = true, volumePrivilegeAbsentVerified = true, tokenRecheckedAfterExit = true, treeExitVerified = true, hostOwnerChecks = 8, hostOwner = owner.Clone(), ordinaryUserAccountAccepted = false, guestLaunched = false, accountCreated = false };
+                                return new { schema = "switchyard-restricted-host-process-proof/v1", success = true, processCreationApi = "CreateProcessWithTokenW", creatorPrivileges = CreatorPrivileges, primaryTokenVerified = true, sameUserVerified = true, mediumIntegrityVerified = true, administratorsDenyOnlyVerified = true, volumePrivilegeAbsentVerified = true, tokenRecheckedAfterExit = true, treeExitVerified = true, hostOwnerChecks = 8, hostOwner = owner.Clone(), ordinaryUserAccountAccepted = false, guestLaunched = false, accountCreated = false };
                             }
                             finally
                             {
@@ -146,7 +180,7 @@ internal static class NativeRestrictedHostProof
                                 Require(ActiveProcesses(job) == 0);
                             }
                         }
-                        finally { if (initialized) DeleteProcThreadAttributeList(attributes); if (attributes != IntPtr.Zero) Marshal.FreeHGlobal(attributes); if (jobs != IntPtr.Zero) Marshal.FreeHGlobal(jobs); }
+                        finally { if (initialized) DeleteProcThreadAttributeList(attributes); if (attributes != IntPtr.Zero) Marshal.FreeHGlobal(attributes); if (jobs != IntPtr.Zero) Marshal.FreeHGlobal(jobs); if (environment != IntPtr.Zero) Marshal.FreeHGlobal(environment); }
                     }
                 }
             }
@@ -177,7 +211,7 @@ internal static class NativeRestrictedHostProof
     [DllImport("advapi32.dll", CharSet = CharSet.Unicode, SetLastError = true)] [return: MarshalAs(UnmanagedType.Bool)] private static extern bool ConvertStringSidToSidW(string value, out IntPtr sid);
     [DllImport("advapi32.dll")] private static extern uint GetLengthSid(IntPtr sid);
     [DllImport("advapi32.dll", CharSet = CharSet.Unicode, SetLastError = true)] [return: MarshalAs(UnmanagedType.Bool)] private static extern bool LookupPrivilegeValueW(string? system, string name, out long luid);
-    [DllImport("advapi32.dll", CharSet = CharSet.Unicode, SetLastError = true)] [return: MarshalAs(UnmanagedType.Bool)] private static extern bool CreateProcessAsUserW(SafeAccessTokenHandle token, string image, StringBuilder command, IntPtr processSecurity, IntPtr threadSecurity, bool inherit, uint flags, IntPtr environment, string directory, ref StartupInfoEx startup, out ProcessInformation process);
+    [DllImport("advapi32.dll", CharSet = CharSet.Unicode, SetLastError = true)] [return: MarshalAs(UnmanagedType.Bool)] private static extern bool CreateProcessWithTokenW(SafeAccessTokenHandle token, uint logonFlags, string image, StringBuilder command, uint flags, IntPtr environment, string directory, ref StartupInfoEx startup, out ProcessInformation process);
     [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)] private static extern SafeJobHandle CreateJobObjectW(IntPtr security, string? name);
     [DllImport("kernel32.dll", SetLastError = true)] [return: MarshalAs(UnmanagedType.Bool)] private static extern bool SetInformationJobObject(SafeJobHandle job, int kind, ref ExtendedLimits limits, uint size);
     [DllImport("kernel32.dll", SetLastError = true)] [return: MarshalAs(UnmanagedType.Bool)] private static extern bool QueryInformationJobObject(SafeJobHandle job, int kind, out Accounting accounting, uint size, IntPtr returned);

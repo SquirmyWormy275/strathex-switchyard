@@ -65,7 +65,7 @@ internal static class Program
         }
         catch(Exception error)
         {
-            Console.WriteLine(JsonSerializer.Serialize(new { schema="switchyard-storage-broker-protocol-proof/v1",success=false,errorCategory=error.GetType().Name,nativeCode=error is System.ComponentModel.Win32Exception native?native.NativeErrorCode:error.HResult&0xffff,nativeExchangeChecks=OperatingSystem.IsWindows()?NativeExchangeProof.CompletedChecks:0,failedCheckPhase=OperatingSystem.IsWindows()?NativeExchangeProof.Phase:null,restrictedHostPhase=OperatingSystem.IsWindows()?NativeRestrictedHostProof.Phase:null }));
+            Console.WriteLine(JsonSerializer.Serialize(new { schema="switchyard-storage-broker-protocol-proof/v1",success=false,errorCategory=error.GetType().Name,nativeCode=error is System.ComponentModel.Win32Exception native?native.NativeErrorCode:error.HResult&0xffff,nativeExchangeChecks=OperatingSystem.IsWindows()?NativeExchangeProof.CompletedChecks:0,failedCheckPhase=OperatingSystem.IsWindows()?NativeExchangeProof.Phase:null,restrictedHostPhase=OperatingSystem.IsWindows()?NativeRestrictedHostProof.Phase:null,restrictedHostCreatorPrivileges=OperatingSystem.IsWindows()?NativeRestrictedHostProof.CreatorPrivileges:null }));
             return 2;
         }
     }
