@@ -44,7 +44,7 @@ export function createScannerFixtures({ store, stateDirectory, isActive = async 
   });
   async function proposal(c, input) {
     if (!uuid(input?.requestId) || typeof input.action !== "string") throw Error("Review one exact fixture maintenance action and request UUID.");
-    const keys = { "install-trust": ["policy"], "install-fixture": ["manifestPath"], "revoke-trust": ["authorityId", "keyId", "reason"], "revoke-fixture": ["fixtureId", "reason"] }[input.action];
+    const keys = { "install-trust": ["policy"], "install-fixture": ["manifestPath"], "revoke-trust": ["authorityId", "keyId", "reason"], "revoke-fixture": ["fixtureId", "reason"], "remove-fixture": ["fixtureId", "reason"] }[input.action];
     if (!keys || !exact(input, ["requestId", "action", ...keys, ...(Object.hasOwn(input, "compartment") ? ["compartment"] : [])])) throw Error("Fixture maintenance accepts only its closed operator fields; task, shell and approval overrides are refused.");
     const r = registry(c);
     if (input.action === "install-trust") {
@@ -56,13 +56,18 @@ export function createScannerFixtures({ store, stateDirectory, isActive = async 
       if (typeof input.manifestPath !== "string" || input.manifestPath.length > 4096 || !isAbsolute(input.manifestPath) || /[\x00-\x1f\x7f]/.test(input.manifestPath)) throw Error("Choose an exact absolute signed fixture manifest path.");
       if (process.platform === "win32" && !/^[A-Za-z]:[\\/]/.test(input.manifestPath)) throw Error("Select a local drive manifest path; UNC and device-namespace paths are outside fixture maintenance.");
       const inspected = await r.inspectFixture(input.manifestPath), m = inspected.manifest;
-      if ((await r.listFixtures()).some(f => f.id === m.id)) throw Error("The original fixture identity is already retained; it cannot be replaced in place.");
-      return { payload: { manifestPath: inspected.sourcePath, manifestSha256: inspected.manifestSha256 }, summary: { id: m.id, kind: m.kind, authorityId: m.authorityId, keyId: m.keyId, feedVersion: m.feedVersion, toolName: m.toolName, toolVersion: m.toolVersion, contentSha256: m.contentSha256, contentBytes: inspected.contentBytes, manifestSha256: inspected.manifestSha256, generatedAt: m.generatedAt, expiresAt: m.expiresAt } };
+      if ((await r.storageUsage()).allocations.some(f => f.id === m.id) || (await r.listFixtures()).some(f => f.id === m.id)) throw Error("The original fixture identity is already retained; it cannot be replaced in place.");
+      return { payload: { manifestPath: inspected.sourcePath, manifestSha256: inspected.manifestSha256 }, summary: { id: m.id, kind: m.kind, authorityId: m.authorityId, keyId: m.keyId, feedVersion: m.feedVersion, toolName: m.toolName, toolVersion: m.toolVersion, contentSha256: m.contentSha256, contentBytes: inspected.contentBytes, storageBytes: inspected.contentBytes + inspected.manifestBytes, manifestSha256: inspected.manifestSha256, generatedAt: m.generatedAt, expiresAt: m.expiresAt } };
     }
     if (typeof input.reason !== "string" || !input.reason.trim() || input.reason.length > 512 || /[\x00-\x1f\x7f]/.test(input.reason)) throw Error("Provide a bounded single-line fixture revocation reason.");
     if (input.action === "revoke-trust") {
       if (!identifier(input.authorityId) || !digest(input.keyId) || !(await r.listTrust()).some(t => t.authorityId === input.authorityId && t.keyId === input.keyId && t.status === "active")) throw Error("Choose the exact active fixture authority and public key.");
       return { payload: { authorityId: input.authorityId, keyId: input.keyId, reason: input.reason }, summary: { authorityId: input.authorityId, keyId: input.keyId, reason: input.reason } };
+    }
+    if (input.action === "remove-fixture") {
+      if (!identifier(input.fixtureId)) throw Error("Choose the exact retained fixture allocation.");
+      const snapshot = await r.inspectRemoval(input.fixtureId);
+      return { payload: { snapshot, reason: input.reason }, summary: { fixtureId: input.fixtureId, reason: input.reason, manifestSha256: snapshot.manifestSha256, contentSha256: snapshot.contentSha256, remainingFiles: snapshot.files.map(({ name, bytes, sha256 }) => ({ name, bytes, sha256 })), originalDirectoryAbsent: snapshot.rootIdentity === null, reconcilesPriorRemoval: snapshot.originalRemovalSha256 !== null } };
     }
     if (!identifier(input.fixtureId) || !(await r.listFixtures()).some(f => f.id === input.fixtureId && f.status === "active")) throw Error("Choose the exact active signed fixture.");
     return { payload: { fixtureId: input.fixtureId, reason: input.reason }, summary: { fixtureId: input.fixtureId, reason: input.reason } };
@@ -96,7 +101,7 @@ export function createScannerFixtures({ store, stateDirectory, isActive = async 
     recover,
     async list(c) {
       await state(c, false); const r = registry(c);
-      return { trusts: (await r.listTrust()).map(({ publicKeyPem, ...metadata }) => metadata), fixtures: (await r.listFixtures()).map(({ packageRoot, ...metadata }) => metadata), reviews: ((await store.snapshot(c)).scannerFixtureReviews ?? []).map(view), authorityGranted: false };
+      return { storage: await r.storageUsage(), trusts: (await r.listTrust()).map(({ publicKeyPem, ...metadata }) => metadata), fixtures: (await r.listFixtures()).map(({ packageRoot, ...metadata }) => metadata), reviews: ((await store.snapshot(c)).scannerFixtureReviews ?? []).map(view), authorityGranted: false };
     },
     async review(c, input) {
       input = structuredClone(input); await recover(c);
@@ -131,6 +136,7 @@ export function createScannerFixtures({ store, stateDirectory, isActive = async 
         if (row.action === "install-fixture") {
           const selected = await registry(c).inspectFixture(row.payload.manifestPath); if (selected.manifestSha256 !== row.payload.manifestSha256) throw Error("The exact signed fixture changed after review.");
         }
+        if (row.action === "remove-fixture" && scopeHash(await registry(c).inspectRemoval(row.payload.snapshot.id)) !== scopeHash(row.payload.snapshot)) throw Error("The exact reviewed removal files changed; preserve them and obtain a fresh review.");
         const approved = await suiteConfirmations(store, c, undefined, now).consume({ action, targetSnapshotId: row.scopeDigest, scopeDigest: row.scopeDigest, token: input.token }); if (!approved.allowed) throw Error(approved.reason);
         await update(c, row.requestId, "scanner-fixture-admit", async (saved, latest) => { await guard(latest); if (saved.status !== "reviewed") throw Error("The fixture request was already admitted."); saved.status = "applying"; });
         const protectedJournal = journal(c, guard), unguarded = journal(c); let attempted = false, effect, claimId, result;
@@ -146,6 +152,7 @@ export function createScannerFixtures({ store, stateDirectory, isActive = async 
           if (row.action === "install-trust") effect = await r.installTrust(row.payload.policy, by);
           else if (row.action === "install-fixture") effect = await r.installFixture(row.payload.manifestPath, by, row.payload.manifestSha256);
           else if (row.action === "revoke-trust") { await r.revokeTrust(row.payload.authorityId, row.payload.keyId, row.payload.reason, by); effect = { authorityId: row.payload.authorityId, keyId: row.payload.keyId, status: "revoked" }; }
+          else if (row.action === "remove-fixture") { await r.removeFixture(row.payload.snapshot, row.payload.reason, by, check); effect = { id: row.payload.snapshot.id, status: "removed", priorRemovalReconciled: row.payload.snapshot.originalRemovalSha256 !== null }; }
           else { await r.revokeFixture(row.payload.fixtureId, row.payload.reason, by); effect = { id: row.payload.fixtureId, status: "revoked" }; }
           await update(c, row.requestId, "scanner-fixture-effect-observed", saved => { saved.observedEffect = effect; }); await check();
           const receipt = await protectedJournal.transaction(async transaction => {

@@ -145,3 +145,115 @@ test("public trust enrollment rejects a matching signing private key before writ
   assert.equal((await setup.registry.listTrust()).length, 1);
   assert.equal(JSON.stringify(await setup.store.readEntries()).includes("PRIVATE KEY"), false);
 });
+
+test("quota counts manifest bytes and unknown reservations before destination creation, including conservative legacy allocations", async context => {
+  const s = await fixture(context), manifest = await signedManifest(s, "quota-refusal", "scanner");
+  await s.store.append("b122.scanner-fixture.reserve.v1", { id: "unconfirmed-original", manifestSha256: "a".repeat(64), contentSha256: "b".repeat(64), storageBytes: 64 * 1024 * 1024 });
+  await assert.rejects(s.registry.installFixture(manifest, "operator"), /aggregate.*quota/);
+  await assert.rejects(readdir(join(s.state, "scanner-fixtures")), { code: "ENOENT" });
+  assert.equal((await s.registry.storageUsage()).remainingBytes, 0);
+  const fresh = await s.registry.inspectRemoval("unconfirmed-original");
+  await s.registry.removeFixture(fresh, "Observe absent original allocation", "operator");
+  await s.registry.installFixture(manifest, "operator");
+  const installed = (await s.registry.listFixtures())[0]!;
+  assert.equal((await s.registry.storageUsage()).allocatedBytes, (await readFile(manifest)).length + (await readFile(join(installed.packageRoot, "content.bin"))).length);
+  // Historical installs had no reservation/byte count. They must not provide
+  // unlimited new capacity merely because their files predate accounting.
+  await s.store.append("b122.scanner-fixture.install.v1", { id: "legacy", kind: "scanner", manifestSha256: "c".repeat(64), packageRoot: join(s.state, "scanner-fixtures/legacy"), installedBy: "legacy operator" });
+  await assert.rejects(s.registry.installFixture(await signedManifest(s, "legacy-quota-refusal", "scanner"), "operator"), /aggregate.*quota/);
+  assert.equal((await s.registry.storageUsage()).remainingBytes, 0);
+});
+
+test("independent installers atomically compete for the final retained allocation slot", async context => {
+  const s = await fixture(context);
+  for (let n = 0; n < 31; n++) await s.store.append("b122.scanner-fixture.reserve.v1", { id: "pending-" + n, manifestSha256: "a".repeat(64), contentSha256: "b".repeat(64), storageBytes: 1 });
+  const other = new DurableScannerFixtureRegistry(new ProtectedJsonStore({ filePath: s.store.filePath }), s.state, () => new Date(observedAt));
+  const a = await signedManifest(s, "quota-race-a", "scanner"), b = await signedManifest(s, "quota-race-b", "advisory");
+  const results = await Promise.allSettled([s.registry.installFixture(a, "first"), other.installFixture(b, "second")]);
+  assert.equal(results.filter(r => r.status === "fulfilled").length, 1); assert.equal(results.filter(r => r.status === "rejected").length, 1);
+  assert.equal((await s.registry.storageUsage()).allocatedCount, 32); assert.equal((await s.registry.listFixtures()).length, 1);
+  assert.equal((await readdir(join(s.state, "scanner-fixtures"))).length, 1);
+});
+
+test("a lost reservation reply retains quota without copying or replaying an installation", async context => {
+  const s = await fixture(context), manifest = await signedManifest(s, "reserved-lost-reply", "scanner"), transaction = s.store.transaction.bind(s.store); let fail = true;
+  s.store.transaction = async work => { const result = await transaction(work); if (fail && (result as JournalEntry | undefined)?.kind === "b122.scanner-fixture.reserve.v1") { fail = false; throw Error("Synthetic lost durable reservation reply"); } return result; };
+  await assert.rejects(s.registry.installFixture(manifest, "operator"), /lost durable reservation/);
+  await assert.rejects(readdir(join(s.state, "scanner-fixtures")), { code: "ENOENT" });
+  assert.equal((await s.registry.storageUsage()).allocatedCount, 1);
+  await assert.rejects(s.registry.installFixture(manifest, "retry"), /already installed or retained/);
+  await s.registry.removeFixture(await s.registry.inspectRemoval("reserved-lost-reply"), "Fresh absent-allocation reconciliation", "operator");
+  assert.equal((await s.registry.storageUsage()).allocatedBytes, 0);
+  await assert.rejects(s.registry.installFixture(manifest, "reuse removed identity"), /already installed or retained/);
+});
+
+test("reviewed removal requires revocation, preserves tombstones and quota until exact directory absence", async context => {
+  const s = await fixture(context), path = await signedManifest(s, "remove-original", "scanner");
+  await s.registry.installFixture(path, "operator");
+  await assert.rejects(s.registry.inspectRemoval("remove-original"), /Separately revoke/);
+  const bytes = (await s.registry.storageUsage()).allocatedBytes;
+  await s.registry.revokeFixture("remove-original", "withdraw", "operator"); assert.equal((await s.registry.storageUsage()).allocatedBytes, bytes);
+  await s.administration.removeFixture("remove-original", "Reviewed retention complete");
+  assert.equal((await s.registry.storageUsage()).allocatedBytes, 0); assert.equal((await s.registry.listFixtures())[0]!.status, "removed");
+  assert.equal((await s.registry.listTrust())[0]!.status, "active");
+  await assert.rejects(readdir(join(s.state, "scanner-fixtures/remove-original")), { code: "ENOENT" });
+  await assert.rejects(s.registry.installFixture(path, "replacement"), /already installed or retained/);
+});
+
+test("partial removal retains quota and requires a fresh review of only original remaining files", async context => {
+  const s = await fixture(context), id = "partial-removal";
+  await s.registry.installFixture(await signedManifest(s, id, "scanner"), "operator"); await s.registry.revokeFixture(id, "withdraw", "operator");
+  const snapshot = await s.registry.inspectRemoval(id); let checks = 0;
+  await assert.rejects(s.registry.removeFixture(snapshot, "remove", "operator", async () => { if (++checks === 4) throw Error("Synthetic interrupted deletion"); }), /interrupted deletion/);
+  assert.deepEqual(await readdir(join(s.state, "scanner-fixtures", id)), ["content.bin"]); assert.equal((await s.registry.storageUsage()).allocatedCount, 1);
+  await assert.rejects(s.registry.removeFixture(snapshot, "replay", "operator"), /changed/);
+  const remaining = await s.registry.inspectRemoval(id); assert.equal(remaining.files.length, 1); assert.ok(remaining.originalRemovalSha256);
+  await s.registry.removeFixture(remaining, "fresh reviewed remainder", "operator"); assert.equal((await s.registry.storageUsage()).allocatedCount, 0);
+});
+
+test("removal preserves extra files, changed bytes, replacement roots and identity substitutions", async context => {
+  const s = await fixture(context), id = "preserve-removal", root = join(s.state, "scanner-fixtures", id);
+  await s.registry.installFixture(await signedManifest(s, id, "scanner"), "operator"); await s.registry.revokeFixture(id, "withdraw", "operator");
+  const original = await s.registry.inspectRemoval(id), content = await readFile(join(root, "content.bin"));
+  await writeFile(join(root, "foreign.txt"), "irreplaceable"); await assert.rejects(s.registry.inspectRemoval(id), /Preserve/);
+  await (await import("node:fs/promises")).unlink(join(root, "foreign.txt"));
+  await writeFile(join(root, "content.bin"), "changed"); await assert.rejects(s.registry.removeFixture(original, "remove", "operator"), /Preserve/); await writeFile(join(root, "content.bin"), content);
+  const { rename } = await import("node:fs/promises"); await rename(root, root + "-original"); await mkdir(root);
+  for (const file of ["manifest.json", "content.bin"]) await writeFile(join(root, file), await readFile(join(root + "-original", file)));
+  await assert.rejects(s.registry.inspectRemoval(id), /Preserve/);
+  await assert.rejects(s.registry.removeFixture(original, "remove", "operator"), /Preserve/);
+  assert.equal((await s.registry.storageUsage()).allocatedCount, 1); assert.equal(await readFile(join(root, "content.bin"), "utf8"), content.toString());
+});
+
+test("a lost removed-journal acknowledgement frees only committed storage and never repeats deletion", async context => {
+  const s = await fixture(context), id = "removed-lost-reply";
+  await s.registry.installFixture(await signedManifest(s, id, "scanner"), "operator"); await s.registry.revokeFixture(id, "withdraw", "operator");
+  const snapshot = await s.registry.inspectRemoval(id), append = s.store.append.bind(s.store);
+  s.store.append = async (kind, payload) => { const result = await append(kind, payload); if (kind === "b122.scanner-fixture.remove.v1") throw Error("Synthetic lost removed acknowledgement"); return result; };
+  await assert.rejects(s.registry.removeFixture(snapshot, "remove", "operator"), /lost removed/);
+  assert.equal((await s.registry.storageUsage()).allocatedCount, 0); assert.equal((await s.registry.listFixtures())[0]!.status, "removed");
+  await assert.rejects(s.registry.removeFixture(snapshot, "replay", "operator"), /Separately revoke/);
+});
+
+test("linked directory and hard-linked content cannot inherit reviewed removal ownership", async context => {
+  const s = await fixture(context), id = "linked-removal", root = join(s.state, "scanner-fixtures", id);
+  await s.registry.installFixture(await signedManifest(s, id, "scanner"), "operator"); await s.registry.revokeFixture(id, "withdraw", "operator");
+  const reviewed = await s.registry.inspectRemoval(id), fs = await import("node:fs/promises"), outside = root + "-outside";
+  await fs.rename(root, outside); await fs.symlink(outside, root, process.platform === "win32" ? "junction" : "dir");
+  await assert.rejects(s.registry.removeFixture(reviewed, "remove", "operator"), /Preserve/); assert.equal((await readdir(outside)).length, 2);
+  await fs.unlink(root); await fs.rename(outside, root);
+  const content = join(root, "content.bin"), foreign = join(s.source, "independent.bin"); await fs.rename(content, foreign); await fs.link(foreign, content);
+  await assert.rejects(s.registry.inspectRemoval(id), /Preserve/); assert.equal((await s.registry.storageUsage()).allocatedCount, 1); assert.ok((await readFile(foreign)).length > 0);
+});
+
+test("an expired legacy revoked fixture can be explicitly removed and partial removal retains its original content pin", async context => {
+  const s = await fixture(context), id = "legacy-expired", source = await signedManifest(s, id, "scanner"), root = join(s.state, "scanner-fixtures", id);
+  await mkdir(root, { recursive: true }); await writeFile(join(root, "manifest.json"), await readFile(source)); await writeFile(join(root, "content.bin"), await readFile(join(s.source, id + ".json")));
+  await s.store.append("b122.scanner-fixture.install.v1", { id, kind: "scanner", packageRoot: root, manifestSha256: createHash("sha256").update(await readFile(source)).digest("hex"), installedBy: "original legacy operator" });
+  const expired = new DurableScannerFixtureRegistry(s.store, s.state, () => new Date("2028-01-01"));
+  await expired.revokeFixture(id, "retention complete", "operator"); assert.equal((await expired.storageUsage()).allocatedBytes, 67108864);
+  const snapshot = await expired.inspectRemoval(id); let calls = 0;
+  await assert.rejects(expired.removeFixture(snapshot, "remove", "operator", async () => { if (++calls === 4) throw Error("Synthetic legacy partial deletion"); }), /partial deletion/);
+  assert.deepEqual(await readdir(root), ["content.bin"]);
+  await expired.removeFixture(await expired.inspectRemoval(id), "new exact remainder review", "operator"); assert.equal((await expired.storageUsage()).allocatedBytes, 0);
+});

@@ -7,6 +7,16 @@ records exact source checkpoints and receipts.
 
 ## Current backend
 
+Aggregate signed-fixture storage and separately reviewed removal are implemented.
+Each compartment reserves manifest plus content bytes atomically before copying,
+with a 64 MiB/32-allocation bound. Unknown and revoked allocations keep consuming
+quota. Exact directory/file identities and hashes bind removal; unfamiliar or
+changed files remain preserved. Partial deletion needs a fresh approval and never
+upgrades the original uncertain request. Immutable IDs and audit history survive
+cleanup. The change passes 88 combined checks, two additional linked/legacy
+registry cases and type checking; installed and focused native Windows checks
+are pending. [Contract](signed-fixtures.md).
+
 The Suite now exposes separately reviewed signed scanner/advisory trust,
 installation and revocation, with compartment-local AEAD journals, one-use
 approvals, exact manifest pins, guarded receipts and kernel ownership. HTTP
@@ -17,7 +27,7 @@ checks and 59 combined controller/registry/HTTP/privacy/harness/package checks
 pass; type checking passes. The package includes the actual registry and runs
 under normal Node flags. The installed demonstration now passes ten checks; native Windows controller
 acceptance remains pending. [Fixture boundary](signed-fixtures.md) records the
-remaining aggregate quota, removal, Shield execution and frontend work.
+remaining Shield execution and frontend work.
 
 Normal Windows Run now uses the protected System storage service for new
 exchanges. The desktop client does not elevate or enable volume privilege.
@@ -52,7 +62,7 @@ JavaScript owner repeats eight native checks, alongside 31 restricted-client
 and thirty filesystem checks. Their archive digests also verified; small JSON
 receipts retained. This supersedes the earlier combined-batch failure without
 changing its failed outcome or any production/per-file deadline. The newer
-fixture controller is a separate pending native checkpoint.
+fixture controller is a separate pending native checkpoint; focused registry and maintenance jobs now cover it independently.
 
 Complete Windows workflow [41948972575](https://github.com/SquirmyWormy275/strathex-switchyard/actions/runs/41948972575)
 at `1f4e8e5` passes all thirty filesystem checks, 112 compiled portable checks,
@@ -75,7 +85,7 @@ missed the new owner group, and the enlarged serial batch reached six minutes.
 `windows-storage-contracts-b0f-failed.json` preserves that failure. The timeout
 inventory is corrected and the eight complete contract files now use independent
 Windows jobs with their original isolated per-file bounds. No assertion or
-production deadline changed. Native rerun is pending. A complete native
+production deadline changed. The later `fc1fc27` rerun above passes. A complete native
 application/guest journey and interactive UAC remain unaccepted.
 
 ## Installed Linux and F77
@@ -90,8 +100,10 @@ and frozen Home were restored. Only the known synthetic package, signing scratch
 bundle and proof checkout were removed. Receipts
 `assignment-legends-1793846107230.json` and
 `installed-signed-fixtures-1793846351612.json` retained. No model/account, hardware
-or microphone operation. The complete Linux lane is running at immutable
-`27e0eb3`; required inventory is now 168 groups.
+or microphone operation. The complete Linux lane at immutable `27e0eb3` passes 168/168 groups: 1,117
+tests, 1,107 passed, ten declared skips. Receipt
+`df4c7c97-bddc-41b3-8cde-a92fdf1e5822` retained, all child cleanup verified and
+owned fixture parent/checkouts removed.
 
 The normal installed application at `e1a1f30`, release
 `ed5b058f76ad93ab75dc3e3ebd787291de27b6b1b4165fa0db30d9b9ede59143`,
@@ -107,7 +119,7 @@ Receipts `assignment-legends-1793843467065.json` and
 modes, private endpoint and exact frozen Home were preserved; HID transports
 exited and temporary bundle/checkout were removed. The frontend stays frozen.
 
-The last accepted complete Linux checkpoint, `a1e71b0`, passes 166/166 groups:
+The previous complete Linux checkpoint, `a1e71b0`, passes 166/166 groups:
 1,101 tests, 1,091 passed, ten declared skips. Receipt
 `f2749065-cd67-4d3e-9a10-c78b86b901c6` retained, every child cleanup verified,
 owned fixtures and checkout removed. Installed Run and pipeline demonstrations
@@ -124,8 +136,7 @@ checking pass. The normal Suite's compartment API and Linux pipeline connection
 are now implemented above; their installed and native Windows acceptance remain
 separate pending checks.
 
-Windows pipelines, complete Shield/scanner execution, aggregate fixture quota/
-removal, writable build
+Windows pipelines, complete Shield/scanner execution, writable build
 preparation, exact desktop/IDE/terminal attachments and the remaining frontend
 controls are unfinished implementation. The task requirement remains the full
 suite. Claude Code is only a token-limit contingency; no delegated coding job
@@ -141,8 +152,7 @@ is authorized by these checkpoints.
 
 ## Continuation
 
-Verify the preparation race correction and separated contract jobs on native
-Windows. The latest normal Linux backend, full Linux checkpoint and native owner
+Verify the new fixture registry/maintenance contracts on native Windows. The latest normal Linux backend, full Linux checkpoint and native owner
 receipt are now recorded above. Continue the
 independently executable backend requirements above. Keep small source/JSON
 evidence locally, remove successful scratch and publish GitHub checkpoints.

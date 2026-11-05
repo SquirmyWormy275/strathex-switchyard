@@ -4,6 +4,8 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { requiredGroups, runVerification, assertRequiredTestManifest } from "./run-isolated-tests.mjs";
 const suites = {
+  "fixture-registry": "apps/windows-companion/test/scanner-fixtures.test.ts",
+  "fixture-maintenance": "tools/layout-studio/scanner-fixtures.test.mjs",
   harness: "scripts/run-isolated-tests.test.mjs",
   leases: "tools/layout-studio/state-lock.test.mjs",
   "legacy-images": "tools/layout-studio/windows-exchange-images.test.mjs",
@@ -14,7 +16,7 @@ const suites = {
   "run-owner": "tools/layout-studio/windows-reviewed-runner.test.mjs"
 };
 const flags = process.argv.slice(2), suite = flags[1]?.startsWith("--suite=") ? flags[1].slice(8) : undefined;
-if (process.platform !== "win32" || flags.length !== 2 || flags[0] !== "--synthetic" || !Object.hasOwn(suites, suite)) throw Error("Use on Windows: node scripts/verify-windows-storage-contracts.mjs --synthetic --suite=harness|leases|legacy-images|broker-owner|sandbox-native|sandbox-sessions|reviewed-run|run-owner. No disk, VM, account or keyboard is opened.");
+if (process.platform !== "win32" || flags.length !== 2 || flags[0] !== "--synthetic" || !Object.hasOwn(suites, suite)) throw Error("Use on Windows: node scripts/verify-windows-storage-contracts.mjs --synthetic --suite=fixture-registry|fixture-maintenance|harness|leases|legacy-images|broker-owner|sandbox-native|sandbox-sessions|reviewed-run|run-owner. No disk, VM, account or keyboard is opened.");
 assertRequiredTestManifest();
 const groups = requiredGroups.filter(group => group.file === suites[suite]);
 if (groups.length !== 1) throw Error("The complete Windows storage contract is absent or ambiguous in the required inventory.");

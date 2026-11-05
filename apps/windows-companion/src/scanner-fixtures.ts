@@ -3,6 +3,8 @@ import { createHash, createPublicKey, verify } from "node:crypto";
 import { lstat, mkdir, readFile, realpath, writeFile } from "node:fs/promises";
 import { dirname, isAbsolute, relative, resolve } from "node:path";
 
+import { fixtureDirectory, inspectFixtureRemoval, removeReviewedFixture, type FixtureRemovalSnapshot, type FixtureStorageIdentity } from "./scanner-fixture-files.ts";
+
 import type { JournalEntry, JsonValue, ProtectedJsonStore } from "../../../packages/control-plane/src/store.ts";
 import type { WindowsUserPresenceRunner } from "./windows-user-presence.ts";
 
@@ -10,6 +12,17 @@ const trustInstallKind = "b122.scanner-trust.install.v1";
 const trustRevokeKind = "b122.scanner-trust.revoke.v1";
 const fixtureInstallKind = "b122.scanner-fixture.install.v1";
 const fixtureRevokeKind = "b122.scanner-fixture.revoke.v1";
+const fixtureReserveKind = "b122.scanner-fixture.reserve.v1";
+const fixtureRootKind = "b122.scanner-fixture.root.v1";
+const fixtureNotCreatedKind = "b122.scanner-fixture.not-created.v1";
+const fixtureRemovalStartedKind = "b122.scanner-fixture.removal-started.v1";
+const fixtureRemoveKind = "b122.scanner-fixture.remove.v1";
+export const scannerFixtureStorageLimits = Object.freeze({ maximumBytes: 64 * 1024 * 1024, maximumAllocations: 32 });
+interface FixtureAllocation {
+  id: string; manifestSha256: string; contentSha256: string | null; storageBytes: number;
+  status: "reserved" | "active" | "revoked" | "removed" | "not-created";
+  rootIdentity?: FixtureStorageIdentity; removal?: FixtureRemovalSnapshot;
+}
 const maximumManifestBytes = 1024 * 1024;
 const maximumContentBytes = 64 * 1024 * 1024;
 const digestPattern = /^[a-f0-9]{64}$/;
@@ -65,7 +78,7 @@ export interface ScannerFixtureResolver {
 }
 
 export interface InstalledScannerFixtureTrust extends ScannerFixtureTrustPolicy { readonly installedAt: string; readonly installedBy: string; readonly status: "active" | "revoked"; }
-export interface InstalledScannerFixture { readonly id: string; readonly kind: ScannerFixtureKind; readonly packageRoot: string; readonly manifestSha256: string; readonly installedAt: string; readonly installedBy: string; readonly status: "active" | "revoked"; }
+export interface InstalledScannerFixture { readonly id: string; readonly kind: ScannerFixtureKind; readonly packageRoot: string; readonly manifestSha256: string; readonly installedAt: string; readonly installedBy: string; readonly status: "active" | "revoked" | "removed"; }
 
 /**
  * Protected installed-state registry. Every resolve rehashes the copied files,
@@ -111,33 +124,113 @@ export class DurableScannerFixtureRegistry implements ScannerFixtureResolver {
 
   async inspectFixture(manifestPath: string) {
     const { source, manifest, contentSource } = await this.selectedPackage(manifestPath);
-    return { sourcePath: source.path, manifestSha256: sha256(source.bytes), contentBytes: contentSource.bytes.byteLength, manifest };
+    return { sourcePath: source.path, manifestSha256: sha256(source.bytes), contentBytes: contentSource.bytes.byteLength, manifestBytes: source.bytes.byteLength, manifest };
   }
 
   async installFixture(manifestPath: string, installedBy: string, expectedManifestSha256?: string): Promise<InstalledScannerFixture> {
     const { source, manifest, contentSource } = await this.selectedPackage(manifestPath, expectedManifestSha256);
     const destination = resolve(this.packageRoot, manifest.id);
     if (!inside(this.packageRoot, destination)) throw new Error("Scanner fixture identity escaped host state.");
-    if ((await this.fixtures()).some((item) => item.id === manifest.id)) throw new Error("Scanner fixture identity is already installed and cannot be replaced in place.");
-    await mkdir(this.packageRoot, { recursive: true, mode: 0o700 });
-    // Exclusive creation is the cross-process reservation. A rename could
-    // replace an unfamiliar empty directory; a failed second installer must
-    // never remove the first installer's destination or accepted contents.
-    try { await mkdir(destination, { mode: 0o700 }); }
-    catch { throw new Error("The scanner fixture directory already exists or cannot be reserved; preserve its original files and reconcile before retrying."); }
+    const manifestSha256 = sha256(source.bytes), contentSha256 = manifest.contentSha256;
+    const storageBytes = source.bytes.byteLength + contentSource.bytes.byteLength;
+    installedBy = bounded(installedBy, "scanner fixture operator", 160);
+    // Reserve the entire copied package in the same protected transaction as
+    // the aggregate quota check, before creating any destination or file.
+    await this.store.transaction(async transaction => {
+      const allocations = this.allocationsFrom(await transaction.readEntries<JsonValue>());
+      if (allocations.some(item => item.id === manifest.id)) throw new Error("Scanner fixture identity is already installed or retained and cannot be replaced in place.");
+      const retained = allocations.filter(item => !["removed", "not-created"].includes(item.status));
+      if (retained.length >= scannerFixtureStorageLimits.maximumAllocations || retained.reduce((sum, item) => sum + item.storageBytes, 0) + storageBytes > scannerFixtureStorageLimits.maximumBytes) throw new Error("The aggregate scanner fixture storage quota is full; separately review retained allocations before importing another package.");
+      return transaction.append(fixtureReserveKind, { id: manifest.id, manifestSha256, contentSha256, storageBytes, installedBy });
+    });
     try {
+      await fixtureDirectory(this.packageRoot, true);
+      await mkdir(destination, { mode: 0o700 });
+    } catch {
+      // This attempt created no destination files. Never adopt or erase an
+      // existing directory; retain the identity tombstone, release only quota.
+      await this.store.append(fixtureNotCreatedKind, { id: manifest.id });
+      throw new Error("The scanner fixture directory already exists or cannot be reserved; preserve its original files and reconcile before retrying.");
+    }
+    try {
+      const rootIdentity = await fixtureDirectory(destination, false);
+      if (!rootIdentity) throw new Error("The exact scanner fixture directory disappeared.");
+      await this.store.append(fixtureRootKind, { id: manifest.id, rootIdentity });
       await writeFile(resolve(destination, "manifest.json"), source.bytes, { flag: "wx", mode: 0o600 });
       await writeFile(resolve(destination, "content.bin"), contentSource.bytes, { flag: "wx", mode: 0o600 });
       await this.verifyInstalledAt(destination, this.now());
-      const manifestSha256 = sha256(source.bytes);
-      const entry = await this.store.append(fixtureInstallKind, { id: manifest.id, kind: manifest.kind, packageRoot: destination, manifestSha256, installedBy: bounded(installedBy, "scanner fixture operator", 160) });
+      await inspectFixtureRemoval(destination, manifest.id, manifestSha256, contentSha256, undefined, rootIdentity);
+      const entry = await this.store.append(fixtureInstallKind, { id: manifest.id, kind: manifest.kind, packageRoot: destination, manifestSha256, contentSha256, storageBytes, installedBy });
       return { id: manifest.id, kind: manifest.kind, packageRoot: destination, manifestSha256, installedAt: entry.at, installedBy, status: "active" };
     } catch {
-      // The durable append may have committed before its acknowledgement was
-      // lost. Preserve the exact reservation and files; never replay or erase
-      // a possibly accepted fixture, or recursively delete unfamiliar content.
       throw new Error("The scanner fixture installation outcome is unconfirmed; preserve its reserved directory and protected journal for reconciliation.");
     }
+  }
+
+  async storageUsage() {
+    const allocations = this.allocationsFrom(await this.store.readEntries<JsonValue>());
+    const retained = allocations.filter(item => !["removed", "not-created"].includes(item.status));
+    const allocatedBytes = retained.reduce((sum, item) => sum + item.storageBytes, 0);
+    return { ...scannerFixtureStorageLimits, allocatedBytes, remainingBytes: Math.max(0, scannerFixtureStorageLimits.maximumBytes - allocatedBytes), allocatedCount: retained.length, allocations: retained.map(({ id, status, storageBytes }) => ({ id, status, storageBytes })) };
+  }
+
+  async inspectRemoval(id: string): Promise<FixtureRemovalSnapshot> {
+    identifier(id, "scanner fixture");
+    const allocation = this.allocationsFrom(await this.store.readEntries<JsonValue>()).find(item => item.id === id);
+    if (!allocation || !["revoked", "reserved"].includes(allocation.status)) throw new Error("Separately revoke the exact installed fixture before reviewing removal; only an original unconfirmed allocation may be reconciled directly.");
+    const root = resolve(this.packageRoot, id);
+    let contentSha256 = allocation.contentSha256 ?? allocation.removal?.contentSha256;
+    if (!contentSha256) {
+      // Legacy records reserved no byte count or content digest. Charge the
+      // full quota until explicit cleanup; expiry/revoked trust cannot prevent
+      // deletion of bytes still pinned by the original protected manifest hash.
+      const file = await concreteFile(resolve(root, "manifest.json"), maximumManifestBytes, "original revoked scanner manifest");
+      if (sha256(file.bytes) !== allocation.manifestSha256) throw new Error("Preserve a changed original scanner fixture manifest.");
+      const raw = JSON.parse(Buffer.from(file.bytes).toString("utf8"));
+      contentSha256 = parseManifest(file.bytes, new Date(raw.generatedAt)).contentSha256;
+    }
+    if (allocation.status === "reserved" && !allocation.rootIdentity && await fixtureDirectory(root, false)) throw new Error("Preserve a directory without its original protected creation identity.");
+    return inspectFixtureRemoval(root, id, allocation.manifestSha256, contentSha256, allocation.removal, allocation.rootIdentity);
+  }
+
+  async removeFixture(snapshot: FixtureRemovalSnapshot, reason: string, removedBy: string, check: () => Promise<void> = async () => {}): Promise<void> {
+    reason = bounded(reason, "scanner fixture removal", 512); removedBy = bounded(removedBy, "scanner fixture operator", 160);
+    const fresh = await this.inspectRemoval(snapshot.id);
+    if (canonical(fresh) !== canonical(snapshot)) throw new Error("The reviewed fixture removal files or original allocation changed; preserve them and review again.");
+    await check();
+    await this.store.transaction(async transaction => {
+      const original = this.allocationsFrom(await transaction.readEntries<JsonValue>()).find(item => item.id === snapshot.id);
+      if (!original || !["revoked", "reserved"].includes(original.status) || (original.removal ? sha256(JSON.stringify(original.removal)) : null) !== snapshot.originalRemovalSha256) throw new Error("The original removal was already attempted; obtain a fresh review of its remaining files.");
+      return transaction.append(fixtureRemovalStartedKind, { id: snapshot.id, snapshot: snapshot as unknown as JsonValue, reason, removedBy });
+    });
+    await removeReviewedFixture(resolve(this.packageRoot, snapshot.id), snapshot, check);
+    await check();
+    if (await fixtureDirectory(resolve(this.packageRoot, snapshot.id), false)) throw new Error("Preserve a reappeared fixture directory; removal remains unconfirmed.");
+    await this.store.append(fixtureRemoveKind, { id: snapshot.id, manifestSha256: snapshot.manifestSha256, contentSha256: snapshot.contentSha256, reason, removedBy });
+  }
+
+  private allocationsFrom(entries: readonly JournalEntry<JsonValue>[]): FixtureAllocation[] {
+    const values = new Map<string, FixtureAllocation>();
+    for (const entry of entries) {
+      if (![fixtureReserveKind, fixtureInstallKind, fixtureRevokeKind, fixtureRootKind, fixtureNotCreatedKind, fixtureRemovalStartedKind, fixtureRemoveKind].includes(entry.kind)) continue;
+      const p = entry.payload as unknown as Record<string, unknown>, id = identifier(p?.id, "protected scanner allocation");
+      const found = values.get(id);
+      if (entry.kind === fixtureReserveKind || entry.kind === fixtureInstallKind) {
+        const manifestSha256 = digest(p.manifestSha256, "protected scanner manifest");
+        if (entry.kind === fixtureInstallKind && (typeof p.packageRoot !== "string" || (process.platform === "win32" ? p.packageRoot.toLowerCase() !== resolve(this.packageRoot, id).toLowerCase() : p.packageRoot !== resolve(this.packageRoot, id)))) throw new Error("Preserve a fixture whose protected package path differs from its fixed allocation.");
+        const storageBytes = p.storageBytes === undefined && entry.kind === fixtureInstallKind ? scannerFixtureStorageLimits.maximumBytes : p.storageBytes;
+        if (!Number.isSafeInteger(storageBytes) || (storageBytes as number) < 1 || (storageBytes as number) > scannerFixtureStorageLimits.maximumBytes || entry.kind === fixtureReserveKind && found || entry.kind === fixtureInstallKind && found && (found.status !== "reserved" || found.manifestSha256 !== manifestSha256 || found.storageBytes !== storageBytes || found.contentSha256 !== p.contentSha256)) throw new Error("Protected scanner allocation is malformed or conflicts with its original reservation.");
+        values.set(id, { ...found, id, manifestSha256, contentSha256: p.contentSha256 === undefined ? null : digest(p.contentSha256, "protected scanner content"), storageBytes: storageBytes as number, status: entry.kind === fixtureReserveKind ? "reserved" : "active" });
+      } else {
+        if (!found) { if (entry.kind === fixtureRevokeKind) continue; throw new Error("Protected scanner allocation has no original reservation."); }
+        if (entry.kind === fixtureRevokeKind) found.status = "revoked";
+        else if (entry.kind === fixtureNotCreatedKind) { if (found.status !== "reserved" || found.rootIdentity) throw new Error("A created fixture reservation cannot be released without reviewed removal."); found.status = "not-created"; }
+        else if (entry.kind === fixtureRootKind) { if (found.status !== "reserved" || found.rootIdentity || !record(p.rootIdentity)) throw new Error("The original fixture directory identity changed."); found.rootIdentity = p.rootIdentity as unknown as FixtureStorageIdentity; }
+        else if (entry.kind === fixtureRemovalStartedKind) { if (!["revoked", "reserved"].includes(found.status) || !record(p.snapshot)) throw new Error("The original fixture removal allocation changed."); found.removal = p.snapshot as unknown as FixtureRemovalSnapshot; }
+        else { if (!found.removal || !["revoked", "reserved"].includes(found.status)) throw new Error("Fixture storage cannot be released without its original reviewed removal."); found.status = "removed"; }
+      }
+    }
+    return [...values.values()];
   }
 
   async revokeFixture(id: string, reason: string, revokedBy: string): Promise<void> {
@@ -216,9 +309,9 @@ export class DurableScannerFixtureRegistry implements ScannerFixtureResolver {
       if (entry.kind === fixtureInstallKind) {
         if (!record(payload) || typeof payload.id !== "string" || !kind(payload.kind) || typeof payload.packageRoot !== "string" || typeof payload.manifestSha256 !== "string" || typeof payload.installedBy !== "string") throw new Error("Protected scanner fixture journal is malformed.");
         values.set(payload.id, { id: identifier(payload.id, "scanner fixture"), kind: payload.kind, packageRoot: payload.packageRoot, manifestSha256: digest(payload.manifestSha256, "scanner manifest"), installedAt: entry.at, installedBy: payload.installedBy, status: "active" });
-      } else if (entry.kind === fixtureRevokeKind) {
+      } else if (entry.kind === fixtureRevokeKind || entry.kind === fixtureRemoveKind) {
         if (!record(payload) || typeof payload.id !== "string") throw new Error("Protected scanner fixture revocation is malformed.");
-        const found = values.get(payload.id); if (found) values.set(found.id, { ...found, status: "revoked" });
+        const found = values.get(payload.id); if (found) values.set(found.id, { ...found, status: entry.kind === fixtureRemoveKind ? "removed" : "revoked" });
       }
     }
     return [...values.values()];
@@ -232,6 +325,8 @@ export interface ScannerFixtureAdministration {
   installFixture(sourcePath: string): Promise<InstalledScannerFixture>;
   listFixtures(): Promise<readonly InstalledScannerFixture[]>;
   revokeFixture(id: string, reason: string): Promise<void>;
+  storageUsage(): ReturnType<DurableScannerFixtureRegistry["storageUsage"]>;
+  removeFixture(id: string, reason: string): Promise<void>;
 }
 
 export function createScannerFixtureAdministration(options: Readonly<{ registry: DurableScannerFixtureRegistry; presence: WindowsUserPresenceRunner; now?: () => Date }>): ScannerFixtureAdministration {
@@ -242,7 +337,9 @@ export function createScannerFixtureAdministration(options: Readonly<{ registry:
     async revokeTrust(authorityId: string, keyId: string, reason: string) { return options.registry.revokeTrust(authorityId, keyId, reason, await operator(`Revoke scanner fixture authority ${authorityId}.`)); },
     async installFixture(sourcePath: string) { const bytes = await readBounded(sourcePath, maximumManifestBytes); const manifest = parseManifest(bytes, (options.now ?? (() => new Date()))()); return options.registry.installFixture(sourcePath, await operator(`Install signed ${manifest.kind} fixture ${manifest.id} until ${manifest.expiresAt}.`), sha256(bytes)); },
     async listFixtures() { return options.registry.listFixtures(); },
-    async revokeFixture(id: string, reason: string) { return options.registry.revokeFixture(id, reason, await operator(`Revoke scanner fixture ${id}.`)); }
+    async revokeFixture(id: string, reason: string) { return options.registry.revokeFixture(id, reason, await operator(`Revoke scanner fixture ${id}.`)); },
+    async storageUsage() { return options.registry.storageUsage(); },
+    async removeFixture(id: string, reason: string) { const snapshot = await options.registry.inspectRemoval(id); await options.registry.removeFixture(snapshot, reason, await operator(`Remove only the reviewed original files for scanner fixture ${id}, manifest ${snapshot.manifestSha256}. Preserve all authority and operation history.`)); }
   };
 }
 
