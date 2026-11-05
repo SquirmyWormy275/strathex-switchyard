@@ -1,4 +1,6 @@
-# Short-lived Windows lock helpers
+# Serialize private state across store instances
+
+## Current Windows worker reuse
 
 Every protected mutation still holds an exclusive kernel file lock. Each state
 read still retrieves its compartment key and authenticates fresh encrypted bytes.
@@ -44,3 +46,89 @@ actual Windows file-sharing and parent-loss behavior must pass native CI through
 the default store path. No native Windows acceptance is claimed by this document.
 
 Nine focused groups pass 85 checks with every process-tree termination and child cleanup verified; typecheck passes. [Software evidence](evidence/keyless-windows-leases-summary.json).
+
+## Earlier implementation and evidence
+
+The following checkpoints describe earlier source cohorts. Current Windows worker reuse and its still-pending native acceptance are described above; earlier passes do not accept the newer implementation.
+
+Independent store objects can address the same sealed compartment files in one
+host process. Initialization and mutations now share a process-local queue keyed
+by normalized private root and compartment. Each transaction still obtains its
+own platform kernel lock, re-reads state, checks the lease before writing and
+waits for helper exit. The queue is removed when its last transaction settles.
+
+This prevents same-process store instances from competing to start lock helpers
+for the same state. It does not replace cross-process locking, reuse a lease
+between transactions or change the existing 15-second acquisition deadline.
+Resource locks and nonblocking probes retain their existing kernel behavior.
+Callback failure cannot publish uncommitted fields or poison the next instance's
+transaction.
+
+The motivating [Windows failure](evidence/windows-c8b-state-lock-failed-summary.json)
+hit that acquisition deadline during the existing initialization/concurrent-write
+journey. The child exited within its original test deadline and cleanup verified;
+the result remains failed. A competing cold helper startup is a plausible
+contributor, not an established root cause. The shared queue removes that
+competition without weakening the kernel boundary.
+
+Four isolated store/lock/Suite/scanner groups pass all 41 checks, with cleanup
+verified (`isolated-test-924a833e-560c-41f5-aabd-32408b16b6f7.json`). These include
+independent stores retaining one compartment key and all twelve writes,
+cross-process crash release, held-resource probes, failed transaction recovery
+and detached pipe ownership. The digest-verified native Windows `59a73de` lease group now passes five tests
+and one declared platform skip, with cleanup verified. The earlier failure
+remains failed; the full native workflow is not accepted.
+
+
+The same source still has two [separate lock acquisition failures](evidence/windows-59a-state-lock-summary.json)
+in the first Sandbox transport and ignored-tree authority cases. Each hits the
+unchanged 15-second acquisition limit; the file itself exits within its bound
+and cleanup verifies. This is available-CI software validation, separate from
+actual guest/device/account acceptance. Module startup is a plausible contributor,
+not a confirmed diagnosis.
+
+Windows lock acquisition now uses a closed five-field ASCII line rather than
+importing PowerShell Utility and parsing JSON. A canonical base64 UTF-8 path
+preserves literal Unicode, tabs and shell punctuation; neither side evaluates
+text. Requests are bounded to 22,000 characters and 16 KiB path bytes, with
+strict PID/boolean/version/encoding validation. The helper uses only language
+and .NET operations, with module autoload disabled. It still owns the exclusive
+kernel file handle until pipe closure, checks the original parent's birth and
+exit, retains sharing-error-only retries/nonblocking behavior, and keeps both
+the ten-second contention and 15-second acquisition bounds. No warm-up,
+background lease reuse or retry of a failed transaction is introduced.
+
+Four isolated Suite/lock/Sandbox/ignored-authority groups pass 36 checks with
+every cleanup verified (`isolated-test-9c07dacc-b24e-49be-91d9-a7a1e54c6e91.json`).
+Linux exercises real kernel locks and the closed request's Unicode/injection/
+size boundaries. Windows must still execute its native parser and lock journey;
+these Linux checks do not establish the startup failure's cause or repair.
+
+
+Native Windows `4700d9a` now passes all three corresponding groups, with archive
+digests and every child cleanup verified: eight Sandbox transport tests, three
+ignored-tree authority tests, and six lease tests plus one declared platform
+skip. This executes the actual new parser and kernel-lock helper under the
+original bounds. [Exact source/artifact summary](evidence/windows-470-state-lock-summary.json).
+Earlier failures remain failed and their precise startup cause is not proven by
+a later pass. The whole workflow, actual guest and ordinary-account acceptance
+remain separate.
+
+Linux now runs the fixed `/usr/bin/cat` pipe reader under `/usr/bin/flock`
+instead of starting Node for each lease. The readiness line can be echoed only
+after the kernel grants the lock. An open input pipe holds it; pipe EOF retires
+the reader after normal completion or abrupt parent loss. There is no shell,
+lease reuse or deadline change. Held nonblocking probes, independent store
+serialization, failed mutations, detached-owner crash release and a forcibly
+lost lock owner all remain covered. A lost owner invalidates the original lease
+before a new writer can be accepted through it.
+
+Three isolated Suite/commit/lock groups pass 28 checks with cleanup verified
+(`isolated-test-0bab35ff-6d9c-4a70-8ac8-13788fdeb4eb.json`). The commit group
+finishes in 43,621 ms under its unchanged 45,000 ms bound; its prior timeout
+remains failed. Thirty local lease acquisitions observed median 51.99 ms before
+and 7.05 ms after, with both owned fixtures removed
+(`linux-lock-latency-before-1793899173770.json` and
+`linux-lock-latency-after-1793899235545.json`). This is a local measurement under
+changing workstation load, not a universal benchmark or proof of the earlier
+full-run failure's cause. The later `9dc0a94` checkpoint passes all 235 Linux groups; `7c44f05` subsequently fails one history-fixture cleanup in 236 groups. That fixture is corrected, with nine focused groups/85 checks passing, and a new complete 237-group run is in progress. [Original failed full run](evidence/linux-host-recording-full-failure-summary.json).
