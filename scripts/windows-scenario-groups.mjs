@@ -24,3 +24,15 @@ export function selectWindowsContractGroups(files, requiredGroups) {
     return selected;
   });
 }
+
+// One bounded CI worker per Shield scenario. The former file-level job could
+// spend five independent 300-second child budgets inside one six-minute step.
+export const windowsStorageScenarioSuites = Object.freeze(Object.fromEntries(
+  ["shield-change", "shield-codebase", "shield-supply-chain", "shield-release", "shield-clean"].map((suite, index) => [suite, Object.freeze({ file: "tools/layout-studio/repository-windows-shield.test.mjs", pattern: windowsShieldScenarios[index] })])
+));
+export function selectWindowsStorageScenario(suite, requiredGroups) {
+  if (!Object.hasOwn(windowsStorageScenarioSuites, suite)) throw Error("Choose an exact declared storage scenario suite.");
+  const expected = windowsStorageScenarioSuites[suite];
+  // Validate the entire file inventory before selecting one declared shard.
+  return selectWindowsContractGroups([expected.file], requiredGroups).filter(group => group.pattern === expected.pattern);
+}
