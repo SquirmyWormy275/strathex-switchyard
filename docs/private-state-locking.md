@@ -52,3 +52,13 @@ every cleanup verified (`isolated-test-9c07dacc-b24e-49be-91d9-a7a1e54c6e91.json
 Linux exercises real kernel locks and the closed request's Unicode/injection/
 size boundaries. Windows must still execute its native parser and lock journey;
 these Linux checks do not establish the startup failure's cause or repair.
+
+
+Native Windows `4700d9a` now passes all three corresponding groups, with archive
+digests and every child cleanup verified: eight Sandbox transport tests, three
+ignored-tree authority tests, and six lease tests plus one declared platform
+skip. This executes the actual new parser and kernel-lock helper under the
+original bounds. [Exact source/artifact summary](evidence/windows-470-state-lock-summary.json).
+Earlier failures remain failed and their precise startup cause is not proven by
+a later pass. The whole workflow, actual guest and ordinary-account acceptance
+remain separate.

@@ -17,7 +17,9 @@ Shared state queues retain an independent kernel lease and original deadlines
 per transaction; the native Windows `59a73de` lease group now passes five tests
 and one declared skip. Separate cold lock failures remain failed. The next
 Windows helper removes module/JSON loading from acquisition and preserves the
-original bounds; 36 local checks pass, native confirmation pending.
+original bounds; 36 local checks pass. Native `4700d9a` now passes eight Sandbox
+transport, three ignored-tree authority and six lease checks plus one declared
+skip, with three archive digests and all cleanup verified.
 [Lock evidence](private-state-locking.md).
 
 The restricted Windows primary-process check remains failed before child creation.
