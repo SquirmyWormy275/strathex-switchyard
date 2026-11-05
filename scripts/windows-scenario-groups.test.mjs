@@ -65,3 +65,12 @@ test("native filesystem, setup and restricted exchange CI lanes preserve every o
   assert.match(source, /"license-scanner": "tools\/layout-studio\/repository-windows-shield-licenses\.test\.mjs"/);
   assert.equal(selectWindowsContractGroups(["tools/layout-studio/repository-windows-shield-licenses.test.mjs"], requiredGroups).length, 1);
 });
+test("fresh native and contract lanes queue by exact ref and matrix identity instead of waiting for an unrelated whole workflow", async () => {
+  const workflow = await readFile(new URL("../.github/workflows/switchyard-windows-filesystem.yml", import.meta.url), "utf8");
+  assert.doesNotMatch(workflow, /^concurrency:/m);
+  const native = workflow.slice(workflow.indexOf("  verify-native-filesystem:"), workflow.indexOf("  verify-storage-contracts:")), contracts = workflow.slice(workflow.indexOf("  verify-storage-contracts:"));
+  assert.match(native, /    concurrency:\n      group: switchyard-windows-native-\$\{\{ github\.ref \}\}-\$\{\{ matrix\.lane \}\}\n      cancel-in-progress: false/);
+  assert.match(contracts, /    concurrency:\n      group: switchyard-windows-storage-contract-\$\{\{ github\.ref \}\}-\$\{\{ matrix\.suite \}\}\n      cancel-in-progress: false/);
+  assert.doesNotMatch(workflow, /cancel-in-progress: true|^    needs:/m);
+  assert.equal([...workflow.matchAll(/^      cancel-in-progress: false$/gm)].length, 2);
+});

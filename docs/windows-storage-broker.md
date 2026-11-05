@@ -377,3 +377,22 @@ Both managed targets again compile without warnings/errors and all 223 portable
 checks pass, with owned scratch removed
 (`windows-history-native-build-1793891291067.json`). Native validation remains
 unfinished. [Source-bound failed summary](evidence/windows-03a-restricted-failed-summary.json).
+
+
+### Queue native proofs independently
+
+Each Windows native matrix lane now has its own per-ref concurrency group; each
+software contract suite has a separate per-ref/suite group. Fresh restricted
+process evidence no longer waits for an unrelated complete contract workflow to
+finish. The three native lanes, every software suite, job identities, artifact
+inventories and original deadlines remain required. Running jobs are not
+cancelled by the new groups. As with GitHub's existing single-pending behavior,
+a newer pending job can replace an older pending job for that same lane; a
+cancelled result is never accepted as a pass.
+
+This uses [GitHub's documented job-level matrix concurrency](https://docs.github.com/en/actions/how-tos/write-workflows/choose-when-workflows-run/control-workflow-concurrency).
+The workflow/runner inventory checks pass 22 cases in two isolated groups, with
+both child cleanups verified
+(`isolated-test-5765093e-c5c7-4cae-b147-a300397d844c.json`). Native execution of
+the queued token-query diagnostic remains pending; queue changes cannot supply
+the missing native evidence.

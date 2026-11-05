@@ -8,12 +8,11 @@ on:
 permissions:
   contents: read
 
-concurrency:
-  group: switchyard-windows-filesystem-${{ github.ref }}
-  cancel-in-progress: false
-
 jobs:
   verify-native-filesystem:
+    concurrency:
+      group: switchyard-windows-native-${{ github.ref }}-${{ matrix.lane }}
+      cancel-in-progress: false
     strategy:
       fail-fast: false
       matrix:
@@ -260,6 +259,9 @@ jobs:
           retention-days: 7
 
   verify-storage-contracts:
+    concurrency:
+      group: switchyard-windows-storage-contract-${{ github.ref }}-${{ matrix.suite }}
+      cancel-in-progress: false
     runs-on: windows-2022
     timeout-minutes: 8
     strategy:
