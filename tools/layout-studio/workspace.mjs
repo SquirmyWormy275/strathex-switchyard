@@ -66,13 +66,13 @@ const modifierValues = { shift: ["SHIFT", 1], ctrl: ["CTRL", 4], alt: ["ALT", 8]
 /** A closed local implementation compiles a gesture; imported labels cannot select code. */
 export function compileConnection(input, actionId, implementation, target = null) {
   if (input?.profile?.evidence === "source-reference") throw new Error("This preset contains a reference typing layer. Read or import your actual keyboard configuration before connecting shortcuts.");
-  if (!["native-chatgpt.focus/v1", "switchyard.role/v1"].includes(implementation)) throw new Error("That local action is unavailable. Choose an explicitly supported connection.");
+  if (!["native-chatgpt.focus/v1", "native-vscode.focus/v1", "switchyard.role/v1"].includes(implementation)) throw new Error("That local action is unavailable. Choose an explicitly supported connection.");
   if (implementation === "switchyard.role/v1" && (!target || !identifier.test(target.roleId) || !["summon", "resume", "review", "handoff", "status", "cancel"].includes(target.intent))) throw new Error("Choose an exact locally bound role and stable intent.");
   const review = analyzePlan(input);
   const action = review.plan.actions.find((a) => a.id === actionId);
   if (!action?.binding) throw new Error("Assign the action to a physical key and modifier first.");
   if (review.issues.some((i) => i.severity === "error")) throw new Error("Resolve layout conflicts before connecting an action.");
-  if (implementation === "native-chatgpt.focus/v1" && action.consequence !== "navigation") throw new Error("Show ChatGPT is navigation. Revise the action's consequence before connecting it.");
+  if (implementation !== "switchyard.role/v1" && action.consequence !== "navigation") throw new Error("Native client focus is navigation. Revise the action's consequence before connecting it.");
   if (implementation === "switchyard.role/v1" && !["navigation", "read_only"].includes(action.consequence)) throw new Error("Role controls in this configuration bridge support navigation or read-only design operations only.");
   const key = review.plan.profile.keys.find((k) => k.id === action.binding.keyId);
   const match = /^KC_([A-Z]|[0-9]|F(?:[1-9]|1[0-9]|2[0-4]))$/.exec(key.baseKeycode ?? "");
@@ -80,7 +80,7 @@ export function compileConnection(input, actionId, implementation, target = null
   const names = action.binding.modifier.split("_");
   if (!names.includes("gui") || names.some((n) => !modifierValues[n]) || names.length < 2) throw new Error("Choose Super plus at least one other modifier for this host shortcut, preserving ordinary typing and common app shortcuts.");
   return {
-    implementation, actionId: action.id, label: implementation === "native-chatgpt.focus/v1" ? "Show ChatGPT" : `${target.intent} · ${target.roleId}`, key: match[1],
+    implementation, actionId: action.id, label: implementation === "native-chatgpt.focus/v1" ? "Show ChatGPT" : implementation === "native-vscode.focus/v1" ? "Show VS Code" : `${target.intent} · ${target.roleId}`, key: match[1],
     ...(implementation === "switchyard.role/v1" ? { roleId: target.roleId, intent: target.intent } : {}),
     shortcut: `${names.map((n) => modifierValues[n][0]).join(" + ")} + ${match[1]}`,
     modmask: names.reduce((sum, n) => sum + modifierValues[n][1], 0)

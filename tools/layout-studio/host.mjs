@@ -25,36 +25,50 @@ export async function runHypr(...args) {
   return r.stdout;
 }
 
-export async function nativeChatgptWindow(hypr = runHypr, readProcess = linuxProcess) {
-  const expected = join(homedir(), ".local/lib/chatgpt-visible-voice/native/ChatGPT");
+const nativeTargets = Object.freeze({
+  chatgpt: Object.freeze({ name: "ChatGPT", executable: join(homedir(), ".local/lib/chatgpt-visible-voice/native/ChatGPT"), initialClasses: Object.freeze(["chatgpt"]), instruction: "using your safe launcher", description: "repaired native ChatGPT" }),
+  vscode: Object.freeze({ name: "VS Code", executable: "/usr/share/code/code", initialClasses: Object.freeze(["code", "com.microsoft.VSCode"]), instruction: "from the installed native editor", description: "native VS Code" })
+});
+async function nativeWindow(target, hypr, readProcess) {
+  const expected = target.executable;
   const clients = JSON.parse(await hypr("clients", "-j"));
   if (!Array.isArray(clients)) throw new Error("Window discovery is unavailable.");
   const candidates = [];
   for (const w of clients) {
-    if (w?.initialClass !== "chatgpt" || w.floating !== false || !Number.isSafeInteger(w.pid) || w.pid < 1 || !/^0x[0-9a-f]{1,16}$/i.test(w.address)) continue;
+    if (!target.initialClasses.includes(w?.initialClass) || w.floating !== false || !Number.isSafeInteger(w.pid) || w.pid < 1 || !/^0x[0-9a-f]{1,16}$/i.test(w.address)) continue;
     try {
       const process = await readProcess(w.pid);
       if (process.pid === w.pid && process.uid === uid && process.executable === expected && process.state !== "Z" && /^[1-9][0-9]*$/.test(process.startTicks)) candidates.push({ window: w, identity: { address: w.address, pid: w.pid, startTicks: process.startTicks } });
     } catch { /* Exited/unverified processes are unavailable, never a fallback. */ }
   }
-  if (candidates.length !== 1 || candidates[0].window.mapped !== true || candidates[0].window.hidden !== false) throw new Error("Open one native ChatGPT main window using your safe launcher. Its current-user process and exact mapped window must verify before focus is available.");
+  if (candidates.length !== 1 || candidates[0].window.mapped !== true || candidates[0].window.hidden !== false) throw new Error(`Open one native ${target.name} main window ${target.instruction}. Its current-user process and exact mapped window must verify before focus is available.`);
   return candidates[0].identity;
 }
 
-export async function focusNativeChatgpt(hypr = runHypr, { readProcess = linuxProcess, assertCurrent = async () => {} } = {}) {
+async function focusNativeWindow(target, hypr, { readProcess = linuxProcess, assertCurrent = async () => {} } = {}) {
   await assertCurrent();
-  const before = await nativeChatgptWindow(hypr, readProcess);
+  const before = await nativeWindow(target, hypr, readProcess);
   await assertCurrent();
-  const justBefore = await nativeChatgptWindow(hypr, readProcess);
-  if (JSON.stringify(before) !== JSON.stringify(justBefore)) throw new Error("The exact native ChatGPT process/window changed before focus.");
+  const justBefore = await nativeWindow(target, hypr, readProcess);
+  if (JSON.stringify(before) !== JSON.stringify(justBefore)) throw new Error(`The exact native ${target.name} process/window changed before focus.`);
   const answer = await hypr("dispatch", `hl.dsp.focus({ window = "address:${before.address}" })`);
   if (answer.trim() !== "ok") throw new Error("The compositor did not acknowledge focus.");
   const after = JSON.parse(await hypr("activewindow", "-j"));
-  const current = await nativeChatgptWindow(hypr, readProcess);
+  const current = await nativeWindow(target, hypr, readProcess);
   await assertCurrent();
-  if (after.address !== before.address || after.pid !== before.pid || JSON.stringify(current) !== JSON.stringify(before)) throw new Error("The exact ChatGPT main window was not verified after focus.");
-  return { status: "verified", windowFocusVerified: true, taskResumptionVerified: false, modelPromptSubmitted: false, accountVerified: false, summary: "Exact repaired native ChatGPT main window focused and read back with unchanged process birth identity. Account, conversation and task resumption are not established." };
+  if (after.address !== before.address || after.pid !== before.pid || JSON.stringify(current) !== JSON.stringify(before)) throw new Error(`The exact ${target.name} main window was not verified after focus.`);
+  return { status: "verified", windowFocusVerified: true, taskResumptionVerified: false, modelPromptSubmitted: false, accountVerified: false, summary: `Exact ${target.description} main window focused and read back with unchanged process birth identity. Account, repository, conversation and task resumption are not established.` };
 }
+
+
+export const nativeChatgptWindow = (hypr = runHypr, readProcess = linuxProcess) => nativeWindow(nativeTargets.chatgpt, hypr, readProcess);
+export const nativeVscodeWindow = (hypr = runHypr, readProcess = linuxProcess) => nativeWindow(nativeTargets.vscode, hypr, readProcess);
+export const focusNativeChatgpt = (hypr = runHypr, options) => focusNativeWindow(nativeTargets.chatgpt, hypr, options);
+export const focusNativeVscode = (hypr = runHypr, options) => focusNativeWindow(nativeTargets.vscode, hypr, options);
+export const nativeFocusImplementations = Object.freeze({
+  "native-chatgpt.focus/v1": Object.freeze({ provider: "native-chatgpt", inspect: nativeChatgptWindow, focus: focusNativeChatgpt }),
+  "native-vscode.focus/v1": Object.freeze({ provider: "native-vscode", inspect: nativeVscodeWindow, focus: focusNativeVscode })
+});
 
 async function ownedFile(path, privateFile = false) {
   const meta = await lstat(path, { bigint: true });
@@ -113,13 +127,15 @@ export async function discoverHost(hypr = runHypr, sysRoot = "/sys/bus/usb/devic
     await nativeChatgptWindow(hypr);
     result.chatgpt = { status: "focusable", message: "Verified native ChatGPT main window. Focus only; no session observation or task resumption." };
   } catch { result.chatgpt = { status: "unavailable", message: "Native ChatGPT focus is unavailable until one verified main window is open." }; }
+  try { await nativeVscodeWindow(hypr); result.vscode = { status: "focusable", message: "Verified native VS Code main window. Focus only; repository, extension, account and agent session are not identified." }; }
+  catch { result.vscode = { status: "unavailable", message: "Native VS Code focus requires one verified installed main window; no alternate editor or browser was selected." }; }
   return result;
 }
 
 export function createHostBridge({
   configPath = join(process.env.XDG_CONFIG_HOME || join(homedir(), ".config"), "hypr/bindings.lua"),
   stateRoot = join(process.env.XDG_STATE_HOME || join(homedir(), ".local/state"), "strathex-switchyard/configuration-transactions"),
-  hypr = runHypr, verifyTarget = (connection) => connection.implementation === "native-chatgpt.focus/v1" ? nativeChatgptWindow(hypr) : Promise.reject(new Error("Role configuration requires the suite policy verifier.")), focus, now = () => Date.now(), intentEntry, afterRestoreWrite = async () => {}
+  hypr = runHypr, verifyTarget = (connection) => Object.hasOwn(nativeFocusImplementations, connection.implementation) ? nativeFocusImplementations[connection.implementation].inspect(hypr) : Promise.reject(new Error("Role configuration requires the suite policy verifier.")), focus, now = () => Date.now(), intentEntry, afterRestoreWrite = async () => {}
 } = {}) {
   const reviews = new Map();
   const script = fileURLToPath(import.meta.url);
@@ -316,7 +332,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const args = process.argv.slice(2);
   try {
     if (args.length === 1 && args[0] === "focus-chatgpt") await dispatchPhysicalIntent({ implementation: "native-chatgpt.focus/v1" });
-    else if (args[0] === "intent" && args.length === 2 && args[1] === "native-chatgpt.focus/v1") await dispatchPhysicalIntent({ implementation: args[1] });
+    else if (args[0] === "intent" && args.length === 2 && Object.hasOwn(nativeFocusImplementations, args[1])) await dispatchPhysicalIntent({ implementation: args[1] });
     else if (args[0] === "intent" && args.length === 4) await dispatchPhysicalIntent({ implementation: args[1], roleId: args[2], intent: args[3] });
     else throw new Error("Only closed physical intents are supported.");
   } catch { process.stderr.write("Switchyard: physical intent unavailable or rejected by the active workspace. Open the app and review its exact target and policy.\n"); process.exitCode = 1; }

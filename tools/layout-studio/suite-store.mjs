@@ -14,7 +14,7 @@ import { createPortablePackage, packageDefinition, portableDefinitionDigest, pre
 
 const idPattern = /^[a-z][a-z0-9-]{0,47}$/;
 const templates = {
-  personal: { providers: ["codex", "claude-code", "native-chatgpt", "custom-agent", "local-transcription", "github-copilot", "claude-desktop", "cursor", "figma"], accounts: [], export: true, recording: true, crossCompartment: false, retentionDays: 30 },
+  personal: { providers: ["codex", "claude-code", "native-chatgpt", "native-vscode", "custom-agent", "local-transcription", "github-copilot", "claude-desktop", "cursor", "figma"], accounts: [], export: true, recording: true, crossCompartment: false, retentionDays: 30 },
   work: { providers: ["microsoft-365-copilot"], accounts: [], export: false, recording: false, crossCompartment: false, retentionDays: 7 }
 };
 

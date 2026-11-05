@@ -129,8 +129,11 @@ test("cold-start physical intent honors persisted Work selection before any UI b
   await store.initialize("personal"); await store.initialize("company", "work"); await store.selection("company");
   const suite = createSuite({ store, agents: { discovery: async () => [], close() {}, resume: async () => { effects++; } }, voice: { discovery: async () => ({ available: false }) }, hypr: async () => { effects++; throw new Error("No compositor effect expected"); } });
   try {
-    await assert.rejects(suite.authorizeConnection(undefined, { implementation: "native-chatgpt.focus/v1" }), /prohibited/);
-    await assert.rejects(suite.handle("/api/suite/intent", { implementation: "native-chatgpt.focus/v1", compartment: "personal" }), /prohibited/);
+    for (const implementation of ["native-chatgpt.focus/v1", "native-vscode.focus/v1"]) {
+      assert.deepEqual(closedIntent({ implementation }), { implementation });
+      await assert.rejects(suite.authorizeConnection(undefined, { implementation }), /prohibited/);
+      await assert.rejects(suite.handle("/api/suite/intent", { implementation, compartment: "personal" }), /prohibited/);
+    }
     assert.equal(effects, 0);
     assert.equal((await suite.handle("/api/suite/bootstrap")).activeCompartment, "company");
     await assert.rejects(suite.authorizeConnection("personal", { implementation: "native-chatgpt.focus/v1" }), /Select this workspace/);
@@ -138,11 +141,11 @@ test("cold-start physical intent honors persisted Work selection before any UI b
 });
 
 test("the authenticated native focus gateway rechecks actual selected workspace and mode around exact dispatch", async t => {
-  for (const mutation of ["none", "selection-before-effect", "mode-before-effect", "mode-after-effect"]) await t.test(mutation, async () => {
+  for (const app of ["chatgpt", "vscode"]) for (const mutation of ["none", "selection-before-effect", "mode-before-effect", "mode-after-effect"]) await t.test(app + " · " + mutation, async () => {
     const root = await mkdtemp(join(tmpdir(), "switchyard-native-focus-policy-")), keys = new Map();
     const store = createSuiteStore({ root, secrets: { get: async (c,p) => keys.get(c+p), set: async (c,p,v) => { keys.set(c+p,v); } } });
     await store.initialize("personal"); await store.initialize("company", "work"); await store.update("personal", "synthetic-companion", s => { s.mode = "personal-companion"; });
-    const window = { pid: 123, address: "0x123", initialClass: "chatgpt", mapped: true, hidden: false, floating: false }; let observations = 0, dispatches = 0;
+    const window = { pid: 123, address: "0x123", initialClass: app === "chatgpt" ? "chatgpt" : "code", mapped: true, hidden: false, floating: false }; let observations = 0, dispatches = 0;
     const hypr = async command => {
       if (command === "clients") {
         if (++observations === 2 && mutation === "selection-before-effect") await store.selection("company");
@@ -153,10 +156,10 @@ test("the authenticated native focus gateway rechecks actual selected workspace 
       if (command === "activewindow") return JSON.stringify(window);
       throw Error("Unexpected native focus command");
     };
-    const suite = createSuite({ store, platform: "linux", hypr, nativeProcess: async pid => ({ pid, uid: userInfo().uid, executable: join(homedir(), ".local/lib/chatgpt-visible-voice/native/ChatGPT"), state: "S", startTicks: "12345" }), agents: { discovery: async () => [], close() {} }, voice: { discovery: async () => ({ available: false }) } });
+    const suite = createSuite({ store, platform: "linux", hypr, nativeProcess: async pid => ({ pid, uid: userInfo().uid, executable: app === "chatgpt" ? join(homedir(), ".local/lib/chatgpt-visible-voice/native/ChatGPT") : "/usr/share/code/code", state: "S", startTicks: "12345" }), agents: { discovery: async () => [], close() {} }, voice: { discovery: async () => ({ available: false }) } });
     const server = createStudioServer({ suite, bridge: { close() {} }, token: "b".repeat(43) }); server.listen(0, "127.0.0.1"); await once(server, "listening");
     const origin = `http://127.0.0.1:${server.address().port}`;
-    const invoke = authenticated => fetch(origin + "/api/suite/intent", { method: "POST", headers: { "Content-Type": "application/json", Origin: origin, ...(authenticated ? { Authorization: `Bearer ${server.accessToken}` } : {}) }, body: JSON.stringify({ implementation: "native-chatgpt.focus/v1" }) });
+    const invoke = authenticated => fetch(origin + "/api/suite/intent", { method: "POST", headers: { "Content-Type": "application/json", Origin: origin, ...(authenticated ? { Authorization: `Bearer ${server.accessToken}` } : {}) }, body: JSON.stringify({ implementation: `native-${app}.focus/v1` }) });
     try {
       const denied = await invoke(false); await denied.arrayBuffer(); assert.equal(denied.status, 401); assert.equal(observations, 0);
       const response = await invoke(true), result = await response.json();

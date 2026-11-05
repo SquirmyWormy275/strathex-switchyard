@@ -10,7 +10,7 @@ import { join } from "node:path";
 import { newPlan, parseBoardProfile } from "./model.mjs";
 import { portableProfile, importProfile, proposalContext, reviewProposal, compileConnection } from "./workspace.mjs";
 import { snapshotChoices, importVialSnapshot } from "./vial-snapshot.mjs";
-import { createHostBridge, discoverHost, nativeChatgptWindow, focusNativeChatgpt } from "./host.mjs";
+import { createHostBridge, discoverHost, nativeChatgptWindow, focusNativeChatgpt, nativeVscodeWindow, focusNativeVscode } from "./host.mjs";
 import { createStudioServer } from "./serve.mjs";
 
 function plan() {
@@ -32,7 +32,7 @@ function chatgptFocusFixture() {
 
 test("installed native focus verification requires its explicit synthetic flag before reading application state", () => {
   const script = fileURLToPath(new URL("../../scripts/verify-native-focus-host.mjs", import.meta.url));
-  for (const args of [[], ["--not-a-proof"], ["--synthetic", "extra"]]) {
+  for (const args of [[], ["--not-a-proof"], ["--synthetic", "extra"], ["--synthetic", "--client=cursor"], ["--client=vscode", "--synthetic"]]) {
     const result = spawnSync(process.execPath, [script, ...args], { env: { ...(process.env.SystemRoot ? { SystemRoot: process.env.SystemRoot } : {}) }, encoding: "utf8", timeout: 5000, maxBuffer: 32768 });
     assert.equal(result.error, undefined); assert.notEqual(result.status, 0); assert.equal(result.stdout, ""); assert.match(result.stderr, /Use on the pilot: node scripts\/verify-native-focus-host.mjs --synthetic/);
   }
@@ -67,6 +67,25 @@ test("native ChatGPT focus cannot upgrade wrong-window readback, process replace
   const revoked = chatgptFocusFixture(); let checks = 0;
   await assert.rejects(focusNativeChatgpt(revoked.hypr, { readProcess: revoked.readProcess, assertCurrent: async () => { if (++checks === 3) throw Error("Policy changed after effect"); } }), /Policy changed after effect/);
   assert.equal(revoked.calls.filter(call => call[0] === "dispatch").length, 1);
+});
+
+test("native VS Code uses only its installed executable and exact current-user main window, without inferring repository or agent identity", async () => {
+  for (const initialClass of ["code", "com.microsoft.VSCode"]) {
+    const f = chatgptFocusFixture(); f.process.executable = "/usr/share/code/code"; f.window.initialClass = initialClass;
+    const result = await focusNativeVscode(f.hypr, { readProcess: f.readProcess }); assert.equal(result.windowFocusVerified, true); assert.equal(result.modelPromptSubmitted, false); assert.equal(result.accountVerified, false); assert.equal(result.taskResumptionVerified, false); assert.match(result.summary, /repository.*not established/);
+    assert.deepEqual(f.calls.filter(call => call[0] === "dispatch"), [["dispatch", 'hl.dsp.focus({ window = "address:0x123" })']]);
+  }
+  const compiled = compileConnection(plan(), "summon", "native-vscode.focus/v1"); assert.equal(compiled.label, "Show VS Code"); assert.equal(compiled.shortcut, "SUPER + ALT + F1");
+  const changed = plan(); changed.actions[0].consequence = "read_only"; assert.throws(() => compileConnection(changed, "summon", "native-vscode.focus/v1"), /navigation/);
+});
+
+test("native VS Code rejects spoofed classes, alternate editors, PID reuse and multiple main windows", async () => {
+  for (const change of [f => { f.process.executable = join(homedir(), ".local/lib/chatgpt-visible-voice/native/ChatGPT"); }, f => { f.process.executable = "/usr/bin/codium"; }, f => { f.window.initialClass = "Code - project title"; }, f => { f.process.uid++; }, f => { f.window.hidden = true; }, f => { f.windows.push({ ...f.window, address: "0x456", hidden: true }); }]) {
+    const f = chatgptFocusFixture(); f.window.initialClass = "code"; f.process.executable = "/usr/share/code/code";
+    change(f); await assert.rejects(nativeVscodeWindow(f.hypr, f.readProcess), /one native VS Code main window/); assert.equal(f.calls.some(call => call[0] === "dispatch"), false);
+  }
+  const reused = chatgptFocusFixture(); reused.process.executable = "/usr/share/code/code"; reused.window.initialClass = "code"; let checks = 0;
+  await assert.rejects(focusNativeVscode(reused.hypr, { readProcess: reused.readProcess, assertCurrent: async () => { if (++checks === 2) reused.process.startTicks = "22222"; } }), /changed before focus/); assert.equal(reused.calls.some(call => call[0] === "dispatch"), false);
 });
 
 test("portable profile migrates legacy plans, excludes environment connections, and rejects future versions", () => {

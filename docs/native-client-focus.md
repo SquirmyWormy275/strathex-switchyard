@@ -71,3 +71,40 @@ unchanged failed outcome are recorded in
 `failed-native-focus-installed-cleanup-1793881033321.json`. The corrected verifier
 checks actual active work and independently settles every retained guardian
 before selecting its empty fixture; it preserves the original mode.
+
+
+## VS Code navigation
+
+`native-vscode.focus/v1` now connects the same exact-process/window boundary to
+the Suite's authenticated active-workspace intent route, reviewed shortcut
+compiler, stable CLI gateway and host capability discovery. It requires one
+current-user native `/usr/share/code/code` main window. The current verified
+Wayland class is `com.microsoft.VSCode`; the earlier verified `code` class is also
+accepted. Both still require the exact executable and unchanged process birth.
+A class label alone, alternate editor, hidden/multiple windows or reused PID
+cannot choose a target. Missing clients refuse without launching another app.
+
+The local label is **Show VS Code** and the consequence is navigation. The
+`native-vscode` provider is Personal-only under the default policy. Work and
+keyboard-only checks occur before and after focus, with no personal fallback.
+Repository, GitHub Copilot extension, account, editor task and agent-session
+identity remain unverified. No content, prompt, URI, command or executable path
+can be supplied through this route. Broader IDE/session integration and native
+Windows focus remain unfinished.
+
+Six isolated configuration/gateway/terminal/Suite/package/runner groups pass all
+90 checks with every child cleanup verified and owned scratch removed
+(`isolated-test-66903f0b-865b-492b-b007-3b68326d91b7.json`). Real native source-gateway
+acceptance passes unauthenticated and keyboard-only refusals, then exact VS Code
+focus, with the repaired ChatGPT identity unchanged and zero model prompts
+(`native-vscode-gateway-1793881739644.json`). Its editor uses a separate temporary
+profile and extensions directory with installed extensions disabled, following
+[the documented isolation options](https://code.visualstudio.com/docs/configure/command-line#_isolating-vs-code-instances).
+The first live prototype excludes the current verified class and refuses before
+any focus effect; `native-vscode-gateway-failed-1793881702084.json` remains failed
+and its owned gateway fixture is removed. The corrected path explicitly includes
+the observed class; it does not broaden to arbitrary titles/classes.
+
+The installed verifier accepts `--synthetic --client=vscode` as a separate mode;
+the original command continues to check repaired ChatGPT. Normal installed VS Code
+acceptance and owned editor/profile retirement are being collected.

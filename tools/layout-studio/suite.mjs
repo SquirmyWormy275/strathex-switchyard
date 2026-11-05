@@ -9,7 +9,7 @@ import { createAgentService } from "./agents.mjs";
 import { localVoice } from "./voice.mjs";
 import { parseWorkflow, observationSummary } from "./workflow.mjs";
 import { surfaceForClass } from "../../scripts/workflow-monitor.mjs";
-import { runHypr, nativeChatgptWindow } from "./host.mjs";
+import { runHypr, nativeFocusImplementations } from "./host.mjs";
 import { createDeviceService } from "./devices.mjs";
 import { createCopilot } from "./copilot.mjs";
 import { createCustomAgents, agentIntents } from "./custom-agents.mjs";
@@ -362,13 +362,12 @@ export function createSuite({ store = createSuiteStore(), platform = process.pla
       if (path === "/api/suite/intent") {
         if (Object.keys(body).some(k => !["compartment", "implementation", "roleId", "intent", "requestId", "workspaceBaseUrl"].includes(k))) throw new Error("Physical dispatch is outside the closed intent contract.");
         await loadSelection();
-        if (body.implementation === "native-chatgpt.focus/v1") {
-          const selected = activeCompartment;
-          await this.authorizeConnection(selected);
-          const { focusNativeChatgpt } = await import("./host.mjs");
-          return focusNativeChatgpt(hypr, { readProcess: nativeProcess, assertCurrent: async () => {
+        if (Object.hasOwn(nativeFocusImplementations, body.implementation)) {
+          const native = nativeFocusImplementations[body.implementation], selected = activeCompartment;
+          await this.authorizeConnection(selected, { implementation: body.implementation });
+          return native.focus(hypr, { readProcess: nativeProcess, assertCurrent: async () => {
             if (closed || selected !== activeCompartment || await store.selection() !== selected) throw new Error("The selected native client workspace changed; no alternate target was selected.");
-            await store.authorize(selected, { provider: "native-chatgpt" });
+            await store.authorize(selected, { provider: native.provider });
           } });
         }
         if (body.implementation === "switchyard.role/v1") return this.dispatchRole(activeCompartment, body.roleId, body.intent, undefined, body.requestId);
@@ -481,7 +480,7 @@ export function createSuite({ store = createSuiteStore(), platform = process.pla
     async authorizeConnection(compartment, connection = { implementation: "native-chatgpt.focus/v1" }) {
       await loadSelection(); compartment ??= activeCompartment;
       if (compartment !== activeCompartment) throw new Error("Select this workspace before reviewing a physical shortcut. The active workspace policy controls every invocation.");
-      if (connection.implementation === "native-chatgpt.focus/v1") { await store.authorize(compartment, { provider: "native-chatgpt" }); if (platform !== "linux") throw new Error("Verified native ChatGPT window focus is not implemented on this platform. Bind a supported agent role instead."); return nativeChatgptWindow(hypr, nativeProcess); }
+      if (Object.hasOwn(nativeFocusImplementations, connection.implementation)) { const native = nativeFocusImplementations[connection.implementation]; await store.authorize(compartment, { provider: native.provider }); if (platform !== "linux") throw new Error("Verified native client window focus is not implemented on this platform. Bind a supported agent role instead."); return native.inspect(hypr, nativeProcess); }
       if (connection.implementation !== "switchyard.role/v1") throw new Error("This physical connection is outside the closed action map.");
       const state = await store.snapshot(compartment), binding = roleTarget(state, connection.roleId, connection.intent);
       await store.authorize(compartment, { provider: binding.provider });
