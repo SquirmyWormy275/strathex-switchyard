@@ -58,12 +58,13 @@ This is explicit input assembly, not automatic coverage of every change or
 relevant history. Unsupported data is refused, and clean results still remain
 incomplete. No passing Release Shield gate is introduced.
 
-Windows staged-input execution remains unfinished implementation. Its [native
-transport foundation](windows-index-staging.md) now compiles and passes 49
-portable packet checks, but the reviewed host connection is still unfinished. Its existing
-reviewed guest path refuses requests requiring an index resolver; it does not
-silently scan worktree bytes under an index label. Ordinary Windows worktree
-scanner checks remain separate from native guest/account acceptance.
+The [Windows reviewed staged-input path](windows-index-staging.md) is now
+implemented and contract tested. It uses a separate 320 KiB native transport
+subset, verifies exact packet/witness hashes and completes index consumption
+before guest preparation. A reviewed guest-double scan uses fresh Git bytes and
+authenticates the same provenance; no physical worktree substitution is accepted.
+Native NTFS packet staging is queued in Windows CI. Actual Windows guest,
+interactive and installed acceptance remain separate unaccepted checks.
 
 Six focused cases cover the closed declaration/provenance parser, exact host
 binding, a real Linux scan of staged-only secrets alongside clean worktree bytes,

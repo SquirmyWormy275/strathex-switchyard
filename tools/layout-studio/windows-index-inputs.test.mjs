@@ -1,6 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
+import { spawnSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
 import { buildWindowsIndexPacket, windowsIndexRequest, windowsIndexRawLimit, windowsIndexRequestLimit } from "./windows-index-inputs.mjs";
 const sha = bytes => createHash("sha256").update(bytes).digest("hex");
 function fixture({ sizes = [24], algorithm = "sha1" } = {}) {
@@ -18,4 +20,8 @@ test("private Windows content has its own 320 KiB transport subset and complete 
   const exact=fixture({sizes:[256*1024,windowsIndexRawLimit-256*1024]}),packet=buildWindowsIndexPacket(exact);assert.ok(Buffer.byteLength(windowsIndexRequest({inputFiles:exact.inputFiles},packet).text)<windowsIndexRequestLimit);
   assert.throws(()=>buildWindowsIndexPacket(fixture({sizes:[256*1024+1]})));assert.throws(()=>buildWindowsIndexPacket(fixture({sizes:[256*1024,windowsIndexRawLimit-256*1024+1]})),/320 KiB/);
   assert.throws(()=>windowsIndexRequest({metadata:"x".repeat(windowsIndexRequestLimit)},packet),/original 512 KiB/);assert.throws(()=>windowsIndexRequest({indexInputs:packet},packet),/newly constructed/);
+});
+test("native index verifier refuses a non-disposable environment before selecting its helper or creating a proof root",()=>{
+  const script=fileURLToPath(new URL("../../scripts/verify-windows-index-native.mjs",import.meta.url)),env={GITHUB_ACTIONS:"false",RUNNER_OS:"Windows",NODE_NO_WARNINGS:"1",...(process.env.SystemRoot?{SystemRoot:process.env.SystemRoot}:{})},result=spawnSync(process.execPath,["--experimental-transform-types",script,"--synthetic","--helper=Z:\\unselected\\Switchyard.Hotkeys.exe"],{env,encoding:"utf8",timeout:5000,maxBuffer:32768});
+  assert.equal(result.error,undefined);assert.notEqual(result.status,0);assert.equal(result.stdout,"");assert.match(result.stderr,/Use the disposable Windows CI index proof/);
 });

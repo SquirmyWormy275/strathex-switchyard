@@ -1,10 +1,12 @@
 # Windows private index staging
 
-The native Windows input stager now supports a closed private packet carrying
-Git index bytes. Its parser and byte-copy path are implemented and compile; the
-ordinary reviewed Windows execution service does not yet send these packets.
-Windows staged-scan review, admission, guest execution and installed acceptance
-remain unfinished. Requests requiring index sources still refuse that path.
+The reviewed Windows execution service now connects exact index sources to the
+native input stager through a closed private packet. Review, admission and
+staging re-witness original Git bytes under the current task grant; the guest
+runner consumes private index copies alongside ordinary worktree inputs.
+Software contract checks pass with native NTFS/guest execution explicitly doubled.
+Actual NTFS packet staging is queued as an independent Windows CI check; full
+native guest, interactive and installed Windows acceptance remain unaccepted.
 
 The JavaScript builder accepts only Shield actions, exact index-witness metadata,
 the reviewed disposable file allowlist and private borrowed byte buffers. Every
@@ -15,9 +17,9 @@ unowned aliases, missing or altered buffers and extra fields are refused.
 The optional native `indexInputs` packet contains its action, index witness and
 base64-encoded bytes. It is private stdin, never a repository file, public API
 response or protected-store payload. Hashes of the exact packet and witness join
-the native staging proof; source bytes are absent from that proof. The future
-host connection must compare both hashes and independently recheck Git/task/
-authority freshness around consumption. The pure parser alone grants no authority
+the native staging proof; source bytes are absent from that proof. The host
+compares both hashes and independently rechecks Git/task/authority freshness
+around consumption before tools, exchange storage or a guest starts. The pure parser alone grants no authority
 and cannot authenticate a repository or infer an index's currentness.
 
 The transport retains the original 512 KiB complete native input limit. Index
@@ -47,9 +49,25 @@ SDK copy, service, volume, account, guest or keyboard was opened.
 Three JavaScript transport cases and the runner/selector/package subset pass all
 27 checks in four independently exited groups with child cleanup
 (`isolated-test-c2366df9-0439-4560-a8cf-0b107dc7d836.json`). Type checking passes.
-The native Windows CI contract gets a separate packet-builder job and requires
-all 49 portable checks when verifying its helper. Actual NTFS packet staging and
-full reviewed Windows staged scans are not accepted by these Linux-host checks.
+The native Windows CI contract gets separate packet-builder, staging and scanner
+jobs and requires all 49 portable checks when verifying its helper. Five isolated
+groups pass 52 new/adjacent checks, including the actual orchestrator order and
+late-validation cleanup, a full reviewed guest-double journey using fresh Git
+bytes rather than fixture content, source drift and both scanner hosts
+(`isolated-test-954840a2-3fa0-466b-ac27-3791b4a121c4.json`). Ten ordinary
+Windows scanner/pipeline/Run/input/package groups pass 29 checks
+(`isolated-test-115dfe58-5a6c-4e0d-9bdb-ca97f11e2b88.json`); every child cleanup
+verifies. The native verifier also passes its non-disposable-environment guard.
+These Linux-host checks do not accept actual NTFS staging or a native guest.
+
+The independent CI-only `scripts/verify-windows-index-native.mjs` runs the real
+stager through real owned native guardians. It checks private NTFS ACLs and
+identity readback, distinct index/worktree copies, exact native packet/witness
+hashes, independent exits and cleanup. It injects general-action and wrong-object
+packets after JavaScript validation to test actual C# refusal. A physical source
+alias and unselected credential must remain unchanged. The small receipt records
+`sourceGitObserved:false`: this proves the native staging component, not task/Git
+freshness or a guest scan. Its Windows CI acceptance remains pending.
 
 See [the installed Linux staged-scan path](staged-shield-inputs.md) for the already
 connected implementation and [index byte witnessing](git-index-inputs.md) for the

@@ -3,15 +3,19 @@ import { createHash } from "node:crypto";
 import { createRepositoryRecipeEvidence } from "../../apps/windows-companion/src/repository-runtime-broker.ts";
 import { validateShieldBundle, parseShieldScannerReport, shieldFixturePins } from "./repository-shield.mjs";
 import { readAttestedWindowsReport } from "./repository-windows-pipeline.mjs";
-import { shieldActions, shieldEngineVersion } from "./shield-scanner-engine.mjs";
+import { shieldActions, shieldEngineVersion, shieldIndexPrefix } from "./shield-scanner-engine.mjs";
+import { shieldIndexFiles } from "./shield-index-inputs.mjs";
 import { evaluateShieldExceptions } from "./shield-exception-ledger.mjs";
 
 const sha = bytes => createHash("sha256").update(bytes).digest("hex");
-export async function validateWindowsShield({ loaded, repositoryRoot, action, resolveFixtures, now = Date.now }) {
+export async function validateWindowsShield({ loaded, repositoryRoot, action, resolveFixtures, resolveIndexInputs, now = Date.now }) {
   if (!shieldActions.includes(action)) return undefined;
   const recipe = loaded.recipe, script = /^\{INPUT_ROOT\}[\\/](.+\.mjs)$/.exec(recipe.arguments[0]);
   if (recipe.workingRoot !== "input" || recipe.workingDirectory !== "." || !script || recipe.arguments.length !== 2 || recipe.artifacts.length || Object.keys(recipe.environment).length !== 1 || recipe.environment.NODE_ENV !== "test") throw Error("Windows Shield requires the exact pinned scanner, read-only input cwd, two literal arguments and test environment.");
-  return validateShieldBundle({ inputFiles: loaded.manifest.inputFiles, enginePath: script[1].replaceAll("\\", "/"), requestPath: recipe.arguments[1].replaceAll("\\", "/"), repositoryRoot, action, additionalFiles: [loaded.manifest.catalogPath], resolveFixtures, now });
+  const shield = await validateShieldBundle({ inputFiles: loaded.manifest.inputFiles, enginePath: script[1].replaceAll("\\", "/"), requestPath: recipe.arguments[1].replaceAll("\\", "/"), repositoryRoot, action, additionalFiles: [loaded.manifest.catalogPath], resolveFixtures, resolveIndexInputs, now });
+  const indexed = new Set(shieldIndexFiles(shield.request).map(file => file.path));
+  if (loaded.manifest.inputFiles.some(file => file.path.startsWith(shieldIndexPrefix) && !indexed.has(file.path))) throw Error("Each reserved Windows input needs its exact witnessed original index source.");
+  return shield;
 }
 
 export async function attestWindowsShield({ store, compartment, stateDirectory, review, request, result, receiptEvidence, resolveScannerFixtures, resolveShieldExceptions, guard, now }) {
@@ -35,6 +39,7 @@ export async function attestWindowsShield({ store, compartment, stateDirectory, 
       guest: "switchyard-windows-sandbox-guest/v1", node: "24.14.0", nodeRuntime: `sha256:${review.executableIdentity.recipeRuntime.sha256}`, catalog: `sha256:${review.catalogSha256}`, guestResultManifest: `sha256:${result.resultManifestSha256}`, scanner: shieldEngineVersion, scannerSource: `sha256:${shield.engineSha256}`, scannerRequest: `sha256:${shield.requestSha256}`,
       ...Object.fromEntries(fixtures.map(f => [`fixture:${f.kind}:${f.id}`, `manifest=sha256:${f.manifestSha256};content=sha256:${f.contentSha256};feed=${f.feedVersion};tool=${f.toolName}@${f.toolVersion}`]))
     }, scannerFixtureIds: [shield.request.scanner.id], advisoryFixtureIds: shield.request.advisory ? [shield.request.advisory.id] : [], coverage: report.coverage.map(c => ({ dimension: c.dimension, status: "unavailable", fixtureId: shield.request.scanner.id })), policyVersion: request.target.policyVersion, createdAt: observedAt.toISOString(), expiresAt: new Date(Math.min(observedAt.getTime() + 300000, ...fixtures.map(f => Date.parse(f.expiresAt)))).toISOString() };
+    if(shield.indexWitness)binding.toolVersions.gitIndexInputs=`sha256:${sha(JSON.stringify(shield.indexWitness))}`;
     if(shieldExceptionEvaluation){binding.toolVersions.shieldExceptions=`sha256:${sha(JSON.stringify(shieldExceptionEvaluation))}`;if(shieldExceptionEvaluation.expiresAt)binding.expiresAt=new Date(Math.min(Date.parse(binding.expiresAt),Date.parse(shieldExceptionEvaluation.expiresAt))).toISOString();}
     await guard();
     const typed = createRepositoryRecipeEvidence(request, { status: "completed", summary: "Verified pinned Windows scanner observation", exitCode: 0, output, outputTruncated: false }, binding, now()), receiptEvidenceEnvelope = receiptEvidence.issueRepositoryRecipeEvidence(typed, request, binding);

@@ -112,6 +112,7 @@ const linuxCompanionTests = ["linux-secret", "linux-isolation", "linux-lifecycle
     ...(process.platform !== "linux" && linuxSkippedOnNonLinux.has(name) ? { expectedSkipped: linuxSkippedOnNonLinux.get(name) } : {})
   }));
 export function nativeTestOverrides(file, platform = process.platform) {
+  if (file === "tools/layout-studio/repository-windows-shield-index.test.mjs") return { timeoutMs: platform === "win32" ? 300_000 : 120_000 };
   if (file === "tools/layout-studio/task-index-inputs.test.mjs") return { timeoutMs: platform === "win32" ? 300_000 : 120_000 };
   if (file === "tools/layout-studio/repository-shield-osv-source.test.mjs") return { timeoutMs: platform === "win32" ? 300_000 : 120_000 };
   if (file === "tools/layout-studio/repository-shield-ignored-trees.test.mjs") return { timeoutMs: platform === "win32" ? 300_000 : 120_000 };
@@ -129,7 +130,7 @@ export function nativeTestOverrides(file, platform = process.platform) {
   if (platform === "win32" && ["repository-windows-shield", "repository-windows-shield-recovery", "repository-windows-pipeline", "repository-windows-pipeline-recovery", "repository-windows-execution", "repository-windows-execution-recovery", "repository-windows-execution-stop", "repository-windows-execution-output"].some(name => file === `tools/layout-studio/${name}.test.mjs`)) return { timeoutMs: 300_000 };
   if (file === "tools/layout-studio/windows-exchange-images.test.mjs") return { timeoutMs: platform === "win32" ? 240_000 : 120_000 };
   if (file === "tools/layout-studio/repository-recovery.test.mjs") return { timeoutMs: 120_000 };
-  const protectedNativeGroups = ["claude-coding", "agents-claude", "conversation-bindings", "codex-submissions", "claude-submissions", "windows-reviewed-inputs", "windows-sandbox-native", "windows-sandbox-sessions", "windows-guest-tools", "windows-exchange-images", "windows-broker-exchanges", "scanner-fixtures", "scanner-fixture-removal", "scanner-fixture-invalidation", "windows-reviewed-runner", "repository-windows-execution"].map((name) => `tools/layout-studio/${name}.test.mjs`);
+  const protectedNativeGroups = ["claude-coding", "agents-claude", "conversation-bindings", "codex-submissions", "claude-submissions", "windows-reviewed-inputs", "windows-index-staging", "windows-sandbox-native", "windows-sandbox-sessions", "windows-guest-tools", "windows-exchange-images", "windows-broker-exchanges", "scanner-fixtures", "scanner-fixture-removal", "scanner-fixture-invalidation", "windows-reviewed-runner", "repository-windows-execution"].map((name) => `tools/layout-studio/${name}.test.mjs`);
   return platform === "win32" && protectedNativeGroups.includes(file) ? { timeoutMs: 120_000 } : {};
 }
 export const requiredGroups = [
@@ -199,6 +200,8 @@ export const requiredGroups = [
   { file: "tools/layout-studio/shield-input-inventory.test.mjs" },
   { file: "tools/layout-studio/git-index-inputs.test.mjs" },
   { file: "tools/layout-studio/windows-index-inputs.test.mjs" },
+  { file: "tools/layout-studio/windows-index-staging.test.mjs", ...nativeTestOverrides("tools/layout-studio/windows-index-staging.test.mjs") },
+  { file: "tools/layout-studio/repository-windows-shield-index.test.mjs", ...nativeTestOverrides("tools/layout-studio/repository-windows-shield-index.test.mjs") },
   { file: "tools/layout-studio/task-index-inputs.test.mjs", ...nativeTestOverrides("tools/layout-studio/task-index-inputs.test.mjs"), expectedSkipped: process.platform === "linux" ? 0 : 1 },
   { file: "tools/layout-studio/ignored-tree-policy.test.mjs" },
   { file: "tools/layout-studio/repository-shield-ignored-trees.test.mjs", ...nativeTestOverrides("tools/layout-studio/repository-shield-ignored-trees.test.mjs"), expectedSkipped: process.platform === "linux" ? 0 : 1 },

@@ -16,7 +16,8 @@ alias into the repository. Both scanner exits, replay/feed retirement and full
 restoration verify. Receipts `assignment-legends-1793868587004.json` and
 `installed-shield-baseline-1793868749979.json` retained; owned source/signing/packages/
 staging/bundle/proof checkout removed. One empty task, zero prompts and no
-keyboard access. Windows staged-input execution remains unfinished.
+keyboard access. Later Windows source connection passes software contracts;
+actual NTFS/guest and installed Windows acceptance remain separate.
 
 Earlier installed source `4a6627a`, release
 `1a5c80ec8c7b9e6626c7ea2867edc1b295a5432c7aecb2bea135d094793d32cf`,
@@ -352,5 +353,11 @@ with zero warnings/errors and passes 49 new portable parser/hash/boundary checks
 alongside all 112 previous checks, using the existing offline SDK. Four isolated
 JS transport/runner/selector/package groups pass all 27 checks; child cleanup and
 type checking pass. Owned build scratch is removed. The 320 KiB raw subset keeps
-the original complete 512 KiB stdin bound; Windows host connection, actual NTFS
-packet staging and reviewed staged scans remain unfinished/unaccepted.
+the original complete 512 KiB stdin bound. The Windows host connection is now
+implemented and passes five isolated groups/52 focused checks plus ten ordinary
+scanner/pipeline/Run/input/package groups/29 checks, with every child cleanup
+verified. Review and staging bind fresh Git bytes and packet/witness digests;
+late validation precedes guest preparation. Actual NTFS packet staging has an
+independent CI verifier before service lifecycle checks, with a scoped receipt
+and native fault injection; acceptance remains pending. Native Windows guest,
+interactive and installed acceptance remain separate unaccepted checks.

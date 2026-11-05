@@ -74,6 +74,7 @@ preview does not apply that policy or grant it. Automatic complete-target scan a
 operator-configured general exclusions,
 history scanning and the frontend remain unfinished implementation. A separate
 [explicit Linux staged-input scan](staged-shield-inputs.md) now preserves both
-index and worktree origin; automatic assembly and Windows staging remain unfinished.
+index and worktree origin; automatic assembly remains unfinished. Windows staging now has contract checks;
+actual NTFS/guest acceptance remains separate.
 See [explicit ignored scanner inputs](ignored-scanner-inputs.md) for the distinct
 reviewed read-only scan path.

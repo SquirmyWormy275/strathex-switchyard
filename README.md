@@ -109,8 +109,9 @@ identifies relevant ignored names and groups build trees before a separate exact
 scan review; its metadata remains incomplete and grants no authority. A separate
 [index byte witness](docs/git-index-inputs.md) verifies explicitly named staged
 blobs without returning source text or treating that observation as a scan.
-Linux [explicit staged scans](docs/staged-shield-inputs.md) now inspect both index
-and worktree copies under the existing isolated execution boundary.
+[Explicit staged scans](docs/staged-shield-inputs.md) inspect both index and
+worktree copies: Linux has installed acceptance; the Windows reviewed connection
+has software checks with native staging/guest acceptance kept separate.
 The [Windows scanner path](docs/windows-shield.md)
 uses the same pinned engine through reviewed guest execution; its tests double the guest.
 [Explicit ignored inputs](docs/ignored-scanner-inputs.md) let the pinned scanner

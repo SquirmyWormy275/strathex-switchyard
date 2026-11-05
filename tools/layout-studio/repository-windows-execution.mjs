@@ -20,6 +20,7 @@ import { shieldReceiptEvidence } from "./repository-shield.mjs";
 import { pipelineEvidence } from "./repository-pipeline.mjs";
 import { attestWindowsPipeline, windowsPipelineDependencies } from "./repository-windows-pipeline.mjs";
 import { createWindowsExecutionStops } from "./repository-windows-execution-stop.mjs";
+import { windowsIndexRawLimit } from "./windows-index-inputs.mjs";
 
 const uuid = value => typeof value === "string" && /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/.test(value);
 const digest = value => typeof value === "string" && /^[a-f0-9]{64}$/.test(value);
@@ -42,7 +43,11 @@ export function createWindowsRepositoryExecution({ store, authority, stateDirect
     const source = await directoryIdentity(resolved.task.repositoryRoot), sourceIdentity = { device: source.dev.toString(), inode: source.ino.toString() };
     const selected = { repositoryRoot: resolved.task.repositoryRoot, sourceIdentity, manifestPath: proposal.manifestPath, manifestSha256: proposal.manifestSha256, allowedFiles };
     const loaded = await loadWindowsReviewedRun({ ...selected, expectedAction: proposal.action, recipeRuntimeSha256: prerequisites.recipeRuntime.sha256 });
-    const shield=await validateWindowsShield({loaded,repositoryRoot:resolved.task.repositoryRoot,action:proposal.action,resolveFixtures:resolveScannerFixtures?input=>resolveScannerFixtures(c,input):undefined,now});
+    const shield=await validateWindowsShield({loaded,repositoryRoot:resolved.task.repositoryRoot,action:proposal.action,resolveFixtures:resolveScannerFixtures?input=>resolveScannerFixtures(c,input):undefined,resolveIndexInputs:(paths,consume)=>authority.useIndexInputs(c,resolved.record.id,proposal.action,paths,consume),now});
+    if(shield?.indexWitness){
+      if(shield.indexWitness.rows.reduce((sum,row)=>sum+row.size,0)>windowsIndexRawLimit)throw Error("Windows index input staging supports at most 320 KiB inside its original bounded native transport.");
+      selected.indexWitness=shield.indexWitness;
+    }
     return { selected, loaded, ...(shield?{shield}:{}) };
   }
   async function output(c, review, run) {
@@ -101,7 +106,7 @@ export function createWindowsRepositoryExecution({ store, authority, stateDirect
           try {
             if (control.signal.aborted) return { status: control.reason() === "deadline" ? "timed_out" : control.reason() === "unavailable" ? "unavailable" : "cancelled", effectDisposition: "not_started", summary: "Windows Run refused an expired, cancelled or unverifiable durable operation." };
             const guard = async () => { await check(); const checked = await request.effectGuard.assertCurrent({ action: request.action, operationId: request.operationId, target: request.target, ...(request.session ? { session: request.session } : {}), ...(request.authority ? { authority: request.authority } : {}) }); if (!checked.allowed) throw Error(checked.reason); };
-            const result = await runner.run(c, { operationId: request.operationId, scopeDigest: review.scopeDigest, provider: resolved.task.provider }, review.plan, guard, control.signal, review.action);
+            const result = await runner.run(c, { operationId: request.operationId, scopeDigest: review.scopeDigest, provider: resolved.task.provider }, review.plan, guard, control.signal, review.action, review.shield?.indexWitness ? { useIndexInputs:(paths,consume)=>authority.useIndexInputs(c,review.authorityId,review.action,paths,consume) } : undefined);
             const state = await store.snapshot(c), guest = state.repositoryWindowsGuests?.find(row => row.operationId === request.operationId);
             const uncertainStart = state.repositoryWindowsGuestCommands?.some(row => row.operationId === request.operationId && row.action === "start" && row.startAcknowledged === true && row.result?.effectStarted !== false);
             const effectDisposition = result.status === "incomplete" ? "ambiguous" : ["blocked", "unavailable"].includes(result.status) ? guest?.startVerified === true ? "committed" : uncertainStart ? "ambiguous" : "not_started" : "committed";
@@ -130,7 +135,7 @@ export function createWindowsRepositoryExecution({ store, authority, stateDirect
       if ((await runner.list(c)).some(row => row.cleanupPending)) throw Error("Reconcile the existing Windows Run and its native storage before another review.");
       const resolved = await authority.resolve(c, input.authorityId, input.action), prerequisites = await runner.prerequisites(), selected = await plan(resolved, input, prerequisites,c); current(c, g);
       const packet = { engine, requestId: input.requestId, authorityId: input.authorityId, manifestPath: input.manifestPath, manifestSha256: input.manifestSha256, action: input.action, taskId: resolved.task.id, sessionId: resolved.task.sessionId, provider: resolved.task.provider, repositoryRoot: resolved.task.repositoryRoot, targetSnapshotId: resolved.snapshot.id, taskDigest: resolved.binding, workspaceDigest: resolved.workspace, plan: selected.selected, recipe: selected.loaded.recipe, catalogSha256: selected.loaded.manifest.catalogSha256, executableIdentity: prerequisites, executionPolicy, ...(attestedActions.includes(input.action)?{validationPolicyDigest:validationPolicyDigest(await store.snapshot(c))}:{}), ...(selected.shield?{shield:selected.shield}:{}) }, row = { ...packet, scopeDigest: scopeHash(["switchyard-windows-execution-review/v1", c, packet]), status: "reviewed", createdAt: now() }, host = await runtimeFor(c, row, resolved, g);
-      const confirmation = await host.runtime.confirmations.issue({ action: row.action, sessionId: row.sessionId, authorityId: row.authorityId, targetSnapshotId: row.targetSnapshotId, scopeDigest: row.scopeDigest, reason: "Run only this exact selected non-production input/catalog/runtime set inside the displayed bounded Windows guest. No provider permission or live-repository write is granted.", reauthenticated: false }); await host.check(); row.expiresAt = confirmation.record.expiresAt; row.tokenDigest = tokenHash(confirmation.token);
+      const confirmation = await host.runtime.confirmations.issue({ action: row.action, sessionId: row.sessionId, authorityId: row.authorityId, targetSnapshotId: row.targetSnapshotId, scopeDigest: row.scopeDigest, reason: "Run only this exact selected non-production input/catalog/runtime set inside the displayed bounded Windows guest. No provider permission or live-repository write is granted." + (row.shield?.indexWitness ? " This scan also includes the displayed staged Git versions, separately from working files." : ""), reauthenticated: false }); await host.check(); row.expiresAt = confirmation.record.expiresAt; row.tokenDigest = tokenHash(confirmation.token);
       await store.update(c, "windows-execution-review", state => { state.repositoryExecutionReviews = [...(state.repositoryExecutionReviews ?? []).slice(-127), row]; }); return { review: view(row), confirmation };
     }); },
     async apply(c, input) { return exclusive(c, async g => {

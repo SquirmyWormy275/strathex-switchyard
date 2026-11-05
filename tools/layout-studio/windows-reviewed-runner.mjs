@@ -5,7 +5,7 @@ import { captureRepositoryExecutableIdentity } from "../../apps/windows-companio
 import { WindowsSandboxBackend } from "../../apps/windows-companion/src/windows-sandbox.ts";
 import { privateDirectory } from "./private-fs.mjs";
 import { scopeHash } from "./confirmations.mjs";
-import { connectedExecutionActions } from "./repository-execution-actions.mjs";
+import { connectedExecutionActions, windowsShieldActions } from "./repository-execution-actions.mjs";
 import { loadWindowsReviewedRun } from "./windows-reviewed-run.mjs";
 import { createWindowsReviewedInputs } from "./windows-reviewed-inputs.mjs";
 import { createWindowsGuestTools } from "./windows-guest-tools.mjs";
@@ -13,6 +13,8 @@ import { createWindowsExchangeImages } from "./windows-exchange-images.mjs";
 import { createWindowsBrokerExchanges } from "./windows-broker-exchanges.mjs";
 import { createWindowsSandboxSessions } from "./windows-sandbox-sessions.mjs";
 import { createWindowsSandboxNativeCalls, validateWindowsStoragePrerequisites } from "./windows-sandbox-native.mjs";
+import { shieldIndexPrefix } from "./shield-scanner-engine.mjs";
+import { shieldIndexStagingBytes } from "./shield-index-inputs.mjs";
 
 const schema = "switchyard-windows-reviewed-runner/v1";
 const helperPath = fileURLToPath(new URL("../../runtime/hotkeys/Switchyard.Hotkeys.exe", import.meta.url));
@@ -136,10 +138,12 @@ export function createWindowsReviewedRunner({ store, stateDirectory, platform = 
       if (p.identities.nodeVersion !== "24.14.0") throw Error("Windows Run requires its pinned Node 24.14.0 prerequisite.");
       return structuredClone(p.identities);
     },
-    async run(c, context, plan, authorize, signal, action = "run_target") {
+    async run(c, context, plan, authorize, signal, action = "run_target", indexOptions) {
       context = structuredClone(context); plan = structuredClone(plan);
+      const withIndex=plan&&Object.hasOwn(plan,"indexWitness");
       if (!connectedExecutionActions("win32").includes(action) || platform !== "win32" || !context || Object.keys(context).sort().join() !== "operationId,provider,scopeDigest" || !uuid(context.operationId) || !digest(context.scopeDigest) || !["codex", "claude-code"].includes(context.provider) || typeof authorize !== "function"
-        || !plan || Object.keys(plan).sort().join() !== "allowedFiles,manifestPath,manifestSha256,repositoryRoot,sourceIdentity") throw Error("Bind Windows Run only to one host-admitted task operation and exact reviewed file plan.");
+        || !plan || Object.keys(plan).sort().join() !== (withIndex?"allowedFiles,indexWitness,manifestPath,manifestSha256,repositoryRoot,sourceIdentity":"allowedFiles,manifestPath,manifestSha256,repositoryRoot,sourceIdentity")) throw Error("Bind Windows Run only to one host-admitted task operation and exact reviewed file plan.");
+      if(withIndex&&(!windowsShieldActions.includes(action)||!indexOptions||Object.keys(indexOptions).join()!=="useIndexInputs"||typeof indexOptions.useIndexInputs!=="function")||!withIndex&&indexOptions!==undefined)throw Error("Reserved Windows index inputs require their private current Shield consumer; no worktree fallback is permitted.");
       if (closed || [...resources.values()].some(resource => resource.compartment === c)) throw Error("Wait for the current owned Windows Run; no concurrent replacement was started.");
       const id = context.operationId, operationKey = key(c, id), planDigest = scopeHash(plan), resource = { compartment: c, controller: new AbortController(), consumerReleased: false, done: null };
       resources.set(operationKey, resource); seen.add(c);
@@ -177,7 +181,14 @@ export function createWindowsReviewedRunner({ store, stateDirectory, platform = 
             catch { resource.controller.abort(); }
             finally { polling = false; }
           }, 500); pollTimer.unref?.();
-          const input = await p.inputs.prepare(c, context, { repositoryRoot: plan.repositoryRoot, sourceIdentity: plan.sourceIdentity, inputFiles: loaded.manifest.inputFiles }, check); await check();
+          const inputRequest={repositoryRoot:plan.repositoryRoot,sourceIdentity:plan.sourceIdentity,inputFiles:loaded.manifest.inputFiles};
+          if(!withIndex&&windowsShieldActions.includes(action)&&loaded.manifest.inputFiles.some(file=>file.path.startsWith(shieldIndexPrefix)))throw Error("Windows scanner aliases cannot use physical worktree input staging.");
+          let input;
+          if(withIndex){
+            const request={files:plan.indexWitness.rows.map(row=>({path:shieldIndexPrefix+row.path,sha256:row.sha256,size:row.size,source:{kind:"git-index",path:row.path,objectId:row.objectId,mode:row.mode}}))};
+            input=await indexOptions.useIndexInputs(plan.indexWitness.rows.map(row=>row.path),(report,bytes)=>p.inputs.prepare(c,context,inputRequest,check,{action,indexWitness:plan.indexWitness,indexBytes:shieldIndexStagingBytes({request,indexWitness:plan.indexWitness},report,bytes)}));
+          }else input=await p.inputs.prepare(c,context,inputRequest,check);
+          await check();
           await update(c, id, "windows-run-inputs-ready", row => { row.phase = "inputs"; });
           const tools = await p.tools.prepare(c, context, { expectedSha256: p.identities.helperSha256 }, check); await tools.assertCurrent(); await check();
           const image = await p.images.prepare(c, context, check, { inputManifestSha256: input.inputManifestSha256 }), exchange = await image.createVolume(); await check();

@@ -4,6 +4,7 @@ import { validateRepositoryInputs } from "../../apps/windows-companion/src/repos
 import { NodeFileDigestReader } from "../../packages/control-plane/src/git-inspector.ts";
 
 import { connectedExecutionActions, windowsPipelineActions, windowsShieldActions } from "./repository-execution-actions.mjs";
+import { shieldIndexPrefix } from "./shield-scanner-engine.mjs";
 
 export const windowsReviewedRunSchema = "switchyard-windows-reviewed-run/v1";
 const digest = value => typeof value === "string" && /^[a-f0-9]{64}$/.test(value);
@@ -65,8 +66,12 @@ export async function loadWindowsReviewedRun({ repositoryRoot, manifestPath, man
   if (witnesses.get(manifestPath) !== `sha256:${manifestSha256}`) throw Error("The Windows Run manifest must belong to the exact task-owned file grant.");
   const read = await reader.read(repositoryRoot, manifestPath); let manifest;
   try { manifest = parseWindowsReviewedRun(read.bytes, manifestSha256, expectedAction); } finally { read.bytes.fill(0); }
+  if (windowsShieldActions.includes(expectedAction) && manifest.catalogPath.startsWith(shieldIndexPrefix)) throw Error("Windows scanner control files cannot use reserved index aliases.");
   let recipe;
   for (const input of manifest.inputFiles) {
+    // Only pinned Shield may defer a reserved input to a separately witnessed
+    // private index consumer. Ordinary Run/pipeline reads remain physical.
+    if (windowsShieldActions.includes(expectedAction) && input.path.startsWith(shieldIndexPrefix)) continue;
     if (witnesses.get(input.path) !== `sha256:${input.sha256}`) throw Error("Every Windows Run input must match this exact task-owned snapshot.");
     const selected = await reader.read(repositoryRoot, input.path);
     try {

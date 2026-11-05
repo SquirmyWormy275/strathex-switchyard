@@ -5,7 +5,7 @@ import { NodeFileDigestReader } from "../../packages/control-plane/src/git-inspe
 import { createDurableAbortControl } from "../../packages/control-plane/src/execution-cancellation.ts";
 import { createRepositoryRecipeEvidence } from "../../apps/windows-companion/src/repository-runtime-broker.ts";
 import { pipelineDependencies } from "./repository-pipeline.mjs";
-import { shieldActions, shieldEngineVersion, validateShieldRequest, scannerPath } from "./shield-scanner-engine.mjs";
+import { shieldActions, shieldEngineVersion, shieldIndexPrefix, validateShieldRequest, scannerPath } from "./shield-scanner-engine.mjs";
 import { evaluateShieldExceptions } from "./shield-exception-ledger.mjs";
 import { resolveShieldIndexWitness } from "./shield-index-inputs.mjs";
 
@@ -48,12 +48,14 @@ export async function validateShieldBundle({inputFiles,enginePath,requestPath,re
   // second literal filename into JavaScript evaluated by Node.
   if (typeof enginePath !== "string" || !/^[A-Za-z0-9_][A-Za-z0-9_./-]*\.mjs$/.test(enginePath)) throw Error("Shield requires one literal .mjs entrypoint path without Node options.");
   enginePath=scannerPath(enginePath);requestPath=scannerPath(requestPath);
+  if ([enginePath, requestPath, ...additionalFiles].some(path => path === shieldIndexPrefix.slice(0, -1) || path.startsWith(shieldIndexPrefix))) throw Error("Scanner control files cannot use reserved index aliases.");
   const inputs = new Map(inputFiles.map(f => [f.path, f])), engineSha256 = sha(await readFile(engineUrl));
   if (enginePath === requestPath || inputs.get(enginePath)?.sha256 !== engineSha256 || !inputs.has(requestPath)) throw Error("Shield requires the exact shipped scanner bytes and a reviewed request input.");
   const reader = new NodeFileDigestReader({ maxFileBytes: 128 * 1024 });
   const r = await reader.read(repositoryRoot, requestPath); let request;
   try { if (r.digest !== `sha256:${inputs.get(requestPath).sha256}`) throw Error("Shield request changed."); request = validateShieldRequest(JSON.parse(r.bytes.toString("utf8"))); } finally { r.bytes.fill(0); }
   if (request.action !== action) throw Error("Shield request action does not match the exact grant.");
+  if ([request.scanner.path, request.advisory?.path].some(path => path?.startsWith(shieldIndexPrefix) || path === shieldIndexPrefix.slice(0, -1))) throw Error("Scanner feeds cannot use reserved index aliases.");
   const declared = [...additionalFiles.map(scannerPath), enginePath, requestPath, request.scanner.path, ...(request.advisory ? [request.advisory.path] : []), ...request.files.map(f => f.path)];
   if (new Set(declared).size !== declared.length || inputs.size !== declared.length || declared.some(p => !inputs.has(p))) throw Error("Shield requires precisely the reviewed engine, request, feeds and scanned inputs.");
   for (const f of [...request.files, request.scanner, ...(request.advisory ? [request.advisory] : [])]) if (inputs.get(f.path)?.sha256 !== f.sha256 || f.size !== undefined && inputs.get(f.path)?.size !== f.size) throw Error("Shield input witnesses do not match the exact request.");

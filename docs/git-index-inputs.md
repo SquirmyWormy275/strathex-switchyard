@@ -39,7 +39,8 @@ This is byte witnessing, not scanning. The response explicitly retains
 files, new files, history and full repository scope remain outside this operation;
 an index change after the response requires another observation. A separate [Linux staged scanner path](staged-shield-inputs.md) now connects
 these blobs to reviewed private staging; the witness operation itself still
-performs no scan. Windows staged-input execution remains unfinished.
+performs no scan. The Windows host connection is also implemented and contract tested; actual
+NTFS/guest acceptance remains separate.
 
 Four parser/hash/boundary cases and authenticated task/HTTP, five drift scenarios
 and real Linux guardian checks pass. The real journey witnesses staged bytes
@@ -71,5 +72,5 @@ verified query exits, two scanner exits, unchanged original index and worktree,
 exact replay/feed retirement and full restoration. Owned repository, signing
 material, packages, staging, bundle and proof checkout were removed; one empty
 task, zero prompts, no keyboard access. The separate Linux staged-scan path has
-source checks and installed acceptance at `11d8cc7`; Windows staging remains
-unfinished.
+source checks and installed acceptance at `11d8cc7`. Windows staging now has
+software contract checks; native NTFS/guest acceptance remains separate.
