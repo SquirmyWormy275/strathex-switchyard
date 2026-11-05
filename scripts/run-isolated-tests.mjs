@@ -149,6 +149,7 @@ export const requiredGroups = [
   { file: "tools/layout-studio/repository-execution-stop.test.mjs" },
   { file: "tools/layout-studio/windows-reviewed-inputs.test.mjs", ...nativeTestOverrides("tools/layout-studio/windows-reviewed-inputs.test.mjs") },
   { file: "tools/layout-studio/windows-storage-native.test.mjs" },
+  { file: "tools/layout-studio/shield-exception-ledger.test.mjs" },
   { file: "tools/layout-studio/scanner-fixtures.test.mjs", ...nativeTestOverrides("tools/layout-studio/scanner-fixtures.test.mjs") },
   { file: "tools/layout-studio/scanner-fixture-invalidation.test.mjs", ...nativeTestOverrides("tools/layout-studio/scanner-fixture-invalidation.test.mjs") },
   { file: "tools/layout-studio/repository-validation-policy.test.mjs", timeoutMs: 120_000, ...nativeTestOverrides("tools/layout-studio/repository-validation-policy.test.mjs"), expectedSkipped: process.platform === "linux" ? 0 : 1 },

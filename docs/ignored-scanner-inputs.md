@@ -59,8 +59,13 @@ incomplete. Real Linux namespace execution finds a synthetic private-key marker
 in an ignored `.env`, preserves the original bytes/index, rejects later source
 drift and retains a failed receipt with incomplete coverage. The Windows host
 passes the same software path with an explicit guest double. The seventeen existing authority/Run/Linux/Windows Shield cases, twenty-two
-inventory/package cases and type checking also pass. Native Windows and normal
-installed ignored-file acceptance are separate checks.
+inventory/package cases and type checking also pass. Six existing pipeline/race regressions also pass. Native Windows remains
+separate. Normal installed `1a5cd43` passes six update/sixteen actual Change Scan
+checks: ignored secret detection without matched-byte disclosure or index/source
+mutation, exact expiry/retirement/replay, two native exits and full restoration.
+Receipts `assignment-legends-1793857942421.json` and
+`installed-shield-baseline-1793858153322.json` are retained; owned scratch removed.
+One empty task, zero prompts.
 
 The repeatable installed verifier supports:
 

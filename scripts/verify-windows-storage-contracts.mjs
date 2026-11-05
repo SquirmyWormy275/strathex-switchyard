@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { requiredGroups, runVerification, assertRequiredTestManifest } from "./run-isolated-tests.mjs";
 const suites = {
   "backend-contract": "apps/windows-companion/test/windows-sandbox.test.ts",
+  "shield-exception-ledger": "tools/layout-studio/shield-exception-ledger.test.mjs",
   "ignored-authority": "tools/layout-studio/task-authority-ignored-inputs.test.mjs",
   "ignored-scanner": "tools/layout-studio/repository-ignored-scanner-inputs.test.mjs",
   "fixture-invalidation": "tools/layout-studio/scanner-fixture-invalidation.test.mjs",
@@ -28,7 +29,7 @@ const suites = {
   "run-owner": "tools/layout-studio/windows-reviewed-runner.test.mjs"
 };
 const flags = process.argv.slice(2), suite = flags[1]?.startsWith("--suite=") ? flags[1].slice(8) : undefined;
-if (process.platform !== "win32" || flags.length !== 2 || flags[0] !== "--synthetic" || !Object.hasOwn(suites, suite)) throw Error("Use on Windows: node scripts/verify-windows-storage-contracts.mjs --synthetic --suite=ignored-authority|ignored-scanner|fixture-invalidation|validation-policy|shield-evidence|shield-policy|shield-recovery|pipeline-recovery|pipeline-policy|pipeline-evidence|fixture-removal|backend-contract|fixture-registry|fixture-maintenance|harness|leases|legacy-images|broker-owner|sandbox-native|sandbox-sessions|reviewed-run|run-owner. No disk, VM, account or keyboard is opened.");
+if (process.platform !== "win32" || flags.length !== 2 || flags[0] !== "--synthetic" || !Object.hasOwn(suites, suite)) throw Error("Use on Windows: node scripts/verify-windows-storage-contracts.mjs --synthetic --suite=shield-exception-ledger|ignored-authority|ignored-scanner|fixture-invalidation|validation-policy|shield-evidence|shield-policy|shield-recovery|pipeline-recovery|pipeline-policy|pipeline-evidence|fixture-removal|backend-contract|fixture-registry|fixture-maintenance|harness|leases|legacy-images|broker-owner|sandbox-native|sandbox-sessions|reviewed-run|run-owner. No disk, VM, account or keyboard is opened.");
 assertRequiredTestManifest();
 const groups = requiredGroups.filter(group => group.file === suites[suite]);
 if (groups.length !== 1) throw Error("The complete Windows storage contract is absent or ambiguous in the required inventory.");

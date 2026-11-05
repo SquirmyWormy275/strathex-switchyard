@@ -10,10 +10,25 @@ function verified(entries) {
   }
   return structuredClone(entries);
 }
+const fields = { effects: "repositoryEffectJournal", recovery: "repositoryRecoveryJournal", execution: "repositoryExecutionJournal", "execution-stop": "repositoryExecutionStopJournal", storage: "windowsStorageJournal", fixtures: "scannerFixtureJournal", "shield-policy": "shieldExceptionJournal" };
+const fieldFor = domain => { if (!Object.hasOwn(fields, domain)) throw new Error("Unsupported protected repository journal domain."); return fields[domain]; };
+/** Use only inside an existing locked store.update; the outer transaction owns commit/rollback. */
+export function repositoryEffectTransaction(state, domain, { now = Date.now, receiptGuard } = {}) {
+  const field = fieldFor(domain); state[field] = verified(state[field] ?? []);
+  return {
+    readEntries: async () => structuredClone(state[field]),
+    append: async (kind, payload) => {
+      if (kind === "receipt.issued") await receiptGuard?.(state, payload.receipt);
+      const previous = state[field].at(-1);
+      const entry = { schemaVersion: 1, sequence: (previous?.sequence ?? 0) + 1, id: randomUUID(), kind, at: new Date(now()).toISOString(), payload: structuredClone(payload), ...(previous ? { previousHash: previous.hash } : {}) };
+      entry.hash = journalEntryHash(entry);
+      if (state[field].length >= 8192 || Buffer.byteLength(stableJson([...state[field], entry])) > 2 * 1024 * 1024) throw new Error("The protected repository effect journal is full; prior effects were preserved.");
+      state[field].push(entry); return structuredClone(entry);
+    }
+  };
+}
 export function repositoryEffectJournal(store, compartment, { now = Date.now, provider, domain = "effects", guard, receiptGuard } = {}) {
-  const fields = { effects: "repositoryEffectJournal", recovery: "repositoryRecoveryJournal", execution: "repositoryExecutionJournal", "execution-stop": "repositoryExecutionStopJournal", storage: "windowsStorageJournal", fixtures: "scannerFixtureJournal" };
-  if (!Object.hasOwn(fields, domain)) throw new Error("Unsupported protected repository journal domain.");
-  const field = fields[domain];
+  const field = fieldFor(domain);
   const journal = {
     filePath: `suite-aead:${compartment}:repository-${domain}`, hasAuthenticatedProtection: true,
     async readEntries() { return verified((await store.snapshot(compartment))[field] ?? []); },
@@ -21,18 +36,7 @@ export function repositoryEffectJournal(store, compartment, { now = Date.now, pr
     async transaction(fn) {
       return store.update(compartment, "repository-effect-journal", async state => {
         await guard?.(state);
-        state[field] = verified(state[field] ?? []);
-        const result = await fn({
-          readEntries: async () => structuredClone(state[field]),
-          append: async (kind, payload) => {
-            if (kind === "receipt.issued") await receiptGuard?.(state, payload.receipt);
-            const previous = state[field].at(-1);
-            const entry = { schemaVersion: 1, sequence: (previous?.sequence ?? 0) + 1, id: randomUUID(), kind, at: new Date(now()).toISOString(), payload: structuredClone(payload), ...(previous ? { previousHash: previous.hash } : {}) };
-            entry.hash = journalEntryHash(entry);
-            if (state[field].length >= 8192 || Buffer.byteLength(stableJson([...state[field], entry])) > 2 * 1024 * 1024) throw new Error("The protected repository effect journal is full; prior effects were preserved.");
-            state[field].push(entry); return structuredClone(entry);
-          }
-        });
+        const result = await fn(repositoryEffectTransaction(state, domain, { now, receiptGuard }));
         await guard?.(state); return result;
       }, { provider });
     },

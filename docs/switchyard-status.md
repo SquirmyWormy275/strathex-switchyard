@@ -7,14 +7,19 @@ host. [Verification](verification.md) retains accepted and failed checkpoints.
 
 ## Installed application
 
-Installed source `9f3024e`, release
-`31905b5bf9240446ba556d0c1681676eac5fb831b87b14b3a961727af8222115`,
-passes six normal update and fourteen actual Supply Chain checks. Signed
-freshness deadlines clip both receipts; approved scanner retirement marks them
-invalid while preserving historical failed/incomplete outcomes. Two native exits,
-exact replay, full original-state restoration and owned scratch removal pass.
-Receipts `assignment-legends-1793857471815.json` and
-`installed-shield-baseline-1793857655461.json` retained. One empty task, zero prompts.
+Installed source `1a5cd43`, release
+`74bf1ba59db8ef22eea2436abf5ea963505dd0e5cc0b7b31e52cff1be5dd53d7`,
+passes six normal update and sixteen actual Change Scan checks. The pinned
+scanner finds a synthetic secret in an explicitly approved ignored `.env`, with
+no matched bytes returned or Git index/source mutation. Both receipts obey
+signed freshness deadlines and later retirement; replay, two native exits,
+original-state restoration and owned scratch removal pass. Receipts
+`assignment-legends-1793857942421.json` and
+`installed-shield-baseline-1793858153322.json` retained. One empty task, zero prompts.
+
+Earlier installed `9f3024e` passes six update/fourteen expiry/retirement checks:
+`assignment-legends-1793857471815.json`,
+`installed-shield-baseline-1793857655461.json`; owned scratch removed.
 
 Earlier installed `0cd785f` passes six update/thirteen deadline checks:
 `assignment-legends-1793856754649.json`,
@@ -75,8 +80,14 @@ Explicit ignored inputs are now restricted to pinned Shield actions at grant and
 execution admission. Five focused authority/Linux/Windows guest-double cases pass:
 redacted findings from an ignored `.env`, unchanged original bytes/index and later
 source-drift refusal. Whole-repository/automatic ignored-secret/history inventory
-is still unfinished. [Contract](ignored-scanner-inputs.md). Later installed
-ignored-input acceptance is pending.
+is still unfinished. [Contract](ignored-scanner-inputs.md). Normal installed ignored-input acceptance passes at `1a5cd43` (six update/sixteen
+actual checks). Six existing pipeline/race regressions also pass.
+
+The exception ledger foundation implements exact action/target/scanner/finding
+bindings, redacted reasons, bounded expiry, append-only withdrawal and atomic
+policy/receipt retirement. Six ledger/confirmation checks and twenty journal
+regressions pass. Operator API, scan evaluation and installed exception acceptance
+are unfinished; the foundation is not an active override path.
 
 ## Complete and native checkpoints
 
