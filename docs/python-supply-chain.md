@@ -2,7 +2,7 @@
 
 Supply Chain and Release Shield can inventory explicitly reviewed Python
 requirements alongside npm lockfiles. Start with a `requirements.txt` containing
-exact numeric release pins, then use the normal task grant and signed scanner/feed
+exact version pins, then use the normal task grant and signed scanner/feed
 review described in the [baseline scanner guide](shield-baseline-scanner.md).
 The scanner reads metadata only; it never invokes pip or installs dependencies.
 
@@ -21,8 +21,13 @@ The recognized paths are `requirements.txt`, `requirements.lock` and simple
 named variants such as `requirements-dev.txt`. Distribution names follow
 [PyPA name normalization](https://packaging.python.org/en/latest/specifications/name-normalization/):
 lowercase, with runs of dots, underscores and hyphens collapsed to one hyphen.
-Numeric releases have one to four components, no leading zeroes, at most 32
-characters and bounded integer components. Optional SHA-256 declarations must use
+Versions support bounded PEP 440 epochs, release segments, alpha/beta/candidate,
+post/development suffixes and local labels, including standard aliases and numeric
+normalization. The declaration stays literal in the inventory; comparisons use
+normalized numeric/suffix identity, including zero-padded release equivalence.
+Versions are limited to 128 ASCII characters and 32 release/local segments;
+whitespace, controls and unsupported syntax refuse. Integer comparisons do not
+round large components through JavaScript numbers. Optional SHA-256 declarations must use
 literal lowercase hex. Comments, CRLF and backslash continuations are supported.
 
 Each requirements file is limited to 256 KiB, 8,192 physical lines, 8,192
@@ -31,8 +36,8 @@ normalized names. The aggregate dependency inventory retains its 4,096-component
 ceiling across all reviewed manifests.
 
 This is a strict subset of the [pip requirements format](https://pip.pypa.io/en/stable/reference/requirements-file-format/).
-Includes, indexes, URLs, editable/local sources, extras, markers, ranges, epochs,
-pre/post/dev/local releases and other syntax refuse inventory for that whole file.
+Includes, indexes, URLs, editable/local sources, extras, markers, ranges, wildcards
+and other unsupported requirements syntax refuse inventory for that whole file.
 The report adds `unsupported_python_requirements`; it never returns a partial
 package list or follows an include/index. No environment or dependency graph is
 resolved, and a pin does not prove the distribution exists.
@@ -47,17 +52,19 @@ component before accepting a report. PyPI package URLs use `pkg:pypi/…`; hash
 declarations appear only as metadata properties. Composition stays `unknown`.
 
 Signed advisory entries use `ecosystem: "PyPI"`. Matching includes ecosystem,
-normalized name and literal version, so npm data cannot cover a Python package.
+normalized name and PEP 440 version equivalence, so npm data cannot cover a Python
+package. Equivalent duplicate feed identities refuse the entire feed; an empty
+alias cannot conceal another entry with findings.
 The [OSV collector](osv-advisory-source.md) accepts explicit public PyPI queries
-and independently proves literal affected versions or supported numeric
-`ECOSYSTEM` introduced/fixed intervals. It never reads a requirements file or
+and independently proves explicit affected versions (including equivalent PEP 440
+spellings) or supported `ECOSYSTEM` introduced/fixed intervals. It never reads a requirements file or
 automatically sends project package identities upstream.
 
 An affected package produces failed findings; unassessed severity stays unknown.
 An empty advisory list establishes only that selected source observation. Every
 result retains incomplete coverage, unresolved Python environment, unknown
 license metadata and unverified artifact/publisher provenance. Broader Python
-formats, full PEP 440 semantics, dependency resolution, installed-package
+requirements/specifier formats, dependency resolution, installed-package
 verification and wider ecosystems remain unfinished implementation.
 
 ## Reproduce the installed demonstration
@@ -95,3 +102,33 @@ removed. See the [retained summary](evidence/installed-pypi-summary.json) for ex
 release, receipt identities and limits. Temporary schema tooling was also removed
 (`pypi-schema-tool-cleanup-1793885199709.json`); the initial schema/installer
 failures remain recorded separately.
+
+## Validate non-final versions without network or account changes
+
+The version comparator is checked against 295 reference identifiers from the
+already installed PyPA `packaging` 26.3 implementation: 87,025 ordered comparisons
+also verify semantic identity keys. The committed fixture lets portable tests use
+these independent facts without installing Python packages. Regeneration uses
+`scripts/generate-pypi-version-oracle.py`; its recorded reference source hash
+makes changes reviewable. [Version scheme](https://packaging.python.org/en/latest/specifications/version-specifiers/).
+
+A separate installed demonstration uses fixed synthetic signed feed bytes and
+an epoch/pre/post/dev/local requirements pin. It creates an empty native task,
+submits no model prompt and makes no public advisory query:
+
+```sh
+mise exec node@24.14.0 -- node scripts/verify-shield-host.mjs \
+  --synthetic --action=shield_supply_chain --pep440-requirements
+```
+
+Repeat with `--action=release_shield` for Release. The fixture matches a differently
+spelled equivalent advisory, keeps the literal pin in the BOM, and checks failed
+findings plus a clean comparison that remains incomplete. Package URLs fold case
+and percent-encode reserved version characters while the inventory retains the
+original declaration. [Package URL type](https://github.com/package-url/purl-spec/blob/main/types/pypi-definition.json),
+[encoding rules](https://github.com/package-url/purl-spec/blob/main/faq.md#plus-character).
+
+This command is an acceptance procedure; an installed pass is recorded separately
+from software tests and native source-fixture execution.
+
+[Software receipt, reference hashes and native source-fixture limits](evidence/pep440-summary.json).

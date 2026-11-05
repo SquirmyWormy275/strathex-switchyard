@@ -75,15 +75,50 @@ function utf8(bytes) { return new TextDecoder("utf-8", { fatal: true }).decode(b
 function json(bytes) { if (bytes.length > 2 * 1024 * 1024) throw Error("Scanner JSON exceeds its bound."); return JSON.parse(utf8(bytes)); }
 const npmName = value => typeof value === "string" && ![".", ".."].includes(value) && /^(?:@[a-z0-9._-]+\/)?[a-z0-9._-]{1,128}$/.test(value);
 const npmVersion = value => typeof value === "string" && /^\d+\.\d+\.\d+(?:-[A-Za-z0-9.-]+)?(?:\+[A-Za-z0-9.-]+)?$/.test(value);
-export function pypiStableRelease(value) {
-  if (typeof value !== "string" || value.length > 32 || !/^(?:0|[1-9]\d*)(?:\.(?:0|[1-9]\d*)){0,3}$/.test(value)) throw Error("Only exact stable numeric Python releases are supported.");
-  const parts = value.split(".").map(Number);
-  if (parts.some(part => !Number.isSafeInteger(part) || part > 2147483647)) throw Error("Python release exceeds the supported numeric bound.");
-  return parts;
+// Bounded PEP 440 identifiers. Keep literal declarations in the BOM; compare
+// identities by normalized numeric and suffix semantics, never lexicographic order.
+const pythonVersionPattern = /^v?(?:([0-9]+)!)?([0-9]+(?:\.[0-9]+)*)(?:[-_.]?(alpha|beta|preview|pre|rc|a|b|c)[-_.]?([0-9]+)?)?(?:(?:-([0-9]+))|(?:[-_.]?(post|rev|r)[-_.]?([0-9]+)?))?(?:[-_.]?(dev)[-_.]?([0-9]+)?)?(?:\+([a-z0-9]+(?:[-_.][a-z0-9]+)*))?$/i;
+const pythonInteger = value => value.replace(/^0+(?=[0-9])/, "");
+const comparePythonInteger = (a, b) => a.length === b.length ? (a < b ? -1 : a > b ? 1 : 0) : a.length < b.length ? -1 : 1;
+export function parsePypiVersion(value) {
+  if (typeof value !== "string" || !value.length || value.length > 128 || !/^[A-Za-z0-9.!+_-]+$/.test(value)) throw Error("Choose a bounded literal Python version without whitespace or controls.");
+  const m = pythonVersionPattern.exec(value);
+  if (!m) throw Error("Unsupported PEP 440 Python version.");
+  const release = m[2].split(".").map(pythonInteger), local = m[10]?.toLowerCase().split(/[-_.]/).map(part => /^[0-9]+$/.test(part) ? [1, pythonInteger(part)] : [0, part]) ?? null;
+  if (release.length > 32 || local && local.length > 32) throw Error("Python version segment bound exceeded.");
+  const label = m[3]?.toLowerCase(), phase = label ? ({ alpha: 0, a: 0, beta: 1, b: 1, preview: 2, pre: 2, rc: 2, c: 2 })[label] : null;
+  const dev = m[8] === undefined ? null : pythonInteger(m[9] ?? "0");
+  return { epoch: pythonInteger(m[1] ?? "0"), release, pre: phase === null ? null : [phase, pythonInteger(m[4] ?? "0")], post: m[5] !== undefined || m[6] !== undefined ? pythonInteger(m[5] ?? m[7] ?? "0") : null, dev, local };
+}
+export function pypiVersionKey(value) {
+  const v = parsePypiVersion(value), release = [...v.release];
+  while (release.length > 1 && release.at(-1) === "0") release.pop();
+  return JSON.stringify([v.epoch, release, v.pre, v.post, v.dev, v.local]);
+}
+export function comparePypiVersions(left, right) {
+  const a = parsePypiVersion(left), b = parsePypiVersion(right), epoch = comparePythonInteger(a.epoch, b.epoch);
+  if (epoch) return epoch;
+  for (let i = 0; i < Math.max(a.release.length, b.release.length); i++) {
+    const order = comparePythonInteger(a.release[i] ?? "0", b.release[i] ?? "0"); if (order) return order;
+  }
+  const preRank = v => v.pre ? v.pre[0] : v.post === null && v.dev !== null ? -1 : 3;
+  const rank = preRank(a) - preRank(b); if (rank) return Math.sign(rank);
+  if (a.pre && b.pre) { const order = comparePythonInteger(a.pre[1], b.pre[1]); if (order) return order; }
+  for (const [field, missingFirst] of [["post", true], ["dev", false]]) {
+    if (a[field] === null || b[field] === null) { if (a[field] !== b[field]) return (a[field] === null) === missingFirst ? -1 : 1; }
+    else { const order = comparePythonInteger(a[field], b[field]); if (order) return order; }
+  }
+  if (a.local === null || b.local === null) return a.local === b.local ? 0 : a.local === null ? -1 : 1;
+  for (let i = 0; i < Math.min(a.local.length, b.local.length); i++) {
+    const [at, av] = a.local[i], [bt, bv] = b.local[i];
+    if (at !== bt) return at < bt ? -1 : 1;
+    const order = at ? comparePythonInteger(av, bv) : av < bv ? -1 : av > bv ? 1 : 0; if (order) return order;
+  }
+  return Math.sign(a.local.length - b.local.length);
 }
 export function pypiIdentity(name, version) {
   if (typeof name !== "string" || name.length > 128 || !/^[A-Za-z0-9](?:[A-Za-z0-9._-]*[A-Za-z0-9])?$/.test(name)) throw Error("Unsupported literal Python distribution name.");
-  pypiStableRelease(version);
+  parsePypiVersion(version);
   return { ecosystem: "PyPI", name: name.toLowerCase().replace(/[-_.]+/g, "-"), version };
 }
 export const isPinnedRequirementsPath = path => typeof path === "string" && /(?:^|\/)requirements(?:[-_.][A-Za-z0-9_-]+)?\.(?:txt|lock)$/i.test(path);
@@ -98,8 +133,8 @@ export function parsePinnedRequirements(text) {
     if (!line || line.includes("\\") || pending.length + line.length > 8192) throw Error("Unsupported Python requirements continuation.");
     pending += (pending ? " " : "") + line;
     if (continued) continue;
-    const match = /^([A-Za-z0-9][A-Za-z0-9._-]*)[ \t]*==[ \t]*([0-9]+(?:\.[0-9]+){0,3})(?:[ \t]+((?:--hash=sha256:[a-f0-9]{64})(?:[ \t]+--hash=sha256:[a-f0-9]{64})*))?$/.exec(pending);
-    if (!match) throw Error("Requirements outside the exact numeric-pin/hash subset are unsupported.");
+    const match = /^([A-Za-z0-9][A-Za-z0-9._-]*)[ \t]*==[ \t]*([A-Za-z0-9.!+_-]{1,128})(?:[ \t]+((?:--hash=sha256:[a-f0-9]{64})(?:[ \t]+--hash=sha256:[a-f0-9]{64})*))?$/.exec(pending);
+    if (!match) throw Error("Requirements outside the exact version-pin/hash subset are unsupported.");
     const identity = pypiIdentity(match[1], match[2]), declaredSha256 = match[3] ? match[3].split(/[ \t]+/).map(value => value.slice(14)).sort() : [];
     if (names.has(identity.name) || declaredSha256.length > 64 || new Set(declaredSha256).size !== declaredSha256.length || components.length >= 4096) throw Error("Duplicate or excessive Python requirements metadata.");
     names.add(identity.name); components.push({ ...identity, declaredSha256 }); pending = "";
@@ -129,7 +164,7 @@ function workspaceLink(packages, link, cache) {
   cache.set(path, result); return result;
 }
 export function shieldCycloneDxComponent(c) { return { type: "library", "bom-ref": "switchyard:" + sha(`${c.ecosystem}\0${c.lockPath??c.requirementsPath}\0${c.location??c.name}\0${c.name}\0${c.version}`), name: c.name, version: c.version,
-      ...(c.ecosystem === "PyPI" ? { purl: `pkg:pypi/${c.name}@${c.version}` } : {}),
+      ...(c.ecosystem === "PyPI" ? { purl: `pkg:pypi/${c.name}@${encodeURIComponent(c.version.toLowerCase()).replaceAll("!", "%21")}` } : {}),
       ...(c.license ? { licenses: [{ license: { name: c.license } }] } : {}), properties: [
         { name: "switchyard:ecosystem", value: c.ecosystem },
         ...(c.ecosystem === "PyPI" ? [{ name: "switchyard:requirements-file", value: c.requirementsPath }, { name: "switchyard:declared-sha256", value: JSON.stringify(c.declaredSha256) }, { name: "switchyard:python-environment", value: "not-resolved" }] : [{ name: "switchyard:lockfile", value: c.lockPath }, { name: "switchyard:package-location", value: c.location }, { name: "switchyard:installed-as", value: c.installedAs }]),
@@ -174,6 +209,7 @@ function parseRules(bytes) {
   const allowedLicenses = array(v.allowedLicenses, 128); if (allowedLicenses.some(s => typeof s !== "string" || !/^[A-Za-z0-9.-]{1,80}\+?$/.test(s) || npmLicenseDeclaration(s)?.expression !== s) || new Set(allowedLicenses.map(s => s.toLowerCase())).size !== allowedLicenses.length) throw Error("Unsupported license policy.");
   return { selected, allowedLicenses };
 }
+const advisoryIdentityKey = ({ ecosystem, name, version }) => `${ecosystem}:${name}@${ecosystem === "PyPI" ? pypiVersionKey(version) : version}`;
 function parseAdvisories(bytes) {
   const v = json(bytes); exact(v, ["schema", "version", "engine", "packages"]);
   if (v.schema !== "switchyard-shield-advisories/v1" || v.version !== 1 || v.engine !== shieldEngineVersion) throw Error("Unsupported advisory feed.");
@@ -184,7 +220,7 @@ function parseAdvisories(bytes) {
     if (p.ecosystem === "npm" && npmName(p.name) && npmVersion(p.version)) identity = { ecosystem: "npm", name: p.name, version: p.version };
     else if (p.ecosystem === "PyPI") identity = pypiIdentity(p.name, p.version);
     else throw Error("Unsupported advisory package identity.");
-    const key = `${identity.ecosystem}:${identity.name}@${identity.version}`; if (keys.has(key)) throw Error("Duplicate advisory package."); keys.add(key);
+    const key = advisoryIdentityKey(identity); if (keys.has(key)) throw Error("Duplicate advisory package."); keys.add(key);
     const advisories = array(p.advisories, 32).map(a => { exact(a, ["id", "severity"]); identifier(a.id); if (!["low", "medium", "high", "critical", "unknown"].includes(a.severity)) throw Error("Invalid advisory severity."); return { id: a.id, severity: a.severity }; });
     if (new Set(advisories.map(a => a.id)).size !== advisories.length) throw Error("Duplicate advisory.");
     return { ...identity, advisories };
@@ -196,6 +232,7 @@ export async function scanShieldInputs(proposed, { readInput }) {
   const request = validateShieldRequest(proposed), requested = dimensions[request.action], findings = [], gaps = new Set(["repository_scope_unverified"]), inventory = [], components = []; let dependencyManifests = 0;
   const readFeed = async f => { const b = await readInput(f.path, 2 * 1024 * 1024); if (sha(b) !== f.sha256) throw Error("Scanner feed changed."); return b; };
   const policy = parseRules(await readFeed(request.scanner)), advisory = request.advisory ? parseAdvisories(await readFeed(request.advisory)) : [];
+  const advisoryByIdentity = new Map(advisory.map(entry => [advisoryIdentityKey(entry), entry]));
   const add = finding => { if (findings.length < 512) findings.push(finding); else gaps.add("finding_limit"); };
   for (const file of request.files) {
     const bytes = await readInput(file.path, file.size); if (bytes.length !== file.size || sha(bytes) !== file.sha256) throw Error("Scanner input changed.");
@@ -221,7 +258,7 @@ export async function scanShieldInputs(proposed, { readInput }) {
       for (const component of declared) {
         if (components.length >= 4096) throw Error("Aggregate dependency inventory exceeds its original component bound.");
         components.push({ ...component, requirementsPath: file.path });
-        const known = advisory.find(a => a.ecosystem === "PyPI" && a.name === component.name && a.version === component.version);
+        const known = advisoryByIdentity.get(advisoryIdentityKey(component));
         if (!known) gaps.add("advisory_package_coverage");
         if (known?.advisories.some(a => a.severity === "unknown")) gaps.add("advisory_severity_unassessed");
         for (const a of known?.advisories ?? []) add({ ruleId: a.id, dimension: "vulnerabilities", severity: a.severity, path: file.path, line: null, fingerprint: sha(`${a.id}\0PyPI\0${file.path}\0${file.sha256}\0${component.name}\0${component.version}`) });
@@ -254,7 +291,7 @@ export async function scanShieldInputs(proposed, { readInput }) {
         const component = { ecosystem: "npm", name, installedAs, version: p.version, location, lockPath: file.path, license: license?.expression ?? null, integritySha256: !linked && typeof p.integrity === "string" ? sha(p.integrity) : null, ...(linked ? { workspace: linked.workspace } : {}) };
         if (components.length >= 4096) throw Error("Aggregate dependency inventory exceeds its original component bound.");
         components.push(component);
-        const known = advisory.find(a => a.ecosystem === "npm" && a.name === name && a.version === p.version);
+        const known = advisoryByIdentity.get(advisoryIdentityKey({ ecosystem: "npm", name, version: p.version }));
         if (!known) gaps.add("advisory_package_coverage");
         if (known?.advisories.some(advisory => advisory.severity === "unknown")) gaps.add("advisory_severity_unassessed");
         for (const a of known?.advisories ?? []) add({ ruleId: a.id, dimension: "vulnerabilities", severity: a.severity, path: file.path, line: null, fingerprint: sha(`${a.id}\0${file.path}\0${file.sha256}\0${location}\0${p.version}`) });

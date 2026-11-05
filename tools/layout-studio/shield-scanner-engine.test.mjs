@@ -1,10 +1,12 @@
+import { execFileSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
 import test from "node:test";
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { mkdtemp, readFile, writeFile, symlink, link, rm, realpath } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { scanShieldInputs, shieldActions, shieldEngineVersion, validateShieldRequest, createShieldFileReader, parsePinnedRequirements, pypiIdentity, pypiStableRelease, npmLicenseDeclaration } from "./shield-scanner-engine.mjs";
+import { scanShieldInputs, shieldActions, shieldEngineVersion, validateShieldRequest, createShieldFileReader, parsePinnedRequirements, pypiIdentity, parsePypiVersion, pypiVersionKey, comparePypiVersions, npmLicenseDeclaration } from "./shield-scanner-engine.mjs";
 const sha = b => createHash("sha256").update(b).digest("hex");
 import { parseShieldScannerReport } from "./repository-shield.mjs";
 import {scannerFixture} from "./test-support/shield-scanner-fixture.mjs";
@@ -110,16 +112,49 @@ test("filesystem reader enforces exact read bounds and refuses symlinks, hardlin
 });
 
 
-test("numeric Python requirement pins normalize distribution names and retain declared hashes without resolving an environment", () => {
+test("offline Python verifier rejects missing scope and incompatible actions or public queries before installed access", () => {
+  const entry = fileURLToPath(new URL("../../scripts/verify-shield-host.mjs", import.meta.url));
+  for (const args of [["--synthetic", "--pep440-requirements"], ["--synthetic", "--action=shield_change_scan", "--pep440-requirements"], ["--synthetic", "--action=shield_supply_chain", "--pep440-requirements", "--osv-advisory"]]) {
+    assert.throws(() => execFileSync(process.execPath, [entry, ...args], { encoding: "utf8", timeout: 5000, stdio: ["ignore", "pipe", "pipe"] }), error => error.status === 1 && error.stderr.includes("Usage: node scripts/verify-shield-host.mjs"));
+  }
+});
+
+test("bounded PEP 440 version identities and ordering match the independent PyPA oracle", async () => {
+  const oracle = JSON.parse(await readFile(new URL("../../scripts/fixtures/pep440-oracle.json", import.meta.url), "utf8"));
+  assert.equal(oracle.schema, "switchyard-pep440-oracle/v1");
+  for (const [left, rank] of oracle.cases) {
+    parsePypiVersion(left);
+    for (const [right, otherRank] of oracle.cases) {
+      const expected = Math.sign(rank - otherRank);
+      assert.equal(comparePypiVersions(left, right), expected, left + " vs " + right);
+      assert.equal(pypiVersionKey(left) === pypiVersionKey(right), expected === 0, left + " identity vs " + right);
+    }
+  }
+  for (const version of [...oracle.invalid, " 1.0", "1.0\n", "１.０", "1.".repeat(32)+"0", "1+"+"x".repeat(127)]) assert.throws(() => parsePypiVersion(version));
+});
+
+test("non-final Python pins keep literal versions, match equivalent advisory identities and percent-encode package URLs", async () => {
+  const version = "01!02.0RC01.post02.dev03+LOCAL-001";
+  assert.deepEqual(parsePinnedRequirements("Example_Package=="+version), [{ ecosystem: "PyPI", name: "example-package", version, declaredSha256: [] }]);
+  const f = scannerFixture({ action: "shield_supply_chain", files: { "requirements.txt": "Example_Package=="+version }, advisory: [{ ecosystem: "PyPI", name: "example-package", version: "1!2.0rc1.post2.dev3+local.1", advisories: [{ id: "SYNTHETIC-PEP440", severity: "high" }] }] }), report = await f.scan();
+  assert.equal(report.outcome, "failed"); assert.equal(report.sbom.components[0].version, version); assert.equal(report.findings.some(f => f.ruleId === "SYNTHETIC-PEP440"), true);
+  assert.equal(report.cycloneDx.components[0].purl, "pkg:pypi/example-package@01%2102.0rc01.post02.dev03%2Blocal-001");
+  assert.equal(report.gaps.includes("unsupported_python_requirements"), false); assert.equal(report.gaps.includes("python_environment_not_resolved"), true);
+  parseShieldScannerReport(JSON.stringify(report), { engine: report.engine, requestSha256: report.requestSha256, request: f.request }, f.request.action);
+  const duplicate = scannerFixture({ action: "shield_supply_chain", files: { "requirements.txt": "example==1.0" }, advisory: [{ ecosystem: "PyPI", name: "example", version: "1", advisories: [] }, { ecosystem: "PyPI", name: "example", version: "01.0.0", advisories: [{ id: "NEVER_HIDE", severity: "high" }] }] });
+  await assert.rejects(duplicate.scan(), /Duplicate advisory/);
+});
+
+test("Python requirement pins normalize distribution names and retain declared hashes without resolving an environment", () => {
   const continuation = String.fromCharCode(92), text = ["# synthetic declarations", "Requests==2.19.1 " + continuation, "  --hash=sha256:" + "b".repeat(64) + " " + continuation, "  --hash=sha256:" + "a".repeat(64), "My___Package.name == 2026.10 # metadata only"].join("\r\n");
   assert.deepEqual(parsePinnedRequirements(text), [{ ecosystem: "PyPI", name: "requests", version: "2.19.1", declaredSha256: ["a".repeat(64), "b".repeat(64)] }, { ecosystem: "PyPI", name: "my-package-name", version: "2026.10", declaredSha256: [] }]);
   assert.deepEqual(parsePinnedRequirements("# empty declared input\n"), []);
   assert.deepEqual(pypiIdentity("PyYAML", "6.0.2"), { ecosystem: "PyPI", name: "pyyaml", version: "6.0.2" });
-  for (const version of ["0", "1.0", "2026.10.2", "1.2.3.4"]) assert.ok(pypiStableRelease(version).length);
+  for (const version of ["0", "1.0", "2026.10.2", "1.2.3.4"]) assert.ok(parsePypiVersion(version).release.length);
 });
 
-test("Python requirement includes, indexes, URLs, editable paths, markers, extras and non-numeric releases never become partial package inventory", () => {
-  const values = ["-r private.txt", "--index-url https://user:NEVER_COPY_SECRET@example.invalid/simple", "-e ../private", "name @ https://example.invalid/source.whl", "name>=1.0", "name[extra]==1.0", "name==1.0; python_version<'3.12'", "name==1.0rc1", "name==1!2.0", "name==1.0.post1", "name==1.0+local", "name==01.0", "name==1.2.3.4.5", "name==1.0\nNAME==1.0", "name==1.0 --hash=sha256:"+"a".repeat(63), "name==1.0 --hash=sha256:"+"a".repeat(64)+" --hash=sha256:"+"a".repeat(64), "name==1.0 " + String.fromCharCode(92), "name==1.0\0"];
+test("Python requirement includes, indexes, URLs, editable paths, markers, extras and unsupported syntax never become partial package inventory", () => {
+  const values = ["-r private.txt", "--index-url https://user:NEVER_COPY_SECRET@example.invalid/simple", "-e ../private", "name @ https://example.invalid/source.whl", "name>=1.0", "name[extra]==1.0", "name==1.0; python_version<'3.12'", "name==1.0rcX", "name==1!", "name==1.0..post1", "name==1.0+", "name==1.*", "name==1.0dev1post2", "name==1.0\nNAME==1.0", "name==1.0 --hash=sha256:"+"a".repeat(63), "name==1.0 --hash=sha256:"+"a".repeat(64)+" --hash=sha256:"+"a".repeat(64), "name==1.0 " + String.fromCharCode(92), "name==1.0\0"];
   for (const value of values) assert.throws(() => parsePinnedRequirements("ordinary==1.0\n" + value));
   assert.throws(() => parsePinnedRequirements("#".repeat(256*1024+1))); assert.throws(() => parsePinnedRequirements("\n".repeat(8193)));
 });

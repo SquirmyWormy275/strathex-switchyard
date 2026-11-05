@@ -43,20 +43,33 @@ test("unassessed OSV severity remains a failing vulnerability with an explicit g
 });
 
 
-test("PyPI queries normalize names while retaining exact numeric releases and separating ecosystem identities", () => {
+test("PyPI queries normalize names while retaining literal PEP 440 versions and separating ecosystem identities", () => {
   const python = { ecosystem: "PyPI", name: "Example___Package.name", version: "1.2" };
   assert.deepEqual(osvPackageQueries([python]), [{ ecosystem: "PyPI", name: "example-package-name", version: "1.2" }]);
   assert.equal(osvPackageQueries([query, { ...query, ecosystem: "PyPI" }]).length, 2);
-  for (const version of ["1.0rc1", "1!1.2", "2.0.post1", "01.0", "1.2.3.4.5", "1.0+local"]) assert.throws(() => osvPackageQueries([{ ...python, version }]));
+  for (const version of ["1.0rc1", "1!1.2", "2.0.post1", "01.0", "1.2.3.4.5", "1.0+local"]) assert.equal(osvPackageQueries([{ ...python, version }])[0].version, version);
   assert.throws(() => osvPackageQueries([{ ecosystem: "PyPI", name: "Foo_Bar", version: "1" }, { ecosystem: "PyPI", name: "foo-bar", version: "1.0" }]));
 });
 
-test("PyPI affected evidence supports only explicit versions or numeric release ranges and never borrows an npm match", () => {
+test("PyPI affected evidence supports only explicit versions or PEP 440 release ranges and never borrows an npm match", () => {
   const python = { ecosystem: "PyPI", name: "Example_Package", version: "1.2.0" }, source = record();
   source.affected = [{ package: { ecosystem: "PyPI", name: "example.package" }, ranges: [{ type: "ECOSYSTEM", events: [{ introduced: "1.2" }, { fixed: "1.3" }] }] }];
-  const result = normalizeOsvRecord(source, python, now()); assert.equal(result.evidence.affectedVersionEvidence, "stable-pypi-release-range"); assert.equal(result.advisory.severity, "unknown");
-  for (const change of [r => { r.affected[0].package.ecosystem = "npm"; }, r => { r.affected[0].ranges[0].type = "SEMVER"; }, r => { r.affected[0].ranges[0].events = [{ introduced: "0" }, { fixed: "1.2" }]; }, r => { r.affected[0].ranges[0].events = [{ introduced: "0" }, { fixed: "2.0rc1" }]; }]) { const altered = structuredClone(source); change(altered); assert.throws(() => normalizeOsvRecord(altered, python, now())); }
+  const result = normalizeOsvRecord(source, python, now()); assert.equal(result.evidence.affectedVersionEvidence, "pep440-pypi-version-range"); assert.equal(result.advisory.severity, "unknown");
+  for (const change of [r => { r.affected[0].package.ecosystem = "npm"; }, r => { r.affected[0].ranges[0].type = "SEMVER"; }, r => { r.affected[0].ranges[0].events = [{ introduced: "0" }, { fixed: "1.2" }]; }, r => { r.affected[0].ranges[0].events = [{ introduced: "0" }, { fixed: "2.0rcX" }]; }]) { const altered = structuredClone(source); change(altered); assert.throws(() => normalizeOsvRecord(altered, python, now())); }
   const literal = structuredClone(source); literal.affected[0].versions = [python.version]; literal.affected[0].ranges = [{ type: "GIT", repo: "https://NEVER_FETCH.invalid", events: [] }]; assert.equal(normalizeOsvRecord(literal, python, now()).evidence.affectedVersionEvidence, "literal-version");
+});
+
+test("PyPI advisory evidence orders non-final epoch boundaries and normalizes only equivalent explicit identities", () => {
+  const source = record(), python = { ecosystem: "PyPI", name: "example", version: "1!1.0rc2" };
+  source.affected = [{ package: { ecosystem: "PyPI", name: "example" }, ranges: [{ type: "ECOSYSTEM", events: [{ introduced: "1!1.0a1" }, { fixed: "1!1.0.post1" }] }] }];
+  for (const version of ["1!1.0a1", "1!1.0rc2", "1!1.0+local", "1!1.0.post1.dev1"]) assert.equal(normalizeOsvRecord(source, { ...python, version }, now()).evidence.affectedVersionEvidence, "pep440-pypi-version-range");
+  for (const version of ["1!1.0.dev1", "1!1.0.post1", "1!1.0.post2", "2!0", "9.99"]) assert.throws(() => normalizeOsvRecord(source, { ...python, version }, now()));
+  source.affected[0].ranges = [];
+  source.affected[0].versions = ["01!01.0C02"];
+  assert.equal(normalizeOsvRecord(source, python, now()).evidence.affectedVersionEvidence, "pep440-version-equivalent");
+  assert.throws(() => normalizeOsvRecord(source, { ...python, version: "1!1.0rc2+patched" }, now()));
+  for (const pair of [["v1.0rc1", "01.0C01"], ["1+ABC-001", "01.0+abc.1"]]) assert.throws(() => osvPackageQueries(pair.map(version => ({ ...python, version }))));
+  assert.equal(osvPackageQueries(["1+1", "1+abc"].map(version => ({ ...python, version }))).length, 2);
 });
 
 test("mixed public OSV transport binds each exact ecosystem and source hash without installation, credentials or inferred severity", async () => {

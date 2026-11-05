@@ -52,3 +52,8 @@ selected sealed state and the frozen frontend. Its owned bundle and checkout wer
 removed. This metadata-only update does not establish live account-switch or
 native designer-race acceptance.
 [Installed update evidence](evidence/installed-account-fence-update-summary.json).
+
+The final designer-fence source `60e87943` subsequently passed the same normal
+installed six update/seven metadata checks. All 54 workspaces, selected sealed
+state and frontend were preserved; its disposable checkout and bundle were
+removed. The linked installed evidence records both source-specific updates.

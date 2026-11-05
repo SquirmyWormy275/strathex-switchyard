@@ -27,7 +27,7 @@ OSV documents version-query fuzzy matching. The collector independently requires
 the returned ecosystem/name and either an explicit literal affected version or
 a supported interval containing that exact query. npm accepts stable
 `major.minor.patch` releases and `SEMVER` intervals. PyPI accepts the [bounded
-numeric release subset](python-supply-chain.md) and `ECOSYSTEM` intervals, with
+PEP 440 version scheme](python-supply-chain.md) and `ECOSYSTEM` intervals, with
 trailing zero components compared equivalently. Only ordered `introduced`/`fixed`
 boundaries are supported. Prereleases, build metadata, other ecosystems and
 unsupported range boundaries fail collection; they are not converted into an
@@ -105,7 +105,7 @@ authenticated failed/incomplete outcomes, feed retirement and full original-stat
 restoration. Owned source, signing material, packages, staging, release bundle and
 proof checkout were removed; zero model prompts and no keyboard access.
 
-Automatic whole-repository scope, automatic history selection, additional ecosystems/full Python semantics, full CVSS/contextual assessment,
+Automatic whole-repository scope, automatic history selection, additional ecosystems and broader Python requirements/specifier semantics, full CVSS/contextual assessment,
 publisher provenance and ordinary UI source management remain unfinished. A
 successful query with no returned records describes that selected identity at
 that observation time; it does not verify publication, source bytes or complete
