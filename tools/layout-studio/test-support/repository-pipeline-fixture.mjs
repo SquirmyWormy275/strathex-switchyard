@@ -9,7 +9,7 @@ import {createScannerFixtures} from "../scanner-fixtures.mjs";
 import {createScannerAuthority,signScannerFixture} from "../../../scripts/b122-scanner-fixture.mjs";
 const sha=value=>createHash("sha256").update(value).digest("hex");
 
-export async function fixture(t,{action="pipeline_local_gate",report="complete",hold=false,signedFeeds=false}={}){
+export async function fixture(t,{action="pipeline_local_gate",report="complete",hold=false,signedFeeds=false,workspaceMode}={}){
  const f=await authorityFixture(t,{executionActions:connectedExecutionActions("linux")});
  let fixtures, signingKeyPath;
  if(signedFeeds){
@@ -24,14 +24,14 @@ export async function fixture(t,{action="pipeline_local_gate",report="complete",
  let acknowledgeReady;const nativeReady=new Promise(resolve=>{acknowledgeReady=resolve;}),update=f.store.update;
  f.store.update=async(...args)=>{const result=await update(...args);if(args[1]==="repository-execution-ready")acknowledgeReady();return result;};
  const dimensions=["correctness",...(action==="pipeline_clean_reproduction"?["reproduction"]:[]),"isolation","production_data","ambient_credentials"],body={schema:"sxsy-b122.linux-repository-recipe-result",version:1,coverage:dimensions.map(dimension=>({dimension,status:report==="unavailable"&&dimension==="correctness"?"unavailable":"covered",fixtureId:"approved:synthetic-program"})),scannerFixtureIds:signedFeeds?["synthetic-scanner"]:[],advisoryFixtureIds:signedFeeds?["synthetic-advisory"]:[]};
- const program=`import assert from 'node:assert/strict';import{readFile,writeFile,access}from'node:fs/promises';import net from'node:net';
+ const program=`import assert from 'node:assert/strict';import{readFile,writeFile,access}from'node:fs/promises';import net from'node:net';import{spawnSync}from'node:child_process';
  ${signedFeeds?`await assert.rejects(access(${JSON.stringify(signingKeyPath)}));`:""}
- assert.equal(await readFile('input.txt','utf8'),'reviewed non-production input');assert.equal(process.env.HOME,undefined);assert.equal(process.env.NODE_ENV,'test');await assert.rejects(access(${JSON.stringify(join(f.root,"task.txt"))}));await assert.rejects(writeFile('input.txt','forbidden'));await writeFile('/tmp/pipeline-output','temporary');
+ assert.equal(await readFile('input.txt','utf8'),'reviewed non-production input');assert.equal(process.env.HOME,undefined);assert.equal(process.env.NODE_ENV,'test');await assert.rejects(access(${JSON.stringify(join(f.root,"task.txt"))}));${workspaceMode==="temporary-build"?`await writeFile('input.txt','changed in the bounded copy');await writeFile('built.mjs',"process.stdout.write('actual bounded build')");const built=spawnSync(process.execPath,['built.mjs'],{encoding:'utf8',timeout:1000,maxBuffer:4096});assert.equal(built.status,0,built.stderr);assert.equal(built.stdout,'actual bounded build');`:"await assert.rejects(writeFile('input.txt','forbidden'));"}await writeFile('/tmp/pipeline-output','temporary');
  await new Promise((resolve,reject)=>{const s=net.connect(443,'1.1.1.1');s.once('error',()=>{s.destroy();resolve();});s.once('connect',()=>{s.destroy();reject(Error('Unexpected network'));});s.setTimeout(1000,()=>{s.destroy();reject(Error('Unconfirmed network denial'));});});
  ${hold?"setInterval(()=>{},1000);":report==="malformed"?"process.stdout.write('untyped program output');":`process.stdout.write(${JSON.stringify(JSON.stringify(body))});`}`;
  await writeFile(join(f.root,"program.mjs"),program);await writeFile(join(f.root,"input.txt"),"reviewed non-production input");
  const inputs=[["program.mjs",program],["input.txt","reviewed non-production input"]].map(([path,bytes])=>({path,sha256:sha(bytes),size:Buffer.byteLength(bytes),classification:"non-production"}));
- const manifest={schema:"sxsy-b122.repository-runtime",version:1,repositoryRoot:f.root,allowedHttpsUrls:[],recipes:{[action]:{kind:"process",executable:process.execPath,args:["program.mjs"],cwd:".",environment:{NODE_ENV:"test"},lifecycle:"foreground",isolation:"disposable",timeoutMs:hold?15000:5000,maxOutputBytes:8192,inputFiles:inputs}}};
+ const manifest={schema:"sxsy-b122.repository-runtime",version:1,repositoryRoot:f.root,allowedHttpsUrls:[],recipes:{[action]:{kind:"process",executable:process.execPath,args:["program.mjs"],cwd:".",environment:{NODE_ENV:"test"},lifecycle:"foreground",isolation:"disposable",...(workspaceMode?{workspaceMode}:{}),timeoutMs:hold?15000:5000,maxOutputBytes:8192,inputFiles:inputs}}};
  const bytes=JSON.stringify(manifest);await writeFile(join(f.root,"pipeline.json"),bytes);
  const grantInput={...f.proposed,paths:["task.txt","program.mjs","input.txt","pipeline.json"],classifications:{includedUntracked:["program.mjs","input.txt","pipeline.json"]},actions:[action]},approval=await f.service.review("personal",grantInput),grant=await f.service.issue("personal",{...grantInput,token:approval.confirmation.token});
  const execution=createRepositoryExecution({store:f.store,authority:f.service,stateDirectory:join(f.stage,"execution"),...(fixtures?{resolveScannerFixtures:(c,input)=>fixtures.resolve(c,input)}:{})});f.onCleanup(()=>execution.close());

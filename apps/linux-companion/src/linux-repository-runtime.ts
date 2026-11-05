@@ -36,9 +36,10 @@ export class LinuxBubblewrapRepositoryProcessSupervisor implements RepositoryPro
   private readonly inner: RepositoryProcessSupervisor;
   private readonly actions: ReadonlySet<string>;
   private readonly readOnlyDisposable: boolean;
-  private readonly temporaryBytes?: number;
-  constructor(inner: RepositoryProcessSupervisor, { additionalActions = [], readOnlyDisposable = false, temporaryBytes = 64 * 1024 * 1024 }: { additionalActions?: readonly string[]; readOnlyDisposable?: boolean; temporaryBytes?: number } = {}) {
-    this.inner=inner; this.actions=new Set([...isolatedActions,...additionalActions]); this.readOnlyDisposable=readOnlyDisposable;
+  private readonly temporaryBuilds: boolean;
+  private readonly temporaryBytes: number;
+  constructor(inner: RepositoryProcessSupervisor, { additionalActions = [], readOnlyDisposable = false, temporaryBuilds = false, temporaryBytes = 64 * 1024 * 1024 }: { additionalActions?: readonly string[]; readOnlyDisposable?: boolean; temporaryBuilds?: boolean; temporaryBytes?: number } = {}) {
+    this.inner=inner; this.actions=new Set([...isolatedActions,...additionalActions]); this.readOnlyDisposable=readOnlyDisposable; this.temporaryBuilds=temporaryBuilds;
     if (temporaryBytes !== undefined && (!Number.isSafeInteger(temporaryBytes) || temporaryBytes < 16 * 1024 * 1024 || temporaryBytes > 256 * 1024 * 1024)) throw new Error("Choose a bounded temporary namespace filesystem.");
     this.temporaryBytes=temporaryBytes;
   }
@@ -46,6 +47,10 @@ export class LinuxBubblewrapRepositoryProcessSupervisor implements RepositoryPro
   observeOperation(request: RepositoryProcessObservationRequest): Promise<OperationControllerObservation> { return this.inner.observeOperation(request); }
 
   async start(request: RepositoryProcessStartRequest): Promise<RepositorySupervisedProcess> {
+    if (request.workspaceMode !== undefined && !["read-only", "temporary-build"].includes(request.workspaceMode)) throw new Error("The exact workspace permission is unsupported.");
+    if (request.workspaceMode !== undefined && !this.actions.has(request.action)) throw new Error("The declared workspace permission is not connected to this action; no direct host fallback was selected.");
+    const writable = request.workspaceMode === "temporary-build";
+    if (writable && (!this.temporaryBuilds || request.isolation !== "disposable" || !this.actions.has(request.action))) throw new Error("This namespace has not enabled bounded disposable build copies; no writable host fallback was selected.");
     if (!this.actions.has(request.action)) return this.inner.start(request);
     if (!request.executionRoot || !request.isolation) throw new Error("The Linux sandboxed repository recipe has no exact execution-root binding.");
     const repositoryRoot = await realpath(request.repositoryRoot);
@@ -76,14 +81,28 @@ export class LinuxBubblewrapRepositoryProcessSupervisor implements RepositoryPro
       const systemExecutable = ["/usr/", "/bin/", "/lib/", "/lib64/"].some((prefix) => executable.startsWith(prefix));
       const mappedExecutable = inside(executionRoot, executable) ? mappedPath(executionRoot, executable) : systemExecutable ? executable : "/b122-tool";
       const executableBind = ["--ro-bind", "/proc/self/fd/3", mappedExecutable];
-      const mount = request.isolation === "disposable" && !this.readOnlyDisposable ? "--bind" : "--ro-bind";
+      const mount = request.isolation === "disposable" && !this.readOnlyDisposable && request.workspaceMode !== "read-only" ? "--bind" : "--ro-bind";
       const environment = Object.entries(request.environment).sort(([left], [right]) => left.localeCompare(right)).flatMap(([name, value]) => ["--setenv", name, value]);
-      const args = [
+      let args = [
         "--unshare-user", "--disable-userns", "--assert-userns-disabled", "--unshare-pid", "--unshare-ipc", "--unshare-uts", "--unshare-cgroup-try", "--unshare-net",
         "--die-with-parent", "--new-session", "--clearenv", "--proc", "/proc", "--dev", "/dev", ...(this.temporaryBytes ? ["--size", String(this.temporaryBytes)] : []), "--tmpfs", "/tmp",
         "--ro-bind", "/usr", "/usr", "--ro-bind", "/bin", "/bin", "--ro-bind", "/lib", "/lib", "--ro-bind-try", "/lib64", "/lib64", "--dir", "/etc", "--ro-bind-try", "/etc/ld.so.cache", "/etc/ld.so.cache",
         mount, executionRoot, "/workspace", ...executableBind, "--remount-ro", "/dev", "--remount-ro", "/", "--chdir", mappedCwd, ...environment, mappedExecutable, ...request.args
       ];
+      if (writable) {
+        // The outer namespace creates a single sized tmpfs before the inner
+        // bwrap resolves its overlay sources. Only the final sandbox is allowed
+        // to execute the reviewed tool. Its overlay upper and /tmp share quota.
+        // A distinct 4 MiB setup /tmp is never mapped into that final sandbox.
+        const systems = ["--ro-bind", "/usr", "/usr", "--ro-bind", "/bin", "/bin", "--ro-bind", "/lib", "/lib", "--ro-bind-try", "/lib64", "/lib64", "--dir", "/etc", "--ro-bind-try", "/etc/ld.so.cache", "/etc/ld.so.cache"];
+        const namespaces = ["--unshare-user", "--unshare-pid", "--unshare-ipc", "--unshare-uts", "--unshare-cgroup-try", "--unshare-net", "--die-with-parent", "--new-session", "--clearenv", "--proc", "/proc", "--dev", "/dev"];
+        const inner = [bwrapPath, ...namespaces, "--disable-userns", "--assert-userns-disabled", ...systems,
+          "--bind", "/b122-build-storage/tmp", "/tmp", "--overlay-src", "/b122-inputs", "--overlay", "/b122-build-storage/upper", "/b122-build-storage/work", "/workspace",
+          "--ro-bind", "/b122-tool", mappedExecutable, "--remount-ro", "/dev", "--remount-ro", "/", "--chdir", mappedCwd, ...environment, mappedExecutable, ...request.args];
+        args = [...namespaces, ...systems, "--ro-bind", executionRoot, "/b122-inputs", "--ro-bind", "/proc/self/fd/3", "/b122-tool",
+          "--size", String(this.temporaryBytes), "--tmpfs", "/b122-build-storage", "--dir", "/b122-build-storage/upper", "--dir", "/b122-build-storage/work", "--dir", "/b122-build-storage/tmp",
+          "--size", "4194304", "--tmpfs", "/tmp", "--remount-ro", "/dev", "--remount-ro", "/", "--chdir", "/", ...inner];
+      }
       const bwrap = await realpath(bwrapPath);
       if (bwrap !== bwrapPath || !(await lstat(bwrap)).isFile()) throw new Error("The fixed Linux Bubblewrap executable is unavailable.");
       const child = await this.inner.start({

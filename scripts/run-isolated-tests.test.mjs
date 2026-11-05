@@ -97,6 +97,7 @@ test("only explicitly slow integration or release groups extend the bounded defa
       ["tools/layout-studio/repository-recovery.test.mjs", 120_000],
       ["tools/layout-studio/repository-execution.test.mjs", process.platform === "win32" ? 480_000 : 240_000],
       ["tools/layout-studio/repository-pipeline.test.mjs", 120_000],
+      ["tools/layout-studio/repository-temporary-build.test.mjs", 120_000],
       ["tools/layout-studio/repository-pipeline-fixtures.test.mjs", 120_000],
       ["apps/windows-companion/test/authenticated-pipe.test.ts", 240_000],
       ["apps/windows-companion/test/companion-lifecycle-helper.test.ts", 240_000],

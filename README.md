@@ -92,7 +92,9 @@ Windows worker/runtime checkpoint passes 261 groups: 1,690 tests passed and 48
 declared skips. The newer Studio Windows Run and separate stop approval pass
 all four native Windows policy jobs with an explicit guest runner double. Linux
 also connects separately reviewed local-gate and clean-reproduction recipes to
-the isolated runner and authenticated evidence. The [Windows pipeline path](docs/windows-pipelines.md)
+the isolated runner and authenticated evidence. An explicit [bounded build workspace](docs/bounded-build-workspace.md)
+lets reviewed recipes build in a disposable writable copy while preserving the live repository;
+its source/kernel checks pass and installed acceptance remains pending. The [Windows pipeline path](docs/windows-pipelines.md)
 now uses reviewed guest inputs and authenticated reports with actual signed feeds;
 native guest execution is doubled in its current tests. [Signed fixture maintenance](docs/signed-fixtures.md)
 now connects operator-reviewed public trust and exact feed metadata to these pipelines;

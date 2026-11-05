@@ -60,6 +60,8 @@ export interface RepositoryProcessRecipe {
   readonly maxOutputBytes: number;
   /** Optional v1 extension; Linux disposable roots require these exact host-pinned bytes. */
   readonly inputFiles?: readonly RepositoryInputFile[];
+  /** Explicit Linux-only disposable workspace permission; absent remains read-only in the Suite. */
+  readonly workspaceMode?: "read-only" | "temporary-build";
   readonly web?: RepositoryWebRecipe;
   readonly python?: Readonly<{ readonly interpreter: string }>;
 }
@@ -186,6 +188,7 @@ export interface RepositoryProcessStartRequest {
   readonly executionRoot?: string;
   readonly isolation?: RepositoryRuntimeIsolation;
   readonly manifestSha256: string;
+  readonly workspaceMode?: "read-only" | "temporary-build";
   readonly executable: string;
   readonly executableSha256: string;
   readonly args: readonly string[];
@@ -411,7 +414,7 @@ function validateStopRecipe(value: Record<string, unknown>, errors: string[]): R
 }
 
 function validateProcessRecipe(action: RepositoryProcessAction, value: Record<string, unknown>, allowedHttpsUrls: readonly string[], errors: string[]): RepositoryProcessRecipe {
-  exactKeys(value, ["kind", "executable", "args", "cwd", "environment", "lifecycle", "isolation", "timeoutMs", "maxOutputBytes", "web", "python", "inputFiles"], ["kind", "executable", "args", "cwd", "environment", "lifecycle", "isolation", "timeoutMs", "maxOutputBytes"], action, errors);
+  exactKeys(value, ["kind", "executable", "args", "cwd", "environment", "lifecycle", "isolation", "timeoutMs", "maxOutputBytes", "web", "python", "inputFiles", "workspaceMode"], ["kind", "executable", "args", "cwd", "environment", "lifecycle", "isolation", "timeoutMs", "maxOutputBytes"], action, errors);
   if (value.kind !== "process") errors.push(`${action} must use a process recipe.`);
   if (!boundedString(value.executable, `${action}.executable`, errors, 2_048) || !isAbsolute(value.executable as string)) errors.push(`${action}.executable must be an exact absolute executable path.`);
   const args: string[] = [];
@@ -446,6 +449,7 @@ function validateProcessRecipe(action: RepositoryProcessAction, value: Record<st
     try { inputFiles = validateRepositoryInputs(value.inputFiles); } catch (error) { errors.push(`${action}.inputFiles: ${(error as Error).message}`); }
     if (isolation !== "disposable") errors.push(`${action}.inputFiles requires disposable isolation.`);
   }
+  if (value.workspaceMode !== undefined && (value.workspaceMode !== "read-only" && value.workspaceMode !== "temporary-build" || isolation !== "disposable" || !inputFiles?.length)) errors.push(`${action}.workspaceMode requires read-only or temporary-build and exact disposable inputs.`);
   boundedInteger(value.timeoutMs, `${action}.timeoutMs`, errors, 50, maximumTimeoutMs);
   boundedInteger(value.maxOutputBytes, `${action}.maxOutputBytes`, errors, 1, maximumOutputBytes);
   const web = value.web === undefined ? undefined : validateWebRecipe(action, value.web, allowedHttpsUrls, errors);
@@ -466,6 +470,7 @@ function validateProcessRecipe(action: RepositoryProcessAction, value: Record<st
     timeoutMs: typeof value.timeoutMs === "number" ? value.timeoutMs : 1_000,
     maxOutputBytes: typeof value.maxOutputBytes === "number" ? value.maxOutputBytes : 4_096,
     ...(inputFiles ? { inputFiles } : {}),
+    ...(value.workspaceMode === "read-only" || value.workspaceMode === "temporary-build" ? { workspaceMode: value.workspaceMode } : {}),
     ...(web ? { web } : {}),
     ...(python ? { python } : {})
   };
@@ -698,6 +703,7 @@ export class RepositoryRuntime {
   private readonly executionRoots: RepositoryExecutionRootProvider;
   private readonly healthProbe: RuntimeHealthProbe;
   private readonly processSupervisor: RepositoryProcessSupervisor;
+  private readonly temporaryBuilds: boolean;
   private readonly managed = new Map<string, ManagedRecord>();
 
   constructor(
@@ -707,6 +713,7 @@ export class RepositoryRuntime {
       executionRoots?: RepositoryExecutionRootProvider;
       healthProbe?: RuntimeHealthProbe;
       processSupervisor?: RepositoryProcessSupervisor;
+      temporaryBuilds?: boolean;
     }> = {}
   ) {
     if (verified[verifiedBrand] !== true) throw new Error("Repository runtime requires a digest-verified host manifest.");
@@ -715,6 +722,7 @@ export class RepositoryRuntime {
     this.executionRoots = dependencies.executionRoots ?? defaultExecutionRoots;
     this.healthProbe = dependencies.healthProbe ?? defaultHealthProbe;
     this.processSupervisor = dependencies.processSupervisor ?? new DirectChildProcessSupervisor();
+    this.temporaryBuilds = dependencies.temporaryBuilds === true;
   }
 
   async recoverManagedProcesses(): Promise<readonly ManagedRepositoryProcess[]> {
@@ -828,6 +836,7 @@ export class RepositoryRuntime {
     if (signal?.aborted) return { status: "cancelled", summary: `${action} was cancelled before execution.`, effectDisposition: "not_started" };
     const admission = await effectGuard.check(action, this.verified.canonicalRepositoryRoot);
     if (!admission.allowed) return { status: "blocked", summary: untrustedSummary(admission.reason), effectDisposition: "not_started" };
+    if (recipe.workspaceMode !== undefined && (!this.temporaryBuilds || process.platform !== "linux")) return { status: "unavailable", summary: "Explicit isolated workspace modes are not connected to this host runtime; no host fallback was selected.", effectDisposition: "not_started" };
     let lease: RepositoryExecutionRootLease;
     try { lease = await this.executionRoots.prepare({ action, repositoryRoot: this.verified.canonicalRepositoryRoot, isolation: recipe.isolation, ...(recipe.inputFiles ? { inputFiles: recipe.inputFiles } : {}) }); }
     catch (error) {
@@ -924,6 +933,7 @@ export class RepositoryRuntime {
         executionRoot: lease.root,
         isolation: lease.isolation,
         manifestSha256: this.verified.digest,
+        ...(recipe.workspaceMode ? { workspaceMode: recipe.workspaceMode } : {}),
         executable,
         executableSha256: expectedExecutable.sha256,
         args: recipe.args,

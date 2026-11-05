@@ -7,7 +7,17 @@ separates unfinished software from exact device/account checks, and
 
 ## Installed pilot
 
-Normal installed source `3ec0549`, release
+Current installed source is `d2c413d`, release
+`d59010f455c4202cffde4bd7fec786c817e1a721c81117ec0e76e0d4465f7933`.
+It passes six update and ten actual Run/stop checks, including root/device
+write denials in the program, original input protection, exact stop/replay and
+independent exit/cleanup with zero prompts. Receipts
+`assignment-legends-1793850275117.json` and
+`installed-repository-execution-1793850446831.json` retained. Original workspace,
+modes/private endpoint/frozen Home are preserved; owned stage, bundle and proof
+checkout removed. The newer writable-copy mode is not yet installed.
+
+Previous installed source `3ec0549`, release
 `a170fa2163dd28062afd6ec24f65beb85fe1a0a791c09b4559f0607c3b8f8ce8`,
 passes six update and eight native metadata checks. Claude 2.1.317 version,
 first-party login and exact repository inventory pass through nine independently
@@ -27,6 +37,17 @@ owned synthetic packages/signing scratch were removed. Receipts
 
 ## Current backend
 
+Linux recipes now have an explicit `temporary-build` permission for a writable
+overlay copy of reviewed inputs. The overlay and `/tmp` share one 64 MiB kernel
+quota; original staged/live bytes remain unchanged. Hidden setup storage is not
+mapped into the task, root/dev remain read-only and further user namespaces are
+disabled. A host must enable this mode; imported JSON cannot enable a direct
+fallback. Review/checkpoint bind the displayed permission. Actual build, quota,
+input preservation, both pipeline receipts, replay and cancellation/exit checks
+pass. The new group/harness checks pass 22 cases, existing runtime/guardian/
+inventory 37, and build/Run/Suite/package 33; type checking passes. Installed
+acceptance is pending. [Build workspace contract](bounded-build-workspace.md).
+
 The Linux namespace now remounts its generated root and device filesystem
 read-only and disables/asserts nested user namespaces. A fresh actual test found
 that the earlier `/tmp` quota did not cover regular-file writes under `/`,
@@ -35,7 +56,7 @@ that the earlier `/tmp` quota did not cover regular-file writes under `/`,
 ENOSPC, refuses nested namespace creation and verifies the host namespace limit
 is unchanged. Thirty-one namespace/runtime/guardian/inventory cases, thirty
 actual pipeline/Suite/package regressions and type checking pass; installed
-acceptance is pending. Bounded writable build preparation remains separate work.
+acceptance is pending. The separate bounded writable mode is connected above; its installed proof is pending.
 
 Windows Run uses the protected LocalSystem storage service for new exchanges;
 there is no privilege-enabling or direct-volume fallback in normal Run. Exact
@@ -75,7 +96,7 @@ The corrected complete Linux lane at immutable `238592b` now passes all 172
 groups: 1,131 tests, 1,121 passed and ten declared skips. Receipt
 `9cc25902-466d-4ff1-a5a7-7a6bdcfb8c5d` retained; every child cleanup verified
 and owned fixtures/checkout removed. It predates the separate namespace quota
-closure, covered by the focused checks above. Current inventory is 173 groups.
+closure, covered by the focused checks above. Current inventory is 175 groups.
 
 Native Windows `5d398d2`, workflow
 [41960677205](https://github.com/SquirmyWormy275/strathex-switchyard/actions/runs/41960677205),
@@ -124,7 +145,7 @@ the independent 90-query capture; receipts are in verification. Source identity
 does not authenticate the hardware or select its physical case. No unlock,
 configuration write, reset, flash or electrical command was sent.
 
-Complete Shield/scanner execution, bounded writable build preparation, exact
+Complete Shield/scanner execution, exact
 desktop/IDE/terminal attachments and remaining frontend controls are unfinished
 implementation. The frozen UI still needs owner visual review and the remaining
 omakase flows. Continue every independently executable backend requirement.
