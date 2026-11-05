@@ -6,6 +6,7 @@ import { createDurableAbortControl } from "../../packages/control-plane/src/exec
 import { createRepositoryRecipeEvidence } from "../../apps/windows-companion/src/repository-runtime-broker.ts";
 import { pipelineDependencies } from "./repository-pipeline.mjs";
 import { shieldActions, shieldEngineVersion, validateShieldRequest, scannerPath } from "./shield-scanner-engine.mjs";
+import { evaluateShieldExceptions } from "./shield-exception-ledger.mjs";
 
 const sha = b => createHash("sha256").update(b).digest("hex");
 const engineUrl = new URL("./shield-scanner-engine.mjs", import.meta.url);
@@ -19,8 +20,10 @@ export function shieldReceiptEvidence(factory) {
     issue: factory.issue.bind(factory),
     issueRepositoryRecipeEvidence: factory.issueRepositoryRecipeEvidence.bind(factory),
     forResult(definition, result, target) {
+      const decision=result.data?.shieldExceptionEvaluation, envelope=result.data?.receiptEvidenceEnvelope;
+      if(decision!==undefined||envelope?.evidence?.toolVersions?.shieldExceptions!==undefined){if(!decision||decision.action!==definition.action||decision.targetSnapshotId!==target?.id||decision.completeness!=="incomplete"||decision.gateEligible!==false||envelope?.evidence?.toolVersions?.shieldExceptions!==`sha256:${sha(JSON.stringify(decision))}`)return undefined;}
       if (result.status !== "failed" || !shieldActions.includes(definition.action)) return factory.forResult(definition, result, target);
-      const report = result.data?.shieldReport, envelope = result.data?.receiptEvidenceEnvelope;
+      const report = result.data?.shieldReport;
       if (!report || report.schema !== "switchyard-shield-findings/v1" || report.action !== definition.action || report.engine !== shieldEngineVersion || report.outcome !== "failed" || report.completeness !== "incomplete" || !Array.isArray(report.findings) || !report.findings.length || report.findings.length > 512 || envelope?.producer !== "repository-runtime" || envelope.outcome !== "incomplete" || envelope.completeness !== "incomplete") return undefined;
       const reportDigest = sha(JSON.stringify(report));
       if (reportDigest !== envelope.evidence?.resultSha256 || reportDigest !== envelope.evidence?.outputSha256) return undefined;
@@ -82,7 +85,7 @@ export function parseShieldScannerReport(output,shield,action) {
 }
 
 export function shieldDependencies(options) {
-  const { runtime, review, target, receiptEvidence, now, resolveScannerFixtures } = options;
+  const { runtime, review, target, receiptEvidence, now, resolveScannerFixtures, resolveShieldExceptions } = options;
   const metadata = pipelineDependencies(options), shield = review.shield;
   return { ...metadata, execute: async request => {
     if (!shield || request.action !== review.action || request.target.id !== target.id || !request.effectGuard) return empty("Shield requires its exact pinned scanner review and current effect authority.");
@@ -103,12 +106,14 @@ export function shieldDependencies(options) {
       // This engine cannot attest full repository scope/history or broad security
       // coverage. Never upgrade its baseline results into a passing Shield gate.
       const fixtures = await resolveCurrent(); if (!(await guard()).allowed || control.signal.aborted) throw Error("Shield authority changed before evidence issuance.");
-      const createdAt = new Date(now()).toISOString(), expiresAt = new Date(Math.min(now() + 300000, ...fixtures.map(f => Date.parse(f.expiresAt)))).toISOString();
+      const shieldExceptionEvaluation=await evaluateShieldExceptions(resolveShieldExceptions,{action:request.action,targetSnapshotId:target.id,scannerSourceSha256:shield.engineSha256,findings:report.findings},now());
+      const createdAt = new Date(now()).toISOString(), expiresAt = new Date(Math.min(now() + 300000, ...fixtures.map(f => Date.parse(f.expiresAt)),shieldExceptionEvaluation?.expiresAt?Date.parse(shieldExceptionEvaluation.expiresAt):Infinity)).toISOString();
       const binding = { manifestSha256: review.manifestSha256, helperSha256: shield.engineSha256, helperVersion: shieldEngineVersion, resultSha256: sha(result.output), toolVersions: { node: process.versions.node, repositoryExecutable: `sha256:${review.executableIdentity.sha256}`, scanner: shieldEngineVersion, scannerSource: `sha256:${shield.engineSha256}`, scannerRequest: `sha256:${shield.requestSha256}`, ...Object.fromEntries(fixtures.map(f => [`fixture:${f.kind}:${f.id}`, `manifest=sha256:${f.manifestSha256};content=sha256:${f.contentSha256};feed=${f.feedVersion};tool=${f.toolName}@${f.toolVersion}`])) }, scannerFixtureIds: [shield.request.scanner.id], advisoryFixtureIds: shield.request.advisory ? [shield.request.advisory.id] : [], coverage: report.coverage.map(c => ({ dimension: c.dimension, status: "unavailable", fixtureId: shield.request.scanner.id })), policyVersion: request.target.policyVersion, createdAt, expiresAt };
+      if(shieldExceptionEvaluation)binding.toolVersions.shieldExceptions=`sha256:${sha(JSON.stringify(shieldExceptionEvaluation))}`;
       // Authenticate the incomplete observation and report hash. The separate
       // command receipt records findings as failed; no completion proof is issued.
       const evidence = createRepositoryRecipeEvidence(request, result, binding, now()), receiptEvidenceEnvelope = receiptEvidence.issueRepositoryRecipeEvidence(evidence, request, binding);
-      return { status: report.outcome === "failed" ? "failed" : "incomplete", summary: report.outcome === "failed" ? "Shield found baseline security or policy findings. Full repository coverage remains incomplete." : "The pinned baseline scanner ran; full repository scope and required coverage remain incomplete.", effectDisposition: result.effectDisposition, data: { shieldReport: report, receiptEvidenceEnvelope } };
+      return { status: report.outcome === "failed"&&!shieldExceptionEvaluation?.allFindingsExcepted ? "failed" : "incomplete", summary: shieldExceptionEvaluation?.allFindingsExcepted?"Exact findings have current reviewed exceptions; mandatory Shield coverage remains incomplete.":report.outcome === "failed" ? "Shield found baseline security or policy findings. Full repository coverage remains incomplete." : "The pinned baseline scanner ran; full repository scope and required coverage remain incomplete.", effectDisposition: result.effectDisposition, data: { shieldReport: report, receiptEvidenceEnvelope,...(shieldExceptionEvaluation?{shieldExceptionEvaluation}:{}) } };
     } catch { return { status: "incomplete", summary: "Shield could not verify its original scanner, signed feeds or exact report. No passing gate was issued.", effectDisposition: result?.effectDisposition ?? "not_started" }; }
     finally { control.dispose(); }
   } };

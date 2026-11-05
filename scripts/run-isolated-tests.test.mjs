@@ -103,6 +103,8 @@ test("only explicitly slow integration or release groups extend the bounded defa
       ["tools/layout-studio/repository-pipeline-fixtures.test.mjs", 120_000],
       ["tools/layout-studio/repository-validation-policy.test.mjs", process.platform === "win32" ? 300_000 : 120_000],
       ["tools/layout-studio/repository-ignored-scanner-inputs.test.mjs", process.platform === "win32" ? 300_000 : 120_000],
+      ["tools/layout-studio/repository-shield-exceptions.test.mjs", 120_000],
+      ["tools/layout-studio/repository-windows-shield-exceptions.test.mjs", process.platform === "win32" ? 300_000 : 120_000],
       ["apps/windows-companion/test/authenticated-pipe.test.ts", 240_000],
       ["apps/windows-companion/test/companion-lifecycle-helper.test.ts", 240_000],
       ["apps/windows-companion/test/council-workspace-isolation.test.ts", 240_000],

@@ -48,7 +48,7 @@ receipts and cleanup facts remain in verification and history; no model prompts.
 | --- | --- | --- |
 | Linux execution | Exact task grants, reviews, checkpoints, budgets, native guardians and replay. Run and both pipelines use read-only snapshots or explicitly approved writable copies sharing a 64 MiB overlay/temporary filesystem quota. Actual build, ENOSPC, input preservation and stop/exit checks pass. [Contract](bounded-build-workspace.md). | Filesystem bound, not a process-memory claim. Generated files are ephemeral; no new artifact write-back. |
 | Windows execution | Run and both pipelines connect exact catalogs, the protected LocalSystem storage broker, reviewed operator setup, result/ownership validation and non-upgrading recovery. [Storage](windows-storage-broker.md), [pipelines](windows-pipelines.md). | Complete interactive app/guest/UAC journey remains unaccepted; the latest service-removal correction still needs native verification. |
-| Shield baseline | Fixed heuristic scanner, signed public rule/advisory inputs, exact npm advisories/licenses, redacted findings and non-passing coverage. All four Linux actions pass actual namespace checks. The new Windows connection passes task/Git/crypto/receipt/recovery software checks with an explicit guest double. [Linux/shared scanner](shield-baseline-scanner.md), [Windows](windows-shield.md). | Full repository/ignored-secret/history scope, broader ecosystems, publisher provenance and audited expiring exceptions remain unfinished. No baseline result passes complete Shield. |
+| Shield baseline | Fixed heuristic scanner, signed public rule/advisory inputs, exact npm advisories/licenses, redacted findings and non-passing coverage. All four Linux actions pass actual namespace checks. The new Windows connection passes task/Git/crypto/receipt/recovery software checks with an explicit guest double. [Linux/shared scanner](shield-baseline-scanner.md), [Windows](windows-shield.md). | Full repository/ignored-secret/history scope, broader ecosystems, publisher provenance and automatic scope inventory remain unfinished. No baseline result passes complete Shield. |
 | SBOM | Supply Chain/Release produce CycloneDX 1.6 inventories, exact lockfile hashes, stable component references and real npm alias names. Four generated examples conform to the official schema; temporary validation tooling is removed. [Example and limits](evidence/README.md). | Workspace links unsupported; scope and dependency graph/provenance explicitly unverified. |
 | Signed feeds | Operator-selected public trust, exact package approvals, AEAD journals, guarded receipts, 64 MiB/32-allocation aggregate reservations and separately reviewed exact removal. Unknown/revoked allocations retain quota; unfamiliar contents and original uncertain outcomes remain preserved. [Contract](signed-fixtures.md). | Provenance alone never establishes scanner coverage or a security result. |
 | Native agents | Exact account/directory/session bindings, reviewed text, cancellation, uncertain-outcome recovery and owned command guardians. Claude 2.1.308/2.1.317 designer/text approval binds the exact version; actual 2.1.317 metadata passes without prompts. [Bindings](claude-task-bindings.md). | Current-version real model execution remains unaccepted. Claude Code is only an implementation contingency; no coding job was delegated. |
@@ -83,20 +83,23 @@ source-drift refusal. Whole-repository/automatic ignored-secret/history inventor
 is still unfinished. [Contract](ignored-scanner-inputs.md). Normal installed ignored-input acceptance passes at `1a5cd43` (six update/sixteen
 actual checks). Six existing pipeline/race regressions also pass.
 
-The exception ledger foundation implements exact action/target/scanner/finding
-bindings, redacted reasons, bounded expiry, append-only withdrawal and atomic
-policy/receipt retirement. Six ledger/confirmation checks and twenty journal
-regressions pass. Operator API, scan evaluation and installed exception acceptance
-are unfinished; the foundation is not an active override path.
+Reviewed expiring exceptions now connect exact current protected findings to
+Personal-only one-use operator approvals, atomic audit/budget/receipt retirement,
+immutable raw reports and separately authenticated decisions on both hosts.
+Twenty-nine core/HTTP/inventory checks and two host journeys pass. All findings
+excepted stays incomplete; withdrawal restores failure on the next scan.
+[Contract](shield-exceptions.md). Native Windows and installed exception acceptance
+remain separate; frontend exception controls are unfinished.
 
 ## Complete and native checkpoints
 
-Immutable `9a73479` passes all 180 required Linux groups: 1,157 tests,
-1,147 passed and ten declared skips. Receipt
-`isolated-test-32b40b9e-9781-41fd-9884-5ff70282cbdb.json` is retained with every
-child cleanup verified; owned fixture parent and checkout are removed. It includes
-bounded builds, Linux/Windows baseline software, direct-terminal checks and
-CycloneDX. New receipt-invalidation source and its complete run remain separate.
+Immutable `9f3024e` passes all 182 required Linux groups: 1,166 tests,
+1,156 passed and ten declared skips. Receipt
+`isolated-test-23947e9d-cdf5-4c8d-8d4b-e81335569189.json` is retained with every
+child cleanup verified; owned fixture parent and checkout are removed. It covers
+receipt retirement and the race barrier. The later ignored-input/exception-ledger
+foundation at `ace2d22` has a separate complete 185-group run in progress; current
+connected exception source is later still.
 
 Native Windows `5d398d2`, workflow
 [41960677205](https://github.com/SquirmyWormy275/strathex-switchyard/actions/runs/41960677205),

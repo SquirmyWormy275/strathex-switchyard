@@ -30,7 +30,7 @@ permissions are not inferred from copied files; publisher provenance is not
 inferred from a registry URL or integrity string. The request scope is literally
 `reviewed-inputs`; it cannot claim an entire repository. Full staged/unstaged/new
 and automatic ignored-secret inventory, relevant Git history, broad language/ecosystem
-coverage, signed publisher provenance and audited expiring exceptions remain
+coverage and signed publisher provenance remain
 unfinished implementation. This is separate from unavailable hardware/accounts.
 
 ## Configure an exact run
@@ -170,3 +170,8 @@ scans, with closed classifications and exact read-only witnesses on both hosts.
 They remain outside commit/Run/pipeline authority and the Git index. Five focused
 authority/real-Linux/Windows-guest-double cases pass.
 [Setup and remaining scope](ignored-scanner-inputs.md).
+
+Personal [reviewed exceptions](shield-exceptions.md) now connect exact protected
+findings to expiring, audited decisions. Reports keep raw findings; both hosts
+authenticate the decision separately and never upgrade missing coverage to a
+complete Shield pass. Normal installed exception acceptance is pending.

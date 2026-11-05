@@ -4,6 +4,7 @@ import { mkdir, writeFile, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { authorityFixture } from "./task-authority-fixture.mjs";
 import { createRepositoryExecution } from "../repository-execution.mjs";
+import { createShieldExceptions } from "../shield-exceptions.mjs";
 import { createScannerFixtures } from "../scanner-fixtures.mjs";
 import { createScannerAuthority, signScannerFixture } from "../../../scripts/b122-scanner-fixture.mjs";
 import { scannerFixture } from "./shield-scanner-fixture.mjs";
@@ -12,7 +13,7 @@ import { scopeHash } from "../confirmations.mjs";
 const sha = value => createHash("sha256").update(value).digest("hex");
 
 // Real task/Git/crypto/kernel boundaries; the Windows guest runner is doubled.
-export async function windowsExecutionFixture(t, { action = "run_target", pipelineReport = "complete", signedFeeds = false, shield = false, clean = false, ignoredSecrets = false, resolveScannerFixtures } = {}) {
+export async function windowsExecutionFixture(t, { action = "run_target", pipelineReport = "complete", signedFeeds = false, shield = false, clean = false, ignoredSecrets = false, exceptions = false, resolveScannerFixtures } = {}) {
   const f = await authorityFixture(t, { executionActions: connectedExecutionActions("win32") }), prerequisites = { helperSha256: "c".repeat(64), recipeRuntime: { path: "C:\\owned\\node.exe", sha256: "b".repeat(64) }, nodeVersion: "24.14.0" };
   const sample=shield?scannerFixture({action,files:{...(ignoredSecrets?{".env":"-----BEGIN PRIVATE KEY-----\nsynthetic ignored secret"}:{}),"app.js":clean||ignoredSecrets?"const ordinary=1;":"-----BEGIN PRIVATE KEY-----\neval(untrusted);","package-lock.json":JSON.stringify({lockfileVersion:3,packages:{"node_modules/synthetic":{version:"1.0.0",license:"MIT"}}})},advisory:[{ecosystem:"npm",name:"synthetic",version:"1.0.0",advisories:clean?[]:[{id:"GHSA-synthetic-only",severity:"high"}]}]}):undefined;
   if(sample)sample.content.set("request.json",Buffer.from(JSON.stringify(sample.request)));
@@ -51,7 +52,8 @@ export async function windowsExecutionFixture(t, { action = "run_target", pipeli
     stopOperation:async(_c,id)=>{stopRequests++;const override=await stopHook(id);if(override)return override;const wake=waiting.get(id);wake?.();return{accepted:Boolean(wake),stopped:Boolean(wake)};},
     stopCompartment:async()=>{for(const wake of waiting.values())wake();return{stopped:true,cleaned:true};},close:async()=>{for(const wake of waiting.values())wake();}
   };
-  const services=[];const create=()=>{const execution=createRepositoryExecution({store:f.store,authority:f.service,stateDirectory:join(f.stage,"execution"),platform:"win32",windowsRunner:runner,resolveScannerFixtures:fixtureResolver,isActive:async()=>true,now:f.now});services.push(execution);return execution;};
+  const exceptionService=exceptions?createShieldExceptions({store:f.store,authority:f.service,now:f.now}):undefined;if(exceptionService)f.onCleanup(()=>exceptionService.close());
+  const services=[];const create=()=>{const execution=createRepositoryExecution({store:f.store,authority:f.service,stateDirectory:join(f.stage,"execution"),platform:"win32",windowsRunner:runner,resolveScannerFixtures:fixtureResolver,...(exceptionService?{resolveShieldExceptions:(c,input)=>exceptionService.evaluate(c,input)}:{}),isActive:async()=>true,now:f.now});services.push(execution);return execution;};
   f.onCleanup(async()=>{for(const execution of services)await execution.close();});const execution=create(),proposed={requestId:randomUUID(),authorityId:grant.id,manifestPath:"run.json",manifestSha256:sha(bytes),action};
-  return {fixtures,sample,outputs:()=>{artifacts=true;},backendStatus:value=>{backendStatus=value;},onStop:fn=>{stopHook=fn;},stopRequests:()=>stopRequests,...f,execution,create,proposed,grant,grantInput,prerequisites,effects:()=>effects,hold:()=>{hold=true;},entered:entry};
+  return {fixtures,sample,exceptions:exceptionService,outputs:()=>{artifacts=true;},backendStatus:value=>{backendStatus=value;},onStop:fn=>{stopHook=fn;},stopRequests:()=>stopRequests,...f,execution,create,proposed,grant,grantInput,prerequisites,effects:()=>effects,hold:()=>{hold=true;},entered:entry};
 }

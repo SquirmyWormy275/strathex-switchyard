@@ -70,6 +70,18 @@ export class ShieldExceptionLedger {
       if (record) applied.push({ exceptionId: record.id, fingerprint: record.fingerprint, reason: record.reason, expiresAt: record.expiresAt });
       else remaining.push(finding.fingerprint);
     }
-    return { schema: "switchyard-shield-exception-evaluation/v1", policyDigest: scopeHash(entries), applied, unexceptedFingerprints: remaining, allFindingsExcepted: findings.length > 0 && remaining.length === 0, completeness: "incomplete", gateEligible: false, ...(applied.length ? { expiresAt: new Date(Math.min(...applied.map(record => Date.parse(record.expiresAt)))).toISOString() } : {}) };
+    return { schema: "switchyard-shield-exception-evaluation/v1", action, targetSnapshotId, scannerSourceSha256, policyDigest: scopeHash(entries), applied, unexceptedFingerprints: remaining, allFindingsExcepted: findings.length > 0 && remaining.length === 0, completeness: "incomplete", gateEligible: false, ...(applied.length ? { expiresAt: new Date(Math.min(...applied.map(record => Date.parse(record.expiresAt)))).toISOString() } : {}) };
   }
+}
+
+/** Validate the host decision separately from the unchanged pinned scanner report. */
+export async function evaluateShieldExceptions(evaluate, input, now = Date.now()) {
+  if (typeof evaluate !== "function") return undefined;
+  const result = await evaluate(input), fields = ["schema", "action", "targetSnapshotId", "scannerSourceSha256", "policyDigest", "applied", "unexceptedFingerprints", "allFindingsExcepted", "completeness", "gateEligible", ...(result?.expiresAt !== undefined ? ["expiresAt"] : [])];
+  if (!exact(result, fields) || result.schema !== "switchyard-shield-exception-evaluation/v1" || result.action !== input.action || result.targetSnapshotId !== input.targetSnapshotId || result.scannerSourceSha256 !== input.scannerSourceSha256 || !digest(result.policyDigest) || result.completeness !== "incomplete" || result.gateEligible !== false || !Array.isArray(result.applied) || !Array.isArray(result.unexceptedFingerprints)) throw Error("The exact host exception decision is invalid.");
+  const all = [...result.applied.map(record => record.fingerprint), ...result.unexceptedFingerprints], expected = input.findings.map(finding => finding.fingerprint);
+  if (all.length !== expected.length || new Set(all).size !== all.length || all.some(fingerprint => !expected.includes(fingerprint)) || result.applied.some(record => !exact(record, ["exceptionId", "fingerprint", "reason", "expiresAt"]) || !uuid(record.exceptionId) || !reference(record.reason, 512) || !Number.isFinite(Date.parse(record.expiresAt)) || Date.parse(record.expiresAt) <= now) || result.allFindingsExcepted !== (expected.length > 0 && result.unexceptedFingerprints.length === 0)) throw Error("The host exception decision changed its exact findings or lifetime.");
+  const expiresAt = result.applied.length ? new Date(Math.min(...result.applied.map(record => Date.parse(record.expiresAt)))).toISOString() : undefined;
+  if (result.expiresAt !== expiresAt) throw Error("The host exception deadline changed.");
+  return result;
 }

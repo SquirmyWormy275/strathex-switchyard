@@ -10,6 +10,7 @@ export function validationPolicyDigest(state) {
   if (state.scannerFixtureReviews?.some(row => row.status === "applying" || row.status === "outcome-unconfirmed" && row.maintenanceStoppedVerified !== true)) throw Error("Settle or reconcile the exact signed fixture maintenance operation before validation can establish evidence.");
   return scopeHash(["switchyard-validation-policy/v1",
     (state.scannerFixtureJournal ?? []).filter(entry => entry.kind.startsWith("b122.scanner-")),
+    (state.shieldExceptionJournal ?? []).filter(entry => entry.kind.startsWith("shield.exception-")),
     (state.repositoryExecutionJournal ?? []).filter(entry => entry.kind === "receipt.actions-invalidated").map(entry => entry.hash)]);
 }
 

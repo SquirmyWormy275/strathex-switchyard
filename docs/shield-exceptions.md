@@ -1,37 +1,76 @@
 # Audited, expiring Shield exceptions
 
-The protected exception ledger is implemented. Operator review/API and scanner
-application are unfinished; this ledger alone is not an active override path.
-Baseline Shield still returns failed or incomplete results.
+Switchyard connects Personal operator reviews to exact protected findings. Both
+execution hosts retain the original scanner report and authenticate a separate
+exception decision. Findings covered by current exceptions yield an incomplete
+command result; they never establish missing coverage or a complete Shield gate.
 
-Each ledger grant binds one action, complete target snapshot, pinned scanner
-source hash, protected source receipt, finding fingerprint, rule and path. A
-reason and exact expiry are required. Review accepts one minute through
-twenty-four hours; applying a review never extends its original deadline.
-Matching ends exactly at expiry. Changed scope, scanner, rule, path or fingerprint
-cannot inherit the exception. Empty findings never count as an overridden pass.
+## Review one finding
 
-Reasons are bounded and redacted. Withdrawal appends attribution, reason and
-time while preserving the original grant. Retained IDs and active duplicates
-cannot be replaced in place. The ledger caps active/history counts and uses the
-existing authenticated compartment, chained journal and byte bounds. Its
-match result always reports incomplete coverage and no gate eligibility.
+Use `POST /api/suite/host/shield-exceptions/review` with a request UUID,
+`action: "grant"`, protected `sourceReceiptId`, exact finding `fingerprint`,
+reason and canonical ISO `expiresAt`. The source must be a still-current failed
+receipt from the pinned scanner. The host checks its protected report/evidence
+binding and revalidates the original task target. Agent-authored findings,
+expired/retired receipts, broad scopes and changed targets cannot grant exceptions.
 
-The shared locked-state journal port allows a policy grant/withdrawal, prior
-validation-receipt retirement and audit records to commit in one compartment
-transaction. A fault between domains rolls back both. It introduces no external
-filesystem mutation or second state store. Existing scanner fixture maintenance
-continues using its original kernel lease and pre-effect retirement path.
+The review shows the action, target, scanner source, rule, path, reason, expiry
+and prior-receipt retirement. Apply its exact UUID and one-use token through
+`POST /api/suite/host/shield-exceptions/apply`. Both calls require the active
+Personal companion workspace. Work and task content cannot authorize exceptions.
+Ordinary snapshots omit the private reviews and journal; the explicit authenticated
+`.../list` route exposes their bounded operator metadata.
 
-Six core/confirmation cases cover exact matching and mismatches, partial
-findings, expiry boundaries, immutable withdrawal, malformed/broad proposals,
-reason redaction and cross-domain rollback. Twenty existing signed-fixture
-maintenance/removal/invalidation cases pass after extracting the shared journal
-port. The fixture tests still exercise real encrypted persistence and kernel
-leases; no account, hardware or model is required for these ledger checks.
+Expiry is one minute through twenty-four hours from review. Approval time never
+extends that deadline. The source receipt must still be unexpired immediately
+inside policy commit. Exceptions match only the original action, complete target,
+pinned scanner source, fingerprint, rule and path. Their usefulness therefore
+ends when any of those bindings changes, even before their clock expires.
 
-The next implementation connects one-use Personal operator reviews to a
-protected, still-current finding and applies those decisions alongside the raw
-scanner report. Work/task input cannot grant exceptions. Even a valid exception
-must leave mandatory missing coverage incomplete. [Current status](switchyard-status.md)
-records this foundation separately from installed scanner acceptance.
+## Apply without hiding evidence
+
+The policy mutation, budget, audit, maintenance receipt and prior validation
+receipt retirement commit in one locked compartment transaction. A fault rolls
+back every domain; a consumed approval cannot replay the mutation. If only the
+commit acknowledgement is lost, retry reads the retained exact result and does
+not create another exception. No external repository or filesystem effect occurs.
+
+The next separately reviewed scan preserves raw findings, their counts and report
+hash. It adds `shieldExceptionEvaluation`, including exact binding, applied IDs,
+redacted reasons and remaining finding fingerprints. The authenticated evidence
+binds that decision's SHA-256 and clips its receipt deadline to applicable
+exception expiry as well as feed deadlines. Partial exceptions leave failure;
+all findings excepted still leaves incomplete mandatory coverage. Empty findings
+do not count as an overridden pass. Receipt commit refuses concurrent policy drift.
+
+Withdraw an exact retained exception with a new review (`action: "revoke"`,
+`exceptionId`, reason). Withdrawal appends attribution and time, preserves the
+original grant and retires prior validation receipts atomically. Retained IDs and
+active duplicates cannot be replaced in place. The ledger caps active/history
+counts and uses the existing authenticated journal byte bounds.
+
+## Verification and limits
+
+Twenty-nine core/controller/HTTP/inventory cases pass, including exact mismatches,
+expiry, one-use review, reason redaction, cross-domain rollback, lost replies,
+Work rejection and snapshot privacy. Separate real Linux namespace and Windows
+host/guest-double journeys pass: failed scan, exact approval, incomplete repeat
+with authenticated unchanged findings, withdrawal, then failure again. New
+Windows native CI and normal installed exception acceptance remain separate.
+Eleven final package/controller checks, forty Suite/maintenance/Shield/race
+regressions and type checking also pass.
+
+The installed verifier supports a synthetic three-scan journey:
+
+```sh
+mise exec node@24.14.0 -- node scripts/verify-shield-host.mjs \
+  --synthetic --action=shield_change_scan --ignored-secret-input \
+  --reviewed-exception
+```
+
+That mode uses ordinary feed freshness and a separately clipped exception
+lifetime. The bounded-feed verifier remains a separate acceptance path. No key
+material is submitted to a model; no device, microphone, tenant or account UI is
+opened. Complete repository/history/ecosystem/provenance coverage and frontend
+exception controls remain unfinished. [Current verification](verification.md)
+records accepted versions separately from those limitations.

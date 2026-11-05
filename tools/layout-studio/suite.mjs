@@ -32,6 +32,7 @@ import { createRepositoryEffectRecovery } from "./repository-effect-recovery.mjs
 import { createRepositoryCommits } from "./repository-commits.mjs";
 import { createRepositoryExecution } from "./repository-execution.mjs";
 import { createScannerFixtures } from "./scanner-fixtures.mjs";
+import { createShieldExceptions } from "./shield-exceptions.mjs";
 import { createWindowsStorageSetup } from "./windows-storage-setup.mjs";
 import { connectedExecutionActions } from "./repository-execution-actions.mjs";
 import { createClientLaunch } from "./client-launch.mjs";
@@ -39,7 +40,7 @@ import { createClientIntegrations } from "./client-integrations.mjs";
 import { clientRecipe } from "../../integrations/client-recipes.mjs";
 
 const kinds = ["interruption", "resume", "switch", "handoff", "status", "review", "approval", "failure", "recovery", "other"];
-export function createSuite({ store = createSuiteStore(), platform = process.platform, agents, voice = localVoice(), hypr = runHypr, devices, copilot, coding, codexSubmissions, claudeCoding, claudeSubmissions, keyboardIndicators = createKeyboardIndicators(), taskAuthority, taskAuthorityFactory = createTaskAuthority, repositoryRecovery, repositoryCommits, repositoryExecution, storageSetup, fixtureAdministration, clientLaunch, spawnExample = spawn, foreground, scheduleForeground = setInterval, clearForeground = clearInterval } = {}) {
+export function createSuite({ store = createSuiteStore(), platform = process.platform, agents, voice = localVoice(), hypr = runHypr, devices, copilot, coding, codexSubmissions, claudeCoding, claudeSubmissions, keyboardIndicators = createKeyboardIndicators(), taskAuthority, taskAuthorityFactory = createTaskAuthority, repositoryRecovery, repositoryCommits, repositoryExecution, storageSetup, fixtureAdministration, shieldExceptions, clientLaunch, spawnExample = spawn, foreground, scheduleForeground = setInterval, clearForeground = clearInterval } = {}) {
   agents ??= createAgentService({ store, runtimeRoot: join(process.env.XDG_RUNTIME_DIR || process.env.LOCALAPPDATA || join(homedir(), ".local/state"), "switchyard-design") });
   devices ??= createDeviceService({ store });
   copilot ??= createCopilot({ store });
@@ -63,7 +64,8 @@ export function createSuite({ store = createSuiteStore(), platform = process.pla
   const repositoryDirectory = join(process.env.XDG_STATE_HOME || process.env.LOCALAPPDATA || join(homedir(), ".local/state"), "strathex-switchyard/repository-effects");
   repositoryCommits ??= createRepositoryCommits({ store, authority: taskAuthority, stateDirectory: repositoryDirectory });
   fixtureAdministration ??= createScannerFixtures({ store, stateDirectory: join(repositoryDirectory, "fixtures"), isActive: async c => { await loadSelection(); return c === activeCompartment; } });
-  repositoryExecution ??= createRepositoryExecution({ store, authority: taskAuthority, platform, resolveScannerFixtures: (c, input) => fixtureAdministration.resolve(c, input), stateDirectory: join(repositoryDirectory, "execution"), isActive: async c => { await loadSelection(); return c === activeCompartment; } });
+  shieldExceptions ??= createShieldExceptions({ store, authority: taskAuthority, isActive: async c => { await loadSelection(); return c === activeCompartment; } });
+  repositoryExecution ??= createRepositoryExecution({ store, authority: taskAuthority, platform, resolveScannerFixtures: (c, input) => fixtureAdministration.resolve(c, input), resolveShieldExceptions: (c,input) => shieldExceptions.evaluate(c,input), stateDirectory: join(repositoryDirectory, "execution"), isActive: async c => { await loadSelection(); return c === activeCompartment; } });
   repositoryRecovery ??= createRepositoryEffectRecovery({ store, stateDirectory: repositoryDirectory, isActive: async c => { await loadSelection(); return c === activeCompartment; } });
   storageSetup ??= createWindowsStorageSetup({store,platform,isActive:async c=>{await loadSelection();return c===activeCompartment;}});
   clientLaunch ??= createClientLaunch({ store, stateDirectory: join(repositoryDirectory, "client-launches"), isActive: async c => { await loadSelection(); return c === activeCompartment; } });
@@ -160,8 +162,8 @@ export function createSuite({ store = createSuiteStore(), platform = process.pla
         await loadSelection();
         if (activeCompartment !== compartment) {
           await matrixDiagnostics.stopCompartment(activeCompartment);
-          const executionStop = await repositoryExecution.stopCompartment(activeCompartment), commitStop = await repositoryCommits.stopCompartment(activeCompartment), recoveryStop = await repositoryRecovery.stopCompartment(activeCompartment), clientStop = await clientLaunch.stopCompartment(activeCompartment), authorityStop = await taskAuthority.stopCompartment(activeCompartment), storageStop=await storageSetup.stopCompartment(activeCompartment), fixturesStop=await fixtureAdministration.stopCompartment(activeCompartment);
-          if (executionStop?.stopped === false || commitStop?.stopped === false || recoveryStop?.stopped === false || clientStop?.stopped === false || authorityStop?.stopped === false || storageStop?.stopped===false || fixturesStop?.stopped===false) throw new Error("An owned repository, client or host-setup guardian has not verified exit; workspace selection was preserved.");
+          const executionStop = await repositoryExecution.stopCompartment(activeCompartment), commitStop = await repositoryCommits.stopCompartment(activeCompartment), recoveryStop = await repositoryRecovery.stopCompartment(activeCompartment), clientStop = await clientLaunch.stopCompartment(activeCompartment), authorityStop = await taskAuthority.stopCompartment(activeCompartment), storageStop=await storageSetup.stopCompartment(activeCompartment), fixturesStop=await fixtureAdministration.stopCompartment(activeCompartment), exceptionsStop=await shieldExceptions.stopCompartment(activeCompartment);
+          if (executionStop?.stopped === false || commitStop?.stopped === false || recoveryStop?.stopped === false || clientStop?.stopped === false || authorityStop?.stopped === false || storageStop?.stopped===false || fixturesStop?.stopped===false || exceptionsStop?.stopped===false) throw new Error("An owned repository, client or host-setup guardian has not verified exit; workspace selection was preserved.");
           pauseMonitor(activeCompartment); await foreground.stopCompartment?.(activeCompartment);
           await store.update(activeCompartment, "compartment-suspend-sources", (s) => { for (const o of s.observations) if (o.status === "recording") o.status = "paused"; for (const v of s.voice) if (v.status === "recording") v.status = "paused"; });
         }
@@ -179,12 +181,12 @@ export function createSuite({ store = createSuiteStore(), platform = process.pla
         });
         if (body.mode === "keyboard-only") {
           await matrixDiagnostics.stopCompartment(compartment);
-          const executionStop = await repositoryExecution.stopCompartment(compartment), commitStop = await repositoryCommits.stopCompartment(compartment), recoveryStop = await repositoryRecovery.stopCompartment(compartment), clientStop = await clientLaunch.stopCompartment(compartment), authorityStop = await taskAuthority.stopCompartment(compartment), storageStop=await storageSetup.stopCompartment(compartment), fixturesStop=await fixtureAdministration.stopCompartment(compartment);
+          const executionStop = await repositoryExecution.stopCompartment(compartment), commitStop = await repositoryCommits.stopCompartment(compartment), recoveryStop = await repositoryRecovery.stopCompartment(compartment), clientStop = await clientLaunch.stopCompartment(compartment), authorityStop = await taskAuthority.stopCompartment(compartment), storageStop=await storageSetup.stopCompartment(compartment), fixturesStop=await fixtureAdministration.stopCompartment(compartment), exceptionsStop=await shieldExceptions.stopCompartment(compartment);
           pauseMonitor(compartment);
           // Stop the exact print continuation before reconciling the original
           // background inventory, which can briefly report the same session.
           const claudeTextStop = await claudeSubmissions.stopCompartment(compartment).catch(() => ({ stopped: false }));
-          const stopped = await Promise.all([executionStop, commitStop, recoveryStop, clientStop, authorityStop, storageStop, fixturesStop, foreground.stopCompartment?.(compartment), agents.stopCompartment?.(compartment), coding.stopCompartment?.(compartment), codexSubmissions.stopCompartment(compartment), claudeTextStop, voiceQueue.stopCompartment(compartment), claudeCoding.stopCompartment?.(compartment), ...["custom", "langchain"].map((kind) => stopExample(compartment, kind))]);
+          const stopped = await Promise.all([executionStop, commitStop, recoveryStop, clientStop, authorityStop, storageStop, fixturesStop, exceptionsStop, foreground.stopCompartment?.(compartment), agents.stopCompartment?.(compartment), coding.stopCompartment?.(compartment), codexSubmissions.stopCompartment(compartment), claudeTextStop, voiceQueue.stopCompartment(compartment), claudeCoding.stopCompartment?.(compartment), ...["custom", "langchain"].map((kind) => stopExample(compartment, kind))]);
           result.ownedProcessesStopped = stopped.every((r) => !r || r.stopped !== false && r.status !== "stop-unconfirmed");
           if (!result.ownedProcessesStopped) throw new Error("Keyboard-only mode was saved, but an owned process stop is unconfirmed. No new provider or recording operation is permitted.");
         }
@@ -197,6 +199,13 @@ export function createSuite({ store = createSuiteStore(), platform = process.pla
         if (Object.keys(proposal).some(k => k !== "compartment")) throw Error("Inspect only this exact compartment's signed fixture maintenance.");
         if (path.endsWith("/recover")) { await fixtureAdministration.list(compartment); return fixtureAdministration.recover(compartment); }
         return fixtureAdministration.list(compartment);
+      }
+      if (["/api/suite/host/shield-exceptions/list", "/api/suite/host/shield-exceptions/review", "/api/suite/host/shield-exceptions/apply"].includes(path)) {
+        const { workspaceBaseUrl, ...proposal } = body;
+        if (path.endsWith("/review")) return shieldExceptions.review(compartment, proposal);
+        if (path.endsWith("/apply")) return shieldExceptions.apply(compartment, proposal);
+        if (Object.keys(proposal).some(key => key !== "compartment")) throw Error("Inspect only this exact compartment's reviewed finding exceptions.");
+        return shieldExceptions.list(compartment);
       }
       if (path === "/api/suite/coding/authority/review") return taskAuthority.review(compartment, body);
       if(["/api/suite/host/windows-storage/inspect","/api/suite/host/windows-storage/list","/api/suite/host/windows-storage/review","/api/suite/host/windows-storage/apply"].includes(path)){
@@ -343,7 +352,7 @@ export function createSuite({ store = createSuiteStore(), platform = process.pla
         const s = await store.snapshot(compartment);
         // Recovery packets include original index bytes and private ownership
         // records. Explicit recovery routes expose observations, never backups.
-        const { repositoryEffectJournal, repositoryRecoveryJournal, repositoryEffectCheckpoints, repositoryEffects, repositoryCommitReviews, clientLaunches, repositoryExecutions, repositoryExecutionJournal, repositoryExecutionReviews, repositoryExecutionStaging, repositoryExecutionStops, repositoryExecutionStopJournal, repositoryWindowsInputs, repositoryWindowsGuests, repositoryWindowsGuestCommands, repositoryWindowsTools, repositoryWindowsImages, repositoryWindowsBrokerExchanges, repositoryWindowsRuns, windowsStorageNative,windowsStorageReviews,windowsStorageJournal,scannerFixtureReviews,scannerFixtureJournal,...snapshot } = s;
+        const { repositoryEffectJournal, repositoryRecoveryJournal, repositoryEffectCheckpoints, repositoryEffects, repositoryCommitReviews, clientLaunches, repositoryExecutions, repositoryExecutionJournal, repositoryExecutionReviews, repositoryExecutionStaging, repositoryExecutionStops, repositoryExecutionStopJournal, repositoryWindowsInputs, repositoryWindowsGuests, repositoryWindowsGuestCommands, repositoryWindowsTools, repositoryWindowsImages, repositoryWindowsBrokerExchanges, repositoryWindowsRuns, windowsStorageNative,windowsStorageReviews,windowsStorageJournal,scannerFixtureReviews,scannerFixtureJournal,shieldExceptionJournal,shieldExceptionReviews,...snapshot } = s;
         return { ...snapshot, voice: s.voice.map((v) => ({ ...v, chunks: v.chunks.map(({ audio, ...c }) => ({ ...c, pendingAudio: Boolean(audio) })) })), observationSummaries: s.observations.map(observationSummary) };
       }
       if (path === "/api/suite/profile/save") return store.saveProfile(compartment, body.profile);
@@ -453,6 +462,6 @@ export function createSuite({ store = createSuiteStore(), platform = process.pla
       if (binding.targetKind === "client-surface") return { available: true, implementation: connection.implementation, provider: binding.provider, roleId: binding.roleId, intent: binding.intent, capability: "launch-only", recipeId: binding.targetId, sessionIdentified: false, evidence: "exact fixed homepage launch request; no account, window focus, resume or conversation identity verified" };
       return { available: true, implementation: connection.implementation, provider: binding.provider, roleId: binding.roleId, intent: binding.intent, evidence: binding.targetKind === "coding-task" ? "exact coding-task identity; runtime status or owned read-only daemon resume, without window focus, completion or mediated-control authority" : "exact owned configuration conversation or authenticated adapter session; not general coding-task control" };
     },
-    async close() { closed = true; const boundaryStops = await Promise.allSettled([matrixDiagnostics.close(), repositoryExecution.close(), repositoryCommits.close(), repositoryRecovery.close(), clientLaunch.close(), taskAuthority.close(), storageSetup.close(), fixtureAdministration.close()]); readoutProfiles.close(); for (const timer of monitors.values()) clearForeground(timer); monitors.clear(); for (const key of new Set([...examples.keys(), ...exampleStarts.keys()])) exampleGenerations.set(key, (exampleGenerations.get(key) ?? 0) + 1); await Promise.allSettled(exampleStarts.values()); let claudeStopError; try { await claudeSubmissions.close(); } catch (error) { claudeStopError = error; } await Promise.all([foreground.close?.(), agents.close(), coding.close?.(), codexSubmissions.close(), voiceQueue.close(), claudeCoding.close?.(), keyboardIndicators.close().then(result => { if (result.stopped !== true) throw new Error("Owned indicator probe exit is unconfirmed."); }), ...[...examples.values()].map((child) => stopOwnedChild(child))]); if (claudeStopError) throw claudeStopError; const failedBoundary = boundaryStops.find(r => r.status === "rejected"); if (failedBoundary) throw failedBoundary.reason; }
+    async close() { closed = true; const boundaryStops = await Promise.allSettled([matrixDiagnostics.close(), repositoryExecution.close(), repositoryCommits.close(), repositoryRecovery.close(), clientLaunch.close(), taskAuthority.close(), storageSetup.close(), fixtureAdministration.close(), shieldExceptions.close()]); readoutProfiles.close(); for (const timer of monitors.values()) clearForeground(timer); monitors.clear(); for (const key of new Set([...examples.keys(), ...exampleStarts.keys()])) exampleGenerations.set(key, (exampleGenerations.get(key) ?? 0) + 1); await Promise.allSettled(exampleStarts.values()); let claudeStopError; try { await claudeSubmissions.close(); } catch (error) { claudeStopError = error; } await Promise.all([foreground.close?.(), agents.close(), coding.close?.(), codexSubmissions.close(), voiceQueue.close(), claudeCoding.close?.(), keyboardIndicators.close().then(result => { if (result.stopped !== true) throw new Error("Owned indicator probe exit is unconfirmed."); }), ...[...examples.values()].map((child) => stopOwnedChild(child))]); if (claudeStopError) throw claudeStopError; const failedBoundary = boundaryStops.find(r => r.status === "rejected"); if (failedBoundary) throw failedBoundary.reason; }
   };
 }

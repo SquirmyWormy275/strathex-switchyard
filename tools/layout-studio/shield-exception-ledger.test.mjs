@@ -6,7 +6,7 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { createSuiteStore } from "./suite-store.mjs";
 import { repositoryEffectJournal, repositoryEffectTransaction } from "./repository-effect-journal.mjs";
-import { ShieldExceptionLedger, validateException } from "./shield-exception-ledger.mjs";
+import { ShieldExceptionLedger, validateException, evaluateShieldExceptions } from "./shield-exception-ledger.mjs";
 import { ReceiptLedger } from "../../packages/control-plane/src/receipts.ts";
 
 async function fixture(t) {
@@ -57,4 +57,10 @@ test("policy change and prior receipt retirement commit atomically across protec
   });
   await assert.rejects(change(true), /transaction failure/); assert.equal((await execution.get(receipt.id)).invalidatedBy, undefined); assert.deepEqual(await f.ledger.list(), []);
   await change(false); assert.equal((await execution.get(receipt.id)).invalidatedBy, "synthetic:policy-change"); assert.equal((await f.ledger.list()).length, 1); assert.equal(await f.journal.verifyChain(), true);
+});
+
+test("host attestation refuses altered exception scope, missing findings, deadline substitution and claims of complete coverage", async t => {
+  const f = await fixture(t); await f.ledger.grant(f.input, "authenticated-synthetic-review"); const result = await f.ledger.evaluate(f.request);
+  assert.deepEqual(await evaluateShieldExceptions(() => result, f.request, f.now()), result);
+  for (const changed of [{ ...result, targetSnapshotId: "e".repeat(64) }, { ...result, scannerSourceSha256: "f".repeat(64) }, { ...result, allFindingsExcepted: false }, { ...result, gateEligible: true }, { ...result, completeness: "complete" }, { ...result, applied: [] }, { ...result, expiresAt: new Date(f.now() + 120000).toISOString() }, { ...result, applied: [{ ...result.applied[0], expiresAt: new Date(f.now()).toISOString() }] }]) await assert.rejects(evaluateShieldExceptions(() => changed, f.request, f.now()));
 });
