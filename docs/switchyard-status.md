@@ -5,6 +5,18 @@ The F77 is the connected pilot, not a scope limit. The [requirement ledger](swit
 separates unfinished software from checks requiring an exact device, account or
 host. [Verification](verification.md) retains accepted and failed checkpoints.
 
+The latest complete Linux checkpoint is immutable `112efdc`: 211/211 groups,
+1,246 passed tests and ten declared skips, with every child cleanup verified and
+owned fixture/worktree removed. Windows client software at the same PR head
+passes six groups/61 tests with an independently verified artifact digest.
+Neither result substitutes for native Windows NTFS/guest acceptance.
+
+Selected first-parent history witnessing now passes 38 isolated history/index/
+runner checks. Actual raw commit links, reconstructed tree hashes, selected old
+blob bytes and eleven real native exits verify without source/message disclosure
+or repository writes. Historical scanning remains unfinished; installed history
+witness acceptance is pending. [Contract](git-history-inputs.md).
+
 ## Installed application
 
 Latest installed source `112efdc`, release

@@ -7,6 +7,7 @@ import { createRepositoryInspection } from "./repository-inspection.mjs";
 import { connectedExecutionActions, linuxShieldActions } from "./repository-execution-actions.mjs";
 import { ignoredTreeRoots } from "./ignored-tree-policy.mjs";
 import { gitIndexPaths } from "./git-index-inputs.mjs";
+import { historySelection } from "./git-history-inputs.mjs";
 const uuid = v => typeof v === "string" && /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/.test(v);
 const taskDigest = t => scopeHash([t.id, t.provider, t.sessionId, t.repositoryRoot, t.repositoryIdentity, t.accountFingerprint, t.status, t.nativeTransport, t.nativeIdentityVerified, t.launchPolicy]);
 const workspaceDigest = s => scopeHash([s.id, s.policy, s.mode, s.modeSelectedAt ?? null, s.accounts, s.taskAuthorityEpoch ?? 0]);
@@ -98,6 +99,13 @@ export function createTaskAuthority({ store, checkNative, isActive = async () =>
   const scope = (c, result) => scopeHash(["switchyard-task-authority/v1", c, result.binding, result.workspace, result.snapshot.id, result.proposed]);
   const view = record => ({ ...structuredClone(record), status: record.grant.revokedAt ? "revoked" : Date.parse(record.grant.expiresAt) <= now() ? "expired" : "issued", targetCurrentness: "requires-revalidation", nativePermissionsChanged: false, providerTaskCompletionVerified: false, localCommitExecutionImplemented: Boolean(localCommitExecutionImplemented), connectedExecutionActions: [...executionActions] });
   return {
+    async historyInputs(c,input){return exclusive(c,async generation=>{
+      if(!input||Object.keys(input).some(key=>!["taskId","compartment","paths","depth"].includes(key))||!uuid(input.taskId)||input.compartment!==undefined&&input.compartment!==c)throw Error("Witness only named bounded history inputs for one bound task; arbitrary commits, refs, commands and policies are refused.");
+      const selected=historySelection(input.paths,input.depth),{state,task}=await access(c,input.taskId,generation),binding=taskDigest(task),workspace=workspaceDigest(state);
+      if(typeof checkNative!=="function"||typeof inspection.historyInputs!=="function")throw Error("The native history input verifier is unavailable.");
+      const authorize=async()=>{const fresh=await access(c,task.id,generation);if(taskDigest(fresh.task)!==binding||workspaceDigest(fresh.state)!==workspace)throw Error("The exact task, account or workspace changed during history witnessing.");};
+      await checkNative(c,task);await authorize();const result=await inspection.historyInputs(c,task,selected.paths,selected.depth,authorize);await authorize();await checkNative(c,task);await authorize();return{...result,taskId:task.id,provider:task.provider,nativePermissionsChanged:false};
+    });},
     async useIndexInputs(c, id, action, selectedPaths, consume) { return exclusive(c, async generation => {
       if (!linuxShieldActions.includes(action) || typeof consume !== "function" || typeof inspection.useIndexInputs !== "function" || typeof checkNative !== "function") throw Error("Private index input consumption is available only to the connected pinned Shield scanner.");
       const selected = gitIndexPaths(selectedPaths), initial = await this.assertCurrent(c, id, action), binding = initial.record.taskDigest, workspace = initial.record.workspaceDigest;
