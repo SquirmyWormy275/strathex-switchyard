@@ -67,7 +67,14 @@ hashes, independent exits and cleanup. It injects general-action and wrong-objec
 packets after JavaScript validation to test actual C# refusal. A physical source
 alias and unselected credential must remain unchanged. The small receipt records
 `sourceGitObserved:false`: this proves the native staging component, not task/Git
-freshness or a guest scan. Its Windows CI acceptance remains pending.
+freshness or a guest scan. Native job `127212549882` in workflow `42017703826` now passes all six
+checks with three independently stopped guardians and owned scratch removed.
+Artifact `13411040491` archive SHA-256 is
+`936db7b13a507af66bb2266789afff743c243f36ec3aa425a21a7d43775591f8`;
+its digest and PR head `bd77ec4` verify. The artifact uses merge revision
+`b5295a6`. Source Git freshness and native guest scans remain separate. The overall
+filesystem workflow failed in another contract; native component success does not
+upgrade that outcome. [Evidence summary](evidence/windows-bd77-native-summary.json).
 
 See [the installed Linux staged-scan path](staged-shield-inputs.md) for the already
 connected implementation and [index byte witnessing](git-index-inputs.md) for the

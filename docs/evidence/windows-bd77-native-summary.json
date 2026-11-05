@@ -1,0 +1,121 @@
+{
+  "schema": "switchyard-native-windows-evidence-summary/v1",
+  "pullRequestHead": "bd77ec4159d9da4a4b537afe852440210c26af34",
+  "artifactRevision": "b5295a67b55e02064daf3b0a5494332212817b7f",
+  "workflowRun": 42017703826,
+  "nativeJob": 127212549882,
+  "scope": "disposable-native-Windows-host-not-guest-or-user-account",
+  "helperSha256": "840fd22e27d6166379c27caf512754b0c83eedcb1dfe31c340e6d3e81a8e0ae6",
+  "artifacts": [
+    {
+      "id": 13411040491,
+      "name": "switchyard-windows-index-native-b5295a67b55e02064daf3b0a5494332212817b7f",
+      "archiveSha256": "936db7b13a507af66bb2266789afff743c243f36ec3aa425a21a7d43775591f8",
+      "localReceipt": "windows-bd77-index-native.json",
+      "receiptSha256": "0c1581a2cfbe90cbae592160bbe8f36c46824892f6b695013852ece0838dd447",
+      "success": true
+    },
+    {
+      "id": 13411035059,
+      "name": "switchyard-storage-contract-inspect-cli-b5295a67b55e02064daf3b0a5494332212817b7f",
+      "archiveSha256": "59c7fa92e85a83ad45a78b40a535ef471ce2e37ff010141a929070f6e2c821be",
+      "localReceipt": "windows-bd77-inspect-cli.json",
+      "receiptSha256": "a22a657bc2d3b55aae5af565ec1ec03bbefa88bcd6504c06fd5f490f8a8d3487",
+      "success": true
+    },
+    {
+      "id": 13410806084,
+      "name": "switchyard-storage-contract-history-windows-scanner-b5295a67b55e02064daf3b0a5494332212817b7f",
+      "archiveSha256": "e00089b468f0def86575c22e792b22dce1994b949f94fce9cb1eb133e6d93251",
+      "localReceipt": "windows-bd77-history-reviewed-scanner.json",
+      "receiptSha256": "ba1022957bc794e2afee7d7b048a6cd25f6c61cc0b196ee64a955894870372e6",
+      "success": true
+    },
+    {
+      "id": 13410786321,
+      "name": "switchyard-windows-history-native-b5295a67b55e02064daf3b0a5494332212817b7f",
+      "archiveSha256": "95b4b31c9eb6a66b09191ee864cc31cf65d9bfdce1724a1ebf045a6d3ce1f954",
+      "localReceipt": "windows-bd77-history-native.json",
+      "receiptSha256": "810f9caaeaba74fec812a87b8ca16725074a1561c5b70105d655a1b317c7e453",
+      "success": true
+    },
+    {
+      "id": 13410691241,
+      "name": "switchyard-storage-broker-protocol-b5295a67b55e02064daf3b0a5494332212817b7f",
+      "archiveSha256": "5bb7ea91bcbd45fb25dc65f77970948df3ea5aace7189be3f8b8302df1ab3030",
+      "localReceipt": "windows-bd77-broker-protocol.json",
+      "receiptSha256": "a8c137c1a0109024e791ada899b165053551d3e3a47dda05ea0629d4a32edf50",
+      "success": true
+    },
+    {
+      "id": 13410676426,
+      "name": "switchyard-windows-filesystem-b5295a67b55e02064daf3b0a5494332212817b7f",
+      "archiveSha256": "da6d509e1fb4736329b05a128a4a152a81af62b7c2ac32905bb29e7178de719b",
+      "localReceipt": "windows-bd77-filesystem.json",
+      "receiptSha256": "a6b94d82a1da205fe9450c0775f7795cd392d552a82d29b410b868104c2bf2d0",
+      "success": true
+    },
+    {
+      "id": 13410213136,
+      "name": "switchyard-storage-broker-bootstrap-b5295a67b55e02064daf3b0a5494332212817b7f",
+      "archiveSha256": "c81720dc5a6127d9797139c3e7e6323bbea683f824e0410623ac23f13024967c",
+      "localReceipt": "windows-bd77-broker-bootstrap.json",
+      "receiptSha256": "f6553628b162b63c80361b73f9f1948754b12e48261042c4cbc86b074b730296",
+      "success": true
+    },
+    {
+      "id": 13410053625,
+      "name": "switchyard-storage-broker-exchange-b5295a67b55e02064daf3b0a5494332212817b7f",
+      "archiveSha256": "fdc17cb9ee590c114dcaf7676898cd43587c5b2c42fb003007bce5625eb8d1e5",
+      "localReceipt": "windows-bd77-broker-exchange.json",
+      "receiptSha256": "39674271a5b68e8b59385d33f71dc1368257f83f2e6fff25ede90872ef862304",
+      "success": true
+    }
+  ],
+  "nativeIndex": {
+    "checks": 6,
+    "independentlyStoppedGuardians": 3,
+    "ownedScratchRemoved": true,
+    "sourceGitObserved": false
+  },
+  "nativeHistory": {
+    "checks": 6,
+    "independentlyStoppedGuardians": 3,
+    "ownedScratchRemoved": true,
+    "sourceGitObserved": false
+  },
+  "protocol": {
+    "portableChecks": 223,
+    "protectedFileChecks": 16,
+    "indexPacketChecks": 49,
+    "historyPacketChecks": 62
+  },
+  "filesystem": {
+    "checks": 30,
+    "nativeCalls": 39,
+    "ownedDiskAttached": true,
+    "ownedDiskDetached": true
+  },
+  "broker": {
+    "restrictedMetadataChecks": 13,
+    "restrictedExchangeChecks": 31,
+    "javascriptOwnerChecks": 8,
+    "serviceAndFilesRemoved": true,
+    "nativeExitVerified": true,
+    "normalUserSetupAccepted": false,
+    "javascriptOwnerOrdinaryUserToken": false
+  },
+  "softwareContracts": {
+    "inspectorTests": 11,
+    "historicalCodebaseAndReleaseTests": 2,
+    "allChildCleanupVerified": true,
+    "guestAndGuardianDoublesRetained": true
+  },
+  "guestAccepted": false,
+  "interactiveSetupAccepted": false,
+  "providerAccountAccepted": false,
+  "keyboardHardwareAccepted": false,
+  "archivesRetainedLocally": false,
+  "filesystemWorkflowConclusion": "failure",
+  "nativeJobConclusion": "success"
+}

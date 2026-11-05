@@ -111,14 +111,16 @@ scan review; its metadata remains incomplete and grants no authority. A separate
 blobs without returning source text or treating that observation as a scan.
 The installed [read-only inspector](docs/inspect-cli.md) exposes these readers as
 `switchyard inspect`; start with `switchyard inspect --help`. It creates no tasks, grants,
-prompts or scans.
+prompts or scans. Its normal installed-launcher demonstration passes with the
+actual selected workspace, independent query exits and full restoration.
 The [history witness](docs/git-history-inputs.md) verifies bounded raw commit,
 tree and selected old blob identities without disclosing source or messages.
 [Linux historical scans](docs/historical-shield-inputs.md) now inspect reviewed
 first-parent versions, retaining incomplete scope and original Git provenance.
 [Explicit staged scans](docs/staged-shield-inputs.md) inspect both index and
 worktree copies: Linux has installed acceptance; the Windows reviewed connection
-has software checks with native staging/guest acceptance kept separate.
+has software checks and independently verified native NTFS staging. Guest
+execution and ordinary-user account acceptance remain separate.
 The [Windows scanner path](docs/windows-shield.md)
 uses the same pinned engine through reviewed guest execution; its tests double the guest.
 [Explicit ignored inputs](docs/ignored-scanner-inputs.md) let the pinned scanner

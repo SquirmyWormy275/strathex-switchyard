@@ -5,12 +5,13 @@ The F77 is the connected pilot, not a scope limit. The [requirement ledger](swit
 separates unfinished software from checks requiring an exact device, account or
 host. [Verification](verification.md) retains accepted and failed checkpoints.
 
-The latest complete Linux checkpoint is immutable `13635bb`: 217/217 groups,
-1,293 tests, 1,283 passed and ten declared skips. Every child cleanup verifies,
-owned fixture/worktree removed (`isolated-test-799530a3-c749-4c04-b5f5-7503e7b7c0f6.json`).
-This includes historical scanning, the Windows connection and package/recovery
-corrections; later inspector changes remain separately tested. Native Windows
-NTFS/guest acceptance is separate.
+The latest complete Linux checkpoint is immutable `bd77ec4`: 218/218 groups,
+1,304 tests, 1,294 passed and ten declared skips. Every child cleanup verifies;
+owned fixtures, dependency aliases and checkout are removed
+(`isolated-test-386e9c91-d440-4c1c-a8d8-baf1338f6221.json`). This includes the
+selected-workspace inspector correction. Windows native staging and broker
+component acceptance now have digest-verified evidence; guest/account acceptance
+remains separate. [Native summary](evidence/windows-bd77-native-summary.json).
 
 The later immutable `82eb764` full run remains failed at interrupted-install
 recovery: 213/214 groups pass, 1,266 tests pass, one fails and ten skips. Recovery
@@ -29,13 +30,24 @@ access. Linux historical scanner integration now separately passes five focused
 cases and sixty isolated scanner/history/index/runner checks; installed historical
 scan acceptance passes at `4901cc8`. Windows historical transport passes portable/
 staging contracts, and its normal scanner connection passes 57 isolated checks
-with the guest doubled. Native acceptance checks remain pending; automatic scope
+with the guest doubled. Native NTFS packet staging now passes six checks per transport with three
+independently stopped guardians each; actual guest acceptance remains pending. Automatic scope
 and broader history remain unfinished software. [Witness](git-history-inputs.md),
 [scanner connection](historical-shield-inputs.md).
 
 ## Installed application
 
-Latest installed source `13635bb`, release
+Latest installed source `bd77ec4`, release
+`34a37d55e05f9f75a185f170c801c357e26506883362d24d49dedf332b4e5bf8`,
+passes six update/sixteen CLI/API and separate current-file scan checks. All four
+inspector commands run through the normal stable launcher in the actual selected
+workspace. Twenty-four CLI query guardians, eleven direct history queries and two
+scanners independently exit; restoration and owned scratch removal verify.
+Receipts `assignment-legends-1793877445888.json` and
+`installed-shield-baseline-1793877607788.json`; zero prompts and no keyboard access.
+This mode witnesses historical inputs, then separately scans current files.
+
+Earlier installed source `13635bb`, release
 `81367973a693738830be3a97cbc3edc165329ca4fc8a4c33f748586d809e1539`,
 passes six update/thirteen actual historical-scan/API compatibility checks after
 the Windows connection and package/recovery changes. Both scanner exits, original

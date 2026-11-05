@@ -47,7 +47,7 @@ A separate disposable Windows CI verifier now exercises actual NTFS staging and
 native guardians with one positive packet and two faults injected after JavaScript
 validation. It retains only its small JSON receipt and runs before service
 lifecycle checks. It opens no guest/service/volume/account/device and makes no Git
-freshness claim (`sourceGitObserved:false`). Actual execution is pending; portable
+freshness claim (`sourceGitObserved:false`). Actual native staging execution now passes as recorded below; portable
 or doubled tests do not substitute for that native result.
 
 The normal host now binds this witness into review, approval and the protected
@@ -72,3 +72,17 @@ The separate ordinary compatibility run passes seven groups/19 checks but retain
 its failed package-size assertion. The [package/recovery correction](suite-release-recovery.md)
 passes 38 isolated checks without raising the size budget; the original failed
 receipt remains failed. Native Windows/guest acceptance is not inferred.
+
+
+Native Windows job `127212549882` in workflow `42017703826` passes six historical
+staging checks, three independently stopped guardians and owned scratch removal.
+Artifact `13410786321` archive SHA-256 verifies as
+`95b4b31c9eb6a66b09191ee864cc31cf65d9bfdce1724a1ebf045a6d3ce1f954`.
+The PR head is `bd77ec4`; artifact execution uses merge revision `b5295a6`.
+The portable protocol proof passes 223 checks, plus sixteen actual protected-file
+checks. The reviewed historical software connection passes two Windows tests
+(including both Codebase and Release journeys) with cleanup; its guest/guardian
+boundaries remain doubled. No task/Git freshness, native guest or ordinary-user
+setup acceptance is inferred. The overall filesystem workflow failed elsewhere;
+its native component job passed. All archive digests, receipt hashes and scopes
+are retained in the [native evidence summary](evidence/windows-bd77-native-summary.json).

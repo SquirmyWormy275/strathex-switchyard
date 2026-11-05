@@ -91,7 +91,7 @@ The source correction resolves and pins the actual selected workspace, refuses
 mid-request changes and tests real Git/API reads in a non-Personal workspace.
 Four isolated inspector/history/index/Suite groups pass 50 checks with child
 cleanup (`isolated-test-06aa9e22-f57f-4464-98d0-85d44973f003.json`); corrected
-installed acceptance is pending. A subsequent edge-test prototype expected cache
+installed acceptance passes at `bd77ec4` as described below. A subsequent edge-test prototype expected cache
 drift refusal before priming that cache; it remains failed in
 `isolated-test-25d4150d-a893-40c2-95df-7f92c39431b1.json`. The corrected edge first
 observes the active workspace, then changes the saved selection and requires
@@ -99,3 +99,19 @@ refusal without changing either selection. The subsequent inspector/package
 subset passes all 16 checks with child cleanup
 (`isolated-test-2becc2ff-4f23-4c3a-97da-3ad7c3d20fd8.json`), including the
 primed-cache, unauthenticated-status and forbidden-selection-input cases.
+
+
+The corrected installed `bd77ec4` journey passes six normal update and sixteen
+actual CLI/API plus separate current-file scanner checks, release
+`34a37d55e05f9f75a185f170c801c357e26506883362d24d49dedf332b4e5bf8`.
+Receipts `assignment-legends-1793877445888.json` and
+`installed-shield-baseline-1793877607788.json` retain 24 independently exited CLI
+query guardians (tasks zero, inventory seven, index six, history eleven), eleven
+additional direct history-query exits and two scanner exits. The selected synthetic
+workspace, source/index/HEAD, zero grants/turns/execution journal before scanner
+review, full restoration and exact frozen Home verify. Owned repository/signing/
+packages/staging/bundle/proof checkout are removed; zero model prompts and no
+keyboard access. This journey witnesses history and separately scans current
+files; installed historical-byte scanning has its own earlier accepted journey.
+Native Windows software evidence also passes all eleven inspector tests with
+child cleanup; its guardians are doubled, without guest/account acceptance.
