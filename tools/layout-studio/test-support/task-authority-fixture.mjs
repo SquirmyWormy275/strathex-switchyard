@@ -13,7 +13,15 @@ const execute = promisify(execFile);
 export async function authorityFixture(t, { executionActions = [] } = {}) {
   const stage = await mkdtemp(join(tmpdir(), "switchyard-authority-"));
   let serviceToClose;
-  const cleanup = []; t.after(async () => { const results = await Promise.allSettled([...cleanup.map(fn => fn()), serviceToClose?.close()]); const failure = results.find(r => r.status === "rejected"); if (failure) throw failure.reason; await rm(stage, { recursive: true, force: true }); });
+  const cleanup = []; t.after(async () => {
+    const failures = [];
+    // Stop ingress before its owner and shared protected store. Concurrent
+    // duplicate closes can create state files while another close removes them.
+    for (const fn of [...cleanup].reverse()) { try { await fn(); } catch (error) { failures.push(error); } }
+    try { await serviceToClose?.close(); } catch (error) { failures.push(error); }
+    if (failures.length) throw new AggregateError(failures, "Synthetic authority cleanup did not settle; preserve its root.");
+    await rm(stage, { recursive: true, force: true });
+  });
   await mkdir(join(stage, "repository")); const root = await realpath(join(stage, "repository"));
   const git = await fixedGitExecutable();
   const run = async (...args) => (await execute(git, args, { cwd: root, env: { ...process.env, GIT_CONFIG_NOSYSTEM: "1", GIT_CONFIG_GLOBAL: process.platform === "win32" ? "NUL" : "/dev/null", GIT_TERMINAL_PROMPT: "0" }, timeout: 10000 })).stdout;
@@ -35,7 +43,7 @@ export async function authorityFixture(t, { executionActions = [] } = {}) {
     const frame = { schema: "switchyard-runtime-command/v1", id: randomUUID(), guardianPid: 12345, birth: "1", containment: process.platform === "linux" ? "owned-linux-session" : "windows-job" };
     await options.onGuardianReady(frame);
     const p = (await store.snapshot("personal")).repositoryProbes.find(p => p.ownedRuntime.id === frame.id); assert.equal(p.stoppedVerified, false);
-    try { const result = await execute(executable, args, { cwd: options.cwd, env: options.env, timeout: options.timeout, maxBuffer: options.maxOutputBytes, signal: options.signal }); return { ...result, status: "completed", exitCode: 0, inputDelivered: true, treeExitVerified: true }; }
+    try { const pending = execute(executable, args, { cwd: options.cwd, env: options.env, timeout: options.timeout, maxBuffer: options.maxOutputBytes, signal: options.signal }); pending.child.stdin.on("error", () => {}); pending.child.stdin.end(options.inputBytes ?? options.inputText); const result = await pending; return { ...result, status: "completed", exitCode: 0, inputDelivered: true, treeExitVerified: true }; }
     catch (e) { if (e.code === "ABORT_ERR" || !Number.isInteger(e.code)) throw e; return { status: "failed", exitCode: e.code, stdout: e.stdout, stderr: e.stderr, inputDelivered: true, treeExitVerified: true }; }
   };
   const inspection = createRepositoryInspection({ store, command, guardianStopped: async () => true, now });

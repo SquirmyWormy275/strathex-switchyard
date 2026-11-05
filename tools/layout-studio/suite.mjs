@@ -213,6 +213,10 @@ export function createSuite({ store = createSuiteStore(), platform = process.pla
         const { workspaceBaseUrl, ...input } = body;
         return taskAuthority.scannerInputs(compartment, input);
       }
+      if (path === "/api/suite/coding/authority/index-inputs") {
+        const { workspaceBaseUrl, ...input } = body;
+        return taskAuthority.indexInputs(compartment, input);
+      }
       if(["/api/suite/host/windows-storage/inspect","/api/suite/host/windows-storage/list","/api/suite/host/windows-storage/review","/api/suite/host/windows-storage/apply"].includes(path)){
         const {workspaceBaseUrl,...proposal}=body;
         if(path.endsWith("/review"))return storageSetup.review(compartment,proposal);

@@ -112,6 +112,7 @@ const linuxCompanionTests = ["linux-secret", "linux-isolation", "linux-lifecycle
     ...(process.platform !== "linux" && linuxSkippedOnNonLinux.has(name) ? { expectedSkipped: linuxSkippedOnNonLinux.get(name) } : {})
   }));
 export function nativeTestOverrides(file, platform = process.platform) {
+  if (file === "tools/layout-studio/task-index-inputs.test.mjs") return { timeoutMs: platform === "win32" ? 300_000 : 120_000 };
   if (file === "tools/layout-studio/repository-shield-osv-source.test.mjs") return { timeoutMs: platform === "win32" ? 300_000 : 120_000 };
   if (file === "tools/layout-studio/repository-shield-ignored-trees.test.mjs") return { timeoutMs: platform === "win32" ? 300_000 : 120_000 };
   if (file === "tools/layout-studio/task-authority-ignored-trees.test.mjs") return { timeoutMs: platform === "win32" ? 300_000 : 120_000 };
@@ -195,6 +196,8 @@ export const requiredGroups = [
   { file: "tools/layout-studio/osv-advisory-source.test.mjs" },
   { file: "tools/layout-studio/repository-shield-osv-source.test.mjs", ...nativeTestOverrides("tools/layout-studio/repository-shield-osv-source.test.mjs"), expectedSkipped: process.platform === "linux" ? 0 : 1 },
   { file: "tools/layout-studio/shield-input-inventory.test.mjs" },
+  { file: "tools/layout-studio/git-index-inputs.test.mjs" },
+  { file: "tools/layout-studio/task-index-inputs.test.mjs", ...nativeTestOverrides("tools/layout-studio/task-index-inputs.test.mjs"), expectedSkipped: process.platform === "linux" ? 0 : 1 },
   { file: "tools/layout-studio/ignored-tree-policy.test.mjs" },
   { file: "tools/layout-studio/repository-shield-ignored-trees.test.mjs", ...nativeTestOverrides("tools/layout-studio/repository-shield-ignored-trees.test.mjs"), expectedSkipped: process.platform === "linux" ? 0 : 1 },
   { file: "tools/layout-studio/task-authority-ignored-trees.test.mjs", ...nativeTestOverrides("tools/layout-studio/task-authority-ignored-trees.test.mjs") },

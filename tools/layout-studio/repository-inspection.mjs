@@ -10,6 +10,7 @@ import { runRuntimeCommand, runtimeGuardianStopped } from "./runtime-command.mjs
 import { verifyRepositoryIdentity } from "./coding-task-identity.mjs";
 import { shieldInventoryQueries, buildShieldInputInventory } from "./shield-input-inventory.mjs";
 import { ignoredTreeRoots, ignoredTreeQuery, assertIgnoredTreeListing, ignoredTreeWitness } from "./ignored-tree-policy.mjs";
+import { gitIndexPaths, gitIndexLimits, gitIndexListingQuery, gitIndexBatchQuery, selectGitIndexEntries, gitIndexBatchInput, witnessGitIndexBatch, gitIndexWitnessReport } from "./git-index-inputs.mjs";
 
 const queries = new Set([
   ["rev-parse", "--show-toplevel"], ["remote", "get-url", "origin"], ["branch", "--show-current"],
@@ -18,7 +19,7 @@ const queries = new Set([
   ["write-tree"], ["rev-parse", "HEAD^{tree}"], ["rev-parse", "--absolute-git-dir"], ["rev-parse", "--git-path", "index"], ["ls-files", "-z"], ["ls-files", "--deleted", "-z"],
   ["ls-files", "--others", "--exclude-standard", "-z"],
   ["ls-files", "--others", "--ignored", "--exclude-standard", "-z"],
-  ["submodule", "status", "--recursive"], ...Object.values(shieldInventoryQueries)
+  ["submodule", "status", "--recursive"], gitIndexListingQuery, ...Object.values(shieldInventoryQueries)
 ].map(v => JSON.stringify(v)));
 export async function fixedGitExecutable() {
   for (const name of process.platform === "win32" ? ["C:\\Program Files\\Git\\cmd\\git.exe", "C:\\Program Files\\Git\\bin\\git.exe"] : ["/usr/bin/git"]) {
@@ -29,7 +30,7 @@ export async function fixedGitExecutable() {
 export function inspectionEnvironment(scratch) {
   const windows = process.platform === "win32", system = process.env.SystemRoot || "C:\\Windows";
   return { ...(windows ? { SystemRoot: system, WINDIR: system, PATH: `${system}\\System32`, GIT_CONFIG_GLOBAL: "NUL" } : { PATH: "/usr/bin:/bin", HOME: "/nonexistent", GIT_CONFIG_GLOBAL: "/dev/null" }),
-    GIT_CONFIG_NOSYSTEM: "1", GIT_OPTIONAL_LOCKS: "0", GIT_NO_REPLACE_OBJECTS: "1", GIT_TERMINAL_PROMPT: "0", GCM_INTERACTIVE: "Never", GIT_ALLOW_PROTOCOL: "", LC_ALL: "C", ...(scratch ? { TMPDIR: scratch, TMP: scratch, TEMP: scratch } : {}) };
+    GIT_CONFIG_NOSYSTEM: "1", GIT_OPTIONAL_LOCKS: "0", GIT_NO_REPLACE_OBJECTS: "1", GIT_NO_LAZY_FETCH: "1", GIT_TERMINAL_PROMPT: "0", GCM_INTERACTIVE: "Never", GIT_ALLOW_PROTOCOL: "", LC_ALL: "C", ...(scratch ? { TMPDIR: scratch, TMP: scratch, TEMP: scratch } : {}) };
 }
 function safeRemote(value) {
   if (!value) return;
@@ -78,7 +79,9 @@ export function createRepositoryInspection({ store, command = runRuntimeCommand,
   return {
     async observe(c, task, authorize = async () => {}) { return this.capture(c, task, {}, authorize, { metadataOnly: true }); },
     async scannerInputs(c, task, authorize = async () => {}) { return this.capture(c, task, {}, authorize, { scannerInventory: true }); },
-    async capture(c, task, classifications, authorize = async () => {}, { metadataOnly = false, scannerInventory = false } = {}) {
+    async indexInputs(c, task, paths, authorize = async () => {}) { return this.capture(c, task, {}, authorize, { indexPaths: gitIndexPaths(paths) }); },
+    async capture(c, task, classifications, authorize = async () => {}, { metadataOnly = false, scannerInventory = false, indexPaths } = {}) {
+      const selectedIndexPaths = indexPaths === undefined ? undefined : gitIndexPaths(indexPaths);
       const excludedTrees = ignoredTreeRoots(classifications.excludedIgnoredTrees ?? []), excludedQuery = excludedTrees.length ? ignoredTreeQuery(excludedTrees) : undefined;
       const generation = generations.get(c) ?? 0, resource = { controller: new AbortController(), clients: new Set() }; seen.add(c);
       const check = async () => { if (closed || generation !== (generations.get(c) ?? 0) || resource.controller.signal.aborted) throw new Error("Repository inspection was stopped."); await authorize(); };
@@ -104,12 +107,13 @@ export function createRepositoryInspection({ store, command = runRuntimeCommand,
         },
         async state(root, path) { await check(); if (++fileCount > 4096 || path.includes("\\")) throw new Error("Repository manifest is unsupported."); return digests.state(root, path); }
       };
-      const start = now();
-      const runner = { async run(args, cwd = task.repositoryRoot) {
-        await check(); if (now() - start > 45000 || (!queries.has(JSON.stringify(args)) && JSON.stringify(args) !== JSON.stringify(excludedQuery)) || cwd !== task.repositoryRoot) throw new Error("Only bounded exact-root Git inspection queries are permitted.");
+      const start = now(); let allowedBatchInput;
+      const runner = { async run(args, cwd = task.repositoryRoot, text) {
+        const batch = JSON.stringify(args) === JSON.stringify(gitIndexBatchQuery) && typeof allowedBatchInput === "string" && text === allowedBatchInput;
+        await check(); if (now() < start || now() - start > 45000 || (!batch && (!queries.has(JSON.stringify(args)) && JSON.stringify(args) !== JSON.stringify(excludedQuery) || text !== undefined)) || cwd !== task.repositoryRoot) throw new Error("Only bounded exact-root Git inspection queries and derived blob identities are permitted.");
         let readyPersisted = false;
         const result = await runOwnedNativeCommand({ executable, args: ["--no-pager", "-c", "core.fsmonitor=false", "-c", "core.untrackedCache=false", "-c", "protocol.allow=never", ...args], cwd,
-          env: inspectionEnvironment(scratch), timeout: 10000, maxOutputBytes: 262144, captureStderrBytes: 4096, signal: resource.controller.signal, resource, command, guardianStopped,
+          env: inspectionEnvironment(scratch), ...(batch ? { text } : {}), timeout: 10000, maxOutputBytes: batch ? gitIndexLimits.outputBytes : 262144, captureStderrBytes: 4096, signal: resource.controller.signal, resource, command, guardianStopped,
           onReady: async scope => { await check(); await store.update(c, "repository-probe-ready", s => { const all = s.repositoryProbes ?? [], held = all.filter(p => !p.stoppedVerified || p.scratch && p.scratchCleanupPending !== false); const recentLimit = Math.min(7, Math.max(0, 15 - held.length)); s.repositoryProbes = held.concat(recentLimit ? all.filter(p => !held.includes(p)).slice(-recentLimit) : []); if (s.repositoryProbes.length >= 16) throw new Error("Unsettled repository guardians require reconciliation."); s.repositoryProbes.push({ taskId: task.id, ownerKind, ownedRuntime: scope, stoppedVerified: false, scratchCleanupPending: true, scratch, scratchIdentity: { device: scratchIdentity.dev.toString(), inode: scratchIdentity.ino.toString() }, at: now() }); }, { provider: task.provider }); readyPersisted = true; await check(); },
           onStopped: async scope => { if (!readyPersisted) { if (!await guardianStopped(scope)) throw new Error("The unacknowledged repository guardian has not verified exit."); return; } await store.update(c, "repository-probe-exit", s => { const p = s.repositoryProbes?.find(p => p.ownedRuntime.id === scope.id); if (!p) throw new Error("The exact repository guardian record is unavailable."); p.stoppedVerified = true; }); }
         });
@@ -128,6 +132,20 @@ export function createRepositoryInspection({ store, command = runRuntimeCommand,
       } };
       try {
         await privateDirectory(runtimeRoot); scratch = await mkdtemp(join(runtimeRoot, "probe-")); scratchIdentity = await directoryIdentity(scratch); resource.scratch = scratch; resource.scratchIdentity = { device: scratchIdentity.dev.toString(), inode: scratchIdentity.ino.toString() };
+        if (selectedIndexPaths) {
+          const root = await runner.run(["rev-parse", "--show-toplevel"]), head = await runner.run(["rev-parse", "HEAD"]), before = await runner.run(gitIndexListingQuery);
+          if (root.exitCode || head.exitCode || before.exitCode || !/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(head.stdout.trim())) throw Error("Exact Git index repository metadata is unavailable.");
+          const entries = selectGitIndexEntries(before.stdout, selectedIndexPaths, head.stdout.trim().length);
+          allowedBatchInput = gitIndexBatchInput(entries);
+          const blobs = await runner.run(gitIndexBatchQuery, task.repositoryRoot, allowedBatchInput);
+          allowedBatchInput = undefined;
+          if (blobs.exitCode) throw Error("The exact selected index blobs are unavailable; no filters or network fallback were used.");
+          const rows = await witnessGitIndexBatch(blobs.stdout, entries);
+          const after = await runner.run(gitIndexListingQuery), finalHead = await runner.run(["rev-parse", "HEAD"]);
+          if (after.exitCode || finalHead.exitCode || after.stdout !== before.stdout || finalHead.stdout !== head.stdout) throw Error("The Git index or repository revision changed during input witnessing; inspect again.");
+          await check(); await verifyRepositoryIdentity(task);
+          return { ...gitIndexWitnessReport({ head: head.stdout.trim(), listing: before.stdout, rows, observedAt: new Date(now()).toISOString() }), repositoryRoot: task.repositoryRoot, observationOnly: true };
+        }
         if (scannerInventory) {
           const root = await runner.run(["rev-parse", "--show-toplevel"]), head = await runner.run(["rev-parse", "HEAD"]);
           if (root.exitCode || head.exitCode || !/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(head.stdout.trim())) throw Error("Exact scanner inventory repository metadata is unavailable.");

@@ -110,6 +110,13 @@ receipts and cleanup facts remain in verification and history; no model prompts.
 
 ## Backend capabilities
 
+The task-bound [index byte witness](git-index-inputs.md) now verifies selected
+staged blobs against original Git object identities and SHA-256 without returning
+source, granting authority or claiming a scan. Four isolated groups pass all 25
+checks, including task/account/index/HEAD drift and real Linux guardian exits.
+Installed acceptance and connection to scanner staging remain unfinished.
+
+
 | Area | Implemented behavior and evidence | Practical limit |
 | --- | --- | --- |
 | Linux execution | Exact task grants, reviews, checkpoints, budgets, native guardians and replay. Run and both pipelines use read-only snapshots or explicitly approved writable copies sharing a 64 MiB overlay/temporary filesystem quota. Actual build, ENOSPC, input preservation and stop/exit checks pass. [Contract](bounded-build-workspace.md). | Filesystem bound, not a process-memory claim. Generated files are ephemeral; no new artifact write-back. |
@@ -292,3 +299,8 @@ GitHub checkpoints. Preserve the Dvorak/Omarchy setup and frozen frontend.
 Detailed history: [5](switchyard-status-history-5.md), [4](switchyard-status-history-4.md),
 [3](switchyard-status-history-3.md), [2](switchyard-status-history-2.md),
 [1](switchyard-status-history-1.md).
+
+Complete immutable Linux `adbd10a` now passes all 205 required groups: 1,212
+passed tests and ten declared skips, every child cleanup verified. Receipt
+`isolated-test-c4c0c525-33d5-4ed8-9ebf-8784cee9e487.json` retained; owned fixture
+parent and detached checkout removed. Later index work is separately tested.

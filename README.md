@@ -106,7 +106,10 @@ rule/advisory data with explicit findings and coverage gaps. The [development SB
 shows standard CycloneDX output and its limits. The [public OSV collector](docs/osv-advisory-source.md)
 produces unsigned exact-version advisory data for separate signing and review. A [task-bound input preview](docs/scanner-input-inventory.md)
 identifies relevant ignored names and groups build trees before a separate exact
-scan review; its metadata remains incomplete and grants no authority. The [Windows scanner path](docs/windows-shield.md)
+scan review; its metadata remains incomplete and grants no authority. A separate
+[index byte witness](docs/git-index-inputs.md) verifies explicitly named staged
+blobs without returning source text or treating that observation as a scan.
+The [Windows scanner path](docs/windows-shield.md)
 uses the same pinned engine through reviewed guest execution; its tests double the guest.
 [Explicit ignored inputs](docs/ignored-scanner-inputs.md) let the pinned scanner
 inspect a separately approved `.env` without commit or general execution access.
