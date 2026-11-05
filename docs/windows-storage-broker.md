@@ -185,3 +185,18 @@ It does not accept a missing query as absence or accept mismatched metadata.
 Access denial, invalid handles and other unexpected errors preserve the original
 installation. The sole absence condition remains OpenService error 1060, after
 closing each observation handle and within the original bound.
+
+
+### Current removal diagnostics
+
+At `6a45643`, the native worker again passes all 31 restricted exchange checks
+and eight JavaScript-owner checks, then fails removal at configuration readback.
+The failed artifact remains failed; its verified digest is retained in the
+[checkpoint summary](evidence/windows6a-validation-summary.json). Removal now
+reports fixed phase labels for required/returned buffer size, header, bounded
+string range/termination/value checks, tag and environment. No paths, account
+strings, environment values or native buffer bytes are added to diagnostics.
+All exact comparisons, recognized pending native codes and original absence/
+stop/exit deadlines stay unchanged. The helper compiles with zero warnings;
+112 portable protocol/journal/fact checks pass using the existing SDK. Native
+service-removal acceptance still requires a fresh worker result.

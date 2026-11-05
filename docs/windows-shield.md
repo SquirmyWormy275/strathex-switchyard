@@ -57,7 +57,8 @@ approvals, checkpoints, budgets, exact output files, HMAC receipts and recovery.
 The scanner algorithm runs on real synthetic source/feed bytes; this is not a
 claim that a VM or interactive Windows account was exercised.
 
-The policy case exercises all four actions plus clean incomplete input. The
+Five independent policy cases exercise all four actions plus clean incomplete
+input. The
 recovery case refuses alternate working roots, extra arguments/environment/
 artifacts, substituted scanner bytes, missing feeds, revocation, malformed
 output and lost acknowledgement. Two fast evidence cases cover distinct
@@ -74,3 +75,15 @@ are connected. Native Windows execution and the complete updated lane remain
 unaccepted until their own results arrive; Linux software tests do not substitute
 for them. No physical keyboard, VM, work tenant or new account is opened by these
 contract tests.
+
+
+The earlier native `6a45643` Shield-policy file hit its 300-second deadline; the
+failed digest-verified receipt stays failed. Its four action scenarios and clean
+case now run in five separately exited groups. The three stop-admission/recovery
+scenarios similarly run independently after the earlier stop-file timeout.
+Per-child Windows bounds remain 300 seconds; command budgets and every original
+assertion are unchanged. Both Windows verifier entry points require the complete
+fixed scenario inventory, rejecting a missing, duplicate or broadened selection.
+Nineteen selector/runner checks and all eight scenario groups pass locally with
+the guest doubled (`isolated-test-a2e0b8c1-ad73-4e98-b009-72ec411d2904.json`).
+Every child cleanup verifies. New native Windows acceptance remains pending.

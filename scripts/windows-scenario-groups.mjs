@@ -1,0 +1,26 @@
+/** Fixed native scenarios: retain every assertion without extending a deadline. */
+export const windowsShieldScenarios = Object.freeze([
+  ...["shield_change_scan", "shield_codebase_audit", "shield_supply_chain", "release_shield"].map(action => `Windows ${action} retains pinned scanner observations and incomplete failed receipts`),
+  "Windows clean Shield input cannot establish complete coverage"
+]);
+export const windowsStopScenarios = Object.freeze([
+  "a separately approved Windows stop has its own operation, budget and receipt while preserving the original admission",
+  "a failed atomic Windows stop admission sends no cancellation and cannot reuse its consumed approval",
+  "a lost final Windows stop write recovers only its existing protected receipt and exact exit without another cancellation"
+]);
+const scenarios = Object.freeze({
+  "tools/layout-studio/repository-windows-shield.test.mjs": windowsShieldScenarios,
+  "tools/layout-studio/repository-windows-execution-stop.test.mjs": windowsStopScenarios
+});
+export function windowsScenarioGroups(file) {
+  if (!Object.hasOwn(scenarios, file)) throw Error("No fixed independently executable scenario inventory exists for this file.");
+  return scenarios[file].map(name => ({ file, pattern: name }));
+}
+export function selectWindowsContractGroups(files, requiredGroups) {
+  if (!Array.isArray(files) || !files.length || files.some(file => typeof file !== "string" || !file) || new Set(files).size !== files.length || !Array.isArray(requiredGroups)) throw Error("Select exact distinct Windows contract files.");
+  return files.flatMap(file => {
+    const selected = requiredGroups.filter(group => group.file === file), expected = Object.hasOwn(scenarios, file) ? scenarios[file] : [undefined];
+    if (selected.length !== expected.length || new Set(selected.map(group => group.pattern)).size !== expected.length || expected.some(name => !selected.some(group => group.pattern === name))) throw Error("The complete Windows contract scenario inventory is missing or ambiguous.");
+    return selected;
+  });
+}

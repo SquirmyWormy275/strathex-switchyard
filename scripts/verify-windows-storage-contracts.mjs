@@ -1,7 +1,8 @@
 #!/usr/bin/env node
-/** Complete storage contract files; existing isolated inventory/deadlines apply. */
+/** Every scenario in complete storage files; original per-child deadlines apply. */
 import { join } from "node:path";
 import { tmpdir } from "node:os";
+import { selectWindowsContractGroups } from "./windows-scenario-groups.mjs";
 import { requiredGroups, runVerification, assertRequiredTestManifest } from "./run-isolated-tests.mjs";
 const suites = {
   "backend-contract": "apps/windows-companion/test/windows-sandbox.test.ts",
@@ -35,8 +36,7 @@ const suites = {
 const flags = process.argv.slice(2), suite = flags[1]?.startsWith("--suite=") ? flags[1].slice(8) : undefined;
 if (process.platform !== "win32" || flags.length !== 2 || flags[0] !== "--synthetic" || !Object.hasOwn(suites, suite)) throw Error("Use on Windows: node scripts/verify-windows-storage-contracts.mjs --synthetic --suite=receipt-authority|receipt-authority-state|shield-exceptions|shield-exception-execution|shield-exception-ledger|ignored-authority|ignored-scanner|fixture-invalidation|validation-policy|shield-evidence|shield-policy|shield-recovery|pipeline-recovery|pipeline-policy|pipeline-evidence|fixture-removal|backend-contract|fixture-registry|fixture-maintenance|harness|leases|legacy-images|broker-owner|sandbox-native|sandbox-sessions|reviewed-run|run-owner. No disk, VM, account or keyboard is opened.");
 assertRequiredTestManifest();
-const groups = requiredGroups.filter(group => group.file === suites[suite]);
-if (groups.length !== 1) throw Error("The complete Windows storage contract is absent or ambiguous in the required inventory.");
+const groups = selectWindowsContractGroups([suites[suite]], requiredGroups);
 const result = await runVerification({ groups, outputDirectory: join(process.env.RUNNER_TEMP || tmpdir(), "switchyard-storage-contracts", suite) });
 console.log(JSON.stringify({ suite, success: result.receipt.success, runId: result.receipt.runId, totals: result.receipt.totals, guestLaunched: false, accountOpened: false, keyboardOpened: false }));
 for (const child of result.receipt.children.filter(child => !child.success)) console.log(JSON.stringify({ file: child.file, exitCode: child.exitCode, timeout: child.timeout, diagnostic: child.failureDiagnostic }));

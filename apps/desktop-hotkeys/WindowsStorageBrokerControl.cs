@@ -45,21 +45,35 @@ internal static class WindowsStorageBrokerControl
     }
     private static void VerifyConfiguration(ServiceHandle service,WindowsStorageBrokerInstallation.Settings settings,bool allowDeletedEnvironment=false,Action<string>? phase=null)
     {
-        phase?.Invoke("service-absence-query-configuration");
+        phase?.Invoke("service-absence-query-configuration-size");
         bool initial=QueryServiceConfigW(service,IntPtr.Zero,0,out uint required);int error=Marshal.GetLastWin32Error();
         if(initial)throw Invalid();if(error!=122)throw new Win32Exception(error);
+        phase?.Invoke("service-absence-configuration-required-size");
         if(required<Marshal.SizeOf<Configuration>()||required>16384)throw Invalid();
         IntPtr memory=Marshal.AllocHGlobal(checked((int)required));
         try
         {
+            phase?.Invoke("service-absence-query-configuration-read");
             if(!QueryServiceConfigW(service,memory,required,out uint returned))throw new Win32Exception(Marshal.GetLastWin32Error());
+            phase?.Invoke("service-absence-configuration-returned-size");
             if(returned>required)throw Invalid();var config=Marshal.PtrToStructure<Configuration>(memory);
-            string Text(IntPtr pointer)
+            string Text(IntPtr pointer,string field)
             {
+                phase?.Invoke("service-absence-configuration-"+field+"-range");
                 long offset=pointer.ToInt64()-memory.ToInt64();if(offset<0||offset>=required||(offset&1)!=0)throw Invalid();int maximum=checked((int)Math.Min((required-offset)/2,2049));
-                for(int i=0;i<maximum;i++)if(Marshal.ReadInt16(pointer,i*2)==0)return Marshal.PtrToStringUni(pointer,i)??throw Invalid();throw Invalid();
+                phase?.Invoke("service-absence-configuration-"+field+"-termination");
+                for(int i=0;i<maximum;i++)if(Marshal.ReadInt16(pointer,i*2)==0){phase?.Invoke("service-absence-configuration-"+field+"-value");return Marshal.PtrToStringUni(pointer,i)??throw Invalid();}throw Invalid();
             }
-            if(config.Type!=16||config.Start!=2||config.Error!=1||Text(config.Binary)!=settings.ServiceCommand||!Text(config.Account).Equals("LocalSystem",StringComparison.OrdinalIgnoreCase)||Text(config.Display)!="Switchyard scoped storage (metadata bootstrap)"||config.Dependencies!=IntPtr.Zero&&Text(config.Dependencies).Length!=0||config.Group!=IntPtr.Zero&&Text(config.Group).Length!=0||config.Tag!=0)throw Invalid();
+            // These are fixed phase labels only. Never publish service paths,
+            // account strings, environment values or native buffer contents.
+            phase?.Invoke("service-absence-configuration-header");
+            if(config.Type!=16||config.Start!=2||config.Error!=1)throw Invalid();
+            if(Text(config.Binary,"binary")!=settings.ServiceCommand)throw Invalid();
+            if(!Text(config.Account,"account").Equals("LocalSystem",StringComparison.OrdinalIgnoreCase))throw Invalid();
+            if(Text(config.Display,"display")!="Switchyard scoped storage (metadata bootstrap)")throw Invalid();
+            if(config.Dependencies!=IntPtr.Zero&&Text(config.Dependencies,"dependencies").Length!=0)throw Invalid();
+            if(config.Group!=IntPtr.Zero&&Text(config.Group,"group").Length!=0)throw Invalid();
+            phase?.Invoke("service-absence-configuration-tag");if(config.Tag!=0)throw Invalid();
         }
         finally{Marshal.FreeHGlobal(memory);}
         phase?.Invoke("service-absence-environment");VerifyEnvironment(settings,allowDeletedEnvironment);

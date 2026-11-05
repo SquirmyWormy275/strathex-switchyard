@@ -169,11 +169,14 @@ limits and separate scanner reviews remain unchanged.
 
 ## Complete and native checkpoints
 
-Immutable `6a45643` passes all 191 required Linux groups: 1,192 tests,
-1,182 passed and ten declared skips. Receipt
-`isolated-test-b0474209-3e04-4603-8ef6-441f439fb5d6.json` is retained with every
+Immutable `18e6185` passes all 192 required Linux groups: 1,197 tests,
+1,187 passed and ten declared skips. Receipt
+`isolated-test-2ff9aeb6-bbc7-471c-9a6b-c50aea14fe8a.json` is retained with every
 child cleanup verified; owned fixture parent and checkout are removed. It covers
-connected exceptions, receipt-time authority and cached source-only haptic facts.
+connected exceptions, receipt-time authority, cached source-only haptic facts and
+workspace lock inventory. The later metadata preview and scenario split are
+verified separately. Earlier `6a45643` passes 191 groups (1,182 passed/ten skips),
+receipt `isolated-test-b0474209-3e04-4603-8ef6-441f439fb5d6.json`.
 The later workspace inventory separately passes fourteen checks in two isolated
 groups (`isolated-test-54ad40b5-a325-4130-9d63-93d5e307d1d6.json`), with child cleanup. Earlier `ace2d22` passes
 185 groups (1,166 passed/ten skips), receipt
@@ -207,7 +210,12 @@ three platform skips, with child cleanup. These cover exceptions, ignored inputs
 receipt-time authority and policy invalidation; the guest is doubled. Its full
 filesystem workflow fails service-removal configuration readback, and Shield
 policy/stop files hit their 300-second group deadlines. All three failures are
-retained. [Exact artifact evidence](evidence/windows6a-validation-summary.json).
+retained. Five Shield and three stop scenarios now run independently under their
+original child deadlines, with a complete closed selection check. Nineteen runner/
+selector cases and all eight isolated scenarios pass locally; native rerun is
+pending. Removal adds only bounded fixed phase labels; both C# targets compile
+without warnings and 112 portable checks pass with the existing SDK.
+[Exact artifact evidence](evidence/windows6a-validation-summary.json).
 
 Later service-removal failures remain failed. The `238592b` receipt identifies
 `service-absence-query-configuration`. The correction preserves Win32 errors,

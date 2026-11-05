@@ -5,6 +5,7 @@ import { mkdir, mkdtemp, realpath, rename, rm, writeFile } from "node:fs/promise
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 import { dirname, isAbsolute, join, resolve } from "node:path";
+import { windowsScenarioGroups } from "./windows-scenario-groups.mjs";
 import { terminateOwnedProcessTree } from "./test-support/process-tree.mjs";
 
 export const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -129,6 +130,7 @@ export function nativeTestOverrides(file, platform = process.platform) {
 }
 export const requiredGroups = [
   { file: "scripts/run-isolated-tests.test.mjs" },
+  { file: "scripts/windows-scenario-groups.test.mjs" },
   { file: "scripts/verify-runtime-platform.test.mjs" },
   { file: "deployment/suite/release.test.mjs" },
   { file: "deployment/suite/application.test.mjs" },
@@ -175,14 +177,15 @@ export const requiredGroups = [
   { file: "tools/layout-studio/repository-windows-execution.test.mjs", ...nativeTestOverrides("tools/layout-studio/repository-windows-execution.test.mjs") },
   { file: "tools/layout-studio/repository-windows-pipeline.test.mjs", ...nativeTestOverrides("tools/layout-studio/repository-windows-pipeline.test.mjs") },
   { file: "tools/layout-studio/repository-windows-pipeline-recovery.test.mjs", ...nativeTestOverrides("tools/layout-studio/repository-windows-pipeline-recovery.test.mjs") },
-  ...["repository-windows-shield","repository-windows-shield-recovery"].map(name=>({file:`tools/layout-studio/${name}.test.mjs`,timeoutMs:120_000,...nativeTestOverrides(`tools/layout-studio/${name}.test.mjs`)})),
+  ...windowsScenarioGroups("tools/layout-studio/repository-windows-shield.test.mjs").map(group => ({ ...group, timeoutMs: 120_000, ...nativeTestOverrides(group.file) })),
+  { file: "tools/layout-studio/repository-windows-shield-recovery.test.mjs", timeoutMs: 120_000, ...nativeTestOverrides("tools/layout-studio/repository-windows-shield-recovery.test.mjs") },
   { file: "tools/layout-studio/windows-pipeline-evidence.test.mjs" },
   { file: "tools/layout-studio/windows-shield-evidence.test.mjs" },
   { file: "tools/layout-studio/linux-namespace-budget.test.mjs", expectedSkipped: process.platform === "linux" ? 0 : 1 },
   { file: "tools/layout-studio/linux-temporary-workspace.test.mjs", expectedSkipped: process.platform === "linux" ? 0 : 1 },
   { file: "tools/layout-studio/repository-temporary-build.test.mjs", timeoutMs: 120_000, expectedSkipped: process.platform === "linux" ? 0 : 2 },
   { file: "tools/layout-studio/repository-windows-execution-recovery.test.mjs", ...nativeTestOverrides("tools/layout-studio/repository-windows-execution-recovery.test.mjs") },
-  { file: "tools/layout-studio/repository-windows-execution-stop.test.mjs", ...nativeTestOverrides("tools/layout-studio/repository-windows-execution-stop.test.mjs") },
+  ...windowsScenarioGroups("tools/layout-studio/repository-windows-execution-stop.test.mjs").map(group => ({ ...group, ...nativeTestOverrides(group.file) })),
   { file: "tools/layout-studio/repository-windows-execution-output.test.mjs", ...nativeTestOverrides("tools/layout-studio/repository-windows-execution-output.test.mjs") },
   { file: "tools/layout-studio/repository-execution.test.mjs", timeoutMs: 240_000, ...nativeTestOverrides("tools/layout-studio/repository-execution.test.mjs"), ...(process.platform !== "linux" ? { expectedSkipped: 1 } : {}) },
   { file: "tools/layout-studio/shield-scanner-engine.test.mjs" },
