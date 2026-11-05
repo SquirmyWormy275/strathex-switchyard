@@ -7,11 +7,17 @@ host. [Verification](verification.md) retains accepted and failed checkpoints.
 
 ## Installed application
 
-Latest installed source `0423f23`, release
-`d6c38d53a33776dfb1ffc3b2f7d6b361d0de4e401612a39dbae8ae447ad4b6a4`,
-passes six normal update checks after the exact outcome/budget correction.
-Receipt `assignment-legends-1793859695968.json` retained; owned bundle/proof
-checkout removed. The actual exception journey below is accepted at its own source.
+Latest installed source `0f04adc`, release
+`1d8c3ce421672a4516b86cf8fe18d286a3b60e2f0e070f5b1acc49c9dd0ce25c`,
+passes six update and seventeen actual exception API checks with the receipt-time
+local authority guard. Raw findings, exact exception expiry/withdrawal/replay,
+three native exits, original-state restoration and owned scratch removal pass.
+Receipts `assignment-legends-1793860291500.json` and
+`installed-shield-baseline-1793860601561.json` retained; zero prompts.
+
+Earlier installed `0423f23` passes six normal update checks after the outcome/
+budget correction (`assignment-legends-1793859695968.json`); owned bundle and
+proof checkout removed.
 
 Installed source `82bd9b3`, release
 `4175121a117a6cdbb72eac3e685158e01b9d0b594b53a1493853ea896677ec96`,
@@ -108,20 +114,28 @@ Both execution hosts now verify the exact protected task/account/mode and grant
 ledger at validation receipt commit. Three focused state/host cases pass,
 including post-validation account change and grant revocation, with independent
 zero native exits and no replay. Six existing pipeline/policy races and twenty-nine
-contract/maintenance cases pass; type checking passes. Later installed/native
-acceptance is separate. [Contract](receipt-authority-commit.md).
+contract/maintenance cases pass; type checking passes. Installed acceptance passes at `0f04adc` (six update/seventeen actual API checks).
+Native Windows remains separate. [Contract](receipt-authority-commit.md).
+
+Device identification now reports source-only haptic declarations for two audited
+F77 builds. UID, complete definition, protocol and revision must match; live
+state, fitted hardware and electrical/timing limits remain unverified, with no
+allowed operations. Seven capability/catalog cases, twenty-five inventory/readout contracts and
+twenty-three package/Suite checks pass, including zero-HID, protected typing
+controls and cross-compartment checks. [Audit](solenoid-capability-audit.md). New installed
+inspection acceptance remains pending; runtime control is still unfinished.
 
 ## Complete and native checkpoints
 
-Immutable `ace2d22` passes all 185 required Linux groups: 1,176 tests,
-1,166 passed and ten declared skips. Receipt
-`isolated-test-3f42aecd-3967-4c0c-bda3-67b9b7d268ef.json` is retained with every
+Immutable `82bd9b3` passes all 188 required Linux groups: 1,185 tests,
+1,175 passed and ten declared skips. Receipt
+`isolated-test-028adfa5-e6df-40ae-8931-85c79fd9c6ab.json` is retained with every
 child cleanup verified; owned fixture parent and checkout are removed. It covers
-ignored inputs, receipt retirement and the exception ledger foundation. Earlier
-`9f3024e` passes 182 groups (1,156 passed/ten skips), receipt
-`isolated-test-23947e9d-cdf5-4c8d-8d4b-e81335569189.json`, with owned scratch removed.
-The connected exception source at `82bd9b3` has a separate 188-group run in
-progress; the later exact-outcome/budget correction has focused checks separately.
+connected exceptions and source-policy receipt races. Earlier `ace2d22` passes
+185 groups (1,166 passed/ten skips), receipt
+`isolated-test-3f42aecd-3967-4c0c-bda3-67b9b7d268ef.json`, with owned scratch removed.
+The later outcome/deadline and task-authority guards have their focused/installed
+checks separately; the new haptic source assessment is later still.
 
 Native Windows `5d398d2`, workflow
 [41960677205](https://github.com/SquirmyWormy275/strathex-switchyard/actions/runs/41960677205),

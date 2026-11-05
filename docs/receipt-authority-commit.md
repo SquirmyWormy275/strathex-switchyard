@@ -36,3 +36,9 @@ inventory, remaining native/client/physical acceptance and broader gate
 consumption remain separate work. [Evidence](verification.md) and
 [policy retirement](validation-receipt-invalidation.md) record their accepted
 sources and limits.
+
+Normal installed `0f04adc` passes six update/seventeen actual exception/scan API
+checks with this guard, exact expiry/withdrawal/replay and three independently
+verified native exits. Original state is restored and owned scratch removed.
+Receipts `assignment-legends-1793860291500.json` and
+`installed-shield-baseline-1793860601561.json` are retained; zero prompts.

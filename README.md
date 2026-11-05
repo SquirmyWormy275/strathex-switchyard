@@ -85,7 +85,7 @@ uncertain outcomes remain unchanged. Provider replies do not establish coding-ta
 These checks do not prove a finished keyboard/agent appliance. General coding-task
 controls, physical role shortcut selection in the frontend, platform lifecycle acceptance, profile-library visual acceptance,
 expanded device editing controls, complete device settings and final UI acceptance remain unfinished.
-The complete Linux runner checkpoint at `ace2d22` passes 185 groups: 1,166 tests passed and
+The complete Linux runner checkpoint at `82bd9b3` passes 188 groups: 1,175 tests passed and
 ten declared platform skips. Windows filesystem CI passes all 30 native checks,
 including bounded volume disk-full, exact detach and mapping admission. The full
 Windows worker/runtime checkpoint passes 261 groups: 1,690 tests passed and 48
