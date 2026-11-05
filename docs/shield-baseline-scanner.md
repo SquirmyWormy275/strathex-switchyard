@@ -174,4 +174,5 @@ authority/real-Linux/Windows-guest-double cases pass.
 Personal [reviewed exceptions](shield-exceptions.md) now connect exact protected
 findings to expiring, audited decisions. Reports keep raw findings; both hosts
 authenticate the decision separately and never upgrade missing coverage to a
-complete Shield pass. Normal installed exception acceptance is pending.
+complete Shield pass. Normal installed exception acceptance passes at `82bd9b3`: six update and
+seventeen actual API checks, three verified exits, full restoration and zero prompts.

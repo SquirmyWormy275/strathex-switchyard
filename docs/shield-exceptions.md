@@ -31,9 +31,14 @@ ends when any of those bindings changes, even before their clock expires.
 
 The policy mutation, budget, audit, maintenance receipt and prior validation
 receipt retirement commit in one locked compartment transaction. A fault rolls
-back every domain; a consumed approval cannot replay the mutation. If only the
-commit acknowledgement is lost, retry reads the retained exact result and does
-not create another exception. No external repository or filesystem effect occurs.
+back every domain; a consumed approval cannot replay the mutation. Verified
+rollback settles the review as failed/not-started and records a sanitized audit.
+If only the commit acknowledgement is lost, authenticated receipt/effect
+read-back recovers the original result with explicit metadata, without another
+policy mutation. The original budget deadline is checked before receipt issuance and final
+settlement; a late local effect rolls back both policy and prior-receipt
+retirement. Unknown read-back remains an error. No external repository or
+filesystem effect occurs.
 
 The next separately reviewed scan preserves raw findings, their counts and report
 hash. It adds `shieldExceptionEvaluation`, including exact binding, applied IDs,
@@ -56,7 +61,12 @@ expiry, one-use review, reason redaction, cross-domain rollback, lost replies,
 Work rejection and snapshot privacy. Separate real Linux namespace and Windows
 host/guest-double journeys pass: failed scan, exact approval, incomplete repeat
 with authenticated unchanged findings, withdrawal, then failure again. New
-Windows native CI and normal installed exception acceptance remain separate.
+Windows native CI remains separate. Normal installed `82bd9b3` passes six normal
+update/seventeen actual API checks, including exact approval, unchanged raw
+findings, authenticated incomplete repeat, withdrawal, original expiry/replay and
+three native exits. Original state is restored and owned scratch removed. Receipts
+`assignment-legends-1793859246213.json` and
+`installed-shield-baseline-1793859581132.json` are retained; zero prompts.
 Eleven final package/controller checks, forty Suite/maintenance/Shield/race
 regressions and type checking also pass.
 
@@ -74,3 +84,8 @@ material is submitted to a model; no device, microphone, tenant or account UI is
 opened. Complete repository/history/ecosystem/provenance coverage and frontend
 exception controls remain unfinished. [Current verification](verification.md)
 records accepted versions separately from those limitations.
+
+The later failure-state correction passes thirteen controller/ledger cases and
+twelve package/controller cases. It settles verified rollback honestly and
+recovers only a proven original commit; its acceptance is separate from the
+installed 82bd9b3 exception journey.

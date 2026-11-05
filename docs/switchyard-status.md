@@ -7,15 +7,20 @@ host. [Verification](verification.md) retains accepted and failed checkpoints.
 
 ## Installed application
 
-Installed source `1a5cd43`, release
-`74bf1ba59db8ef22eea2436abf5ea963505dd0e5cc0b7b31e52cff1be5dd53d7`,
-passes six normal update and sixteen actual Change Scan checks. The pinned
-scanner finds a synthetic secret in an explicitly approved ignored `.env`, with
-no matched bytes returned or Git index/source mutation. Both receipts obey
-signed freshness deadlines and later retirement; replay, two native exits,
-original-state restoration and owned scratch removal pass. Receipts
-`assignment-legends-1793857942421.json` and
-`installed-shield-baseline-1793858153322.json` retained. One empty task, zero prompts.
+Installed source `82bd9b3`, release
+`4175121a117a6cdbb72eac3e685158e01b9d0b594b53a1493853ea896677ec96`,
+passes six normal update and seventeen actual exception/Change Scan API checks.
+A protected failed finding gets one exact audited approval; a real repeat scan
+retains raw findings and authenticates the exception while remaining incomplete.
+Withdrawal, original expiry, duplicate handling, prior-receipt retirement, three
+native exits and full original-state restoration pass. Receipts
+`assignment-legends-1793859246213.json` and
+`installed-shield-baseline-1793859581132.json` retained; owned source/packages/
+signing/staging/bundle/proof checkout removed. One empty task, zero prompts.
+
+Earlier installed `1a5cd43` passes six update/sixteen ignored-secret/expiry checks:
+`assignment-legends-1793857942421.json`,
+`installed-shield-baseline-1793858153322.json`; owned scratch removed.
 
 Earlier installed `9f3024e` passes six update/fourteen expiry/retirement checks:
 `assignment-legends-1793857471815.json`,
@@ -88,18 +93,22 @@ Personal-only one-use operator approvals, atomic audit/budget/receipt retirement
 immutable raw reports and separately authenticated decisions on both hosts.
 Twenty-nine core/HTTP/inventory checks and two host journeys pass. All findings
 excepted stays incomplete; withdrawal restores failure on the next scan.
-[Contract](shield-exceptions.md). Native Windows and installed exception acceptance
-remain separate; frontend exception controls are unfinished.
+A later outcome correction settles verified policy rollback as failed/not-started
+and recovers only an exact committed receipt/effect after lost acknowledgement;
+thirteen controller/ledger cases pass, including late-budget rollback. [Contract](shield-exceptions.md). Normal installed exception acceptance passes at `82bd9b3` (six update/seventeen
+API checks). Native Windows remains separate; frontend controls are unfinished.
 
 ## Complete and native checkpoints
 
-Immutable `9f3024e` passes all 182 required Linux groups: 1,166 tests,
-1,156 passed and ten declared skips. Receipt
-`isolated-test-23947e9d-cdf5-4c8d-8d4b-e81335569189.json` is retained with every
+Immutable `ace2d22` passes all 185 required Linux groups: 1,176 tests,
+1,166 passed and ten declared skips. Receipt
+`isolated-test-3f42aecd-3967-4c0c-bda3-67b9b7d268ef.json` is retained with every
 child cleanup verified; owned fixture parent and checkout are removed. It covers
-receipt retirement and the race barrier. The later ignored-input/exception-ledger
-foundation at `ace2d22` has a separate complete 185-group run in progress; current
-connected exception source is later still.
+ignored inputs, receipt retirement and the exception ledger foundation. Earlier
+`9f3024e` passes 182 groups (1,156 passed/ten skips), receipt
+`isolated-test-23947e9d-cdf5-4c8d-8d4b-e81335569189.json`, with owned scratch removed.
+The connected exception source at `82bd9b3` has a separate 188-group run in
+progress; the later exact-outcome/budget correction has focused checks separately.
 
 Native Windows `5d398d2`, workflow
 [41960677205](https://github.com/SquirmyWormy275/strathex-switchyard/actions/runs/41960677205),

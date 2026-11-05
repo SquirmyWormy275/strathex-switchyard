@@ -71,7 +71,7 @@ export function createShieldExceptions({ store, authority, isActive = async () =
       await guard(c, current, row.workspaceDigest, generation, lease);
       if (Date.parse(row.expiresAt) <= now() || validationPolicyDigest(current) !== row.policyDigest || scopeHash(await prepare(c, row.proposal, true)) !== scopeHash(row.payload)) throw Error("The exact exception approval, source finding or policy changed; obtain a new review.");
       const approved = await suiteConfirmations(store, c, undefined, now).consume({ action, targetSnapshotId: row.scopeDigest, scopeDigest: row.scopeDigest, token: input.token }); if (!approved.allowed) throw Error(approved.reason);
-      return store.update(c, "shield-exception-apply", async saved => {
+      try { return await store.update(c, "shield-exception-apply", async saved => {
         await guard(c, saved, row.workspaceDigest, generation, lease); const original = saved.shieldExceptionReviews?.find(candidate => candidate.requestId === row.requestId);
         if (!original || original.status !== "reviewed" || validationPolicyDigest(saved) !== row.policyDigest || Date.parse(row.expiresAt) <= now()) throw Error("The consumed exception review changed before policy commit; it was not replayed.");
         const port = domain => { const transaction = repositoryEffectTransaction(saved, domain, { now }); return { readEntries: transaction.readEntries, transaction: fn => fn(transaction) }; }, policy = port("shield-policy"), clock = () => new Date(now()).toISOString(), budgets = new DurableBudgetManager(policy, { clock }), receipts = new ReceiptLedger(policy, { clock });
@@ -80,12 +80,32 @@ export function createShieldExceptions({ store, authority, isActive = async () =
           if (!source || source.invalidatedBy || source.result !== "failed" || source.targetSnapshotId !== row.payload.targetSnapshotId || source.action !== row.payload.action || !source.expiresAt || Date.parse(source.expiresAt) <= now()) throw Error("The original source receipt expired or was retired before atomic policy commit.");
         }
         await budgets.configure(limits); const claim = await budgets.claim({ operationId: row.requestId, commandClass: action, requestedBy: "authenticated-personal-exception-review" }); if (!claim.allowed) throw Error(claim.reason); const started = await budgets.start(claim.claim.id); if (!started.allowed) throw Error(started.reason);
+        const deadline=Date.parse(started.claim.expiresAt),checkDeadline=()=>{if(!Number.isFinite(deadline)||now()>=deadline)throw Error("The original exception maintenance budget expired; no passing policy commit is permitted.");};checkDeadline();
         const by = `suite:${c}:review:${row.requestId}`; await new ReceiptLedger(port("execution"), { clock }).invalidateActions(validationActions, by);
         const exceptions = new ShieldExceptionLedger(policy, { now }), effect = row.action === "grant" ? await exceptions.grant(row.payload, by, row.requestId) : await exceptions.revoke(row.payload.exceptionId, row.payload.reason, by);
+        checkDeadline();
         const receipt = await receipts.issue({ operationId: row.requestId, action, targetSnapshotId: row.scopeDigest, result: "passed", completeness: "complete", evidenceDigest: scopeHash([row.scopeDigest, effect]), policyVersion: version, toolVersions: { exceptions: "exact-expiring-finding/v1" }, ...(row.action === "grant" ? { expiresAt: row.payload.expiresAt } : {}) });
-        await receipts.audit({ action, status: "completed", operationId: row.requestId, targetSnapshotId: row.scopeDigest, detail: `Applied exact ${row.action} with reviewed reason: ${row.payload.reason}` }); await budgets.settle(claim.claim.id, "completed"); await guard(c, saved, row.workspaceDigest, generation, lease);
+        await receipts.audit({ action, status: "completed", operationId: row.requestId, targetSnapshotId: row.scopeDigest, detail: `Applied exact ${row.action} with reviewed reason: ${row.payload.reason}` }); await budgets.settle(claim.claim.id, "completed"); await guard(c, saved, row.workspaceDigest, generation, lease);checkDeadline();
         original.status = "settled"; original.result = { status: "completed", effectDisposition: "committed", operationId: row.requestId, receiptId: receipt.id, maintenanceAction: row.action, exceptionId: effect.id, authorityGranted: false, completeShieldGateAvailable: false }; return { ...original.result, replayed: false };
-      });
+      }); } catch (error) {
+        // All effects above share one authenticated local transaction. A fresh
+        // read can distinguish its committed result from a verified rollback;
+        // neither case authorizes running the mutation again.
+        const observed = (await store.snapshot(c)).shieldExceptionReviews?.find(saved => saved.requestId === row.requestId);
+        if (observed?.status === "settled" && observed.result?.status === "completed") {
+          const proof = await new ReceiptLedger(journal(c), { clock: () => new Date(now()).toISOString() }).get(observed.result.receiptId), effect = (await ledger(c).list()).find(record => record.id === observed.result.exceptionId);
+          const by=`suite:${c}:review:${row.requestId}`;
+          if (!proof || proof.action !== action || proof.operationId !== row.requestId || proof.targetSnapshotId !== row.scopeDigest || proof.result !== "passed" || proof.completeness!=="complete" || proof.invalidatedBy || !effect || (row.action === "grant" ? effect.id!==row.requestId||effect.issuedBy!==by : effect.id!==row.payload.exceptionId||!effect.revokedAt||effect.revokedBy!==by)) throw error;
+          return { ...observed.result, replayed: false, acknowledgementRecovered: true };
+        }
+        if (!observed || observed.status !== "reviewed") throw error;
+        return store.update(c, "shield-exception-apply-failed", async saved => {
+          const original = saved.shieldExceptionReviews?.find(candidate => candidate.requestId === row.requestId); if (!original || original.status !== "reviewed") throw error;
+          const transaction = repositoryEffectTransaction(saved, "shield-policy", { now }), port = { readEntries: transaction.readEntries, transaction: fn => fn(transaction) };
+          await new ReceiptLedger(port, { clock: () => new Date(now()).toISOString() }).audit({ action, status: "failed", operationId: row.requestId, targetSnapshotId: row.scopeDigest, detail: "The approved local policy transaction did not commit. Its one-use approval is consumed; obtain a new review. No exception or prior receipt retirement was applied." });
+          original.status = "settled"; original.result = { status: "failed", effectDisposition: "not_started", operationId: row.requestId, authorityGranted: false, completeShieldGateAvailable: false, summary: "The approved policy transaction did not commit; its approval was consumed. Review current evidence again." }; return { ...original.result, replayed: false };
+        });
+      }
     }); },
     async evaluate(c, input) { await state(c); return ledger(c).evaluate(input); },
     async stopCompartment(c) { generations.set(c, (generations.get(c) ?? 0) + 1); await Promise.allSettled([pending.get(c)].filter(Boolean)); return { stopped: true }; },
