@@ -37,7 +37,7 @@ export class LinuxBubblewrapRepositoryProcessSupervisor implements RepositoryPro
   private readonly actions: ReadonlySet<string>;
   private readonly readOnlyDisposable: boolean;
   private readonly temporaryBytes?: number;
-  constructor(inner: RepositoryProcessSupervisor, { additionalActions = [], readOnlyDisposable = false, temporaryBytes }: { additionalActions?: readonly string[]; readOnlyDisposable?: boolean; temporaryBytes?: number } = {}) {
+  constructor(inner: RepositoryProcessSupervisor, { additionalActions = [], readOnlyDisposable = false, temporaryBytes = 64 * 1024 * 1024 }: { additionalActions?: readonly string[]; readOnlyDisposable?: boolean; temporaryBytes?: number } = {}) {
     this.inner=inner; this.actions=new Set([...isolatedActions,...additionalActions]); this.readOnlyDisposable=readOnlyDisposable;
     if (temporaryBytes !== undefined && (!Number.isSafeInteger(temporaryBytes) || temporaryBytes < 16 * 1024 * 1024 || temporaryBytes > 256 * 1024 * 1024)) throw new Error("Choose a bounded temporary namespace filesystem.");
     this.temporaryBytes=temporaryBytes;
@@ -79,10 +79,10 @@ export class LinuxBubblewrapRepositoryProcessSupervisor implements RepositoryPro
       const mount = request.isolation === "disposable" && !this.readOnlyDisposable ? "--bind" : "--ro-bind";
       const environment = Object.entries(request.environment).sort(([left], [right]) => left.localeCompare(right)).flatMap(([name, value]) => ["--setenv", name, value]);
       const args = [
-        "--unshare-user", "--unshare-pid", "--unshare-ipc", "--unshare-uts", "--unshare-cgroup-try", "--unshare-net",
+        "--unshare-user", "--disable-userns", "--assert-userns-disabled", "--unshare-pid", "--unshare-ipc", "--unshare-uts", "--unshare-cgroup-try", "--unshare-net",
         "--die-with-parent", "--new-session", "--clearenv", "--proc", "/proc", "--dev", "/dev", ...(this.temporaryBytes ? ["--size", String(this.temporaryBytes)] : []), "--tmpfs", "/tmp",
         "--ro-bind", "/usr", "/usr", "--ro-bind", "/bin", "/bin", "--ro-bind", "/lib", "/lib", "--ro-bind-try", "/lib64", "/lib64", "--dir", "/etc", "--ro-bind-try", "/etc/ld.so.cache", "/etc/ld.so.cache",
-        mount, executionRoot, "/workspace", ...executableBind, "--chdir", mappedCwd, ...environment, mappedExecutable, ...request.args
+        mount, executionRoot, "/workspace", ...executableBind, "--remount-ro", "/dev", "--remount-ro", "/", "--chdir", mappedCwd, ...environment, mappedExecutable, ...request.args
       ];
       const bwrap = await realpath(bwrapPath);
       if (bwrap !== bwrapPath || !(await lstat(bwrap)).isFile()) throw new Error("The fixed Linux Bubblewrap executable is unavailable.");

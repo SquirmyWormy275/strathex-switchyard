@@ -35,6 +35,7 @@ try{
   const program=`import assert from 'node:assert/strict';import {access,writeFile,open,statfs} from 'node:fs/promises';import {createConnection} from 'node:net';
 for(const path of ['unselected.env','/etc/passwd',${JSON.stringify(homedir())},${JSON.stringify(repositoryRoot)}])await assert.rejects(access(path));
 for(const name of ['HOME','SSH_AUTH_SOCK','DBUS_SESSION_BUS_ADDRESS','OPENAI_API_KEY','ANTHROPIC_API_KEY'])assert.equal(process.env[name],undefined);
+for(const path of ['/outside-temporary-budget','/etc/outside-temporary-budget','/dev/outside-temporary-budget','/dev/shm/outside-temporary-budget'])await assert.rejects(writeFile(path,'must stay within the temporary budget'),{code:'EROFS'});
 await assert.rejects(writeFile('forbidden-output','must not reach the host'));await writeFile('/tmp/owned-output','synthetic temporary output');
 const fs=await statfs('/tmp');assert.equal(fs.bsize*fs.blocks,67108864);
 const connected=await new Promise(resolve=>{const socket=createConnection({host:'127.0.0.1',port:${listener.address().port}});const finish=v=>{socket.destroy();resolve(v)};socket.once('connect',()=>finish(true));socket.once('error',()=>finish(false));socket.setTimeout(1000,()=>finish(false))});assert.equal(connected,false);

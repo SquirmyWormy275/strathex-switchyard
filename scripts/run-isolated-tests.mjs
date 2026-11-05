@@ -160,6 +160,7 @@ export const requiredGroups = [
   { file: "tools/layout-studio/repository-windows-pipeline.test.mjs", ...nativeTestOverrides("tools/layout-studio/repository-windows-pipeline.test.mjs") },
   { file: "tools/layout-studio/repository-windows-pipeline-recovery.test.mjs", ...nativeTestOverrides("tools/layout-studio/repository-windows-pipeline-recovery.test.mjs") },
   { file: "tools/layout-studio/windows-pipeline-evidence.test.mjs" },
+  { file: "tools/layout-studio/linux-namespace-budget.test.mjs", expectedSkipped: process.platform === "linux" ? 0 : 1 },
   { file: "tools/layout-studio/repository-windows-execution-recovery.test.mjs", ...nativeTestOverrides("tools/layout-studio/repository-windows-execution-recovery.test.mjs") },
   { file: "tools/layout-studio/repository-windows-execution-stop.test.mjs", ...nativeTestOverrides("tools/layout-studio/repository-windows-execution-stop.test.mjs") },
   { file: "tools/layout-studio/repository-windows-execution-output.test.mjs", ...nativeTestOverrides("tools/layout-studio/repository-windows-execution-output.test.mjs") },

@@ -27,6 +27,16 @@ owned synthetic packages/signing scratch were removed. Receipts
 
 ## Current backend
 
+The Linux namespace now remounts its generated root and device filesystem
+read-only and disables/asserts nested user namespaces. A fresh actual test found
+that the earlier `/tmp` quota did not cover regular-file writes under `/`,
+`/etc` or `/dev`; those paths now refuse writes. The default temporary mount is
+64 MiB, and the real guardian/namespace proof fills it across several files to
+ENOSPC, refuses nested namespace creation and verifies the host namespace limit
+is unchanged. Thirty-one namespace/runtime/guardian/inventory cases, thirty
+actual pipeline/Suite/package regressions and type checking pass; installed
+acceptance is pending. Bounded writable build preparation remains separate work.
+
 Windows Run uses the protected LocalSystem storage service for new exchanges;
 there is no privilege-enabling or direct-volume fallback in normal Run. Exact
 installation/task/input mapping, stable effect IDs, read-only lost-result lookup,
