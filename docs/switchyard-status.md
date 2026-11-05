@@ -7,15 +7,17 @@ separates unfinished software from exact device/account checks, and
 
 ## Installed pilot
 
-Current installed source is `d2c413d`, release
-`d59010f455c4202cffde4bd7fec786c817e1a721c81117ec0e76e0d4465f7933`.
-It passes six update and ten actual Run/stop checks, including root/device
-write denials in the program, original input protection, exact stop/replay and
-independent exit/cleanup with zero prompts. Receipts
-`assignment-legends-1793850275117.json` and
-`installed-repository-execution-1793850446831.json` retained. Original workspace,
-modes/private endpoint/frozen Home are preserved; owned stage, bundle and proof
-checkout removed. The newer writable-copy mode is not yet installed.
+Current installed source is `50dd23d`, release
+`fa150bd32f710676b214d7180f251a5f17c497cc17340751f6a24566dad7e03a`.
+It passes six update and ten actual writable-copy Run/stop checks. The reviewed
+program builds in the bounded copy, denies root/device/host/credential/network
+escapes, preserves original input bytes, retains exact duplicate receipts and
+independently verifies stop/cleanup. One empty native task, zero model prompts.
+Receipts `assignment-legends-1793851542323.json` and
+`installed-repository-execution-1793851723364.json` retained. Original selection,
+modes/definitions/private endpoint/frozen Home are preserved; owned staging,
+bundle and proof checkout removed. Pipeline writable builds separately pass
+actual source/namespace checks; this installed journey exercises Run and stop.
 
 Previous installed source `3ec0549`, release
 `a170fa2163dd28062afd6ec24f65beb85fe1a0a791c09b4559f0607c3b8f8ce8`,
@@ -45,8 +47,8 @@ disabled. A host must enable this mode; imported JSON cannot enable a direct
 fallback. Review/checkpoint bind the displayed permission. Actual build, quota,
 input preservation, both pipeline receipts, replay and cancellation/exit checks
 pass. The new group/harness checks pass 22 cases, existing runtime/guardian/
-inventory 37, and build/Run/Suite/package 33; type checking passes. Installed
-acceptance is pending. [Build workspace contract](bounded-build-workspace.md).
+inventory 37, and build/Run/Suite/package 33; type checking passes. The installed
+Run/stop journey above also passes. [Build workspace contract](bounded-build-workspace.md).
 
 The Linux namespace now remounts its generated root and device filesystem
 read-only and disables/asserts nested user namespaces. A fresh actual test found
@@ -55,8 +57,8 @@ that the earlier `/tmp` quota did not cover regular-file writes under `/`,
 64 MiB, and the real guardian/namespace proof fills it across several files to
 ENOSPC, refuses nested namespace creation and verifies the host namespace limit
 is unchanged. Thirty-one namespace/runtime/guardian/inventory cases, thirty
-actual pipeline/Suite/package regressions and type checking pass; installed
-acceptance is pending. The separate bounded writable mode is connected above; its installed proof is pending.
+actual pipeline/Suite/package regressions and type checking pass. Installed
+read-only `d2c413d` and writable-copy `50dd23d` journeys both pass.
 
 Windows Run uses the protected LocalSystem storage service for new exchanges;
 there is no privilege-enabling or direct-volume fallback in normal Run. Exact
@@ -92,11 +94,12 @@ is an implementation contingency for token limits; no coding job was delegated.
 
 ## Latest verification and correction
 
-The corrected complete Linux lane at immutable `238592b` now passes all 172
-groups: 1,131 tests, 1,121 passed and ten declared skips. Receipt
-`9cc25902-466d-4ff1-a5a7-7a6bdcfb8c5d` retained; every child cleanup verified
-and owned fixtures/checkout removed. It predates the separate namespace quota
-closure, covered by the focused checks above. Current inventory is 175 groups.
+The complete Linux lane at immutable `66f6416` passes all 173 groups:
+1,132 tests, 1,122 passed and ten declared skips. Receipt
+`3b943d60-cd9d-40f9-ac79-fceab62a645f` retained; every child cleanup verified
+and owned fixtures/checkout removed. It includes namespace quota closure and
+the service-deletion query correction. The newer writable-copy checkpoint
+`50dd23d` is running its separate immutable 175-group lane.
 
 Native Windows `5d398d2`, workflow
 [41960677205](https://github.com/SquirmyWormy275/strathex-switchyard/actions/runs/41960677205),
@@ -125,7 +128,7 @@ handle error still preserves the installation. A pending query never establishes
 absence: only a new OpenService error 1060 does. Both actual C# targets compile
 with zero warnings and 112 portable checks pass; fresh native acceptance is pending.
 
-Last accepted complete Linux is `403e0c9`: 168/168 groups, 1,121 tests,
+Earlier accepted complete Linux `403e0c9`: 168/168 groups, 1,121 tests,
 1,111 passed and ten declared skips. Receipt
 `13be1a30-2e93-4b87-8a94-9a1953285b9f` retained with all child cleanup verified.
 The `5d398d2` lane attempted 172 groups: 171 passed; its sole failure was a stale
@@ -134,7 +137,7 @@ authority capability assertion expecting only Run. Receipt
 the exact Run-only grant from all three connected capabilities, while retaining
 unsupported-action and Work denials; all nine authority cases pass. Every child
 cleanup verified and failed checkout/fixtures are removed. The corrected complete
-172-group rerun above passes; no assertion, platform skip or deadline was waived.
+172-group rerun at `238592b` and the later 173-group lane both pass; no assertion, platform skip or deadline was waived.
 
 ## F77 and remaining work
 

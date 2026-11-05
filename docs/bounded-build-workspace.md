@@ -86,3 +86,14 @@ Use a fresh `execution-validation-...` name. The verifier creates one empty nati
 Codex task with zero prompts, exercises reviewed Run/stop and restores the original
 workspace/modes/private endpoint. Its current installed build demonstration is
 pending; do not infer it from the source/kernel tests alone.
+
+Normal installed `50dd23d`, release
+`fa150bd32f710676b214d7180f251a5f17c497cc17340751f6a24566dad7e03a`,
+passes six update checks and this ten-check Run/stop journey. It submits zero
+model prompts and independently stops three owned guardians. Original workspace,
+modes, definitions, private endpoint and frozen Home are preserved; owned
+staging, bundle and source proof checkout are removed. Small receipts
+`assignment-legends-1793851542323.json` and
+`installed-repository-execution-1793851723364.json` are retained privately.
+The installed proof covers Run/stop; both writable pipeline actions have their
+separate actual namespace/source evidence above.

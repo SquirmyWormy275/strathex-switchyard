@@ -85,7 +85,7 @@ uncertain outcomes remain unchanged. Provider replies do not establish coding-ta
 These checks do not prove a finished keyboard/agent appliance. General coding-task
 controls, physical role shortcut selection in the frontend, platform lifecycle acceptance, profile-library visual acceptance,
 expanded device editing controls, complete device settings and final UI acceptance remain unfinished.
-The complete Linux runner checkpoint at `238592b` passes 172 groups: 1,121 tests passed and
+The complete Linux runner checkpoint at `66f6416` passes 173 groups: 1,122 tests passed and
 ten declared platform skips. Windows filesystem CI passes all 30 native checks,
 including bounded volume disk-full, exact detach and mapping admission. The full
 Windows worker/runtime checkpoint passes 261 groups: 1,690 tests passed and 48
@@ -94,7 +94,7 @@ all four native Windows policy jobs with an explicit guest runner double. Linux
 also connects separately reviewed local-gate and clean-reproduction recipes to
 the isolated runner and authenticated evidence. An explicit [bounded build workspace](docs/bounded-build-workspace.md)
 lets reviewed recipes build in a disposable writable copy while preserving the live repository;
-its source/kernel checks pass and installed acceptance remains pending. The [Windows pipeline path](docs/windows-pipelines.md)
+its source/kernel checks and normal installed Run/stop demonstration pass with zero model prompts. The [Windows pipeline path](docs/windows-pipelines.md)
 now uses reviewed guest inputs and authenticated reports with actual signed feeds;
 native guest execution is doubled in its current tests. [Signed fixture maintenance](docs/signed-fixtures.md)
 now connects operator-reviewed public trust and exact feed metadata to these pipelines;
