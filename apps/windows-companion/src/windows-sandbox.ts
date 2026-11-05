@@ -289,6 +289,13 @@ export interface WindowsSandboxBoundedExchangeBinding {
   readonly mountIdentity: Readonly<{ device: string; inode: string }>;
   readonly footerSha256: string;
   readonly volumeGuid: string;
+  readonly broker?: Readonly<{
+    installationId: string;
+    ownerScope: string;
+    serviceImageSha256: string;
+    taskScopeSha256: string;
+    inputManifestSha256: string;
+  }>;
 }
 
 /** Supplied by the trusted native volume service, never request JSON. */
@@ -710,6 +717,10 @@ export class WindowsSandboxBackend {
       || !isAbsolute(exchange.root) || !isAbsolute(exchange.nativeBinding.stagingRoot) || !samePath(exchange.root, join(exchange.nativeBinding.stagingRoot, "mount"))
       || !validDigest(exchange.nativeBinding.footerSha256))) return { status: "blocked", summary: "Windows Sandbox rejected an unbound native bounded-volume capability." };
     if (reviewed && (!safeUuid.test(request.operationId ?? "") || reviewed.operationId !== request.operationId || typeof reviewed.assertCurrent !== "function" || reviewed.privateAclReadbackVerified !== true || reviewed.sandboxEnforced !== false || !validDigest(reviewed.inputManifestSha256))) return { status: "blocked", summary: "Windows Sandbox rejected an unbound reviewed-input capability." };
+    const broker = exchange?.nativeBinding.broker;
+    if (exchange && Object.hasOwn(exchange.nativeBinding, "broker") && (!broker || typeof broker !== "object" || Array.isArray(broker) || Object.keys(broker).sort().join() !== "inputManifestSha256,installationId,ownerScope,serviceImageSha256,taskScopeSha256"
+      || !safeUuid.test(broker.installationId) || ![broker.ownerScope, broker.serviceImageSha256, broker.taskScopeSha256, broker.inputManifestSha256].every(validDigest)
+      || broker.inputManifestSha256 !== reviewed?.inputManifestSha256)) return { status: "blocked", summary: "Windows Sandbox rejected a broker exchange bound to different reviewed inputs or an unknown installation scope." };
     const recipeId = request.recipeId ?? "full_sandbox";
     if (!safeIdentifier.test(recipeId)) return { status: "blocked", summary: "Windows Sandbox rejected an invalid repository recipe identifier." };
     const profile = resolveProfile(request.profile, recipeId);

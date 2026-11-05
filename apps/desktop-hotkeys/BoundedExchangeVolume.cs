@@ -204,7 +204,17 @@ internal static partial class ReviewedInputStager
                 if (attach)
                 {
                     if (loaded) throw new InvalidOperationException("native-volume-already-attached");
-                    phase = "attach"; var parameters = new AttachParameters { Version = 1 }; NativeSuccess(AttachVirtualDisk(image, IntPtr.Zero, 6, 0, ref parameters, IntPtr.Zero)); loaded = true;
+                    phase = "attach"; var parameters = new AttachParameters { Version = 1 }; IntPtr diskSecurity = IntPtr.Zero;
+                    try
+                    {
+                        // NULL inherits the image file's read-only client ACL.
+                        // Give data access to the attached disk instead; the
+                        // backing file and mount reparse point remain read-only.
+                        // https://learn.microsoft.com/en-us/windows/win32/api/virtdisk/nf-virtdisk-attachvirtualdisk
+                        if (broker != null && !ConvertStringSecurityDescriptorToSecurityDescriptorW("D:P(A;;GA;;;SY)(A;;GA;;;BA)(A;;GRGW;;;" + broker.ClientSid + ")", 1, out diskSecurity, out _)) throw new Win32Exception(Marshal.GetLastWin32Error());
+                        NativeSuccess(AttachVirtualDisk(image, diskSecurity, 6, 0, ref parameters, IntPtr.Zero)); loaded = true;
+                    }
+                    finally { if (diskSecurity != IntPtr.Zero) LocalFree(diskSecurity); }
                     phase = "find-volume"; var until = DateTime.UtcNow.AddSeconds(10);
                     while (true) { try { volume = FindOwnedVolume(image); break; } catch (InvalidOperationException error) when (error.Message == "native-volume-not-ready" && DateTime.UtcNow < until) { Thread.Sleep(50); } }
                     phase = "mount"; if (!SetVolumeMountPointW(mountPath + "\\", volume)) throw new Win32Exception(Marshal.GetLastWin32Error()); mounted = true;

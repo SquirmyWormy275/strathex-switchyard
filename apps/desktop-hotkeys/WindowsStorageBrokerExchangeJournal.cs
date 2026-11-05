@@ -12,6 +12,7 @@ internal sealed class WindowsStorageBrokerExchangeJournal(
     internal const int MaximumEvents = 8;
     internal sealed record Admission(bool EffectAllowed, bool Replayed, WindowsStorageBrokerExchangeProtocol.Proof? Result);
     internal sealed record State(string OperationId, string TaskScopeSha256, string InputManifestSha256, string Phase, WindowsStorageBrokerExchangeProtocol.Proof? Proof);
+    internal sealed record RecordedResult(string Status, WindowsStorageBrokerExchangeProtocol.Proof? Proof);
     private sealed record Entry(int Sequence, string PreviousSha256, string Action, string RequestId, string OperationId, string TaskScopeSha256, string InputManifestSha256, string EffectSha256, string Phase, WindowsStorageBrokerExchangeProtocol.Proof? Proof);
     private sealed record Observed(List<Entry> Entries, string Digest);
     private static Exception Invalid() => new InvalidOperationException("Preserve the original bounded exchange journal; no native effect may be replayed or inferred.");
@@ -95,6 +96,16 @@ internal sealed class WindowsStorageBrokerExchangeJournal(
     {
         var observed = Observe(operationId); var latest = observed.Entries.LastOrDefault();
         return latest == null ? null : new(latest.OperationId, latest.TaskScopeSha256, latest.InputManifestSha256, latest.Phase, latest.Proof);
+    }
+    internal RecordedResult Lookup(WindowsStorageBrokerExchangeProtocol.RequestScope request)
+    {
+        WindowsStorageBrokerExchangeProtocol.CheckRequest(binding, request); var observed = Observe(request.OperationId);
+        if (observed.Entries.Count > 0 && !SameScope(observed.Entries[0], request)) throw Invalid();
+        var original = observed.Entries.FirstOrDefault(entry => entry.RequestId == request.RequestId);
+        if (original == null) return new("absent", null);
+        if (original.EffectSha256 != request.EffectDigest) throw Invalid();
+        var recorded = observed.Entries.FirstOrDefault(entry => entry.RequestId == request.RequestId && entry.Phase == "recorded");
+        return recorded == null ? new("reserved", null) : new("recorded", recorded.Proof ?? throw Invalid());
     }
     internal void Complete(WindowsStorageBrokerExchangeProtocol.RequestScope request, WindowsStorageBrokerExchangeProtocol.Proof proof)
     {

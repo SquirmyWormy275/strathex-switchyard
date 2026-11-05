@@ -25,6 +25,10 @@ export function validateWindowsStoragePrerequisites(value) {
 
 export function validateWindowsExchangeBinding(value,operationId){
   const keys=["schema","operationId","stagingRoot","stagingIdentity","imageIdentity","mountIdentity","footerSha256","volumeGuid"];
+  if(value&&Object.hasOwn(value,"broker")){
+    keys.push("broker");const b=value.broker;
+    if(!b||typeof b!=="object"||Array.isArray(b)||Object.keys(b).sort().join()!=="inputManifestSha256,installationId,ownerScope,serviceImageSha256,taskScopeSha256"||!uuid(b.installationId)||![b.ownerScope,b.serviceImageSha256,b.taskScopeSha256,b.inputManifestSha256].every(dig))throw Error("Bind only the exact protected broker installation, task and reviewed inputs.");
+  }
   const identity=value=>value&&typeof value==="object"&&!Array.isArray(value)&&Object.keys(value).sort().join()==="device,inode"&&[value.device,value.inode].every(part=>typeof part==="string"&&/^(0|[1-9][0-9]{0,19})$/.test(part));
   if(!value||typeof value!=="object"||Array.isArray(value)||Object.keys(value).sort().join()!==keys.sort().join()||value.schema!=="switchyard-windows-bounded-volume/v1"||!uuid(operationId)||value.operationId!==operationId||!dig(value.footerSha256)||![value.stagingIdentity,value.imageIdentity,value.mountIdentity].every(identity)||typeof value.stagingRoot!=="string"||value.stagingRoot.length>2048||!new RegExp("^[A-Za-z]:[\\\\/].*[\\\\/]disk-"+operationId+"$").test(value.stagingRoot)||/[\x00-\x1f\x7f]/.test(value.stagingRoot)||typeof value.volumeGuid!=="string"||!/^\\\\\?\\Volume\{[a-f0-9-]{36}\}\\$/i.test(value.volumeGuid))throw Error("Bind only the exact host-owned bounded Windows exchange volume.");
   return structuredClone(value);

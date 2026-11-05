@@ -83,3 +83,21 @@ The first engine Windows run failed during the preceding metadata-service
 removal, before reaching its volume test. That failure remains retained; bounded
 removal phase diagnostics and one post-failure observation were added to isolate
 it. See [verification](verification.md) for the exact source and receipt.
+
+The native `f2285b8` exchange run reached the client's first filesystem write and
+failed with access denied. Passing a null security descriptor to
+[AttachVirtualDisk](https://learn.microsoft.com/en-us/windows/win32/api/virtdisk/nf-virtdisk-attachvirtualdisk)
+inherits the image file's ACL. The corrected broker supplies a separate disk
+DACL granting only System/Administrators and its designated client data access.
+The backing image and mount reparse point retain their protected read-only client
+ACLs. Five actual kernel-open denials now accompany the filesystem-write/disk-full
+proof; its complete 31-check native rerun remains required.
+
+`exchange-result` looks up an original request in the protected journal after a
+fresh signed serial pipe observation. It reports absent, reserved or recorded
+without invoking `Begin` or performing any effect. The helper checks expected
+installation/owner/image identity before effect requests. The native transport
+pins that tuple, exact task/input/request IDs and independently stopped guardian.
+All 43 journal and 23 fact checks pass locally; the combined host setup/transport/
+Sandbox/release checks pass 84 cases with explicit native/guest doubles. These
+are supporting pieces of the normal Run connection, which remains unfinished.

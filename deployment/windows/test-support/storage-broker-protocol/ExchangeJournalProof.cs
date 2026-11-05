@@ -27,12 +27,16 @@ internal static class ExchangeJournalProof
             if (fault == "changed") rows[^1] = "{}"u8.ToArray();
         });
         var journal = Journal(); Require(journal.Begin(original).EffectAllowed && rows.Count == 1);
+        Require(journal.Lookup(original) is { Status: "reserved", Proof: null } && rows.Count == 1);
+        Require(journal.Lookup(Request()) is { Status: "absent", Proof: null } && rows.Count == 1);
+        Refuses(() => journal.Lookup(Request(id: original.RequestId, taskScope: new string('6', 64))));
         var pending = journal.Begin(Request(id: original.RequestId, nonce: new string('f', 64)));
         Require(!pending.EffectAllowed && pending.Replayed && pending.Result?.State == "outcome-unconfirmed");
         Refuses(() => journal.Begin(Request("attach")));
         Refuses(() => journal.Begin(Request(taskScope: new string('1', 64))));
         Refuses(() => journal.Complete(Request(id: original.RequestId, taskScope: new string('2', 64)), created));
         journal.Complete(original, created); Require(rows.Count == 2);
+        Require(journal.Lookup(original) == new WindowsStorageBrokerExchangeJournal.RecordedResult("recorded", created) && rows.Count == 2);
         var replay = journal.Begin(Request(id: original.RequestId, nonce: new string('f', 64)));
         Require(!replay.EffectAllowed && replay.Replayed && replay.Result == created && rows.Count == 2);
         journal.Complete(original, created); Require(rows.Count == 2);
@@ -51,8 +55,10 @@ internal static class ExchangeJournalProof
         rows.Clear(); fault = "before"; Refuses(() => journal.Begin(original)); Require(rows.Count == 0);
         fault = "after"; Refuses(() => journal.Begin(original)); Require(rows.Count == 1); fault = "";
         Require(!Journal().Begin(original).EffectAllowed); Refuses(() => Journal().Begin(Request("create")));
+        Require(Journal().Lookup(original) is { Status: "reserved", Proof: null } && rows.Count == 1);
         fault = "after"; Refuses(() => journal.Complete(original, created)); Require(rows.Count == 2); fault = "";
         Require(Journal().Begin(original).Result == created && !Journal().Begin(original).EffectAllowed);
+        Require(Journal().Lookup(original).Proof == created && rows.Count == 2);
         rows.RemoveAt(1); Require(Journal().Begin(original).Result?.State == "outcome-unconfirmed");
         fault = "changed"; rows.Clear(); Refuses(() => journal.Begin(original)); fault = "";
         rows.Clear(); Require(journal.Begin(Request("inspect")).Result == null && rows.Count == 0);

@@ -917,6 +917,17 @@ test("bounded exchange survives an unknown guest exit and cannot be extracted or
  const backend=createBackend(setup,successfulRunner(()=>{launches++;}),[],{requireReviewedInputs:true,requireBoundedExchange:true}),request={...await sandboxRequest(setup),operationId:inputs.lease.operationId,reviewedInputs:inputs.lease,reviewedExchange:exchange.lease};
  const result=await backend.run(request);assert.equal(result.status,"failed");assert.match(result.summary,/guest exit remains unconfirmed/i);await access(join(exchange.lease.root,"result-manifest.json"));assert.equal((await readdir(setup.destinationRoot)).length,0);assert.equal((await backend.run(request)).status,"blocked");assert.equal(launches,1);assert.equal(exchange.held(),0);
 });
+test("a protected broker exchange must bind the same exact reviewed input manifest before any guest or output effect",async context=>{
+ for(const variant of ["matching","other-inputs","invalid-scope","unknown-field","null-scope","false-scope"]){
+  const setup=await fixture(context),inputs=await reviewedInputFixture(setup),exchange=await reviewedExchangeFixture(setup,inputs.lease.operationId);let launches=0;
+  let broker:any={installationId:"12345678-1234-4567-8123-123456789abc",ownerScope:"a".repeat(64),serviceImageSha256:"b".repeat(64),taskScopeSha256:"c".repeat(64),inputManifestSha256:inputs.lease.inputManifestSha256};
+  if(variant==="other-inputs")broker.inputManifestSha256="f".repeat(64);if(variant==="invalid-scope")broker.taskScopeSha256="unreviewed";if(variant==="unknown-field")broker.approved=true;if(variant==="null-scope")broker=null;if(variant==="false-scope")broker=false;
+  const lease={...exchange.lease,nativeBinding:{...exchange.lease.nativeBinding,broker}},backend=createBackend(setup,exactGuestRunner(successfulRunner(()=>{launches++;})),[],{requireReviewedInputs:true,requireBoundedExchange:true});
+  const result=await backend.run({...await sandboxRequest(setup),operationId:inputs.lease.operationId,reviewedInputs:inputs.lease,reviewedExchange:lease});
+  assert.equal(result.status,variant==="matching"?"completed":"blocked",variant+": "+result.summary);assert.equal(launches,variant==="matching"?1:0);assert.equal(exchange.held(),0);await access(join(exchange.lease.nativeBinding.stagingRoot,"exchange.vhd"));
+  if(variant!=="matching")assert.deepEqual(await readdir(setup.destinationRoot),[]);
+ }
+});
 test("bounded output still rejects links and a revoked native volume before extraction",async context=>{
  for(const failure of ["link","revoked"]){
   const setup=await fixture(context),inputs=await reviewedInputFixture(setup),exchange=await reviewedExchangeFixture(setup,inputs.lease.operationId),inner=successfulRunner();

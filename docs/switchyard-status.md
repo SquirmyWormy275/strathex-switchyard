@@ -8,6 +8,22 @@ behind each accepted result.
 
 ## Active backend iteration
 
+Native `f2285b8` passes both setup/service lifecycles (six plus thirteen checks
+each) and all 106 portable crypto/journal/fact checks on Windows. Four downloaded
+archive digests verified; receipts retained. The actual exchange fails its first
+restricted-client filesystem write. The attach call inherited the read-only image
+ACL; it now supplies a separate disk-only client read/write descriptor, retaining
+read-only backing file and mount point. The expanded 31-check native rerun is
+pending; the failed exchange remains failed.
+
+Original result lookup is now read-only and installation/task/input/request bound;
+it cannot reserve or resend a missing effect. The native transport and mapping
+validator are connected to this contract. Both C# targets compile without
+warnings, all 112 portable checks pass, 51 related setup/suite/release and 33
+Sandbox backend checks pass, and type checking passes. Normal Run factory/guest
+consumer integration remains unfinished. Claude Code is a contingency for token
+limits; no delegated coding job was launched.
+
 Protected broker mapping now has a read-only native entry: fresh signed mounted
 state, exact task/input/installation journal and image facts, then pinned native
 UUID/footer/mount/extent/capacity/ACL verification. A changed directory cannot
