@@ -37,7 +37,8 @@ export function createWindowsRepositoryExecution({ store, authority, stateDirect
   const update = (c, id, action, fn) => store.update(c, action, state => { const row = state.repositoryExecutionReviews?.find(row => row.requestId === id && row.engine === engine); if (!row) throw Error("The protected Windows execution review changed."); return fn(row); });
   async function exclusive(c, fn) { if (pending.has(c)) throw Error("Wait for this workspace's current Windows execution admission."); seen.add(c); const g = generations.get(c) ?? 0, operation = Promise.resolve().then(() => fn(g)); pending.set(c, operation); try { return await operation; } finally { if (pending.get(c) === operation) pending.delete(c); } }
   async function plan(resolved, proposal, prerequisites,c) {
-    const allowedFiles = [...resolved.files.tracked, ...resolved.files.untracked].filter(file => resolved.proposed.paths.includes(file.path)).map(file => ({ path: file.path, digest: file.digest }));
+    const ignored=windowsShieldActions.includes(proposal.action)?(resolved.files.ignored??[]).filter(file=>file.classification==="included"&&resolved.proposed.classifications.includedIgnored?.includes(file.path)):[];
+    const allowedFiles = [...resolved.files.tracked, ...resolved.files.untracked,...ignored].filter(file => resolved.proposed.paths.includes(file.path)).map(file => ({ path: file.path, digest: file.digest }));
     const source = await directoryIdentity(resolved.task.repositoryRoot), sourceIdentity = { device: source.dev.toString(), inode: source.ino.toString() };
     const selected = { repositoryRoot: resolved.task.repositoryRoot, sourceIdentity, manifestPath: proposal.manifestPath, manifestSha256: proposal.manifestSha256, allowedFiles };
     const loaded = await loadWindowsReviewedRun({ ...selected, expectedAction: proposal.action, recipeRuntimeSha256: prerequisites.recipeRuntime.sha256 });

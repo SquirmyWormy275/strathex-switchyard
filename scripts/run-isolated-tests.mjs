@@ -111,6 +111,8 @@ const linuxCompanionTests = ["linux-secret", "linux-isolation", "linux-lifecycle
     ...(process.platform !== "linux" && linuxSkippedOnNonLinux.has(name) ? { expectedSkipped: linuxSkippedOnNonLinux.get(name) } : {})
   }));
 export function nativeTestOverrides(file, platform = process.platform) {
+  if (file === "tools/layout-studio/repository-ignored-scanner-inputs.test.mjs") return { timeoutMs: platform === "win32" ? 300_000 : 120_000 };
+  if (file === "tools/layout-studio/task-authority-ignored-inputs.test.mjs" && platform === "win32") return { timeoutMs: 240_000 };
   if (file === "tools/layout-studio/repository-validation-policy.test.mjs") return { timeoutMs: platform === "win32" ? 300_000 : 120_000 };
   if (platform === "win32" && file === "tools/layout-studio/suite.test.mjs") return { timeoutMs: 120_000 };
   if (platform === "win32" && file === "tools/layout-studio/repository-execution.test.mjs") return { timeoutMs: 480_000 };
@@ -176,6 +178,8 @@ export const requiredGroups = [
   { file: "tools/layout-studio/repository-shield.test.mjs", timeoutMs: 120_000, expectedSkipped: process.platform === "linux" ? 0 : 2 },
   { file: "tools/layout-studio/repository-pipeline.test.mjs", timeoutMs: 120_000, ...(process.platform !== "linux" ? { expectedSkipped: 5 } : {}) },
   { file: "tools/layout-studio/repository-pipeline-fixtures.test.mjs", timeoutMs: 120_000, ...(process.platform !== "linux" ? { expectedSkipped: 2 } : {}) },
+  { file: "tools/layout-studio/task-authority-ignored-inputs.test.mjs", ...nativeTestOverrides("tools/layout-studio/task-authority-ignored-inputs.test.mjs") },
+  { file: "tools/layout-studio/repository-ignored-scanner-inputs.test.mjs", ...nativeTestOverrides("tools/layout-studio/repository-ignored-scanner-inputs.test.mjs"), expectedSkipped: process.platform === "linux" ? 0 : 1 },
   { file: "tools/layout-studio/task-authority.test.mjs", ...nativeTestOverrides("tools/layout-studio/task-authority.test.mjs") },
   { file: "tools/layout-studio/devices.test.mjs" },
   { file: "tools/layout-studio/xwhatsit-expansion.test.mjs" },

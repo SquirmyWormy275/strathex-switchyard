@@ -7,16 +7,18 @@ host. [Verification](verification.md) retains accepted and failed checkpoints.
 
 ## Installed application
 
-Installed source `0cd785f`, release
-`37ccf92f55c8659a8a4fadc1fd4c73869767fd94f803d98d1e3e6225896963ff`,
-passes six update and thirteen actual Supply Chain API checks, including exact
-receipt expiry clipped to the original signed five-minute freshness deadline.
-Known-vulnerable and clean incomplete versions retain report-bound BOMs,
-failed/incomplete receipts, replay and two independently verified native exits.
-Original selection/modes/definitions/private endpoint/frozen Home are restored.
-Receipts `assignment-legends-1793856754649.json` and
-`installed-shield-baseline-1793856930607.json` retained; owned source/packages/
-staging/signing/bundle/proof checkout removed. One empty task, zero prompts.
+Installed source `9f3024e`, release
+`31905b5bf9240446ba556d0c1681676eac5fb831b87b14b3a961727af8222115`,
+passes six normal update and fourteen actual Supply Chain checks. Signed
+freshness deadlines clip both receipts; approved scanner retirement marks them
+invalid while preserving historical failed/incomplete outcomes. Two native exits,
+exact replay, full original-state restoration and owned scratch removal pass.
+Receipts `assignment-legends-1793857471815.json` and
+`installed-shield-baseline-1793857655461.json` retained. One empty task, zero prompts.
+
+Earlier installed `0cd785f` passes six update/thirteen deadline checks:
+`assignment-legends-1793856754649.json`,
+`installed-shield-baseline-1793856930607.json`; owned scratch removed.
 
 Earlier installed `9a73479`, release
 `af1b58752f76e021e2a790a8052a0439407dce9b548fd0a462d32bbf399959c8`,
@@ -66,8 +68,15 @@ Both execution hosts bind policy at review/admission and protect receipt commit
 against policy drift; status separates historical outcomes from invalidation and
 expiry. [Contract](validation-receipt-invalidation.md). Thirty-five core/package cases, ten final package/recovery cases, four existing
 feed-bound pipeline cases, both receipt-race cases, twenty maintenance/Shield
-cases, fifteen Run/recovery/output cases and type checking pass. Normal installed
-retirement acceptance is pending.
+cases, fifteen Run/recovery/output cases and type checking pass. Normal installed retirement acceptance passes at `9f3024e` (six update/fourteen
+API checks; zero prompts and owned scratch removed).
+
+Explicit ignored inputs are now restricted to pinned Shield actions at grant and
+execution admission. Five focused authority/Linux/Windows guest-double cases pass:
+redacted findings from an ignored `.env`, unchanged original bytes/index and later
+source-drift refusal. Whole-repository/automatic ignored-secret/history inventory
+is still unfinished. [Contract](ignored-scanner-inputs.md). Later installed
+ignored-input acceptance is pending.
 
 ## Complete and native checkpoints
 

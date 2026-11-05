@@ -68,3 +68,9 @@ expiring reviewed exceptions and comprehensive target-drift gate consumption
 remain unfinished. A signed feed and a fresh receipt never establish coverage
 that a scanner did not perform. [Feed deadlines and trust](signed-fixtures.md)
 and [current verification](verification.md) record the accepted source versions.
+
+Normal installed `9f3024e` passes six update/fourteen actual Supply Chain API
+checks, including receipt expiry, retired receipt status and unchanged historical
+results. Both guardians exit; original state is restored and owned scratch
+removed. Receipts `assignment-legends-1793857471815.json` and
+`installed-shield-baseline-1793857655461.json` are retained. Zero model prompts.

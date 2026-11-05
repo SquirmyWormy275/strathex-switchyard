@@ -104,6 +104,8 @@ Linux [Shield baseline scans](docs/shield-baseline-scanner.md) run pinned code a
 rule/advisory data with explicit findings and coverage gaps. The [development SBOM example](docs/evidence/README.md)
 shows standard CycloneDX output and its limits. The [Windows scanner path](docs/windows-shield.md)
 uses the same pinned engine through reviewed guest execution; its tests double the guest.
+[Explicit ignored inputs](docs/ignored-scanner-inputs.md) let the pinned scanner
+inspect a separately approved `.env` without commit or general execution access.
 Full Shield scope remains unfinished.
 Personal host setup now has reviewed install/remove and a fixed native boundary.
 The bounded storage service and normal

@@ -29,7 +29,7 @@ Every report currently includes `repository_scope_unverified`. History and sourc
 permissions are not inferred from copied files; publisher provenance is not
 inferred from a registry URL or integrity string. The request scope is literally
 `reviewed-inputs`; it cannot claim an entire repository. Full staged/unstaged/new
-and ignored-secret inventory, relevant Git history, broad language/ecosystem
+and automatic ignored-secret inventory, relevant Git history, broad language/ecosystem
 coverage, signed publisher provenance and audited expiring exceptions remain
 unfinished implementation. This is separate from unavailable hardware/accounts.
 
@@ -164,3 +164,9 @@ five-minute freshness limit; it never waits for or extends that limit.
 
 Protected feed maintenance also retires prior validation receipts and both hosts
 check policy at receipt commit. [Invalidation contract](validation-receipt-invalidation.md).
+
+Explicit ignored paths such as `.env` can now be owned only for pinned Shield
+scans, with closed classifications and exact read-only witnesses on both hosts.
+They remain outside commit/Run/pipeline authority and the Git index. Five focused
+authority/real-Linux/Windows-guest-double cases pass.
+[Setup and remaining scope](ignored-scanner-inputs.md).

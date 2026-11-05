@@ -43,7 +43,8 @@ export function createRepositoryExecution({store,authority,stateDirectory,platfo
       const verified=await verifyRepositoryRuntimeManifest(read.bytes,{expectedSha256:proposal.manifestSha256,repositoryRoot:resolved.task.repositoryRoot}),recipe=verified.manifest.recipes[proposal.action];
       if(!recipe||recipe.kind!=="process"||recipe.lifecycle!==(proposal.action==="run_target"?"managed":"foreground")||recipe.isolation!=="disposable"||!recipe.inputFiles?.length||recipe.timeoutMs>600000||recipe.maxOutputBytes>524288)throw Error("Connected execution requires its bounded lifecycle and exact disposable input set.");
       if(linuxPipelineActions.includes(proposal.action)&&Object.entries(recipe.environment).some(([name,value])=>name==="NODE_ENV"&&value!=="test"))throw Error("A connected pipeline cannot select a production NODE_ENV.");
-      const witnesses=new Map([...resolved.files.tracked,...resolved.files.untracked].map(f=>[f.path,f]));
+      const ignored=linuxShieldActions.includes(proposal.action)?(resolved.files.ignored??[]).filter(f=>f.classification==="included"&&resolved.proposed.classifications.includedIgnored?.includes(f.path)):[];
+      const witnesses=new Map([...resolved.files.tracked,...resolved.files.untracked,...ignored].map(f=>[f.path,f]));
       for(const input of recipe.inputFiles)if(!resolved.proposed.paths.includes(input.path)||witnesses.get(input.path)?.digest!==`sha256:${input.sha256}`)throw Error("Every execution input must match this exact task-owned file snapshot.");
       const shield=await validateShieldRecipe({recipe,repositoryRoot:resolved.task.repositoryRoot,action:proposal.action,resolveFixtures:resolveScannerFixtures?input=>resolveScannerFixtures(c,input):undefined,now});
       return {verified,recipe,...(shield?{shield}:{})};

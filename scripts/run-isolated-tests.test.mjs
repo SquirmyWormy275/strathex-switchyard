@@ -92,7 +92,7 @@ test("only explicitly slow integration or release groups extend the bounded defa
       ["deployment/suite/installation.test.mjs", 120_000],
       ["apps/provider-adapter-host/test/tls-network-e2e.test.ts", 300_000],
       ["apps/vscode-extension/test/named-pipe-transport.test.ts", 120_000],
-      ...(process.platform === "win32" ? [["tools/layout-studio/task-authority.test.mjs", 240_000]] : []),
+      ...(process.platform === "win32" ? [["tools/layout-studio/task-authority.test.mjs", 240_000], ["tools/layout-studio/task-authority-ignored-inputs.test.mjs", 240_000]] : []),
       ...(process.platform === "win32" ? [["tools/layout-studio/suite.test.mjs", 120_000]] : []),
       ["tools/layout-studio/repository-recovery.test.mjs", 120_000],
       ["tools/layout-studio/repository-execution.test.mjs", process.platform === "win32" ? 480_000 : 240_000],
@@ -102,6 +102,7 @@ test("only explicitly slow integration or release groups extend the bounded defa
       ...["repository-windows-shield","repository-windows-shield-recovery"].map(name=>[`tools/layout-studio/${name}.test.mjs`,process.platform==="win32"?300_000:120_000]),
       ["tools/layout-studio/repository-pipeline-fixtures.test.mjs", 120_000],
       ["tools/layout-studio/repository-validation-policy.test.mjs", process.platform === "win32" ? 300_000 : 120_000],
+      ["tools/layout-studio/repository-ignored-scanner-inputs.test.mjs", process.platform === "win32" ? 300_000 : 120_000],
       ["apps/windows-companion/test/authenticated-pipe.test.ts", 240_000],
       ["apps/windows-companion/test/companion-lifecycle-helper.test.ts", 240_000],
       ["apps/windows-companion/test/council-workspace-isolation.test.ts", 240_000],
@@ -126,6 +127,10 @@ test("only explicitly slow integration or release groups extend the bounded defa
     assert.deepEqual(nativeTestOverrides("tools/layout-studio/repository-recovery.test.mjs", "linux"), { timeoutMs: 120_000 });
     assert.deepEqual(nativeTestOverrides("tools/layout-studio/repository-validation-policy.test.mjs", "win32"), { timeoutMs: 300_000 });
     assert.deepEqual(nativeTestOverrides("tools/layout-studio/repository-validation-policy.test.mjs", "linux"), { timeoutMs: 120_000 });
+    assert.deepEqual(nativeTestOverrides("tools/layout-studio/repository-ignored-scanner-inputs.test.mjs", "win32"), { timeoutMs: 300_000 });
+    assert.deepEqual(nativeTestOverrides("tools/layout-studio/repository-ignored-scanner-inputs.test.mjs", "linux"), { timeoutMs: 120_000 });
+    assert.deepEqual(nativeTestOverrides("tools/layout-studio/task-authority-ignored-inputs.test.mjs", "win32"), { timeoutMs: 240_000 });
+    assert.deepEqual(nativeTestOverrides("tools/layout-studio/task-authority-ignored-inputs.test.mjs", "linux"), {});
     assert.deepEqual(nativeTestOverrides("unreviewed.test.mjs", "win32"), {});
     assert.deepEqual(nativeTestOverrides("tools/layout-studio/repository-execution.test.mjs", "win32"), { timeoutMs: 480_000 });
     const delayed = ["-e", "setTimeout(() => process.exit(0), 150)"];

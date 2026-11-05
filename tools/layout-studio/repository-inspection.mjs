@@ -135,9 +135,9 @@ export function createRepositoryInspection({ store, command = runRuntimeCommand,
           observed.gitDirectory = await realpath(observed.gitDirectory); observed.indexPath = resolve(task.repositoryRoot, observed.indexPath);
           await check(); await verifyRepositoryIdentity(task); return observed;
         }
-        const included = new Set(classifications.includedUntracked), excluded = new Set(classifications.excludedUntracked), ignored = new Set(classifications.excludedIgnored);
+        const included = new Set(classifications.includedUntracked), excluded = new Set(classifications.excludedUntracked), includedIgnored = new Set(classifications.includedIgnored ?? []), ignored = new Set(classifications.excludedIgnored);
         let inspection;
-        const inspector = new GitCliInspector({ runner, digestReader, classifyUntracked: p => included.has(p) ? "included" : excluded.has(p) ? "excluded" : "unknown", classifyIgnored: p => ignored.has(p) ? "excluded" : "unknown" });
+        const inspector = new GitCliInspector({ runner, digestReader, classifyUntracked: p => included.has(p) ? "included" : excluded.has(p) ? "excluded" : "unknown", classifyIgnored: p => includedIgnored.has(p) ? "included" : ignored.has(p) ? "excluded" : "unknown" });
         const factory = new TargetSnapshotFactory({ async inspect(root) { inspection = await inspector.inspect(root); inspection.canonicalRemote = safeRemote(inspection.canonicalRemote); return inspection; } }, { clock: () => new Date(now()).toISOString() });
         const snapshot = await factory.capture({ targetHint: task.repositoryRoot, policyVersion: "switchyard-task-local-authority/v1", environment: { toolVersions: { node: process.versions.node }, values: { gitContract: "fixed-read-only-guardian/v1" } } });
         await check(); await verifyRepositoryIdentity(task);
