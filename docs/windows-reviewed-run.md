@@ -79,7 +79,7 @@ to restrict startup DLL imports to System32. Its new no-effect native proof read
 that field from the actual PE image, observes the current native user, and checks
 unknown commands/changed helper bytes are refused before elevation. Compilation
 and all five original checks pass on native Windows at `39bc24f`. The managed bootstrap compiles and
-refuses Linux. The separate native-setup lifecycle passes six lifecycle and thirteen restricted-client checks at `d7872fb`, including protected staging, clean managed startup and exact removal. The worker was already elevated; actual UAC interaction remains unaccepted. A sixth no-effect regression now binds exit to the original creation time and Job Object across PID reuse; its native rerun is pending. Privileged volume integration remains unfinished.
+refuses Linux. The separate native-setup lifecycle passes six lifecycle and thirteen restricted-client checks at `d7872fb`, including protected staging, clean managed startup and exact removal. The worker was already elevated; actual UAC interaction remains unaccepted. A sixth no-effect regression now binds exit to the original creation time and Job Object across PID reuse; all six no-effect and thirty filesystem checks pass at `21038f6`. Privileged volume integration remains unfinished.
 
 The broker metadata wire contract is now implemented separately from the future
 privileged service. It accepts only a closed metadata request and binds a fresh

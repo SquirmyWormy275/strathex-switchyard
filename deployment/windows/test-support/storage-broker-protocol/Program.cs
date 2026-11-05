@@ -43,7 +43,7 @@ using var changed=JsonDocument.Parse(storage.RootElement.GetRawText().Replace("\
 Refuses(()=>WindowsStorageBrokerProtocol.Reply(binding,request,changed.RootElement,key));
 using var wrongCurve=ECDsa.Create(ECCurve.NamedCurves.nistP384);
 Refuses(()=>WindowsStorageBrokerProtocol.Reply(binding,request,storage.RootElement,wrongCurve));
-int protectedFilesChecks=0,nativeServiceChecks=0;
+int exchangeProtocolChecks=ExchangeProtocolProof.Run(),protectedFilesChecks=0,nativeServiceChecks=0;
 if(args.Length>0)
 {
     if(!OperatingSystem.IsWindows()||args.Length!=1)throw new InvalidOperationException("Choose only the explicit disposable Windows proof.");
@@ -51,4 +51,4 @@ if(args.Length>0)
     else if(args[0]=="--native-service")nativeServiceChecks=NativeServiceProof.Run();
     else throw new InvalidOperationException("The native proof flag is not recognized.");
 }
-Console.WriteLine(JsonSerializer.Serialize(new {schema="switchyard-storage-broker-protocol-proof/v1",success=true,checks,protectedFilesChecks,nativeServiceChecks,serviceInstalled=false,volumeOpened=false,guestLaunched=false}));
+Console.WriteLine(JsonSerializer.Serialize(new {schema="switchyard-storage-broker-protocol-proof/v1",success=true,checks,exchangeProtocolChecks,protectedFilesChecks,nativeServiceChecks,serviceInstalled=false,volumeOpened=false,guestLaunched=false}));

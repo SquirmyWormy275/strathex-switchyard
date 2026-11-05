@@ -8,6 +8,17 @@ behind each accepted result.
 
 ## Active backend iteration
 
+Normal installed `819840a` passes six update and six host setup API checks,
+receipt `installed-windows-storage-api-1793837324149.json`. Windows setup is
+correctly unavailable on Linux; arbitrary selectors, unauthenticated requests
+and Work evidence access are refused. Definitions, mode, private link and frozen
+Home are unchanged. Bundle staging and the proof checkout were removed.
+
+The closed exchange wire now passes thirty compiled crypto/parser checks and
+keeps its fixed 64 MiB limit, exact task/input/operation scope and fresh signed
+challenge separate from durable effect authority. Its privileged engine and
+normal Run connection remain unfinished; metadata still reports no volume broker.
+
 Complete Linux `cba5e2b` passes 163/163 groups: 1,062 tests, 1,052 passed and ten
 declared skips. Receipt `26d8a535-ec4e-45ea-b47c-2db8d3bdb7e7` retained; every
 child cleanup verified and the disposable worktree removed. Installed normal
@@ -32,8 +43,9 @@ unfinished implementation or acceptance checks as described in the
 A later `d7872fb` filesystem pass failed while re-observing a stopped guardian,
 after verified image detach. The Windows exit observer previously treated any
 live process with that PID as the original guardian. Commit `21038f6` compares
-original creation time and Job emptiness; its new native regression and thirty
-filesystem checks are rerunning. The failed receipt remains failed and retained.
+original creation time and Job emptiness; its new native regression and all thirty
+filesystem checks pass in workflow `41938283517`. Three archive digests were
+verified and receipts retained. The failed receipt remains failed and retained.
 
 Linux hosted run `41924141682` exposed a stop-readiness race: a durable running
 owner could become visible before its exact in-memory stop controller. The
