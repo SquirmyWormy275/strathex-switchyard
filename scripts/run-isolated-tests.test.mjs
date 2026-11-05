@@ -88,7 +88,7 @@ test("only explicitly slow integration or release groups extend the bounded defa
     assert.equal(tlsGroups.every((group) => group.timeoutMs === 300_000 && typeof group.pattern === "string"), true);
     const overrides = new Map(requiredGroups.filter((candidate) => candidate.timeoutMs !== undefined).map((candidate) => [candidate.file, candidate.timeoutMs]));
     const expected = [
-      ...(process.platform === "win32" ? ["claude-coding", "agents-claude", "conversation-bindings", "codex-submissions", "claude-submissions", "windows-reviewed-inputs", "windows-sandbox-native", "windows-sandbox-sessions", "windows-guest-tools", "windows-exchange-images", "windows-broker-exchanges", "scanner-fixtures", "scanner-fixture-removal", "windows-reviewed-runner", "repository-windows-shield", "repository-windows-shield-recovery", "repository-windows-pipeline", "repository-windows-pipeline-recovery", "repository-windows-execution", "repository-windows-execution-recovery", "repository-windows-execution-stop", "repository-windows-execution-output"].map((name) => [`tools/layout-studio/${name}.test.mjs`, name.startsWith("repository-windows-execution") || name.startsWith("repository-windows-pipeline") || name.startsWith("repository-windows-shield") ? 300_000 : name === "windows-exchange-images" ? 240_000 : 120_000]) : [["tools/layout-studio/windows-exchange-images.test.mjs", 120_000]]),
+      ...(process.platform === "win32" ? ["claude-coding", "agents-claude", "conversation-bindings", "codex-submissions", "claude-submissions", "windows-reviewed-inputs", "windows-sandbox-native", "windows-sandbox-sessions", "windows-guest-tools", "windows-exchange-images", "windows-broker-exchanges", "scanner-fixtures", "scanner-fixture-removal", "scanner-fixture-invalidation", "windows-reviewed-runner", "repository-windows-shield", "repository-windows-shield-recovery", "repository-windows-pipeline", "repository-windows-pipeline-recovery", "repository-windows-execution", "repository-windows-execution-recovery", "repository-windows-execution-stop", "repository-windows-execution-output"].map((name) => [`tools/layout-studio/${name}.test.mjs`, name.startsWith("repository-windows-execution") || name.startsWith("repository-windows-pipeline") || name.startsWith("repository-windows-shield") ? 300_000 : name === "windows-exchange-images" ? 240_000 : 120_000]) : [["tools/layout-studio/windows-exchange-images.test.mjs", 120_000]]),
       ["deployment/suite/installation.test.mjs", 120_000],
       ["apps/provider-adapter-host/test/tls-network-e2e.test.ts", 300_000],
       ["apps/vscode-extension/test/named-pipe-transport.test.ts", 120_000],
@@ -101,6 +101,7 @@ test("only explicitly slow integration or release groups extend the bounded defa
       ["tools/layout-studio/repository-shield.test.mjs", 120_000],
       ...["repository-windows-shield","repository-windows-shield-recovery"].map(name=>[`tools/layout-studio/${name}.test.mjs`,process.platform==="win32"?300_000:120_000]),
       ["tools/layout-studio/repository-pipeline-fixtures.test.mjs", 120_000],
+      ["tools/layout-studio/repository-validation-policy.test.mjs", process.platform === "win32" ? 300_000 : 120_000],
       ["apps/windows-companion/test/authenticated-pipe.test.ts", 240_000],
       ["apps/windows-companion/test/companion-lifecycle-helper.test.ts", 240_000],
       ["apps/windows-companion/test/council-workspace-isolation.test.ts", 240_000],
@@ -113,7 +114,7 @@ test("only explicitly slow integration or release groups extend the bounded defa
       ["deployment/windows/Test-B122TrustedBootstrap.ps1#pwsh", 300_000]
     ];
     assert.deepEqual(overrides, new Map(process.platform === "win32" ? expected : expected.filter(([file]) => !file.startsWith("deployment/windows/"))));
-    for (const name of ["claude-coding", "agents-claude", "conversation-bindings", "codex-submissions", "claude-submissions", "windows-reviewed-inputs", "windows-sandbox-native", "windows-sandbox-sessions", "windows-guest-tools", "windows-exchange-images", "windows-broker-exchanges", "scanner-fixtures", "scanner-fixture-removal", "windows-reviewed-runner", "repository-windows-shield", "repository-windows-shield-recovery", "repository-windows-pipeline", "repository-windows-pipeline-recovery", "repository-windows-execution", "repository-windows-execution-recovery", "repository-windows-execution-stop", "repository-windows-execution-output"]) {
+    for (const name of ["claude-coding", "agents-claude", "conversation-bindings", "codex-submissions", "claude-submissions", "windows-reviewed-inputs", "windows-sandbox-native", "windows-sandbox-sessions", "windows-guest-tools", "windows-exchange-images", "windows-broker-exchanges", "scanner-fixtures", "scanner-fixture-removal", "scanner-fixture-invalidation", "windows-reviewed-runner", "repository-windows-shield", "repository-windows-shield-recovery", "repository-windows-pipeline", "repository-windows-pipeline-recovery", "repository-windows-execution", "repository-windows-execution-recovery", "repository-windows-execution-stop", "repository-windows-execution-output"]) {
       assert.deepEqual(nativeTestOverrides(`tools/layout-studio/${name}.test.mjs`, "win32"), { timeoutMs: name.startsWith("repository-windows-execution") || name.startsWith("repository-windows-pipeline") || name.startsWith("repository-windows-shield") ? 300_000 : name === "windows-exchange-images" ? 240_000 : 120_000 });
       assert.deepEqual(nativeTestOverrides(`tools/layout-studio/${name}.test.mjs`, "linux"), name === "windows-exchange-images" ? { timeoutMs: 120_000 } : {});
     }
@@ -123,6 +124,8 @@ test("only explicitly slow integration or release groups extend the bounded defa
     assert.deepEqual(nativeTestOverrides("tools/layout-studio/suite.test.mjs", "linux"), {});
     assert.deepEqual(nativeTestOverrides("tools/layout-studio/repository-recovery.test.mjs", "win32"), { timeoutMs: 120_000 });
     assert.deepEqual(nativeTestOverrides("tools/layout-studio/repository-recovery.test.mjs", "linux"), { timeoutMs: 120_000 });
+    assert.deepEqual(nativeTestOverrides("tools/layout-studio/repository-validation-policy.test.mjs", "win32"), { timeoutMs: 300_000 });
+    assert.deepEqual(nativeTestOverrides("tools/layout-studio/repository-validation-policy.test.mjs", "linux"), { timeoutMs: 120_000 });
     assert.deepEqual(nativeTestOverrides("unreviewed.test.mjs", "win32"), {});
     assert.deepEqual(nativeTestOverrides("tools/layout-studio/repository-execution.test.mjs", "win32"), { timeoutMs: 480_000 });
     const delayed = ["-e", "setTimeout(() => process.exit(0), 150)"];

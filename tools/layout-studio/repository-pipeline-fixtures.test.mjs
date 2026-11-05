@@ -14,6 +14,9 @@ test("real Linux pipeline evidence binds both operator-installed signed feeds wi
   assert.equal(verified.length,2);for(const feed of verified)assert.equal(evidence.evidence.toolVersions[`fixture:${feed.kind}:${feed.id}`],`manifest=sha256:${feed.manifestSha256};content=sha256:${feed.contentSha256};feed=${feed.feedVersion};tool=${feed.toolName}@${feed.toolVersion}`);assert.equal(evidence.completeness,"complete");
   assert.equal((await f.execution.apply("personal",input)).receiptId,result.receiptId);
   const status=await f.execution.status("personal",f.proposed.requestId);assert.equal(status.nativeExitVerified,true);assert.equal(status.stagingCleanupPending,false);assert.equal(await f.run("rev-parse","HEAD"),head);
+  assert.equal(status.receipt.historicalResult,"passed");assert.equal(status.receipt.invalidatedBy,null);assert.equal(status.receipt.scopeRevalidated,false);
+  const retired=await f.fixtures.review("personal",{requestId:randomUUID(),action:"revoke-fixture",fixtureId:"synthetic-scanner",reason:"Withdraw accepted synthetic policy"});assert.equal((await f.fixtures.apply("personal",{requestId:retired.review.requestId,token:retired.confirmation.token})).status,"completed");
+  const after=await f.execution.status("personal",f.proposed.requestId);assert.equal(after.outcome.status,"completed");assert.equal(after.receipt.historicalResult,"passed");assert.equal(after.receipt.invalidatedBy,`suite:personal:review:${retired.review.requestId}`);assert.equal(after.receipt.gateEligible,false);assert.equal((await f.execution.apply("personal",input)).receiptId,result.receiptId);
  }
 });
 test("revoked or changed signed feeds keep a completed isolated program incomplete without manufacturing passing pipeline evidence",linux,async t=>{

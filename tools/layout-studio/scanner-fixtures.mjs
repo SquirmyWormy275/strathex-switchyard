@@ -6,9 +6,12 @@ import { DurableBudgetManager } from "../../packages/control-plane/src/budgets.t
 import { OperationSagaStore } from "../../packages/control-plane/src/operations.ts";
 import { ReceiptLedger } from "../../packages/control-plane/src/receipts.ts";
 import { repositoryEffectJournal } from "./repository-effect-journal.mjs";
+import { validationActions } from "./repository-validation-policy.mjs";
 import { suiteConfirmations, scopeHash } from "./confirmations.mjs";
 
-const action = "configure_scanner_fixtures", version = "suite-scanner-fixtures/v1";
+const action = "configure_scanner_fixtures", version = "suite-scanner-fixtures/v2";
+// Preserve the original cross-process kernel lease across the review upgrade.
+const legacyVersion = "suite-scanner-fixtures/v1";
 const uuid = v => typeof v === "string" && /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/.test(v);
 const identifier = v => typeof v === "string" && /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/.test(v);
 const digest = v => typeof v === "string" && /^[a-f0-9]{64}$/.test(v);
@@ -16,7 +19,7 @@ const hash = v => createHash("sha256").update(v).digest("hex");
 const exact = (v, keys) => v && typeof v === "object" && !Array.isArray(v) && Object.keys(v).sort().join() === keys.slice().sort().join();
 const workspace = s => scopeHash([s.id, s.policy, s.mode, s.modeSelectedAt ?? null, s.accounts]);
 const limits = { version, commandClasses: { [action]: { maxConcurrent: 1, timeoutMs: 120000, maxAttempts: 1, windowMs: 3600000, maxClaimsPerWindow: 24, maxCostUnitsPerWindow: 24, defaultCostUnits: 1 } } };
-const view = r => ({ requestId: r.requestId, action: r.action, scopeDigest: r.scopeDigest, summary: r.summary, status: r.status, expiresAt: r.expiresAt, result: r.result ?? null });
+const view = r => ({ requestId: r.requestId, action: r.action, scopeDigest: r.scopeDigest, summary: r.summary, receiptInvalidation: r.receiptInvalidation ?? null, status: r.status, expiresAt: r.expiresAt, result: r.result ?? null });
 
 export function createScannerFixtures({ store, stateDirectory, isActive = async () => true, now = Date.now } = {}) {
   if (typeof stateDirectory !== "string" || !isAbsolute(stateDirectory)) throw Error("Use the fixed private scanner-fixture state directory.");
@@ -32,7 +35,7 @@ export function createScannerFixtures({ store, stateDirectory, isActive = async 
   }
   async function exclusive(c, fn) {
     await state(c); if (pending.has(c)) throw Error("Wait for this workspace's exact fixture maintenance operation.");
-    const generation = generations.get(c) ?? 0, work = Promise.resolve().then(() => store.withResourceLock("repository-execution", scopeHash([version, stateDirectory, c]), lease => fn(generation, lease)));
+    const generation = generations.get(c) ?? 0, work = Promise.resolve().then(() => store.withResourceLock("repository-execution", scopeHash([legacyVersion, stateDirectory, c]), lease => fn(generation, lease)));
     pending.set(c, work); try { return await work; } finally { if (pending.get(c) === work) pending.delete(c); }
   }
   async function assertState(c, current, row, generation, lease) {
@@ -40,7 +43,7 @@ export function createScannerFixtures({ store, stateDirectory, isActive = async 
     lease.assert();
   }
   const update = (c, id, event, fn) => store.update(c, event, s => {
-    const row = s.scannerFixtureReviews?.find(r => r.requestId === id); if (!row || row.schema !== version) throw Error("The protected fixture review changed."); return fn(row, s);
+    const row = s.scannerFixtureReviews?.find(r => r.requestId === id); if (!row || ![version, legacyVersion].includes(row.schema)) throw Error("The protected fixture review changed."); return fn(row, s);
   });
   async function proposal(c, input) {
     if (!uuid(input?.requestId) || typeof input.action !== "string") throw Error("Review one exact fixture maintenance action and request UUID.");
@@ -77,10 +80,10 @@ export function createScannerFixtures({ store, stateDirectory, isActive = async 
     if (!rows.some(r => ["applying", "outcome-unconfirmed"].includes(r.status))) return { stopped: true, recoveredWithoutReplay: true };
     if (initial.policy !== "personal") throw Error("Preserve unfamiliar fixture ownership outside Personal policy.");
     if (pending.has(c)) return { stopped: false, recoveredWithoutReplay: true };
-    const observed = await store.tryWithResourceLock("repository-execution", scopeHash([version, stateDirectory, c]), async lease => {
+    const observed = await store.tryWithResourceLock("repository-execution", scopeHash([legacyVersion, stateDirectory, c]), async lease => {
       for (const row of (await store.snapshot(c)).scannerFixtureReviews ?? []) {
         if (!["applying", "outcome-unconfirmed"].includes(row.status)) continue;
-        if (row.schema !== version || !uuid(row.requestId) || !digest(row.scopeDigest)) throw Error("Preserve an unfamiliar original fixture maintenance record.");
+        if (![version, legacyVersion].includes(row.schema) || !uuid(row.requestId) || !digest(row.scopeDigest)) throw Error("Preserve an unfamiliar original fixture maintenance record.");
         lease.assert();
         await journal(c).transaction(async transaction => {
           const { operations, budgets } = ledger({ transaction: fn => fn(transaction), readEntries: transaction.readEntries }), op = await operations.get(row.requestId);
@@ -109,10 +112,11 @@ export function createScannerFixtures({ store, stateDirectory, isActive = async 
         const current = await state(c); if (current.scannerFixtureReviews?.some(r => r.requestId === input.requestId)) throw Error("This exact fixture request already has a retained review; no replacement.");
         const before = await registryDigest(c), prepared = await proposal(c, input);
         if (await registryDigest(c) !== before) throw Error("The installed fixture/trust registry changed during review.");
-        const workspaceDigest = workspace(current), scopeDigest = scopeHash([version, c, input.requestId, input.action, workspaceDigest, before, prepared]);
-        const row = { schema: version, requestId: input.requestId, action: input.action, ...prepared, workspaceDigest, registryDigest: before, scopeDigest, status: "reviewed", at: now() };
+        const receiptInvalidation = { actions: [...validationActions], scope: "all-prior-validation-receipts-in-this-workspace", beforeRegistryEffect: true };
+        const workspaceDigest = workspace(current), scopeDigest = scopeHash([version, c, input.requestId, input.action, workspaceDigest, before, prepared, receiptInvalidation]);
+        const row = { schema: version, requestId: input.requestId, action: input.action, ...prepared, receiptInvalidation, workspaceDigest, registryDigest: before, scopeDigest, status: "reviewed", at: now() };
         await assertState(c, await state(c), row, generation, lease);
-        const confirmation = await suiteConfirmations(store, c, undefined, now).issue({ action, targetSnapshotId: scopeDigest, scopeDigest, reason: `Apply only this ${input.action} to this workspace's signed evidence registry. Public trust is operator-selected; no task/provider authority, executable or scan result is granted.`, reauthenticated: false });
+        const confirmation = await suiteConfirmations(store, c, undefined, now).issue({ action, targetSnapshotId: scopeDigest, scopeDigest, reason: `Apply only this ${input.action} to this workspace's signed evidence registry. Invalidate all prior pipeline and Shield receipts in this workspace before the registry effect. Public trust is operator-selected; no task/provider authority, executable or scan result is granted.`, reauthenticated: false });
         row.tokenDigest = hash(confirmation.token); row.expiresAt = confirmation.record.expiresAt;
         await store.update(c, "scanner-fixture-review", async saved => {
           await assertState(c, saved, row, generation, lease); const rows = saved.scannerFixtureReviews ?? [], retained = rows.filter(r => ["applying", "outcome-unconfirmed"].includes(r.status) || r.status === "reviewed" && Date.parse(r.expiresAt) > now());
@@ -149,6 +153,8 @@ export function createScannerFixtures({ store, stateDirectory, isActive = async 
           await check(); const claim = await ledger(unguarded).budgets.get(claimId); if (claim?.state !== "running" || Date.parse(claim.expiresAt) <= now()) throw Error("The exact fixture maintenance budget expired before effect.");
           claimDeadline = Date.parse(claim.expiresAt); await check();
           const r = registry(c, guard), by = `suite:${c}:review:${row.requestId}`; attempted = true;
+          await new ReceiptLedger(repositoryEffectJournal(store, c, { domain: "execution", now, guard }), { clock: () => new Date(now()).toISOString() }).invalidateActions(validationActions, by);
+          await check();
           if (row.action === "install-trust") effect = await r.installTrust(row.payload.policy, by);
           else if (row.action === "install-fixture") effect = await r.installFixture(row.payload.manifestPath, by, row.payload.manifestSha256);
           else if (row.action === "revoke-trust") { await r.revokeTrust(row.payload.authorityId, row.payload.keyId, row.payload.reason, by); effect = { authorityId: row.payload.authorityId, keyId: row.payload.keyId, status: "revoked" }; }

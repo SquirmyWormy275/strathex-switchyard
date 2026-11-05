@@ -10,7 +10,7 @@ function verified(entries) {
   }
   return structuredClone(entries);
 }
-export function repositoryEffectJournal(store, compartment, { now = Date.now, provider, domain = "effects", guard } = {}) {
+export function repositoryEffectJournal(store, compartment, { now = Date.now, provider, domain = "effects", guard, receiptGuard } = {}) {
   const fields = { effects: "repositoryEffectJournal", recovery: "repositoryRecoveryJournal", execution: "repositoryExecutionJournal", "execution-stop": "repositoryExecutionStopJournal", storage: "windowsStorageJournal", fixtures: "scannerFixtureJournal" };
   if (!Object.hasOwn(fields, domain)) throw new Error("Unsupported protected repository journal domain.");
   const field = fields[domain];
@@ -25,6 +25,7 @@ export function repositoryEffectJournal(store, compartment, { now = Date.now, pr
         const result = await fn({
           readEntries: async () => structuredClone(state[field]),
           append: async (kind, payload) => {
+            if (kind === "receipt.issued") await receiptGuard?.(state, payload.receipt);
             const previous = state[field].at(-1);
             const entry = { schemaVersion: 1, sequence: (previous?.sequence ?? 0) + 1, id: randomUUID(), kind, at: new Date(now()).toISOString(), payload: structuredClone(payload), ...(previous ? { previousHash: previous.hash } : {}) };
             entry.hash = journalEntryHash(entry);

@@ -92,8 +92,9 @@ Nineteen registry cases pass, including actual P-256 installs for each of the
 three deadline sources, observations one millisecond before/exactly at expiry,
 and an authenticated observation that becomes unusable at real trust expiry.
 Thirty-six registry/evidence/package cases, nineteen controller/removal/pipeline/
-Windows Shield integration cases and type checking pass. Installed deadline
-acceptance is pending. The repeatable pilot verifier supports a five-minute
+Windows Shield integration cases and type checking pass. Normal installed deadline
+acceptance passes at `0cd785f`: six update and thirteen actual Supply Chain checks,
+including both receipt expiry comparisons, native exit and full restoration. The repeatable pilot verifier supports a five-minute
 signed freshness window without waiting for expiry:
 
 ```sh
@@ -104,6 +105,15 @@ mise exec node@24.14.0 -- node scripts/verify-shield-host.mjs \
 That synthetic check requires a single selected action and independently compares
 each authenticated expiry with the original signed package/trust deadlines.
 Core checks separately exercise the exact expiry boundary.
+
+## Prior result retirement
+
+Version 2 maintenance approvals explicitly include invalidating prior pipeline
+and Shield receipts in this compartment before changing the registry. Reviews
+bind the affected actions and scope. Both hosts check policy drift inside the
+protected receipt transaction; an old in-flight scan cannot issue a pass after
+revocation. Historical outcomes remain intact and status exposes invalidation
+separately. [Race, recovery and limits](validation-receipt-invalidation.md).
 
 ## Verification and remaining work
 

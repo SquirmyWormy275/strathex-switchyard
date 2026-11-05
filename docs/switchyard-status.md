@@ -7,16 +7,23 @@ host. [Verification](verification.md) retains accepted and failed checkpoints.
 
 ## Installed application
 
-Installed source `9a73479`, release
-`af1b58752f76e021e2a790a8052a0439407dce9b548fd0a462d32bbf399959c8`,
-passes six update and eleven actual Supply Chain API checks after the shared
-strict report parser/Windows source integration. Known-vulnerable and clean
-incomplete versions retain report-bound BOMs, exact failed/incomplete receipts,
-replay, two independent native exits and restored original state. Receipts
-`assignment-legends-1793855902184.json` and
-`installed-shield-baseline-1793856071289.json` retained; owned source/packages/
+Installed source `0cd785f`, release
+`37ccf92f55c8659a8a4fadc1fd4c73869767fd94f803d98d1e3e6225896963ff`,
+passes six update and thirteen actual Supply Chain API checks, including exact
+receipt expiry clipped to the original signed five-minute freshness deadline.
+Known-vulnerable and clean incomplete versions retain report-bound BOMs,
+failed/incomplete receipts, replay and two independently verified native exits.
+Original selection/modes/definitions/private endpoint/frozen Home are restored.
+Receipts `assignment-legends-1793856754649.json` and
+`installed-shield-baseline-1793856930607.json` retained; owned source/packages/
 staging/signing/bundle/proof checkout removed. One empty task, zero prompts.
-The frontend remains frozen; no native Windows guest is claimed by this Linux proof.
+
+Earlier installed `9a73479`, release
+`af1b58752f76e021e2a790a8052a0439407dce9b548fd0a462d32bbf399959c8`,
+passes six update and eleven actual Supply Chain checks after the shared strict
+parser/Windows source integration (`assignment-legends-1793855902184.json`,
+`installed-shield-baseline-1793856071289.json`); owned scratch removed.
+The frontend remains frozen; no Windows guest is claimed by these Linux proofs.
 
 Earlier installed `8e83371` passes its separate six update/eleven Supply Chain
 checks (`assignment-legends-1793854523011.json`,
@@ -43,8 +50,8 @@ receipts and cleanup facts remain in verification and history; no model prompts.
 Signed feed facts now expire at the earliest content, signed freshness-SLA or
 trust deadline. Nineteen real registry/HMAC checks cover each source and exact
 boundaries; 36 contract/package and 19 controller/pipeline/Windows Shield
-integration checks pass, with type checking. The later deadline correction has
-pending installed acceptance. [Contract](signed-fixtures.md).
+integration checks pass, with type checking. Normal installed deadline acceptance
+passes at `0cd785f`. [Contract](signed-fixtures.md).
 
 The new Windows Shield source connects separate policy/recovery/evidence CI
 jobs. Its shared report parser refuses changed request/feed/source identities,
@@ -54,14 +61,22 @@ in three independently exited groups; every child cleanup verifies. Existing
 Run/authority files pass 35, pipeline/evidence five and final package/inventory/
 evidence 27. These tests do not launch a VM, create an account or touch a keyboard.
 
+Version 2 feed maintenance reviews include prior validation-receipt invalidation.
+Both execution hosts bind policy at review/admission and protect receipt commit
+against policy drift; status separates historical outcomes from invalidation and
+expiry. [Contract](validation-receipt-invalidation.md). Thirty-five core/package cases, ten final package/recovery cases, four existing
+feed-bound pipeline cases, both receipt-race cases, twenty maintenance/Shield
+cases, fifteen Run/recovery/output cases and type checking pass. Normal installed
+retirement acceptance is pending.
+
 ## Complete and native checkpoints
 
-Immutable `8e83371` passes all 177 required Linux groups: 1,153 tests,
-1,143 passed and ten declared skips. Receipt
-`e62a9f97-1739-46e2-ace5-c806b79262da` is retained with every child cleanup
-verified; owned fixture parent and checkout are removed. It includes bounded
-builds, baseline Shield, entrypoint closure, direct-terminal checks and CycloneDX.
-The newer Windows Shield source has 180 Linux groups; its complete run is pending.
+Immutable `9a73479` passes all 180 required Linux groups: 1,157 tests,
+1,147 passed and ten declared skips. Receipt
+`isolated-test-32b40b9e-9781-41fd-9884-5ff70282cbdb.json` is retained with every
+child cleanup verified; owned fixture parent and checkout are removed. It includes
+bounded builds, Linux/Windows baseline software, direct-terminal checks and
+CycloneDX. New receipt-invalidation source and its complete run remain separate.
 
 Native Windows `5d398d2`, workflow
 [41960677205](https://github.com/SquirmyWormy275/strathex-switchyard/actions/runs/41960677205),

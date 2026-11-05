@@ -157,7 +157,10 @@ package/staging/bundle/proof scratch removed. Zero prompts. A focused run accept
 incomplete versions, both with report-bound BOM hashes.
 
 Signed fixture facts now clip receipt expiry to content expiry, signed maximum
-age and trust expiry. Registry/HMAC boundary checks pass; normal installed
-acceptance of this deadline correction remains pending. Use
+age and trust expiry. Registry/HMAC boundary checks and normal installed
+acceptance at `0cd785f` pass (six update/thirteen actual checks; zero prompts). Use
 `--bounded-feed-deadline` with one selected action to exercise an actual signed
 five-minute freshness limit; it never waits for or extends that limit.
+
+Protected feed maintenance also retires prior validation receipts and both hosts
+check policy at receipt commit. [Invalidation contract](validation-receipt-invalidation.md).
