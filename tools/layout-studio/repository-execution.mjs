@@ -52,7 +52,7 @@ export function createRepositoryExecution({store,authority,stateDirectory,platfo
   }
   async function runtimeFor(c,review,resolved,g,loaded) {
     const check=async()=>{current(c,g);if(!await isActive(c))throw Error("Select this workspace before executing its reviewed task.");const fresh=await authority.assertCurrent(c,review.authorityId,review.action);if(fresh.record.taskDigest!==review.taskDigest||fresh.record.workspaceDigest!==review.workspaceDigest)throw Error("The execution task/account/workspace scope changed.");const read=await reader.read(review.repositoryRoot,review.manifestPath);try{if(read.digest!==`sha256:${review.manifestSha256}`)throw Error("The exact host recipe changed before execution.");}finally{read.bytes.fill(0);}current(c,g);};
-    const journal=repositoryEffectJournal(store,c,{provider:resolved.task.provider,domain:"execution",now,receiptGuard:validationReceiptGuard(review.validationPolicyDigest)});
+    const journal=repositoryEffectJournal(store,c,{provider:resolved.task.provider,domain:"execution",now,receiptGuard:validationReceiptGuard(review.validationPolicyDigest,review,now)});
     const rawReceiptEvidence=[...linuxPipelineActions,...linuxShieldActions].includes(review.action)?await pipelineEvidence({store,compartment:c,provider:resolved.task.provider,policyVersion:resolved.snapshot.policyVersion,now}):undefined;
     const receiptEvidence=rawReceiptEvidence&&linuxShieldActions.includes(review.action)?shieldReceiptEvidence(rawReceiptEvidence):rawReceiptEvidence;
     const payload={schema:"switchyard-execution-checkpoint/v1",scopeDigest:review.scopeDigest,targetSnapshotId:review.targetSnapshotId,manifestSha256:review.manifestSha256,recipe:review.recipe,executionPolicy:review.executionPolicy};

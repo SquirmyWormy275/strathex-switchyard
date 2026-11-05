@@ -7,6 +7,12 @@ host. [Verification](verification.md) retains accepted and failed checkpoints.
 
 ## Installed application
 
+Latest installed source `0423f23`, release
+`d6c38d53a33776dfb1ffc3b2f7d6b361d0de4e401612a39dbae8ae447ad4b6a4`,
+passes six normal update checks after the exact outcome/budget correction.
+Receipt `assignment-legends-1793859695968.json` retained; owned bundle/proof
+checkout removed. The actual exception journey below is accepted at its own source.
+
 Installed source `82bd9b3`, release
 `4175121a117a6cdbb72eac3e685158e01b9d0b594b53a1493853ea896677ec96`,
 passes six normal update and seventeen actual exception/Change Scan API checks.
@@ -97,6 +103,13 @@ A later outcome correction settles verified policy rollback as failed/not-starte
 and recovers only an exact committed receipt/effect after lost acknowledgement;
 thirteen controller/ledger cases pass, including late-budget rollback. [Contract](shield-exceptions.md). Normal installed exception acceptance passes at `82bd9b3` (six update/seventeen
 API checks). Native Windows remains separate; frontend controls are unfinished.
+
+Both execution hosts now verify the exact protected task/account/mode and grant
+ledger at validation receipt commit. Three focused state/host cases pass,
+including post-validation account change and grant revocation, with independent
+zero native exits and no replay. Six existing pipeline/policy races and twenty-nine
+contract/maintenance cases pass; type checking passes. Later installed/native
+acceptance is separate. [Contract](receipt-authority-commit.md).
 
 ## Complete and native checkpoints
 

@@ -74,3 +74,7 @@ checks, including receipt expiry, retired receipt status and unchanged historica
 results. Both guardians exit; original state is restored and owned scratch
 removed. Receipts `assignment-legends-1793857471815.json` and
 `installed-shield-baseline-1793857655461.json` are retained. Zero model prompts.
+
+Both execution hosts also check [current protected task/account/authority state](receipt-authority-commit.md)
+inside validation receipt append. This is separate from reading historical
+results or revalidating a live external provider/filesystem.

@@ -111,6 +111,8 @@ const linuxCompanionTests = ["linux-secret", "linux-isolation", "linux-lifecycle
     ...(process.platform !== "linux" && linuxSkippedOnNonLinux.has(name) ? { expectedSkipped: linuxSkippedOnNonLinux.get(name) } : {})
   }));
 export function nativeTestOverrides(file, platform = process.platform) {
+  if (file === "tools/layout-studio/repository-receipt-authority.test.mjs") return { timeoutMs: platform === "win32" ? 300_000 : 120_000 };
+  if (file === "tools/layout-studio/receipt-authority-state.test.mjs" && platform === "win32") return { timeoutMs: 240_000 };
   if (file === "tools/layout-studio/repository-windows-shield-exceptions.test.mjs") return { timeoutMs: platform === "win32" ? 300_000 : 120_000 };
   if (file === "tools/layout-studio/repository-ignored-scanner-inputs.test.mjs") return { timeoutMs: platform === "win32" ? 300_000 : 120_000 };
   if (file === "tools/layout-studio/task-authority-ignored-inputs.test.mjs" && platform === "win32") return { timeoutMs: 240_000 };
@@ -156,6 +158,8 @@ export const requiredGroups = [
   { file: "tools/layout-studio/repository-windows-shield-exceptions.test.mjs", ...nativeTestOverrides("tools/layout-studio/repository-windows-shield-exceptions.test.mjs") },
   { file: "tools/layout-studio/scanner-fixtures.test.mjs", ...nativeTestOverrides("tools/layout-studio/scanner-fixtures.test.mjs") },
   { file: "tools/layout-studio/scanner-fixture-invalidation.test.mjs", ...nativeTestOverrides("tools/layout-studio/scanner-fixture-invalidation.test.mjs") },
+  { file: "tools/layout-studio/receipt-authority-state.test.mjs", ...nativeTestOverrides("tools/layout-studio/receipt-authority-state.test.mjs") },
+  { file: "tools/layout-studio/repository-receipt-authority.test.mjs", ...nativeTestOverrides("tools/layout-studio/repository-receipt-authority.test.mjs"), expectedSkipped: process.platform === "linux" ? 0 : 1 },
   { file: "tools/layout-studio/repository-validation-policy.test.mjs", timeoutMs: 120_000, ...nativeTestOverrides("tools/layout-studio/repository-validation-policy.test.mjs"), expectedSkipped: process.platform === "linux" ? 0 : 1 },
   { file: "tools/layout-studio/scanner-fixture-removal.test.mjs", ...nativeTestOverrides("tools/layout-studio/scanner-fixture-removal.test.mjs") },
   { file: "tools/layout-studio/windows-broker-exchanges.test.mjs", ...nativeTestOverrides("tools/layout-studio/windows-broker-exchanges.test.mjs") },

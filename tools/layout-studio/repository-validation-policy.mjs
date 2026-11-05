@@ -3,6 +3,7 @@ import { ReceiptLedger } from "../../packages/control-plane/src/receipts.ts";
 import { repositoryEffectJournal } from "./repository-effect-journal.mjs";
 import { linuxPipelineActions, linuxShieldActions } from "./repository-execution-actions.mjs";
 import { scopeHash } from "./confirmations.mjs";
+import { assertTaskAuthorityReceiptState } from "./task-authority.mjs";
 
 export const validationActions = Object.freeze([...linuxPipelineActions, ...linuxShieldActions]);
 
@@ -14,8 +15,10 @@ export function validationPolicyDigest(state) {
     (state.repositoryExecutionJournal ?? []).filter(entry => entry.kind === "receipt.actions-invalidated").map(entry => entry.hash)]);
 }
 
-export const validationReceiptGuard = expected => async (state, receipt) => {
-  if (validationActions.includes(receipt.action) && (!/^[a-f0-9]{64}$/.test(expected ?? "") || validationPolicyDigest(state) !== expected)) throw Error("The reviewed validation policy changed before the protected receipt commit; no current gate is established.");
+export const validationReceiptGuard = (expected, review, now = Date.now) => async (state, receipt) => {
+  if (!validationActions.includes(receipt.action)) return;
+  if (!/^[a-f0-9]{64}$/.test(expected ?? "") || validationPolicyDigest(state) !== expected) throw Error("The reviewed validation policy changed before the protected receipt commit; no current gate is established.");
+  if (review) await assertTaskAuthorityReceiptState(state, review, receipt, now);
 };
 
 /** Historical results are displayed separately from present receipt validity. */

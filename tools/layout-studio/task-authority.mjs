@@ -49,6 +49,15 @@ function ledger(state, now) {
     } })
   }, { clock: () => new Date(now()).toISOString() });
 }
+/** Receipt-time check over already locked protected state; performs no nested store I/O. */
+export async function assertTaskAuthorityReceiptState(state, review, receipt, now = Date.now) {
+  const record=state.taskAuthorities?.find(record=>record.id===review.authorityId);
+  if(!record||record.grant.revokedAt||state.policy!=="personal"||state.mode!=="personal-companion"||record.taskDigest!==review.taskDigest||record.workspaceDigest!==review.workspaceDigest||workspaceDigest(state)!==review.workspaceDigest||record.targetSnapshot.id!==review.targetSnapshotId||receipt.authorityId!==record.id||receipt.action!==review.action||receipt.targetSnapshotId!==review.targetSnapshotId)throw Error("The exact task/account/workspace authority changed before receipt commit.");
+  const task=taskIn(state,record.taskId);
+  if(taskDigest(task)!==record.taskDigest||task.id!==review.taskId||task.sessionId!==review.sessionId||task.repositoryRoot!==review.repositoryRoot)throw Error("The exact native task binding changed before receipt commit.");
+  const decision=await ledger(state,now).evaluate({authorityId:record.id,repositoryRoot:task.repositoryRoot,sessionId:task.sessionId,taskId:task.id,planRevision:record.grant.planRevision,action:review.action});
+  if(!decision.allowed)throw Error("The exact execution authority was revoked, expired or changed before receipt commit.");
+}
 export function createTaskAuthority({ store, checkNative, isActive = async () => true, inspection = createRepositoryInspection({ store, ownerKind: "task-authority" }), localCommitExecutionImplemented = false, executionActions = [], now = () => Date.now() } = {}) {
   if (!Array.isArray(executionActions) || new Set(executionActions).size!==executionActions.length || executionActions.some(a => !connectedExecutionActions("linux").includes(a))) throw new Error("Choose only execution actions connected by this host implementation.");
   const generations = new Map(), pending = new Set(), seen = new Set(); let closed = false;
