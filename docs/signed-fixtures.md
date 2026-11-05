@@ -79,9 +79,35 @@ manifest/content hashes, feed version and tool version. Signing keys and feed
 files are not added to the task's isolated input set. Changed or revoked feeds
 keep the pipeline incomplete even when its program exits zero.
 
+## Effective evidence deadlines
+
+Resolved fixture facts expose the earliest of the signed content expiry,
+`generatedAt + maximumAgeSeconds` and the approving trust key's expiry. This
+can be earlier than the manifest's declared expiry. Host pipeline/Shield evidence
+uses that effective deadline when clipping receipt lifetime. A fresh observation
+cannot remain usable after its feed's signed freshness SLA or trust expiry; the
+exact boundary is expired. Package bytes and their signed manifest stay unchanged.
+
+Nineteen registry cases pass, including actual P-256 installs for each of the
+three deadline sources, observations one millisecond before/exactly at expiry,
+and an authenticated observation that becomes unusable at real trust expiry.
+Thirty-six registry/evidence/package cases, nineteen controller/removal/pipeline/
+Windows Shield integration cases and type checking pass. Installed deadline
+acceptance is pending. The repeatable pilot verifier supports a five-minute
+signed freshness window without waiting for expiry:
+
+```sh
+mise exec node@24.14.0 -- node scripts/verify-shield-host.mjs \
+  --synthetic --action=shield_supply_chain --bounded-feed-deadline
+```
+
+That synthetic check requires a single selected action and independently compares
+each authenticated expiry with the original signed package/trust deadlines.
+Core checks separately exercise the exact expiry boundary.
+
 ## Verification and remaining work
 
-Seventeen registry tests cover actual files, P-256 signatures, aggregate quota,
+Nineteen registry tests cover actual files, P-256 signatures, aggregate quota,
 concurrent allocation, linked/replaced paths, partial removal and lost replies.
 Eleven maintenance and four independently grouped removal tests cover real encrypted persistence/kernel leases, HTTP
 authorization, Work rejection, private snapshot omission, expiry, substitution,

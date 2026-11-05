@@ -70,6 +70,7 @@ export interface VerifiedScannerFixture {
   readonly manifestSha256: string;
   readonly contentSha256: string;
   readonly generatedAt: string;
+  /** Earliest signed content expiry, freshness-SLA deadline, or trust expiry. */
   readonly expiresAt: string;
 }
 
@@ -264,11 +265,13 @@ export class DurableScannerFixtureRegistry implements ScannerFixtureResolver {
     const manifest = parseManifest(manifestFile.bytes, observedAt);
     const content = await concreteFile(resolve(canonicalRoot, "content.bin"), maximumContentBytes, "installed scanner content");
     if (!inside(canonicalRoot, manifestFile.path) || !inside(canonicalRoot, content.path) || sha256(content.bytes) !== manifest.contentSha256) throw new Error("Installed scanner content digest is invalid.");
-    await this.verifyManifest(manifest, manifestFile.bytes, canonicalRoot, observedAt, content.bytes);
-    return { id: manifest.id, kind: manifest.kind, authorityId: manifest.authorityId, keyId: manifest.keyId, feedVersion: manifest.feedVersion, toolName: manifest.toolName, toolVersion: manifest.toolVersion, manifestSha256: sha256(manifestFile.bytes), contentSha256: manifest.contentSha256, generatedAt: manifest.generatedAt, expiresAt: manifest.expiresAt };
+    const authority = await this.verifyManifest(manifest, manifestFile.bytes, canonicalRoot, observedAt, content.bytes);
+    const deadline = Math.min(Date.parse(manifest.expiresAt), Date.parse(manifest.generatedAt) + manifest.maximumAgeSeconds * 1000, Date.parse(authority.expiresAt));
+    if (deadline <= observedAt.getTime()) throw new Error("Scanner fixture freshness or trust deadline has expired.");
+    return { id: manifest.id, kind: manifest.kind, authorityId: manifest.authorityId, keyId: manifest.keyId, feedVersion: manifest.feedVersion, toolName: manifest.toolName, toolVersion: manifest.toolVersion, manifestSha256: sha256(manifestFile.bytes), contentSha256: manifest.contentSha256, generatedAt: manifest.generatedAt, expiresAt: new Date(deadline).toISOString() };
   }
 
-  private async verifyManifest(manifest: SignedScannerFixtureManifest, bytes: Uint8Array, root: string, observedAt: Date, installedContent?: Uint8Array): Promise<void> {
+  private async verifyManifest(manifest: SignedScannerFixtureManifest, bytes: Uint8Array, root: string, observedAt: Date, installedContent?: Uint8Array): Promise<InstalledScannerFixtureTrust> {
     const authority = (await this.trust()).find((item) => item.authorityId === manifest.authorityId && item.keyId === manifest.keyId && item.status === "active");
     if (!authority || !authority.allowedKinds.includes(manifest.kind) || Date.parse(authority.expiresAt) <= observedAt.getTime()) throw new Error("Scanner fixture authority is unavailable, revoked, expired, or wrong-kind.");
     const { signature, ...signed } = manifest;
@@ -277,6 +280,7 @@ export class DurableScannerFixtureRegistry implements ScannerFixtureResolver {
     const content = installedContent ?? (await concreteFile(resolve(root, manifest.contentFile), maximumContentBytes, "scanner fixture content")).bytes;
     if (sha256(content) !== manifest.contentSha256) throw new Error("Scanner fixture content digest is invalid.");
     if (!digestPattern.test(sha256(bytes))) throw new Error("Scanner fixture manifest digest is invalid.");
+    return authority;
   }
 
   async listTrust(): Promise<readonly InstalledScannerFixtureTrust[]> { return this.trust(); }
@@ -365,7 +369,7 @@ function parseManifest(bytes: Uint8Array, observedAt: Date): SignedScannerFixtur
   const keys = ["schema", "version", "id", "kind", "authorityId", "keyId", "feedVersion", "toolName", "toolVersion", "contentFile", "contentSha256", "generatedAt", "expiresAt", "maximumAgeSeconds", "signatureAlgorithm", "signature"];
   if (!record(value) || !exact(value, keys) || value.schema !== "sxsy-b122.scanner-fixture" || value.version !== 1 || !kind(value.kind) || value.signatureAlgorithm !== "ecdsa-p256-sha256" || !Number.isSafeInteger(value.maximumAgeSeconds) || (value.maximumAgeSeconds as number) < 60 || (value.maximumAgeSeconds as number) > 31 * 24 * 60 * 60) throw new Error("Scanner fixture manifest schema is invalid.");
   const generatedAt = time(value.generatedAt, "scanner fixture generation"); const expiresAt = time(value.expiresAt, "scanner fixture expiry"); const generated = Date.parse(generatedAt); const expires = Date.parse(expiresAt);
-  if (generated > observedAt.getTime() + 5 * 60_000 || expires <= observedAt.getTime() || expires <= generated || observedAt.getTime() - generated > (value.maximumAgeSeconds as number) * 1000) throw new Error("Scanner fixture is future-dated, expired, or outside its signed freshness SLA.");
+  if (generated > observedAt.getTime() + 5 * 60_000 || expires <= observedAt.getTime() || expires <= generated || observedAt.getTime() - generated >= (value.maximumAgeSeconds as number) * 1000) throw new Error("Scanner fixture is future-dated, expired, or outside its signed freshness SLA.");
   return { schema: "sxsy-b122.scanner-fixture", version: 1, id: identifier(value.id, "scanner fixture"), kind: value.kind, authorityId: identifier(value.authorityId, "scanner authority"), keyId: digest(value.keyId, "scanner key"), feedVersion: bounded(value.feedVersion, "feed version", 128), toolName: bounded(value.toolName, "scanner tool", 128), toolVersion: bounded(value.toolVersion, "scanner tool version", 128), contentFile: safeRelative(value.contentFile), contentSha256: digest(value.contentSha256, "scanner content"), generatedAt, expiresAt, maximumAgeSeconds: value.maximumAgeSeconds as number, signatureAlgorithm: "ecdsa-p256-sha256", signature: bounded(value.signature, "scanner signature", 512) };
 }
 

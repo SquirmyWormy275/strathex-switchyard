@@ -155,3 +155,9 @@ Receipts `assignment-legends-1793854523011.json` and
 package/staging/bundle/proof scratch removed. Zero prompts. A focused run accepts
 `--synthetic --action=shield_supply_chain` and exercises known-failing and clean
 incomplete versions, both with report-bound BOM hashes.
+
+Signed fixture facts now clip receipt expiry to content expiry, signed maximum
+age and trust expiry. Registry/HMAC boundary checks pass; normal installed
+acceptance of this deadline correction remains pending. Use
+`--bounded-feed-deadline` with one selected action to exercise an actual signed
+five-minute freshness limit; it never waits for or extends that limit.

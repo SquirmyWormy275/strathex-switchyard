@@ -7,18 +7,20 @@ host. [Verification](verification.md) retains accepted and failed checkpoints.
 
 ## Installed application
 
-Installed source `8e83371`, release
-`bfcbc28da24980f712872357c42416bd4203c1c65394ff2adc52b58e3e076e60`,
-passes six update and eleven actual Supply Chain API checks. Known-vulnerable
-and clean incomplete versions return report-bound CycloneDX hashes, protected
-failed/incomplete receipts, exact replay and two independently verified native
-exits. Feed retirement and original selection/modes/definitions/private endpoint/
-frozen Home restoration pass. One empty native task, zero model prompts.
+Installed source `9a73479`, release
+`af1b58752f76e021e2a790a8052a0439407dce9b548fd0a462d32bbf399959c8`,
+passes six update and eleven actual Supply Chain API checks after the shared
+strict report parser/Windows source integration. Known-vulnerable and clean
+incomplete versions retain report-bound BOMs, exact failed/incomplete receipts,
+replay, two independent native exits and restored original state. Receipts
+`assignment-legends-1793855902184.json` and
+`installed-shield-baseline-1793856071289.json` retained; owned source/packages/
+staging/signing/bundle/proof checkout removed. One empty task, zero prompts.
+The frontend remains frozen; no native Windows guest is claimed by this Linux proof.
 
-Receipts `assignment-legends-1793854523011.json` and
-`installed-shield-baseline-1793854727077.json` are retained. Owned source,
-staging, packages, signing keys, bundle and proof checkout are removed. The
-application runs independently of the repository; its frontend remains frozen.
+Earlier installed `8e83371` passes its separate six update/eleven Supply Chain
+checks (`assignment-legends-1793854523011.json`,
+`installed-shield-baseline-1793854727077.json`); owned scratch is removed.
 
 Earlier installed `b6dca0a` exercises all four Shield actions and a clean case
 through thirteen actual checks. `326a9f3` passes eleven narrower checks, including
@@ -37,6 +39,12 @@ receipts and cleanup facts remain in verification and history; no model prompts.
 | Signed feeds | Operator-selected public trust, exact package approvals, AEAD journals, guarded receipts, 64 MiB/32-allocation aggregate reservations and separately reviewed exact removal. Unknown/revoked allocations retain quota; unfamiliar contents and original uncertain outcomes remain preserved. [Contract](signed-fixtures.md). | Provenance alone never establishes scanner coverage or a security result. |
 | Native agents | Exact account/directory/session bindings, reviewed text, cancellation, uncertain-outcome recovery and owned command guardians. Claude 2.1.308/2.1.317 designer/text approval binds the exact version; actual 2.1.317 metadata passes without prompts. [Bindings](claude-task-bindings.md). | Current-version real model execution remains unaccepted. Claude Code is only an implementation contingency; no coding job was delegated. |
 | Direct terminal focus | Foot/Alacritty fixed ancestry, current user, foreground CLI, PID birth/TTY/group checks and one exact compositor window with readback. Hidden/unmapped sibling windows refuse focus. Thirty-two surrounding cases pass (31 passed, one declared skip); five package checks and type checking pass. | Alacritty is absent, so its native check remains unaccepted. Tabbed/multiplexed, IDE, stopped-task and Windows attachments remain unfinished. No terminal or desktop config is installed. |
+
+Signed feed facts now expire at the earliest content, signed freshness-SLA or
+trust deadline. Nineteen real registry/HMAC checks cover each source and exact
+boundaries; 36 contract/package and 19 controller/pipeline/Windows Shield
+integration checks pass, with type checking. The later deadline correction has
+pending installed acceptance. [Contract](signed-fixtures.md).
 
 The new Windows Shield source connects separate policy/recovery/evidence CI
 jobs. Its shared report parser refuses changed request/feed/source identities,

@@ -7,10 +7,13 @@ import test from "node:test";
 
 import { createScannerFixtureAdministration, DurableScannerFixtureRegistry } from "../src/scanner-fixtures.ts";
 import { ProtectedJsonStore, type JournalEntry, type JsonValue } from "../../../packages/control-plane/src/store.ts";
+import { HostReceiptEvidenceFactory } from "../src/receipt-evidence.ts";
+import { targetSnapshotDigest } from "../../../packages/control-plane/src/snapshot.ts";
+import { commandForAction } from "../../../packages/control-plane/src/command-catalog.ts";
 
 const observedAt = new Date("2026-08-24T12:00:00.000Z");
 
-async function fixture(context: test.TestContext) {
+async function fixture(context: test.TestContext, trustExpiresAt = "2027-08-24T12:00:00.000Z") {
   const root = await mkdtemp(join(tmpdir(), "sxsy-b122-scanner-fixture-"));
   const source = join(root, "source"); const state = join(root, "state");
   await Promise.all([mkdir(source), mkdir(state)]);
@@ -19,7 +22,7 @@ async function fixture(context: test.TestContext) {
   const publicKeyPem = keys.publicKey.export({ type: "spki", format: "pem" }).toString();
   const keyId = createHash("sha256").update(createPublicKey(publicKeyPem).export({ type: "spki", format: "der" })).digest("hex");
   const trustPath = join(source, "trust.json");
-  await writeFile(trustPath, JSON.stringify({ schema: "sxsy-b122.scanner-fixture-trust", version: 1, authorityId: "security-lab", keyId, publicKeyPem, allowedKinds: ["scanner", "advisory"], expiresAt: "2027-08-24T12:00:00.000Z" }), "utf8");
+  await writeFile(trustPath, JSON.stringify({ schema: "sxsy-b122.scanner-fixture-trust", version: 1, authorityId: "security-lab", keyId, publicKeyPem, allowedKinds: ["scanner", "advisory"], expiresAt: trustExpiresAt }), "utf8");
   const presence = { async verify() { return { verified: true, operator: "TEST\\Security" }; } };
   const store=new ProtectedJsonStore({ filePath: join(state, "protected.jsonl") });
   const registry = new DurableScannerFixtureRegistry(store, state, () => new Date(observedAt));
@@ -56,6 +59,33 @@ test("installed signed scanner and advisory fixtures are rehashed and SLA-checke
 
   await writeFile(join(setup.state, "scanner-fixtures", "scanner-feed-1", "content.bin"), "tampered", "utf8");
   await assert.rejects(setup.registry.resolve({ scannerFixtureIds: ["scanner-feed-1"], advisoryFixtureIds: [], observedAt }), /digest/i);
+});
+
+test("resolved evidence expires at the earliest signed SLA, trust or absolute deadline, including its exact boundary", async context => {
+  for (const [label, trustSeconds, absoluteSeconds, expectedSeconds] of [["sla", 300, 300, 60], ["trust", 30, 300, 30], ["absolute", 300, 20, 20]] as const) {
+    const setup = await fixture(context, new Date(observedAt.getTime() + trustSeconds * 1000).toISOString());
+    await setup.administration.installFixture(await signedManifest(setup, `deadline-${label}`, "scanner", { generatedAt: observedAt.toISOString(), expiresAt: new Date(observedAt.getTime() + absoluteSeconds * 1000).toISOString(), maximumAgeSeconds: 60 }));
+    const resolve = (offset: number) => setup.registry.resolve({ scannerFixtureIds: [`deadline-${label}`], advisoryFixtureIds: [], observedAt: new Date(observedAt.getTime() + offset) });
+    const deadline = new Date(observedAt.getTime() + expectedSeconds * 1000).toISOString();
+    assert.equal((await resolve(0))[0]!.expiresAt, deadline);
+    assert.equal((await resolve(expectedSeconds * 1000 - 1))[0]!.expiresAt, deadline);
+    await assert.rejects(resolve(expectedSeconds * 1000), /expired|freshness SLA|authority/i);
+  }
+});
+
+test("an authenticated observation issued just before real fixture trust expiry cannot outlive that effective deadline", async context => {
+  const setup = await fixture(context, "2026-08-24T12:00:30.000Z");
+  await setup.administration.installFixture(await signedManifest(setup, "short-trust", "scanner", { generatedAt: observedAt.toISOString(), expiresAt: "2026-08-25T12:00:00.000Z", maximumAgeSeconds: 60 }));
+  let clock = new Date("2026-08-24T12:00:29.999Z");
+  const facts = (await setup.registry.resolve({ scannerFixtureIds: ["short-trust"], advisoryFixtureIds: [], observedAt: clock }))[0]!;
+  const material = { repositoryRoot: setup.root, branch: "feature/expiry", head: "1".repeat(40), indexTree: "2".repeat(40), trackedManifest: "tracked", untrackedManifest: "untracked", submodules: {}, policyVersion: "expiry-policy", environmentFingerprint: "environment", completeness: "complete" as const, reasons: [] };
+  const target = { ...material, id: targetSnapshotDigest(material), capturedAt: clock.toISOString() }, factory = new HostReceiptEvidenceFactory({ authenticationKey: Buffer.alloc(32, 9), policyVersion: target.policyVersion, exactVersions: { scanner: "synthetic" }, clock: () => clock });
+  const envelope = factory.issue({ producer: "scanner", action: "shield_change_scan", operationId: "expiry-observation", target, outcome: "incomplete", completeness: "incomplete", observedAt: clock.toISOString(), expiresAt: facts.expiresAt, evidence: { scannerFeedSha256: facts.contentSha256, findingCount: 0 } });
+  const result = { status: "incomplete" as const, summary: "Partial observation", operationId: "expiry-observation", data: { receiptEvidenceEnvelope: envelope } };
+  assert.ok(factory.forResult(commandForAction("shield_change_scan"), result, target));
+  clock = new Date("2026-08-24T12:00:30.000Z");
+  assert.equal(factory.forResult(commandForAction("shield_change_scan"), result, target), undefined);
+  await assert.rejects(setup.registry.resolve({ scannerFixtureIds: ["short-trust"], advisoryFixtureIds: [], observedAt: clock }), /authority/i);
 });
 
 test("fixture IDs, signatures, freshness, kind, and revocation all fail closed", async (context) => {
