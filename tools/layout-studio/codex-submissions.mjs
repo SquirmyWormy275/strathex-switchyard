@@ -1,7 +1,7 @@
 /** Codex-specific native contract for the shared protected text-turn lifecycle. */
 import { CodexClient, assertCodexDesignConfig, codexDesignConfig, readCodexMcpNames, trustedCli } from "./agents.mjs";
 import { verifyRepositoryIdentity } from "./coding-task-identity.mjs";
-import { runRestrictedCodexTurn } from "./codex-turn.mjs";
+import { assertCodexResultCurrent, runRestrictedCodexTurn } from "./codex-turn.mjs";
 import { createReviewedTaskText } from "./reviewed-task-text.mjs";
 import { stopOwnedChild } from "./owned-process.mjs";
 export function createCodexSubmissions({ store, resolveCli = trustedCli, resolveMcp = readCodexMcpNames, clientFactory = (exe, cwd, names) => new CodexClient(exe, cwd, names, { clientInfo: { name: "switchyard_reviewed_text", title: "Switchyard reviewed text", version: "0.1.0" } }), stopChild = stopOwnedChild, now = () => Date.now() } = {}) {
@@ -30,7 +30,7 @@ export function createCodexSubmissions({ store, resolveCli = trustedCli, resolve
           await checkRoot(); await client.recheckAccount(); await authorize();
         },
         async runTurn(options) { return { ...await runRestrictedCodexTurn({ client, threadId: task.sessionId, ...options, stopChild, maxOutputBytes: 32768 }), nativeSessionVerified: true, nativeTurnIdSupported: true }; },
-        assertResultCurrent(result) { if (client.closed || (client.accountEpoch ?? 0) !== result.accountEpoch) throw Object.assign(new Error("The native Codex account/connection changed before reply persistence."), { code: "ACCOUNT_UNCONFIRMED" }); }
+        assertResultCurrent(result) { assertCodexResultCurrent(client, result); }
       };
     }
   } });

@@ -1,0 +1,20 @@
+{
+  "schema": "switchyard-installed-account-fence-update/v1",
+  "sourceCommit": "6d298cfdbeda88463f1936e172d997a584365207",
+  "applicationRelease": "e580230f22e4263c65dce8d2e95644761d9d339886e847a7d439b6ad82ac141a",
+  "updateReceipt": "assignment-legends-1793910937778.json",
+  "metadataReceipt": "installed-copilot-journal-metadata-1793910938013.json",
+  "updateChecks": 6,
+  "metadataChecks": 7,
+  "workspaceInventoryCount": 54,
+  "selectedStatePreserved": true,
+  "frozenFrontend": "24100ef601b810efb0cda95e4fe0842d2944560734b02c4cf482c25e19150543",
+  "homeSha256": "20ba0095a6b9650046df34541872aa7e0a7cdc7db5182f065abb009127c6c130",
+  "modelPromptsSubmitted": 0,
+  "loginChanged": false,
+  "keyboardOpened": false,
+  "microphoneOpened": false,
+  "ownedWorktreeRemoved": true,
+  "disposableBundleRemoved": true,
+  "liveAccountSwitchAccepted": false
+}

@@ -2,6 +2,10 @@
 import { stopOwnedChild } from "./owned-process.mjs";
 import { codexAccountBoundary } from "./codex-requests.mjs";
 const identity = (v) => typeof v === "string" && /^[A-Za-z0-9_-]{1,128}$/.test(v);
+/** Synchronous fence for the encrypted mutation after an asynchronously finished turn. */
+export function assertCodexResultCurrent(client, result) {
+  if (client.closed || (client.accountEpoch ?? 0) !== result.accountEpoch) throw Object.assign(new Error("The native Codex account/connection changed before reply persistence."), { code: "ACCOUNT_UNCONFIRMED" });
+}
 export function runRestrictedCodexTurn({ client, threadId, text, outputSchema, onStarted = async () => {}, checkCurrent = () => {}, signal, timeoutMs = 120000, maxOutputBytes = 512 * 1024, stopChild = stopOwnedChild } = {}) {
   if (!client || client.closed || client.nativeVersion !== "0.166.0" || client.restrictionsVerified !== true || typeof client.recheckAccount !== "function" || !/^[a-f0-9]{64}$/.test(client.accountFingerprint ?? "") || !identity(threadId) || typeof text !== "string" || !text.trim() || Buffer.byteLength(text) > 1024 * 1024 || !Number.isInteger(timeoutMs) || timeoutMs < 10 || timeoutMs > 120000 || !Number.isInteger(maxOutputBytes) || maxOutputBytes < 128 || maxOutputBytes > 512 * 1024) throw new Error("An exact reviewed native connection and bounded text turn are required.");
   checkCurrent();

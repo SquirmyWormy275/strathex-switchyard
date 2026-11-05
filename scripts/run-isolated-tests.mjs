@@ -543,4 +543,19 @@ export async function runVerification({ groups = requiredGroups, cwd = root, out
   try { return { receipt, receiptPath: await receiptWriter(outputDirectory, receipt) }; }
   catch { receipt.receiptWrite = { completed: false, error: "atomic-receipt-write-failed" }; receipt.success = false; return { receipt, receiptPath: null }; }
 }
-if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) { const { receipt, receiptPath } = await runVerification(); for (const child of receipt.children) { process.stdout.write(`${child.success ? "PASS" : "FAIL"} ${child.file}${child.pattern ? ` :: ${child.pattern}` : ""}\n`); if (!child.success) process.stdout.write(`FAIL_DETAIL ${JSON.stringify({ file: child.file, pattern: child.pattern, exitCode: child.exitCode, signal: child.signal, timeout: child.timeout, spawnError: child.spawnError, cleanupCompleted: child.cleanupCompleted, cleanupError: child.cleanupError, processTreeTermination: child.processTreeTermination, testCounts: child.testCounts ?? null, safeTrace: child.safeTrace, diagnostic: child.failureDiagnostic })}\n`); } process.stdout.write(`${receiptPath ? "RECEIPT" : "RECEIPT_WRITE_FAILED"} ${receipt.runId}${receiptPath ? ` ${receiptPath}` : ""}\n`); process.exitCode = receipt.success ? 0 : 1; }
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  const arguments_ = process.argv.slice(2);
+  if (arguments_.length) {
+    const help = arguments_.length === 1 && arguments_[0] === "--help";
+    process[help ? "stdout" : "stderr"].write("Usage: node scripts/run-isolated-tests.mjs [--help]\nRun the complete required manifest with no arguments. For selected groups, use the exported runVerification API.\n");
+    process.exitCode = help ? 0 : 2;
+  } else {
+    const { receipt, receiptPath } = await runVerification();
+    for (const child of receipt.children) {
+      process.stdout.write(`${child.success ? "PASS" : "FAIL"} ${child.file}${child.pattern ? ` :: ${child.pattern}` : ""}\n`);
+      if (!child.success) process.stdout.write(`FAIL_DETAIL ${JSON.stringify({ file: child.file, pattern: child.pattern, exitCode: child.exitCode, signal: child.signal, timeout: child.timeout, spawnError: child.spawnError, cleanupCompleted: child.cleanupCompleted, cleanupError: child.cleanupError, processTreeTermination: child.processTreeTermination, testCounts: child.testCounts ?? null, safeTrace: child.safeTrace, diagnostic: child.failureDiagnostic })}\n`);
+    }
+    process.stdout.write(`${receiptPath ? "RECEIPT" : "RECEIPT_WRITE_FAILED"} ${receipt.runId}${receiptPath ? ` ${receiptPath}` : ""}\n`);
+    process.exitCode = receipt.success ? 0 : 1;
+  }
+}

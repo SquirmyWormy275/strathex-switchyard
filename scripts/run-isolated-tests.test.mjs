@@ -1,3 +1,5 @@
+import { execFileSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
 import assert from "node:assert/strict";
 import test from "node:test";
 import { mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
@@ -7,6 +9,15 @@ import { assertRequiredTestManifest, createStrictTestEnvironment, linuxGroups, r
 const executable = process.execPath;
 async function group(directory, name, code) { const file = join(directory, `${name}.test.mjs`); await writeFile(file, code, "utf8"); return { file }; }
 async function verify(groups, outputDirectory, timeoutMs = 1_000) { return runVerification({ groups, outputDirectory, timeoutMs, executable: process.execPath }); }
+test("runner CLI help and unsupported arguments never start the default verification manifest", () => {
+  const entry = fileURLToPath(new URL("./run-isolated-tests.mjs", import.meta.url));
+  const run = args => execFileSync(process.execPath, [entry, ...args], { encoding: "utf8", timeout: 5000, stdio: ["ignore", "pipe", "pipe"] });
+  assert.match(run(["--help"]), /^Usage:/);
+  for (const args of [["--unknown"], ["--help", "unexpected"]]) {
+    assert.throws(() => run(args), error => error.status === 2 && error.stdout === "" && /^Usage:/.test(error.stderr));
+  }
+});
+
 test("atomic receipt records current successful child exits", async () => { const directory = await mkdtemp(join(tmpdir(), "sxsy-receipt-")); try { const result = await verify([await group(directory, "pass", "import test from 'node:test'; test('real test',()=>{});")], directory); const saved = JSON.parse(await readFile(result.receiptPath, "utf8")); assert.equal(saved.runId, result.receipt.runId); assert.equal(saved.success, true); assert.equal(saved.children[0].exitCode, 0); assert.equal(saved.children[0].timeout, false); assert.deepEqual(saved.children[0].testCounts, { total: 1, passed: 1, failed: 0, cancelled: 0, skipped: 0, todo: 0 }); assert.equal(saved.totals.tests, 1); assert.deepEqual((await readdir(directory)).filter((name) => name.endsWith(".tmp")), []); } finally { await rm(directory, { recursive: true, force: true }); } });
 
 test("test groups fail closed on zero-match patterns, skipped tests, and todo tests", async () => {

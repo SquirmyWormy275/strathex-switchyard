@@ -3,7 +3,7 @@ import { spawn } from "node:child_process";
 import { appendAgentObservation } from "./agent-observation.mjs";
 import { EventEmitter } from "node:events";
 import { codexAccountBoundary, deniedCodexServerRequest } from "./codex-requests.mjs";
-import { runRestrictedCodexTurn } from "./codex-turn.mjs";
+import { assertCodexResultCurrent, runRestrictedCodexTurn } from "./codex-turn.mjs";
 import { readClaudeDesignLogin } from "./claude-account.mjs";
 import { runRuntimeCommand, runtimeGuardianStopped } from "./runtime-command.mjs";
 import { runOwnedNativeCommand, guardianScope } from "./owned-native-command.mjs";
@@ -297,7 +297,7 @@ export function createAgentService({ store, runtimeRoot, codexFactory = (exe, cw
       try {
         await store.update(compartment, "design-draft", (s) => { currentGeneration(compartment, generation); s.conversations = [...s.conversations.filter((c) => c.id !== id), { ...conversation, id, provider, sessionId: conversation?.sessionId ?? null, updatedAt: Date.now(), messages: [...(conversation?.messages ?? []), { role: "user", text: message }].slice(-40), status: "pending" }]; observeDesign(s, provider, id, "design-request-reserved"); }, { provider });
         currentGeneration(compartment, generation);
-        let response;
+        let response, assertReplyCurrent = () => {};
         if (provider === "codex") {
           const client = await codex(compartment);
           currentGeneration(compartment, generation);
@@ -315,6 +315,7 @@ export function createAgentService({ store, runtimeRoot, codexFactory = (exe, cw
           currentGeneration(compartment, generation);
           const controller = new AbortController(); running.set(key, { provider, sessionId, controller, turnId: null });
           const turn = await runRestrictedCodexTurn({ client, threadId: sessionId, text: contextText, outputSchema: designResponseSchema, signal: controller.signal, stopChild, checkCurrent: () => currentGeneration(compartment, generation), onStarted: async (turnId) => { running.get(key).turnId = turnId; } });
+          assertReplyCurrent = () => assertCodexResultCurrent(client, turn);
           try { response = JSON.parse(turn.text); } catch { throw new Error("Codex did not return a valid structured proposal."); }
         } else if (provider === "claude-code") {
           const cwd = join(runtimeRoot, compartment); await privateDirectory(cwd);
@@ -354,7 +355,7 @@ export function createAgentService({ store, runtimeRoot, codexFactory = (exe, cw
         } else throw new Error("This provider does not offer a configured design route. No fallback provider was selected.");
         const reviewed = validateDesignResponse(response, plan);
         const saved = { id, provider, sessionId, accountFingerprint, ...(ownedRuntime ? { ownedRuntime, ownedRuntimeStoppedVerified: true } : {}), updatedAt: Date.now(), messages: [...(conversation?.messages ?? []), { role: "user", text: message }, { role: "assistant", text: reviewed.reply }].slice(-40), proposal: reviewed.proposal, workflow: reviewed.workflow };
-        await store.update(compartment, "design-conversation", (s) => { currentGeneration(compartment, generation); s.conversations = [...s.conversations.filter((c) => c.id !== id), saved]; observeDesign(s, provider, id, "design-reply-recorded"); }, { provider });
+        await store.update(compartment, "design-conversation", (s) => { currentGeneration(compartment, generation); assertReplyCurrent(); s.conversations = [...s.conversations.filter((c) => c.id !== id), saved]; observeDesign(s, provider, id, "design-reply-recorded"); }, { provider });
         return { ...reviewed, conversationId: id, sessionId, provider, ...(ownedRuntime ? { ownedRuntime, ownedRuntimeStoppedVerified: true } : {}), provenance: "provider-returned exact session; design output independently validated" };
       } catch (error) {
         const uncertain = provider === "codex" && error.stopVerified === false ? clients.get(compartment)?.child : null;

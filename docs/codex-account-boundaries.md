@@ -36,3 +36,19 @@ open; the tests do not log the user out or claim coverage of every external
 credential-store mutation. Native Windows and wider IDE/account integration
 remain separate acceptance work.
 [Exact receipts and source hashes](evidence/codex-account-boundary-summary.json).
+
+The configuration designer shares the same final synchronous fence inside its
+encrypted conversation mutation. Tests invalidate the connection after the final
+account read, while storage admission is pending, with either a closed connection
+or a changed epoch and the original fingerprint. Both retain the user's draft and
+native session identity, save no late assistant reply and issue no replacement
+model request. The seven-group follow-up passes 80 checks, including designer,
+reviewed text, Claude/binding compatibility, packaging and runner CLI checks.
+[Follow-up receipt and source hashes](evidence/codex-design-account-boundary-summary.json).
+
+The earlier `6d298cfd` connection-fence source was also installed normally: six
+update and seven private metadata checks passed, preserving all 54 workspaces,
+selected sealed state and the frozen frontend. Its owned bundle and checkout were
+removed. This metadata-only update does not establish live account-switch or
+native designer-race acceptance.
+[Installed update evidence](evidence/installed-account-fence-update-summary.json).

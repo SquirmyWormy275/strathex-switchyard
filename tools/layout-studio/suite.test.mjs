@@ -295,6 +295,45 @@ test("observation and voice expose explicit sources, pause/restart recovery, del
   } finally { await suite.close(); }
 }));
 
+test("Codex designer rejects a late reply when its pinned connection changes while waiting for encrypted persistence", () => fixture(async ({ store, root }) => {
+  await store.initialize("personal");
+  await store.update("personal", "mode-select", s => { s.mode = "personal-companion"; s.observations = [{ id: "design-observation", status: "recording", sources: ["agent-events"], exclusions: [], events: [], updatedAt: Date.now() }]; });
+  for (const boundary of ["closed", "epoch"]) {
+    const calls = [], client = new EventEmitter();
+    Object.assign(client, { closed: false, accountEpoch: 0, nativeVersion: "0.166.0", accountFingerprint: "a".repeat(64), restrictionsVerified: true,
+      initialize: async () => {}, recheckAccount: async () => client.accountFingerprint, close() { this.closed = true; },
+      request: async (method, params) => {
+        calls.push({ method, params });
+        if (method === "thread/start") return { thread: { id: "design-" + boundary }, sandbox: { type: "readOnly" }, approvalPolicy: "never", modelProvider: "openai" };
+        if (method === "turn/start") {
+          setImmediate(() => {
+            client.emit("notification", { method: "item/completed", params: { threadId: "design-" + boundary, turnId: "exact-turn", item: { type: "agentMessage", text: JSON.stringify({ reply: "LATE_REPLY_MUST_NOT_BE_RETAINED", summary: "Review", actions: [], steps: ["Review"], roles: ["Reviewer"] }) } } });
+            client.emit("notification", { method: "turn/completed", params: { threadId: "design-" + boundary, turn: { id: "exact-turn", status: "completed" } } });
+          }); return { turn: { id: "exact-turn" } };
+        }
+        throw Error("Unexpected method");
+      }
+    });
+    const guardedStore = { ...store, update: async (c, operation, mutate, options) => {
+      if (operation === "design-conversation") {
+        // The turn and its final account read already finished. Its original
+        // fingerprint remains the same; only the native connection is invalid.
+        if (boundary === "closed") client.closed = true; else client.accountEpoch++;
+      }
+      return store.update(c, operation, mutate, options);
+    } };
+    const service = createAgentService({ store: guardedStore, runtimeRoot: join(root, boundary), codexFactory: () => client, resolveCli: async () => "/synthetic-native-cli", resolveMcp: async () => [] });
+    try {
+      await assert.rejects(service.design({ compartment: "personal", provider: "codex", message: "Synthetic design review", plan: samplePlan() }), { code: "ACCOUNT_UNCONFIRMED" });
+      const state = await store.snapshot("personal"), saved = state.conversations.find(c => c.sessionId === "design-" + boundary);
+      assert.ok(saved); assert.equal(saved.accountFingerprint, "a".repeat(64)); assert.equal(saved.status, "failed"); assert.equal(saved.messages.length, 1); assert.equal(saved.messages[0].role, "user");
+      assert.equal(JSON.stringify(state).includes("LATE_REPLY_MUST_NOT_BE_RETAINED"), false);
+      assert.deepEqual(state.observations[0].events.slice(-2).map(e => e.phase), ["design-request-reserved", "design-request-failed"]);
+      assert.equal(calls.filter(c => c.method === "thread/start").length, 1); assert.equal(calls.filter(c => c.method === "turn/start").length, 1);
+    } finally { await service.close(); }
+  }
+}));
+
 test("Codex design binds an exact returned session, rejects unsafe outputs and never switches providers", () => fixture(async ({ store, root }) => {
   await store.initialize("personal"); await store.initialize("work", "work");
   await store.update("personal", "mode-select", (s) => { s.mode = "personal-companion"; s.observations = [{ id: "design-observation", status: "recording", sources: ["agent-events"], exclusions: [], events: [], updatedAt: Date.now() }]; });
