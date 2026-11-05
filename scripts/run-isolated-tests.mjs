@@ -140,6 +140,7 @@ export function nativeTestOverrides(file, platform = process.platform) {
 export const requiredGroups = [
   { file: "scripts/run-isolated-tests.test.mjs" },
   { file: "scripts/windows-scenario-groups.test.mjs" },
+  { file: "scripts/windows-restricted-owner-report.test.mjs" },
   { file: "scripts/verify-runtime-platform.test.mjs" },
   { file: "deployment/suite/release.test.mjs" },
   { file: "deployment/suite/inspect.test.mjs", ...nativeTestOverrides("deployment/suite/inspect.test.mjs") },

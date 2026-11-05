@@ -16,6 +16,8 @@ internal static class NativeRestrictedHostProof
 {
     internal static string Phase = "not-started";
     internal static object? CreatorPrivileges;
+    private static readonly List<bool> HistoricalFilteredFlags = new();
+    internal static bool[] HistoricalFilterObservations => HistoricalFilteredFlags.ToArray();
     private static void Require(bool condition) { if (!condition) throw new InvalidOperationException("The restricted host process proof did not verify."); }
     private static void Native(bool condition) { if (!condition) throw new Win32Exception(Marshal.GetLastWin32Error()); }
     private static byte[] ReadBounded(string path)
@@ -62,8 +64,10 @@ internal static class NativeRestrictedHostProof
         Require(ReadToken(token, 25, pointer => new SecurityIdentifier(Marshal.ReadIntPtr(pointer)).Value) == "S-1-16-8192");
         Phase = stage + "/restricting-sids-present";
         Require(IsTokenRestricted(token));
-        Phase = stage + "/filtered-token-flag";
-        Require(ReadToken(token, 21, pointer => Marshal.ReadInt32(pointer)) != 0);
+        // Historical filter metadata is not the actual restricting SID list.
+        // Observe it without substituting it for the public restriction proof.
+        Phase = stage + "/historical-filter-observation";
+        HistoricalFilteredFlags.Add(ReadToken(token, 21, pointer => Marshal.ReadInt32(pointer)) != 0);
         Phase = stage + "/restricting-sid-count";
         var restrictions = ReadToken(token, 11, pointer =>
         {
@@ -86,12 +90,13 @@ internal static class NativeRestrictedHostProof
             return found;
         });
         Require(disabledAdmin);
-        Phase = stage + "/volume-privilege-absent";
+        Phase = stage + "/assigned-privileges";
         Native(LookupPrivilegeValueW(null, "SeManageVolumePrivilege", out long volume));
+        Native(LookupPrivilegeValueW(null, "SeChangeNotifyPrivilege", out long traverse));
         ReadToken(token, 3, pointer =>
         {
-            int count = Marshal.ReadInt32(pointer); Require(count is >= 0 and <= 256);
-            for (int i = 0; i < count; i++) { var privilege = Marshal.PtrToStructure<Privilege>(IntPtr.Add(pointer, 4 + i * Marshal.SizeOf<Privilege>())); Require(privilege.Low != unchecked((uint)volume) || privilege.High != unchecked((int)(volume >> 32))); }
+            int count = Marshal.ReadInt32(pointer); Require(count is >= 0 and <= 1);
+            for (int i = 0; i < count; i++) { var privilege = Marshal.PtrToStructure<Privilege>(IntPtr.Add(pointer, 4 + i * Marshal.SizeOf<Privilege>())); Require(privilege.Low != unchecked((uint)volume) || privilege.High != unchecked((int)(volume >> 32))); Require(privilege.Low == unchecked((uint)traverse) && privilege.High == unchecked((int)(traverse >> 32))); }
             return true;
         });
         Phase = stage;
@@ -127,23 +132,35 @@ internal static class NativeRestrictedHostProof
             {
                 Phase = "restricted-primary-token";
                 Native(ConvertStringSidToSidW("S-1-5-32-544", out admin)); var disabled = new SidAttributes { Sid = admin };
-                // Set the intended restricting list in the first filter.
-                // Subsequent filtering intersects with the existing list,
-                // as specified by the native API.
+                // Create explicit SID restrictions and privilege deletion in
+                // one public API call, then verify the actual resulting token.
                 restricting = Marshal.AllocHGlobal(Marshal.SizeOf<SidAttributes>() * 4);
                 foreach (string text in new[] { user, "S-1-1-0", "S-1-5-11", "S-1-5-32-545" })
                 {
                     Native(ConvertStringSidToSidW(text, out var sid)); restrictingSids.Add(sid);
                     Marshal.StructureToPtr(new SidAttributes { Sid = sid }, IntPtr.Add(restricting, (restrictingSids.Count - 1) * Marshal.SizeOf<SidAttributes>()), false);
                 }
-                Native(CreateRestrictedToken(source, 1, 1, ref disabled, 0, IntPtr.Zero, 4, restricting, out var reduced));
-                using (reduced)
                 {
-                    // DISABLE_MAX_PRIVILEGE ignores its delete list. Delete the
-                    // volume privilege in a second call, then verify absence.
-                    Native(LookupPrivilegeValueW(null, "SeManageVolumePrivilege", out long volume)); deleted = Marshal.AllocHGlobal(Marshal.SizeOf<Privilege>());
-                    Marshal.StructureToPtr(new Privilege { Low = unchecked((uint)volume), High = unchecked((int)(volume >> 32)) }, deleted, false);
-                    Native(CreateRestrictedToken(reduced, 0, 0, ref disabled, 1, deleted, 4, restricting, out var restricted));
+                    // Explicitly delete every assigned privilege except normal
+                    // traverse notification in one filter. No disabled powerful
+                    // privilege remains available for the child to re-enable.
+                    Native(LookupPrivilegeValueW(null, "SeChangeNotifyPrivilege", out long traverse));
+                    var removals = ReadToken(source, 3, pointer =>
+                    {
+                        int count = Marshal.ReadInt32(pointer); Require(count is >= 0 and <= 256); var result = new List<Privilege>();
+                        for (int i = 0; i < count; i++)
+                        {
+                            var privilege = Marshal.PtrToStructure<Privilege>(IntPtr.Add(pointer, 4 + i * Marshal.SizeOf<Privilege>()));
+                            if (privilege.Low != unchecked((uint)traverse) || privilege.High != unchecked((int)(traverse >> 32))) result.Add(new Privilege { Low = privilege.Low, High = privilege.High });
+                        }
+                        return result;
+                    });
+                    if (removals.Count > 0)
+                    {
+                        deleted = Marshal.AllocHGlobal(Marshal.SizeOf<Privilege>() * removals.Count);
+                        for (int i = 0; i < removals.Count; i++) Marshal.StructureToPtr(removals[i], IntPtr.Add(deleted, i * Marshal.SizeOf<Privilege>()), false);
+                    }
+                    Native(CreateRestrictedToken(source, 0, 1, ref disabled, checked((uint)removals.Count), deleted, 4, restricting, out var restricted));
                     using (restricted)
                     {
                         Native(ConvertStringSidToSidW("S-1-16-8192", out medium)); var label = new SidAttributes { Sid = medium, Attributes = 0x20 };
@@ -213,7 +230,7 @@ internal static class NativeRestrictedHostProof
                                 Require(report.GetProperty("schema").GetString() == "switchyard-restricted-host-result/v1" && report.GetProperty("nonce").GetString() == nonce && report.GetProperty("success").GetBoolean());
                                 var owner = report.GetProperty("owner"); Require(owner.GetProperty("success").GetBoolean() && owner.GetProperty("checks").GetArrayLength() == 8 && owner.GetProperty("nativeExitVerified").GetBoolean() && owner.GetProperty("fixtureRemoved").GetBoolean() && !owner.GetProperty("ordinaryUserToken").GetBoolean());
                                 Phase = "complete";
-                                return new { schema = "switchyard-restricted-host-process-proof/v1", success = true, processCreationApi = "CreateProcessAsUserW", creatorPrivileges = CreatorPrivileges, creatorQuotaRestoredVerified = true, restrictingSidListVerified = true, restrictingSidCount = 4, primaryTokenVerified = true, sameUserVerified = true, mediumIntegrityVerified = true, administratorsDenyOnlyVerified = true, volumePrivilegeAbsentVerified = true, tokenRecheckedAfterExit = true, treeExitVerified = true, hostOwnerChecks = 8, hostOwner = owner.Clone(), ordinaryUserAccountAccepted = false, guestLaunched = false, accountCreated = false };
+                                return new { schema = "switchyard-restricted-host-process-proof/v1", success = true, processCreationApi = "CreateProcessAsUserW", creatorPrivileges = CreatorPrivileges, creatorQuotaRestoredVerified = true, restrictingSidListVerified = true, restrictingSidCount = 4, primaryTokenVerified = true, sameUserVerified = true, mediumIntegrityVerified = true, administratorsDenyOnlyVerified = true, volumePrivilegeAbsentVerified = true, onlyTraversePrivilegeAssignedVerified = true, historicalFilteredFlags = HistoricalFilteredFlags.ToArray(), tokenRecheckedAfterExit = true, treeExitVerified = true, hostOwnerChecks = 8, hostOwner = owner.Clone(), ordinaryUserAccountAccepted = false, guestLaunched = false, accountCreated = false };
                             }
                             finally
                             {

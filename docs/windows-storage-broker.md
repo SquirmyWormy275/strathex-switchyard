@@ -325,3 +325,38 @@ checks. The strict native C++ build succeeds. Earlier setup failures remain
 failed and their cause remains unestablished. The same overall workflow still
 fails the separate restricted-token and software contracts; it is not accepted
 as a whole. No ordinary-account/UAC or guest acceptance is inferred.
+
+
+### Actual restrictions and historical token metadata
+
+The next native run at `59a73de` passes public `IsTokenRestricted` but fails the
+separate historical `TokenHasRestrictions` assertion before creating a child.
+Its [digest-verified failed receipt](evidence/windows-59a-restricted-failed-summary.json)
+remains failed, with the original protected service/context preserved. Earlier
+31-case exchange and eight-case owner checks do not establish restricted primary
+process acceptance.
+
+The test-only correction now uses one [`CreateRestrictedToken`](https://learn.microsoft.com/en-us/windows/win32/api/securitybaseapi/nf-securitybaseapi-createrestrictedtoken)
+call: four explicit restricting SIDs, Administrators disabled to deny-only, and
+explicit deletion of every assigned privilege except optional
+`SeChangeNotifyPrivilege`. It verifies the resulting primary token, same user,
+medium integrity, exact SID identities, Administrators deny-only and assigned
+privileges before resuming the child and again after exit. Public
+[`IsTokenRestricted`](https://learn.microsoft.com/en-us/windows/win32/api/securitybaseapi/nf-securitybaseapi-istokenrestricted)
+and the actual restricting SID list remain required.
+
+The [`TokenHasRestrictions`](https://learn.microsoft.com/en-us/windows/win32/api/winnt/ne-winnt-token_information_class)
+historical flag is retained as three boolean observations, separate from those
+concrete restrictions. The reserved `TokenIsRestricted` information class is not
+used. Creation-time Job containment, scoped creator privilege restoration, exact
+owner/handle identity, verified tree exit, cleanup and original deadlines remain
+required. A closed report validator rejects missing restriction witnesses,
+unknown process-proof fields and account/guest/fallback claims.
+
+Both managed targets compile with zero warnings/errors and all 223 portable
+checks pass using the existing SDK; owned scratch is removed
+(`windows-history-native-build-1793890000422.json`). Four isolated report,
+workflow, runner and verifier groups pass 25 checks with every cleanup verified
+(`isolated-test-ace3199b-6401-426e-b3fe-fc9b90fc7731.json`). This correction still
+requires native Windows execution. It changes no shipped helper/setup commands,
+workstation privileges, accounts or logon settings.
