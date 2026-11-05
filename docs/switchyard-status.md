@@ -8,6 +8,25 @@ behind each accepted result.
 
 ## Active backend iteration
 
+Normal Windows Run now uses protected broker exchanges with exact task/input
+binding and durable per-effect requests. The host lease spans preparation to
+retirement; a consumer kernel lease blocks premature cleanup. Lost replies use
+read-only original result lookup, with no effect resend or Run-outcome upgrade.
+Unavailable service stages nothing, including for privileged users. Existing
+direct images retain their cleanup path. Snapshot privacy and the required
+isolated/native inventories include this owner. Seventy focused owner/runner/
+HTTP/privacy/package/inventory checks pass; type checking passes. Full native
+normal-app/guest and interactive UAC acceptance remain open.
+
+Native workflow `41948972575` at `1f4e8e5` passes completely: all thirty
+filesystem checks, 112 compiled portable checks, sixteen protected-file checks,
+both six-plus-thirteen setup/service lifecycles and the complete 31-check
+restricted-client volume proof. Four archive digests verified and JSON receipts
+retained (`windows-{exchange,filesystem}-1f4-native.json`,
+`windows-native-setup-1f4-lifecycle.json`, `windows-broker-1f4-protocol.json`).
+The exchange receipt independently verifies native exit. No interactive
+Sandbox/UAC or new normal-app adapter acceptance is inferred.
+
 Normal installed `3e346c1` now passes six update checks and five actual F77
 read-only API checks. Complete keymap and macro hashes match the independent
 guarded capture; current protected source reconciliation passes without profile

@@ -93,8 +93,8 @@ declared skips. The newer Studio Windows Run and separate stop approval pass
 all four native Windows policy jobs with an explicit guest runner double. Linux
 also connects separately reviewed local-gate and clean-reproduction recipes to
 the isolated runner and authenticated evidence. Personal host setup now has reviewed install/remove and a fixed native boundary.
-The new bounded storage service engine awaits native acceptance; its normal
-task/guest connection remains unfinished. [Verification details](docs/verification.md)
+The bounded storage service and normal
+task/guest connection are implemented; native complete-journey acceptance remains open. [Verification details](docs/verification.md)
 identify each source checkpoint and practical limit. Interactive Windows acceptance remains open. Current F77 discovery and readout pass; ordinary typing, hotplug and physical writes remain unaccepted. B122
 physical acceptance and approved Microsoft tenant tests remain open. All 27 B122
 acceptance gates remain **NOT ACCEPTED**. Source availability is not acceptance.

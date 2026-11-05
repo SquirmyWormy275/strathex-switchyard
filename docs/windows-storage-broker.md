@@ -4,11 +4,13 @@ Switchyard keeps privileged volume operations in its fixed LocalSystem service.
 The desktop application stays unelevated. The native installer and Personal
 review/apply route are described in [reviewed Windows Run](windows-reviewed-run.md).
 
-The exchange engine is implemented and compiles without warnings. Its service
-transport and restricted-client native proof are new and await Windows CI.
-**The normal task Run/guest-consumer connection is unfinished.** Metadata still
-reports `brokerImplemented:false`; neither compilation nor a service lifecycle
-establishes a working interactive Windows Sandbox run.
+The normal Windows Run factory now uses the fixed broker client for new
+exchanges, including ordinary users without volume-management privilege. The
+engine, pipe, protected staging and client ownership path are implemented.
+Native restricted-client storage and normal Run orchestration are separate
+checks: a working interactive Windows Sandbox run and normal-user UAC still
+require an authorized Windows host. Metadata retains `brokerImplemented:false`
+until that complete native journey is accepted.
 
 ## Fixed resource boundary
 
@@ -63,10 +65,9 @@ It creates no account and checks exact image creation, duplicate refusal,
 foreign-scope/capacity denial, read-only host files, attach, actual kernel
 filesystem exhaustion, detach and retirement through the System pipe.
 
-That new proof must pass before native exchange acceptance is claimed. Connecting
-the normal host admission to this service, binding the exact guest consumer,
-maintaining independent VM exit before cleanup, and interactive Sandbox/UAC
-acceptance remain separate work. No device, account, guest, workstation mount or
+That new proof must pass before native exchange acceptance is claimed. The normal host admission, exact guest consumer and independent exit-before-cleanup
+connection are implemented and fault-tested; native application/guest and
+interactive Sandbox/UAC acceptance remain separate checks. No device, account, guest, workstation mount or
 physical keyboard was changed on the Linux pilot by these builds.
 
 The helper also exposes fixed `probe-exchange` and `exchange-binding` observations.
@@ -77,7 +78,7 @@ result, exact immutable facts and journal state, then pins the original native
 image, mount and extent through admission. The ordinary client receives no
 volume-management privilege. The 24-case native proof now includes this mapping
 and a substituted-root rejection. Both C# builds and all 106 portable checks
-pass; its actual Windows execution and normal Run connection remain pending.
+pass; its actual Windows execution and normal Run native acceptance remain pending.
 
 The first engine Windows run failed during the preceding metadata-service
 removal, before reaching its volume test. That failure remains retained; bounded
@@ -99,5 +100,38 @@ without invoking `Begin` or performing any effect. The helper checks expected
 installation/owner/image identity before effect requests. The native transport
 pins that tuple, exact task/input/request IDs and independently stopped guardian.
 All 43 journal and 23 fact checks pass locally; the combined host setup/transport/
-Sandbox/release checks pass 84 cases with explicit native/guest doubles. These
-are supporting pieces of the normal Run connection, which remains unfinished.
+Sandbox/release checks pass 84 cases with explicit native/guest doubles. The normal Run connection now consumes them through its exact protected ownership adapter.
+
+
+## Normal Run ownership
+
+`windows-broker-exchanges.mjs` holds the same kernel host lease as Personal setup
+from preparation through verified retirement. It never installs or elevates. A
+read-only capability check precedes input/tool staging; an unavailable broker
+settles the consumed Run as unavailable even for a privileged desktop user.
+Only a protected native observation supplies the exact disk directory admitted
+to the guest backend. The parent Program Files directory is never allowed.
+
+The encrypted owner binds the original installation/client, operation, task
+scope and reviewed input-manifest hash. Create, attach, detach and retire each
+receive a stable request UUID persisted before native dispatch. Missing replies
+are reconciled through read-only lookup after independent original guardian
+exit; neither an absent result nor a reservation is resent. A final protected
+result can recover storage facts while the original uncertain Run outcome stays
+uncertain. Fresh mapping checks precede guest use. The consumer kernel lease
+fences retirement even during the interval before a guest session exists.
+
+Retirement requires original guest exit, native guardian exit, current signed
+state and fixed original cleanup requests. Mode or workspace revocation blocks
+new capabilities but permits exact cleanup. Private broker owners are omitted
+from ordinary snapshots. Retained images from the earlier direct privileged
+implementation keep their original cleanup port; they are never a fallback for
+new Run effects. Portable tests use explicit service/VM doubles; native storage
+and full guest acceptance are recorded separately in [verification](verification.md).
+
+Native `1f4e8e5` is now accepted for the complete 31-check restricted-client
+storage proof, both service/setup lifecycles and all thirty native filesystem
+checks. Four archive digests were verified and receipts retained. This accepts
+the protected storage engine and exact removal lifetime; the newer JavaScript
+owner adapter still needs its own native demonstration and the complete guest
+journey remains unaccepted.
