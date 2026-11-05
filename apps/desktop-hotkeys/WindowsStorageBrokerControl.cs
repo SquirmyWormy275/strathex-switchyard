@@ -121,8 +121,22 @@ internal static class WindowsStorageBrokerControl
         phase?.Invoke("service-absence");long absentDeadline=Environment.TickCount64+10000;
         while(true)
         {
-            using var observed=OpenServiceW(manager,settings.ServiceName,4);int error=Marshal.GetLastWin32Error();
-            if(observed.IsInvalid&&error==1060)break;if(!observed.IsInvalid||error!=1072||Environment.TickCount64>=absentDeadline)throw Invalid();Thread.Sleep(50);
+            // DeleteService marks the entry; SCM removes it asynchronously after
+            // every service handle closes. A still-open, stopped original entry
+            // is not absence. Close this observation handle before waiting, and
+            // never accept another configuration, a running service or timeout.
+            bool absent;
+            using(var observed=OpenServiceW(manager,settings.ServiceName,5))
+            {
+                int error=Marshal.GetLastWin32Error();absent=observed.IsInvalid&&error==1060;
+                if(!observed.IsInvalid)
+                {
+                    VerifyConfiguration(observed,settings);var remaining=ReadStatus(observed);
+                    if(remaining.State!=1||remaining.Pid!=0)throw Invalid();
+                }
+                else if(!absent&&error!=1072)throw new Win32Exception(error);
+            }
+            if(absent)break;if(Environment.TickCount64>=absentDeadline)throw Invalid();Thread.Sleep(50);
         }
         phase?.Invoke("protected-inventory");string[] expected={WindowsStorageBrokerInstallation.Executable,WindowsStorageBrokerInstallation.Configuration,WindowsStorageBrokerInstallation.PrivateKey};
         if(WindowsStorageBrokerDiagnostic.Read(settings)!=null)expected=expected.Append(WindowsStorageBrokerDiagnostic.FileName).ToArray();

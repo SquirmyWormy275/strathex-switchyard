@@ -8,6 +8,25 @@ behind each accepted result.
 
 ## Active backend iteration
 
+Normal installed `3e346c1` now passes six update checks and five actual F77
+read-only API checks. Complete keymap and macro hashes match the independent
+guarded capture; current protected source reconciliation passes without profile
+adoption. Definitions, selection, modes, private link and frozen Home preserved.
+No HID transport remains; bundle and disposable checkout removed. Receipts
+`assignment-legends-1793842045992.json` and
+`installed-f77-readout-1793842177742.json` retained. Two earlier proof-script
+failures remain retained (unsupported selection route; mismatched hash encoding);
+they sent no configuration command. Physical typing/hotplug/write acceptance
+remains open.
+
+Service removal now closes each observation handle before waiting for SCM
+delete completion and accepts only the original stopped configuration while
+pending. Actual absence still requires Win32 1060 within the original bound;
+other errors, running/replaced services and timeout preserve the installation.
+The helper compiles with zero warnings/errors and scratch was removed. Native
+CI is required; no removal or volume pass is claimed from compilation. See
+[Microsoft’s delete lifetime contract](https://learn.microsoft.com/en-us/windows/win32/api/winsvc/nf-winsvc-deleteservice).
+
 Current F77 discovery and read-only configuration capture pass with the Linux
 `hidraw` backend already shipped by the pinned runtime. The libusb backend
 reported zero usage fields and silently hid its configuration interface. No
@@ -15,8 +34,8 @@ permission, driver or desktop change was required. VIA 9 / Vial 4 reports three
 8 × 11 layers; the complete definition and UID match the pinned F77 source.
 Classic and Ultra Compact remain separate case choices. Ninety read/query
 reports, no unlock/configuration/flash/reset/electrical command. Protected live
-snapshot and `f77-live-readout-1793841566987.json` retained; normal installed-app
-update and readout still pending. The platform-backend regression passes along
+snapshot and `f77-live-readout-1793841566987.json` retained; installed-app
+update and readout are now accepted at the separate receipt above. The platform-backend regression passes along
 with all eighteen device tests. Typing, hotplug and physical writes remain open.
 
 Complete Linux `f8591fe` passes 165/165 groups: 1,083 tests, 1,073 passed and ten
