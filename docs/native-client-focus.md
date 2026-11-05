@@ -40,3 +40,22 @@ pass 65 checks; the final four-group gateway/package subset passes 38, with ever
 child cleanup verified and owned scratch removed. Type checking passes. These
 demonstrations exercise current source; normal installed-release acceptance of
 this later correction remains separate.
+
+
+For normal installed-release acceptance, the bounded pilot verifier is:
+
+```sh
+mise exec node@24.14.0 -- node scripts/verify-native-focus-host.mjs --synthetic
+```
+
+It requires a ready installed app containing this exact source, an already open
+repaired native main window and an initially keyboard-only selected workspace.
+It mutually authenticates the saved app before sending its bearer. A fixed empty
+validation workspace is independently checked before use; an existing populated
+workspace is preserved. It proves unauthenticated and keyboard-only refusal,
+then exact focus through the normal installed gateway. Restoration returns the
+validation workspace to keyboard-only and restores the original selection,
+Personal definitions, private endpoint and frozen Home. The small encrypted
+validation audit and JSON receipt are retained. It creates no native coding task,
+feed, scanner fixture, prompt, credential account, keyboard or microphone access.
+Actual installed acceptance for this later correction is being collected.

@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { once } from "node:events";
-import { spawn } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
 import { request } from "node:http";
 import { mkdtemp, mkdir, readFile, writeFile, readdir, rm, symlink, chmod } from "node:fs/promises";
 import { tmpdir, homedir, userInfo } from "node:os";
@@ -28,6 +29,14 @@ function chatgptFocusFixture() {
   const hypr = async (...args) => { calls.push(args); if (args[0] === "clients") return JSON.stringify(windows); if (args[0] === "dispatch") { dispatch(); return "ok\n"; } if (args[0] === "activewindow") return JSON.stringify(active()); throw Error("Unexpected native target command"); };
   return { process, window, windows, calls, hypr, readProcess: async pid => { assert.equal(pid, 123); return structuredClone(process); }, onDispatch: callback => { dispatch = callback; }, active: callback => { active = callback; } };
 }
+
+test("installed native focus verification requires its explicit synthetic flag before reading application state", () => {
+  const script = fileURLToPath(new URL("../../scripts/verify-native-focus-host.mjs", import.meta.url));
+  for (const args of [[], ["--not-a-proof"], ["--synthetic", "extra"]]) {
+    const result = spawnSync(process.execPath, [script, ...args], { env: { ...(process.env.SystemRoot ? { SystemRoot: process.env.SystemRoot } : {}) }, encoding: "utf8", timeout: 5000, maxBuffer: 32768 });
+    assert.equal(result.error, undefined); assert.notEqual(result.status, 0); assert.equal(result.stdout, ""); assert.match(result.stderr, /Use on the pilot: node scripts\/verify-native-focus-host.mjs --synthetic/);
+  }
+});
 
 test("native ChatGPT focus uses its exact repaired main-window address and process birth without prompting or resuming", async () => {
   const f = chatgptFocusFixture(); f.windows.push({ ...f.window, address: "0x456", floating: true }); let checks = 0;
