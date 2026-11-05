@@ -1,0 +1,57 @@
+{
+  "schema": "switchyard-linux-timeout-summary/v1",
+  "sourceCommit": "ea5a0f71b8ade5551aa42d23e8eb06d8cca399d4",
+  "fullReceipt": "isolated-test-b3e1e5ae-64fe-4bfd-b8a5-4b0975fad064.json",
+  "fullReceiptSha256": "8896a4a71c6640bb9cf216a93c62a901413deb7e7a3aa7ce4384d4684656f4d0",
+  "fullRunSuccess": false,
+  "totals": {
+    "required": 233,
+    "passed": 231,
+    "failed": 2,
+    "tests": 1402,
+    "passedTests": 1392,
+    "failedTests": 0,
+    "skippedTests": 10,
+    "cancelledTests": 0,
+    "todoTests": 0
+  },
+  "reportedCountsAreIncomplete": true,
+  "failures": [
+    {
+      "file": "tools/layout-studio/repository-shield.test.mjs",
+      "timeout": true,
+      "effectiveTimeoutMs": 120000,
+      "durationMs": 120026,
+      "cleanupCompleted": true
+    },
+    {
+      "file": "tools/layout-studio/repository-pipeline.test.mjs",
+      "timeout": true,
+      "effectiveTimeoutMs": 120000,
+      "durationMs": 120022,
+      "cleanupCompleted": true
+    }
+  ],
+  "allChildCleanup": true,
+  "sameBoundRerunReceipt": "isolated-test-806c0013-b72c-4b90-9047-b688c8d07ac4.json",
+  "sameBoundRerunSuccess": false,
+  "rerunFailures": [
+    {
+      "file": "tools/layout-studio/repository-shield.test.mjs",
+      "timeout": true,
+      "effectiveTimeoutMs": 120000,
+      "cleanupCompleted": true
+    },
+    {
+      "file": "tools/layout-studio/repository-pipeline.test.mjs",
+      "timeout": true,
+      "effectiveTimeoutMs": 120000,
+      "cleanupCompleted": true
+    }
+  ],
+  "lastCompleteSource": "514bf685d5f103911fab6702613fe422d5bdc6a3",
+  "deadlinesChanged": false,
+  "causeConfirmed": false,
+  "cleanupReceipt": "failed-full-ea5-cleanup-1793904390517.json",
+  "ownedFixturesAliasesWorktreeMarkerRemoved": true
+}

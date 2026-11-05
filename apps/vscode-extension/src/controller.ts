@@ -6,6 +6,7 @@ import { lstat, realpath, stat } from "node:fs/promises";
 import { createServer } from "node:net";
 import { chordCommands, chordFor, type B122Control, type B122Modifier, type ChordCommand } from "./commands.ts";
 import { codexLocalThreadItems, operatorSessionItems, type CodexLocalThreadBinding, type CodexLocalThreadObservation } from "./operator-status.ts";
+import { revealExactTerminal } from "./terminal-focus.ts";
 import { commandFor } from "../../../packages/control-plane/src/command-catalog.ts";
 import { authorityBroadcastReviewScopeDigest, type WorkflowArtifact } from "../../../packages/control-plane/src/workflow-artifacts.ts";
 import {
@@ -3150,7 +3151,7 @@ export class ManagedSessionController {
         return "Opened a new VS Code window.";
       case "focus_integrated_terminal":
         if (!action.workspaceRoot) throw new Error("The integrated-terminal action is not bound to an exact workspace root.");
-        await this.focusIntegratedTerminal(action.workspaceRoot);
+        await this.focusIntegratedTerminal(action.workspaceRoot, authorization.expiresAt);
         return `Focused the integrated VS Code terminal for ${action.workspaceRoot}.`;
       case "open_compound_palette":
         return this.openCompoundPalette(action.id, action.workspaceRoot);
@@ -3849,11 +3850,14 @@ export class ManagedSessionController {
     if (!Number.isFinite(Date.parse(authorization.expiresAt)) || Date.parse(authorization.expiresAt) <= Date.parse(this.now())) throw new Error("The one-time host-action authorization expired before the local effect.");
   }
 
-  private async focusIntegratedTerminal(workspaceRoot: string): Promise<void> {
+  private async focusIntegratedTerminal(workspaceRoot: string, authorizationExpiresAt: string): Promise<void> {
     const requestedRoot = resolve(workspaceRoot);
-    if (!(this.vscode.workspace.workspaceFolders ?? []).some((folder) => samePath(resolve(folder.uri.fsPath), requestedRoot))) {
-      throw new Error("The exact integrated-terminal workspace is no longer open in this VS Code window.");
-    }
+    const assertCurrent = () => {
+      this.assertAdmissionActive(); this.requireLiveHostAuthorization({ expiresAt: authorizationExpiresAt });
+      if (!(this.vscode.workspace.workspaceFolders ?? []).some(folder => samePath(resolve(folder.uri.fsPath), requestedRoot))) throw new Error("The exact integrated-terminal workspace is no longer open in this VS Code window.");
+      if (!this.vscode.window.state.focused) throw new Error("The original VS Code window lost focus before exact terminal selection could be accepted.");
+    };
+    assertCurrent();
     const eligible = this.vscode.window.terminals.filter((terminal) => {
       const record = this.terminalRecords.get(terminal);
       return !!record?.session.workspaceRoot && samePath(record.session.workspaceRoot, requestedRoot);
@@ -3867,11 +3871,23 @@ export class ManagedSessionController {
       const items = eligible.map((candidate, index) => ({ label: candidate.name, description: `Exact ${requestedRoot} terminal ${index + 1}` }));
       const selected = await this.vscode.window.showQuickPick(items, { placeHolder: `Choose one integrated terminal bound to ${requestedRoot}` });
       if (!selected) throw new Error("Exact integrated-terminal selection was cancelled.");
-      terminal = eligible[items.indexOf(selected)];
+      const index = items.indexOf(selected);
+      if (index < 0) throw new Error("The picker did not return one exact offered terminal identity.");
+      terminal = eligible[index];
     }
+    const offeredTerminal = terminal;
+    const assertSelectionCurrent = () => {
+      assertCurrent();
+      if (!offeredTerminal) return;
+      const record = this.terminalRecords.get(offeredTerminal);
+      if (this.closedTerminals.has(offeredTerminal) || !this.vscode.window.terminals.includes(offeredTerminal) || !record?.session.workspaceRoot || !samePath(record.session.workspaceRoot, requestedRoot)) throw new Error("The exact offered terminal binding changed while selection was pending.");
+    };
+    assertSelectionCurrent();
     terminal ??= this.vscode.window.createTerminal({ name: "SXSY-B122 Terminal", cwd: requestedRoot });
-    terminal.show();
-    await this.registerTerminal(terminal, undefined, requestedRoot);
+    await revealExactTerminal(this.vscode.window, terminal, assertSelectionCurrent);
+    const registered = await this.registerTerminal(terminal, undefined, requestedRoot);
+    assertSelectionCurrent();
+    if (!this.vscode.window.terminals.includes(terminal) || this.vscode.window.activeTerminal !== terminal || !registered.session.workspaceRoot || !samePath(registered.session.workspaceRoot, requestedRoot)) throw new Error("The exact terminal selection or registration changed before acknowledgement.");
   }
 
   private debugConfigurations(): readonly DebugConfigurationLike[] {

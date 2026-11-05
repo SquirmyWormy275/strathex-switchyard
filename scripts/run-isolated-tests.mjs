@@ -77,7 +77,7 @@ const mediatedGitTests = [
   "shared lock content changed in place is preserved rather than overwritten",
   "private lock content changed in place remains untouched during cleanup"
 ].map((pattern) => ({ file: "apps/windows-companion/test/mediated-git.test.ts", pattern }));
-const extensionTests = ["commands", "companion-bridge", "controller", "named-pipe-transport", "operator-status"]
+const extensionTests = ["commands", "companion-bridge", "controller", "named-pipe-transport", "operator-status", "terminal-focus"]
   .map((name) => ({
     file: `apps/vscode-extension/test/${name}.test.ts`,
     ...(name === "controller" && process.platform !== "linux" ? { expectedSkipped: 1 } : {}),

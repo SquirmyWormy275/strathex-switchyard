@@ -147,8 +147,8 @@ class FakeTerminal implements TerminalLike {
   shown = 0;
   readonly name: string;
   readonly processId: PromiseLike<number | undefined> = Promise.resolve(4242);
-  constructor(name: string) { this.name = name; }
-  show(): void { this.shown += 1; }
+  constructor(name: string, private readonly onShow?: (terminal: FakeTerminal) => void) { this.name = name; }
+  show(): void { this.shown += 1; this.onShow?.(this); }
   sendText(text: string): void { this.sent.push(text); }
 }
 
@@ -186,6 +186,7 @@ class FakeVscode {
   focused = true;
   private readonly openListeners: Array<(terminal: TerminalLike) => unknown> = [];
   private readonly closeListeners: Array<(terminal: TerminalLike) => unknown> = [];
+  private readonly activeTerminalListeners = new Set<(terminal: TerminalLike | undefined) => unknown>();
   private readonly workspaceListeners: Array<() => unknown> = [];
   private readonly debugStartListeners: Array<(session: DebugSessionLike) => unknown> = [];
   private readonly debugStopListeners: Array<(session: DebugSessionLike) => unknown> = [];
@@ -197,7 +198,7 @@ class FakeVscode {
   readonly api: VscodeLike;
 
   constructor(terminalNames = ["Manual terminal"], workspaceRoots = ["C:\\repo"]) {
-    this.terminals = terminalNames.map((name) => new FakeTerminal(name));
+    this.terminals = terminalNames.map((name) => new FakeTerminal(name, terminal => this.activateTerminal(terminal)));
     this.activeTerminal = this.terminals[0];
     this.workspaceFolders = workspaceRoots.map((fsPath) => ({ uri: { fsPath } }));
     const self = this;
@@ -215,7 +216,7 @@ class FakeVscode {
         get activeTerminal(): TerminalLike | undefined { return self.activeTerminal; },
         createTerminal(options): TerminalLike {
           self.terminalOptions.push(options);
-          const terminal = new FakeTerminal(options.name);
+          const terminal = new FakeTerminal(options.name, candidate => self.activateTerminal(candidate));
           self.createdTerminals.push(terminal);
           self.terminals.push(terminal);
           self.activeTerminal = terminal;
@@ -238,6 +239,7 @@ class FakeVscode {
         async showOpenDialog(): Promise<readonly { fsPath: string }[] | undefined> { const path = self.openDialogPaths.shift(); return path ? [{ fsPath: path }] : undefined; },
         onDidOpenTerminal(listener): DisposableLike { self.openListeners.push(listener); return new FakeDisposable(); },
         onDidCloseTerminal(listener): DisposableLike { self.closeListeners.push(listener); return new FakeDisposable(); },
+        onDidChangeActiveTerminal(listener): DisposableLike { self.activeTerminalListeners.add(listener); return { dispose: () => { self.activeTerminalListeners.delete(listener); } }; },
         onDidChangeWindowState(listener): DisposableLike { self.focusListeners.push(listener); return new FakeDisposable(); }
       },
       workspace: {
@@ -285,6 +287,12 @@ class FakeVscode {
   }
 
   async fireOpen(terminal: FakeTerminal): Promise<void> { for (const listener of this.openListeners) await listener(terminal); }
+  activateTerminal(terminal: FakeTerminal | undefined): void { this.activeTerminal = terminal; for (const listener of this.activeTerminalListeners) listener(terminal); }
+  async fireClose(terminal: FakeTerminal): Promise<void> {
+    const index = this.terminals.indexOf(terminal); if (index >= 0) this.terminals.splice(index, 1);
+    if (this.activeTerminal === terminal) this.activateTerminal(undefined);
+    for (const listener of this.closeListeners) await listener(terminal);
+  }
   async fireWorkspaceChange(): Promise<void> { for (const listener of this.workspaceListeners) await listener(); }
   async fireDebugStart(session: DebugSessionLike): Promise<void> { this.activeDebugSession = session; for (const listener of this.debugStartListeners) await listener(session); }
   async fireDebugStop(session: DebugSessionLike): Promise<void> { for (const listener of this.debugStopListeners) await listener(session); if (this.activeDebugSession === session) this.activeDebugSession = undefined; }
@@ -4654,6 +4662,72 @@ test("Shift Terminal never focuses an arbitrary active terminal and creates or r
   assert.match(bridge.completedHostActions.at(-1)?.summary ?? "", /workspace.*no longer open/i);
   await controller.stop();
 });
+
+for (const drift of ["none", "active-terminal", "closed-terminal", "workspace", "expiry", "window-focus", "unknown-item"] as const) {
+  test(`Shift Terminal rechecks the exact same-title picker target after ${drift} drift`, async () => {
+    const root = process.platform === "win32" ? "C:\\picker-root" : "/picker-root";
+    const vscode = new FakeVscode(["Identical title", "Identical title"], [root]);
+    vscode.activeTerminal = undefined;
+    const original = vscode.api.window.showQuickPick;
+    const offered = vscode.terminals[1]!;
+    let now = "2026-11-05T00:00:00.000Z", pickerReached = false;
+    vscode.api.window.showQuickPick = async <T extends string | QuickPickItemLike>(items: readonly T[], options?: { readonly placeHolder?: string }): Promise<T | undefined> => {
+      if (!options?.placeHolder?.startsWith("Choose one integrated terminal bound to")) return original(items, options);
+      pickerReached = true; await Promise.resolve();
+      if (drift === "closed-terminal") await vscode.fireClose(offered);
+      if (drift === "workspace") vscode.workspaceFolders = [];
+      if (drift === "expiry") now = "2099-01-01T00:00:00.000Z";
+      if (drift === "window-focus") vscode.focused = false;
+      if (drift === "active-terminal") vscode.activateTerminal(vscode.terminals[0]);
+      return drift === "unknown-item" ? { label: "Identical title" } as T : items[1];
+    };
+    const bridge = new FakeBridge();
+    const controller = new ManagedSessionController(vscode.api, new FakeContext(), bridge, {
+      idFactory: sequenceFactory(), now: () => now, resolveGitRoots: async () => [{ gitRoot: root }]
+    });
+    try {
+      await controller.start();
+      bridge.nextDispatch = { status: "running", summary: "Exact integrated terminal awaits host acknowledgement.", data: {
+        hostActionId: `host-action:${"8".repeat(64)}`, hostActionKind: "focus_integrated_terminal", hostActionExpiresAt: "2099-01-01T00:00:00.000Z", hostActionWorkspaceRoot: root
+      } };
+      await controller.dispatchChord(chordFor("TERMINAL", "shift")!);
+      assert.equal(pickerReached, true); assert.equal(vscode.createdTerminals.length, 0, "a missing offered target must never create a replacement");
+      assert.equal(vscode.terminals[0]?.shown, 0, "the same title or active terminal must not substitute for the selected object");
+      const succeeded = drift === "none" || drift === "active-terminal";
+      assert.equal(bridge.completedHostActions.at(-1)?.succeeded, succeeded);
+      assert.equal(offered.shown, succeeded ? 1 : 0);
+      if (succeeded) assert.equal(vscode.activeTerminal, offered);
+      else assert.match(bridge.completedHostActions.at(-1)?.summary ?? "", /binding changed|no longer open|expired|lost focus|offered terminal identity/i);
+    } finally { await controller.stop(); }
+  });
+}
+
+for (const drift of ["closed-terminal", "active-terminal", "workspace", "expiry"] as const) {
+  test(`Shift Terminal refuses acknowledgement after new-terminal registration encounters ${drift} drift`, async () => {
+    const root = process.platform === "win32" ? "C:\\registration-root" : "/registration-root";
+    const vscode = new FakeVscode([], [root]), bridge = new FakeBridge(); let now = "2026-11-05T00:00:00.000Z";
+    const controller = new ManagedSessionController(vscode.api, new FakeContext(), bridge, { idFactory: sequenceFactory(), now: () => now, resolveGitRoots: async () => [{ gitRoot: root }] });
+    await controller.start(); const before = bridge.registerCalls;
+    let release!: () => void; bridge.registerGate = new Promise<void>(resolve => { release = resolve; });
+    try {
+      bridge.nextDispatch = { status: "running", summary: "Exact integrated terminal awaits host acknowledgement.", data: {
+        hostActionId: `host-action:${"8".repeat(64)}`, hostActionKind: "focus_integrated_terminal", hostActionExpiresAt: "2099-01-01T00:00:00.000Z", hostActionWorkspaceRoot: root
+      } };
+      const dispatching = controller.dispatchChord(chordFor("TERMINAL", "shift")!);
+      for (let attempt = 0; attempt < 100 && bridge.registerCalls === before; attempt++) await new Promise(resolve => setTimeout(resolve, 5));
+      assert.equal(bridge.registerCalls, before + 1); const terminal = vscode.createdTerminals[0]!; assert.equal(terminal.shown, 1);
+      if (drift === "closed-terminal") await vscode.fireClose(terminal);
+      if (drift === "active-terminal") vscode.activateTerminal(undefined);
+      if (drift === "workspace") vscode.workspaceFolders = [];
+      if (drift === "expiry") now = "2099-01-01T00:00:00.000Z";
+      release(); await dispatching;
+      assert.equal(vscode.createdTerminals.length, 1); assert.equal(terminal.shown, 1);
+      assert.equal(bridge.completedHostActions.at(-1)?.succeeded, false);
+      assert.equal(bridge.completedHostActions.at(-1)?.effectDisposition, "ambiguous", "a shown terminal must not be misreported as no local effect");
+      assert.match(bridge.completedHostActions.at(-1)?.summary ?? "", /before acknowledgement|no longer open|expired/i);
+    } finally { release(); await controller.stop(); }
+  });
+}
 
 test("Raw-HID provisioning UI collects only the exact device tuple and never a helper path or digest", async () => {
   const vscode = new FakeVscode();

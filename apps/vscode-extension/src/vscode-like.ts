@@ -72,6 +72,7 @@ export interface VscodeLike {
     showOpenDialog?(options?: { readonly canSelectFiles?: boolean; readonly canSelectFolders?: boolean; readonly canSelectMany?: boolean; readonly openLabel?: string; readonly filters?: Readonly<Record<string, readonly string[]>> }): PromiseLike<readonly UriLike[] | undefined>;
     onDidOpenTerminal(listener: (terminal: TerminalLike) => unknown): DisposableLike;
     onDidCloseTerminal(listener: (terminal: TerminalLike) => unknown): DisposableLike;
+    onDidChangeActiveTerminal?(listener: (terminal: TerminalLike | undefined) => unknown): DisposableLike;
     onDidChangeWindowState(listener: (state: { readonly focused: boolean }) => unknown): DisposableLike;
   };
   readonly workspace: {

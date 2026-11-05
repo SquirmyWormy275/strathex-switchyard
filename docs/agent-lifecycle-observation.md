@@ -45,6 +45,14 @@ collector/Suite/Claude-design/package groups pass 39 checks with cleanup
 these checks are simulated; no native design turn was submitted for this change.
 Broader configuration runtime-status and external lifecycle streams remain separate.
 
+The normal installed source `7d9310a` passes six update and seven privacy/metadata
+checks with all 54 workspace identities, plus exact installed hash pins for the
+configuration adapter, collector and workflow boundary. This journey preserves
+selected sealed bytes, selection and frozen frontend, creates no workspace and
+submits no model request. Its bundle and checkout are removed. These are installed
+source/privacy checks; native configuration-turn event acceptance is still open.
+[Installed configuration observation evidence](evidence/installed-design-observation-summary.json).
+
 Seven isolated collector/task/bridge/Suite/runner/package groups pass 85 checks
 with every cleanup verified (`isolated-test-84a838e4-fc9c-447d-ad62-7721135461df.json`).
 Cases execute real encrypted state with explicit provider doubles, preserving
