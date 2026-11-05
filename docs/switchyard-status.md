@@ -5,11 +5,12 @@ The F77 is the connected pilot, not a scope limit. The [requirement ledger](swit
 separates unfinished software from checks requiring an exact device, account or
 host. [Verification](verification.md) retains accepted and failed checkpoints.
 
-The latest complete Linux checkpoint is immutable `112efdc`: 211/211 groups,
-1,246 passed tests and ten declared skips, with every child cleanup verified and
-owned fixture/worktree removed. Windows client software at the same PR head
-passes six groups/61 tests with an independently verified artifact digest.
-Neither result substitutes for native Windows NTFS/guest acceptance.
+The latest complete Linux checkpoint is immutable `13635bb`: 217/217 groups,
+1,293 tests, 1,283 passed and ten declared skips. Every child cleanup verifies,
+owned fixture/worktree removed (`isolated-test-799530a3-c749-4c04-b5f5-7503e7b7c0f6.json`).
+This includes historical scanning, the Windows connection and package/recovery
+corrections; later inspector changes remain separately tested. Native Windows
+NTFS/guest acceptance is separate.
 
 The later immutable `82eb764` full run remains failed at interrupted-install
 recovery: 213/214 groups pass, 1,266 tests pass, one fails and ten skips. Recovery
@@ -17,8 +18,8 @@ now shares the existing release file ceiling plus its manifest; a maximum-size
 crash/recovery regression and all 38 isolated package/installation/runner checks
 pass. Duplicate browser-only backend copies are omitted while frozen assets stay
 intact, keeping the package below its unchanged 5 MiB test budget. Failed receipts
-and exact owned cleanup are retained. Corrected full/installed acceptance is
-pending. [Contract](suite-release-recovery.md).
+and exact owned cleanup are retained. Later immutable `13635bb` passes the full 217 groups and installed six update/
+thirteen actual history-scan checks; the earlier failure remains failed. [Contract](suite-release-recovery.md).
 
 Selected first-parent history witnessing passes 38 isolated history/index/runner
 checks and installed `40bb3eb` passes six update/fourteen actual witness and
@@ -42,7 +43,7 @@ Git provenance, replay/feed retirement and full restoration pass. Receipts
 `assignment-legends-1793875875539.json` and
 `installed-shield-baseline-1793876047390.json`; owned source/signing/packages/
 staging/bundle/proof checkout removed. One empty task, zero prompts, no keyboard
-access, exact frozen frontend. Corrected complete Linux run remains in progress.
+access, exact frozen frontend. Corrected complete Linux run passes all 217 groups with child cleanup and owned scratch removed.
 
 Earlier installed source `4901cc8`, release
 `ffd440981ebb02b4ffb887c94a8f7951a47608244a5bd5e9f3553de86cf7c471`,
@@ -444,3 +445,12 @@ and existing inventory/index/history readers without authority, prompts, scans o
 endpoint disclosure. Ten CLI/gateway/privacy tests and three isolated groups/32
 checks pass with child cleanup and type checking; the stable-launcher installed
 journey is implemented with acceptance pending. UI remains frozen.
+
+The first installed inspector at `44221bf` remains failed because an omitted
+compartment used the API Personal default. Native grants/scans had not started;
+all eleven query exits, original-state restoration and exact synthetic fixture/
+trust/source/signing/packages/staging/proof-checkout cleanup verify. The source
+fix reads and explicitly binds the selected workspace, rejects changed selection
+before output and passes non-Personal real API/Git coverage in the 50-check
+inspector/history/index/Suite subset. Corrected installed acceptance is pending.
+[Contract and retained outcomes](inspect-cli.md).

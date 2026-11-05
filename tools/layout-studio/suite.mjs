@@ -153,6 +153,11 @@ export function createSuite({ store = createSuiteStore(), platform = process.pla
     async handle(path, body = {}) {
       if (closed) throw new Error("This local suite is closed.");
       const compartment = body.compartment ?? "personal";
+      if(path==="/api/suite/compartment/status"){
+        if(Object.keys(body).some(key=>key!=="workspaceBaseUrl"))throw Error("Read only the selected workspace; selection arguments are refused.");
+        await loadSelection();if(await store.selection()!==activeCompartment)throw Error("The saved workspace changed outside this active instance; select it through the application before inspecting.");
+        return{schema:"switchyard-active-compartment/v1",activeCompartment,authorityGranted:false};
+      }
       if (path === "/api/suite/bootstrap") {
         await loadSelection();
         return { compartments: await store.list(), activeCompartment, agents: await agents.discovery(), voice: await voice.discovery() };

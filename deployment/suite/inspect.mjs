@@ -36,14 +36,18 @@ export async function runInspectionCli(args,{endpointFile=join(applicationStateR
  const current=async()=>{if(await readEndpoint(endpointFile)!==text)throw Error("The saved application instance changed; no result was accepted.");const proof=await probe(endpoint);if(proof.authenticated!==true||proof.status!=="ready")throw Error("The saved application is not ready; no result was accepted.");};
  // Challenge-response authenticates the listener before disclosing its bearer.
  await current();const {url,token}=binding;
- let response;try{response=await fetcher(new URL("/api/suite/"+selected.route,url.origin),{method:"POST",redirect:"error",headers:{"Content-Type":"application/json",Origin:url.origin,Authorization:"Bearer "+token},body:JSON.stringify(selected.body),signal:AbortSignal.timeout(120000)});}catch{throw Error("The authenticated local inspection did not settle; no remote destination or retry was selected.");}
- if(response.status!==200){await response.body?.cancel();throw Error(`Local inspection refused (${response.status}). Check the active workspace and exact task/path selection.`);}
- const value=await boundedJson(response);let result;
+ const post=async(route,body)=>{
+  if(await readEndpoint(endpointFile)!==text)throw Error("The saved application instance changed; no result was accepted.");
+  let response;try{response=await fetcher(new URL("/api/suite/"+route,url.origin),{method:"POST",redirect:"error",headers:{"Content-Type":"application/json",Origin:url.origin,Authorization:"Bearer "+token},body:JSON.stringify(body),signal:AbortSignal.timeout(120000)});}catch{throw Error("The authenticated local inspection did not settle; no remote destination or retry was selected.");}
+  if(response.status!==200){await response.body?.cancel();throw Error(`Local inspection refused (${response.status}). Check the active workspace and exact task/path selection.`);}return boundedJson(response);
+ };
+ const active=async()=>{const scope=await post("compartment/status",{});if(scope?.schema!=="switchyard-active-compartment/v1"||scope.authorityGranted!==false||typeof scope.activeCompartment!=="string"||!/^[a-z][a-z0-9-]{0,47}$/.test(scope.activeCompartment))throw Error("The active workspace could not be verified; no result was accepted.");return scope.activeCompartment;};
+ const compartment=await active(),value=await post(selected.route,{...selected.body,compartment});let result;
  if(selected.kind==="tasks"){
   if(!Array.isArray(value)||value.length>512||value.some(row=>!row||typeof row!=="object"||!uuid(row.id)||row.provider!==selected.provider||["label","repositoryRoot","status"].some(key=>Object.hasOwn(row,key)&&(typeof row[key]!=="string"||row[key].length>8192))))throw Error("The local task inventory was invalid; no result was accepted.");
-  result={kind:"bound-tasks",provider:selected.provider,activeWorkspaceOnly:true,tasks:value.map(row=>Object.fromEntries(["id","provider","label","repositoryRoot","status"].filter(key=>Object.hasOwn(row,key)).map(key=>[key,row[key]]))),authorityGranted:false,modelPromptSubmitted:false};
+  result={kind:"bound-tasks",provider:selected.provider,activeWorkspaceOnly:true,activeCompartment:compartment,tasks:value.map(row=>Object.fromEntries(["id","provider","label","repositoryRoot","status"].filter(key=>Object.hasOwn(row,key)).map(key=>[key,row[key]]))),authorityGranted:false,modelPromptSubmitted:false};
  }else{
-  if(!value||value.schema!==selected.schema||value.taskId!==selected.body.taskId||value.sourceBytesReturned!==false||value.scanPerformed!==false||value.authorityGranted!==false||value.gateEligible!==false||value.completeness!=="incomplete")throw Error("The local response was not the exact incomplete read-only observation; no result was accepted.");result=value;
+  if(!value||value.schema!==selected.schema||value.taskId!==selected.body.taskId||value.sourceBytesReturned!==false||value.scanPerformed!==false||value.authorityGranted!==false||value.gateEligible!==false||value.completeness!=="incomplete")throw Error("The local response was not the exact incomplete read-only observation; no result was accepted.");result={...value,activeCompartment:compartment};
  }
- await current();write(JSON.stringify(result,null,2));return result;
+ if(await active()!==compartment)throw Error("The active workspace changed during inspection; no result was accepted.");await current();write(JSON.stringify(result,null,2));return result;
 }

@@ -45,4 +45,6 @@ Installed `13635bb` passes six normal update/thirteen historical-scan/API checks
 with both scanner exits, exact frozen frontend, full restoration and owned scratch
 removed (`assignment-legends-1793875875539.json`,
 `installed-shield-baseline-1793876047390.json`). Zero prompts or keyboard access.
-A corrected complete checkpoint remains pending.
+The corrected immutable `13635bb` checkpoint passes all 217 required groups,
+1,283 tests and ten declared skips, with every child cleanup verified and owned
+fixtures/aliases/checkout removed (`isolated-test-799530a3-c749-4c04-b5f5-7503e7b7c0f6.json`).

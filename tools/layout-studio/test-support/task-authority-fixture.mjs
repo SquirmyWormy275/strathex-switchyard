@@ -10,7 +10,7 @@ import { repositoryIdentity } from "../coding-task-identity.mjs";
 import { createRepositoryInspection, fixedGitExecutable } from "../repository-inspection.mjs";
 import { createTaskAuthority } from "../task-authority.mjs";
 const execute = promisify(execFile);
-export async function authorityFixture(t, { executionActions = [] } = {}) {
+export async function authorityFixture(t, { executionActions = [], compartment = "personal" } = {}) {
   const stage = await mkdtemp(join(tmpdir(), "switchyard-authority-"));
   let serviceToClose;
   const cleanup = []; t.after(async () => {
@@ -34,15 +34,15 @@ export async function authorityFixture(t, { executionActions = [] } = {}) {
   const keys = new Map(), secrets = { get: async (c, p) => keys.get(`${c}:${p}`), set: async (c, p, v) => { keys.set(`${c}:${p}`, v); } };
   let time = Date.now(); const now = () => time;
   const store = createSuiteStore({ root: join(stage, "private"), secrets, clock: now });
-  await store.initialize("personal"); await store.initialize("work", "work");
+  await store.initialize("personal"); await store.initialize("work", "work"); if(compartment!=="personal")await store.initialize(compartment);
   const task = { schema: "switchyard-coding-session/v1", id: randomUUID(), provider: "codex", sessionId: "synthetic-session", nativeTransport: "owned-stdio", repositoryRoot: root, repositoryIdentity: await repositoryIdentity(root), accountFingerprint: "a".repeat(64), status: "registered", launchPolicy: "read-only/on-request" };
-  await store.update("personal", "fixture", s => { s.mode = "personal-companion"; s.codingSessions = [task]; });
+  await store.update(compartment, "fixture", s => { s.mode = "personal-companion"; s.codingSessions = [task]; });
   let calls = 0, active = true, nativeChecks = 0;
   const command = async (executable, args, options) => {
     calls++; assert.equal(executable, git); assert.ok(args.includes("core.fsmonitor=false")); assert.equal(options.env.GIT_ALLOW_PROTOCOL, ""); assert.equal(options.env.GIT_CONFIG_NOSYSTEM, "1");
     const frame = { schema: "switchyard-runtime-command/v1", id: randomUUID(), guardianPid: 12345, birth: "1", containment: process.platform === "linux" ? "owned-linux-session" : "windows-job" };
     await options.onGuardianReady(frame);
-    const p = (await store.snapshot("personal")).repositoryProbes.find(p => p.ownedRuntime.id === frame.id); assert.equal(p.stoppedVerified, false);
+    const p = (await store.snapshot(compartment)).repositoryProbes.find(p => p.ownedRuntime.id === frame.id); assert.equal(p.stoppedVerified, false);
     try { const pending = execute(executable, args, { cwd: options.cwd, env: options.env, timeout: options.timeout, maxBuffer: options.maxOutputBytes, signal: options.signal }); pending.child.stdin.on("error", () => {}); pending.child.stdin.end(options.inputBytes ?? options.inputText); const result = await pending; return { ...result, status: "completed", exitCode: 0, inputDelivered: true, treeExitVerified: true }; }
     catch (e) { if (e.code === "ABORT_ERR" || !Number.isInteger(e.code)) throw e; return { status: "failed", exitCode: e.code, stdout: e.stdout, stderr: e.stderr, inputDelivered: true, treeExitVerified: true }; }
   };
