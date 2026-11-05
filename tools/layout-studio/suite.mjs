@@ -42,10 +42,9 @@ import { clientRecipe } from "../../integrations/client-recipes.mjs";
 import { linuxProcess } from "./native-process.mjs";
 
 const kinds = ["interruption", "resume", "switch", "handoff", "status", "review", "approval", "failure", "recovery", "other"];
-export function createSuite({ store = createSuiteStore(), platform = process.platform, agents, voice = localVoice(), hypr = runHypr, nativeProcess = linuxProcess, devices, copilot, coding, codexSubmissions, claudeCoding, claudeSubmissions, keyboardIndicators = createKeyboardIndicators(), taskAuthority, taskAuthorityFactory = createTaskAuthority, repositoryRecovery, repositoryCommits, repositoryExecution, storageSetup, fixtureAdministration, shieldExceptions, clientLaunch, spawnExample = spawn, foreground, scheduleForeground = setInterval, clearForeground = clearInterval } = {}) {
+export function createSuite({ store = createSuiteStore(), platform = process.platform, agents, voice = localVoice(), hypr = runHypr, nativeProcess = linuxProcess, devices, copilot, copilotFactory = createCopilot, coding, codexSubmissions, claudeCoding, claudeSubmissions, keyboardIndicators = createKeyboardIndicators(), taskAuthority, taskAuthorityFactory = createTaskAuthority, repositoryRecovery, repositoryCommits, repositoryExecution, storageSetup, fixtureAdministration, shieldExceptions, clientLaunch, spawnExample = spawn, foreground, scheduleForeground = setInterval, clearForeground = clearInterval } = {}) {
   agents ??= createAgentService({ store, runtimeRoot: join(process.env.XDG_RUNTIME_DIR || process.env.LOCALAPPDATA || join(homedir(), ".local/state"), "switchyard-design") });
   devices ??= createDeviceService({ store });
-  copilot ??= createCopilot({ store });
   coding ??= createCodingSessions({ store });
   codexSubmissions ??= createCodexSubmissions({ store });
   claudeSubmissions ??= createClaudeSubmissions({ store });
@@ -61,6 +60,8 @@ export function createSuite({ store = createSuiteStore(), platform = process.pla
   let selectionLoaded = false;
   let selectionLoading;
   let closed = false;
+  const copilotTransitions = new Map();
+  copilot ??= copilotFactory({ store, isActive: async c => { await loadSelection(); return !closed && !copilotTransitions.has(c) && c === activeCompartment && await store.selection() === c; } });
   const matrixDiagnostics = createMatrixDiagnostics({ store, devices, isActive: async (c) => { await loadSelection(); return c === activeCompartment; } });
   taskAuthority ??= taskAuthorityFactory({ store, localCommitExecutionImplemented: true, executionActions: connectedExecutionActions(platform), isActive: async c => { await loadSelection(); return c === activeCompartment; }, checkNative: (c, task) => task.provider === "codex" ? coding.status(c, task.id) : claudeCoding.status(c, task.id) });
   const repositoryDirectory = join(process.env.XDG_STATE_HOME || process.env.LOCALAPPDATA || join(homedir(), ".local/state"), "strathex-switchyard/repository-effects");
@@ -167,7 +168,11 @@ export function createSuite({ store = createSuiteStore(), platform = process.pla
       if (!started.has(compartment)) { const list = await store.list(); if (!list.some((c) => c.id === compartment)) throw new Error("Choose or create this compartment first."); await initialize(compartment); }
       if (path === "/api/suite/compartment/select") {
         await loadSelection();
+        const previous = activeCompartment, switching = previous !== compartment;
+        if (switching) copilotTransitions.set(previous, (copilotTransitions.get(previous) ?? 0) + 1);
+        try {
         if (activeCompartment !== compartment) {
+          await copilot.stopCompartment?.(activeCompartment);
           await matrixDiagnostics.stopCompartment(activeCompartment);
           const executionStop = await repositoryExecution.stopCompartment(activeCompartment), commitStop = await repositoryCommits.stopCompartment(activeCompartment), recoveryStop = await repositoryRecovery.stopCompartment(activeCompartment), clientStop = await clientLaunch.stopCompartment(activeCompartment), authorityStop = await taskAuthority.stopCompartment(activeCompartment), storageStop=await storageSetup.stopCompartment(activeCompartment), fixturesStop=await fixtureAdministration.stopCompartment(activeCompartment), exceptionsStop=await shieldExceptions.stopCompartment(activeCompartment);
           if (executionStop?.stopped === false || commitStop?.stopped === false || recoveryStop?.stopped === false || clientStop?.stopped === false || authorityStop?.stopped === false || storageStop?.stopped===false || fixturesStop?.stopped===false || exceptionsStop?.stopped===false) throw new Error("An owned repository, client or host-setup guardian has not verified exit; workspace selection was preserved.");
@@ -175,6 +180,7 @@ export function createSuite({ store = createSuiteStore(), platform = process.pla
           await store.update(activeCompartment, "compartment-suspend-sources", (s) => { for (const o of s.observations) if (o.status === "recording") o.status = "paused"; for (const v of s.voice) if (v.status === "recording") v.status = "paused"; });
         }
         await store.selection(compartment); activeCompartment = compartment; return { id: compartment };
+        } finally { if (switching) { const remaining = (copilotTransitions.get(previous) ?? 1) - 1; if (remaining) copilotTransitions.set(previous, remaining); else copilotTransitions.delete(previous); } }
       }
       if (path === "/api/suite/mode") {
         const result = await store.update(compartment, "mode-select", (s) => {
@@ -187,6 +193,7 @@ export function createSuite({ store = createSuiteStore(), platform = process.pla
           return { mode: s.mode, policyStillEnforced: true };
         });
         if (body.mode === "keyboard-only") {
+          await copilot.stopCompartment?.(compartment);
           await matrixDiagnostics.stopCompartment(compartment);
           const executionStop = await repositoryExecution.stopCompartment(compartment), commitStop = await repositoryCommits.stopCompartment(compartment), recoveryStop = await repositoryRecovery.stopCompartment(compartment), clientStop = await clientLaunch.stopCompartment(compartment), authorityStop = await taskAuthority.stopCompartment(compartment), storageStop=await storageSetup.stopCompartment(compartment), fixturesStop=await fixtureAdministration.stopCompartment(compartment), exceptionsStop=await shieldExceptions.stopCompartment(compartment);
           pauseMonitor(compartment);
@@ -487,6 +494,6 @@ export function createSuite({ store = createSuiteStore(), platform = process.pla
       if (binding.targetKind === "client-surface") return { available: true, implementation: connection.implementation, provider: binding.provider, roleId: binding.roleId, intent: binding.intent, capability: "launch-only", recipeId: binding.targetId, sessionIdentified: false, evidence: "exact fixed homepage launch request; no account, window focus, resume or conversation identity verified" };
       return { available: true, implementation: connection.implementation, provider: binding.provider, roleId: binding.roleId, intent: binding.intent, evidence: binding.targetKind === "coding-task" ? "exact coding-task identity; runtime status or owned read-only daemon resume, without window focus, completion or mediated-control authority" : "exact owned configuration conversation or authenticated adapter session; not general coding-task control" };
     },
-    async close() { closed = true; const boundaryStops = await Promise.allSettled([matrixDiagnostics.close(), repositoryExecution.close(), repositoryCommits.close(), repositoryRecovery.close(), clientLaunch.close(), taskAuthority.close(), storageSetup.close(), fixtureAdministration.close(), shieldExceptions.close()]); readoutProfiles.close(); for (const timer of monitors.values()) clearForeground(timer); monitors.clear(); for (const key of new Set([...examples.keys(), ...exampleStarts.keys()])) exampleGenerations.set(key, (exampleGenerations.get(key) ?? 0) + 1); await Promise.allSettled(exampleStarts.values()); let claudeStopError; try { await claudeSubmissions.close(); } catch (error) { claudeStopError = error; } await Promise.all([foreground.close?.(), agents.close(), coding.close?.(), codexSubmissions.close(), voiceQueue.close(), claudeCoding.close?.(), keyboardIndicators.close().then(result => { if (result.stopped !== true) throw new Error("Owned indicator probe exit is unconfirmed."); }), ...[...examples.values()].map((child) => stopOwnedChild(child))]); if (claudeStopError) throw claudeStopError; const failedBoundary = boundaryStops.find(r => r.status === "rejected"); if (failedBoundary) throw failedBoundary.reason; }
+    async close() { closed = true; const boundaryStops = await Promise.allSettled([copilot.close?.(), matrixDiagnostics.close(), repositoryExecution.close(), repositoryCommits.close(), repositoryRecovery.close(), clientLaunch.close(), taskAuthority.close(), storageSetup.close(), fixtureAdministration.close(), shieldExceptions.close()]); readoutProfiles.close(); for (const timer of monitors.values()) clearForeground(timer); monitors.clear(); for (const key of new Set([...examples.keys(), ...exampleStarts.keys()])) exampleGenerations.set(key, (exampleGenerations.get(key) ?? 0) + 1); await Promise.allSettled(exampleStarts.values()); let claudeStopError; try { await claudeSubmissions.close(); } catch (error) { claudeStopError = error; } await Promise.all([foreground.close?.(), agents.close(), coding.close?.(), codexSubmissions.close(), voiceQueue.close(), claudeCoding.close?.(), keyboardIndicators.close().then(result => { if (result.stopped !== true) throw new Error("Owned indicator probe exit is unconfirmed."); }), ...[...examples.values()].map((child) => stopOwnedChild(child))]); if (claudeStopError) throw claudeStopError; const failedBoundary = boundaryStops.find(r => r.status === "rejected"); if (failedBoundary) throw failedBoundary.reason; }
   };
 }

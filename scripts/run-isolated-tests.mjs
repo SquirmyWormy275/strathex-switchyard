@@ -143,6 +143,7 @@ export const requiredGroups = [
   { file: "scripts/windows-restricted-owner-report.test.mjs" },
   { file: "scripts/verify-shield-license-host.test.mjs" },
   { file: "tools/layout-studio/copilot-account-binding.test.mjs" },
+  { file: "tools/layout-studio/copilot-lifecycle.test.mjs" },
   { file: "scripts/verify-runtime-platform.test.mjs" },
   { file: "deployment/suite/release.test.mjs" },
   { file: "deployment/suite/inspect.test.mjs", ...nativeTestOverrides("deployment/suite/inspect.test.mjs") },

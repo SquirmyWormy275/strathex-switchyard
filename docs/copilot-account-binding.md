@@ -30,7 +30,31 @@ can recap a prompt or contain the model response; its type alone does not prove
 a speaker role. This adapter proposes configuration; it grants no task authority
 or verified completion. Approved tenant/license/consent acceptance remains open.
 
-Local in-flight request shutdown on mode/workspace changes and durable
-uncertain-effect/restart handling remain unfinished software. They are separate
-from missing tenant acceptance; remote cancellation cannot be inferred from
-closing a local HTTP request.
+Local in-flight requests now have per-compartment generations and abort signals.
+A deliberate new sign-in, workspace switch, keyboard-only mode or application
+shutdown invalidates prior operations, clears device-code sessions and blocks
+follow-up requests and late response acceptance. The real Suite checks both its
+active selection and the saved selection; transitions suspend new Copilot work
+before waiting for other owners. Mode/selection checks run before transport,
+after response bodies and at final persistence/readback.
+
+The transport keeps its original sixty-second and 1 MiB bounds, disables
+redirects and releases/cancels response readers. Stop waits at most one second
+for local settlement and reports whether it actually settled. Generation fences
+continue to reject a late transport that ignored abort. `remoteCancellationVerified`
+remains false: closing local HTTP cannot undo a delivered request or a response
+already retained in account-bound private history. No proposal is applied.
+
+Five isolated runner/account/lifecycle/Suite/integration groups pass 58 checks
+with every cleanup verified (`isolated-test-29524493-24b4-423e-9a7a-45f76d8549c5.json`).
+Final account/lifecycle checks pass all fifteen cases with cleanup, including
+stopping after private history persistence
+(`isolated-test-5753c369-d16b-4fc9-8e05-f8f6e47fd36e.json`). These execute real
+encrypted state and the actual Suite mode/workspace/shutdown composition with
+simulated network responses. Type checking passes. No Microsoft endpoint is
+contacted.
+
+Durable uncertain-effect/restart handling remains unfinished software. Remote
+creation or chat delivery followed by failure must not be represented as
+verified remote cancellation or harmless automatic replay. Approved work tenant,
+license and consent acceptance remain separate unavailable-account checks.
