@@ -76,7 +76,7 @@ internal static partial class ReviewedInputStager
         finally { FindVolumeClose(find); }
         return owned ?? throw new InvalidOperationException("native-volume-not-ready");
     }
-    private static SafeFileHandle PinMount(string path, JsonElement expected, bool restrictNew, out bool mounted)
+    private static SafeFileHandle PinMount(string path, JsonElement expected, bool restrictNew, out bool mounted, string? brokerSid = null)
     {
         var handle = CreateFileW(NativeName(path), ReadAttributes | ReadControl | (restrictNew ? WriteDac : 0), ShareRead | ShareWrite, IntPtr.Zero, OpenExisting, BackupSemantics | OpenReparsePoint, IntPtr.Zero);
         try
@@ -87,12 +87,13 @@ internal static partial class ReviewedInputStager
             {
                 var reparse = new byte[16384];
                 if (!DeviceIoControl(handle, GetReparsePoint, IntPtr.Zero, 0, reparse, (uint)reparse.Length, out uint used, IntPtr.Zero) || used < 16 || BinaryPrimitives.ReadUInt32LittleEndian(reparse) != MountPointTag) throw new InvalidOperationException("native-volume-mount-tag");
-                VerifyPrivateDirectory(handle);
+                if (brokerSid == null) VerifyPrivateDirectory(handle); else WindowsStorageBrokerFiles.VerifyMountDirectory(handle, brokerSid);
             }
             else
             {
                 if (Directory.EnumerateFileSystemEntries(path).Any()) throw new InvalidOperationException("native-volume-foreign-mount-entries");
-                if (restrictNew) RestrictNewDirectory(handle); else VerifyPrivateDirectory(handle, requireProtected: false);
+                if (brokerSid != null) WindowsStorageBrokerFiles.VerifyMountDirectory(handle, brokerSid);
+                else if (restrictNew) RestrictNewDirectory(handle); else VerifyPrivateDirectory(handle, requireProtected: false);
             }
             return handle;
         }
@@ -155,26 +156,35 @@ internal static partial class ReviewedInputStager
         public void Dispose() { foreach (var handle in handles.AsEnumerable().Reverse()) handle.Dispose(); }
     }
 
-    public static int RunBoundedVolume()
+    private static JsonElement BoundedVolume(JsonElement request, ref string phase, WindowsStorageBrokerInstallation.Settings? broker = null)
     {
-        const string schema = "switchyard-windows-bounded-volume/v1"; var handles = new List<SafeFileHandle>(); string phase = "request";
+        const string schema = "switchyard-windows-bounded-volume/v1"; var handles = new List<SafeFileHandle>();
         try
         {
-            Console.InputEncoding = new UTF8Encoding(false, true); Console.OutputEncoding = new UTF8Encoding(false);
-            var text = new StringBuilder(); int character; while ((character = Console.In.Read()) != -1 && character != '\n') { if (character == '\r' || text.Length >= 8192) throw Invalid(); text.Append((char)character); }
-            using var document = JsonDocument.Parse(text.ToString()); var request = document.RootElement;
             string action = request.GetProperty("action").GetString() ?? ""; bool attach = action == "attach";
             Exact(request, attach ? new[] { "schema", "action", "operationId", "stagingRoot", "stagingIdentity", "imageIdentity", "mountIdentity", "footerSha256", "initialImageSha256" } : new[] { "schema", "action", "operationId", "stagingRoot", "stagingIdentity", "imageIdentity", "mountIdentity", "footerSha256" });
             if (request.GetProperty("schema").GetString() != schema || action is not ("attach" or "inspect" or "detach") || !Guid.TryParseExact(request.GetProperty("operationId").GetString(), "D", out var operation) || operation == Guid.Empty || !Digest.IsMatch(request.GetProperty("footerSha256").GetString() ?? "")) throw Invalid();
             string root = Absolute(request.GetProperty("stagingRoot")); if (Path.GetFileName(root) != "disk-" + operation.ToString("D")) throw Invalid();
+            if (broker != null)
+            {
+                if (WindowsStorageBrokerFiles.CurrentOwnerSid() != "S-1-5-18" || !root.Equals(new WindowsStorageBrokerExchangeFiles(broker).DiskRoot(operation.ToString("D")), StringComparison.OrdinalIgnoreCase)) throw Invalid();
+                foreach (string parent in new[] { broker.Root, Path.Combine(broker.Root, WindowsStorageBrokerExchangeFiles.DirectoryName), new WindowsStorageBrokerExchangeFiles(broker).OperationRoot(operation.ToString("D")) }) handles.Add(WindowsStorageBrokerFiles.PinDirectory(parent, broker.ClientSid));
+            }
             phase = "directory"; var directory = PinDirectories(root, handles, ReadControl);
-            if (!Matches(Information(directory, true), request.GetProperty("stagingIdentity"))) throw Invalid(); VerifyPrivateDirectory(directory);
+            if (!Matches(Information(directory, true), request.GetProperty("stagingIdentity"))) throw Invalid();
+            if (broker == null) VerifyPrivateDirectory(directory); else handles.Add(WindowsStorageBrokerFiles.PinDirectory(root, broker.ClientSid));
             var entries = Directory.EnumerateFileSystemEntries(root).Select(Path.GetFileName).Order(StringComparer.Ordinal).ToArray();
             if (!entries.SequenceEqual(new[] { "exchange.vhd", "mount" })) throw new InvalidOperationException("native-volume-entry-set");
             string imagePath = Path.Combine(root, "exchange.vhd"), mountPath = Path.Combine(root, "mount");
-            using var metadata = CreateFileW(NativeName(imagePath), ReadAttributes, ShareRead | ShareWrite, IntPtr.Zero, OpenExisting, OpenReparsePoint, IntPtr.Zero); var original = Information(metadata, false);
+            using var metadata = CreateFileW(NativeName(imagePath), ReadAttributes | (broker == null ? 0 : GenericRead), ShareRead | ShareWrite, IntPtr.Zero, OpenExisting, OpenReparsePoint, IntPtr.Zero); var original = Information(metadata, false);
             if (!Matches(original, request.GetProperty("imageIdentity")) || original.Links != 1 || (((ulong)original.SizeHigh << 32) | original.SizeLow) != (ulong)BoundedExchangeImage.BackingBytes) throw Invalid();
-            using var mount = PinMount(mountPath, request.GetProperty("mountIdentity"), attach, out bool mounted);
+            if (broker != null)
+            {
+                var footer = new byte[512]; int read = 0;
+                while (read < footer.Length) { int count = RandomAccess.Read(metadata, footer.AsSpan(read), BoundedExchangeImage.VirtualBytes + read); if (count == 0) throw Invalid(); read += count; }
+                if (Convert.ToHexString(SHA256.HashData(footer)).ToLowerInvariant() != request.GetProperty("footerSha256").GetString()) throw Invalid();
+            }
+            using var mount = PinMount(mountPath, request.GetProperty("mountIdentity"), attach, out bool mounted, broker?.ClientSid);
             if (attach)
             {
                 if (mounted || Directory.EnumerateFileSystemEntries(mountPath).Any()) throw Invalid();
@@ -222,13 +232,28 @@ internal static partial class ReviewedInputStager
             {
                 var reparse = new byte[16384];
                 if (!DeviceIoControl(mount, GetReparsePoint, IntPtr.Zero, 0, reparse, (uint)reparse.Length, out uint used, IntPtr.Zero) || used < 16 || BinaryPrimitives.ReadUInt32LittleEndian(reparse) != MountPointTag) throw new InvalidOperationException("native-volume-mount-tag");
-                VerifyPrivateDirectory(mount);
+                if (broker == null) VerifyPrivateDirectory(mount); else WindowsStorageBrokerFiles.VerifyMountDirectory(mount, broker.ClientSid);
             }
             if (!Matches(Information(metadata, false), request.GetProperty("imageIdentity")) || !Matches(Information(directory, true), request.GetProperty("stagingIdentity"))) throw Invalid();
-            Console.WriteLine(JsonSerializer.Serialize(new { schema, action, operationId = operation.ToString("D"), stagingIdentity = request.GetProperty("stagingIdentity"), imageIdentity = Identity(original), mountIdentity = request.GetProperty("mountIdentity"), volume, mounted, attached = loaded, detachedVerified = !loaded && !mounted, virtualBytes = BoundedExchangeImage.VirtualBytes, backingBytes = BoundedExchangeImage.BackingBytes, volumeBytes, exchangeQuotaEnforced = loaded && mounted, sandboxEnforced = false }));
-            return 0;
+            return JsonSerializer.SerializeToElement(new { schema, action, operationId = operation.ToString("D"), stagingIdentity = request.GetProperty("stagingIdentity"), imageIdentity = Identity(original), mountIdentity = request.GetProperty("mountIdentity"), volume, mounted, attached = loaded, detachedVerified = !loaded && !mounted, virtualBytes = BoundedExchangeImage.VirtualBytes, backingBytes = BoundedExchangeImage.BackingBytes, volumeBytes, exchangeQuotaEnforced = loaded && mounted, sandboxEnforced = false });
+        }
+
+        finally { foreach (var handle in handles.AsEnumerable().Reverse()) handle.Dispose(); }
+    }
+
+    internal static JsonElement BrokerBoundedVolume(WindowsStorageBrokerInstallation.Settings settings, JsonElement request)
+    {
+        string phase = "request"; return BoundedVolume(request, ref phase, settings);
+    }
+    public static int RunBoundedVolume()
+    {
+        string phase = "request";
+        try
+        {
+            Console.InputEncoding = new UTF8Encoding(false, true); Console.OutputEncoding = new UTF8Encoding(false);
+            var text = new StringBuilder(); int character; while ((character = Console.In.Read()) != -1 && character != '\n') { if (character == '\r' || text.Length >= 8192) throw Invalid(); text.Append((char)character); }
+            using var document = JsonDocument.Parse(text.ToString()); Console.WriteLine(BoundedVolume(document.RootElement, ref phase).GetRawText()); return 0;
         }
         catch (Exception error) { string detail = error is InvalidOperationException && Regex.IsMatch(error.Message, "^native-(?:vhd|volume)-[a-z0-9-]{1,100}$", RegexOptions.CultureInvariant) ? error.Message : "boundary"; Console.Error.WriteLine($"Native bounded volume failed at {phase}; Win32={(error is Win32Exception native ? native.NativeErrorCode : 0)}; detail={detail}. Preserve the exact owned image and mount until independent reconciliation."); return 2; }
-        finally { foreach (var handle in handles.AsEnumerable().Reverse()) handle.Dispose(); }
     }
 }

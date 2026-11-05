@@ -61,6 +61,29 @@ internal static class NativeServiceProof
         if(handle.IsInvalid){handle.Dispose();throw new InvalidOperationException("The exact pipe did not reopen.");}
         return new NamedPipeClientStream(PipeDirection.InOut,true,true,handle);
     }
+    [StructLayout(LayoutKind.Sequential)] private struct Privilege { public uint Low; public int High; public uint Attributes; }
+    [DllImport("advapi32.dll",CharSet=CharSet.Unicode,SetLastError=true)] [return:MarshalAs(UnmanagedType.Bool)] private static extern bool LookupPrivilegeValueW(string? system,string name,out long luid);
+    internal static void WithoutVolumePrivilege(Action action)
+    {
+        if(!OpenProcessToken(new IntPtr(-1),0xe,out var source))throw new Win32Exception(Marshal.GetLastWin32Error());
+        using(source)
+        {
+            if(!ConvertStringSidToSidW("S-1-5-32-544",out var admins))throw new Win32Exception(Marshal.GetLastWin32Error());
+            IntPtr deleted=IntPtr.Zero;
+            try
+            {
+                var disabled=new SidAttributes{Sid=admins};if(!CreateRestrictedToken(source,1,1,ref disabled,0,IntPtr.Zero,0,IntPtr.Zero,out var reduced))throw new Win32Exception(Marshal.GetLastWin32Error());
+                using(reduced)
+                {
+                    if(!LookupPrivilegeValueW(null,"SeManageVolumePrivilege",out long luid))throw new Win32Exception(Marshal.GetLastWin32Error());
+                    deleted=Marshal.AllocHGlobal(Marshal.SizeOf<Privilege>());Marshal.StructureToPtr(new Privilege{Low=unchecked((uint)luid),High=unchecked((int)(luid>>32))},deleted,false);
+                    if(!CreateRestrictedToken(reduced,0,0,ref disabled,1,deleted,0,IntPtr.Zero,out var restricted))throw new Win32Exception(Marshal.GetLastWin32Error());
+                    using(restricted)WindowsIdentity.RunImpersonated(restricted,action);
+                }
+            }
+            finally{if(deleted!=IntPtr.Zero)Marshal.FreeHGlobal(deleted);LocalFree(admins);}
+        }
+    }
     private static async Task DelayedConsumption(WindowsStorageBrokerInstallation.Settings settings)
     {
         using var pipe=OpenClient(settings);using var deadline=new CancellationTokenSource(TimeSpan.FromSeconds(5));

@@ -11,6 +11,7 @@ internal sealed class WindowsStorageBrokerExchangeJournal(
 {
     internal const int MaximumEvents = 8;
     internal sealed record Admission(bool EffectAllowed, bool Replayed, WindowsStorageBrokerExchangeProtocol.Proof? Result);
+    internal sealed record State(string OperationId, string TaskScopeSha256, string InputManifestSha256, string Phase, WindowsStorageBrokerExchangeProtocol.Proof? Proof);
     private sealed record Entry(int Sequence, string PreviousSha256, string Action, string RequestId, string OperationId, string TaskScopeSha256, string InputManifestSha256, string EffectSha256, string Phase, WindowsStorageBrokerExchangeProtocol.Proof? Proof);
     private sealed record Observed(List<Entry> Entries, string Digest);
     private static Exception Invalid() => new InvalidOperationException("Preserve the original bounded exchange journal; no native effect may be replayed or inferred.");
@@ -89,6 +90,11 @@ internal sealed class WindowsStorageBrokerExchangeJournal(
         if (latest?.Phase == "reserved" || !Allowed(latest?.Proof?.State, request.Action)) throw Invalid();
         Append(observed, request, "reserved", null);
         return new(true, false, null);
+    }
+    internal State? Current(string operationId)
+    {
+        var observed = Observe(operationId); var latest = observed.Entries.LastOrDefault();
+        return latest == null ? null : new(latest.OperationId, latest.TaskScopeSha256, latest.InputManifestSha256, latest.Phase, latest.Proof);
     }
     internal void Complete(WindowsStorageBrokerExchangeProtocol.RequestScope request, WindowsStorageBrokerExchangeProtocol.Proof proof)
     {

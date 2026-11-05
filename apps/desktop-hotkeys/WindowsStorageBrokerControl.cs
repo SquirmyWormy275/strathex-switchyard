@@ -93,6 +93,7 @@ internal static class WindowsStorageBrokerControl
     internal static void Remove(WindowsStorageBrokerInstallation.Settings settings)
     {
         Administrator();using var manager=OpenSCManagerW(null,null,1);if(manager.IsInvalid)throw Invalid();
+        var exchange=new WindowsStorageBrokerExchangeFiles(settings);exchange.AssertRetired();
         using(var service=OpenServiceW(manager,settings.ServiceName,0x10025))
         {
             if(service.IsInvalid)throw Invalid();VerifyConfiguration(service,settings);var status=ReadStatus(service);SafeProcessHandle? process=null;
@@ -106,6 +107,7 @@ internal static class WindowsStorageBrokerControl
                 if(status.State!=1&&!ControlService(service,1,out _))throw Invalid();long deadline=Environment.TickCount64+30000;
                 while(ReadStatus(service).State!=1){if(Environment.TickCount64>=deadline)throw Invalid();Thread.Sleep(50);}
                 if(process!=null&&WaitForSingleObject(process,30000)!=0)throw Invalid();
+                exchange.AssertRetired();
                 if(!DeleteService(service))throw Invalid();
             }
             finally{process?.Dispose();}
@@ -120,8 +122,10 @@ internal static class WindowsStorageBrokerControl
         if(WindowsStorageBrokerDiagnostic.Read(settings)!=null)expected=expected.Append(WindowsStorageBrokerDiagnostic.FileName).ToArray();
         using(var root=WindowsStorageBrokerFiles.PinDirectory(settings.Root,settings.ClientSid))
         {
-            if(!Directory.GetFiles(settings.Root).Select(Path.GetFileName).Order().SequenceEqual(expected.Append(WindowsStorageBrokerRuntime.InventoryName).Order())||!Directory.GetDirectories(settings.Root).Select(Path.GetFileName).SequenceEqual(new[]{WindowsStorageBrokerRuntime.DirectoryName}))throw Invalid();
+            var directories=new[]{WindowsStorageBrokerRuntime.DirectoryName}.Concat(exchange.Exists?new[]{WindowsStorageBrokerExchangeFiles.DirectoryName}:Array.Empty<string>()).Order(StringComparer.Ordinal);
+            if(!Directory.GetFiles(settings.Root).Select(Path.GetFileName).Order().SequenceEqual(expected.Append(WindowsStorageBrokerRuntime.InventoryName).Order())||!Directory.GetDirectories(settings.Root).Select(Path.GetFileName).Order(StringComparer.Ordinal).SequenceEqual(directories))throw Invalid();
             WindowsStorageBrokerInstallation.Load(settings.ClientSid);using var key=WindowsStorageBrokerInstallation.OpenSigningKey(settings);
+            exchange.RemoveRetired();
             WindowsStorageBrokerRuntime.RemoveVerified(settings);
             foreach(string name in expected)File.Delete(Path.Combine(settings.Root,name));
         }

@@ -17,13 +17,15 @@ Home are unchanged. Bundle staging and the proof checkout were removed.
 The exchange journal passes 37 compiled fault checks, including reservation and
 final-acknowledgement loss, duplicate refusal, damaged chains and image changes.
 Its protected-file port derives fixed installation/UUID paths and exclusively
-creates flushed/readback immutable records. Native System-service acceptance and
-volume effect integration remain unfinished.
+creates flushed/readback immutable records. Native System-service acceptance and the normal task/guest connection remain
+unfinished.
 
 The closed exchange wire now passes thirty compiled crypto/parser checks and
 keeps its fixed 64 MiB limit, exact task/input/operation scope and fresh signed
-challenge separate from durable effect authority. Its privileged engine and
-normal Run connection remain unfinished; metadata still reports no volume broker.
+challenge separate from durable effect authority. Its native engine and service transport are implemented and compile without
+warnings; the new 22-case restricted-client Windows acceptance is pending. The
+normal Run/guest-consumer connection remains unfinished. Metadata still reports
+no complete volume broker. See the [storage boundary](windows-storage-broker.md).
 
 Complete Linux `cba5e2b` passes 163/163 groups: 1,062 tests, 1,052 passed and ten
 declared skips. Receipt `26d8a535-ec4e-45ea-b47c-2db8d3bdb7e7` retained; every
@@ -39,7 +41,7 @@ workers, with no interactive UAC acceptance or volume authorization inferred.
 Personal host setup now has authenticated inspect/list/review/apply routes,
 fixed hash-pinned native transport, one-use review, atomic pre-effect budget,
 guarded receipts, exact guardian exit and conservative uncertain-outcome
-recovery. Fifty focused transport/controller/suite/package/inventory checks pass.
+recovery. Fifty-five focused transport/controller/suite/package/inventory checks pass.
 Work/task permissions cannot authorize setup; ordinary snapshots omit private
 records. The frontend remains frozen. Privileged bounded-volume operations,
 interactive UAC and the application-to-native setup journey remain separate

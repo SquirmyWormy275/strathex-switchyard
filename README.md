@@ -312,3 +312,8 @@ credential-reference, Raw-HID helper/simulator, Windows Sandbox guest-worker,
 Linux Bubblewrap/process-group, and host-lifecycle implementations. It
 does not claim physical hardware, live external authorization, pipe-ACL or
 same-user adversarial acceptance, a signed release, or production readiness.
+
+The Windows backend keeps installation and fixed-capacity storage in a separate
+protected service. Read the [storage boundary and current evidence](docs/windows-storage-broker.md)
+for its exact scope. Native engine acceptance and its normal task/guest connection
+remain incomplete; the frontend is frozen for review.

@@ -50,9 +50,9 @@ internal static class WindowsStorageBrokerFiles
             parent=Path.GetDirectoryName(parent);
         }
     }
-    private static void Verify(SafeFileHandle handle,string sid,bool directory,bool clientRead,bool executable,bool inheritedPrivate=false)
+    private static void Verify(SafeFileHandle handle,string sid,bool directory,bool clientRead,bool executable,bool inheritedPrivate=false,bool mountPoint=false)
     {
-        if(handle.IsInvalid||!GetFileInformationByHandle(handle,out var info)||(info.Attributes&0x400)!=0||((info.Attributes&0x10)!=0)!=directory)throw Invalid();
+        if(handle.IsInvalid||!GetFileInformationByHandle(handle,out var info)||(!mountPoint&&(info.Attributes&0x400)!=0)||((info.Attributes&0x10)!=0)!=directory)throw Invalid();
         uint error=GetSecurityInfo(handle,1,5,out _,out _,out _,out _,out var descriptor);if(error!=0)throw new Win32Exception(checked((int)error));
         try
         {
@@ -80,6 +80,19 @@ internal static class WindowsStorageBrokerFiles
     {
         NoRedirectedParents(path);var handle=CreateFileW(path,ReadControl|0x80,3,IntPtr.Zero,OpenExisting,BackupSemantics|OpenReparsePoint,IntPtr.Zero);
         try{Verify(handle,sid,true,clientRead,false);return handle;}catch{handle.Dispose();throw;}
+    }
+    // Only the bounded-volume core calls this after verifying the exact mount
+    // reparse tag, native ID and original volume/device/extent binding.
+    internal static void VerifyMountDirectory(SafeFileHandle handle,string sid)=>Verify(handle,sid,true,true,false,mountPoint:true);
+    internal static SafeFileHandle CreateDataFile(string path,string sid)
+    {
+        NoRedirectedParents(path);var security=Security(sid,false,true,false);
+        try
+        {
+            var handle=CreateFileW(path,GenericRead|GenericWrite|ReadControl,1,ref security,CreateNew,OpenReparsePoint,IntPtr.Zero);
+            try{Verify(handle,sid,false,true,false);return handle;}catch{handle.Dispose();throw;}
+        }
+        finally{LocalFree(security.Descriptor);}
     }
     internal static string OwnerForRoot(string path)
     {

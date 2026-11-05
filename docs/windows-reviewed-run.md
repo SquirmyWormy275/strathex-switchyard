@@ -6,7 +6,9 @@ native execution. The live repository is never writable inside the guest, and
 program exit never marks the provider's coding task complete.
 
 The Personal host setup review/apply API and fixed native installer are implemented.
-Privileged bounded-volume operations remain unfinished software.
+The bounded-volume engine and service transport are implemented and await their
+new native restricted-client proof. Normal Run/guest-consumer integration remains
+unfinished software. See the [storage service boundary](windows-storage-broker.md).
 Actual interactive VM acceptance requires a supported Windows Sandbox host;
 filesystem CI and runner doubles do not establish that acceptance. The frontend
 remains frozen for review.
@@ -282,7 +284,7 @@ public setup views omit the raw SID and token. Uncertain elevation retains the
 original evidence and budget and blocks replacement or automatic replay. Stopping
 the unprivileged guardian cannot establish an unknown elevated worker's exit.
 
-Fifteen focused transport/controller checks and fifty combined suite/package/
+Fifteen focused transport/controller checks and fifty-five combined suite/package/
 inventory checks pass locally, including the authenticated HTTP route, lost
 receipt-write recovery, admission failure and a scope change immediately before
 receipt commit. Native setup and service proofs are separate evidence; the full

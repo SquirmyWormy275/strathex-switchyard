@@ -27,7 +27,7 @@ internal sealed class WindowsStorageBrokerExchangeFiles(WindowsStorageBrokerInst
     {
         if (WindowsStorageBrokerFiles.CurrentOwnerSid() != "S-1-5-18") throw Invalid();
     }
-    private string[] Operations()
+    internal string[] Operations()
     {
         using var parent = WindowsStorageBrokerFiles.PinDirectory(settings.Root, settings.ClientSid);
         if (!Present(Root)) return [];
@@ -43,7 +43,9 @@ internal sealed class WindowsStorageBrokerExchangeFiles(WindowsStorageBrokerInst
         using var parent = WindowsStorageBrokerFiles.PinDirectory(Root, settings.ClientSid);
         using var directory = WindowsStorageBrokerFiles.PinDirectory(operation, settings.ClientSid);
         string[] entries = Directory.EnumerateFileSystemEntries(operation).Select(path => Path.GetFileName(path) ?? throw Invalid()).Order(StringComparer.Ordinal).ToArray();
-        string[] records = entries.Where(name => name != "disk-" + operationId).ToArray();
+        string[] facts = entries.Where(name => name is "image.json" or "mount.json").ToArray();
+        foreach (string name in facts) _ = WindowsStorageBrokerFiles.ReadFile(Path.Combine(operation, name), settings.ClientSid, 8192);
+        string[] records = entries.Where(name => name != "disk-" + operationId && !facts.Contains(name, StringComparer.Ordinal)).ToArray();
         if (records.Length > WindowsStorageBrokerExchangeJournal.MaximumEvents || records.Where((name, index) => !Regex.IsMatch(name, "^[0-9]{4}\\.json$", RegexOptions.CultureInvariant) || name != index.ToString("D4", System.Globalization.CultureInfo.InvariantCulture) + ".json").Any()) throw Invalid();
         return records.Select(name => WindowsStorageBrokerFiles.ReadFile(Path.Combine(operation, name), settings.ClientSid, 8192)).ToArray();
     }
@@ -67,4 +69,52 @@ internal sealed class WindowsStorageBrokerExchangeFiles(WindowsStorageBrokerInst
         if (!WindowsStorageBrokerFiles.ReadFile(path, settings.ClientSid, 8192).AsSpan().SequenceEqual(bytes)) throw Invalid();
     }
     internal WindowsStorageBrokerExchangeJournal Journal() => new(settings.Binding, Read, Append);
+    internal bool Exists => Present(Root);
+    internal bool DiskAbsent(string operationId) => !Present(DiskRoot(operationId));
+    internal void WriteFact(string operationId, string name, byte[] bytes)
+    {
+        SystemOnly(); if (name is not ("image.json" or "mount.json")) throw Invalid();
+        using var root = WindowsStorageBrokerFiles.PinDirectory(Root, settings.ClientSid);
+        using var operation = WindowsStorageBrokerFiles.PinDirectory(OperationRoot(operationId), settings.ClientSid);
+        WindowsStorageBrokerFiles.CreateFile(Path.Combine(OperationRoot(operationId), name), settings.ClientSid, bytes);
+    }
+    internal byte[] ReadFact(string operationId, string name)
+    {
+        if (name is not ("image.json" or "mount.json")) throw Invalid();
+        using var root = WindowsStorageBrokerFiles.PinDirectory(Root, settings.ClientSid);
+        using var operation = WindowsStorageBrokerFiles.PinDirectory(OperationRoot(operationId), settings.ClientSid);
+        return WindowsStorageBrokerFiles.ReadFile(Path.Combine(OperationRoot(operationId), name), settings.ClientSid, 8192);
+    }
+    internal void AssertRetired()
+    {
+        foreach (string operation in Operations())
+        {
+            if (Journal().Current(operation) is not { Phase: "recorded", Proof.State: "retired" } || !DiskAbsent(operation)) throw Invalid();
+            _ = ReadFact(operation, "image.json"); _ = Read(operation);
+        }
+    }
+    internal void RemoveRetired()
+    {
+        AssertRetired(); if (!Exists) return;
+        // Removal runs only after the original service and captured process
+        // independently exited. Preflight the complete inventory before deletes.
+        string[] operations = Operations();
+        using (var root = WindowsStorageBrokerFiles.PinDirectory(Root, settings.ClientSid))
+        {
+            foreach (string operation in operations)
+            {
+                string path = OperationRoot(operation);
+                using (var directory = WindowsStorageBrokerFiles.PinDirectory(path, settings.ClientSid))
+                {
+                    _ = Read(operation);
+                    foreach (string file in Directory.EnumerateFiles(path).Select(file => Path.GetFileName(file) ?? throw Invalid()).Order(StringComparer.Ordinal))
+                        File.Delete(Path.Combine(path, file));
+                    if (Directory.EnumerateFileSystemEntries(path).Any()) throw Invalid();
+                }
+                Directory.Delete(path);
+            }
+            if (Directory.EnumerateFileSystemEntries(Root).Any()) throw Invalid();
+        }
+        Directory.Delete(Root);
+    }
 }

@@ -23,7 +23,7 @@ internal static class WindowsStorageBroker
             char[] chars=new char[8193];int count=0;while(count<chars.Length){int read=Console.In.Read(chars,count,chars.Length-count);if(read==0)break;count+=read;}
             if(count>8192)throw Invalid();using var document=JsonDocument.Parse(new string(chars,0,count),new JsonDocumentOptions{MaxDepth=4});var request=document.RootElement;
             action=request.GetProperty("action").GetString()??"";
-            if(action=="metadata")Exact(request,"schema","action");else if(action is "install-bootstrap" or "remove-bootstrap")Exact(request,"schema","action","clientSid","installationId","helperSha256");else throw Invalid();
+            if(action=="metadata")Exact(request,"schema","action");else if(action=="exchange")Exact(request,"schema","action","verb","requestId","operationId","taskScopeSha256","inputManifestSha256");else if(action is "install-bootstrap" or "remove-bootstrap")Exact(request,"schema","action","clientSid","installationId","helperSha256");else throw Invalid();
             if(request.GetProperty("schema").GetString()!=Schema)throw Invalid();
             if(action=="metadata")
             {
@@ -34,6 +34,13 @@ internal static class WindowsStorageBroker
                     Write(new{schema=Schema,action,status="bootstrap-ready",installationId=settings.InstallationId,ownerScope=settings.OwnerScope,serviceImageSha256=settings.ServiceImageSha256,protocolVerified=true,storage,brokerImplemented=false,effectStarted=false});return 0;
                 }
                 catch(Exception error){JsonElement? diagnostic=null;bool installationAbsentVerified=false;try{installationAbsentVerified=WindowsStorageBrokerFiles.RootAbsent(WindowsStorageBrokerFiles.CurrentOwnerSid());}catch{}if(settings!=null){try{serviceState=WindowsStorageBrokerControl.ObserveState(settings);}catch{}try{diagnostic=WindowsStorageBrokerDiagnostic.Read(settings);}catch{}}Write(new{schema=Schema,action,status="unavailable",reason="The original protected broker and its fresh authenticated metadata could not be verified.",installationAbsentVerified,failureStage=stage,serviceState,diagnostic,errorCategory=error.GetType().Name,nativeCode=error is System.ComponentModel.Win32Exception native?native.NativeErrorCode:(int?)null,brokerImplemented=false,effectStarted=false});return 0;}
+            }
+            if(action=="exchange")
+            {
+                var settings=WindowsStorageBrokerInstallation.Load(WindowsStorageBrokerFiles.CurrentOwnerSid());
+                string verb=request.GetProperty("verb").GetString()??"",requestId=request.GetProperty("requestId").GetString()??"",operationId=request.GetProperty("operationId").GetString()??"",taskScopeSha256=request.GetProperty("taskScopeSha256").GetString()??"",inputManifestSha256=request.GetProperty("inputManifestSha256").GetString()??"";
+                var proof=WindowsStorageBrokerPipe.Exchange(settings,verb,requestId,operationId,taskScopeSha256,inputManifestSha256).GetAwaiter().GetResult();
+                Write(new{schema=Schema,action,status="exchange-observed",verb,requestId,operationId,taskScopeSha256,inputManifestSha256,installationId=settings.InstallationId,ownerScope=settings.OwnerScope,serviceImageSha256=settings.ServiceImageSha256,protocolVerified=true,proof=new{state=proof.State,effectStarted=proof.EffectStarted,attached=proof.Attached,mounted=proof.Mounted,detachedVerified=proof.DetachedVerified,exchangeQuotaEnforced=proof.ExchangeQuotaEnforced,virtualBytes=WindowsStorageBrokerExchangeProtocol.VirtualBytes,backingBytes=WindowsStorageBrokerExchangeProtocol.BackingBytes,sandboxEnforced=false},brokerImplemented=false});return 0;
             }
             string sid=request.GetProperty("clientSid").GetString()??"",installationId=request.GetProperty("installationId").GetString()??"",sha=request.GetProperty("helperSha256").GetString()??"";
             string scope=WindowsStorageBrokerFiles.OwnerScope(sid);WindowsStorageBrokerProtocol.Request(new(installationId,scope,sha),new string('a',64));
