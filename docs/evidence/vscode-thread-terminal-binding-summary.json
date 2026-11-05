@@ -19,5 +19,10 @@
   "nativeTuiAttachmentAccepted": false,
   "crossRestartObjectAttachmentImplemented": false,
   "fullStudioTaskAccountAttachmentImplemented": false,
-  "newNativeTaskOrModelRequest": false
+  "newNativeTaskOrModelRequest": false,
+  "caseDistinctWorkflowReceipt": "isolated-test-22586b54-909b-4014-999c-b4ec243f7cc1.json",
+  "caseDistinctWorkflowGroups": 2,
+  "caseDistinctWorkflowChecks": 143,
+  "caseDistinctActualDirectoriesWithApiDouble": true,
+  "allCaseWorkflowChildCleanup": true
 }

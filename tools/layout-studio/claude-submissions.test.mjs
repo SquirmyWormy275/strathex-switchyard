@@ -42,7 +42,8 @@ async function fixture(fn) {
   try { await fn({ root, store, service, options, task, settings, calls, children, input, review, submit }); }
   finally { await service.close(); for (const child of children) await stopOwnedChild(child); await rm(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 50 }); }
 }
-test("stopped owned Claude text uses the exact native UUID and account without inventing turn acknowledgements", () => fixture(async ({ root, store, service, options, calls, input, review, submit }) => {
+test("stopped owned Claude text uses the exact native UUID and account without inventing turn acknowledgements", () => fixture(async ({ root, store, task, service, options, calls, input, review, submit }) => {
+  await store.update("personal", "synthetic-observation", s => { s.observations = [{ id: "text-events", status: "recording", sources: ["agent-events"], exclusions: [], events: [], updatedAt: Date.now() }]; });
   const approval = await review(); assert.equal(approval.modelPromptSubmitted, false); assert.equal(calls.some((c) => c.args.includes("-p")), false);
   const requestId = randomUUID(), result = await submit(approval, { requestId }); assert.equal(result.reply, "Ready"); assert.equal(result.provider, "claude-code"); assert.equal(result.turnId, null); assert.equal(result.nativeTurnIdSupported, false); assert.equal(result.nativeSessionVerified, true); assert.equal(result.taskCompletionVerified, false);
   assert.equal(result.ownedRuntime.schema, "switchyard-runtime-command/v1"); assert.equal(result.ownedRuntimeStoppedVerified, true); assert.notEqual(result.ownedRuntime.id, result.sessionId);
@@ -50,7 +51,19 @@ test("stopped owned Claude text uses the exact native UUID and account without i
   assert.equal(calls.filter((c) => c.args.includes("-p")).length, 1);
   const print = calls.find((c) => c.args.includes("-p")); assert.equal(print.options.shell, false); assert.equal(print.options.env.ANTHROPIC_API_KEY, undefined); assert.equal(print.options.env.ANTHROPIC_BASE_URL, undefined); assert.ok(print.args.includes("--safe-mode") && print.args.includes("--strict-mcp-config")); assert.equal(print.args[print.args.indexOf("--permission-mode") + 1], "plan"); assert.equal(print.args[print.args.indexOf("--tools") + 1], "");
   const sealed = await readFile(join(root, "state/personal.sealed.json"), "utf8"); assert.equal(sealed.includes(input.text), false); assert.equal(sealed.includes(approval.confirmation.token), false); assert.equal((await store.snapshot("personal")).codingTurns.length, 1);
+  const events = (await store.snapshot("personal")).observations[0].events;
+  assert.deepEqual(events.map(event => event.phase), ["text-request-reserved", "text-reply-recorded"], "native Claude supplies no turn acknowledgement to invent");
+  assert.equal(new Set(events.map(event => event.subjectDigest)).size, 1);
+  assert.ok(events.every(event => event.provider === "claude-code" && event.provenance === "switchyard-local-lifecycle" && event.taskCompletionVerified === false && event.timeSavingMeasured === false));
+  for (const value of [task.id, task.sessionId, task.accountFingerprint, task.repositoryRoot, task.label, requestId, input.text, result.reply, result.ownedRuntime.id]) assert.equal(JSON.stringify(events).includes(value), false);
 }));
+test("Claude reviewed-text metadata respects recording pause and its provider category exclusion", async () => {
+  for (const fence of ["paused", "excluded"]) await fixture(async ({ store, review, submit }) => {
+    await store.update("personal", "synthetic-observation", s => { s.observations = [{ id: "text-events", status: fence === "paused" ? "paused" : "recording", sources: ["agent-events"], exclusions: fence === "excluded" ? ["claude"] : [], events: [], updatedAt: Date.now() }]; });
+    assert.equal((await submit(await review())).status, "provider-turn-completed");
+    assert.deepEqual((await store.snapshot("personal")).observations[0].events, []);
+  });
+});
 test("unapproved policy, live sessions, alternate authentication and changed accounts cannot receive Claude task text", () => fixture(async ({ store, service, task, settings, calls, input, review, submit }) => {
   await assert.rejects(service.review("company", input), /prohibited/); assert.equal(calls.length, 0);
   settings.row.state = "working"; await assert.rejects(review(), /separate reviewed stop/); settings.row.state = "stopped";

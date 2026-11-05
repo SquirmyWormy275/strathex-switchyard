@@ -10,6 +10,7 @@ import { createCodexSubmissions } from "./codex-submissions.mjs";
 import { repositoryIdentity } from "./coding-task-identity.mjs";
 import { createSuiteStore } from "./suite-store.mjs";
 import { createSuite } from "./suite.mjs";
+import { appendAgentObservation } from "./agent-observation.mjs";
 const tick = () => new Promise((r) => setImmediate(r));
 async function fixture(fn) {
   const root = await mkdtemp(join(tmpdir(), "switchyard-codex-text-")), repositoryRoot = join(root, "repo"), keys = new Map(), calls = [], clients = [];
@@ -45,16 +46,50 @@ async function fixture(fn) {
   try { await fn({ root, repositoryRoot, store, task, settings, clients, calls, service, options, input, approve, submit, advance: (ms) => { clock += ms; } }); }
   finally { settings.stopped = true; await service.close(); await rm(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 50 }); }
 }
-test("reviewed text uses one exact owned restricted turn, retains its acknowledgement and prevents durable duplicate submission", () => fixture(async ({ root, store, calls, clients, service, options, input, approve, submit }) => {
+test("reviewed text uses one exact owned restricted turn, retains its acknowledgement and prevents durable duplicate submission", () => fixture(async ({ root, store, task, calls, clients, service, options, input, approve, submit }) => {
+  await store.update("personal", "synthetic-observation", s => { s.observations = [{ id: "text-events", status: "recording", sources: ["agent-events"], exclusions: [], events: [], updatedAt: Date.now() }]; appendAgentObservation(s, { provider: "codex", subjectId: task.id, phase: "identity-bound", status: "idle", at: Date.now() }); });
   const review = await approve(); assert.equal(review.modelPromptSubmitted, false); assert.equal(calls.some((c) => c.method === "thread/resume" || c.method === "turn/start"), false);
-  const requestId = randomUUID(), result = await submit(review, { requestId }); assert.equal(result.status, "provider-turn-completed"); assert.equal(result.reply, "Ready"); assert.equal(result.turnId, "exact-turn"); assert.equal(result.taskCompletionVerified, false);
+  const requestId = task.id, result = await submit(review, { requestId }); assert.equal(result.status, "provider-turn-completed"); assert.equal(result.reply, "Ready"); assert.equal(result.turnId, "exact-turn"); assert.equal(result.taskCompletionVerified, false);
   assert.equal(calls.filter((c) => c.method === "turn/start").length, 1); assert.ok(clients.every((c) => c.closed));
   const resume = calls.find((c) => c.method === "thread/resume"); assert.equal(resume.params.config.project_doc_max_bytes, 0); assert.equal(resume.params.approvalPolicy, "never"); assert.equal(resume.params.sandbox, "read-only");
   const restarted = createCodexSubmissions(options); try { const again = await restarted.submit("personal", { ...input, requestId, token: review.confirmation.token }); assert.equal(again.duplicatePrevented, true); } finally { await restarted.close(); }
   assert.equal(calls.filter((c) => c.method === "turn/start").length, 1);
   await assert.rejects(service.submit("personal", { ...input, text: "Different", requestId, token: review.confirmation.token }), /different reviewed text/);
   const sealed = await readFile(join(root, "state/personal.sealed.json"), "utf8"); assert.equal(sealed.includes(input.text), false); assert.equal(sealed.includes(review.confirmation.token), false); assert.equal((await store.snapshot("personal")).codingTurns.length, 1);
+  const allEvents = (await store.snapshot("personal")).observations[0].events, events = allEvents.filter(event => event.phase.startsWith("text-"));
+  assert.equal(allEvents.length, 4); assert.notEqual(allEvents[0].subjectDigest, events[0].subjectDigest, "the same raw UUID in task and text domains must not merge their correlation");
+  assert.deepEqual(events.map(event => event.phase), ["text-request-reserved", "text-identity-bound", "text-reply-recorded"]);
+  assert.deepEqual(events.map(event => event.status), ["reserved-locally", "active", "provider-turn-finished"]);
+  assert.equal(new Set(events.map(event => event.subjectDigest)).size, 1);
+  assert.ok(events.every(event => event.provider === "codex" && event.provenance === "switchyard-local-lifecycle" && event.taskCompletionVerified === false && event.timeSavingMeasured === false));
+  for (const value of [task.id, task.sessionId, task.accountFingerprint, task.repositoryRoot, task.label, requestId, input.text, result.reply, result.turnId]) assert.equal(JSON.stringify(events).includes(value), false);
 }));
+test("reviewed-text collection respects source/category/pause fences including a pause before native acknowledgement", async () => {
+  for (const fence of ["paused", "source", "excluded", "pause-before-ack"]) await fixture(async ({ store, settings, approve, submit }) => {
+    await store.update("personal", "synthetic-observation", s => { s.observations = [{ id: "text-events", status: fence === "paused" ? "paused" : "recording", sources: [fence === "source" ? "deliberate" : "agent-events"], exclusions: fence === "excluded" ? ["codex"] : [], events: [], updatedAt: Date.now() }]; });
+    if (fence === "pause-before-ack") settings.onTurn = async (client, params) => {
+      await store.update("personal", "synthetic-pause", s => { s.observations[0].status = "paused"; });
+      setImmediate(() => client.emit("notification", { method: "turn/completed", params: { threadId: params.threadId, turn: { id: "paused-turn", status: "completed" } } }));
+      return { turn: { id: "paused-turn" } };
+    };
+    const result = await submit(await approve()); assert.equal(result.status, "provider-turn-completed");
+    assert.deepEqual((await store.snapshot("personal")).observations[0].events.map(event => event.phase), fence === "pause-before-ack" ? ["text-request-reserved"] : []);
+  });
+});
+test("failed preparation and uncertain delivery retain distinct local metadata without claiming remote completion", async () => {
+  for (const attempted of [false, true]) await fixture(async ({ store, settings, calls, service, approve, submit }) => {
+    await store.update("personal", "synthetic-observation", s => { s.observations = [{ id: "text-events", status: "recording", sources: ["agent-events"], exclusions: [], events: [], updatedAt: Date.now() }]; });
+    const review = await approve(), requestId = randomUUID();
+    if (attempted) settings.onTurn = async () => { throw new Error("Synthetic lost native acknowledgement"); };
+    else settings.wrongPermissions = true;
+    await assert.rejects(submit(review, { requestId }));
+    assert.equal(calls.filter(call => call.method === "turn/start").length, attempted ? 1 : 0);
+    let events = (await store.snapshot("personal")).observations[0].events;
+    assert.deepEqual(events.map(event => event.phase), ["text-request-reserved", attempted ? "text-outcome-unconfirmed" : "text-request-failed"]);
+    if (attempted) { const review = await service.reviewOutcome("personal", requestId); await service.resolveOutcome("personal", { id: requestId, token: review.confirmation.token }); events = (await store.snapshot("personal")).observations[0].events; assert.equal(events.at(-1).phase, "text-outcome-reviewed"); assert.equal(events.at(-1).status, "unknown"); }
+    assert.ok(events.every(event => event.provenance === "switchyard-local-lifecycle" && event.taskCompletionVerified === false));
+  });
+});
 test("changed prompt, account enrollment, login, directory or expiry invalidates exact reviewed text before a model request", async () => {
   for (const change of ["text", "enrollment", "login", "directory", "expiry"]) await fixture(async ({ root, repositoryRoot, store, settings, calls, approve, submit, advance }) => {
     const review = await approve();

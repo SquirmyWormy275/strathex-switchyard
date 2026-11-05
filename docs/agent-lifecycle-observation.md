@@ -45,6 +45,37 @@ collector/Suite/Claude-design/package groups pass 39 checks with cleanup
 these checks are simulated; no native design turn was submitted for this change.
 Broader configuration runtime-status and external lifecycle streams remain separate.
 
+Reviewed Codex and Claude Code text turns now append local reservation, persisted
+identity, reply, failure/uncertainty and deliberate outcome-review metadata inside
+their existing encrypted transactions. Their `coding-text:` correlation namespace
+stays distinct from task identities even when the same raw UUID appears in both
+domains. The hooks add no state transaction or provider request. Codex can record
+its supported turn acknowledgement; Claude supplies none, so no acknowledgement
+event is invented. All these phases retain local-lifecycle provenance and keep
+task completion and measured savings false. A reserved request does not prove
+delivery; a reviewed uncertain outcome does not prove cancellation or completion.
+
+Five isolated collector/Codex/Claude/Suite/package groups pass 56 checks with
+cleanup, including actual encrypted state, real child-process provider doubles,
+duplicate submission, pause before acknowledgement, category/source exclusions,
+content omission and namespace collision. Native model-turn metadata acceptance
+is separate. The installed proof has an explicit opt-in for that check:
+
+```sh
+node scripts/verify-agent-observation-host.mjs --synthetic-reviewed-text-metadata
+```
+
+This flag reuses the idle existing validation workspace and submits one separately
+reviewed tiny synthetic Codex turn through the normal installed API. It checks the
+three local text phases and duplicate suppression, then independently verifies
+captured native process exit and removes only its own successful records/staging.
+Uncertain failures retain their original context. Cleanup attempts recording stop,
+keyboard-only shutdown, process readback and selection restoration independently.
+The original `--synthetic-native-metadata` flag still submits zero model prompts.
+Neither flag creates a workspace or changes hardware, microphone or frontend.
+Native Claude text-event acceptance and broader runtime/external streams remain
+outstanding; no continuous native stream is claimed by these local hooks.
+
 The normal installed source `7d9310a` passes six update and seven privacy/metadata
 checks with all 54 workspace identities, plus exact installed hash pins for the
 configuration adapter, collector and workflow boundary. This journey preserves

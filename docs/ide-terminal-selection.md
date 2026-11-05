@@ -89,3 +89,8 @@ uses bounded activation plus active-object readback. Linux comparisons preserve
 case and literal backslashes; only Windows comparisons fold case and normalize
 Windows separators, with drive roots distinct from drive-relative paths.
 [Software binding evidence](evidence/vscode-thread-terminal-binding-summary.json).
+
+The case-distinct workflow regression creates real `Repo` and `repo` directories
+and uses the API double to open both roots. Shift Terminal creates two distinct
+objects, preserves both cwd values and returns the second one without reusing
+the first. Its controller/runner groups pass 143 checks with owned cleanup.

@@ -4733,6 +4733,27 @@ test("Shift Terminal never focuses an arbitrary active terminal and creates or r
   await controller.stop();
 });
 
+test("Linux Shift Terminal keeps separately open case-distinct repository roots on different terminal objects", { skip: process.platform !== "linux" }, async () => {
+  const stage = await mkdtemp(join(tmpdir(), "sxsy-terminal-case-")), upper = join(stage, "Repo"), lower = join(stage, "repo");
+  await mkdir(upper); await mkdir(lower);
+  const vscode = new FakeVscode([], [upper, lower]), bridge = new FakeBridge();
+  const controller = new ManagedSessionController(vscode.api, new FakeContext(), bridge, { idFactory: sequenceFactory(), resolveGitRoots: async () => [{ gitRoot: upper }, { gitRoot: lower }] });
+  try {
+    await controller.start();
+    for (const root of [upper, lower]) {
+      bridge.nextDispatch = { status: "running", summary: "Exact integrated terminal awaits host acknowledgement.", data: {
+        hostActionId: `host-action:${(root === upper ? "8" : "9").repeat(64)}`, hostActionKind: "focus_integrated_terminal", hostActionExpiresAt: "2099-01-01T00:00:00.000Z", hostActionWorkspaceRoot: root
+      } };
+      vscode.choose(root); await controller.dispatchChord(chordFor("TERMINAL", "shift")!);
+      assert.equal(bridge.completedHostActions.at(-1)?.succeeded, true);
+    }
+    assert.deepEqual(vscode.terminalOptions.map(options => options.cwd), [upper, lower]);
+    assert.equal(vscode.createdTerminals.length, 2); assert.equal(vscode.createdTerminals[0]?.shown, 1); assert.equal(vscode.createdTerminals[1]?.shown, 1);
+    assert.equal(vscode.activeTerminal, vscode.createdTerminals[1]);
+    assert.deepEqual(controller.listKnownSessions().filter(session => session.surface === "vscode_terminal").map(session => session.workspaceRoot), [upper, lower]);
+  } finally { await controller.stop(); await rm(stage, { recursive: true, force: true }); }
+});
+
 for (const drift of ["none", "active-terminal", "closed-terminal", "workspace", "expiry", "window-focus", "unknown-item"] as const) {
   test(`Shift Terminal rechecks the exact same-title picker target after ${drift} drift`, async () => {
     const root = process.platform === "win32" ? "C:\\picker-root" : "/picker-root";

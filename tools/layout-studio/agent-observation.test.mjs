@@ -10,7 +10,7 @@ const event = changes => ({ provider: "codex", subjectId: "private-native-subjec
 
 test("the native host proof refuses absent, broader or unrecognized flags before account, workspace or process access", () => {
   const script = fileURLToPath(new URL("../../scripts/verify-agent-observation-host.mjs", import.meta.url));
-  for (const args of [[], ["--synthetic"], ["--synthetic-native-metadata", "extra"], ["--synthetic-native-metadata", "--provider=claude-code"]]) {
+  for (const args of [[], ["--synthetic"], ["--synthetic-native-metadata", "extra"], ["--synthetic-native-metadata", "--provider=claude-code"], ["--synthetic-reviewed-text-metadata", "extra"]]) {
     const result = spawnSync(process.execPath, [script, ...args], { encoding: "utf8", timeout: 10000 });
     assert.equal(result.error, undefined); assert.notEqual(result.status, 0); assert.equal(result.stdout, ""); assert.match(result.stderr, /Usage on the pilot/);
   }

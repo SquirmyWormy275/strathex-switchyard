@@ -5,6 +5,7 @@ import { verifyRepositoryIdentity } from "./coding-task-identity.mjs";
 import { scopeHash, suiteConfirmations } from "./confirmations.mjs";
 import { stopOwnedChild } from "./owned-process.mjs";
 import { guardianScope } from "./owned-native-command.mjs";
+import { appendAgentObservation } from "./agent-observation.mjs";
 
 const uuid = (v) => typeof v === "string" && /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/.test(v);
 const unresolved = new Set(["reserved", "submitting", "submitted", "outcome-unconfirmed", "cancellation-requested", "interrupted"]);
@@ -67,6 +68,7 @@ export function createReviewedTaskText({ store, adapter, stopChild = stopOwnedCh
       scopeDigest: scopeHash([text, state.policy, state.mode, state.accounts, adapter.permissions, nativeVersion]) };
   }
   const active = (c, id) => [...running.entries()].some(([key, r]) => key.startsWith(`${c}:`) && r.requestId === id);
+  const observe = (state, id, phase, status) => appendAgentObservation(state, { provider, subjectId: "coding-text:" + id, phase, status, at: now() });
   const view = (t) => ({ ...t, provider: t.provider ?? "codex", taskCompletionVerified: false, provenance: "Owned restricted native text turn; provider completion does not verify its coding task" });
   async function stopCompartment(c) {
     generations.set(c, generation(c) + 1); const resources = [...running.entries()].filter(([key]) => key.startsWith(`${c}:`)).map(([, r]) => r);
@@ -99,7 +101,7 @@ export function createReviewedTaskText({ store, adapter, stopChild = stopOwnedCh
           const cutoff = now() - (s.policy === "work" ? 7 : 30) * 86400000;
           s.codingTurns = s.codingTurns.filter((t) => unresolved.has(t.status) || t.ownedRuntime && t.ownedRuntimeStoppedVerified !== true || t.updatedAt >= cutoff);
           if (s.codingTurns.length >= 32 || Buffer.byteLength(JSON.stringify(s)) > 3 * 1024 * 1024) throw new Error("Review or delete older completed text turns before sending more. Saved context was preserved.");
-          s.codingTurns.push({ schema: "switchyard-coding-text-turn/v1", id: requestId, provider, nativeVersion, operation, taskId, sessionId: task.sessionId, taskDigest: taskDigest(task), accountFingerprint: task.accountFingerprint, prompt: text, promptSha256: scopeHash(text), status: "reserved", turnId: null, reply: null, createdAt: now(), updatedAt: now(), taskCompletionVerified: false }); return true;
+          s.codingTurns.push({ schema: "switchyard-coding-text-turn/v1", id: requestId, provider, nativeVersion, operation, taskId, sessionId: task.sessionId, taskDigest: taskDigest(task), accountFingerprint: task.accountFingerprint, prompt: text, promptSha256: scopeHash(text), status: "reserved", turnId: null, reply: null, createdAt: now(), updatedAt: now(), taskCompletionVerified: false }); observe(s, requestId, "text-request-reserved", "reserved-locally"); return true;
         }, { provider });
         if (!reserved) return { ...view((await store.snapshot(c)).codingTurns.find((t) => t.id === requestId)), duplicatePrevented: true };
         let attempted = false;
@@ -109,12 +111,12 @@ export function createReviewedTaskText({ store, adapter, stopChild = stopOwnedCh
           const result = await native.runTurn({ recovery, text, signal: resource.controller.signal, checkCurrent: current,
             onContainment: async frame => { const scope = guardianScope(frame); await store.update(c, "coding-text-guardian", (s) => { current(); const t = s.codingTurns.find((t) => t.id === requestId); if (t.ownedRuntime && scopeHash(t.ownedRuntime) !== scopeHash(scope)) throw new Error("The saved owned guardian identity changed before start."); t.ownedRuntime = scope; t.ownedRuntimeStoppedVerified = false; }, { provider }); },
             onContainmentStopped: async frame => { const scope = guardianScope(frame); await store.update(c, "coding-text-guardian-exit", (s) => { const t = s.codingTurns.find((t) => t.id === requestId); if (!t || scopeHash(t.ownedRuntime) !== scopeHash(scope)) throw new Error("The exact saved guardian exit could not be recorded."); t.ownedRuntimeStoppedVerified = true; }); },
-            onStarted: async (turnId) => { await store.update(c, "coding-text-identity", (s) => { const t = s.codingTurns.find((t) => t.id === requestId); t.turnId = turnId; t.status = "submitted"; t.updatedAt = now(); }); } });
+            onStarted: async (turnId) => { await store.update(c, "coding-text-identity", (s) => { const t = s.codingTurns.find((t) => t.id === requestId); t.turnId = turnId; t.status = "submitted"; t.updatedAt = now(); observe(s, requestId, "text-identity-bound", "active"); }); } });
           if (typeof result.text !== "string" || Buffer.byteLength(result.text) > 32768 || result.nativeStatus !== "completed" || result.nativeSessionVerified !== true || result.nativeTurnIdSupported === true && !/^[A-Za-z0-9_-]{1,128}$/.test(result.turnId ?? "")) throw new Error("The native reply did not verify its bounded session contract. Saved request identity was retained.");
           await authorize(); await verifyRepositoryIdentity(task);
-          return await store.update(c, "coding-text-reply", (s) => { current(); const bound = taskIn(s, taskId, recovery); if (taskDigest(bound) !== taskDigest(task)) throw new Error("The original task binding changed before retaining its reply."); adapter.acceptResult?.(bound, result); const t = s.codingTurns.find((t) => t.id === requestId); t.reply = result.text; t.status = "provider-turn-completed"; t.nativeStatus = result.nativeStatus; t.nativeTurnIdSupported = result.nativeTurnIdSupported === true; t.nativeSessionVerified = true; t.updatedAt = now(); return view(t); }, { provider });
+          return await store.update(c, "coding-text-reply", (s) => { current(); const bound = taskIn(s, taskId, recovery); if (taskDigest(bound) !== taskDigest(task)) throw new Error("The original task binding changed before retaining its reply."); adapter.acceptResult?.(bound, result); const t = s.codingTurns.find((t) => t.id === requestId); t.reply = result.text; t.status = "provider-turn-completed"; t.nativeStatus = result.nativeStatus; t.nativeTurnIdSupported = result.nativeTurnIdSupported === true; t.nativeSessionVerified = true; t.updatedAt = now(); observe(s, requestId, "text-reply-recorded", "provider-turn-finished"); return view(t); }, { provider });
         } catch (error) {
-          await store.update(c, "coding-text-uncertain", (s) => { const t = s.codingTurns?.find((t) => t.id === requestId); if (t) { t.turnId ??= error.turnId ?? null; t.status = attempted ? "outcome-unconfirmed" : "failed-before-turn"; t.failureCode = /^[A-Z_]{1,40}$/.test(error.code ?? "") ? error.code : "NATIVE_CONTRACT_UNCONFIRMED"; if (error.nativeResultSummary?.schema === "switchyard-claude-result-shape/v1" && JSON.stringify(error.nativeResultSummary).length < 2048) t.nativeResultSummary = error.nativeResultSummary; if (/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/.test(error.observedSessionId ?? "")) t.observedSessionId = error.observedSessionId; t.updatedAt = now(); } if (attempted) adapter.recordUnconfirmed?.(s.codingSessions?.find((t) => t.id === taskId)); }).catch(() => {});
+          await store.update(c, "coding-text-uncertain", (s) => { const t = s.codingTurns?.find((t) => t.id === requestId); if (t) { t.turnId ??= error.turnId ?? null; t.status = attempted ? "outcome-unconfirmed" : "failed-before-turn"; t.failureCode = /^[A-Z_]{1,40}$/.test(error.code ?? "") ? error.code : "NATIVE_CONTRACT_UNCONFIRMED"; if (error.nativeResultSummary?.schema === "switchyard-claude-result-shape/v1" && JSON.stringify(error.nativeResultSummary).length < 2048) t.nativeResultSummary = error.nativeResultSummary; if (/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/.test(error.observedSessionId ?? "")) t.observedSessionId = error.observedSessionId; t.updatedAt = now(); observe(s, requestId, attempted ? "text-outcome-unconfirmed" : "text-request-failed", attempted ? "unknown" : "failed"); } if (attempted) adapter.recordUnconfirmed?.(s.codingSessions?.find((t) => t.id === taskId)); }).catch(() => {});
           throw error;
         }
       }, requestId, recovery);
@@ -138,7 +140,7 @@ export function createReviewedTaskText({ store, adapter, stopChild = stopOwnedCh
       const digest = scopeHash([turn, state.policy, state.mode, state.accounts]);
       const decision = await suiteConfirmations(store, c, undefined, now).consume({ action: adapter.resolveAction, sessionId: turn.sessionId, targetSnapshotId: scopeHash([`${provider}-text-outcome/v1`, c, id]), scopeDigest: digest, token });
       if (!decision.allowed) throw new Error(decision.reason);
-      return store.update(c, "coding-text-outcome-review", (s) => { const t = s.codingTurns?.find((t) => t.id === id); if (!t || scopeHash([t, s.policy, s.mode, s.accounts]) !== digest || active(c, id)) throw new Error("The reviewed outcome or workspace changed. Saved context was preserved."); t.status = "reviewed-unconfirmed"; t.outcomeReviewedAt = now(); t.updatedAt = now(); adapter.recordOutcomeReview?.(s.codingSessions?.find(task => task.id === t.taskId), t); return { ...view(t), modelPromptSubmitted: false }; });
+      return store.update(c, "coding-text-outcome-review", (s) => { const t = s.codingTurns?.find((t) => t.id === id); if (!t || scopeHash([t, s.policy, s.mode, s.accounts]) !== digest || active(c, id)) throw new Error("The reviewed outcome or workspace changed. Saved context was preserved."); t.status = "reviewed-unconfirmed"; t.outcomeReviewedAt = now(); t.updatedAt = now(); adapter.recordOutcomeReview?.(s.codingSessions?.find(task => task.id === t.taskId), t); observe(s, id, "text-outcome-reviewed", "unknown"); return { ...view(t), modelPromptSubmitted: false }; });
     },
     submit: (c, input) => submitText(c, input),
     submitRecovery: (c, input) => submitText(c, input, true),
