@@ -122,3 +122,16 @@ The two previously timed-out files pass separately at 35.042 and 27.523 seconds
 under their original 120-second bounds. Earlier failed full runs remain failed;
 a complete new-source Linux run and installed acceptance are separate checks.
 [Exact hashes, receipts and cleanup](evidence/fresh-protected-reads-summary.json).
+
+The immutable `9dc0a944` Linux code checkpoint subsequently passes the complete
+235-group manifest: 1,445 passed tests, ten declared skips and verified child/
+checkout/fixture cleanup. [Complete receipt](evidence/linux-9dc-complete-summary.json).
+
+Windows client contracts at the same PR head pass seven groups/73 checks. Its
+separate authority file completes ten passing subtests, then exceeds its original
+240-second aggregate file bound. That failed attempt remains failed. The two new
+admission-state regressions now live beside receipt-state checks in an existing
+independent child; authority CI includes the whole child. All cases stay required,
+with both 240-second child limits and the 12-minute CI step unchanged. Linux
+follow-up selection/state groups pass 31 checks; corrected native Windows
+acceptance is pending. [Windows evidence](evidence/windows-authority-9dc-timeout-summary.json).

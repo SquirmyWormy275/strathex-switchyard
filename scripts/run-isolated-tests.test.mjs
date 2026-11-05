@@ -1,3 +1,4 @@
+import { selectWindowsPolicyContractGroups } from "./windows-scenario-groups.mjs";
 import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import assert from "node:assert/strict";
@@ -9,6 +10,18 @@ import { assertRequiredTestManifest, createStrictTestEnvironment, linuxGroups, r
 const executable = process.execPath;
 async function group(directory, name, code) { const file = join(directory, `${name}.test.mjs`); await writeFile(file, code, "utf8"); return { file }; }
 async function verify(groups, outputDirectory, timeoutMs = 1_000) { return runVerification({ groups, outputDirectory, timeoutMs, executable: process.execPath }); }
+test("Windows authority policy selection includes every admission/state child and rejects partial or unknown inventories", () => {
+  const selected = selectWindowsPolicyContractGroups("authority", requiredGroups);
+  assert.deepEqual(selected.map(g => g.file), ["scripts/run-isolated-tests.test.mjs", "tools/layout-studio/task-authority.test.mjs", "tools/layout-studio/receipt-authority-state.test.mjs"]);
+  assert.ok(selected.every(g => g.pattern === undefined));
+  for (const file of ["tools/layout-studio/task-authority.test.mjs", "tools/layout-studio/receipt-authority-state.test.mjs"]) {
+    assert.throws(() => selectWindowsPolicyContractGroups("authority", requiredGroups.filter(g => g.file !== file)), /inventory is missing/);
+    assert.equal(nativeTestOverrides(file, "win32").timeoutMs, 240000);
+  }
+  assert.throws(() => selectWindowsPolicyContractGroups("__proto__", requiredGroups), /exact declared/);
+  assert.equal(new Set(selectWindowsPolicyContractGroups(undefined, requiredGroups).map(g => g.file)).size, 8);
+});
+
 test("runner CLI help and unsupported arguments never start the default verification manifest", () => {
   const entry = fileURLToPath(new URL("./run-isolated-tests.mjs", import.meta.url));
   const run = args => execFileSync(process.execPath, [entry, ...args], { encoding: "utf8", timeout: 5000, stdio: ["ignore", "pipe", "pipe"] });

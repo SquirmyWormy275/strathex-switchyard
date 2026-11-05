@@ -36,3 +36,18 @@ export function selectWindowsStorageScenario(suite, requiredGroups) {
   // Validate the entire file inventory before selecting one declared shard.
   return selectWindowsContractGroups([expected.file], requiredGroups).filter(group => group.pattern === expected.pattern);
 }
+
+// Admission and receipt-time state checks stay in independent bounded children.
+export const windowsPolicyContractFiles = Object.freeze({
+  policy: Object.freeze(["tools/layout-studio/repository-windows-execution.test.mjs"]),
+  recovery: Object.freeze(["tools/layout-studio/repository-windows-execution-recovery.test.mjs"]),
+  stop: Object.freeze(["tools/layout-studio/repository-windows-execution-stop.test.mjs"]),
+  output: Object.freeze(["tools/layout-studio/repository-windows-execution-output.test.mjs"]),
+  authority: Object.freeze(["tools/layout-studio/task-authority.test.mjs", "tools/layout-studio/receipt-authority-state.test.mjs"]),
+  "host-stop": Object.freeze(["tools/layout-studio/repository-execution-stop.test.mjs"])
+});
+export function selectWindowsPolicyContractGroups(suite, requiredGroups) {
+  if (suite !== undefined && !Object.hasOwn(windowsPolicyContractFiles, suite)) throw Error("Choose an exact declared Windows policy suite.");
+  const files = ["scripts/run-isolated-tests.test.mjs", ...(suite === undefined ? Object.values(windowsPolicyContractFiles).flat() : windowsPolicyContractFiles[suite])];
+  return selectWindowsContractGroups(files, requiredGroups);
+}

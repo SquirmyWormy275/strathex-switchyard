@@ -75,6 +75,15 @@
   "ownedComparisonCleanupReceipt": "protected-read-comparison-cleanup-1793914411056.json",
   "ownedComparisonWorktreeFixturesAndAliasRemoved": true,
   "newSdkInstalled": false,
-  "completeCurrentLinuxRunPassed": false,
-  "newSourceInstalledAcceptance": false
+  "newSourceInstalledAcceptance": false,
+  "completeLinuxAtOriginalFocusedCheckpoint": false,
+  "completeLinuxFollowup": {
+    "sourceCommit": "9dc0a944f7ecbbf39d7936b89ccc9297d69f9f80",
+    "receipt": "isolated-test-110e9e17-a41f-4b05-baf7-8e8dd7781d97.json",
+    "groups": 235,
+    "passedTests": 1445,
+    "declaredSkips": 10,
+    "allChildCleanup": true,
+    "ownedCheckoutFixturesAndAliasesRemoved": true
+  }
 }

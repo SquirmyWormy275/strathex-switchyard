@@ -144,6 +144,12 @@ identify each source checkpoint and practical limit. Interactive Windows accepta
 physical acceptance and approved Microsoft tenant tests remain open. All 27 B122
 acceptance gates remain **NOT ACCEPTED**. Source availability is not acceptance.
 
+The latest complete Linux code checkpoint, `9dc0a944`, passes **235 groups** with
+**1,445 passed tests** and ten declared skips. Windows client contracts pass
+**73 checks**; a separate Windows authority file hit its deadline. That attempt remains failed;
+the reorganized admission/state cohort awaits native Windows verification.
+[Source-specific evidence and remaining limits](docs/verification.md).
+
 ## Engineering and contribution
 
 The repository develops an explicit intent boundary: a key asks for an operation;
