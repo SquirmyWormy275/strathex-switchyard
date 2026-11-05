@@ -6,7 +6,7 @@ Revision 2 supersedes any earlier first-slice ceiling. All required suite module
 | Milestone | Work | Dependency / status |
 | --- | --- | --- |
 | A | Isolated integration; product split; runnable Studio; recorder and Codex work retained; live device discovery | In progress |
-| B | Shared proposal/direct model; compatibility review; private baseline; bounded host apply/readback/trial/restore; F77 identity and configuration | Host loop first; F77 currently absent |
+| B | Shared proposal/direct model; compatibility review; private baseline; bounded host apply/readback/trial/restore; F77 identity and configuration | Current F77 readout/source match pass; physical transactions and typing acceptance remain open |
 | C | Agent-authored proposals; workflow aggregates; exact Codex task controls; Claude Code hooks and exact sessions; Microsoft 365 Copilot investigation | Existing inventory retained; new adapter controls pending |
 | D | Portable profile migration; guest/keyboard-only and Copilot-only scenarios; Windows shortcuts/device access; native Windows verification | Portable model first; Windows host unavailable |
 | E | Required controller adapters, broader observation/voice, SDK, policy/storage, Linux/Windows installation | Implement now; hardware/provider acceptance is separate |

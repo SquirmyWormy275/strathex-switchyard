@@ -74,8 +74,12 @@ an explicit recovery-pending transaction across restart.
 USB interface identity and firmware UID are configuration evidence, not hardware
 attestation. A firmware UID can be shared across units; serial-less interfaces
 depend on their current OS path. Real reconnection and operator checks remain
-part of hardware acceptance. No F77 hardware transaction is accepted while the
-pilot device is absent.
+part of hardware acceptance. The connected pilot now passes read-only discovery, complete configuration
+readout and exact source-definition reconciliation. No physical write transaction,
+unlock, typing or hotplug acceptance is inferred. Linux uses the pinned wheel’s
+`hidraw` backend, preserving exact FF60/61 usage selection and existing narrow
+kernel permissions; Windows keeps its native `hid` backend. Discovery opens no
+keyboard.
 
 ## Consented physical-key diagnostic
 

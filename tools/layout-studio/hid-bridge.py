@@ -10,7 +10,13 @@ import json
 import lzma
 import sys
 
-import hid
+# The pinned Linux wheel ships both backends. Its libusb `hid` enumeration can
+# omit usage/descriptor fields and needs USB-device access; use the existing
+# kernel hidraw interface so exact usage matching and narrow uaccess work.
+if sys.platform.startswith("linux"):
+    import hidraw as hid
+else:
+    import hid
 
 
 def inventory():

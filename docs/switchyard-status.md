@@ -8,6 +8,25 @@ behind each accepted result.
 
 ## Active backend iteration
 
+Current F77 discovery and read-only configuration capture pass with the Linux
+`hidraw` backend already shipped by the pinned runtime. The libusb backend
+reported zero usage fields and silently hid its configuration interface. No
+permission, driver or desktop change was required. VIA 9 / Vial 4 reports three
+8 × 11 layers; the complete definition and UID match the pinned F77 source.
+Classic and Ultra Compact remain separate case choices. Ninety read/query
+reports, no unlock/configuration/flash/reset/electrical command. Protected live
+snapshot and `f77-live-readout-1793841566987.json` retained; normal installed-app
+update and readout still pending. The platform-backend regression passes along
+with all eighteen device tests. Typing, hotplug and physical writes remain open.
+
+Complete Linux `f8591fe` passes 165/165 groups: 1,083 tests, 1,073 passed and ten
+declared skips. Receipt `06f341a4-bc1a-4729-8628-5df92ec427be` retained; all child
+cleanup verified, temporary fixtures and disposable checkout removed. Native
+Windows rerun `41946814568` stops at exact service removal: original service
+exit passes, SCM absence does not. Its new bounded result identifies phase
+`service-absence`. The volume proof was not reached; the ACL correction remains
+unaccepted. Investigate the original service handle/delete lifetime.
+
 Native `f2285b8` passes both setup/service lifecycles (six plus thirteen checks
 each) and all 106 portable crypto/journal/fact checks on Windows. Four downloaded
 archive digests verified; receipts retained. The actual exchange fails its first

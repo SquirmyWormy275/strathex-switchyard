@@ -5,6 +5,34 @@ import { compileMacro, editMacroBuffer } from "./vial-macros.mjs";
 import { editLayoutOptions } from "./device-proposal.mjs";
 import { compileDeviceKey } from "./vial-keycodes.mjs";
 import { qmkSettings, readQmkSettings } from "./vial-settings.mjs";
+import { execFileSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
+
+test("the private bridge uses Linux hidraw metadata and the native Windows backend without opening a keyboard during discovery",()=>{
+  const source=fileURLToPath(new URL("./hid-bridge.py",import.meta.url));
+  const program=`import sys,types,io,json,runpy,contextlib,lzma,hashlib,base64
+platform=sys.argv[2];calls={"hid":0,"hidraw":0,"opened":0,"writes":0}
+raw={"vendor_id":0x1209,"product_id":0x4704,"serial_number":"synthetic","interface_number":1,"usage_page":0xff60,"usage":0x61,"path":b"synthetic-raw","product_string":"Synthetic F77"}
+keyboard={**raw,"interface_number":0,"usage_page":1,"usage":6,"path":b"synthetic-typing"}
+def backend(name):
+ module=types.ModuleType(name)
+ def enumerate():
+  calls[name]+=1
+  return [raw,keyboard]if name=="hidraw"or platform=="win32"else[{**raw,"usage_page":0,"usage":0}]
+ def device():
+  calls["opened"]+=1
+  raise AssertionError("Discovery cannot open a device")
+ module.enumerate=enumerate;module.device=device;return module
+sys.modules["hid"]=backend("hid");sys.modules["hidraw"]=backend("hidraw");sys.platform=platform
+sys.stdin=io.TextIOWrapper(io.BytesIO(b'{"id":1,"method":"list"}\\n'));output=io.StringIO()
+with contextlib.redirect_stdout(output):runpy.run_path(sys.argv[1],run_name="__main__")
+print(json.dumps({"reply":json.loads(output.getvalue()),"calls":calls}))`;
+  for(const platform of ["linux","win32"]){
+    const result=JSON.parse(execFileSync(process.platform==="win32"?"python.exe":"/usr/bin/python",["-I","-B","-c",program,source,platform],{encoding:"utf8",timeout:10000,maxBuffer:16384}));
+    assert.equal(result.reply.id,1);assert.equal(result.reply.result.length,1);assert.equal(result.reply.result[0].candidateProtocol,"vial");assert.equal(result.reply.result[0].usage_page,0xff60);assert.equal(result.reply.result[0].interface_number,1);
+    assert.deepEqual(result.calls,{hid:platform==="win32"?1:0,hidraw:platform==="linux"?1:0,opened:0,writes:0});
+  }
+});
 
 function fixture() {
   const deviceId = "a".repeat(64), definition = { name: "Synthetic configuration device", matrix: { rows: 1, cols: 2 }, layouts: { keymap: [["0,0", "0,1"]], labels: [["Enter", "ANSI", "ISO", "Big"], "Split"] } };

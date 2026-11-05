@@ -85,7 +85,7 @@ uncertain outcomes remain unchanged. Provider replies do not establish coding-ta
 These checks do not prove a finished keyboard/agent appliance. General coding-task
 controls, physical role shortcut selection in the frontend, platform lifecycle acceptance, profile-library visual acceptance,
 expanded device editing controls, complete device settings and final UI acceptance remain unfinished.
-The complete Linux runner checkpoint at `4f995d4` passes 165 groups: 1,068 tests passed and
+The complete Linux runner checkpoint at `f8591fe` passes 165 groups: 1,073 tests passed and
 ten declared platform skips. Windows filesystem CI passes all 30 native checks,
 including bounded volume disk-full, exact detach and mapping admission. The full
 Windows worker/runtime checkpoint passes 261 groups: 1,690 tests passed and 48
@@ -95,7 +95,7 @@ also connects separately reviewed local-gate and clean-reproduction recipes to
 the isolated runner and authenticated evidence. Personal host setup now has reviewed install/remove and a fixed native boundary.
 The new bounded storage service engine awaits native acceptance; its normal
 task/guest connection remains unfinished. [Verification details](docs/verification.md)
-identify each source checkpoint and practical limit. Interactive Windows acceptance remains open. F77 physical acceptance awaits reconnection; B122
+identify each source checkpoint and practical limit. Interactive Windows acceptance remains open. Current F77 discovery and readout pass; ordinary typing, hotplug and physical writes remain unaccepted. B122
 physical acceptance and approved Microsoft tenant tests remain open. All 27 B122
 acceptance gates remain **NOT ACCEPTED**. Source availability is not acceptance.
 
