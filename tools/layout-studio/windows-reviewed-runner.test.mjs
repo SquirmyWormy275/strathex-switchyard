@@ -22,13 +22,13 @@ test("an empty Windows workspace opens without optional Run prerequisites, while
 
 // Explicit native service/VM doubles; encrypted state, file reads and kernel
 // leases are real. No disk, VM, account, keyboard or runtime copy is created.
-async function fixture(t, { broker = false } = {}) {
+async function fixture(t, { broker = false, action = "run_target" } = {}) {
   const stage = await mkdtemp(join(tmpdir(), "switchyard-windows-runner-contract-")), root = join(stage, "repository"), stateDirectory = join(stage, "runs"), keys = new Map(), calls = [], consumers = [], services = [];
   await mkdir(root); const secrets = { get: async (c,p) => keys.get(c+p), set: async (c,p,v) => { keys.set(c+p,v); } };
   const store = createSuiteStore({ root: join(stage, "private"), secrets }); await store.initialize("personal"); await store.update("personal", "fixture", state => { state.mode = "personal-companion"; });
-  const runtime = "b".repeat(64), program = Buffer.from("process.stdout.write('synthetic')"), catalog = Buffer.from(JSON.stringify({ schema: "sxsy-b122.windows-sandbox-catalog", version: 1, recipes: [{ id: "run_target", executable: "C:\\B122\\tools\\node.exe", executableSha256: runtime, arguments: ["{INPUT_ROOT}\\program.mjs"], workingRoot: "work", workingDirectory: ".", environment: {}, timeoutMs: 5000, maxOutputBytes: 4096, artifacts: [] }] }));
+  const runtime = "b".repeat(64), program = Buffer.from("process.stdout.write('synthetic')"), catalog = Buffer.from(JSON.stringify({ schema: "sxsy-b122.windows-sandbox-catalog", version: 1, recipes: [{ id: action, executable: "C:\\B122\\tools\\node.exe", executableSha256: runtime, arguments: ["{INPUT_ROOT}\\program.mjs"], workingRoot: "work", workingDirectory: ".", environment: action === "run_target" ? {} : { NODE_ENV: "test" }, timeoutMs: 5000, maxOutputBytes: 4096, artifacts: [] }] }));
   const input = (path, bytes) => ({ path, sha256: sha(bytes), size: bytes.length, classification: "non-production" });
-  const manifest = Buffer.from(JSON.stringify({ schema: "switchyard-windows-reviewed-run/v1", version: 1, recipeId: "run_target", catalogPath: "guest.json", catalogSha256: sha(catalog), inputFiles: [input("program.mjs", program), input("guest.json", catalog)] }));
+  const manifest = Buffer.from(JSON.stringify({ schema: "switchyard-windows-reviewed-run/v1", version: 1, recipeId: action, catalogPath: "guest.json", catalogSha256: sha(catalog), inputFiles: [input("program.mjs", program), input("guest.json", catalog)] }));
   for (const [path, bytes] of [["run.json",manifest],["guest.json",catalog],["program.mjs",program]]) await writeFile(join(root,path),bytes);
   const context = { operationId: randomUUID(), scopeDigest: "a".repeat(64), provider: "codex" }, plan = { repositoryRoot: root, sourceIdentity: { device: "1", inode: "2" }, manifestPath: "run.json", manifestSha256: sha(manifest), allowedFiles: [["run.json",manifest],["guest.json",catalog],["program.mjs",program]].map(([path,bytes]) => ({ path,digest:`sha256:${sha(bytes)}` })) };
   let brokerStatus = "available", brokerProbes = 0; let recoverCalls = 0; let active = true, guestExited = true, unknownExit = false, cleanupAllowed = true, hold = false, stageHold = false, enter, releaseStage, stageEntered, hook = async () => {};
@@ -53,7 +53,7 @@ async function fixture(t, { broker = false } = {}) {
   const backendFactory = options => ({ execute: async request => {
     if (broker) assert.deepEqual(options.allowedTaskRoots, [root, stateDirectory, request.reviewedExchange.nativeBinding.stagingRoot]);
     else assert.deepEqual(options.allowedTaskRoots, [root, stateDirectory]);
-    calls.push("backend"); assert.equal(request.profile,"full_sandbox"); assert.equal(request.recipeId,"run_target"); assert.equal(options.requireReviewedInputs,true); assert.equal(options.requireBoundedExchange,true); assert.equal(options.runner.operationId,request.operationId); assert.equal(request.reviewedInputs.operationId,request.operationId); assert.equal(request.reviewedExchange.operationId,request.operationId); assert.equal(request.expectedHelperSha256,identities.helperSha256); assert.equal(request.expectedRecipeCatalogSha256,sha(catalog));
+    calls.push("backend"); assert.equal(request.profile,"full_sandbox"); assert.equal(request.recipeId,action); assert.equal(options.requireReviewedInputs,true); assert.equal(options.requireBoundedExchange,true); assert.equal(options.runner.operationId,request.operationId); assert.equal(request.reviewedInputs.operationId,request.operationId); assert.equal(request.reviewedExchange.operationId,request.operationId); assert.equal(request.expectedHelperSha256,identities.helperSha256); assert.equal(request.expectedRecipeCatalogSha256,sha(catalog));
     await options.effectGuard.check(); guestExited = false; await hook("backend"); enter();
     if (hold) await new Promise(resolve=>{request.signal.addEventListener("abort",resolve,{once:true});if(request.signal.aborted)resolve();});
     guestExited = !unknownExit; return {status:request.signal.aborted?"cancelled":"completed",summary:"Synthetic backend result",receiptPath:join(stage,"synthetic-receipt.json")};
@@ -61,7 +61,7 @@ async function fixture(t, { broker = false } = {}) {
   const create = (otherStore=store) => { const service=createWindowsReviewedRunner({store:otherStore,stateDirectory,platform:"win32",pins:async()=>identities,servicesFactory,backendFactory,isActive:async()=>active});services.push(service);return service; };
   const runner = create();
   t.after(async()=>{active=true;guestExited=true;cleanupAllowed=true;identities.helperSha256="c".repeat(64);identities.nodeVersion="24.14.0";identities.recipeRuntime.sha256=runtime;releaseStage();for(const service of services){await service.recover("personal");await service.close();}await rm(stage,{recursive:true,force:true});});
-  return {brokerStatus:value=>{brokerStatus=value;},brokerProbes:()=>brokerProbes,preflight:value=>{preflight=value;},preflightValue:()=>structuredClone(preflight),preflights:()=>preflights,recoverCalls:()=>recoverCalls,store,runner,create,context,plan,calls,consumers,identities,entered,staged,releaseStage,run:(binding=context,proposed=plan)=>runner.run("personal",binding,proposed,async()=>{}),hold:()=>{hold=true;},holdStaging:()=>{stageHold=true;},unknownExit:()=>{unknownExit=true;},observeExit:()=>{guestExited=true;unknownExit=false;},active:value=>{active=value;},cleanup:value=>{cleanupAllowed=value;},hook:fn=>{hook=fn;},otherStore:()=>createSuiteStore({root:join(stage,"private"),secrets})};
+  return {brokerStatus:value=>{brokerStatus=value;},brokerProbes:()=>brokerProbes,preflight:value=>{preflight=value;},preflightValue:()=>structuredClone(preflight),preflights:()=>preflights,recoverCalls:()=>recoverCalls,store,runner,create,context,plan,calls,consumers,identities,entered,staged,releaseStage,run:(binding=context,proposed=plan)=>runner.run("personal",binding,proposed,async()=>{},undefined,action),hold:()=>{hold=true;},holdStaging:()=>{stageHold=true;},unknownExit:()=>{unknownExit=true;},observeExit:()=>{guestExited=true;unknownExit=false;},active:value=>{active=value;},cleanup:value=>{cleanupAllowed=value;},hook:fn=>{hook=fn;},otherStore:()=>createSuiteStore({root:join(stage,"private"),secrets})};
 }
 test("missing Sandbox or storage privileges settle as unavailable before staging and cannot replay their consumed operation",async t=>{
  for(const missing of ["alias","privilege"]){const f=await fixture(t),preflight=f.preflightValue();if(missing==="alias")preflight.status="unavailable";else Object.assign(preflight.storage,{privilegeAssigned:false,requiresPrivilegedSetup:true});f.preflight(preflight);
@@ -149,4 +149,14 @@ test("retained broker assets cannot be ignored after a lost Run cleanup write an
   await assert.rejects(f.run(), /native owners and storage/); assert.deepEqual(f.calls, []);
   assert.equal((await f.runner.recover("personal")).cleaned, true); assert.deepEqual(f.calls, ["cleanup-images"]);
   await f.store.update("personal", "fixture-orphan-retirement-persisted", s => { s.repositoryWindowsBrokerExchanges[0].cleanupPending = false; });
+});
+
+test("Windows pipeline actions retain the original reviewed catalog, native profile and storage cleanup path", async t => {
+ for (const action of ["pipeline_local_gate", "pipeline_clean_reproduction"]) {
+  const f = await fixture(t, { action, broker: true });
+  assert.equal((await f.run()).status, "completed");
+  const row = (await f.store.snapshot("personal")).repositoryWindowsRuns[0]; assert.equal(row.action, action); assert.equal(row.cleanupPending, false); assert.equal(row.nativeExitVerified, true);
+  assert.equal((await f.run()).replayed, true); assert.equal(f.calls.filter(c => c === "backend").length, 1);
+  await assert.rejects(f.runner.run("personal", f.context, f.plan, async () => {}, undefined, "run_target"), /different exact review/);
+ }
 });

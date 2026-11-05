@@ -7,6 +7,25 @@ records exact source checkpoints and receipts.
 
 ## Current backend
 
+Windows local gate and clean reproduction now connect exact task grants,
+reviewed Node catalogs, checkpoints/budgets, the existing owned guest/storage
+path and freshly authenticated pipeline reports. Signed feed versions/hashes are
+bound without mapping their keys/bytes into the guest. Lost observations cannot
+be upgraded from native program success or replayed on recovery. Current checks
+pass 35 evidence/policy/parser/harness/package cases, 22 existing Run/owner cases
+and one explicit restart/lost-ack case, plus 27 existing recovery/stop/output/Suite
+regressions, with type checking; guest execution is
+doubled. Native pipeline acceptance remains pending. [Contract](windows-pipelines.md).
+
+The corrected native matrix at `25bd26c` passes all twelve complete contract
+jobs, including eleven maintenance, four removal and 34 actual backend cases.
+Their archive digests and child cleanup verified. Its separate native lifecycle
+job fails service-absence verification after eight actual JavaScript-owner and
+31 restricted-client exchange checks pass; `windows-exchange-25b-removal-failed.json`
+is retained as failed. Investigate that exact native removal boundary; no broad
+cleanup or deadline extension is inferred. Prior accepted native runs remain
+separate evidence.
+
 A Windows Run caller/profile mismatch is corrected: `run_target` now uses the
 backend's supported `full_sandbox` profile. Its fixed deny-network, read-only
 input and bounded-exchange controls remain; no persistent volumes are selected.
@@ -18,9 +37,9 @@ Native `403e0c9` passes all seventeen fixture registry cases; artifact digest an
 child cleanup verified. The fifteen-case maintenance file hit its original
 120-second bound after thirteen passes. Its failed receipt is preserved.
 Maintenance and removal now have separate inventory groups and native matrix
-jobs under the same 120-second bound, retaining all cases. The new required
-Linux inventory has 169 groups; the ongoing complete 168-group run remains tied
-to immutable `403e0c9`. Native profile/split acceptance is pending.
+jobs under the same 120-second bound, retaining all cases. The new required Linux inventory has 172 groups. The completed 168-group
+`403e0c9` run is recorded below; native profile/split checks pass at `25bd26c`
+while its separate lifecycle failure remains open.
 
 Aggregate signed-fixture storage and separately reviewed removal are implemented.
 Each compartment reserves manifest plus content bytes atomically before copying,
@@ -113,8 +132,10 @@ Current installed source is `403e0c9`, release
 `c41ad33e45fd0e1accd5b4b0cad0f6b0abb0b7d6729f2c5c2fd7536fb51101aa`.
 Receipts `assignment-legends-1793847745744.json` (six update checks) and
 `installed-signed-fixtures-1793847762267.json` (eleven API checks) verify the
-new quota/removal journey and complete restoration described above. The complete
-168-group Linux lane is running from this immutable source in a separate checkout.
+new quota/removal journey and complete restoration described above. The complete 168-group Linux lane passes at this immutable source: 1,121
+tests, 1,111 passed, ten declared skips. Receipt
+`13be1a30-2e93-4b87-8a94-9a1953285b9f` retained, every child cleanup verified
+and owned fixtures/checkout removed.
 
 Previous installed `27e0eb3`, release
 `6fdc54437d76707a04ff4daa303565df3e145bc1314aff49b61dd89fec0e3193`,
@@ -162,7 +183,7 @@ checking pass. The normal Suite's compartment API and Linux pipeline connection
 are now implemented above; their installed and native Windows acceptance remain
 separate pending checks.
 
-Windows pipelines, complete Shield/scanner execution, writable build
+Complete Shield/scanner execution, writable build
 preparation, exact desktop/IDE/terminal attachments and the remaining frontend
 controls are unfinished implementation. The task requirement remains the full
 suite. Claude Code is only a token-limit contingency; no delegated coding job

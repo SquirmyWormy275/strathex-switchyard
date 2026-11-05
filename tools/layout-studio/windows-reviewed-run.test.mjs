@@ -73,3 +73,12 @@ test("invalid UTF-8 cannot produce a different host review from the native guest
  const d=documents(),invalid=Buffer.concat([d.bytes.subarray(0,-1),Buffer.from([0xff]),d.bytes.subarray(-1)]);
  assert.throws(()=>parseWindowsReviewedRun(invalid,sha(invalid)));
 });
+
+test("Windows pipeline catalogs require their exact granted action and explicit non-production environment", () => {
+ for (const action of ["pipeline_local_gate", "pipeline_clean_reproduction"]) {
+  const d = documents(r => ({ ...r, id: action, environment: { NODE_ENV: "test" } })), bytes = Buffer.from(JSON.stringify({ ...d.manifest, recipeId: action }));
+  const manifest = parseWindowsReviewedRun(bytes, sha(bytes), action); assert.equal(parseWindowsRunCatalog(d.catalog, manifest, runtime).id, action);
+  assert.throws(() => parseWindowsReviewedRun(bytes, sha(bytes)), /fixed Run recipe/);
+  for (const environment of [{}, { NODE_ENV: "production" }]) { const invalid = documents(r => ({ ...r, id: action, environment })); assert.throws(() => parseWindowsRunCatalog(invalid.catalog, { ...invalid.manifest, recipeId: action }, runtime), /NODE_ENV=test/); }
+ }
+});

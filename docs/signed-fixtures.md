@@ -103,7 +103,8 @@ The combined controller file exceeded its original 120-second bound after
 thirteen passing cases. Its digest-verified failed receipt remains
 `windows-fixture-maintenance-failed-403.json`. Maintenance and removal now run
 independently under the same original bound, with all fifteen cases retained;
-native rerun is pending. The new
+native `25bd26c` passes both complete files with archive digests/child cleanup
+verified (`windows-fixture-{maintenance,removal}-25b.json`). The new
 quota/removal implementation passes 88 combined controller, registry, service,
 HTTP/privacy, harness and package checks plus two additional linked/legacy
 registry cases, with type checking. Normal installed `403e0c9` passes six update and eleven API checks: quota

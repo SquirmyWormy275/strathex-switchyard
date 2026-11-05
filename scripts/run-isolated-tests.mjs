@@ -114,7 +114,7 @@ export function nativeTestOverrides(file, platform = process.platform) {
   if (platform === "win32" && file === "tools/layout-studio/suite.test.mjs") return { timeoutMs: 120_000 };
   if (platform === "win32" && file === "tools/layout-studio/repository-execution.test.mjs") return { timeoutMs: 480_000 };
   if (platform === "win32" && file === "tools/layout-studio/task-authority.test.mjs") return { timeoutMs: 240_000 };
-  if (platform === "win32" && ["repository-windows-execution", "repository-windows-execution-recovery", "repository-windows-execution-stop", "repository-windows-execution-output"].some(name => file === `tools/layout-studio/${name}.test.mjs`)) return { timeoutMs: 300_000 };
+  if (platform === "win32" && ["repository-windows-pipeline", "repository-windows-pipeline-recovery", "repository-windows-execution", "repository-windows-execution-recovery", "repository-windows-execution-stop", "repository-windows-execution-output"].some(name => file === `tools/layout-studio/${name}.test.mjs`)) return { timeoutMs: 300_000 };
   if (file === "tools/layout-studio/windows-exchange-images.test.mjs") return { timeoutMs: platform === "win32" ? 240_000 : 120_000 };
   if (file === "tools/layout-studio/repository-recovery.test.mjs") return { timeoutMs: 120_000 };
   const protectedNativeGroups = ["claude-coding", "agents-claude", "conversation-bindings", "codex-submissions", "claude-submissions", "windows-reviewed-inputs", "windows-sandbox-native", "windows-sandbox-sessions", "windows-guest-tools", "windows-exchange-images", "windows-broker-exchanges", "scanner-fixtures", "scanner-fixture-removal", "windows-reviewed-runner", "repository-windows-execution"].map((name) => `tools/layout-studio/${name}.test.mjs`);
@@ -157,6 +157,9 @@ export const requiredGroups = [
   { file: "tools/layout-studio/windows-reviewed-run.test.mjs" },
   { file: "tools/layout-studio/windows-reviewed-runner.test.mjs", ...nativeTestOverrides("tools/layout-studio/windows-reviewed-runner.test.mjs") },
   { file: "tools/layout-studio/repository-windows-execution.test.mjs", ...nativeTestOverrides("tools/layout-studio/repository-windows-execution.test.mjs") },
+  { file: "tools/layout-studio/repository-windows-pipeline.test.mjs", ...nativeTestOverrides("tools/layout-studio/repository-windows-pipeline.test.mjs") },
+  { file: "tools/layout-studio/repository-windows-pipeline-recovery.test.mjs", ...nativeTestOverrides("tools/layout-studio/repository-windows-pipeline-recovery.test.mjs") },
+  { file: "tools/layout-studio/windows-pipeline-evidence.test.mjs" },
   { file: "tools/layout-studio/repository-windows-execution-recovery.test.mjs", ...nativeTestOverrides("tools/layout-studio/repository-windows-execution-recovery.test.mjs") },
   { file: "tools/layout-studio/repository-windows-execution-stop.test.mjs", ...nativeTestOverrides("tools/layout-studio/repository-windows-execution-stop.test.mjs") },
   { file: "tools/layout-studio/repository-windows-execution-output.test.mjs", ...nativeTestOverrides("tools/layout-studio/repository-windows-execution-output.test.mjs") },

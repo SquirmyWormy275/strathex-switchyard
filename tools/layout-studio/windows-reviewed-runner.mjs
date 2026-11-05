@@ -5,6 +5,7 @@ import { captureRepositoryExecutableIdentity } from "../../apps/windows-companio
 import { WindowsSandboxBackend } from "../../apps/windows-companion/src/windows-sandbox.ts";
 import { privateDirectory } from "./private-fs.mjs";
 import { scopeHash } from "./confirmations.mjs";
+import { connectedExecutionActions } from "./repository-execution-actions.mjs";
 import { loadWindowsReviewedRun } from "./windows-reviewed-run.mjs";
 import { createWindowsReviewedInputs } from "./windows-reviewed-inputs.mjs";
 import { createWindowsGuestTools } from "./windows-guest-tools.mjs";
@@ -135,9 +136,9 @@ export function createWindowsReviewedRunner({ store, stateDirectory, platform = 
       if (p.identities.nodeVersion !== "24.14.0") throw Error("Windows Run requires its pinned Node 24.14.0 prerequisite.");
       return structuredClone(p.identities);
     },
-    async run(c, context, plan, authorize, signal) {
+    async run(c, context, plan, authorize, signal, action = "run_target") {
       context = structuredClone(context); plan = structuredClone(plan);
-      if (platform !== "win32" || !context || Object.keys(context).sort().join() !== "operationId,provider,scopeDigest" || !uuid(context.operationId) || !digest(context.scopeDigest) || !["codex", "claude-code"].includes(context.provider) || typeof authorize !== "function"
+      if (!connectedExecutionActions("win32").includes(action) || platform !== "win32" || !context || Object.keys(context).sort().join() !== "operationId,provider,scopeDigest" || !uuid(context.operationId) || !digest(context.scopeDigest) || !["codex", "claude-code"].includes(context.provider) || typeof authorize !== "function"
         || !plan || Object.keys(plan).sort().join() !== "allowedFiles,manifestPath,manifestSha256,repositoryRoot,sourceIdentity") throw Error("Bind Windows Run only to one host-admitted task operation and exact reviewed file plan.");
       if (closed || [...resources.values()].some(resource => resource.compartment === c)) throw Error("Wait for the current owned Windows Run; no concurrent replacement was started.");
       const id = context.operationId, operationKey = key(c, id), planDigest = scopeHash(plan), resource = { compartment: c, controller: new AbortController(), consumerReleased: false, done: null };
@@ -150,14 +151,14 @@ export function createWindowsReviewedRunner({ store, stateDirectory, platform = 
           lease.assert(); await check(); p = await ports(); if (p.identities.nodeVersion !== "24.14.0") throw Error("Windows Run requires its pinned Node 24.14.0 prerequisite; no runtime was downloaded or substituted.");
           const prior = await get(c, id);
           if (prior) {
-            if (prior.planDigest !== planDigest || prior.scopeDigest !== context.scopeDigest || prior.provider !== context.provider) throw Error("The retained Windows Run belongs to a different exact review; no replay is available.");
+            if (prior.planDigest !== planDigest || prior.scopeDigest !== context.scopeDigest || prior.provider !== context.provider || (prior.action ?? "run_target") !== action) throw Error("The retained Windows Run belongs to a different exact review; no replay is available.");
             return { ...(prior.result ?? { status: "incomplete", summary: "The original Windows Run remains unconfirmed." }), replayed: true, providerTaskCompletionVerified: false };
           }
           await p.sessions.recover(c);
           const retained = await store.snapshot(c);
           if ([retained.repositoryWindowsRuns, retained.repositoryWindowsImages, retained.repositoryWindowsBrokerExchanges].some(rows => rows?.some(row => row.cleanupPending))) throw Error("Reconcile the existing Windows Run's native owners and storage before another run.");
-          const loaded = await loadWindowsReviewedRun({ ...plan, recipeRuntimeSha256: p.identities.recipeRuntime.sha256 }); await check();
-          await store.update(c, "windows-run-reserve", state => { const rows = state.repositoryWindowsRuns ?? []; if (rows.some(row => row.operationId === id || row.cleanupPending)) throw Error("The Windows Run reservation changed."); state.repositoryWindowsRuns = [...rows.slice(-32), { schema, ...context, planDigest, status: "executing", phase: "reserved", cleanupPending: true, createdAt: now() }]; }); reserved = true; resource.reserved = true;
+          const loaded = await loadWindowsReviewedRun({ ...plan, expectedAction: action, recipeRuntimeSha256: p.identities.recipeRuntime.sha256 }); await check();
+          await store.update(c, "windows-run-reserve", state => { const rows = state.repositoryWindowsRuns ?? []; if (rows.some(row => row.operationId === id || row.cleanupPending)) throw Error("The Windows Run reservation changed."); state.repositoryWindowsRuns = [...rows.slice(-32), { schema, ...context, action, planDigest, status: "executing", phase: "reserved", cleanupPending: true, createdAt: now() }]; }); reserved = true; resource.reserved = true;
           const preflight = await p.sessions.metadata(c,context,check,signal); await check();
           const storage = validateWindowsStoragePrerequisites(preflight.storage);
           if (!["available","unavailable"].includes(preflight.status) || preflight.effectStarted !== false) throw Error("The native Windows Run preflight did not verify.");
@@ -188,7 +189,7 @@ export function createWindowsReviewedRunner({ store, stateDirectory, platform = 
           if (exchange.nativeBinding?.broker) allowedTaskRoots.push(exchange.nativeBinding.stagingRoot);
           const runner = p.sessions.forOperation(c, context, check), backend = backendFactory({ allowedTaskRoots, stateRoot: backendRoot, helperDirectory: tools.root, helperFilename: tools.helperFilename, jobManifestRelativePath: loaded.manifest.catalogPath, requireReviewedInputs: true, requireBoundedExchange: true, timeoutMs: loaded.timeoutMs, maxProcessOutputBytes: loaded.recipe.maxOutputBytes, runner, effectGuard: { check: async () => { await check(); await tools.assertCurrent(); return { allowed: true, reason: "The exact host-admitted Windows Run remains current." }; } } });
           const combined = AbortSignal.any([resource.controller.signal, ...(signal ? [signal] : [])]);
-          const observed = await backend.execute({ targetRoot: plan.repositoryRoot, destinationRoot, profile: "full_sandbox", recipeId: "run_target", expectedRecipeCatalogSha256: loaded.manifest.catalogSha256, expectedHelperSha256: p.identities.helperSha256, reviewedInputs: input, reviewedExchange: exchange, operationId: id, signal: combined });
+          const observed = await backend.execute({ targetRoot: plan.repositoryRoot, destinationRoot, profile: "full_sandbox", recipeId: action, expectedRecipeCatalogSha256: loaded.manifest.catalogSha256, expectedHelperSha256: p.identities.helperSha256, reviewedInputs: input, reviewedExchange: exchange, operationId: id, signal: combined });
           lease.assert(); await update(c, id, "windows-run-backend-observed", row => { row.backendObservation = observed; });
           const nativeExitVerified = await p.sessions.consumerStopped(c, id);
           result = observed.status === "completed" && !nativeExitVerified || observed.status === "running"

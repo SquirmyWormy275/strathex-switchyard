@@ -219,7 +219,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        suite: [fixture-removal, backend-contract, fixture-registry, fixture-maintenance, harness, leases, legacy-images, broker-owner, sandbox-native, sandbox-sessions, reviewed-run, run-owner]
+        suite: [pipeline-recovery, pipeline-policy, pipeline-evidence, fixture-removal, backend-contract, fixture-registry, fixture-maintenance, harness, leases, legacy-images, broker-owner, sandbox-native, sandbox-sessions, reviewed-run, run-owner]
     env:
       npm_config_audit: "false"
       npm_config_fund: "false"
