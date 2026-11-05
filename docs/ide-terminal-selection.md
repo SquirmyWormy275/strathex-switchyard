@@ -73,3 +73,19 @@ native task or model request. Native TUI attachment remains an outstanding
 integration check, separate from unavailable hardware/account checks and the
 broader unfinished Studio-to-IDE task integration.
 [Exact parser/software evidence](evidence/native-codex-cli-parser-summary.json).
+
+Within the current extension lifetime, a newly created local Codex terminal now
+keeps the exact thread-session record on its VS Code object. Its later open event
+reuses that record, Shift Terminal can return to it despite a same-title neighbor,
+and closure marks the original thread's terminal surface unreachable. Generic
+provider adoption cannot relabel that binding. Closing a terminal does not prove
+that its native task stopped or completed. Extension reload does not reconstruct
+this object identity from titles or persisted thread metadata; cross-restart IDE
+attachment remains unfinished.
+
+Managed-session focus now requires one unique matching object, its current open
+workspace, unchanged thread/task binding and the same focused editor window. It
+uses bounded activation plus active-object readback. Linux comparisons preserve
+case and literal backslashes; only Windows comparisons fold case and normalize
+Windows separators, with drive roots distinct from drive-relative paths.
+[Software binding evidence](evidence/vscode-thread-terminal-binding-summary.json).

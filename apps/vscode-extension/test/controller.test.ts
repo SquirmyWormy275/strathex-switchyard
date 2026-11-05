@@ -64,7 +64,7 @@ import {
   type AutomationOperationProposal
 } from "../../../packages/control-plane/src/automation-operation-manifest.ts";
 import { authorityBroadcastReviewScopeDigest, type WorkflowArtifact } from "../../../packages/control-plane/src/workflow-artifacts.ts";
-import { deactivateManagedExtension, exactExtensionPackageVersion, ManagedSessionController, workflowResultPresentation } from "../src/controller.ts";
+import { deactivateManagedExtension, exactExtensionPackageVersion, ManagedSessionController, samePath, workflowResultPresentation } from "../src/controller.ts";
 import { chordFor, type B122Control, type B122Modifier } from "../src/commands.ts";
 import type { DebugConfigurationLike, DebugSessionLike, DisposableLike, ExtensionContextLike, QuickPickItemLike, TerminalLike, VscodeLike, WorkspaceFolderLike } from "../src/vscode-like.ts";
 
@@ -141,6 +141,16 @@ function readyContainmentIncident(repositoryRoot: string, fenceEpoch: number, ac
     rotation: { disposition: "not_required", evidenceReference: "reviewed", evidenceDigest: "b".repeat(64), reviewedAt: "2026-08-25T00:00:02.000Z" }
   };
 }
+
+test("exact host path comparisons preserve Linux case and literal backslashes while using Windows path semantics only on Windows", () => {
+  assert.equal(samePath("/work/Repo", "/work/repo", "linux"), false);
+  assert.equal(samePath("/work/a\\b", "/work/a/b", "linux"), false);
+  assert.equal(samePath("/work/repo/", "/work/repo", "linux"), true);
+  assert.equal(samePath("/", "", "linux"), false); assert.equal(samePath("/", "/", "linux"), true);
+  assert.equal(samePath("C:\\Work\\Repo\\", "c:/work/repo", "win32"), true);
+  assert.equal(samePath("C:\\", "c:/", "win32"), true); assert.equal(samePath("C:\\", "C:", "win32"), false);
+  assert.equal(samePath("/work/Repo", "/work/repo", "darwin"), false, "unverified volume case behavior cannot broaden exact identity");
+});
 
 class FakeTerminal implements TerminalLike {
   readonly sent: string[] = [];
@@ -1201,9 +1211,27 @@ test("Linux Codex start binds the App Server thread ID, task, repository, and ex
     assert.deepEqual(vscode.terminalOptions.at(-1)?.shellArgs, ["resume", "--remote", "unix:///synthetic/control.sock", "--sandbox", "read-only", "--ask-for-approval", "on-request", "--cd", root, "019a36f0-1345-7345-b123-123456789abc"]);
     assert.equal(bridge.registered.at(-1)?.metadata["sxsy-b122.codex.threadId"], "019a36f0-1345-7345-b123-123456789abc");
     assert.deepEqual(bridge.registered.at(-1)?.capabilities, ["registered"]);
+    const terminal = vscode.createdTerminals[0]!, registeredCount = bridge.registered.length;
+    await vscode.fireOpen(terminal);
+    assert.equal(bridge.registered.length, registeredCount, "the open event must reuse the exact thread binding instead of registering a phantom generic terminal");
+    assert.equal(controller.listKnownSessions().filter(session => session.surface === "vscode_terminal").length, 1);
+    const neighbor = vscode.api.window.createTerminal({ name: terminal.name, cwd: root });
+    bridge.nextDispatch = { status: "running", summary: "Exact integrated terminal awaits host acknowledgement.", data: {
+      hostActionId: `host-action:${"8".repeat(64)}`, hostActionKind: "focus_integrated_terminal", hostActionExpiresAt: "2099-01-01T00:00:00.000Z", hostActionWorkspaceRoot: root
+    } };
+    await controller.dispatchChord(chordFor("TERMINAL", "shift")!);
+    assert.equal(vscode.activeTerminal, terminal); assert.notEqual(vscode.activeTerminal, neighbor);
+    assert.equal(vscode.createdTerminals.length, 2, "the exact Codex terminal must be reused without creating another shell");
+    vscode.choose(terminal.name);
+    await vscode.invoke("sxsy-b122.adoptTerminal", { terminalName: terminal.name, provider: "claude" });
+    assert.equal(bridge.adopted.length, 0, "generic adoption cannot redirect a native thread binding to another provider");
     await vscode.invoke("sxsy-b122.showManagedSessions");
     const rows = vscode.quickPickSurfaces.at(-1)?.items ?? [];
     assert.ok(rows.some((row) => typeof row !== "string" && /active \(task-bound\)/.test(row.label) && row.detail?.includes("task task-7")));
+    await vscode.fireClose(terminal);
+    assert.equal(bridge.statuses.at(-1)?.sessionId, "codex-thread:019a36f0-1345-7345-b123-123456789abc");
+    assert.equal(bridge.statuses.at(-1)?.status, "unreachable");
+    assert.equal(controller.listKnownSessions().find(session => session.id === "codex-thread:019a36f0-1345-7345-b123-123456789abc")?.status, "unreachable");
   } finally {
     await controller.stop();
     await rm(root, { recursive: true, force: true });

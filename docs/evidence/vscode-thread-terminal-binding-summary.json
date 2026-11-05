@@ -1,0 +1,23 @@
+{
+  "schema": "switchyard-vscode-thread-terminal-binding-summary/v1",
+  "sourceParentCommit": "e2c56615c87b69c096f7229aebeebf6be2d9d5f4",
+  "softwareReceipt": "isolated-test-99ed40d5-5553-4b8f-967b-a77cff65f0d5.json",
+  "receiptSha256": "719cce345890d31db1deecccc607213947f0d28330e3c545196b790abf0e8a1f",
+  "groups": 3,
+  "checks": 136,
+  "allChildCleanup": true,
+  "typecheckPassed": true,
+  "extensionBuildPassed": true,
+  "controllerSha256": "8314b916cd1a809aea8e44614a6f1c7b84737e0744f510d83b58c32d9902abdf",
+  "openEventReusesExactThreadRecord": true,
+  "sameTitleNeighborDoesNotSubstitute": true,
+  "genericProviderAdoptionRefusedForFixedThread": true,
+  "closureUpdatesOriginalTerminalSurfaceIdentity": true,
+  "nativeTaskCompletionClaimed": false,
+  "linuxCaseAndLiteralBackslashesPreserved": true,
+  "windowsSemanticsRestrictedToWindows": true,
+  "nativeTuiAttachmentAccepted": false,
+  "crossRestartObjectAttachmentImplemented": false,
+  "fullStudioTaskAccountAttachmentImplemented": false,
+  "newNativeTaskOrModelRequest": false
+}

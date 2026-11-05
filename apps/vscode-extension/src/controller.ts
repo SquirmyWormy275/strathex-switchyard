@@ -101,7 +101,7 @@ interface StoredWindowState {
 
 interface TrackedTerminal {
   readonly sessionId: string;
-  readonly adoptionKey: string;
+  readonly adoptionKey?: string;
   adopted: boolean;
   session: ExtensionManagedSession;
 }
@@ -620,6 +620,7 @@ export class ManagedSessionController {
       const started = await this.startCodexThread(root, taskId);
       threadId = started.threadId;
       const shellArgs = codexTerminalResumeArguments(threadId, root, this.codexSocketPath);
+      if (this.terminalBySessionId.has(`codex-thread:${threadId}`)) throw new Error("The exact Codex thread already owns a terminal record; no replacement terminal was created.");
       await assertContextCurrent();
       const after = source ? await this.bridge.listSessions().catch(() => undefined) : undefined;
       const target = source && after?.ok && after.value.some((session) => session.id === source.id && session.provider === "codex"
@@ -653,6 +654,10 @@ export class ManagedSessionController {
         name: `SXSY Codex · ${taskId}`, cwd: root, shellPath: executable,
         shellArgs
       });
+      const record: TrackedTerminal = { sessionId: session.id, adopted: false, session: registered?.ok ? registered.value : session };
+      this.terminalRecords.set(terminal, record);
+      this.terminalBySessionId.set(session.id, record);
+      this.sessions.set(session.id, record.session);
       await revealExactTerminal(this.vscode.window, terminal, assertContextCurrent);
       await this.vscode.window.showInformationMessage(`SXSY-B122 opened Codex thread ${threadId} for task ${taskId}; target ${target ?? "unverified"}. Its runtime status does not imply a verified Switchyard outcome.`);
     } catch (error) {
@@ -1427,6 +1432,10 @@ export class ManagedSessionController {
     const terminal = await this.resolveTerminal(argument);
     if (!terminal) return;
     const record = await this.registerTerminal(terminal);
+    if (!record.adoptionKey) {
+      await this.vscode.window.showWarningMessage("SXSY-B122: this terminal is bound to its exact native Codex thread. Generic provider adoption cannot change that binding or its capabilities.");
+      return;
+    }
     if (record.adopted) {
       await this.vscode.window.showWarningMessage("SXSY-B122: this terminal has already been adopted. Its capability set remains unchanged.");
       return;
@@ -3403,9 +3412,17 @@ export class ManagedSessionController {
 
   private async focusManagedSession(session: ExtensionManagedSession): Promise<void> {
     if (session.surface === "vscode_terminal") {
-      const terminal = this.vscode.window.terminals.find((candidate) => this.terminalRecords.get(candidate)?.sessionId === session.id);
-      if (!terminal) throw new Error("The exact managed terminal is no longer open in this VS Code window.");
-      terminal.show();
+      const terminals = this.vscode.window.terminals.filter((candidate) => this.terminalRecords.get(candidate)?.sessionId === session.id);
+      if (terminals.length !== 1) throw new Error("The exact managed terminal is no longer open uniquely in this VS Code window.");
+      const terminal = terminals[0]!;
+      const record = this.terminalRecords.get(terminal)!;
+      const assertCurrent = () => {
+        this.assertAdmissionActive();
+        if (!this.vscode.window.state.focused || this.closedTerminals.has(terminal) || this.terminalRecords.get(terminal) !== record || record.sessionId !== session.id) throw new Error("The exact managed terminal or original window changed before focus.");
+        if (!session.workspaceRoot || !record.session.workspaceRoot || !samePath(record.session.workspaceRoot, session.workspaceRoot) || !(this.vscode.workspace.workspaceFolders ?? []).some(folder => samePath(folder.uri.fsPath, session.workspaceRoot!))) throw new Error("The exact managed-terminal workspace is no longer open in this VS Code window.");
+        if (record.session.metadata["sxsy-b122.kind"] === "codex-app-server-thread" && (record.session.taskId !== session.taskId || record.session.metadata["sxsy-b122.codex.threadId"] !== session.metadata["sxsy-b122.codex.threadId"])) throw new Error("The exact native Codex thread/task binding changed before terminal focus.");
+      };
+      await revealExactTerminal(this.vscode.window, terminal, assertCurrent);
       return;
     }
     if (session.surface === "vscode_window") { await this.executeCommand("workbench.action.focusActiveEditorGroup"); return; }
@@ -4954,8 +4971,14 @@ function parseUint16Text(value: string): number | undefined {
 function validateUint16Text(value: string): string | undefined { return parseUint16Text(value) === undefined ? "Enter a uint16 in decimal or 0x-prefixed hexadecimal." : undefined; }
 function formatUint16(value: number): string { return value.toString(16).padStart(4, "0"); }
 
-function samePath(left: string, right: string): boolean {
-  const normalize = (value: string) => value.replaceAll("\\", "/").replace(/\/+$/, "").toLowerCase();
+export function samePath(left: string, right: string, platform: NodeJS.Platform = process.platform): boolean {
+  if (!left || !right) return false;
+  const normalize = (value: string) => {
+    const native = platform === "win32" ? value.replaceAll("\\", "/").toLowerCase() : value;
+    if (native === "/") return native;
+    if (platform === "win32" && /^[a-z]:\/+$/i.test(native)) return native.slice(0, 2) + "/";
+    return native.replace(/\/+$/, "");
+  };
   return normalize(left) === normalize(right);
 }
 
