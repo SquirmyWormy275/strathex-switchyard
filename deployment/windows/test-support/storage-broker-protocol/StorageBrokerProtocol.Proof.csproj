@@ -13,6 +13,7 @@
     <Compile Include="../../../../apps/desktop-hotkeys/WindowsStorageBrokerExchangeProtocol.cs" Link="WindowsStorageBrokerExchangeProtocol.cs" />
     <Compile Include="../../../../apps/desktop-hotkeys/WindowsStorageBrokerExchangeJournal.cs" Link="WindowsStorageBrokerExchangeJournal.cs" />
     <Compile Include="../../../../apps/desktop-hotkeys/WindowsStorageBrokerExchangeFiles.cs" Link="WindowsStorageBrokerExchangeFiles.cs" />
+    <Compile Include="../../../../apps/desktop-hotkeys/WindowsStorageBrokerExchangeFacts.cs" Link="WindowsStorageBrokerExchangeFacts.cs" />
     <Compile Include="../../../../apps/desktop-hotkeys/WindowsStorageBrokerExchangeEngine.cs" Link="WindowsStorageBrokerExchangeEngine.cs" />
     <Compile Include="../../../../apps/desktop-hotkeys/ReviewedInputStager.cs" Link="ReviewedInputStager.cs" />
     <Compile Include="../../../../apps/desktop-hotkeys/BoundedExchangeVolume.cs" Link="BoundedExchangeVolume.cs" />

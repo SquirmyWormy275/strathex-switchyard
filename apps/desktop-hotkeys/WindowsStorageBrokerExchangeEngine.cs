@@ -11,12 +11,7 @@ internal static class WindowsStorageBrokerExchangeEngine
     private static WindowsStorageBrokerExchangeProtocol.Proof Unknown(bool effect) => new("outcome-unconfirmed", effect, false, false, false, false);
     private static JsonElement Image(WindowsStorageBrokerExchangeFiles files, string operationId)
     {
-        using var json = JsonDocument.Parse(files.ReadFact(operationId, "image.json"), new JsonDocumentOptions { MaxDepth = 4 });
-        string[] names = { "schema", "operationId", "stagingIdentity", "imageIdentity", "mountIdentity", "imageSha256", "footerSha256", "virtualBytes", "backingBytes" };
-        var seen = new HashSet<string>(StringComparer.Ordinal);
-        foreach (var property in json.RootElement.EnumerateObject()) if (!names.Contains(property.Name, StringComparer.Ordinal) || !seen.Add(property.Name)) throw Invalid();
-        if (seen.Count != names.Length || json.RootElement.GetProperty("schema").GetString() != "switchyard-windows-broker-image/v1" || json.RootElement.GetProperty("operationId").GetString() != operationId
-            || json.RootElement.GetProperty("virtualBytes").GetInt64() != WindowsStorageBrokerExchangeProtocol.VirtualBytes || json.RootElement.GetProperty("backingBytes").GetInt64() != WindowsStorageBrokerExchangeProtocol.BackingBytes) throw Invalid(); return json.RootElement.Clone();
+        return WindowsStorageBrokerExchangeFacts.Image(files.ReadFact(operationId, "image.json"), operationId);
     }
     private static JsonElement Volume(WindowsStorageBrokerInstallation.Settings settings, WindowsStorageBrokerExchangeFiles files, string operationId, JsonElement image, string action)
     {
@@ -31,9 +26,8 @@ internal static class WindowsStorageBrokerExchangeEngine
     }
     private static void OriginalVolume(WindowsStorageBrokerExchangeFiles files, string operationId, JsonElement volume)
     {
-        using var json = JsonDocument.Parse(files.ReadFact(operationId, "mount.json"), new JsonDocumentOptions { MaxDepth = 2 });
-        var value = json.RootElement;
-        if (value.EnumerateObject().Count() != 3 || value.GetProperty("schema").GetString() != "switchyard-windows-broker-mount/v1" || value.GetProperty("operationId").GetString() != operationId || value.GetProperty("volume").GetString() != volume.GetProperty("volume").GetString()) throw Invalid();
+        string original = WindowsStorageBrokerExchangeFacts.Mount(files.ReadFact(operationId, "mount.json"), operationId);
+        if (original != volume.GetProperty("volume").GetString()) throw Invalid();
     }
     internal static WindowsStorageBrokerExchangeProtocol.Proof Execute(WindowsStorageBrokerInstallation.Settings settings, WindowsStorageBrokerExchangeProtocol.RequestScope request)
     {

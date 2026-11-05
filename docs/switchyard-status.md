@@ -8,6 +8,17 @@ behind each accepted result.
 
 ## Active backend iteration
 
+Complete Linux `4f995d4` passes 165/165 groups: 1,078 tests, 1,068 passed and ten
+declared skips, receipt `6a95e3e7-0b5d-4ac4-8cca-56a0a95a0c06`. Every child cleanup
+verified; short home-filesystem fixture parent and disposable checkout removed.
+The prior failed quota/socket/runtime receipts remain retained. Native Windows
+engine workflow `41942299398` is running; its 22-case real restricted-client
+volume proof has not yet been accepted.
+
+Exchange image/mount facts now have 23 compiled corruption and substitution
+checks. Retirement validates original metadata before known-file removal; unknown
+or damaged records remain preserved. Both C# targets build without warnings.
+
 Normal installed `819840a` passes six update and six host setup API checks,
 receipt `installed-windows-storage-api-1793837324149.json`. Windows setup is
 correctly unavailable on Linux; arbitrary selectors, unauthenticated requests

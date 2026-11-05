@@ -90,7 +90,9 @@ internal sealed class WindowsStorageBrokerExchangeFiles(WindowsStorageBrokerInst
         foreach (string operation in Operations())
         {
             if (Journal().Current(operation) is not { Phase: "recorded", Proof.State: "retired" } || !DiskAbsent(operation)) throw Invalid();
-            _ = ReadFact(operation, "image.json"); _ = Read(operation);
+            _ = WindowsStorageBrokerExchangeFacts.Image(ReadFact(operation, "image.json"), operation); var records = Read(operation);
+            if (records.Count == WindowsStorageBrokerExchangeJournal.MaximumEvents) _ = WindowsStorageBrokerExchangeFacts.Mount(ReadFact(operation, "mount.json"), operation);
+            else if (records.Count != 4 || Present(Path.Combine(OperationRoot(operation), "mount.json"))) throw Invalid();
         }
     }
     internal void RemoveRetired()

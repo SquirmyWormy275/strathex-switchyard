@@ -53,7 +53,8 @@ Only then can known journal files be removed; there is no recursive cleanup.
 ## Evidence and remaining connection
 
 Sixteen metadata crypto checks, thirty exchange protocol checks and 37 journal
-fault checks execute against compiled source on Linux. Both actual helper and
+fault checks, plus 23 image/mount fact checks, execute against compiled source on
+Linux. Both actual helper and
 linked proof compile with zero warnings/errors; the existing SDK is reused and
 source-only build scratch is removed. The native CI proof uses a restricted
 existing token with Administrators deny-only and `SeManageVolumePrivilege`
