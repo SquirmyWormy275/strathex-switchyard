@@ -63,4 +63,11 @@ mise exec node@24.14.0 -- node scripts/verify-shield-host.mjs \
 It adds a staged synthetic file with different worktree bytes, calls the bound
 read-only API, independently verifies all six probe exits and unchanged index,
 then performs the separately reviewed existing worktree scan. This does not claim
-the staged file was scanned. Installed acceptance remains pending.
+the staged file was scanned. Installed `4a6627a` passes six update and fourteen
+actual API/witness/scan checks. Receipts `assignment-legends-1793867452227.json`
+and `installed-shield-baseline-1793867608531.json` retain all six independently
+verified query exits, two scanner exits, unchanged original index and worktree,
+exact replay/feed retirement and full restoration. Owned repository, signing
+material, packages, staging, bundle and proof checkout were removed; one empty
+task, zero prompts, no keyboard access. Scanner-staging integration remains
+unfinished.

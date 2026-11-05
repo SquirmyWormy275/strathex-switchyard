@@ -7,7 +7,18 @@ host. [Verification](verification.md) retains accepted and failed checkpoints.
 
 ## Installed application
 
-Latest installed source `adbd10a`, release
+Latest installed source `4a6627a`, release
+`1a5c80ec8c7b9e6626c7ea2867edc1b295a5432c7aecb2bea135d094793d32cf`,
+passes six update/fourteen actual index API and separately reviewed worktree-scan
+checks. Staged bytes differ from the worktree; no source is returned, no grant or
+scan is claimed by the witness, and all six query probes independently exit. Two
+scanner exits, unchanged original index/worktree, replay, retirement and full
+restoration verify. Receipts `assignment-legends-1793867452227.json` and
+`installed-shield-baseline-1793867608531.json` retained; all owned repository/
+signing/packages/staging/bundle/proof checkout removed. One empty task, zero
+prompts and no keyboard access.
+
+Earlier installed source `adbd10a`, release
 `04ea52b98e1081f56db0405fc7eec69e7030b3c8094c22245828629ab1046008`,
 passes six update/fourteen actual OSV source and Supply Chain checks. Fresh exact
 public package/version queries, original collection freshness, separate operator
@@ -114,7 +125,8 @@ The task-bound [index byte witness](git-index-inputs.md) now verifies selected
 staged blobs against original Git object identities and SHA-256 without returning
 source, granting authority or claiming a scan. Four isolated groups pass all 25
 checks, including task/account/index/HEAD drift and real Linux guardian exits.
-Installed acceptance and connection to scanner staging remain unfinished.
+Installed witness acceptance passes at `4a6627a`; connection to scanner staging
+remains unfinished.
 
 
 | Area | Implemented behavior and evidence | Practical limit |
