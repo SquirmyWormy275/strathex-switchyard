@@ -38,6 +38,178 @@
   "components": [
     {
       "type": "library",
+      "bom-ref": "switchyard:abc82e791a578be0dd603d5c709d8425af29f0d0cce04045ba4e3c827bc13898",
+      "name": "@strathex/switchyard-companion",
+      "version": "0.2.0",
+      "licenses": [
+        {
+          "license": {
+            "name": "UNLICENSED"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "switchyard:lockfile",
+          "value": "package-lock.json"
+        },
+        {
+          "name": "switchyard:package-location",
+          "value": "node_modules/@strathex/switchyard-companion"
+        },
+        {
+          "name": "switchyard:installed-as",
+          "value": "@strathex/switchyard-companion"
+        },
+        {
+          "name": "switchyard:source-kind",
+          "value": "workspace-link"
+        },
+        {
+          "name": "switchyard:workspace-path",
+          "value": "apps/windows-companion"
+        },
+        {
+          "name": "switchyard:workspace-lock-metadata-sha256",
+          "value": "0e20e2cace15f3a8dc7e804a916cff0bc118ea93271fa618c097cee5484523e7"
+        },
+        {
+          "name": "switchyard:workspace-source",
+          "value": "not-verified"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "switchyard:e457dbdd3331d0f3fb1320d3c568508f9635b03e426e4c2ac9d495cee37650f1",
+      "name": "@strathex/switchyard-linux-companion",
+      "version": "0.1.0",
+      "licenses": [
+        {
+          "license": {
+            "name": "UNLICENSED"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "switchyard:lockfile",
+          "value": "package-lock.json"
+        },
+        {
+          "name": "switchyard:package-location",
+          "value": "node_modules/@strathex/switchyard-linux-companion"
+        },
+        {
+          "name": "switchyard:installed-as",
+          "value": "@strathex/switchyard-linux-companion"
+        },
+        {
+          "name": "switchyard:source-kind",
+          "value": "workspace-link"
+        },
+        {
+          "name": "switchyard:workspace-path",
+          "value": "apps/linux-companion"
+        },
+        {
+          "name": "switchyard:workspace-lock-metadata-sha256",
+          "value": "962847e80725f1e254200290938e2240df83b233e5afb2f3c778fd5f26bc1775"
+        },
+        {
+          "name": "switchyard:workspace-source",
+          "value": "not-verified"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "switchyard:02008812e9f61a283f7c09f37ec2338a867d6fa472f652c8e042e1af66a96904",
+      "name": "@strathex/switchyard-provider-adapter-host",
+      "version": "0.1.0",
+      "licenses": [
+        {
+          "license": {
+            "name": "UNLICENSED"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "switchyard:lockfile",
+          "value": "package-lock.json"
+        },
+        {
+          "name": "switchyard:package-location",
+          "value": "node_modules/@strathex/switchyard-provider-adapter-host"
+        },
+        {
+          "name": "switchyard:installed-as",
+          "value": "@strathex/switchyard-provider-adapter-host"
+        },
+        {
+          "name": "switchyard:source-kind",
+          "value": "workspace-link"
+        },
+        {
+          "name": "switchyard:workspace-path",
+          "value": "apps/provider-adapter-host"
+        },
+        {
+          "name": "switchyard:workspace-lock-metadata-sha256",
+          "value": "7771936e26e5818c1866d659ac58cf83593bf1a35e54be09d69d05836962b303"
+        },
+        {
+          "name": "switchyard:workspace-source",
+          "value": "not-verified"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "switchyard:d4aed809d0d42f123872e520accae58937f55d4dcee1ff67276f8c0aa1c37587",
+      "name": "@strathex/switchyard-vscode",
+      "version": "0.1.0",
+      "licenses": [
+        {
+          "license": {
+            "name": "UNLICENSED"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "switchyard:lockfile",
+          "value": "package-lock.json"
+        },
+        {
+          "name": "switchyard:package-location",
+          "value": "node_modules/@strathex/switchyard-vscode"
+        },
+        {
+          "name": "switchyard:installed-as",
+          "value": "@strathex/switchyard-vscode"
+        },
+        {
+          "name": "switchyard:source-kind",
+          "value": "workspace-link"
+        },
+        {
+          "name": "switchyard:workspace-path",
+          "value": "apps/vscode-extension"
+        },
+        {
+          "name": "switchyard:workspace-lock-metadata-sha256",
+          "value": "2f474a5bdf9b5d5f40fd749a444a24fa19306430a7c88e956d3e88433141d6e5"
+        },
+        {
+          "name": "switchyard:workspace-source",
+          "value": "not-verified"
+        }
+      ]
+    },
+    {
+      "type": "library",
       "bom-ref": "switchyard:93c07fae6c8e2ebd4288f246990760643f81bb37a295294f0e17287c158455e6",
       "name": "@types/node",
       "version": "24.13.3",

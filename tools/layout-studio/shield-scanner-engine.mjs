@@ -34,6 +34,29 @@ export function scannerPath(v) { if (typeof v !== "string" || v.length > 512 || 
 function array(v, limit) { if (!Array.isArray(v) || v.length > limit) throw Error("Scanner array exceeds its bound."); return v; }
 function utf8(bytes) { return new TextDecoder("utf-8", { fatal: true }).decode(bytes); }
 function json(bytes) { if (bytes.length > 2 * 1024 * 1024) throw Error("Scanner JSON exceeds its bound."); return JSON.parse(utf8(bytes)); }
+const npmName = value => typeof value === "string" && ![".", ".."].includes(value) && /^(?:@[a-z0-9._-]+\/)?[a-z0-9._-]{1,128}$/.test(value);
+const npmVersion = value => typeof value === "string" && /^\d+\.\d+\.\d+(?:-[A-Za-z0-9.-]+)?(?:\+[A-Za-z0-9.-]+)?$/.test(value);
+function npmLocationName(location) {
+  scannerPath(location);
+  const parts = location.split("/"), index = parts.lastIndexOf("node_modules");
+  if (parts.includes(".git")) throw Error("Unsupported npm package location.");
+  if (index < 0) return null;
+  const name = parts.slice(index + 1).join("/");
+  if (!npmName(name)) throw Error("Unsupported npm installed name.");
+  return name;
+}
+function workspaceLink(packages, link, cache) {
+  if (!object(link) || link.link !== true || Object.keys(link).some(key => !["link", "resolved"].includes(key)) || typeof link.resolved !== "string") throw Error("Unsupported workspace link.");
+  const path = scannerPath(link.resolved);
+  if (path.split("/").some(part => part === "node_modules" || part === ".git") || !Object.hasOwn(packages, path)) throw Error("Unsupported local workspace target.");
+  if (cache.has(path)) return cache.get(path);
+  const metadata = packages[path];
+  if (!object(metadata) || (metadata.link !== undefined && metadata.link !== false) || Object.hasOwn(metadata, "resolved") || !npmName(metadata.name) || !npmVersion(metadata.version)) throw Error("Workspace metadata is absent or ambiguous.");
+  // Hash declared lock metadata once per target; never open its filesystem
+  // location, follow a link or execute lifecycle scripts.
+  const result = { metadata, workspace: { path, lockMetadataSha256: sha(JSON.stringify(metadata)) } };
+  cache.set(path, result); return result;
+}
 function feed(v) { exact(v, ["id", "path", "sha256"]); return { id: identifier(v.id), path: scannerPath(v.path), sha256: digest(v.sha256) }; }
 export function validateShieldRequest(v) {
   exact(v, ["schema", "version", "action", "scope", "files", "scanner", "advisory"]);
@@ -90,13 +113,25 @@ export async function scanShieldInputs(proposed, { readInput }) {
       let lock;
       try { lock = json(bytes); } catch { gaps.add("invalid_npm_lock"); continue; }
       if (!object(lock) || ![2, 3].includes(lock.lockfileVersion) || !object(lock.packages) || Object.keys(lock.packages).length > 4096) { gaps.add("unsupported_npm_lock"); continue; }
-      for (const [location, p] of Object.entries(lock.packages)) {
+      const links = new Map(), targets = new Set(), workspaceCache = new Map();
+      for (const [location, p] of Object.entries(lock.packages)) if (object(p) && p.link === true) {
+        try {
+          const installedAs = npmLocationName(location);
+          if (!installedAs) throw Error("Unsupported workspace install location.");
+          const target = workspaceLink(lock.packages, p, workspaceCache);
+          links.set(location, { ...target, installedAs }); targets.add(target.workspace.path);
+        } catch { gaps.add("unsupported_npm_package"); }
+      }
+      for (const [location, raw] of Object.entries(lock.packages)) {
         if (!location) continue;
-        if (!object(p) || p.link === true || !location.includes("node_modules/") || typeof p.version !== "string" || !/^\d+\.\d+\.\d+(?:-[A-Za-z0-9.-]+)?(?:\+[A-Za-z0-9.-]+)?$/.test(p.version)) { gaps.add("unsupported_npm_package"); continue; }
-        try { scannerPath(location); } catch { gaps.add("unsupported_npm_package"); continue; }
-        const installedAs = location.split("node_modules/").at(-1), name = p.name ?? installedAs;
-        if (typeof name !== "string" || !/^(?:@[a-z0-9._-]+\/)?[a-z0-9._-]{1,128}$/.test(name)) { gaps.add("unsupported_npm_package"); continue; }
-        const component = { name, installedAs, version: p.version, location, lockPath: file.path, license: typeof p.license === "string" && /^[A-Za-z0-9.+-]{1,80}$/.test(p.license) ? p.license : null, integritySha256: typeof p.integrity === "string" ? sha(p.integrity) : null };
+        if (targets.has(location)) continue;
+        const linked = links.get(location), p = linked?.metadata ?? raw;
+        let installedAs;
+        try { installedAs = npmLocationName(location); } catch { gaps.add("unsupported_npm_package"); continue; }
+        if (!installedAs || !object(p) || (raw.link === true && !linked) || (p.link !== undefined && p.link !== false) || !npmVersion(p.version)) { gaps.add("unsupported_npm_package"); continue; }
+        const name = p.name ?? installedAs;
+        if (!npmName(name)) { gaps.add("unsupported_npm_package"); continue; }
+        const component = { name, installedAs, version: p.version, location, lockPath: file.path, license: typeof p.license === "string" && /^[A-Za-z0-9.+-]{1,80}$/.test(p.license) ? p.license : null, integritySha256: !linked && typeof p.integrity === "string" ? sha(p.integrity) : null, ...(linked ? { workspace: linked.workspace } : {}) };
         components.push(component);
         const known = advisory.find(a => a.name === name && a.version === p.version);
         if (!known) gaps.add("advisory_package_coverage");
@@ -106,7 +141,8 @@ export async function scanShieldInputs(proposed, { readInput }) {
         else if (!policy.allowedLicenses.includes(component.license)) add({ ruleId: "license.disallowed", dimension: "licenses", severity: "high", path: file.path, line: null, fingerprint: sha(`license\0${file.sha256}\0${location}\0${component.license}`) });
         let registry = false;
         try { const u = new URL(p.resolved); registry = u.protocol === "https:" && u.hostname === "registry.npmjs.org" && !u.username && !u.password && !u.search && !u.hash && /^sha512-[A-Za-z0-9+/]{86}==$/.test(p.integrity); } catch {}
-        if (!registry) gaps.add("package_source_or_integrity");
+        if (linked) gaps.add("workspace_source_unverified");
+        if (linked || !registry) gaps.add("package_source_or_integrity");
       }
     }
   }
@@ -126,6 +162,7 @@ export async function scanShieldInputs(proposed, { readInput }) {
     components: components.map(c => ({ type: "library", "bom-ref": "switchyard:" + sha(`${c.lockPath}\0${c.location}\0${c.name}\0${c.version}`), name: c.name, version: c.version,
       ...(c.license ? { licenses: [{ license: { name: c.license } }] } : {}), properties: [
         { name: "switchyard:lockfile", value: c.lockPath }, { name: "switchyard:package-location", value: c.location }, { name: "switchyard:installed-as", value: c.installedAs },
+        ...(c.workspace?[{name:"switchyard:source-kind",value:"workspace-link"},{name:"switchyard:workspace-path",value:c.workspace.path},{name:"switchyard:workspace-lock-metadata-sha256",value:c.workspace.lockMetadataSha256},{name:"switchyard:workspace-source",value:"not-verified"}]:[]),
         ...(c.integritySha256 ? [{ name: "switchyard:integrity-string-sha256", value: c.integritySha256 }] : [])
       ] })), compositions: [{ aggregate: "unknown" }]
   };

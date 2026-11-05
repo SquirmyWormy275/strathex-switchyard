@@ -7,7 +7,14 @@ host. [Verification](verification.md) retains accepted and failed checkpoints.
 
 ## Installed application
 
-Latest installed source `0f04adc`, release
+Latest installed source `6a45643`, release
+`3772efc151709ab0069527753a3f9c33c50b1706455ea60e1b5aaa3a86f1df07`,
+passes six update and three actual cached F77 source-capability API checks.
+No HID transactions or control authority; original state is preserved, and owned
+bundle/proof checkout removed. Receipts `assignment-legends-1793861120925.json`
+and `installed-haptic-source-1793861121084.json` retained; zero prompts.
+
+Earlier installed source `0f04adc`, release
 `1d8c3ce421672a4516b86cf8fe18d286a3b60e2f0e070f5b1acc49c9dd0ce25c`,
 passes six update and seventeen actual exception API checks with the receipt-time
 local authority guard. Raw findings, exact exception expiry/withdrawal/replay,
@@ -122,8 +129,15 @@ F77 builds. UID, complete definition, protocol and revision must match; live
 state, fitted hardware and electrical/timing limits remain unverified, with no
 allowed operations. Seven capability/catalog cases, twenty-five inventory/readout contracts and
 twenty-three package/Suite checks pass, including zero-HID, protected typing
-controls and cross-compartment checks. [Audit](solenoid-capability-audit.md). New installed
-inspection acceptance remains pending; runtime control is still unfinished.
+controls and cross-compartment checks. [Audit](solenoid-capability-audit.md). Normal installed `6a45643` passes six update/three cached-readout checks without
+HID transactions; runtime control is still unfinished.
+
+The npm lock inventory now includes strict root-contained workspace metadata and
+aliases without reading local source directories or running lifecycle scripts.
+Twelve scanner cases and six real-Linux/Windows-guest-double integration cases
+pass. The regenerated seven-component development BOM passes the official schema;
+source bytes, graph, whole-repository scope and provenance remain unverified.
+[Contract and regeneration](shield-baseline-scanner.md).
 
 ## Complete and native checkpoints
 

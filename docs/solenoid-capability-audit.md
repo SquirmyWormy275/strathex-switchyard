@@ -49,7 +49,11 @@ mise exec node@24.14.0 -- node scripts/verify-haptic-source-host.mjs \
 The verifier requires one original protected Personal readout and checks exact
 source facts plus preservation of readout, profile, workflow, mode, transactions,
 selection and private endpoint. It has no HID transport and submits no prompts.
-Installed acceptance remains pending at this source checkpoint.
+Normal installed `6a45643` passes six update and three cached-readout API checks,
+with zero HID transactions and zero prompts. Receipts
+`assignment-legends-1793861120925.json` and
+`installed-haptic-source-1793861121084.json` retain exact source facts and
+original-state preservation; owned bundle and proof checkout are removed.
 
 Runtime-state/control integration remains unfinished protocol work. Fitted
 hardware, electrical behavior and any exact physical transaction require separate

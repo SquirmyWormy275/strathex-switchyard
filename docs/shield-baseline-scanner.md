@@ -22,7 +22,7 @@ excerpt or matched value. It never edits files or rotates a credential.
 | A selected baseline rule finds a match, or an exact advisory/license policy fails | Failed findings report and failed protected command receipt; coverage remains incomplete. |
 | No baseline finding in the selected inputs | Incomplete report and receipt. A clean input set does not establish repository security. |
 | Missing, changed, revoked, expired or incompatible signed feed | Admission refused or result incomplete; no passing receipt. |
-| Binary input, unsupported lock/workspace link, missing advisory package version or unknown license | Explicit coverage gap. |
+| Binary input, unsupported lock or ambiguous/external workspace link, missing advisory package version or unknown license | Explicit coverage gap. |
 | Only a saved native zero exit survives restart | Incomplete higher-level observation; no program replay or passing recovery evidence. |
 
 Every report currently includes `repository_scope_unverified`. History and source
@@ -80,8 +80,12 @@ There is no unreviewed online lookup or version-range interpretation.
 Supply-chain scanning reads npm lockfile versions 2/3, including nested package
 locations, and returns a typed inventory with locked versions, license metadata
 and integrity-string hashes. It checks exact advisories and the signed simple
-license allowlist. Workspace links, unsupported formats and absent source or
-integrity metadata remain gaps. Supply-chain and Release Shield reports additionally contain a standalone
+license allowlist. Root-contained npm workspace links use the target entry's
+explicit name/version/license, retain the installed alias and hash its declared
+lock metadata. The scanner never opens that target directory or executes lifecycle
+scripts. External, missing, cyclic or ambiguous links remain unsupported; local
+source bytes always retain `workspace_source_unverified` and source/integrity gaps.
+Unsupported formats and absent source or integrity metadata remain gaps. Supply-chain and Release Shield reports additionally contain a standalone
 CycloneDX 1.6 `cycloneDx` object. Components have distinct location-bound
 references, lockfile hashes, license names and explicit metadata. Aliases match
 advisories by the real locked package name while retaining the installed name.
@@ -106,7 +110,7 @@ findings and a retained output bound. Linked/traversing paths, changed bytes and
 oversized reads fail. Original source/index/HEAD remain unchanged; exact replay
 returns the original result. Native exit precedes owned staging cleanup.
 
-Nine scanner cases cover real matches, redacted reports, all four incomplete
+Twelve scanner cases cover real matches, redacted reports, all four incomplete
 matrices, exact npm advisories/licenses, unsupported data, malicious feeds,
 overflow and actual filesystem link/read bounds. Real namespace integration
 exercises all four actions and the clean case, pinned-engine/argument refusal,
@@ -139,8 +143,8 @@ restoration. Receipts `assignment-legends-1793853690564.json` and
 Use `--one-action` for a narrower changed-code recheck plus the clean case.
 
 The [development-lock example](evidence/switchyard-development.cdx.json) is
-generated from this repository's actual lockfile: three external components,
-with local workspace links left unsupported. It is a schema-conformant example,
+generated from this repository's actual lockfile: three external components and
+four declared local workspace packages. Their source bytes remain unverified. It is a schema-conformant example,
 not a complete release inventory or a vulnerability/provenance acceptance.
 Four generated cases, including that real lockfile and scoped aliases, validate
 against the official [CycloneDX 1.6 schema](https://github.com/CycloneDX/specification/blob/1.6/schema/bom-1.6.schema.json);
@@ -176,3 +180,21 @@ findings to expiring, audited decisions. Reports keep raw findings; both hosts
 authenticate the decision separately and never upgrade missing coverage to a
 complete Shield pass. Normal installed exception acceptance passes at `82bd9b3`: six update and
 seventeen actual API checks, three verified exits, full restoration and zero prompts.
+
+
+To regenerate the unsigned development example deterministically, run:
+
+```sh
+mise exec node@24.14.0 -- node scripts/export-development-sbom.mjs
+mise exec node@24.14.0 -- node scripts/export-development-sbom.mjs --check
+```
+
+The seven-component workspace example passes the unmodified official CycloneDX
+1.6 schema, with three invalid mutations rejected. Receipt
+`cyclonedx-workspace-schema-proof-1793861912692.json` pins the schema and temporary
+validator sources; tooling was removed without host package/runtime installation.
+Real Linux namespace and Windows guest-double Supply Chain cases preserve aliases,
+raw findings, report-bound metadata, incomplete coverage, replay and cleanup even
+when the workspace source directory does not exist. The installed demonstration
+supports `--synthetic --action=shield_supply_chain --workspace-lock`; installed
+acceptance of this new path remains pending at this source checkpoint.

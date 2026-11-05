@@ -2,10 +2,11 @@
 
 [Switchyard's development SBOM](switchyard-development.cdx.json) is a real
 CycloneDX 1.6 export from this repository's `package-lock.json`. The scanner
-currently inventories three external packages. Its metadata binds the exact
+inventories three external packages and four declared local workspace packages. Its metadata binds the exact
 lockfile hash and deliberately records repository scope as unverified, dependency
 relationships as not collected and publisher provenance as not verified. Local
-workspace links are unsupported. Composition remains `unknown`.
+workspace source bytes remain unverified; their root-contained lock metadata is
+identified separately. Composition remains `unknown`.
 
 This demonstrates deterministic component identities, nested/aliased npm package
 handling and a standard machine-readable output. It does not establish a complete
@@ -28,3 +29,16 @@ are rejected. The separate private verification receipt pins the official
 schemas and validator source; temporary tooling was removed without installing
 host packages or copying a runtime. The Suite's authenticated report also binds
 its BOM through the complete report hash; this checked-in example is unsigned.
+
+
+Regenerate or check this exact artifact without network access or package execution:
+
+```sh
+mise exec node@24.14.0 -- node scripts/export-development-sbom.mjs
+mise exec node@24.14.0 -- node scripts/export-development-sbom.mjs --check
+```
+
+The updated seven-component artifact separately passes the unmodified official
+schema, with three invalid mutations rejected. Receipt
+`cyclonedx-workspace-schema-proof-1793861912692.json` retains exact source hashes;
+temporary tooling is removed and no host package is installed.
