@@ -70,7 +70,15 @@ independently exited groups, with verified child cleanup
 (`isolated-test-7a148ac0-14d8-4a90-b18e-c65eab20fdbd.json`). The added tracked-data
 refusal passes its complete three-case authority file separately. Three focused
 native Windows jobs are connected; those and new installed tree-policy acceptance
-remain separate pending checks.
+remain separate checks. Normal installed `03710e9` passes six update and
+eighteen actual inventory/tree-policy/ignored-secret scan checks. The 80 MiB
+generated file remains present during both separately reviewed scans; generated
+churn is tolerated and a replaced root refuses new admission. Two scanner exits,
+all preview probe exits, exact replay/retirement and full restoration pass.
+Receipts `assignment-legends-1793864731589.json` and
+`installed-shield-baseline-1793864938308.json` retained; owned source/signing/
+sparse build/packages/staging/bundle/proof checkout removed. One empty task,
+zero prompts. Native Windows policy acceptance remains pending.
 
 The repeatable installed proof supports:
 

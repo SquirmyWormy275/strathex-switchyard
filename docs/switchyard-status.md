@@ -7,7 +7,18 @@ host. [Verification](verification.md) retains accepted and failed checkpoints.
 
 ## Installed application
 
-Latest installed source `bfb7f1d`, release
+Latest installed source `03710e9`, release
+`043592fe7c3987cb7b161ce047fb3c2e8b41e5b0da0b717937c50904018efdd8`,
+passes six update/eighteen actual inventory, generated-tree policy and ignored-
+secret scan checks. The 80 MiB tree stays present during scanning; generated
+churn preserves policy and root replacement refuses another admission. Two
+scanner exits, all preview probes, exact replay/feed retirement and full
+restoration pass. Receipts `assignment-legends-1793864731589.json` and
+`installed-shield-baseline-1793864938308.json` retained; all owned source/signing/
+sparse build/packages/staging/bundle/proof checkout removed. One empty task,
+zero prompts.
+
+Earlier installed source `bfb7f1d`, release
 `ed8745bae60c75c3b82487eaf2cc6e9300a1b0988e6df1ad99bc6a5701d9fa25`,
 passes six update and sixteen actual inventory/ignored-secret scan checks. The
 preview groups an 80 MiB sparse build fixture, exposes no source bytes, creates
@@ -172,8 +183,8 @@ binds named whole ignored directories to Shield-only authority using distinct
 directory-policy fingerprints. Selected secret bytes remain exact; excluded
 contents are uninspected. Three policy/filesystem, three authority and two actual
 Linux/Windows-guest-double execution cases pass; ten surrounding input checks,
-thirty-one authority/runner/package cases and type checking pass. New installed
-and native Windows policy acceptance remain pending.
+thirty-one authority/runner/package cases and type checking pass. Normal installed `03710e9` passes six update/eighteen real checks; native Windows
+policy acceptance remains pending.
 
 ## Complete and native checkpoints
 
