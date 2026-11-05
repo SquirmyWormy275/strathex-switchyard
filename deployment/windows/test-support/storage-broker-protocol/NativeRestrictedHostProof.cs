@@ -60,8 +60,10 @@ internal static class NativeRestrictedHostProof
         Require(ReadToken(token, 8, pointer => Marshal.ReadInt32(pointer)) == 1); // TokenPrimary
         Phase = stage + "/medium-integrity";
         Require(ReadToken(token, 25, pointer => new SecurityIdentifier(Marshal.ReadIntPtr(pointer)).Value) == "S-1-16-8192");
-        Phase = stage + "/restriction-flags";
-        Require(IsTokenRestricted(token) && ReadToken(token, 21, pointer => Marshal.ReadInt32(pointer)) != 0);
+        Phase = stage + "/restricting-sids-present";
+        Require(IsTokenRestricted(token));
+        Phase = stage + "/filtered-token-flag";
+        Require(ReadToken(token, 21, pointer => Marshal.ReadInt32(pointer)) != 0);
         Phase = stage + "/restricting-sid-count";
         var restrictions = ReadToken(token, 11, pointer =>
         {
@@ -125,23 +127,22 @@ internal static class NativeRestrictedHostProof
             {
                 Phase = "restricted-primary-token";
                 Native(ConvertStringSidToSidW("S-1-5-32-544", out admin)); var disabled = new SidAttributes { Sid = admin };
-                Native(CreateRestrictedToken(source, 1, 1, ref disabled, 0, IntPtr.Zero, 0, IntPtr.Zero, out var reduced));
+                // Set the intended restricting list in the first filter.
+                // Subsequent filtering intersects with the existing list,
+                // as specified by the native API.
+                restricting = Marshal.AllocHGlobal(Marshal.SizeOf<SidAttributes>() * 4);
+                foreach (string text in new[] { user, "S-1-1-0", "S-1-5-11", "S-1-5-32-545" })
+                {
+                    Native(ConvertStringSidToSidW(text, out var sid)); restrictingSids.Add(sid);
+                    Marshal.StructureToPtr(new SidAttributes { Sid = sid }, IntPtr.Add(restricting, (restrictingSids.Count - 1) * Marshal.SizeOf<SidAttributes>()), false);
+                }
+                Native(CreateRestrictedToken(source, 1, 1, ref disabled, 0, IntPtr.Zero, 4, restricting, out var reduced));
                 using (reduced)
                 {
                     // DISABLE_MAX_PRIVILEGE ignores its delete list. Delete the
                     // volume privilege in a second call, then verify absence.
                     Native(LookupPrivilegeValueW(null, "SeManageVolumePrivilege", out long volume)); deleted = Marshal.AllocHGlobal(Marshal.SizeOf<Privilege>());
                     Marshal.StructureToPtr(new Privilege { Low = unchecked((uint)volume), High = unchecked((int)(volume >> 32)) }, deleted, false);
-                    // A deny-only group/removed privilege does not make
-                    // IsTokenRestricted true. Add an explicit restricting list.
-                    // These normal same-user/public groups still undergo BOTH
-                    // normal and restricting access checks; they grant nothing.
-                    restricting = Marshal.AllocHGlobal(Marshal.SizeOf<SidAttributes>() * 4);
-                    foreach (string text in new[] { user, "S-1-1-0", "S-1-5-11", "S-1-5-32-545" })
-                    {
-                        Native(ConvertStringSidToSidW(text, out var sid)); restrictingSids.Add(sid);
-                        Marshal.StructureToPtr(new SidAttributes { Sid = sid }, IntPtr.Add(restricting, (restrictingSids.Count - 1) * Marshal.SizeOf<SidAttributes>()), false);
-                    }
                     Native(CreateRestrictedToken(reduced, 0, 0, ref disabled, 1, deleted, 4, restricting, out var restricted));
                     using (restricted)
                     {

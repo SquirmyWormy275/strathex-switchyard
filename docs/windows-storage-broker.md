@@ -305,3 +305,14 @@ removed (`windows-history-native-build-1793885463455.json`). The C++ compile and
 actual native retirement/restricted-process reruns remain unaccepted. This is
 unfinished validation on available CI infrastructure, not a missing account or
 physical device.
+
+The independent restricted-exchange worker at `c8b1216` now reaches the precise
+restriction-flags assertion before child creation. Its [digest-verified failure](evidence/windows-c8b-restricted-failed-summary.json)
+remains failed. Microsoft [documents](https://learn.microsoft.com/en-us/windows/win32/api/securitybaseapi/nf-securitybaseapi-createrestrictedtoken)
+that filtering an already restricted token intersects restricting SID lists. The
+next test-only source sets all four intended SIDs in the first filter and retains
+them through the privilege-deletion filter. Each flag has a separate diagnostic
+phase; no restriction or deadline is removed. This addresses an API-ordering
+problem; the original native failure cause is not established until retesting.
+Both managed targets build with zero warnings/errors and all 223 portable checks
+pass, with scratch removed (`windows-history-native-build-1793886535629.json`).
