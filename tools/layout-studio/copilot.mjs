@@ -1,5 +1,6 @@
 /** Microsoft 365 Copilot Graph preview; deliberately separate from GitHub Copilot. */
 import { randomUUID } from "node:crypto";
+import { isDeepStrictEqual } from "node:util";
 import { parsePlan } from "./model.mjs";
 import { designResponseSchema, validateDesignResponse } from "./agents.mjs";
 import { scopeHash } from "./confirmations.mjs";
@@ -180,10 +181,13 @@ export function createCopilot({ store, fetcher = fetch, now = () => Date.now(), 
         scope.requestStage = "submitting";
         const r = await graph(compartment, `/beta/copilot/conversations/${remoteId}/chat`, body, c, scope);
         if (r.value.id !== remoteId || !Array.isArray(r.value.messages)) throw new Error("Microsoft's reply does not match the exact owned conversation.");
-        const reply = r.value.messages.filter((m) => typeof m.text === "string").at(-1)?.text;
-        if (!reply || reply.length > 64000) throw new Error("Microsoft did not return a bounded conversation response.");
+        const reply = r.value.messages.at(-1)?.text;
+        if (typeof reply !== "string" || !reply.trim() || reply.length > 64000) throw new Error("Microsoft did not return a bounded final conversation response.");
+        let parsed;
+        try { parsed = JSON.parse(reply.replace(/^```(?:json)?\s*/, "").replace(/\s*```$/, "")); } catch { /* Unstructured text remains a proposal without inferred layout changes. */ }
+        if (reply.trim() === body.message.text || reply.trim() === message.trim() || isDeepStrictEqual(parsed, JSON.parse(body.message.text))) throw new Error("Microsoft returned the submitted request without a distinct reply. Delivery remains unconfirmed; do not resend automatically.");
         let design;
-        try { design = validateDesignResponse(JSON.parse(reply.replace(/^```(?:json)?\s*/, "").replace(/\s*```$/, "")), plan); }
+        try { design = validateDesignResponse(parsed, plan); }
         catch { design = { reply, proposal: null, workflow: state.workflow, limitation: "The Chat API does not guarantee a structured response. This reply is displayed as text; no layout change was inferred." }; }
         await assertCredential(compartment, c);
         const saved = await store.update(compartment, "m365-design", (s) => {

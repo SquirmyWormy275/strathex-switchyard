@@ -30,6 +30,17 @@ can recap a prompt or contain the model response; its type alone does not prove
 a speaker role. This adapter proposes configuration; it grants no task authority
 or verified completion. Approved tenant/license/consent acceptance remains open.
 
+Only the final message can supply the current reply. Missing, non-text or empty
+final messages refuse instead of selecting an older text message. Exact submitted
+JSON echoes also refuse, including reordered/pretty-printed or fenced JSON and
+an exact plain user-request echo. These refusals retain unconfirmed delivery and
+block automatic resending. A prompt followed by a distinct bounded final reply
+remains supported. This detects exact echoes; it does not prove speaker identity
+or distinguish every paraphrased recap. Four isolated request/account/lifecycle/
+integration groups pass 44 checks with cleanup verified
+(`isolated-test-98ad5e79-e1cb-4577-ac4a-cdade8827769.json`). Responses are simulated;
+no Microsoft request is used by these checks.
+
 Local in-flight requests now have per-compartment generations and abort signals.
 A deliberate new sign-in, workspace switch, keyboard-only mode or application
 shutdown invalidates prior operations, clears device-code sessions and blocks

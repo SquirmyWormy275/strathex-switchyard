@@ -8,6 +8,27 @@ import { createStudioServer } from "./serve.mjs";
 import { once } from "node:events";
 const deferred = () => { let resolve; const promise = new Promise(done => { resolve = done; }); return { promise, resolve }; };
 
+test("exact, reformatted, fenced and plain request echoes retain unconfirmed delivery without an automatic resend", async t => {
+  for (const render of [content => JSON.stringify(content), content => JSON.stringify(Object.fromEntries(Object.entries(content).reverse()), null, 2), content => "```json\n" + JSON.stringify(content) + "\n```", content => content.request]) {
+    const f = await copilotFixture(t, { fetcher: async (_url, request) => { const content = JSON.parse(JSON.parse(request.body).message.text); return new Response(JSON.stringify({ id: remoteId, messages: [{ "@odata.type": "#microsoft.graph.copilotConversationResponseMessage", text: render(content) }] })); } });
+    await f.seed(f.credential.account);
+    await assert.rejects(f.design("owned-conversation"), /submitted request without a distinct reply/);
+    const state = await f.store.snapshot("work"); assert.equal(state.conversations[0].messages.length, 0); assert.equal(state.copilotRequests[0].status, "outcome-unconfirmed"); assert.equal(state.copilotRequests[0].phase, "submitting");
+    await assert.rejects(f.design("owned-conversation"), /unresolved outcome/); assert.equal(f.calls.length, 1);
+  }
+});
+test("a prior response cannot replace an echoed, missing or non-text final message", async t => {
+  for (const final of [content => ({ text: JSON.stringify(content) }), () => ({ adaptiveCards: [{}] }), () => ({ text: 7 }), () => null]) {
+    const f = await copilotFixture(t, { fetcher: async (_url, request) => { const content = JSON.parse(JSON.parse(request.body).message.text); return new Response(JSON.stringify({ id: remoteId, messages: [{ text: "An older reply is not the current result" }, final(content)] })); } });
+    await f.seed(f.credential.account); await assert.rejects(f.design("owned-conversation"), /distinct reply|bounded final/); assert.equal(f.calls.length, 1); assert.equal((await f.api.listRequests("work"))[0].status, "outcome-unconfirmed"); assert.equal((await f.store.snapshot("work")).conversations[0].messages.length, 0);
+  }
+});
+test("an echoed prompt followed by a distinct bounded final proposal remains a normal account-bound result", async t => {
+  const response = { reply: "Synthetic distinct reply", summary: "No key changes", actions: [], steps: ["Review evidence"], roles: ["Reviewer"] };
+  const f = await copilotFixture(t, { fetcher: async (_url, request) => new Response(JSON.stringify({ id: remoteId, messages: [{ text: JSON.parse(request.body).message.text }, { text: JSON.stringify(response) }] })) });
+  await f.seed(f.credential.account); const result = await f.design("owned-conversation"); assert.equal(result.reply, response.reply); assert.equal((await f.api.listRequests("work"))[0].status, "completed"); assert.equal(f.calls.length, 1);
+});
+
 test("an explicit request replays only its recorded response and refuses different content without another POST", async t => {
   const f = await copilotFixture(t), requestId = randomUUID(), first = await f.design(undefined, requestId), repeated = await f.design(undefined, requestId);
   assert.equal(repeated.reused, true); assert.equal(repeated.modelPromptSubmitted, false); assert.equal(repeated.operationId, first.operationId); assert.equal(f.calls.length, 2);
