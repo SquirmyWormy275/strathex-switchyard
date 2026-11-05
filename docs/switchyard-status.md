@@ -14,6 +14,12 @@ correctly unavailable on Linux; arbitrary selectors, unauthenticated requests
 and Work evidence access are refused. Definitions, mode, private link and frozen
 Home are unchanged. Bundle staging and the proof checkout were removed.
 
+The exchange journal passes 37 compiled fault checks, including reservation and
+final-acknowledgement loss, duplicate refusal, damaged chains and image changes.
+Its protected-file port derives fixed installation/UUID paths and exclusively
+creates flushed/readback immutable records. Native System-service acceptance and
+volume effect integration remain unfinished.
+
 The closed exchange wire now passes thirty compiled crypto/parser checks and
 keeps its fixed 64 MiB limit, exact task/input/operation scope and fresh signed
 challenge separate from durable effect authority. Its privileged engine and

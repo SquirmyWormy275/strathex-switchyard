@@ -34,7 +34,7 @@ internal static class WindowsStorageBrokerExchangeProtocol
         if (action is not ("create" or "inspect" or "attach" or "detach" or "retire") || !Uuid(requestId) || !Uuid(operationId) || !Digest(taskScope) || !Digest(inputs) || !Digest(nonce)) throw Invalid();
     }
     private static byte[] Canonical(WindowsStorageBrokerProtocol.Binding binding, string action, string requestId, string operationId, string taskScope, string inputs, string? nonce) =>
-        Utf8.GetBytes(JsonSerializer.Serialize(new { schema = Schema, action, installationId = binding.InstallationId, ownerScope = binding.OwnerScope, requestId, operationId, taskScopeSha256 = taskScope, inputManifestSha256 = inputs, nonce }));
+        Utf8.GetBytes(JsonSerializer.Serialize(new { schema = Schema, action, installationId = binding.InstallationId, ownerScope = binding.OwnerScope, serviceImageSha256 = binding.ServiceImageSha256, requestId, operationId, taskScopeSha256 = taskScope, inputManifestSha256 = inputs, nonce }));
     internal static byte[] Request(WindowsStorageBrokerProtocol.Binding binding, string action, string requestId, string operationId, string taskScope, string inputs, string nonce)
     {
         Binding(binding); Scope(action, requestId, operationId, taskScope, inputs, nonce);
@@ -43,19 +43,19 @@ internal static class WindowsStorageBrokerExchangeProtocol
     internal static RequestScope ReadRequest(ReadOnlySpan<byte> bytes, WindowsStorageBrokerProtocol.Binding binding)
     {
         Binding(binding); using var json = Parse(bytes); var value = json.RootElement;
-        Exact(value, "schema", "action", "installationId", "ownerScope", "requestId", "operationId", "taskScopeSha256", "inputManifestSha256", "nonce");
+        Exact(value, "schema", "action", "installationId", "ownerScope", "serviceImageSha256", "requestId", "operationId", "taskScopeSha256", "inputManifestSha256", "nonce");
         string Text(string name) => value.GetProperty(name).GetString() ?? throw Invalid();
         string action = Text("action"), requestId = Text("requestId"), operationId = Text("operationId"), taskScope = Text("taskScopeSha256"), inputs = Text("inputManifestSha256"), nonce = Text("nonce");
-        if (Text("schema") != Schema || Text("installationId") != binding.InstallationId || Text("ownerScope") != binding.OwnerScope) throw Invalid();
+        if (Text("schema") != Schema || Text("installationId") != binding.InstallationId || Text("ownerScope") != binding.OwnerScope || Text("serviceImageSha256") != binding.ServiceImageSha256) throw Invalid();
         Scope(action, requestId, operationId, taskScope, inputs, nonce);
         return new(action, requestId, operationId, taskScope, inputs, nonce, Sha(Canonical(binding, action, requestId, operationId, taskScope, inputs, nonce)), Sha(Canonical(binding, action, requestId, operationId, taskScope, inputs, null)));
     }
-    private static void CheckRequest(WindowsStorageBrokerProtocol.Binding binding, RequestScope request)
+    internal static void CheckRequest(WindowsStorageBrokerProtocol.Binding binding, RequestScope request)
     {
         var expected = ReadRequest(Request(binding, request.Action, request.RequestId, request.OperationId, request.TaskScopeSha256, request.InputManifestSha256, request.Nonce), binding);
         if (request != expected) throw Invalid();
     }
-    private static void CheckProof(RequestScope request, Proof proof)
+    internal static void CheckProof(RequestScope request, Proof proof)
     {
         if (proof.State is not ("created" or "mounted" or "detached" or "retired" or "outcome-unconfirmed") || proof.Mounted && !proof.Attached
             || proof.ExchangeQuotaEnforced != (proof.Mounted && proof.Attached) || proof.DetachedVerified != (!proof.Mounted && !proof.Attached && proof.State is "created" or "detached" or "retired")) throw Invalid();

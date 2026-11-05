@@ -10,6 +10,8 @@
   <ItemGroup>
     <Compile Include="../../../../apps/desktop-hotkeys/WindowsStorageBrokerProtocol.cs" Link="WindowsStorageBrokerProtocol.cs" />
     <Compile Include="../../../../apps/desktop-hotkeys/WindowsStorageBrokerExchangeProtocol.cs" Link="WindowsStorageBrokerExchangeProtocol.cs" />
+    <Compile Include="../../../../apps/desktop-hotkeys/WindowsStorageBrokerExchangeJournal.cs" Link="WindowsStorageBrokerExchangeJournal.cs" />
+    <Compile Include="../../../../apps/desktop-hotkeys/WindowsStorageBrokerExchangeFiles.cs" Link="WindowsStorageBrokerExchangeFiles.cs" />
     <Compile Include="../../../../apps/desktop-hotkeys/WindowsStorageBrokerFiles.cs" Link="WindowsStorageBrokerFiles.cs" />
     <Compile Include="../../../../apps/desktop-hotkeys/WindowsStorageBrokerInstallation.cs" Link="WindowsStorageBrokerInstallation.cs" />
     <Compile Include="../../../../apps/desktop-hotkeys/WindowsStorageBrokerRuntime.cs" Link="WindowsStorageBrokerRuntime.cs" />
