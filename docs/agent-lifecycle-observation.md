@@ -59,7 +59,7 @@ Five isolated collector/Codex/Claude/Suite/package groups pass 56 checks with
 cleanup, including actual encrypted state, real child-process provider doubles,
 duplicate submission, pause before acknowledgement, category/source exclusions,
 content omission and namespace collision. Native model-turn metadata acceptance
-is separate. The installed proof has an explicit opt-in for that check:
+is separate from those provider doubles. The installed proof has an explicit opt-in:
 
 ```sh
 node scripts/verify-agent-observation-host.mjs --synthetic-reviewed-text-metadata
@@ -75,6 +75,20 @@ The original `--synthetic-native-metadata` flag still submits zero model prompts
 Neither flag creates a workspace or changes hardware, microphone or frontend.
 Native Claude text-event acceptance and broader runtime/external streams remain
 outstanding; no continuous native stream is claimed by these local hooks.
+
+The normal installed source `095f5dd`, release `07dddc50…`, now passes six update,
+seven privacy/metadata and five actual native text-journey checks. One reviewed
+synthetic Codex turn records the three local text phases with separate correlation;
+its duplicate returns the saved result without another event. Three captured
+native processes independently exit, including two from text preparation/execution.
+Only its task, turn, observation and staging are removed. All 54 workspaces remain;
+selection returns to Personal and validation returns to keyboard-only with zero
+tasks, turns or active observations. The updater already retired its bundle, and
+the disposable checkout/marker are removed. The CLI retains one synthetic native
+conversation with one Ready reply. Definitions and frozen Home are preserved;
+fresh mode fences and normal audit bookkeeping remain, so no byte-exact sealed
+state claim is made after this native journey.
+[Installed text-event evidence](evidence/installed-text-observation-summary.json).
 
 The normal installed source `7d9310a` passes six update and seven privacy/metadata
 checks with all 54 workspace identities, plus exact installed hash pins for the
