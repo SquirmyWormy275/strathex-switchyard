@@ -16,8 +16,8 @@ test("release verification rejects a different adjacent 64-bit file identity bef
 });
 test("suite bundles contain the actual offline backend, frozen frontend and licenses without private data, tests or copied runtimes", () => fixture(async ({ bundle, options }) => {
   const manifest = await verifySuiteRelease(bundle.directory, { expectedId: bundle.id, platform: "linux", checkRuntime: true });
-  for (const name of ["app.mjs", "home.mjs", "shell.mjs", "keyboard-view.mjs", "suite-ui.mjs", "device-ui.mjs"]) {
-    assert.equal(manifest.files.some(file => file.path === `tools/layout-studio/${name}`), false, "Browser-only modules must ship once in the frozen frontend.");
+  for (const name of ["index.html", "style.css", "app.mjs", "home.mjs", "shell.mjs", "keyboard-view.mjs", "suite-ui.mjs", "device-ui.mjs"]) {
+    assert.equal(manifest.files.some(file => file.path === `tools/layout-studio/${name}`), false, "Browser-only modules and static assets must ship once in the frozen frontend.");
     assert.ok(manifest.files.some(file => file.path === `frontend/${name}`));
   }
   assert.ok(manifest.files.some(file => file.path === "tools/layout-studio/catalog.mjs"), "The readout backend still needs its shared catalog.");

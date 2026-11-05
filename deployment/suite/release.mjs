@@ -75,9 +75,9 @@ export async function buildSuiteRelease({ sourceRoot, sourceFiles, outputRoot, f
   if (front.schema !== "switchyard-front-end-review/v1" || hash(JSON.stringify(front.files)) !== front.digest) throw new Error("Choose a verified frozen frontend review; preparing a new review is a separate action.");
   if (!Array.isArray(sourceFiles) || !sourceFiles.length || sourceFiles.some((name) => { try { portableName(name); return false; } catch { return true; } })) throw new Error("Provide the explicit tracked source inventory; untracked local files must never enter a bundle.");
   const tracked = new Set(sourceFiles), inputs = new Map(), add = async (from, to = from) => { portableName(to); if (!tracked.has(from)) return; if (inputs.has(to)) throw new Error("A release input was duplicated."); inputs.set(to, await bytes(join(sourceRoot, from))); };
-  // These browser entry points ship once in the independently verified frozen
+  // These browser entry points and static assets ship once in the verified frozen
   // frontend. Shared modules (for example catalog.mjs) remain in the backend.
-  const frontendOnly = new Set(["app.mjs", "home.mjs", "shell.mjs", "keyboard-view.mjs", "suite-ui.mjs", "device-ui.mjs"]);
+  const frontendOnly = new Set(["index.html", "style.css", "app.mjs", "home.mjs", "shell.mjs", "keyboard-view.mjs", "suite-ui.mjs", "device-ui.mjs"]);
   if ([...frontendOnly].some(name => !front.files.some(file => file.file === name))) throw new Error("The frozen frontend is missing its browser module closure.");
   for (const name of await walk(join(sourceRoot, "tools/layout-studio"))) if (!frontendOnly.has(name) && !name.endsWith(".test.mjs") && !name.endsWith(".pyc") && !name.startsWith("test-support/")) await add(`tools/layout-studio/${name}`);
   for (const prefix of ["integrations", "examples/custom-agent", "examples/langchain-agent", "deployment/suite", "third_party/model-f-catalog"]) for (const name of await walk(join(sourceRoot, prefix))) if (!name.endsWith(".test.mjs") && !name.endsWith(".pyc") && !name.startsWith("test-support/")) await add(`${prefix}/${name}`);

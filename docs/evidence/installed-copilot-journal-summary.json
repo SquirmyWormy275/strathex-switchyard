@@ -1,12 +1,12 @@
 {
   "schema": "switchyard-installed-copilot-journal-summary/v1",
-  "sourceCommit": "1877f27197cea0f6e9178b6e9bc8ace404682f2c",
-  "release": "e5993034f3cabc5d2d254ca7f8f62c21a02d6e801c9f397490727feada38a6a9",
-  "updateReceipt": "assignment-legends-1793895792934.json",
+  "sourceCommit": "514bf685d5f103911fab6702613fe422d5bdc6a3",
+  "release": "86bdffe016ceb5c021b3f30ce01197a4e5a3e5041419a955efd5d0b6f133f0a9",
+  "updateReceipt": "assignment-legends-1793899372851.json",
   "updateChecks": 6,
-  "metadataReceipt": "installed-copilot-journal-metadata-1793895793602.json",
+  "metadataReceipt": "installed-copilot-journal-metadata-1793899373305.json",
   "metadataChecks": 6,
-  "cleanupReceipt": "installed-copilot-journal-cleanup-1793895967301.json",
+  "cleanupReceipt": "installed-copilot-journal-cleanup-1793899469334.json",
   "selectedStatePreserved": true,
   "requestJournalsHiddenFromGenericSnapshot": true,
   "unauthenticatedRequestsRefused": true,
@@ -18,5 +18,12 @@
   "modelPromptsSubmitted": 0,
   "keyboardOpened": false,
   "microphoneOpened": false,
-  "tenantAccepted": false
+  "tenantAccepted": false,
+  "previousCheckpoint": {
+    "sourceCommit": "1877f27197cea0f6e9178b6e9bc8ace404682f2c",
+    "release": "e5993034f3cabc5d2d254ca7f8f62c21a02d6e801c9f397490727feada38a6a9",
+    "updateReceipt": "assignment-legends-1793895792934.json",
+    "metadataReceipt": "installed-copilot-journal-metadata-1793895793602.json",
+    "cleanupReceipt": "installed-copilot-journal-cleanup-1793895967301.json"
+  }
 }

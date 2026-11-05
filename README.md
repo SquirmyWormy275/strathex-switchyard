@@ -55,6 +55,8 @@ Copilot-only policy. Imported layouts never enable providers or recording.
   native demonstrations, reproducible checks and their practical limits.
 - [Full suite requirement ledger](docs/switchyard-requirements.md): every handover
   requirement, including checks that require hardware or approved accounts.
+- [Continue implementation](docs/switchyard-continuation.md): current checks,
+  preserved decisions and the next executable backend work.
 - [Earlier Omarchy tools](docs/try-switchyard.md): workflow recorder and existing
   Codex thread controls, with their own repeatable walkthrough.
 

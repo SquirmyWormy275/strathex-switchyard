@@ -1,5 +1,6 @@
 /** Pinned build declarations describe source support; they never authorize device control. */
 import sourceManifest from "../../third_party/model-f-catalog/SOURCES.json" with { type: "json" };
+import protocolAudits from "../../third_party/model-f-catalog/HAPTIC_PROTOCOL_AUDIT.json" with { type: "json" };
 import { identifyCatalogSnapshot } from "./catalog-identity.mjs";
 
 const profiles = [
@@ -8,10 +9,13 @@ const profiles = [
 ];
 
 export function inspectSourceHaptics(catalog, snapshot) {
-  const base = { schema: "switchyard-haptic-capabilities/v1", capturedAt: snapshot?.capturedAt ?? null, sourceSupport: "unverified", source: null, driver: null, liveState: "unavailable", controlAvailability: "unavailable", timingLimits: "unverified", firmwareAuthenticated: false, physicalHardwareVerified: false, electricalLimitsVerified: false, allowedOperations: [], hidTransactions: 0 };
+  const base = { schema: "switchyard-haptic-capabilities/v1", capturedAt: snapshot?.capturedAt ?? null, sourceSupport: "unverified", source: null, protocolAudit: null, driver: null, liveState: "unavailable", controlAvailability: "unavailable", timingLimits: "unverified", firmwareAuthenticated: false, physicalHardwareVerified: false, electricalLimitsVerified: false, allowedOperations: [], hidTransactions: 0 };
   let identity; try { identity = identifyCatalogSnapshot(catalog, snapshot); } catch { return { ...base, reason: "The protected readout does not verify an exact source identity." }; }
   const matches = profiles.filter(profile => identity.status === "source-identity-match" && snapshot.identity.viaProtocol === 9 && snapshot.identity.vialProtocol === profile.vialProtocol && snapshot.identity.keyboardId === profile.keyboardId && identity.definitionSha256 === profile.definitionSha256 && identity.definitions.some(definition => definition.id === profile.definitionId && definition.uidMatches) && sourceManifest.commits[profile.owner] === profile.commit);
   if (matches.length !== 1) return { ...base, reason: "This readout has no uniquely matched pinned haptic build declaration. Existing device settings are preserved." };
   const profile = matches[0];
-  return { ...base, sourceSupport: "declared-solenoid", driver: "solenoid", source: { definitionId: profile.definitionId, repository: profile.repository, commit: profile.commit, file: profile.buildFile, sha256: profile.buildSha256, gitBlobSha: profile.buildGitBlob, url: `https://github.com/${profile.repository}/blob/${profile.commit}/${profile.buildFile}`, declaration: profile.declaration }, reason: "The matched source declares solenoid support. This configuration readout does not verify live solenoid state, fitted hardware or an approved control path." };
+  const audits = protocolAudits.builds.filter(audit => audit.definitionId === profile.definitionId && audit.repository === profile.repository && audit.commit === profile.commit && audit.viaProtocol === 9 && audit.vialProtocol === profile.vialProtocol);
+  const protocolAudit = audits.length === 1 ? structuredClone({ schema: protocolAudits.schema, scope: protocolAudits.scope, provenance: protocolAudits.provenance, ...audits[0] }) : null;
+  const reason = protocolAudit ? "The matched source declares solenoid support. Its audited direct VIA/Vial routes expose no haptic state/control operation. Source identity does not verify running firmware, fitted hardware, live state or electrical limits." : "The matched source declares solenoid support. This configuration readout does not verify live solenoid state, fitted hardware or an approved control path.";
+  return { ...base, sourceSupport: "declared-solenoid", driver: "solenoid", protocolAudit, source: { definitionId: profile.definitionId, repository: profile.repository, commit: profile.commit, file: profile.buildFile, sha256: profile.buildSha256, gitBlobSha: profile.buildGitBlob, url: `https://github.com/${profile.repository}/blob/${profile.commit}/${profile.buildFile}`, declaration: profile.declaration }, reason };
 }

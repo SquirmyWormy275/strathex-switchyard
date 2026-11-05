@@ -55,8 +55,49 @@ with zero HID transactions and zero prompts. Receipts
 `installed-haptic-source-1793861121084.json` retain exact source facts and
 original-state preservation; owned bundle and proof checkout are removed.
 
-Runtime-state/control integration remains unfinished protocol work. Fitted
-hardware, electrical behavior and any exact physical transaction require separate
-acceptance and authorization. This distinction is retained in the
-[requirement ledger](switchyard-requirements.md); neither missing implementation
-nor unavailable physical verification is reported as a complete capability.
+## Direct host protocol audit
+
+The report now includes a source-only `protocolAudit` for each of these two exact
+matches. The [audit manifest](../third_party/model-f-catalog/HAPTIC_PROTOCOL_AUDIT.json)
+records 26 files with SHA-256, Git blob identity and byte count, verified against
+the complete pinned Git trees without saving another firmware checkout.
+
+The WCASS VIA handler delegates extended requests to Vial or its `util_comm`
+keyboard hook. Its closed QMK settings table declares IDs 1–19, with optional
+build-dependent entries; none is haptic state/control. The utility extension
+handles calibration, matrix, keyboard enable, EEPROM and bootloader operations.
+These are not solenoid controls. Internal haptic functions and physical haptic
+keycodes do not establish a host configuration API.
+
+The Leyden Jar fork has the corresponding VIA/Vial handlers, a settings table
+through ID 21 and its own calibration/matrix utility hook. None exposes direct
+haptic state/control. The compiled keyboard support files do not add a haptic
+layout-option handler. Its PS/2 startup can internally disable haptics while
+taking a mutually exclusive connector mode; that is also not a VIA/Vial haptic
+state/control API. This distinction comes from the pinned
+[utility handler](https://github.com/mymakercorner/vial-qmk/blob/761cb1c1b71ed91c48185f3e03465702b21e49f4/keyboards/leyden_jar/util_protocol.c),
+[settings table](https://github.com/mymakercorner/vial-qmk/blob/761cb1c1b71ed91c48185f3e03465702b21e49f4/quantum/qmk_settings.c)
+and [PS/2 glue](https://github.com/mymakercorner/vial-qmk/blob/761cb1c1b71ed91c48185f3e03465702b21e49f4/keyboards/leyden_jar/ps2/ps2_glue.c).
+
+The conclusion is limited to direct VIA/Vial routes in those source revisions.
+It does not claim every firmware or transport lacks haptics. Unknown identities
+receive no protocol-audit claim, and caller-authored fields cannot replace it.
+Returned audit data is copied, so mutating a report cannot change later results.
+No haptic keycode, guessed packet, timing value or operation is enabled.
+
+Runtime-state/control remains unavailable. Supporting it requires an explicitly
+reviewed firmware protocol or another verified supported route, then host-side
+transactions and physical acceptance. That protocol work is distinct from the
+separate authorization and hardware checks for a fitted solenoid, electrical
+behavior and actual operation. The [requirement ledger](switchyard-requirements.md)
+retains both limits; this source audit is not full runtime-control acceptance.
+
+Five isolated identity/haptic/Suite/package/installation groups pass 46 checks
+with every child cleanup verified
+(`isolated-test-62c1c4b1-e613-4b27-a3af-3f02bb0ad9d2.json`). The initial audit
+package exceeded the existing 5 MiB test budget; its
+[failed receipt summary](evidence/haptic-protocol-packaging-failed-summary.json)
+remains failed. Removing duplicate backend HTML/CSS keeps their original verified
+frozen-frontend copies and restores the package budget without changing it.
+Source JSON and all runtime state remain intact. Cached-readout installed
+acceptance for this additional audit remains separate.
