@@ -5,13 +5,15 @@ The F77 is the connected pilot, not a scope limit. The [requirement ledger](swit
 separates unfinished software from checks requiring an exact device, account or
 host. [Verification](verification.md) retains accepted and failed checkpoints.
 
-The latest complete Linux checkpoint is immutable `bd77ec4`: 218/218 groups,
-1,304 tests, 1,294 passed and ten declared skips. Every child cleanup verifies;
+The latest complete Linux checkpoint is immutable `c735516`: 218/218 groups,
+1,316 tests, 1,306 passed and ten declared skips. Every child cleanup verifies;
 owned fixtures, dependency aliases and checkout are removed
-(`isolated-test-386e9c91-d440-4c1c-a8d8-baf1338f6221.json`). This includes the
-selected-workspace inspector correction. Windows native staging and broker
-component acceptance now have digest-verified evidence; guest/account acceptance
-remains separate. [Native summary](evidence/windows-bd77-native-summary.json).
+(`isolated-test-cb4f8300-cb00-40c6-8844-67f7030d6ee8.json`). Later VS Code navigation
+passes focused source and normal installed demonstrations; its latest-source full
+run remains separate. Native Windows staging/broker and all five independently
+scheduled Shield software scenarios have digest-verified evidence. Guest/account
+acceptance remains separate. [Native summary](evidence/windows-bd77-native-summary.json),
+[scenario summary](evidence/windows-869-shield-scenarios-summary.json).
 
 The later immutable `82eb764` full run remains failed at interrupted-install
 recovery: 213/214 groups pass, 1,266 tests pass, one fails and ten skips. Recovery
@@ -37,7 +39,17 @@ and broader history remain unfinished software. [Witness](git-history-inputs.md)
 
 ## Installed application
 
-Latest installed source `b82f056`, release
+Latest installed source `dd0cad1`, release
+`c50a7624c39c2866c59e2c7275c0e7156f5142a73543360751468fcd8309f805`,
+passes six update/five exact VS Code/five repaired ChatGPT focus checks through
+the normal authenticated installed gateway. Original selection, definitions/mode,
+private endpoint and frozen Home restore. The owned editor unit exits; its
+separate profile/extensions, package and proof checkout are removed with user
+settings unchanged. Class-only fallback refuses after the owned editor closes,
+while the other existing editor remains open. Zero prompts/no device access.
+[Digest summary](evidence/native-vscode-focus-summary.json).
+
+Earlier installed source `b82f056`, release
 `a6c095ec81436d03fc136e7f6da73977c842e9cabb57ceb33f15a202daa11416`,
 passes six update/five actual native main-window focus/API/restoration checks.
 One repaired main window and zero floating overlays verify; original selection,

@@ -106,5 +106,22 @@ and its owned gateway fixture is removed. The corrected path explicitly includes
 the observed class; it does not broaden to arbitrary titles/classes.
 
 The installed verifier accepts `--synthetic --client=vscode` as a separate mode;
-the original command continues to check repaired ChatGPT. Normal installed VS Code
-acceptance and owned editor/profile retirement are being collected.
+the original command continues to check repaired ChatGPT. Normal installed `dd0cad1`, release
+`c50a7624c39c2866c59e2c7275c0e7156f5142a73543360751468fcd8309f805`,
+passes six normal update, five VS Code and five repaired ChatGPT compatibility
+checks. Receipts `installed-native-main-window-1793882002589.json` and
+`installed-native-main-window-1793882003855.json` verify full original selection,
+definitions/mode/private endpoint and frozen Home restoration. Window counts are
+scoped to the verified target process. Two earlier installed verifier journeys
+remain failed with restoration: a later precise phase identifies a class-wide
+count that included another application. The actual focus and process-readback
+checks had passed before that terminal count. The corrected verifier counts only
+the independently verified process and retains a dedicated class-collision test.
+
+The exact owned editor unit is stopped; its cgroup is empty/removed and independent
+process readback is clear. Its separate profile/extensions and proof checkout are
+removed, the disposable package is removed and original user settings are
+unchanged (`owned-vscode-retirement-1793882075618.json`). Another application
+sharing VS Code's class remains open. After owned editor exit, the source target
+refuses rather than focusing it (`native-vscode-no-fallback-1793882102370.json`).
+No user editor instance is closed. [Receipt hashes and limits](evidence/native-vscode-focus-summary.json).

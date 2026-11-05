@@ -88,6 +88,13 @@ test("native VS Code rejects spoofed classes, alternate editors, PID reuse and m
   await assert.rejects(focusNativeVscode(reused.hypr, { readProcess: reused.readProcess, assertCurrent: async () => { if (++checks === 2) reused.process.startTicks = "22222"; } }), /changed before focus/); assert.equal(reused.calls.some(call => call[0] === "dispatch"), false);
 });
 
+test("another application sharing VS Code's class cannot steal the exact native editor target", async () => {
+  const f = chatgptFocusFixture(); f.process.executable = "/usr/share/code/code"; f.window.initialClass = "com.microsoft.VSCode";
+  f.windows.push({ ...f.window, pid: 124, address: "0x456" });
+  const result = await focusNativeVscode(f.hypr, { readProcess: async pid => ({ ...f.process, pid, executable: pid === 123 ? "/usr/share/code/code" : "/opt/other-editor/editor" }) });
+  assert.equal(result.windowFocusVerified, true); assert.deepEqual(f.calls.filter(call => call[0] === "dispatch"), [["dispatch", 'hl.dsp.focus({ window = "address:0x123" })']]);
+});
+
 test("portable profile migrates legacy plans, excludes environment connections, and rejects future versions", () => {
   const p = plan(); p.localBindings = { credential: "never-portable", path: "/private" };
   const migrated = importProfile(p);

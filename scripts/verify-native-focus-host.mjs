@@ -24,8 +24,9 @@ await current(); // Authenticate the listener before disclosing its bearer.
 async function api(path, body = {}, expected = 200, authenticated = true) {
   await current();
   const response = await fetch(new URL("/api/suite/" + path, binding.url.origin), { method: "POST", redirect: "error", headers: { "Content-Type": "application/json", Origin: binding.url.origin, ...(authenticated ? { Authorization: "Bearer " + binding.token } : {}) }, body: JSON.stringify(body), signal: AbortSignal.timeout(30000) });
-  assert.equal(response.status, expected, "The fixed installed focus request was refused.");
-  const text = await response.text(); assert.ok(Buffer.byteLength(text) <= 1048576); return JSON.parse(text);
+  const text = await response.text(); assert.ok(Buffer.byteLength(text) <= 1048576); const value = JSON.parse(text);
+  if (response.status !== expected) evidence.refusal = { expected, status: response.status, message: typeof value.error === "string" ? value.error.replaceAll(binding.url.origin, "[local application]").replaceAll(binding.token, "[redacted]").slice(0, 256) : "No supported refusal detail" };
+  assert.equal(response.status, expected, "The fixed installed focus request was refused."); return value;
 }
 const store = createSuiteStore(), selected = await store.selection(), personal = definitions(await store.snapshot("personal")), compartment = "native-focus-validation", checks = [];
 const evidence = { schema: "switchyard-installed-native-main-window-proof/v1", at: new Date().toISOString(), applicationRelease: installed.build, client, checks, modelPromptsSubmitted: 0, keyboardOpened: false, microphoneOpened: false, launcherChanged: false, overlaySettingsChanged: false, frontendChanged: false, accountAccepted: false, taskResumptionAccepted: false };
@@ -51,12 +52,17 @@ try {
   await api("intent", { implementation: `native-${client}.focus/v1` }, 409); checks.push("keyboard-only validation workspace refuses native provider effects");
   stage = "exact-main-window-focus";
   await api("mode", { compartment, mode: "personal-companion" });
+  stage = "authenticated-native-focus-response";
   const result = await api("intent", { implementation: `native-${client}.focus/v1` });
+  stage = "focused-result-claims";
   assert.equal(result.windowFocusVerified, true); assert.equal(result.modelPromptSubmitted, false); assert.equal(result.accountVerified, false); assert.equal(result.taskResumptionVerified, false);
+  stage = "process-identity-readback";
   assert.deepEqual(await target.inspect(), original);
-  const windows = JSON.parse(await runHypr("clients", "-j")).filter(row => target.classes.includes(row.initialClass));
+  stage = "mapped-window-readback";
+  const observed = JSON.parse(await runHypr("clients", "-j")), windows = observed.filter(row => target.classes.includes(row.initialClass) && row.pid === original.pid);
   assert.equal(windows.filter(row => row.mapped).length, 1); assert.equal(windows.filter(row => row.mapped && row.floating).length, 0);
-  evidence.mappedMainWindows = 1; evidence.mappedFloatingOverlays = 0;
+  evidence.mappedMainWindows = 1; evidence.mappedFloatingOverlays = 0; evidence.windowCountScope = "verified-target-process";
+  evidence.classOnlyCandidatesExcluded = observed.filter(row => target.classes.includes(row.initialClass) && row.pid !== original.pid).length;
   checks.push("normal installed authenticated gateway focuses only the unchanged exact native main window, with one mapped main window and zero floating overlays");
 } catch (error) { failure = error; evidence.failure = { stage, category: error.name }; }
 finally {

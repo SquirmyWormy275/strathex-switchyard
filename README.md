@@ -113,6 +113,10 @@ The installed [read-only inspector](docs/inspect-cli.md) exposes these readers a
 `switchyard inspect`; start with `switchyard inspect --help`. It creates no tasks, grants,
 prompts or scans. Its normal installed-launcher demonstration passes with the
 actual selected workspace, independent query exits and full restoration.
+[Native application focus](docs/native-client-focus.md) now verifies the repaired
+ChatGPT and VS Code main windows through the installed gateway, with exact process
+birth, address and current-workspace policy checks. It establishes navigation;
+account, repository and agent-session control remain separate capabilities.
 The [history witness](docs/git-history-inputs.md) verifies bounded raw commit,
 tree and selected old blob identities without disclosing source or messages.
 [Linux historical scans](docs/historical-shield-inputs.md) now inspect reviewed
