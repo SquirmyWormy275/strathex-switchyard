@@ -38,6 +38,10 @@ try {
   const snapshot = await api("snapshot", { compartment: selected }); assert.equal(Object.hasOwn(snapshot, "copilotRequests"), false); assert.equal(Object.hasOwn(snapshot, "copilotRequestTombstones"), false);
   evidence.checks.push("generic installed snapshot does not expose private request journals or tombstones");
   const sealed = hash(await privateRead(stateFile));
+  const expectedCompartments = await store.list(), inventory = await api("compartment/inventory", {});
+  assert.equal(inventory.schema, "switchyard-compartment-inventory/v1"); assert.equal(inventory.complete, true); assert.equal(inventory.authorityGranted, false); assert.equal(inventory.providerObserved, false); assert.equal(inventory.activeCompartment, selected); assert.deepEqual(inventory.compartments, expectedCompartments); assert.ok(inventory.compartments.some(row => row.id === selected)); assert.ok(inventory.compartments.every(row => Object.keys(row).length === 1 && typeof row.id === "string"));
+  await api("compartment/inventory", {}, 401, false); await api("compartment/inventory", { compartment: selected }, 409); await api("compartment/inventory", { replay: true }, 409);
+  evidence.workspaceInventoryCount = inventory.compartments.length; evidence.checks.push("complete bounded workspace metadata includes the selected identity without content, provider observation or selection/replay fields");
   await api("copilot/requests", { compartment: selected }, 401, false); evidence.checks.push("unauthenticated request inspection is refused");
   const rows = await api("copilot/requests", { compartment: selected }); assert.ok(Array.isArray(rows)); assert.equal(rows.length, (before.copilotRequests ?? []).length); assert.ok(rows.every(row => row.remoteCancellationVerified === false)); evidence.retainedRequestCount = rows.length;
   evidence.checks.push("authenticated request metadata remains separate from remote completion or cancellation");

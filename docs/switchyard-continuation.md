@@ -82,10 +82,13 @@ or token. Private verification receipts live outside Git under
 
 ## Next executable tasks
 
-1. The source-audit installed cached-readout check now passes six update/four
-   actual API checks at `0cc9e76c`; exact state/frontend preservation and owned
-   bundle/checkout removal verify. Record its evidence while continuing the
-   remaining exact IDE/task attachment implementation.
+1. Finish normal installed acceptance for complete workspace inventory. The old
+   32-entry truncation hid existing protected identities; all 54 fixture entries
+   and the new bounded metadata route now pass 31 surrounding checks. The updated
+   read-only journal verifier includes inventory without creating a workspace or
+   contacting a provider. The F77 source-audit installed check is already accepted
+   with owned cleanup at `0cc9e76c`. Continue exact IDE/task attachment work after
+   this setup repair; process ancestry alone cannot select an exact IDE tab.
 2. Collect the active 232-group result. Preserve failures honestly; verify exact
    owned child exit before removing task fixtures/aliases/checkouts. Diagnose
    failures without raising deadlines or affecting unrelated workstation jobs.

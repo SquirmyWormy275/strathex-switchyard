@@ -160,6 +160,14 @@ export function createSuite({ store = createSuiteStore(), platform = process.pla
         await loadSelection();if(await store.selection()!==activeCompartment)throw Error("The saved workspace changed outside this active instance; select it through the application before inspecting.");
         return{schema:"switchyard-active-compartment/v1",activeCompartment,authorityGranted:false};
       }
+      if (path === "/api/suite/compartment/inventory") {
+        if (Object.keys(body).some(key => key !== "workspaceBaseUrl")) throw new Error("Workspace inventory accepts no selection, provider or replay fields.");
+        await loadSelection();
+        if (await store.selection() !== activeCompartment) throw new Error("The saved workspace changed outside this active instance; select it through the application before inspecting.");
+        const compartments = await store.list();
+        if (!compartments.some(row => row.id === activeCompartment)) throw new Error("The selected workspace is missing from its private inventory. Preserve the original state.");
+        return { schema: "switchyard-compartment-inventory/v1", compartments, activeCompartment, complete: true, authorityGranted: false, providerObserved: false };
+      }
       if (path === "/api/suite/bootstrap") {
         await loadSelection();
         return { compartments: await store.list(), activeCompartment, agents: await agents.discovery(), voice: await voice.discovery() };

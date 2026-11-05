@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { EventEmitter, once } from "node:events";
-import { mkdtemp, readFile, writeFile, rm } from "node:fs/promises";
+import { mkdtemp, readFile, writeFile, mkdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createSuiteStore } from "./suite-store.mjs";
@@ -52,6 +52,35 @@ test("concurrent suite bootstrap recovers a compartment once and never silently 
     await assert.rejects(suite.handle("/api/suite/compartment/create", { compartment: "personal", policy: "work" }), /policy differs/);
     assert.equal((await store.snapshot("personal")).policy, "personal");
   } finally { await suite.close(); }
+}));
+
+test("workspace discovery retains every sealed identity past32 without credentials, partial overflow or non-file substitution", () => fixture(async ({ root, store, secrets }) => {
+  const ids = Array.from({ length: 54 }, (_, i) => "project-" + String(i).padStart(3, "0"));
+  for (const id of ids) await store.initialize(id);
+  await store.selection(ids.at(-1));
+  const original = await readFile(join(root, ids.at(-1) + ".sealed.json")), get = secrets.get;
+  secrets.get = async () => { throw Error("Workspace metadata must not open credentials or decrypt content"); };
+  try { assert.deepEqual(await store.list(), ids.map(id => ({ id }))); } finally { secrets.get = get; }
+  assert.equal(await store.selection(), ids.at(-1)); assert.deepEqual(await readFile(join(root, ids.at(-1) + ".sealed.json")), original);
+  let discoveryCalls = 0;
+  const suite = createSuite({ store, agents: { discovery: async () => { discoveryCalls++; return []; }, close() {} }, voice: { discovery: async () => ({ available: false }) } });
+  try {
+    const result = await suite.handle("/api/suite/bootstrap"); assert.equal(result.activeCompartment, ids.at(-1)); assert.ok(result.compartments.some(row => row.id === ids.at(-1))); assert.equal(result.compartments.length, 55);
+    const callsBefore = discoveryCalls; secrets.get = async () => { throw Error("Inventory must not open workspace content or credentials"); };
+    try { const inventory = await suite.handle("/api/suite/compartment/inventory"); assert.equal(inventory.schema, "switchyard-compartment-inventory/v1"); assert.equal(inventory.complete, true); assert.equal(inventory.authorityGranted, false); assert.equal(inventory.providerObserved, false); assert.equal(inventory.activeCompartment, ids.at(-1)); assert.deepEqual(inventory.compartments, [...ids, "personal"].sort().map(id => ({ id }))); }
+    finally { secrets.get = get; }
+    assert.equal(discoveryCalls, callsBefore);
+    await assert.rejects(suite.handle("/api/suite/compartment/inventory", { compartment: ids[0] }), /accepts no selection/);
+    await assert.rejects(suite.handle("/api/suite/compartment/inventory", { replay: true }), /accepts no selection/);
+    await store.selection(ids[0]); await assert.rejects(suite.handle("/api/suite/compartment/inventory"), /saved workspace changed/); await store.selection(ids.at(-1));
+  }
+  finally { await suite.close(); }
+  const afterRestart = await readFile(join(root, ids.at(-1) + ".sealed.json"));
+  await mkdir(join(root, "substitute.sealed.json")); await assert.rejects(store.list(), /not an ordinary sealed file/); await rm(join(root, "substitute.sealed.json"), { recursive: true });
+  for (let i = 0; i < 201; i++) await writeFile(join(root, "overflow-" + String(i).padStart(3, "0") + ".sealed.json"), "synthetic metadata name only", { mode: 0o600 });
+  assert.equal((await store.list()).length, 256);
+  await writeFile(join(root, "overflow-last.sealed.json"), "synthetic metadata name only", { mode: 0o600 });
+  await assert.rejects(store.list(), /exceeds 256.*no partial workspace list/); assert.equal(await store.selection(), ids.at(-1)); assert.deepEqual(await readFile(join(root, ids.at(-1) + ".sealed.json")), afterRestart);
 }));
 
 test("repository recovery routes preserve exact IDs and unknown native exit prevents false keyboard-only or workspace-stop acceptance", () => fixture(async ({ store }) => {

@@ -169,8 +169,10 @@ export function createSuiteStore({ root = join(process.env.XDG_STATE_HOME || (pr
     },
     async list() {
       await privateDirectory(root);
-      const ids = (await readdir(root)).filter((n) => /^[a-z][a-z0-9-]{0,47}\.sealed\.json$/.test(n)).map((n) => n.replace(/\.sealed\.json$/, ""));
-      return ids.slice(0, 32).map((id) => ({ id }));
+      const entries = (await readdir(root, { withFileTypes: true })).filter(entry => /^[a-z][a-z0-9-]{0,47}\.sealed\.json$/.test(entry.name));
+      if (entries.length > 256) throw new Error("The workspace metadata inventory exceeds 256 entries. Preserve the private data and review the inventory; no partial workspace list was returned.");
+      if (entries.some(entry => !entry.isFile() || entry.isSymbolicLink())) throw new Error("A workspace entry is not an ordinary sealed file. Preserve the original data; no partial workspace list was returned.");
+      return entries.map(entry => entry.name.replace(/\.sealed\.json$/, "")).sort().map(id => ({ id }));
     },
     async snapshot(id) { const s = await read(id); permit(s); prune(s); return { ...s, mode: s.mode ?? "keyboard-only", policyRules: templates[s.policy] }; },
     async authorize(id, request) { const s = await read(id); return permit(s, request); },
