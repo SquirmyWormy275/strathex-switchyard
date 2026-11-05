@@ -40,6 +40,9 @@ internal static class NativeExchangeProof
             Refuses(()=>{using var stream=File.Open(imagePath,FileMode.Open,FileAccess.Write,FileShare.ReadWrite);});
             Refuses(()=>{using var stream=File.Open(Path.Combine(files.OperationRoot(operation),"0000.json"),FileMode.Open,FileAccess.Write,FileShare.Read);});
             var attached=Call("attach");Require(attached.State=="mounted"&&attached.Attached&&attached.Mounted&&attached.ExchangeQuotaEnforced);
+            var binding=WindowsStorageBrokerExchangeMapping.Observe(settings,operation,task,inputs);Require(binding.GetProperty("broker").GetProperty("taskScopeSha256").GetString()==task);
+            var changed=System.Text.Json.Nodes.JsonNode.Parse(binding.GetRawText())!;string foreignRoot=Path.Combine(settings.Root,"foreign","disk-"+operation);changed["stagingRoot"]=foreignRoot;
+            Refuses(()=>{using var json=JsonDocument.Parse(changed.ToJsonString());using var mapping=ReviewedInputStager.PinBoundedMapping(json.RootElement,Path.Combine(foreignRoot,"mount"));});
             Require(Call("inspect")==attached with{EffectStarted=false});
             bool full=false;long written=0;
             try{using var output=new FileStream(Path.Combine(mount,"synthetic.bin"),FileMode.CreateNew,FileAccess.Write,FileShare.Read);var block=new byte[1024*1024];for(int count=0;count<80;count++){output.Write(block);written+=block.Length;}output.Flush(true);}

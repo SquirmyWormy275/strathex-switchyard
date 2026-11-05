@@ -68,3 +68,18 @@ the normal host admission to this service, binding the exact guest consumer,
 maintaining independent VM exit before cleanup, and interactive Sandbox/UAC
 acceptance remain separate work. No device, account, guest, workstation mount or
 physical keyboard was changed on the Linux pilot by these builds.
+
+The helper also exposes fixed `probe-exchange` and `exchange-binding` observations.
+The probe sends only a fresh nonce-bound inspect for an unknown operation and
+creates no disk or journal. Mapping observation accepts only operation/task/input
+scope and derives the protected path itself. It requires a fresh signed mounted
+result, exact immutable facts and journal state, then pins the original native
+image, mount and extent through admission. The ordinary client receives no
+volume-management privilege. The 24-case native proof now includes this mapping
+and a substituted-root rejection. Both C# builds and all 106 portable checks
+pass; its actual Windows execution and normal Run connection remain pending.
+
+The first engine Windows run failed during the preceding metadata-service
+removal, before reaching its volume test. That failure remains retained; bounded
+removal phase diagnostics and one post-failure observation were added to isolate
+it. See [verification](verification.md) for the exact source and receipt.

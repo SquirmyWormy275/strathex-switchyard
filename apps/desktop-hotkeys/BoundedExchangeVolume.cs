@@ -119,16 +119,19 @@ internal static partial class ReviewedInputStager
         var handles = new List<SafeFileHandle>();
         try
         {
-            Exact(binding, "schema", "operationId", "stagingRoot", "stagingIdentity", "imageIdentity", "mountIdentity", "footerSha256", "volumeGuid");
+            bool brokerBinding = binding.TryGetProperty("broker", out _);
+            Exact(binding, brokerBinding ? new[] { "schema", "operationId", "stagingRoot", "stagingIdentity", "imageIdentity", "mountIdentity", "footerSha256", "volumeGuid", "broker" } : new[] { "schema", "operationId", "stagingRoot", "stagingIdentity", "imageIdentity", "mountIdentity", "footerSha256", "volumeGuid" });
             if (binding.GetProperty("schema").GetString() != "switchyard-windows-bounded-volume/v1"
                 || !Guid.TryParseExact(binding.GetProperty("operationId").GetString(), "D", out var operation) || operation == Guid.Empty
                 || !Digest.IsMatch(binding.GetProperty("footerSha256").GetString() ?? "")) throw Invalid();
             string root = Absolute(binding.GetProperty("stagingRoot")), volume = binding.GetProperty("volumeGuid").GetString() ?? "";
             if (Path.GetFileName(root) != "disk-" + operation.ToString("D") || !VolumeName(volume)
                 || !string.Equals(Path.GetFullPath(mappedRoot), Path.Combine(root, "mount"), StringComparison.OrdinalIgnoreCase)) throw Invalid();
+            var broker = brokerBinding ? WindowsStorageBrokerExchangeMapping.Validate(binding) : null;
+            if (broker != null) foreach (string parent in new[] { broker.Root, Path.Combine(broker.Root, WindowsStorageBrokerExchangeFiles.DirectoryName), new WindowsStorageBrokerExchangeFiles(broker).OperationRoot(operation.ToString("D")) }) handles.Add(WindowsStorageBrokerFiles.PinDirectory(parent, broker.ClientSid));
             var directory = PinDirectories(root, handles, ReadControl);
             if (!Matches(Information(directory, true), binding.GetProperty("stagingIdentity"))) throw Invalid();
-            VerifyPrivateDirectory(directory);
+            if (broker == null) VerifyPrivateDirectory(directory); else handles.Add(WindowsStorageBrokerFiles.PinDirectory(root, broker.ClientSid));
             if (!Directory.EnumerateFileSystemEntries(root).Select(Path.GetFileName).Order(StringComparer.Ordinal).SequenceEqual(new[] { "exchange.vhd", "mount" })) throw Invalid();
             string imagePath = Path.Combine(root, "exchange.vhd"), mountPath = Path.Combine(root, "mount");
             var metadata = CreateFileW(NativeName(imagePath), GenericRead, ShareRead | ShareWrite, IntPtr.Zero, OpenExisting, OpenReparsePoint, IntPtr.Zero); handles.Add(metadata);
@@ -142,7 +145,7 @@ internal static partial class ReviewedInputStager
                 if (count == 0) throw Invalid(); read += count;
             }
             if (Convert.ToHexString(SHA256.HashData(footer)).ToLowerInvariant() != binding.GetProperty("footerSha256").GetString()) throw Invalid();
-            var mount = PinMount(mountPath, binding.GetProperty("mountIdentity"), false, out bool mounted); handles.Add(mount);
+            var mount = PinMount(mountPath, binding.GetProperty("mountIdentity"), false, out bool mounted, broker?.ClientSid); handles.Add(mount);
             if (!mounted) throw Invalid();
             var image = BoundedExchangeImage.OpenNativeImage(imagePath, operation, 0x00080000, 0); handles.Add(image);
             if (!BoundedExchangeImage.ReadNativeState(image, operation)) throw Invalid();

@@ -8,12 +8,21 @@ behind each accepted result.
 
 ## Active backend iteration
 
+Protected broker mapping now has a read-only native entry: fresh signed mounted
+state, exact task/input/installation journal and image facts, then pinned native
+UUID/footer/mount/extent/capacity/ACL verification. A changed directory cannot
+substitute for it. Both C# targets compile without warnings and all 106 portable
+checks pass. The expanded 24-case native volume/mapping proof remains pending;
+normal Run/guest connection is unfinished.
+
 Complete Linux `4f995d4` passes 165/165 groups: 1,078 tests, 1,068 passed and ten
 declared skips, receipt `6a95e3e7-0b5d-4ac4-8cca-56a0a95a0c06`. Every child cleanup
 verified; short home-filesystem fixture parent and disposable checkout removed.
 The prior failed quota/socket/runtime receipts remain retained. Native Windows
-engine workflow `41942299398` is running; its 22-case real restricted-client
-volume proof has not yet been accepted.
+engine workflow `41942299398` passed 83 compiled crypto/journal and 29 protected-file/
+restricted-client checks, then failed service removal after four lifecycle checks.
+Both archive digests were verified; failed receipt retained. The volume proof was
+not reached. Native removal phase diagnostics are now added without effect retry.
 
 Exchange image/mount facts now have 23 compiled corruption and substitution
 checks. Retirement validates original metadata before known-file removal; unknown
@@ -34,7 +43,7 @@ unfinished.
 The closed exchange wire now passes thirty compiled crypto/parser checks and
 keeps its fixed 64 MiB limit, exact task/input/operation scope and fresh signed
 challenge separate from durable effect authority. Its native engine and service transport are implemented and compile without
-warnings; the new 22-case restricted-client Windows acceptance is pending. The
+warnings; the new restricted-client Windows acceptance is pending. The
 normal Run/guest-consumer connection remains unfinished. Metadata still reports
 no complete volume broker. See the [storage boundary](windows-storage-broker.md).
 

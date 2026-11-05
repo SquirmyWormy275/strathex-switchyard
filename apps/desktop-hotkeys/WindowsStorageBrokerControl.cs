@@ -90,10 +90,13 @@ internal static class WindowsStorageBrokerControl
         VerifyConfiguration(service,settings);var status=ReadStatus(service);
         return new{state=status.State,nativeExitCode=status.ExitCode,specificExitCode=status.SpecificExitCode,configurationVerified=true};
     }
-    internal static void Remove(WindowsStorageBrokerInstallation.Settings settings)
+    internal static void Remove(WindowsStorageBrokerInstallation.Settings settings,Action<string>? phase=null)
     {
+        phase?.Invoke("administrator-manager");
         Administrator();using var manager=OpenSCManagerW(null,null,1);if(manager.IsInvalid)throw Invalid();
+        phase?.Invoke("exchange-preflight");
         var exchange=new WindowsStorageBrokerExchangeFiles(settings);exchange.AssertRetired();
+        phase?.Invoke("service-configuration");
         using(var service=OpenServiceW(manager,settings.ServiceName,0x10025))
         {
             if(service.IsInvalid)throw Invalid();VerifyConfiguration(service,settings);var status=ReadStatus(service);SafeProcessHandle? process=null;
@@ -101,34 +104,38 @@ internal static class WindowsStorageBrokerControl
             {
                 if(status.Pid>0)
                 {
+                    phase?.Invoke("capture-native-process");
                     process=OpenProcess(0x101000,false,status.Pid);if(process.IsInvalid)throw Invalid();var image=new StringBuilder(4096);uint length=4096;
                     if(!QueryFullProcessImageNameW(process,0,image,ref length)||!Path.GetFullPath(image.ToString()).Equals(settings.ImagePath,StringComparison.OrdinalIgnoreCase))throw Invalid();
                 }
-                if(status.State!=1&&!ControlService(service,1,out _))throw Invalid();long deadline=Environment.TickCount64+30000;
+                phase?.Invoke("stop-service");if(status.State!=1&&!ControlService(service,1,out _))throw Invalid();long deadline=Environment.TickCount64+30000;
                 while(ReadStatus(service).State!=1){if(Environment.TickCount64>=deadline)throw Invalid();Thread.Sleep(50);}
-                if(process!=null&&WaitForSingleObject(process,30000)!=0)throw Invalid();
+                phase?.Invoke("native-process-exit");if(process!=null&&WaitForSingleObject(process,30000)!=0)throw Invalid();
+                phase?.Invoke("exchange-after-exit");
                 exchange.AssertRetired();
+                phase?.Invoke("delete-service");
                 if(!DeleteService(service))throw Invalid();
             }
             finally{process?.Dispose();}
         }
-        long absentDeadline=Environment.TickCount64+10000;
+        phase?.Invoke("service-absence");long absentDeadline=Environment.TickCount64+10000;
         while(true)
         {
             using var observed=OpenServiceW(manager,settings.ServiceName,4);int error=Marshal.GetLastWin32Error();
             if(observed.IsInvalid&&error==1060)break;if(!observed.IsInvalid||error!=1072||Environment.TickCount64>=absentDeadline)throw Invalid();Thread.Sleep(50);
         }
-        string[] expected={WindowsStorageBrokerInstallation.Executable,WindowsStorageBrokerInstallation.Configuration,WindowsStorageBrokerInstallation.PrivateKey};
+        phase?.Invoke("protected-inventory");string[] expected={WindowsStorageBrokerInstallation.Executable,WindowsStorageBrokerInstallation.Configuration,WindowsStorageBrokerInstallation.PrivateKey};
         if(WindowsStorageBrokerDiagnostic.Read(settings)!=null)expected=expected.Append(WindowsStorageBrokerDiagnostic.FileName).ToArray();
         using(var root=WindowsStorageBrokerFiles.PinDirectory(settings.Root,settings.ClientSid))
         {
             var directories=new[]{WindowsStorageBrokerRuntime.DirectoryName}.Concat(exchange.Exists?new[]{WindowsStorageBrokerExchangeFiles.DirectoryName}:Array.Empty<string>()).Order(StringComparer.Ordinal);
             if(!Directory.GetFiles(settings.Root).Select(Path.GetFileName).Order().SequenceEqual(expected.Append(WindowsStorageBrokerRuntime.InventoryName).Order())||!Directory.GetDirectories(settings.Root).Select(Path.GetFileName).Order(StringComparer.Ordinal).SequenceEqual(directories))throw Invalid();
-            WindowsStorageBrokerInstallation.Load(settings.ClientSid);using var key=WindowsStorageBrokerInstallation.OpenSigningKey(settings);
-            exchange.RemoveRetired();
-            WindowsStorageBrokerRuntime.RemoveVerified(settings);
+            phase?.Invoke("installation-readback");WindowsStorageBrokerInstallation.Load(settings.ClientSid);using var key=WindowsStorageBrokerInstallation.OpenSigningKey(settings);
+            phase?.Invoke("retired-journal-removal");exchange.RemoveRetired();
+            phase?.Invoke("runtime-removal");WindowsStorageBrokerRuntime.RemoveVerified(settings);
+            phase?.Invoke("known-file-removal");
             foreach(string name in expected)File.Delete(Path.Combine(settings.Root,name));
         }
-        Directory.Delete(settings.Root);if(Directory.Exists(settings.Root))throw Invalid();
+        phase?.Invoke("root-removal");Directory.Delete(settings.Root);if(Directory.Exists(settings.Root))throw Invalid();
     }
 }

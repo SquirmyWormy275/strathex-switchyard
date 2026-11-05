@@ -16,14 +16,14 @@ internal static class WindowsStorageBroker
     private static void Write(object value)=>Console.WriteLine(JsonSerializer.Serialize(value));
     internal static int Run()
     {
-        string action="";bool attempted=false;
+        string action="",effectPhase="request";bool attempted=false;
         try
         {
             Console.InputEncoding=new UTF8Encoding(false,true);Console.OutputEncoding=new UTF8Encoding(false);
             char[] chars=new char[8193];int count=0;while(count<chars.Length){int read=Console.In.Read(chars,count,chars.Length-count);if(read==0)break;count+=read;}
             if(count>8192)throw Invalid();using var document=JsonDocument.Parse(new string(chars,0,count),new JsonDocumentOptions{MaxDepth=4});var request=document.RootElement;
             action=request.GetProperty("action").GetString()??"";
-            if(action=="metadata")Exact(request,"schema","action");else if(action=="exchange")Exact(request,"schema","action","verb","requestId","operationId","taskScopeSha256","inputManifestSha256");else if(action is "install-bootstrap" or "remove-bootstrap")Exact(request,"schema","action","clientSid","installationId","helperSha256");else throw Invalid();
+            if(action is "metadata" or "probe-exchange")Exact(request,"schema","action");else if(action=="exchange-binding")Exact(request,"schema","action","operationId","taskScopeSha256","inputManifestSha256");else if(action=="exchange")Exact(request,"schema","action","verb","requestId","operationId","taskScopeSha256","inputManifestSha256");else if(action is "install-bootstrap" or "remove-bootstrap")Exact(request,"schema","action","clientSid","installationId","helperSha256");else throw Invalid();
             if(request.GetProperty("schema").GetString()!=Schema)throw Invalid();
             if(action=="metadata")
             {
@@ -34,6 +34,24 @@ internal static class WindowsStorageBroker
                     Write(new{schema=Schema,action,status="bootstrap-ready",installationId=settings.InstallationId,ownerScope=settings.OwnerScope,serviceImageSha256=settings.ServiceImageSha256,protocolVerified=true,storage,brokerImplemented=false,effectStarted=false});return 0;
                 }
                 catch(Exception error){JsonElement? diagnostic=null;bool installationAbsentVerified=false;try{installationAbsentVerified=WindowsStorageBrokerFiles.RootAbsent(WindowsStorageBrokerFiles.CurrentOwnerSid());}catch{}if(settings!=null){try{serviceState=WindowsStorageBrokerControl.ObserveState(settings);}catch{}try{diagnostic=WindowsStorageBrokerDiagnostic.Read(settings);}catch{}}Write(new{schema=Schema,action,status="unavailable",reason="The original protected broker and its fresh authenticated metadata could not be verified.",installationAbsentVerified,failureStage=stage,serviceState,diagnostic,errorCategory=error.GetType().Name,nativeCode=error is System.ComponentModel.Win32Exception native?native.NativeErrorCode:(int?)null,brokerImplemented=false,effectStarted=false});return 0;}
+            }
+            if(action=="probe-exchange")
+            {
+                try
+                {
+                    var settings=WindowsStorageBrokerInstallation.Load(WindowsStorageBrokerFiles.CurrentOwnerSid());
+                    var proof=WindowsStorageBrokerPipe.Exchange(settings,"inspect",Guid.NewGuid().ToString("D"),Guid.NewGuid().ToString("D"),new string('a',64),new string('b',64)).GetAwaiter().GetResult();
+                    if(proof.State!="outcome-unconfirmed"||proof.EffectStarted||proof.Attached||proof.Mounted||proof.DetachedVerified||proof.ExchangeQuotaEnforced)throw Invalid();
+                    Write(new{schema=Schema,action,status="available",installationId=settings.InstallationId,ownerScope=settings.OwnerScope,serviceImageSha256=settings.ServiceImageSha256,protocolVerified=true,exchangeSupported=true,effectStarted=false,brokerImplemented=false});
+                }
+                catch{Write(new{schema=Schema,action,status="unavailable",exchangeSupported=false,effectStarted=false,brokerImplemented=false});}
+                return 0;
+            }
+            if(action=="exchange-binding")
+            {
+                var settings=WindowsStorageBrokerInstallation.Load(WindowsStorageBrokerFiles.CurrentOwnerSid());
+                var binding=WindowsStorageBrokerExchangeMapping.Observe(settings,request.GetProperty("operationId").GetString()??"",request.GetProperty("taskScopeSha256").GetString()??"",request.GetProperty("inputManifestSha256").GetString()??"");
+                Write(new{schema=Schema,action,status="mapping-verified",binding,protocolVerified=true,effectStarted=false,brokerImplemented=false});return 0;
             }
             if(action=="exchange")
             {
@@ -53,13 +71,13 @@ internal static class WindowsStorageBroker
             else
             {
                 var settings=WindowsStorageBrokerInstallation.Load(sid);if(settings.InstallationId!=installationId||settings.ServiceImageSha256!=sha)throw Invalid();
-                attempted=true;WindowsStorageBrokerControl.Remove(settings);
+                attempted=true;WindowsStorageBrokerControl.Remove(settings,phase=>effectPhase=phase);
                 Write(new{schema=Schema,action,status="removed",installationId,ownerScope=scope,serviceRemovedVerified=true,filesRemovedVerified=true,brokerImplemented=false,effectStarted=true});return 0;
             }
         }
-        catch
+        catch(Exception error)
         {
-            if(attempted){Write(new{schema=Schema,action,status="outcome-unconfirmed",reason="Preserve the exact protected installation and reconcile its original native service ownership; no bootstrap action was replayed.",brokerImplemented=false,effectStarted=true});return 0;}
+            if(attempted){Write(new{schema=Schema,action,status="outcome-unconfirmed",reason="Preserve the exact protected installation and reconcile its original native service ownership; no bootstrap action was replayed.",failurePhase=effectPhase,errorCategory=error.GetType().Name,nativeCode=error is System.ComponentModel.Win32Exception native?native.NativeErrorCode:(int?)null,brokerImplemented=false,effectStarted=true});return 0;}
             return 2;
         }
     }
