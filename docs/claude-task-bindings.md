@@ -29,7 +29,7 @@ frontend does not expose this task panel yet.
 - Review and stop a background task created by Switchyard. External bindings
   are observation-only. Stopping retains the conversation and does not undo
   previous effects or prove completion.
-- Focus a live interactive Claude session in a direct Foot window on Linux.
+- Focus a live interactive Claude session in a direct Foot or Alacritty window on Linux.
   The adapter verifies the exact current native session/PID, executable, user,
   directory, foreground process group, process start identity, terminal ancestry
   and compositor address before dispatch, then verifies native session and focus
@@ -91,7 +91,7 @@ Authenticated same-origin POST routes under `/api/suite/coding/claude/`:
 | `create` | Stable `requestId` UUID, directory and label; one empty background job |
 | `text/create` | Stable request UUID, directory and label; local reservation explicitly awaiting native creation |
 | `status` | Saved task `id`; recheck identity and account |
-| `focus` | Live interactive task `id`; verify/focus its exact direct Foot window |
+| `focus` | Live interactive task `id`; verify/focus its exact single direct Foot/Alacritty window |
 | `stop/review` | Owned task `id`; exact scope and one-use confirmation |
 | `stop` | Same `id` and returned `token`; stop and verify readback |
 
@@ -132,3 +132,26 @@ conversation is running, so it is not used as an exact-resume shortcut. Native
 Primary contracts: [CLI reference](https://code.claude.com/docs/en/cli-reference),
 [inventory and lifecycle](https://code.claude.com/docs/en/agent-view#list-sessions-as-json),
 [environment switches](https://code.claude.com/docs/en/env-vars).
+
+## Direct terminal focus limits
+
+The implemented Linux ancestry map accepts fixed `/usr/bin/foot` and
+`/usr/bin/alacritty`, either directly above the CLI or above one verified
+Bash/Zsh/Fish parent. The CLI must be the exact current user's foreground
+process group in its native session directory. PID birth, parent, executable,
+user, process group, controlling TTY and foreground group must remain identical
+across the two pre-effect observations and final readback. No text is submitted.
+
+Count every compositor window belonging to the terminal PID, including hidden
+and unmapped windows. More than one refuses focus. [Alacritty supports multiple
+windows in one process](https://alacritty.org/), so selecting the only visible
+window would not establish which window owns the CLI. Kitty/Ghostty tabs,
+Foot server clients, multiplexers, remote sessions and Windows attachment still
+need their own exact native boundaries; they are not inferred from this map.
+
+Seven process/window cases pass, including direct and shell-parent Alacritty,
+hidden/multiple windows, changed TTY/terminal, PID reuse and wrong compositor
+readback. Foot has its earlier recorded live acceptance. Alacritty is absent on
+the pilot, so live Alacritty focus remains unaccepted; no terminal is installed
+and no desktop or terminal configuration changes. Discovery lists implementation
+support separately from installation and exact live-window verification.

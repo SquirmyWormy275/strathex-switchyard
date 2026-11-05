@@ -56,7 +56,8 @@ test("a verified native workspace rejection is preserved without claiming an unk
 }));
 
 test("Claude creates one empty background session per durable request, preserves native identities and requires explicit current-account binding", () => fixture(async ({ service, options, store, calls, input, stateRoot, changeAccount }) => {
-  assert.equal((await service.discovery("personal")).available, true);
+  const discovery = await service.discovery("personal"); assert.equal(discovery.available, true);
+  if(discovery.terminalFocus.implemented){assert.deepEqual(discovery.terminalFocus.terminals,["foot","alacritty"]);assert.equal(discovery.terminalFocus.installationObserved,false);assert.equal(discovery.terminalFocus.exactSessionWindow,"requires-live-verification");assert.equal(discovery.terminalFocus.multipleWindowsPerProcess,"refused");}
   const request = input(), tasks = await Promise.all([service.create("personal", request), service.create("personal", request)]);
   assert.equal(calls.filter((c) => c[0] === "--background").length, 1); assert.equal(tasks.filter((t) => t.duplicatePrevented).length, 1);
   const task = tasks.find((t) => t.modelPromptSubmitted === false);

@@ -38,12 +38,26 @@ test("wrong accounts/process owners, directories, executable identity and backgr
 
 test("multiplexed/shared/ambiguous terminals and native PID reuse fail before focus", async () => {
   const f = fixture(); f.processes.get(20).executable = "/usr/bin/tmux";
-  await assert.rejects(createTaskWindow(f.options).focus(f.request), /not a direct Foot/);
+  await assert.rejects(createTaskWindow(f.options).focus(f.request), /not a direct supported terminal/);
   f.processes.get(20).executable = "/usr/bin/foot"; f.windows.push({ ...f.windows[0], address: "0x11" });
   await assert.rejects(createTaskWindow(f.options).focus(f.request), /One exact mapped/);
   f.windows.pop();
   await assert.rejects(createTaskWindow(f.options).focus({ ...f.request, verifySession: async () => { f.processes.get(10).startTicks = "2000"; } }), /changed before focus/);
   assert.equal(f.calls.some((c) => c[0] === "dispatch"), false);
+});
+
+test("direct Alacritty foreground sessions support exact focus, while every same-process second window including hidden windows refuses it", async () => {
+  for (const shell of [false, true]) {
+    const f=fixture(); f.processes.get(20).executable="/usr/bin/alacritty";
+    if(shell){f.processes.get(10).parentPid=30;f.processes.set(30,{...f.processes.get(10),pid:30,parentPid:20,executable:"/usr/bin/bash"});}
+    const r=await createTaskWindow(f.options).focus(f.request); assert.equal(r.terminalKind,"alacritty");assert.equal(r.windowFocusVerified,true);assert.equal(r.taskResumptionVerified,false);
+  }
+  for(const extra of [{mapped:true,hidden:false},{mapped:true,hidden:true},{mapped:false,hidden:false}]){const f=fixture();f.processes.get(20).executable="/usr/bin/alacritty";f.windows.push({...f.windows[0],address:"0x22",...extra});await assert.rejects(createTaskWindow(f.options).focus(f.request),/One exact mapped/);assert.equal(f.calls.some(c=>c[0]==="dispatch"),false);}
+});
+
+test("terminal switching, changed controlling TTY and unsupported tabbed/multiplexed ancestry cannot inherit a previous focus identity",async()=>{
+  for(const executable of ["/usr/bin/kitty","/usr/bin/ghostty","/usr/bin/footclient","/usr/bin/tmux"]){const f=fixture();f.processes.get(20).executable=executable;await assert.rejects(createTaskWindow(f.options).focus(f.request),/not a direct supported terminal/);assert.equal(f.calls.some(c=>c[0]==="dispatch"),false);}
+  for(const change of [()=>"/usr/bin/alacritty",()=>"/usr/bin/foot"]){const f=fixture();await assert.rejects(createTaskWindow(f.options).focus({...f.request,verifySession:async()=>{f.processes.get(20).executable=change();f.processes.get(10).tty=43;}}),/changed before focus/);assert.equal(f.calls.some(c=>c[0]==="dispatch"),false);}
 });
 
 test("focus cannot turn a wrong compositor acknowledgement into an exact task result", async () => {

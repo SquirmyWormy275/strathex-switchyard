@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { mkdtemp, writeFile, symlink, link, rm } from "node:fs/promises";
+import { mkdtemp, writeFile, symlink, link, rm, realpath } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { scanShieldInputs, shieldActions, shieldEngineVersion, validateShieldRequest, createShieldFileReader } from "./shield-scanner-engine.mjs";
@@ -41,7 +41,7 @@ test("changed source/feed bytes and finding overflow fail closed without leaking
   const h = scannerFixture({ files: { "app.js": "eval(x);\n".repeat(600) } }), r = await h.scan(); assert.equal(r.findings.length, 512); assert.ok(r.gaps.includes("finding_limit")); assert.equal(r.outcome, "failed");
 });
 test("filesystem reader enforces exact read bounds and refuses symlinks, hardlinks and traversal", async t => {
-  const root = await mkdtemp(join(tmpdir(), "switchyard-scanner-")); t.after(() => rm(root, { recursive: true, force: true })); await writeFile(join(root, "input"), "bounded"); const read = createShieldFileReader(root);
+  const root = await realpath(await mkdtemp(join(tmpdir(), "switchyard-scanner-"))); t.after(() => rm(root, { recursive: true, force: true })); await writeFile(join(root, "input"), "bounded"); const read = createShieldFileReader(root);
   assert.equal((await read("input", 7)).toString(), "bounded"); await assert.rejects(read("input", 6)); await assert.rejects(read("../input", 7));
   await link(join(root, "input"), join(root, "hard")); await assert.rejects(read("input", 7));
   if (process.platform !== "win32") { await symlink(join(root, "input"), join(root, "symbolic")); await assert.rejects(read("symbolic", 7)); }

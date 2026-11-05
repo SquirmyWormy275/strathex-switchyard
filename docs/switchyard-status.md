@@ -7,17 +7,24 @@ separates unfinished software from exact device/account checks, and
 
 ## Installed pilot
 
-Current installed source is `50dd23d`, release
-`fa150bd32f710676b214d7180f251a5f17c497cc17340751f6a24566dad7e03a`.
-It passes six update and ten actual writable-copy Run/stop checks. The reviewed
-program builds in the bounded copy, denies root/device/host/credential/network
-escapes, preserves original input bytes, retains exact duplicate receipts and
-independently verifies stop/cleanup. One empty native task, zero model prompts.
-Receipts `assignment-legends-1793851542323.json` and
-`installed-repository-execution-1793851723364.json` retained. Original selection,
-modes/definitions/private endpoint/frozen Home are preserved; owned staging,
-bundle and proof checkout removed. Pipeline writable builds separately pass
-actual source/namespace checks; this installed journey exercises Run and stop.
+Current installed source is `b6dca0a`, release
+`239f77a0e92b66e4a6a324e6a590f7f553d215aae93ee277fd27ef65b85bd010`.
+Six update and thirteen actual Shield API checks pass: separate one-action
+grants, all four known-failing scans and a clean incomplete case, authenticated
+report hashes, failed receipts with incomplete coverage, exact replay, five
+independent native exits, revocation and separately approved fixture retirement.
+One empty native task, zero model prompts. Receipts
+`assignment-legends-1793853154242.json` and
+`installed-shield-baseline-1793853523201.json` retained. Original selection,
+modes/definitions/private endpoint/frozen Home restored; owned staging, source
+packages, signing keys, bundle and proof checkout removed. Complete Shield
+scope remains unfinished. The initial four-action-grant verifier was correctly
+refused; its failed receipt and separate successful cleanup receipt remain retained.
+
+Earlier installed `50dd23d` passes six update and ten actual writable-copy
+Run/stop checks with zero prompts and restored original state. Receipts
+`assignment-legends-1793851542323.json` and
+`installed-repository-execution-1793851723364.json` retained; owned scratch removed.
 
 Previous installed source `3ec0549`, release
 `a170fa2163dd28062afd6ec24f65beb85fe1a0a791c09b4559f0607c3b8f8ce8`,
@@ -92,6 +99,14 @@ remain enforced. Thirty-four agent/submission checks and 23 Suite/package
 regressions pass; real 2.1.317 model execution remains unaccepted. Claude Code
 is an implementation contingency for token limits; no coding job was delegated.
 
+Direct Claude window focus now implements fixed Foot and Alacritty ancestry,
+with one exact compositor window per terminal PID. Hidden/unmapped sibling
+windows and changed controlling TTY/process groups refuse focus. Thirty-two
+terminal/Claude/client cases pass (31 passed, one declared Windows skip), five
+package cases and type checking pass. This source extension is not yet installed;
+Alacritty is absent on the pilot, so its native check remains unaccepted. Tabbed,
+multiplexed, stopped-task, IDE and Windows attachments remain unfinished.
+
 ## Latest verification and correction
 
 The complete Linux lane at immutable `50dd23d` passes all 175 groups:
@@ -152,7 +167,7 @@ The pinned baseline Shield scanner is implemented for all four Linux actions,
 with fixed heuristic rules, exact npm advisory/license checks, report-hash
 authentication, failed receipts with incomplete coverage, and explicit scope/
 history/permission/provenance gaps. All four actions and the clean incomplete
-case pass actual namespace checks. Installed acceptance is pending. Full Shield
+case pass actual namespace checks. Normal installed acceptance above also passes. Full Shield
 scope/history/ecosystems/provenance and audited exceptions remain unfinished.
 [Scanner contract](shield-baseline-scanner.md). Exact
 desktop/IDE/terminal attachments and remaining frontend controls are unfinished

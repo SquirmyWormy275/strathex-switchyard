@@ -34,6 +34,10 @@ export function shieldReceiptEvidence(factory) {
 export async function validateShieldRecipe({ recipe, repositoryRoot, action, resolveFixtures, now = Date.now }) {
   if (!shieldActions.includes(action)) return undefined;
   if (recipe.cwd !== "." || recipe.workspaceMode === "temporary-build" || recipe.args.length !== 2 || await realpath(recipe.executable) !== await realpath(process.execPath) || Object.keys(recipe.environment).some(k => k !== "NODE_ENV") || recipe.environment.NODE_ENV !== "test") throw Error("Shield requires the pinned Node scanner, two literal inputs, test environment and read-only workspace.");
+  // Node interprets a leading dash as an option before opening its entrypoint.
+  // A file containing the right engine bytes named '-e' must never turn the
+  // second literal filename into JavaScript evaluated by Node.
+  if (typeof recipe.args[0] !== "string" || !/^[A-Za-z0-9_][A-Za-z0-9_./-]*\.mjs$/.test(recipe.args[0])) throw Error("Shield requires one literal .mjs entrypoint path without Node options.");
   const enginePath = scannerPath(recipe.args[0]), requestPath = scannerPath(recipe.args[1]), inputs = new Map(recipe.inputFiles.map(f => [f.path, f])), engineSha256 = sha(await readFile(engineUrl));
   if (enginePath === requestPath || inputs.get(enginePath)?.sha256 !== engineSha256 || !inputs.has(requestPath)) throw Error("Shield requires the exact shipped scanner bytes and a reviewed request input.");
   const reader = new NodeFileDigestReader({ maxFileBytes: 128 * 1024 });

@@ -38,7 +38,9 @@ reviewed input set. The host requires its exact SHA-256 and its own pinned Node
 executable, with precisely two literal arguments: the engine path and request
 path. The recipe uses foreground disposable isolation, read-only workspace,
 `NODE_ENV=test`, bounded time/output and an exact input allowlist. Node options,
-extra arguments, alternate scripts and writable build mode are refused.
+extra arguments, alternate scripts and writable build mode are refused. Even exact engine bytes
+under an option-like filename such as `-e` are refused: the entrypoint must be
+a literal relative `.mjs` path.
 
 The closed `switchyard-shield-scan/v1` request identifies one exact Shield action,
 the `reviewed-inputs` scope, file paths/sizes/hashes, one scanner feed and an
@@ -116,4 +118,10 @@ It creates a fresh validation compartment/repository, separately installs synthe
 public feeds, issues separate one-action grants, exercises all four failed gates and one clean incomplete result,
 checks duplicates/exit/cleanup, retires synthetic packages and restores the original
 selection, modes, definitions, private endpoint and frozen Home. Installed
-acceptance of this iteration is pending.
+`b6dca0a` passes six update and thirteen installed checks, including all five
+scans, exact failed/incomplete receipt coverage, replay, native exits, revocation,
+package retirement and restoration. Receipts `assignment-legends-1793853154242.json`
+and `installed-shield-baseline-1793853523201.json` retained. Owned source/package/
+signing scratch and proof checkout are removed; one empty task, zero prompts.
+The newer option-filename admission check has separate pending installed acceptance.
+Use `--one-action` for a narrower changed-code recheck plus the clean case.

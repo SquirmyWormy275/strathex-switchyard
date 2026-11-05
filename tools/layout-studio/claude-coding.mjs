@@ -9,7 +9,7 @@ import { directoryIdentity } from "./private-fs.mjs";
 import { runtimeEnvironment } from "./runtime-setup.mjs";
 import { scopeHash, suiteConfirmations } from "./confirmations.mjs";
 import { stopOwnedChild } from "./owned-process.mjs";
-import { createTaskWindow } from "./task-window.mjs";
+import { createTaskWindow, directTaskTerminals } from "./task-window.mjs";
 import { repositoryIdentity, verifyRepositoryIdentity } from "./coding-task-identity.mjs";
 import { runRuntimeCommand, runtimeGuardianStopped } from "./runtime-command.mjs";
 import { runOwnedNativeCommand } from "./owned-native-command.mjs";
@@ -131,7 +131,7 @@ export function createClaudeCoding({ store, resolveCli = trustedCli, run, comman
     async discovery(c) {
       const result = { adapter, provider: "claude-code", installed: null, available: false };
       try { await store.authorize(c, { provider: "claude-code" }); } catch (e) { return { ...result, permitted: false, reason: e.message }; }
-      try { await access(c); result.installed = true; const version = supportedVersion(await execute(c, ["--version"])); await account(c); return { ...result, available: true, permitted: true, version, capabilities: ["exact-coding-task-bind", "runtime-status", "reserve-reviewed-text-task", "create-empty-tools-disabled-background", "reviewed-owned-background-stop", ...(platform === "linux" ? ["focus-live-interactive-foot-window"] : [])] }; }
+      try { await access(c); result.installed = true; const version = supportedVersion(await execute(c, ["--version"])); await account(c); return { ...result, available: true, permitted: true, version, capabilities: ["exact-coding-task-bind", "runtime-status", "reserve-reviewed-text-task", "create-empty-tools-disabled-background", "reviewed-owned-background-stop", ...(platform === "linux" ? ["focus-live-interactive-foot-window", "focus-live-interactive-alacritty-window"] : [])], terminalFocus: { implemented: platform === "linux", terminals: platform === "linux" ? Object.values(directTaskTerminals) : [], installationObserved: false, exactSessionWindow: "requires-live-verification", multipleWindowsPerProcess: "refused" } }; }
       catch (e) { return { ...result, permitted: true, reason: e.message }; }
     },
     async inventory(c, { repositoryRoot }) { const root = await repository(repositoryRoot); await account(c); return inventory(c, root); },
@@ -215,7 +215,7 @@ export function createClaudeCoding({ store, resolveCli = trustedCli, run, comman
       const generation = fence(c), { task, row } = await exact(c, id, generation), executable = await access(c);
       if (row?.kind !== "interactive" || !row.pid) throw new Error("Only a live exact interactive Claude session can be focused. Background worker PIDs are not attached-terminal identities.");
       const result = await windows.focus({ row, executable, repositoryRoot: task.repositoryRoot, verifySession: async () => { const check = await exact(c, id, generation); if (!check.row || check.row.kind !== row.kind || check.row.sessionId !== row.sessionId || check.row.pid !== row.pid || check.row.startedAt !== row.startedAt) throw new Error("Claude's exact interactive session changed during native window focus."); } });
-      return store.update(c, "claude-window-focus", (s) => { const t = taskIn(s, id); t.lastWindowFocus = { at: now(), status: "verified", sessionId: task.sessionId, processId: row.pid, processStartedAt: row.startedAt }; t.observation = observation(row); return { id, sessionId: task.sessionId, ...result }; }, { provider: "claude-code" });
+      return store.update(c, "claude-window-focus", (s) => { const t = taskIn(s, id); t.lastWindowFocus = { at: now(), status: "verified", sessionId: task.sessionId, processId: row.pid, processStartedAt: row.startedAt, ...(result.terminalKind ? { terminalKind: result.terminalKind } : {}) }; t.observation = observation(row); return { id, sessionId: task.sessionId, ...result }; }, { provider: "claude-code" });
     },
     async stop(c, { id, token }) {
       if (!uuid.test(token ?? "")) throw new Error("Use the exact one-use confirmation token from reviewing this owned session stop.");
