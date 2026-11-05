@@ -8,6 +8,11 @@ findings as its other reviewed inputs.
 
 ## Review the exact files
 
+A new [task-bound inventory preview](scanner-input-inventory.md) can first list
+relevant ignored names and group build trees without hashing their contents or
+granted scan authority. It remains incomplete and separate from the following
+consequential review.
+
 The task-authority proposal accepts `classifications.includedIgnored`. Each
 listed path must also appear in the proposal's owned `paths`. It must actually
 be ignored in the captured Git inventory; unknown, missing, incorrectly
@@ -77,8 +82,9 @@ mise exec node@24.14.0 -- node scripts/verify-shield-host.mjs \
 
 This adds an explicitly ignored synthetic secret to the known-failing request;
 the clean request still declares only its own selected inputs. Both remain
-incomplete for full repository coverage. Automatic relevant-secret discovery,
-large ignored build-tree policy, whole-repository inventory and Git history are
+incomplete for full repository coverage. Metadata-only relevant-name discovery and grouped build-tree hints are now
+implemented as an incomplete preview. Automatic complete scan assembly, persisted
+operator policy, scalable consequential build-tree snapshots and Git history are
 still unfinished. Existing bounded inspection refuses unsupported or oversized
 inputs rather than skipping them into a green result. [Current evidence](verification.md)
 separates those implementation gaps from unavailable host/account checks.

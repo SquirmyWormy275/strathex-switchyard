@@ -7,7 +7,16 @@ host. [Verification](verification.md) retains accepted and failed checkpoints.
 
 ## Installed application
 
-Latest installed source `6a45643`, release
+Latest installed source `7dc9196`, release
+`413aaebca22a4f4336af2202481386376802dd390f524d660708823839297014`,
+passes six update and fourteen actual workspace Supply Chain API checks. Known
+vulnerable and clean versions retain non-passing report-bound BOMs, exact replay,
+feed retirement, two verified native exits and full restoration. Receipts
+`assignment-legends-1793862128657.json` and
+`installed-shield-baseline-1793862282934.json` retained; owned repository/signing/
+package/staging/bundle/proof checkout removed. One empty task, zero prompts.
+
+Earlier installed source `6a45643`, release
 `3772efc151709ab0069527753a3f9c33c50b1706455ea60e1b5aaa3a86f1df07`,
 passes six update and three actual cached F77 source-capability API checks.
 No HID transactions or control authority; original state is preserved, and owned
@@ -139,6 +148,14 @@ pass. The regenerated seven-component development BOM passes the official schema
 source bytes, graph, whole-repository scope and provenance remain unverified.
 [Contract and regeneration](shield-baseline-scanner.md).
 
+A new task-bound [scanner input preview](scanner-input-inventory.md) lists
+tracked/new paths, relevant ignored secret-file names and grouped build trees.
+It hashes no source bytes, grants no authority and remains incomplete; unknown
+ignored paths/build-tree contents stay uninspected. Four focused parser/real-Git/
+HTTP/drift/cleanup cases and thirty-four surrounding contracts pass, with type
+checking. Installed preview acceptance remains pending. Consequential snapshot
+limits and separate scanner reviews remain unchanged.
+
 ## Complete and native checkpoints
 
 Immutable `6a45643` passes all 191 required Linux groups: 1,192 tests,
@@ -158,7 +175,12 @@ when Ubuntu 24.04's Bubblewrap refused `--overlay-src`; its failed result is
 retained. CI now builds upstream 0.13.1 from the official SHA-256-pinned archive
 on its disposable worker, preserving the fixed path, scoped AppArmor policy,
 namespace restrictions and unchanged bounded-build tests. Source checksum
-verification passes locally; the fresh native CI run remains unaccepted. No host
+verification passes locally. Later run [41984665699](https://github.com/SquirmyWormy275/strathex-switchyard/actions/runs/41984665699)
+builds the pinned helper and passes the outer namespace probe, but the actual
+two-level build fails with a namespace permission refusal. The distribution
+profile denies capabilities to every bwrap child; nested trusted setup needs
+further scoped integration. The failed run remains failed; no sysctl/profile
+restriction is relaxed to obtain a pass. No host
 package, executable, policy or sysctl was changed on this workstation.
 
 Native Windows `5d398d2`, workflow

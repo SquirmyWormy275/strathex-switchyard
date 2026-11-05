@@ -94,6 +94,19 @@ export function createTaskAuthority({ store, checkNative, isActive = async () =>
   const scope = (c, result) => scopeHash(["switchyard-task-authority/v1", c, result.binding, result.workspace, result.snapshot.id, result.proposed]);
   const view = record => ({ ...structuredClone(record), status: record.grant.revokedAt ? "revoked" : Date.parse(record.grant.expiresAt) <= now() ? "expired" : "issued", targetCurrentness: "requires-revalidation", nativePermissionsChanged: false, providerTaskCompletionVerified: false, localCommitExecutionImplemented: Boolean(localCommitExecutionImplemented), connectedExecutionActions: [...executionActions] });
   return {
+    async scannerInputs(c, input) { return exclusive(c, async generation => {
+      if (!input || Object.keys(input).some(key => !["taskId", "compartment"].includes(key)) || !uuid(input.taskId) || input.compartment !== undefined && input.compartment !== c) throw Error("Inspect scanner inputs for one exact bound task; arbitrary paths, commands and policies are refused.");
+      const { state, task } = await access(c, input.taskId, generation), binding = taskDigest(task), workspace = workspaceDigest(state);
+      if (typeof checkNative !== "function" || typeof inspection.scannerInputs !== "function") throw Error("The native scanner inventory verifier is unavailable.");
+      const authorize = async () => {
+        const fresh = await access(c, task.id, generation);
+        if (taskDigest(fresh.task) !== binding || workspaceDigest(fresh.state) !== workspace) throw Error("The exact task, account or workspace changed during scanner inventory.");
+      };
+      await checkNative(c, task); await authorize();
+      const result = await inspection.scannerInputs(c, task, authorize);
+      await authorize(); await checkNative(c, task); await authorize();
+      return { ...result, taskId: task.id, provider: task.provider, nativePermissionsChanged: false };
+    }); },
     /** Host ports only. No public route accepts a grant, snapshot or native identity. */
     authorityLedger(c) {
       return new AuthorityLedger({

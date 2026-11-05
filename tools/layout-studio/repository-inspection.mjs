@@ -8,6 +8,7 @@ import { TargetSnapshotFactory } from "../../packages/control-plane/src/snapshot
 import { runOwnedNativeCommand } from "./owned-native-command.mjs";
 import { runRuntimeCommand, runtimeGuardianStopped } from "./runtime-command.mjs";
 import { verifyRepositoryIdentity } from "./coding-task-identity.mjs";
+import { shieldInventoryQueries, buildShieldInputInventory } from "./shield-input-inventory.mjs";
 
 const queries = new Set([
   ["rev-parse", "--show-toplevel"], ["remote", "get-url", "origin"], ["branch", "--show-current"],
@@ -16,7 +17,7 @@ const queries = new Set([
   ["write-tree"], ["rev-parse", "HEAD^{tree}"], ["rev-parse", "--absolute-git-dir"], ["rev-parse", "--git-path", "index"], ["ls-files", "-z"], ["ls-files", "--deleted", "-z"],
   ["ls-files", "--others", "--exclude-standard", "-z"],
   ["ls-files", "--others", "--ignored", "--exclude-standard", "-z"],
-  ["submodule", "status", "--recursive"]
+  ["submodule", "status", "--recursive"], ...Object.values(shieldInventoryQueries)
 ].map(v => JSON.stringify(v)));
 export async function fixedGitExecutable() {
   for (const name of process.platform === "win32" ? ["C:\\Program Files\\Git\\cmd\\git.exe", "C:\\Program Files\\Git\\bin\\git.exe"] : ["/usr/bin/git"]) {
@@ -75,7 +76,8 @@ export function createRepositoryInspection({ store, command = runRuntimeCommand,
   }
   return {
     async observe(c, task, authorize = async () => {}) { return this.capture(c, task, {}, authorize, { metadataOnly: true }); },
-    async capture(c, task, classifications, authorize = async () => {}, { metadataOnly = false } = {}) {
+    async scannerInputs(c, task, authorize = async () => {}) { return this.capture(c, task, {}, authorize, { scannerInventory: true }); },
+    async capture(c, task, classifications, authorize = async () => {}, { metadataOnly = false, scannerInventory = false } = {}) {
       const generation = generations.get(c) ?? 0, resource = { controller: new AbortController(), clients: new Set() }; seen.add(c);
       const check = async () => { if (closed || generation !== (generations.get(c) ?? 0) || resource.controller.signal.aborted) throw new Error("Repository inspection was stopped."); await authorize(); };
       await check(); await store.authorize(c, { provider: task.provider }); await verifyRepositoryIdentity(task);
@@ -124,6 +126,20 @@ export function createRepositoryInspection({ store, command = runRuntimeCommand,
       } };
       try {
         await privateDirectory(runtimeRoot); scratch = await mkdtemp(join(runtimeRoot, "probe-")); scratchIdentity = await directoryIdentity(scratch); resource.scratch = scratch; resource.scratchIdentity = { device: scratchIdentity.dev.toString(), inode: scratchIdentity.ino.toString() };
+        if (scannerInventory) {
+          const root = await runner.run(["rev-parse", "--show-toplevel"]), head = await runner.run(["rev-parse", "HEAD"]);
+          if (root.exitCode || head.exitCode || !/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(head.stdout.trim())) throw Error("Exact scanner inventory repository metadata is unavailable.");
+          const output = {};
+          for (const [name, args] of Object.entries(shieldInventoryQueries)) {
+            const result = await runner.run(args);
+            if (result.exitCode) throw Error("The bounded scanner input listing is unavailable.");
+            output[name] = result.stdout;
+          }
+          const after = await runner.run(["rev-parse", "HEAD"]);
+          if (after.exitCode || after.stdout.trim() !== head.stdout.trim()) throw Error("The repository revision changed during scanner inventory; inspect again.");
+          await check(); await verifyRepositoryIdentity(task);
+          return { ...buildShieldInputInventory(output), repositoryRoot: task.repositoryRoot, head: head.stdout.trim(), observedAt: new Date(now()).toISOString(), observationOnly: true };
+        }
         if (metadataOnly) {
           const names = ["root", "branch", "head", "headTree", "gitDirectory", "indexPath"], fixed = [["rev-parse", "--show-toplevel"], ["branch", "--show-current"], ["rev-parse", "HEAD"], ["rev-parse", "HEAD^{tree}"], ["rev-parse", "--absolute-git-dir"], ["rev-parse", "--git-path", "index"]];
           const values = [];

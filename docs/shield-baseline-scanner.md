@@ -196,5 +196,8 @@ validator sources; tooling was removed without host package/runtime installation
 Real Linux namespace and Windows guest-double Supply Chain cases preserve aliases,
 raw findings, report-bound metadata, incomplete coverage, replay and cleanup even
 when the workspace source directory does not exist. The installed demonstration
-supports `--synthetic --action=shield_supply_chain --workspace-lock`; installed
-acceptance of this new path remains pending at this source checkpoint.
+supports `--synthetic --action=shield_supply_chain --workspace-lock`; normal installed
+`7dc9196` passes six update/fourteen actual API checks, two verified exits and
+full restoration. Receipts `assignment-legends-1793862128657.json` and
+`installed-shield-baseline-1793862282934.json` retained; owned scratch removed,
+one empty task and zero prompts.

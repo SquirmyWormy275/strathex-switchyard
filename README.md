@@ -102,7 +102,9 @@ connects operator-reviewed public trust and exact feed metadata to these pipelin
 results when that policy changes and checks the policy again inside receipt commit.
 Linux [Shield baseline scans](docs/shield-baseline-scanner.md) run pinned code and signed
 rule/advisory data with explicit findings and coverage gaps. The [development SBOM example](docs/evidence/README.md)
-shows standard CycloneDX output and its limits. The [Windows scanner path](docs/windows-shield.md)
+shows standard CycloneDX output and its limits. A [task-bound input preview](docs/scanner-input-inventory.md)
+identifies relevant ignored names and groups build trees before a separate exact
+scan review; its metadata remains incomplete and grants no authority. The [Windows scanner path](docs/windows-shield.md)
 uses the same pinned engine through reviewed guest execution; its tests double the guest.
 [Explicit ignored inputs](docs/ignored-scanner-inputs.md) let the pinned scanner
 inspect a separately approved `.env` without commit or general execution access.
