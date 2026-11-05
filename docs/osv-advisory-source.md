@@ -43,9 +43,12 @@ settles the collection without producing a partial success artifact.
 The [OSV schema](https://ossf.github.io/osv-schema/) exposes quantitative severity
 vectors. GitHub also publishes database-specific annotations, but
 [documents those fields as unstable](https://github.com/github/advisory-database#database_specific-values).
-This collector does not calculate CVSS or rely on those annotations. Its findings
-use `severity: "unknown"`; the scanner still fails every matched vulnerability
-and adds `advisory_severity_unassessed`. The strict host parser permits unknown
+Collector version 2 calculates supported complete CVSS 3.0/3.1 base vectors
+using independently verified equations and package-specific scope. It does not
+rely on unstable labels. [Severity calculation and limits](cvss-severity.md)
+describe vector bounds, maximum-score selection and source hashes. Missing,
+unsupported or ambiguous metrics retain `severity: "unknown"`; the scanner still
+fails every matched vulnerability and adds `advisory_severity_unassessed`. The strict host parser permits unknown
 severity only for vulnerability findings. It cannot turn missing severity or
 other missing coverage into a complete pass.
 
@@ -102,7 +105,7 @@ authenticated failed/incomplete outcomes, feed retirement and full original-stat
 restoration. Owned source, signing material, packages, staging, release bundle and
 proof checkout were removed; zero model prompts and no keyboard access.
 
-Automatic whole-repository scope, automatic history selection, additional ecosystems/full Python semantics, CVSS assessment,
+Automatic whole-repository scope, automatic history selection, additional ecosystems/full Python semantics, full CVSS/contextual assessment,
 publisher provenance and ordinary UI source management remain unfinished. A
 successful query with no returned records describes that selected identity at
 that observation time; it does not verify publication, source bytes or complete

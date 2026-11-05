@@ -108,3 +108,8 @@ Required notices:
 Date accessed:
 Verification notes:
 ```
+
+CVSS base scoring is independently implemented from [FIRST’s published
+CVSS specification](https://www.first.org/cvss/v3.1/specification-document).
+FIRST reference calculators were used only for isolated exhaustive comparison;
+no reference calculator code is shipped. [Calculation and evidence](docs/cvss-severity.md).

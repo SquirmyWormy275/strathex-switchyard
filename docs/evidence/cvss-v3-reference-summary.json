@@ -1,0 +1,46 @@
+{
+  "schema": "switchyard-cvss-reference-proof/v1",
+  "success": true,
+  "proofs": [
+    {
+      "version": "3.0",
+      "source": "https://www.first.org/_/cvsscalc30.js",
+      "sourceSha256": "b67022a4162c381bd1bb52e840f9a035cca3b1b7a310e4c515474e3552b615e7",
+      "cases": 2592,
+      "resultSha256": "6b91d11f9a8ed3ffd9eaec3385018f2f6eaa41182f2e36b5c0ae3df1f789d0c1",
+      "ratings": {
+        "critical": 61,
+        "high": 555,
+        "medium": 1464,
+        "none": 96,
+        "low": 416
+      }
+    },
+    {
+      "version": "3.1",
+      "source": "https://www.first.org/_/cvsscalc31.js",
+      "sourceSha256": "900a7d9c44872824bbdb0b21bc60db5b732eb09baaa45d32c298fb02a28f8350",
+      "cases": 2592,
+      "resultSha256": "4fd103d3a3ca0d93d4d612cea1c557034ee53133c59236a9af6dc823f3255d46",
+      "ratings": {
+        "critical": 61,
+        "high": 555,
+        "medium": 1464,
+        "none": 96,
+        "low": 416
+      }
+    }
+  ],
+  "scope": "complete CVSS 3.0/3.1 base metric space only; temporal/environmental metrics unsupported",
+  "officialSourceShipped": false,
+  "externalIoExposedToReference": false,
+  "referenceSourceRemoved": true,
+  "cleanupReceipt": "cvss-reference-cleanup-1793886044371.json",
+  "focusedVerification": {
+    "groups": 8,
+    "tests": 57,
+    "success": true,
+    "everyChildCleanupVerified": true,
+    "receipt": "isolated-test-047ef3e7-9fec-49c6-a15a-53693537a8df.json"
+  }
+}
