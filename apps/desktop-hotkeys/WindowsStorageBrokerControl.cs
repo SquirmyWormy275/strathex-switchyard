@@ -35,14 +35,16 @@ internal static class WindowsStorageBrokerControl
     {
         if(!QueryServiceStatusEx(service,0,out var status,checked((uint)Marshal.SizeOf<Status>()),out uint required)||required!=Marshal.SizeOf<Status>()||status.Type!=16)throw Invalid();return status;
     }
-    private static void VerifyEnvironment(WindowsStorageBrokerInstallation.Settings settings)
+    private static void VerifyEnvironment(WindowsStorageBrokerInstallation.Settings settings,bool allowDeleted=false)
     {
         using var machine=RegistryKey.OpenBaseKey(RegistryHive.LocalMachine,RegistryView.Registry64);
-        using var key=machine.OpenSubKey(@"SYSTEM\CurrentControlSet\Services\"+settings.ServiceName,false)??throw Invalid();
+        using var key=machine.OpenSubKey(@"SYSTEM\CurrentControlSet\Services\"+settings.ServiceName,false);
+        if(key==null){if(allowDeleted)return;throw Invalid();}
         if(key.GetValueKind("Environment")!=RegistryValueKind.MultiString||key.GetValue("Environment",null,RegistryValueOptions.DoNotExpandEnvironmentNames) is not string[] values||!values.SequenceEqual(new[]{"DOTNET_BUNDLE_EXTRACT_BASE_DIR="+WindowsStorageBrokerRuntime.Root(settings)}))throw Invalid();
     }
-    private static void VerifyConfiguration(ServiceHandle service,WindowsStorageBrokerInstallation.Settings settings)
+    private static void VerifyConfiguration(ServiceHandle service,WindowsStorageBrokerInstallation.Settings settings,bool allowDeletedEnvironment=false,Action<string>? phase=null)
     {
+        phase?.Invoke("service-absence-query-configuration");
         if(QueryServiceConfigW(service,IntPtr.Zero,0,out uint required)||Marshal.GetLastWin32Error()!=122||required<Marshal.SizeOf<Configuration>()||required>16384)throw Invalid();
         IntPtr memory=Marshal.AllocHGlobal(checked((int)required));
         try
@@ -56,7 +58,7 @@ internal static class WindowsStorageBrokerControl
             if(config.Type!=16||config.Start!=2||config.Error!=1||Text(config.Binary)!=settings.ServiceCommand||!Text(config.Account).Equals("LocalSystem",StringComparison.OrdinalIgnoreCase)||Text(config.Display)!="Switchyard scoped storage (metadata bootstrap)"||config.Dependencies!=IntPtr.Zero&&Text(config.Dependencies).Length!=0||config.Group!=IntPtr.Zero&&Text(config.Group).Length!=0||config.Tag!=0)throw Invalid();
         }
         finally{Marshal.FreeHGlobal(memory);}
-        VerifyEnvironment(settings);
+        phase?.Invoke("service-absence-environment");VerifyEnvironment(settings,allowDeletedEnvironment);
     }
     internal static WindowsStorageBrokerInstallation.Settings Install(string sid,string installationId,string selfSha256)
     {
@@ -102,7 +104,7 @@ internal static class WindowsStorageBrokerControl
             if(service.IsInvalid)throw Invalid();VerifyConfiguration(service,settings);var status=ReadStatus(service);SafeProcessHandle? process=null;
             // QueryServiceStatusEx does not define a PID for STOPPED or pending
             // states. Never open a stale/recycled PID from such an observation.
-            if(status.State!=1&&status.State!=4)throw Invalid();
+            if(status.State!=1&&(status.State!=4||status.Pid==0))throw Invalid();
             try
             {
                 if(status.State==4&&status.Pid>0)
@@ -116,6 +118,7 @@ internal static class WindowsStorageBrokerControl
                 phase?.Invoke("native-process-exit");if(process!=null&&WaitForSingleObject(process,30000)!=0)throw Invalid();
                 phase?.Invoke("exchange-after-exit");
                 exchange.AssertRetired();
+                phase?.Invoke("delete-service-configuration");VerifyConfiguration(service,settings);
                 phase?.Invoke("delete-service");
                 if(!DeleteService(service))throw Invalid();
             }
@@ -135,7 +138,12 @@ internal static class WindowsStorageBrokerControl
                 int error=Marshal.GetLastWin32Error();absent=observed.IsInvalid&&error==1060;
                 if(!observed.IsInvalid)
                 {
-                    phase?.Invoke("service-absence-configuration");VerifyConfiguration(observed,settings);
+                    phase?.Invoke("service-absence-configuration");
+                    // The original delete was accepted; its registry key may
+                    // disappear before the last SCM observation handle closes.
+                    // Missing environment here is pending, never absence. Any
+                    // present environment/configuration must still match.
+                    VerifyConfiguration(observed,settings,true,phase);
                     phase?.Invoke("service-absence-status");var remaining=ReadStatus(observed);
                     // The independently captured original process has exited.
                     // STOPPED's dwProcessId is never a valid exit observation.

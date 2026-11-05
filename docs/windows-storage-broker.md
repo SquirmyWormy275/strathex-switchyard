@@ -165,3 +165,13 @@ The `25bd26c` native removal failure remains failed. The PID-contract correction
 compiles the actual helper and linked proof without warnings and passes 112
 portable checks; this Linux compilation does not establish native removal
 acceptance. Its fresh Windows lifecycle result remains pending.
+
+The `14aae78` failure is retained at the more specific
+`service-absence-configuration` phase. Full original configuration is now checked
+again immediately before `DeleteService`. During accepted-deletion polling, an
+absent original registry environment is allowed only as a pending observation;
+any present environment and the SCM configuration must still match. It never
+establishes absence or permits file cleanup: SCM error 1060 is still required.
+Query-configuration/environment phases distinguish any remaining failure. Both
+actual targets compile without warnings and 112 portable checks pass; this
+correction still needs its fresh native lifecycle result.

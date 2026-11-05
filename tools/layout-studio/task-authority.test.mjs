@@ -8,7 +8,7 @@ import { authorityFixture as fixture } from "./test-support/task-authority-fixtu
 import { createTaskAuthority } from "./task-authority.mjs";
 import { createSuite } from "./suite.mjs";
 
-test("normal Windows suite authority routes issue only separately reviewed connected Run grants", async t => {
+test("normal Windows suite authority routes distinguish exact reviewed grants from connected Run and pipeline capabilities", async t => {
   const f = await fixture(t); let nativeChecks = 0;
   const suite = createSuite({store:f.store,platform:"win32",agents:{close:async()=>{}},coding:{status:async(c,id)=>{assert.equal(c,"personal");assert.equal(id,f.task.id);nativeChecks++;},close:async()=>{}},
     taskAuthorityFactory:options=>createTaskAuthority({...options,inspection:f.inspection}),
@@ -17,8 +17,8 @@ test("normal Windows suite authority routes issue only separately reviewed conne
   const body={...f.proposed,actions:["run_target"]},review=await suite.handle("/api/suite/coding/authority/review",body);
   assert.deepEqual(review.scope.allowedActions,["run_target"]);assert.ok(nativeChecks>=2);
   await assert.rejects(suite.handle("/api/suite/coding/authority/issue",{...body,token:randomUUID()}));
-  const grant=await suite.handle("/api/suite/coding/authority/issue",{...body,token:review.confirmation.token});assert.deepEqual(grant.connectedExecutionActions,["run_target"]);assert.equal(grant.nativePermissionsChanged,false);
-  await assert.rejects(suite.handle("/api/suite/coding/authority/review",{...body,actions:["debug_target"]}),/explicitly connected/);
+  const grant=await suite.handle("/api/suite/coding/authority/issue",{...body,token:review.confirmation.token});assert.deepEqual(grant.connectedExecutionActions,["run_target","pipeline_local_gate","pipeline_clean_reproduction"]);assert.deepEqual(grant.proposal.actions,["run_target"]);assert.equal(grant.nativePermissionsChanged,false);
+  for(const action of ["debug_target","shield_change_scan","venv"]) await assert.rejects(suite.handle("/api/suite/coding/authority/review",{...body,actions:[action]}),/explicitly connected/);
   await assert.rejects(suite.handle("/api/suite/coding/authority/review",{...body,compartment:"work"}));
 });
 
