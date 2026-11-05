@@ -60,6 +60,23 @@ Neither failure is blocked by absent hardware or accounts.
 [Restricted-child evidence](evidence/windows-restricted-owner-074-failure-summary.json),
 [native lease evidence](evidence/windows-keyless-leases-074-summary.json).
 
+The next restricted-owner proof creates a temporary private window station and
+desktop, explicitly granting only the original user and SYSTEM access and
+requesting a medium integrity label. It supplies that exact desktop at child
+creation, restores the proof process's original namespace immediately after
+creation, and checks both private handle closes after owned-tree exit. Existing
+names refuse; no interactive desktop ACL or persistent machine configuration is
+changed. Token, privilege, same-user, Job, owner and independent-exit assertions
+remain required. Successful report validation additionally requires this startup
+kind and confirmed private-object retirement.
+
+This follows Microsoft's documented [child startup desktop access requirement](https://learn.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-createprocessasuserw).
+It is a source-level candidate for the observed initialization failure, not a
+confirmed root cause or accepted repair. Both managed targets compile with the
+existing SDK; 223 portable checks and three focused groups/28 checks pass, with
+cleanup. Native execution and the separate service-removal failure remain open.
+[Source evidence](evidence/windows-private-desktop-source-summary.json).
+
 ## Prior component evidence
 
 PR head `bd77ec4`, merge execution `b5295a6`, passes the actual Windows native

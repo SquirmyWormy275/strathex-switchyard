@@ -161,7 +161,10 @@ internal static class NativeRestrictedHostProof
             var assign = PrivilegeState(source, "SeAssignPrimaryTokenPrivilege");
             var impersonate = PrivilegeState(source, "SeImpersonatePrivilege");
             CreatorPrivileges = new { quotaAssigned = quota.Assigned, quotaEnabled = quota.Enabled, assignPrimaryAssigned = assign.Assigned, assignPrimaryEnabled = assign.Enabled, impersonateAssigned = impersonate.Assigned, impersonateEnabled = impersonate.Enabled };
-            string user = User(source); IntPtr admin = IntPtr.Zero, medium = IntPtr.Zero, deleted = IntPtr.Zero, restricting = IntPtr.Zero;
+            string user = User(source);
+            Phase = "private-user-object-space";
+            using var desktopSpace = new PrivateDesktopSpace(user);
+            IntPtr admin = IntPtr.Zero, medium = IntPtr.Zero, deleted = IntPtr.Zero, restricting = IntPtr.Zero;
             var restrictingSids = new List<IntPtr>();
             try
             {
@@ -212,7 +215,7 @@ internal static class NativeRestrictedHostProof
                             attributes = Marshal.AllocHGlobal(size); Native(InitializeProcThreadAttributeList(attributes, 1, 0, ref size)); initialized = true;
                             jobs = Marshal.AllocHGlobal(IntPtr.Size); Marshal.WriteIntPtr(jobs, job.DangerousGetHandle());
                             Native(UpdateProcThreadAttribute(attributes, 0, new IntPtr(0x2000d), jobs, new IntPtr(IntPtr.Size), IntPtr.Zero, IntPtr.Zero));
-                            var startup = new StartupInfoEx { Info = new StartupInfo { Size = Marshal.SizeOf<StartupInfoEx>() }, Attributes = attributes };
+                            var startup = new StartupInfoEx { Info = new StartupInfo { Size = Marshal.SizeOf<StartupInfoEx>(), Desktop = desktopSpace.Name }, Attributes = attributes };
                             var variables = new SortedDictionary<string,string>(StringComparer.OrdinalIgnoreCase);
                             // The outer guardian supplies this bounded allowlisted
                             // environment; creation receives it explicitly.
@@ -279,7 +282,7 @@ internal static class NativeRestrictedHostProof
                                 Require(report.GetProperty("schema").GetString() == "switchyard-restricted-host-result/v1" && report.GetProperty("nonce").GetString() == nonce && report.GetProperty("success").GetBoolean());
                                 var owner = report.GetProperty("owner"); Require(owner.GetProperty("success").GetBoolean() && owner.GetProperty("checks").GetArrayLength() == 8 && owner.GetProperty("nativeExitVerified").GetBoolean() && owner.GetProperty("fixtureRemoved").GetBoolean() && !owner.GetProperty("ordinaryUserToken").GetBoolean());
                                 Phase = "complete";
-                                return new { schema = "switchyard-restricted-host-process-proof/v1", success = true, processCreationApi = "CreateProcessAsUserW", creatorPrivileges = CreatorPrivileges, creatorQuotaRestoredVerified = true, restrictingSidListVerified = true, restrictingSidCount = 4, primaryTokenVerified = true, sameUserVerified = true, mediumIntegrityVerified = true, administratorsDenyOnlyVerified = true, volumePrivilegeAbsentVerified = true, onlyTraversePrivilegeAssignedVerified = true, historicalFilteredFlags = HistoricalFilteredFlags.ToArray(), historicalFilterBytes = HistoricalFilterBytes.ToArray(), tokenRecheckedAfterExit = true, treeExitVerified = true, hostOwnerChecks = 8, hostOwner = owner.Clone(), ordinaryUserAccountAccepted = false, guestLaunched = false, accountCreated = false };
+                                return new { schema = "switchyard-restricted-host-process-proof/v1", success = true, processCreationApi = "CreateProcessAsUserW", startupDesktop = "owned-noninteractive", interactiveDesktopInherited = false, privateDesktopClosedVerified = true, creatorPrivileges = CreatorPrivileges, creatorQuotaRestoredVerified = true, restrictingSidListVerified = true, restrictingSidCount = 4, primaryTokenVerified = true, sameUserVerified = true, mediumIntegrityVerified = true, administratorsDenyOnlyVerified = true, volumePrivilegeAbsentVerified = true, onlyTraversePrivilegeAssignedVerified = true, historicalFilteredFlags = HistoricalFilteredFlags.ToArray(), historicalFilterBytes = HistoricalFilterBytes.ToArray(), tokenRecheckedAfterExit = true, treeExitVerified = true, hostOwnerChecks = 8, hostOwner = owner.Clone(), ordinaryUserAccountAccepted = false, guestLaunched = false, accountCreated = false };
                             }
                             finally
                             {
