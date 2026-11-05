@@ -56,6 +56,14 @@ internal static class NativeRestrictedHostProof
         Require(User(token) == user);
         Require(ReadToken(token, 8, pointer => Marshal.ReadInt32(pointer)) == 1); // TokenPrimary
         Require(ReadToken(token, 25, pointer => new SecurityIdentifier(Marshal.ReadIntPtr(pointer)).Value) == "S-1-16-8192");
+        Require(IsTokenRestricted(token) && ReadToken(token, 21, pointer => Marshal.ReadInt32(pointer)) != 0);
+        var restrictions = ReadToken(token, 11, pointer =>
+        {
+            int count = Marshal.ReadInt32(pointer); Require(count == 4); var result = new HashSet<string>(StringComparer.Ordinal);
+            for (int i = 0; i < count; i++) result.Add(new SecurityIdentifier(Marshal.PtrToStructure<SidAttributes>(IntPtr.Add(pointer, (IntPtr.Size == 8 ? 8 : 4) + i * Marshal.SizeOf<SidAttributes>())).Sid).Value);
+            return result;
+        });
+        Require(restrictions.SetEquals(new[] { user, "S-1-1-0", "S-1-5-11", "S-1-5-32-545" }));
         bool disabledAdmin = ReadToken(token, 2, pointer =>
         {
             int count = Marshal.ReadInt32(pointer); Require(count is >= 1 and <= 1024);
@@ -94,14 +102,15 @@ internal static class NativeRestrictedHostProof
         Require((File.GetAttributes(node) & (FileAttributes.Directory | FileAttributes.ReparsePoint)) == 0 && image.Length is > 0 and <= 134217728);
         Require(Convert.ToHexString(SHA256.HashData(image)).ToLowerInvariant() == digest);
         Require((File.GetAttributes(script) & (FileAttributes.Directory | FileAttributes.ReparsePoint)) == 0);
-        Native(OpenProcessToken(new IntPtr(-1), 0x8b, out var source));
+        Native(OpenProcessToken(new IntPtr(-1), 0xab, out var source));
         using (source)
         {
             var quota = PrivilegeState(source, "SeIncreaseQuotaPrivilege");
             var assign = PrivilegeState(source, "SeAssignPrimaryTokenPrivilege");
             var impersonate = PrivilegeState(source, "SeImpersonatePrivilege");
             CreatorPrivileges = new { quotaAssigned = quota.Assigned, quotaEnabled = quota.Enabled, assignPrimaryAssigned = assign.Assigned, assignPrimaryEnabled = assign.Enabled, impersonateAssigned = impersonate.Assigned, impersonateEnabled = impersonate.Enabled };
-            string user = User(source); IntPtr admin = IntPtr.Zero, medium = IntPtr.Zero, deleted = IntPtr.Zero;
+            string user = User(source); IntPtr admin = IntPtr.Zero, medium = IntPtr.Zero, deleted = IntPtr.Zero, restricting = IntPtr.Zero;
+            var restrictingSids = new List<IntPtr>();
             try
             {
                 Phase = "restricted-primary-token";
@@ -113,7 +122,17 @@ internal static class NativeRestrictedHostProof
                     // volume privilege in a second call, then verify absence.
                     Native(LookupPrivilegeValueW(null, "SeManageVolumePrivilege", out long volume)); deleted = Marshal.AllocHGlobal(Marshal.SizeOf<Privilege>());
                     Marshal.StructureToPtr(new Privilege { Low = unchecked((uint)volume), High = unchecked((int)(volume >> 32)) }, deleted, false);
-                    Native(CreateRestrictedToken(reduced, 0, 0, ref disabled, 1, deleted, 0, IntPtr.Zero, out var restricted));
+                    // A deny-only group/removed privilege does not make
+                    // IsTokenRestricted true. Add an explicit restricting list.
+                    // These normal same-user/public groups still undergo BOTH
+                    // normal and restricting access checks; they grant nothing.
+                    restricting = Marshal.AllocHGlobal(Marshal.SizeOf<SidAttributes>() * 4);
+                    foreach (string text in new[] { user, "S-1-1-0", "S-1-5-11", "S-1-5-32-545" })
+                    {
+                        Native(ConvertStringSidToSidW(text, out var sid)); restrictingSids.Add(sid);
+                        Marshal.StructureToPtr(new SidAttributes { Sid = sid }, IntPtr.Add(restricting, (restrictingSids.Count - 1) * Marshal.SizeOf<SidAttributes>()), false);
+                    }
+                    Native(CreateRestrictedToken(reduced, 0, 0, ref disabled, 1, deleted, 4, restricting, out var restricted));
                     using (restricted)
                     {
                         Native(ConvertStringSidToSidW("S-1-16-8192", out medium)); var label = new SidAttributes { Sid = medium, Attributes = 0x20 };
@@ -133,7 +152,7 @@ internal static class NativeRestrictedHostProof
                             var startup = new StartupInfoEx { Info = new StartupInfo { Size = Marshal.SizeOf<StartupInfoEx>() }, Attributes = attributes };
                             var variables = new SortedDictionary<string,string>(StringComparer.OrdinalIgnoreCase);
                             // The outer guardian supplies this bounded allowlisted
-                            // environment; WithToken must receive it explicitly.
+                            // environment; creation receives it explicitly.
                             foreach (System.Collections.DictionaryEntry entry in Environment.GetEnvironmentVariables())
                             {
                                 string name = (string)entry.Key, text = (string)entry.Value!;
@@ -143,11 +162,26 @@ internal static class NativeRestrictedHostProof
                             Require(variables.Count is > 0 and <= 64);
                             environment = Marshal.StringToHGlobalUni(string.Join('\0', variables.Select(entry => entry.Key + "=" + entry.Value)) + "\0\0");
                             string command = string.Join(' ', new[] { node, script, context }.Select(Quote)); Require(command.Length < 1024);
-                            Phase = "creator-impersonation-privilege"; Require(impersonate.Assigned && impersonate.Enabled);
-                            Phase = "create-restricted-child-with-token";
-                            // Fixed API choice, no retry/fallback or alternate
-                            // credentials. No profile load or new logon session.
-                            Native(CreateProcessWithTokenW(restricted, 0, node, new StringBuilder(command), 0x4 | 0x8000000 | 0x80000 | 0x400, environment, repository, ref startup, out var process));
+                            Phase = "creator-assigned-quota-privilege"; Require(quota.Assigned);
+                            ProcessInformation process = default;
+                            try
+                            {
+                                if (!quota.Enabled) SetQuotaPrivilege(source, true);
+                                Phase = "create-restricted-child-with-explicit-restrictions";
+                                // Direct creation accepts the creation-time Job
+                                // attribute. No secondary-logon fallback, profile
+                                // load, new account or post-creation job gap.
+                                Native(CreateProcessAsUserW(restricted, node, new StringBuilder(command), IntPtr.Zero, IntPtr.Zero, false, 0x4 | 0x8000000 | 0x80000 | 0x400, environment, repository, ref startup, out process));
+                            }
+                            finally
+                            {
+                                try
+                                {
+                                    if (!quota.Enabled) SetQuotaPrivilege(source, false);
+                                    Require(PrivilegeState(source, "SeIncreaseQuotaPrivilege") == quota);
+                                }
+                                catch { if (process.Thread != IntPtr.Zero) CloseHandle(process.Thread); if (process.Process != IntPtr.Zero) CloseHandle(process.Process); throw; }
+                            }
                             using var child = new SafeFileHandle(process.Process, true); using var thread = new SafeFileHandle(process.Thread, true);
                             try
                             {
@@ -168,7 +202,7 @@ internal static class NativeRestrictedHostProof
                                 Require(report.GetProperty("schema").GetString() == "switchyard-restricted-host-result/v1" && report.GetProperty("nonce").GetString() == nonce && report.GetProperty("success").GetBoolean());
                                 var owner = report.GetProperty("owner"); Require(owner.GetProperty("success").GetBoolean() && owner.GetProperty("checks").GetArrayLength() == 8 && owner.GetProperty("nativeExitVerified").GetBoolean() && owner.GetProperty("fixtureRemoved").GetBoolean() && !owner.GetProperty("ordinaryUserToken").GetBoolean());
                                 Phase = "complete";
-                                return new { schema = "switchyard-restricted-host-process-proof/v1", success = true, processCreationApi = "CreateProcessWithTokenW", creatorPrivileges = CreatorPrivileges, primaryTokenVerified = true, sameUserVerified = true, mediumIntegrityVerified = true, administratorsDenyOnlyVerified = true, volumePrivilegeAbsentVerified = true, tokenRecheckedAfterExit = true, treeExitVerified = true, hostOwnerChecks = 8, hostOwner = owner.Clone(), ordinaryUserAccountAccepted = false, guestLaunched = false, accountCreated = false };
+                                return new { schema = "switchyard-restricted-host-process-proof/v1", success = true, processCreationApi = "CreateProcessAsUserW", creatorPrivileges = CreatorPrivileges, creatorQuotaRestoredVerified = true, restrictingSidListVerified = true, restrictingSidCount = 4, primaryTokenVerified = true, sameUserVerified = true, mediumIntegrityVerified = true, administratorsDenyOnlyVerified = true, volumePrivilegeAbsentVerified = true, tokenRecheckedAfterExit = true, treeExitVerified = true, hostOwnerChecks = 8, hostOwner = owner.Clone(), ordinaryUserAccountAccepted = false, guestLaunched = false, accountCreated = false };
                             }
                             finally
                             {
@@ -184,8 +218,16 @@ internal static class NativeRestrictedHostProof
                     }
                 }
             }
-            finally { if (admin != IntPtr.Zero) LocalFree(admin); if (medium != IntPtr.Zero) LocalFree(medium); if (deleted != IntPtr.Zero) Marshal.FreeHGlobal(deleted); }
+            finally { if (admin != IntPtr.Zero) LocalFree(admin); if (medium != IntPtr.Zero) LocalFree(medium); if (deleted != IntPtr.Zero) Marshal.FreeHGlobal(deleted); if (restricting != IntPtr.Zero) Marshal.FreeHGlobal(restricting); foreach (IntPtr sid in restrictingSids) LocalFree(sid); }
         }
+    }
+    private static void SetQuotaPrivilege(SafeAccessTokenHandle token, bool enabled)
+    {
+        Native(LookupPrivilegeValueW(null, "SeIncreaseQuotaPrivilege", out long luid));
+        var state = new TokenPrivileges { Count = 1, Entry = new Privilege { Low = unchecked((uint)luid), High = unchecked((int)(luid >> 32)), Attributes = enabled ? 2u : 0u } };
+        Native(AdjustTokenPrivileges(token, false, ref state, 0, IntPtr.Zero, IntPtr.Zero));
+        int error = Marshal.GetLastWin32Error(); if (error != 0) throw new Win32Exception(error);
+        Require(PrivilegeState(token, "SeIncreaseQuotaPrivilege") == (true, enabled));
     }
     private static uint ActiveProcesses(SafeJobHandle job) { Native(QueryInformationJobObject(job, 1, out var accounting, (uint)Marshal.SizeOf<Accounting>(), IntPtr.Zero)); return accounting.Active; }
     private static string Quote(string value)
@@ -196,6 +238,7 @@ internal static class NativeRestrictedHostProof
     }
     [StructLayout(LayoutKind.Sequential)] private struct SidAttributes { public IntPtr Sid; public uint Attributes; }
     [StructLayout(LayoutKind.Sequential)] private struct Privilege { public uint Low; public int High; public uint Attributes; }
+    [StructLayout(LayoutKind.Sequential)] private struct TokenPrivileges { public uint Count; public Privilege Entry; }
     [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)] private struct StartupInfo { public int Size; public string? Reserved, Desktop, Title; public uint X, Y, XSize, YSize, XCount, YCount, Fill, Flags; public ushort Show, ReservedSize; public IntPtr ReservedPointer, Input, Output, Error; }
     [StructLayout(LayoutKind.Sequential)] private struct StartupInfoEx { public StartupInfo Info; public IntPtr Attributes; }
     [StructLayout(LayoutKind.Sequential)] private struct ProcessInformation { public IntPtr Process, Thread; public uint ProcessId, ThreadId; }
@@ -206,12 +249,14 @@ internal static class NativeRestrictedHostProof
     private sealed class SafeJobHandle : SafeHandleZeroOrMinusOneIsInvalid { private SafeJobHandle() : base(true) {} protected override bool ReleaseHandle() => CloseHandle(handle); }
     [DllImport("advapi32.dll", SetLastError = true)] [return: MarshalAs(UnmanagedType.Bool)] private static extern bool OpenProcessToken(IntPtr process, uint access, out SafeAccessTokenHandle token);
     [DllImport("advapi32.dll", SetLastError = true)] [return: MarshalAs(UnmanagedType.Bool)] private static extern bool GetTokenInformation(SafeAccessTokenHandle token, int kind, IntPtr buffer, uint size, out uint used);
+    [DllImport("advapi32.dll", SetLastError = true)] [return: MarshalAs(UnmanagedType.Bool)] private static extern bool IsTokenRestricted(SafeAccessTokenHandle token);
+    [DllImport("advapi32.dll", SetLastError = true)] [return: MarshalAs(UnmanagedType.Bool)] private static extern bool AdjustTokenPrivileges(SafeAccessTokenHandle token, bool disableAll, ref TokenPrivileges state, uint length, IntPtr previous, IntPtr returned);
     [DllImport("advapi32.dll", SetLastError = true)] [return: MarshalAs(UnmanagedType.Bool)] private static extern bool SetTokenInformation(SafeAccessTokenHandle token, int kind, ref SidAttributes label, uint size);
     [DllImport("advapi32.dll", SetLastError = true)] [return: MarshalAs(UnmanagedType.Bool)] private static extern bool CreateRestrictedToken(SafeAccessTokenHandle source, uint flags, uint count, ref SidAttributes disabled, uint deleteCount, IntPtr deleted, uint restrictCount, IntPtr restricting, out SafeAccessTokenHandle token);
     [DllImport("advapi32.dll", CharSet = CharSet.Unicode, SetLastError = true)] [return: MarshalAs(UnmanagedType.Bool)] private static extern bool ConvertStringSidToSidW(string value, out IntPtr sid);
     [DllImport("advapi32.dll")] private static extern uint GetLengthSid(IntPtr sid);
     [DllImport("advapi32.dll", CharSet = CharSet.Unicode, SetLastError = true)] [return: MarshalAs(UnmanagedType.Bool)] private static extern bool LookupPrivilegeValueW(string? system, string name, out long luid);
-    [DllImport("advapi32.dll", CharSet = CharSet.Unicode, SetLastError = true)] [return: MarshalAs(UnmanagedType.Bool)] private static extern bool CreateProcessWithTokenW(SafeAccessTokenHandle token, uint logonFlags, string image, StringBuilder command, uint flags, IntPtr environment, string directory, ref StartupInfoEx startup, out ProcessInformation process);
+    [DllImport("advapi32.dll", CharSet = CharSet.Unicode, SetLastError = true)] [return: MarshalAs(UnmanagedType.Bool)] private static extern bool CreateProcessAsUserW(SafeAccessTokenHandle token, string image, StringBuilder command, IntPtr processSecurity, IntPtr threadSecurity, bool inheritHandles, uint flags, IntPtr environment, string directory, ref StartupInfoEx startup, out ProcessInformation process);
     [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)] private static extern SafeJobHandle CreateJobObjectW(IntPtr security, string? name);
     [DllImport("kernel32.dll", SetLastError = true)] [return: MarshalAs(UnmanagedType.Bool)] private static extern bool SetInformationJobObject(SafeJobHandle job, int kind, ref ExtendedLimits limits, uint size);
     [DllImport("kernel32.dll", SetLastError = true)] [return: MarshalAs(UnmanagedType.Bool)] private static extern bool QueryInformationJobObject(SafeJobHandle job, int kind, out Accounting accounting, uint size, IntPtr returned);

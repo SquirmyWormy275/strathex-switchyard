@@ -24,7 +24,7 @@ user account setup. [Digest summary](evidence/windows-bd77-native-summary.json).
 
 A new test-only `NativeRestrictedHostProof` addresses that first gap. It creates
 one same-user Node child with a restricted primary token through
-[CreateProcessWithTokenW](https://learn.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-createprocesswithtokenw),
+[CreateProcessAsUserW](https://learn.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-createprocessasuserw),
 rather than inferring child identity from thread impersonation. The actual child
 token is inspected before resume and after exit: same user, primary type,
 Administrators deny-only, medium integrity and no assigned volume-management
@@ -54,18 +54,38 @@ they do not upgrade the failed restricted-process proof. The original service,
 ownership and owned context remain preserved, without retry. Archive digest and
 small failed receipt verify in the [failure summary](evidence/windows-restricted-owner-869-failed-summary.json).
 
-The corrected harness makes a single explicit `CreateProcessWithTokenW` call,
-requiring the caller's existing enabled impersonation privilege. It supplies the
-bounded outer-guardian environment explicitly, loads no profile, creates no new
-logon session, and retains creation-time Job assignment plus all actual child-token
-checks. There is no elevated-child fallback, privilege grant or account change.
-Creator privilege-presence flags and exact failure phase are bounded diagnostics.
-Both targets again compile warning-free and all 223 portable checks pass with
-owned scratch removed (`windows-history-native-build-1793880640423.json`). A local
-compiler declaration error in the first correction attempt remains failed in
+The next native `80e8551` attempt uses `CreateProcessWithTokenW` and fails with
+Win32 87 at `create-restricted-child-with-token`, still before child start.
+The original service/context remain preserved, with the failure digest verified.
+Its diagnostics establish an assigned but disabled creator quota privilege,
+no assigned primary-token privilege and enabled impersonation privilege.
+That failure remains failed. [Failure summary](evidence/windows-restricted-owner-80-failed-summary.json).
+
+Current source uses one direct `CreateProcessAsUserW` call with the creation-time
+Job attribute. The token now contains an explicit restricting-SID list: the same
+user plus Everyone, Authenticated Users and Users. Those SIDs undergo an additional
+access check; they grant no access absent the normal check. The native proof
+requires `IsTokenRestricted`, the exact four SIDs, primary type, same user,
+Administrators deny-only, medium integrity and absent volume privilege before
+creation and on the actual child before/after execution. Microsoft's
+[IsTokenRestricted contract](https://learn.microsoft.com/en-us/windows/win32/api/securitybaseapi/nf-securitybaseapi-istokenrestricted)
+checks restricting SIDs, separately from disabled groups/deleted privileges.
+
+The test creator temporarily enables only its already assigned quota privilege
+around that one creation call and independently reads back its original state
+before resuming the child. An absent privilege refuses; no privilege is assigned,
+account created, profile loaded or fallback attempted. The restricted child was
+constructed before that creator-only adjustment. Existing command/input/Job,
+suspended start, timeout and independent exit assertions stay intact. These
+changes follow the documented creation contract; the earlier failures' precise
+kernel cause is not inferred solely from this source correction.
+
+Both targets compile warning-free and all 223 portable checks pass with the
+existing SDK; owned scratch is removed (`windows-history-native-build-1793882469415.json`).
+The earlier local compiler declaration failure remains failed in
 `restricted-host-build-failed-1793880635213.json`; no native code ran and its exact
-build scratch was removed before the corrected build.
-Actual Windows execution of the corrected restricted-process proof is pending.
+scratch was removed before the corrected build. Actual Windows execution of the
+explicit restricting-SID and scoped creator-privilege proof is pending.
 Even a passing result will not establish interactive/UAC, a separate ordinary-user
 account/profile, Windows Sandbox guest isolation or physical acceptance.
 
