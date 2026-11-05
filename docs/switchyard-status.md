@@ -179,8 +179,11 @@ verification passes locally. Later run [41984665699](https://github.com/SquirmyW
 builds the pinned helper and passes the outer namespace probe, but the actual
 two-level build fails with a namespace permission refusal. The distribution
 profile denies capabilities to every bwrap child; nested trusted setup needs
-further scoped integration. The failed run remains failed; no sysctl/profile
-restriction is relaxed to obtain a pass. No host
+further scoped integration. CI now adds one exact `/usr/bin/bwrap` inheritance
+rule only to the trusted setup profile. Ordinary children retain the capability-
+denying stack and the final sandbox disables user namespaces; native acceptance
+is pending. Both failures remain failed. No sysctl, workstation profile or test
+assertion is changed; bounded kernel diagnostics are retained on the next failure. No host
 package, executable, policy or sysctl was changed on this workstation.
 
 Native Windows `5d398d2`, workflow

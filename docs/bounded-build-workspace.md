@@ -26,8 +26,13 @@ disabling. This workstation's 0.13.1 passes the native boundary checks. Ubuntu
 24.04's older distribution package lacks the overlay API; release CI builds
 [upstream 0.13.1](https://github.com/containers/bubblewrap/releases/tag/v0.13.1)
 from the official checksum-pinned archive only on its disposable worker. The
-scoped AppArmor policy and kernel limits stay in place; an unsupported helper
-does not permit a weaker execution path.
+distribution AppArmor policy denies capabilities to ordinary helper children.
+The two-level setup additionally requires the fixed `/usr/bin/bwrap` executable
+to inherit its setup profile on re-entry. CI adds that one exact-path rule only
+on its disposable worker; all other children retain the capability-denying
+stack, and the final sandbox still disables nested user namespaces. This scoped
+integration awaits native CI acceptance; no workstation policy or kernel limit
+is changed, and unsupported setup never permits a weaker execution path.
 
 The runtime and namespace host must enable the extension. A manifest alone cannot
 make a legacy/direct host runtime writable or substitute host execution when
