@@ -12,6 +12,45 @@ checks: a working interactive Windows Sandbox run and normal-user UAC still
 require an authorized Windows host. Metadata retains `brokerImplemented:false`
 until that complete native journey is accepted.
 
+## Current host evidence
+
+PR head `bd77ec4`, merge execution `b5295a6`, passes the actual Windows native
+component job. Digest-verified evidence covers thirteen restricted metadata
+checks, 31 restricted .NET exchange checks and eight JavaScript host-owner checks,
+with exact service/files retirement and independent native exits. The .NET
+checks use thread impersonation; the JavaScript owner used the CI worker token.
+This does not establish a restricted JavaScript primary process or an ordinary
+user account setup. [Digest summary](evidence/windows-bd77-native-summary.json).
+
+A new test-only `NativeRestrictedHostProof` addresses that first gap. It creates
+one same-user Node child with a restricted primary token through
+[CreateProcessAsUserW](https://learn.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-createprocessasuserw),
+rather than inferring child identity from thread impersonation. The actual child
+token is inspected before resume and after exit: same user, primary type,
+Administrators deny-only, medium integrity and no assigned volume-management
+privilege. [CreateRestrictedToken](https://learn.microsoft.com/en-us/windows/win32/api/securitybaseapi/nf-securitybaseapi-createrestrictedtoken)
+disables privileges and a separate call removes the volume privilege; the
+[mandatory integrity label](https://learn.microsoft.com/en-us/windows/win32/secauthz/mandatory-integrity-control)
+is independently read back. The child repeats the eight real host-owner checks.
+
+The child is assigned to an exact kill-on-close Job Object during process creation,
+starts suspended, inherits no handles, and has a ninety-second bound inside the
+existing 120-second native guardian deadline. Original process handles and zero
+active job members verify exit before only the owned result/context fixture is
+removed. Failure preserves the original service, native ownership and fixture;
+there is no fallback to an elevated child, account creation or replay. This is
+trusted CI proof code, not a general untrusted-code sandbox or a shipped helper
+command. No production executable gains a new launch surface.
+
+Both C# targets compile with zero warnings/errors and all 223 portable checks
+still pass using the existing SDK (`windows-history-native-build-1793879927476.json`);
+owned build scratch is removed. Three isolated runner/selector/owner groups pass
+38 checks, including closed context/changed executable and non-disposable child
+refusal, with every cleanup verified (`isolated-test-b8d1adb6-f004-4b92-934f-4dda9e7180e1.json`).
+Actual Windows execution of this new restricted-process proof remains pending.
+Even a passing result will not establish interactive/UAC, a separate ordinary-user
+account/profile, Windows Sandbox guest isolation or physical acceptance.
+
 ## Fixed resource boundary
 
 Requests contain one of `create`, `inspect`, `attach`, `detach` or `retire`, an

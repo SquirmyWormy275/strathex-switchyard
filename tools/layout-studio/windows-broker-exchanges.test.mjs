@@ -4,9 +4,24 @@ import { randomUUID, createHash } from "node:crypto";
 import { mkdtemp, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
+import { spawnSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
 import { createSuiteStore } from "./suite-store.mjs";
 import { createWindowsBrokerExchanges } from "./windows-broker-exchanges.mjs";
+import { validateRestrictedHostContext } from "../../scripts/windows-broker-restricted-owner.mjs";
 const field = "repositoryWindowsBrokerExchanges", sha = x => createHash("sha256").update(x).digest("hex");
+
+test("the restricted native host fixture accepts only its closed executable, installation and digest context", () => {
+  const value = { schema: "switchyard-restricted-host-context/v1", helper: "C:\\owned fixture\\Switchyard.Hotkeys.exe", installationId: randomUUID(), serviceImageSha256: "a".repeat(64), node: "C:\\pinned node\\node.exe", nodeSha256: "b".repeat(64), nonce: "c".repeat(32) };
+  const copy = validateRestrictedHostContext(value); assert.deepEqual(copy, value); copy.helper = "changed"; assert.notEqual(copy.helper, value.helper);
+  for (const change of [v => { v.command = "arbitrary"; }, v => { delete v.nodeSha256; }, v => { v.schema = "other"; }, v => { v.helper = "relative\\Switchyard.Hotkeys.exe"; }, v => { v.helper = "C:\\owned\\..\\Switchyard.Hotkeys.exe"; }, v => { v.helper = "C:\\owned\\foreign.exe"; }, v => { v.node = "C:\\owned\\powershell.exe"; }, v => { v.node += "\n"; }, v => { v.nodeSha256 = "B".repeat(64); }, v => { v.serviceImageSha256 = "a".repeat(63); }, v => { v.installationId = "00000000-0000-0000-0000-000000000000"; }, v => { v.nonce = "stale"; }]) { const changed = structuredClone(value); change(changed); assert.throws(() => validateRestrictedHostContext(changed)); }
+  for (const malformed of [null, [], "fixture"]) assert.throws(() => validateRestrictedHostContext(malformed));
+});
+
+test("the restricted host child refuses a non-disposable environment before reading any context", () => {
+  const result = spawnSync(process.execPath, [fileURLToPath(new URL("../../scripts/windows-broker-restricted-owner.mjs", import.meta.url)), "unselected-context"], { env: { GITHUB_ACTIONS: "false", RUNNER_OS: "Windows", ...(process.env.SystemRoot ? { SystemRoot: process.env.SystemRoot } : {}) }, encoding: "utf8", timeout: 5000, maxBuffer: 32768 });
+  assert.equal(result.error, undefined); assert.notEqual(result.status, 0); assert.equal(result.stdout, ""); assert.match(result.stderr, /Use only the fixed disposable Windows restricted-host child/);
+});
 
 // Explicit protected-service/VHD doubles. AEAD persistence and cross-process
 // kernel leases are real; no volume, account, privilege or VM is created.

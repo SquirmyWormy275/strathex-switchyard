@@ -2,12 +2,12 @@
 /** Install only this exact metadata bootstrap on a disposable elevated CI host. */
 import assert from "node:assert/strict";
 import {createHash,randomUUID} from "node:crypto";
-import {readFile} from "node:fs/promises";
+import {readFile,mkdtemp,rm} from "node:fs/promises";
 import {join,isAbsolute} from "node:path";
 import {tmpdir} from "node:os";
 import {desktopEnvironment} from "../tools/layout-studio/process-environment.mjs";
 import {runRuntimeCommand,runtimeGuardianStopped} from "../tools/layout-studio/runtime-command.mjs";
-import {privateWrite} from "../tools/layout-studio/private-fs.mjs";
+import {privateWrite,directoryIdentity} from "../tools/layout-studio/private-fs.mjs";
 const flags=process.argv.slice(2),exchange=flags.at(-1)==="--exchange";if(exchange)flags.pop();
 const names=["--helper=","--dotnet=","--proof="],setup=flags[4]?.startsWith("--setup=")?flags[4].slice(8):undefined;
 if(process.platform!=="win32"||process.env.GITHUB_ACTIONS!=="true"||process.env.RUNNER_OS!=="Windows"||exchange&&Boolean(setup)||flags.length!==(setup?5:4)||flags[0]!=="--synthetic"||setup&&!isAbsolute(setup)||names.some((name,i)=>!flags[i+1]?.startsWith(name)||!isAbsolute(flags[i+1].slice(name.length))))throw Error("Use the explicit disposable Windows broker CI proof with helper, dotnet, proof and optional native setup paths.");
@@ -15,7 +15,7 @@ const [helper,dotnet,assembly]=names.map((name,i)=>flags[i+1].slice(name.length)
 const evidence={schema:"switchyard-windows-storage-broker-bootstrap-proof/v1",sourceCommit:process.env.GITHUB_SHA??null,installationId,helperSha256,checks,volumeOpened:false,guestLaunched:false,accountCreated:false,normalUserSetupAccepted:false,nativeSetupUsed:Boolean(setup),exchangeRequested:exchange};let failure;
 async function owned(executable,args,{inputText,environment=desktopEnvironment()}={}){
  const result=await runRuntimeCommand(executable,args,{windowsHelper:helper,expectedExecutableSha256:sha(await readFile(executable)),env:environment,inputText,detailed:true,captureStderrBytes:2048,timeout:120000,maxOutputBytes:65536,onGuardianReady:async frame=>{owners.push(frame);await save();}});
- if(result.exitCode!==0){evidence.commandFailure={exitCode:result.exitCode,status:result.status,diagnostic:(result.stderr??"").split(/\r?\n/)[0].slice(0,512)};if(executable===dotnet&&args[0]===assembly){try{const parsed=JSON.parse(result.stdout);if(parsed.schema==="switchyard-storage-broker-protocol-proof/v1"&&parsed.success===false)evidence.commandFailure.proof=Object.fromEntries(["schema","success","errorCategory","nativeCode","nativeExchangeChecks","failedCheckPhase"].map(key=>[key,parsed[key]]));}catch{}}}
+ if(result.exitCode!==0){evidence.commandFailure={exitCode:result.exitCode,status:result.status,diagnostic:(result.stderr??"").split(/\r?\n/)[0].slice(0,512)};if(executable===dotnet&&args[0]===assembly){try{const parsed=JSON.parse(result.stdout);if(parsed.schema==="switchyard-storage-broker-protocol-proof/v1"&&parsed.success===false)evidence.commandFailure.proof=Object.fromEntries(["schema","success","errorCategory","nativeCode","nativeExchangeChecks","failedCheckPhase","restrictedHostPhase"].map(key=>[key,parsed[key]]));}catch{}}}
  const exited=await runtimeGuardianStopped(owners.at(-1),{windowsHelper:helper});if(!exited){evidence.ownershipFailure={command:executable===helper?args[0]:executable===dotnet?"compiled-proof":"identity-observation",scope:owners.at(-1),exitCode:result.exitCode,status:result.status};await save();}
  assert.equal(exited,true,"The exact proof command has no independently verified exit.");assert.equal(result.exitCode,0,"A bootstrap proof command failed.");return result.stdout;
 }
@@ -37,6 +37,15 @@ try{
   evidence.hostExchangeProof=await verifyWindowsBrokerOwner({helper,installationId,serviceImageSha256:helperSha256});
   assert.equal(evidence.hostExchangeProof.success,true);assert.equal(evidence.hostExchangeProof.checks.length,8);assert.equal(evidence.hostExchangeProof.nativeExitVerified,true);assert.equal(evidence.hostExchangeProof.fixtureRemoved,true);evidence.hostExchangeChecks=8;
   checks.push("actual JavaScript owner and native transport completed eight scope, consumer-lease, exit and retirement checks without a guest or setup request");
+  const restrictedRoot=await mkdtemp(join(process.env.RUNNER_TEMP||tmpdir(),"sxbr-")),original=await directoryIdentity(restrictedRoot),contextPath=join(restrictedRoot,"context.json");
+  evidence.restrictedHostFixture={root:restrictedRoot,removed:false};await save();
+  await privateWrite(contextPath,JSON.stringify({schema:"switchyard-restricted-host-context/v1",helper,installationId,serviceImageSha256:helperSha256,node:process.execPath,nodeSha256:sha(await readFile(process.execPath)),nonce:randomUUID().replaceAll("-","")}));
+  const restricted=JSON.parse(await owned(dotnet,[assembly,"--native-host-owner"],{environment:{...desktopEnvironment(),GITHUB_ACTIONS:"true",RUNNER_OS:"Windows",GITHUB_WORKSPACE:process.env.GITHUB_WORKSPACE,SWITCHYARD_TEST_BROKER_INSTALLATION_ID:installationId,SWITCHYARD_TEST_RESTRICTED_HOST_CONTEXT:contextPath}}));
+  const processProof=restricted.nativeRestrictedHostProof;assert.equal(restricted.success,true);assert.equal(processProof?.schema,"switchyard-restricted-host-process-proof/v1");
+  for(const key of ["success","primaryTokenVerified","sameUserVerified","mediumIntegrityVerified","administratorsDenyOnlyVerified","volumePrivilegeAbsentVerified","tokenRecheckedAfterExit","treeExitVerified"])assert.equal(processProof[key],true);
+  assert.equal(processProof.hostOwnerChecks,8);assert.equal(processProof.ordinaryUserAccountAccepted,false);assert.equal(processProof.guestLaunched,false);assert.equal(processProof.accountCreated,false);evidence.restrictedHostExchangeProof=processProof;
+  const current=await directoryIdentity(restrictedRoot);assert.equal(current.dev,original.dev);assert.equal(current.ino,original.ino);await rm(restrictedRoot,{recursive:true});evidence.restrictedHostFixture.removed=true;
+  checks.push("same-user medium-integrity primary-token Node owner completed all eight exchanges without administrator membership or assigned volume privilege; actual child token and exact owned tree exit rechecked");
  }
  if(setup){const removed=JSON.parse(await owned(setup,["--remove-bootstrap",clientSid,installationId,helperSha256,helperSha256]));assert.equal(removed.status,"completed");assert.equal(removed.effectStarted,true);}else{const removed=await broker("remove-bootstrap",binding);evidence.removalObservation=removed;await save();assert.equal(removed.status,"removed");assert.equal(removed.serviceRemovedVerified,true);assert.equal(removed.filesRemovedVerified,true);}checks.push("exact SCM and captured native process exited before inventoried files were removed");
  const absent=await broker("metadata");assert.equal(absent.status,"unavailable");assert.equal(absent.installationAbsentVerified,true);checks.push("removed broker cannot answer a new signed metadata challenge");
