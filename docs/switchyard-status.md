@@ -15,8 +15,8 @@ checks pass. Both Linux pipeline actions now bind verified signed feed metadata;
 revoked/changed feeds keep results incomplete. Seven actual namespace pipeline
 checks and 59 combined controller/registry/HTTP/privacy/harness/package checks
 pass; type checking passes. The package includes the actual registry and runs
-under normal Node flags. Installed demonstration and native Windows controller
-acceptance are pending. [Fixture boundary](signed-fixtures.md) records the
+under normal Node flags. The installed demonstration now passes ten checks; native Windows controller
+acceptance remains pending. [Fixture boundary](signed-fixtures.md) records the
 remaining aggregate quota, removal, Shield execution and frontend work.
 
 Normal Windows Run now uses the protected System storage service for new
@@ -79,6 +79,19 @@ production deadline changed. Native rerun is pending. A complete native
 application/guest journey and interactive UAC remain unaccepted.
 
 ## Installed Linux and F77
+
+Normal installed `27e0eb3`, release
+`6fdc54437d76707a04ff4daa303565df3e145bc1314aff49b61dd89fec0e3193`,
+passes six update and ten signed-fixture API checks. A fresh synthetic Personal
+compartment enrolled its public key, imported/read back its signed package,
+rejected duplicate effects, omitted private maintenance data and separately
+revoked the fixture/key. Original selection, definitions/modes, private endpoint
+and frozen Home were restored. Only the known synthetic package, signing scratch,
+bundle and proof checkout were removed. Receipts
+`assignment-legends-1793846107230.json` and
+`installed-signed-fixtures-1793846351612.json` retained. No model/account, hardware
+or microphone operation. The complete Linux lane is running at immutable
+`27e0eb3`; required inventory is now 168 groups.
 
 The normal installed application at `e1a1f30`, release
 `ed5b058f76ad93ab75dc3e3ebd787291de27b6b1b4165fa0db30d9b9ede59143`,

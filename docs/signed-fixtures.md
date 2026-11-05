@@ -73,6 +73,10 @@ Bubblewrap execution. Existing five pipeline tests also pass after sharing their
 fixture helper. The packaged server is exercised with normal Node 24.14.0 flags.
 
 These checks use synthetic feeds and keys, not a paid model or provider account.
-Normal installed API acceptance and native Windows checks of the new controller
-are pending. The complete Shield/scanner execution connection, aggregate feed
+Normal installed `27e0eb3` passes six update and ten API checks, including
+exact readback, duplicate refusal, privacy, separate revocation, restored modes/
+selection/private link/Home and removal of only the synthetic package/key/source
+scratch. The repeatable [pilot verifier](../scripts/verify-fixtures-host.mjs)
+creates a fresh validation compartment and requests no model/account or hardware.
+Native Windows checks of the new controller remain pending. The complete Shield/scanner execution connection, aggregate feed
 quota, reviewed removal/retention and frontend controls remain unfinished.
