@@ -80,6 +80,14 @@ at their earlier exact sources remain recorded in [verification](verification.md
 
 ## Remaining implementation and external checks
 
+The signed scanner/advisory registry now pins the reviewed manifest across the
+user-presence prompt, refusing even another valid signed package substituted
+before installation. Authority enrollment checks and append share one protected
+transaction, so concurrent approvals cannot introduce two active keys under one
+authority identity. Seven actual filesystem/cryptographic registry tests and type
+checking pass. This hardens the existing companion administration; connecting it
+to the normal Suite's compartment API and pipelines remains implementation work.
+
 Windows pipelines, scanner/advisory application connections, writable build
 preparation, exact desktop/IDE/terminal attachments and the remaining frontend
 controls are unfinished implementation. The task requirement remains the full

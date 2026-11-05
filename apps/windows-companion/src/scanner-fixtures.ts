@@ -3,7 +3,7 @@ import { createHash, createPublicKey, verify } from "node:crypto";
 import { lstat, mkdir, readFile, realpath, writeFile } from "node:fs/promises";
 import { dirname, isAbsolute, relative, resolve } from "node:path";
 
-import type { JsonValue, ProtectedJsonStore } from "../../../packages/control-plane/src/store.ts";
+import type { JournalEntry, JsonValue, ProtectedJsonStore } from "../../../packages/control-plane/src/store.ts";
 import type { WindowsUserPresenceRunner } from "./windows-user-presence.ts";
 
 const trustInstallKind = "b122.scanner-trust.install.v1";
@@ -81,9 +81,11 @@ export class DurableScannerFixtureRegistry implements ScannerFixtureResolver {
 
   async installTrust(policyInput: ScannerFixtureTrustPolicy, installedBy: string): Promise<InstalledScannerFixtureTrust> {
     const policy = validateTrust(policyInput, this.now());
-    if ((await this.trust()).some((item) => item.authorityId === policy.authorityId && item.status === "active")) throw new Error("An active scanner-fixture authority already exists under that identity.");
-    const entry = await this.store.append(trustInstallKind, { policy: policy as unknown as JsonValue, installedBy: bounded(installedBy, "scanner trust operator", 160) });
-    return { ...policy, installedAt: entry.at, installedBy, status: "active" };
+    return this.store.transaction(async transaction => {
+      if (this.trustFrom(await transaction.readEntries<JsonValue>()).some((item) => item.authorityId === policy.authorityId && item.status === "active")) throw new Error("An active scanner-fixture authority already exists under that identity.");
+      const entry = await transaction.append(trustInstallKind, { policy: policy as unknown as JsonValue, installedBy: bounded(installedBy, "scanner trust operator", 160) });
+      return { ...policy, installedAt: entry.at, installedBy, status: "active" as const };
+    });
   }
 
   async revokeTrust(authorityId: string, keyId: string, reason: string, revokedBy: string): Promise<void> {
@@ -92,8 +94,10 @@ export class DurableScannerFixtureRegistry implements ScannerFixtureResolver {
     await this.store.append(trustRevokeKind, { authorityId: identifier(authorityId, "scanner authority"), keyId: digest(keyId, "scanner key"), reason: bounded(reason, "scanner trust revocation", 512), revokedBy: bounded(revokedBy, "scanner trust operator", 160) });
   }
 
-  async installFixture(manifestPath: string, installedBy: string): Promise<InstalledScannerFixture> {
+  async installFixture(manifestPath: string, installedBy: string, expectedManifestSha256?: string): Promise<InstalledScannerFixture> {
+    if (expectedManifestSha256 !== undefined && !digestPattern.test(expectedManifestSha256)) throw new Error("The reviewed scanner fixture manifest digest is invalid.");
     const source = await concreteFile(manifestPath, maximumManifestBytes, "scanner fixture manifest");
+    if (expectedManifestSha256 !== undefined && sha256(source.bytes) !== expectedManifestSha256) throw new Error("The signed scanner fixture changed after review; approve its exact current manifest before installation.");
     const manifest = parseManifest(source.bytes, this.now());
     const sourceRoot = dirname(source.path);
     const contentSource = await concreteFile(resolve(sourceRoot, manifest.contentFile), maximumContentBytes, "scanner fixture content");
@@ -173,8 +177,12 @@ export class DurableScannerFixtureRegistry implements ScannerFixtureResolver {
   async listFixtures(): Promise<readonly InstalledScannerFixture[]> { return this.fixtures(); }
 
   private async trust(): Promise<readonly InstalledScannerFixtureTrust[]> {
+    return this.trustFrom(await this.store.readEntries<JsonValue>());
+  }
+
+  private trustFrom(entries: readonly JournalEntry<JsonValue>[]): readonly InstalledScannerFixtureTrust[] {
     const values = new Map<string, InstalledScannerFixtureTrust>();
-    for (const entry of await this.store.readEntries<JsonValue>()) {
+    for (const entry of entries) {
       const payload = entry.payload as unknown as Record<string, unknown>;
       if (entry.kind === trustInstallKind) {
         if (!record(payload) || !record(payload.policy) || typeof payload.installedBy !== "string") throw new Error("Protected scanner trust journal is malformed.");
@@ -219,7 +227,7 @@ export function createScannerFixtureAdministration(options: Readonly<{ registry:
     async installTrust(sourcePath: string) { const policy = parseTrust(await readBounded(sourcePath, maximumManifestBytes), (options.now ?? (() => new Date()))()); return options.registry.installTrust(policy, await operator(`Install scanner fixture authority ${policy.authorityId} for ${policy.allowedKinds.join(" and ")}.`)); },
     async listTrust() { return options.registry.listTrust(); },
     async revokeTrust(authorityId: string, keyId: string, reason: string) { return options.registry.revokeTrust(authorityId, keyId, reason, await operator(`Revoke scanner fixture authority ${authorityId}.`)); },
-    async installFixture(sourcePath: string) { const bytes = await readBounded(sourcePath, maximumManifestBytes); const manifest = parseManifest(bytes, (options.now ?? (() => new Date()))()); return options.registry.installFixture(sourcePath, await operator(`Install signed ${manifest.kind} fixture ${manifest.id} until ${manifest.expiresAt}.`)); },
+    async installFixture(sourcePath: string) { const bytes = await readBounded(sourcePath, maximumManifestBytes); const manifest = parseManifest(bytes, (options.now ?? (() => new Date()))()); return options.registry.installFixture(sourcePath, await operator(`Install signed ${manifest.kind} fixture ${manifest.id} until ${manifest.expiresAt}.`), sha256(bytes)); },
     async listFixtures() { return options.registry.listFixtures(); },
     async revokeFixture(id: string, reason: string) { return options.registry.revokeFixture(id, reason, await operator(`Revoke scanner fixture ${id}.`)); }
   };

@@ -6,7 +6,7 @@ import { join } from "node:path";
 import test from "node:test";
 
 import { createScannerFixtureAdministration, DurableScannerFixtureRegistry } from "../src/scanner-fixtures.ts";
-import { ProtectedJsonStore } from "../../../packages/control-plane/src/store.ts";
+import { ProtectedJsonStore, type JournalEntry, type JsonValue } from "../../../packages/control-plane/src/store.ts";
 
 const observedAt = new Date("2026-08-24T12:00:00.000Z");
 
@@ -106,3 +106,33 @@ test("an unfamiliar empty or populated fixture directory is preserved before any
 });
 
 function canonical(value: unknown): string { if (value === null || typeof value !== "object") return JSON.stringify(value); if (Array.isArray(value)) return `[${value.map(canonical).join(",")}]`; return `{${Object.entries(value as Record<string, unknown>).sort(([left], [right]) => left.localeCompare(right)).map(([key, item]) => `${JSON.stringify(key)}:${canonical(item)}`).join(",")}}`; }
+
+
+test("a different valid signed package substituted during user presence cannot inherit the original fixture approval", async context => {
+  const setup = await fixture(context), first = await signedManifest(setup, "reviewed-feed", "scanner"), second = await signedManifest(setup, "substituted-feed", "advisory");
+  const administration = createScannerFixtureAdministration({ registry: setup.registry, now: () => new Date(observedAt), presence: { async verify(prompt) {
+    assert.match(prompt, /reviewed-feed/); await writeFile(first, await readFile(second)); return { verified: true, operator: "TEST\\Security" };
+  } } });
+  await assert.rejects(administration.installFixture(first), /changed after review/);
+  assert.deepEqual(await setup.registry.listFixtures(), []);
+  await assert.rejects(readdir(join(setup.state, "scanner-fixtures")), { code: "ENOENT" });
+});
+
+test("concurrent authority enrollment cannot admit two keys under the same active authority identity", async context => {
+  const setup = await fixture(context), otherStore = new ProtectedJsonStore({ filePath: setup.store.filePath }), other = new DurableScannerFixtureRegistry(otherStore, setup.state, () => new Date(observedAt));
+  const original = (await setup.registry.listTrust())[0]!, secondKeys = generateKeyPairSync("ec", { namedCurve: "prime256v1" });
+  const secondPem = secondKeys.publicKey.export({ type: "spki", format: "pem" }).toString(), secondId = createHash("sha256").update(createPublicKey(secondPem).export({ type: "spki", format: "der" })).digest("hex");
+  const firstPolicy = { ...original, authorityId: "concurrent-authority" }, { installedAt: _at, installedBy: _by, status: _status, ...policy } = firstPolicy;
+  // Reproduce simultaneous stale preflight reads from independent old clients.
+  // A transaction's own read remains protected by the actual store's lock.
+  let reads = 0, release!: () => void; const bothRead = new Promise<void>(resolve => { release = resolve; });
+  for (const store of [setup.store, otherStore]) {
+    const read = store.readEntries.bind(store);
+    store.readEntries = async <T = JsonValue>(): Promise<readonly JournalEntry<T>[]> => { const entries = await read<T>(); if (++reads === 2) release(); await bothRead; return entries; };
+  }
+  const results = await Promise.allSettled([setup.registry.installTrust(policy, "first operator"), other.installTrust({ ...policy, keyId: secondId, publicKeyPem: secondPem }, "second operator")]);
+  // Restore fixture adapters before observing the accepted protected journal.
+  setup.store.readEntries = ProtectedJsonStore.prototype.readEntries.bind(setup.store); otherStore.readEntries = ProtectedJsonStore.prototype.readEntries.bind(otherStore);
+  assert.equal(results.filter(r => r.status === "fulfilled").length, 1); assert.equal(results.filter(r => r.status === "rejected").length, 1);
+  assert.equal((await setup.registry.listTrust()).filter(r => r.authorityId === policy.authorityId && r.status === "active").length, 1);
+});
