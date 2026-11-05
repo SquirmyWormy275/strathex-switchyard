@@ -71,4 +71,5 @@ verified query exits, two scanner exits, unchanged original index and worktree,
 exact replay/feed retirement and full restoration. Owned repository, signing
 material, packages, staging, bundle and proof checkout were removed; one empty
 task, zero prompts, no keyboard access. The separate Linux staged-scan path has
-source checks; its installed acceptance and Windows staging remain unfinished.
+source checks and installed acceptance at `11d8cc7`; Windows staging remains
+unfinished.

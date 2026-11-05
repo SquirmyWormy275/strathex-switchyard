@@ -75,8 +75,13 @@ Another four groups pass 37 task-input/runner/stager checks
 Linux/Windows scanner/staging groups pass fourteen checks
 (`isolated-test-be2f96fc-727a-40bb-942f-40efb4041e4d.json`). Every child cleanup
 verifies. Type checking, packaged loading and the unchanged deterministic
-development BOM pass. Installed acceptance
-of the new scan path remains pending. After updating to committed source:
+development BOM pass. Installed `11d8cc7` passes six update and thirteen actual
+staged/worktree API checks. Receipts `assignment-legends-1793868587004.json` and
+`installed-shield-baseline-1793868749979.json` retain staged-only findings,
+authenticated original Git provenance, both independently verified scanner exits,
+exact replay/feed retirement and full restoration. Owned source/signing/packages/
+staging/bundle/proof checkout were removed; one empty task, zero prompts and
+no keyboard access. After updating to committed source:
 
 ```sh
 mise exec node@24.14.0 -- node scripts/verify-shield-host.mjs \

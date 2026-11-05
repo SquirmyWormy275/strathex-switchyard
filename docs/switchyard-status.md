@@ -7,7 +7,18 @@ host. [Verification](verification.md) retains accepted and failed checkpoints.
 
 ## Installed application
 
-Latest installed source `4a6627a`, release
+Latest installed source `11d8cc7`, release
+`1f5e9a2c6e90991850030ac7d316b35c90ed14ef12e7012c179e34697e20f522`,
+passes six update/thirteen actual staged and worktree scanner API checks. The
+real pinned scanner finds a secret only in the index, retains original Git
+provenance in authenticated incomplete evidence, and never writes its reserved
+alias into the repository. Both scanner exits, replay/feed retirement and full
+restoration verify. Receipts `assignment-legends-1793868587004.json` and
+`installed-shield-baseline-1793868749979.json` retained; owned source/signing/packages/
+staging/bundle/proof checkout removed. One empty task, zero prompts and no
+keyboard access. Windows staged-input execution remains unfinished.
+
+Earlier installed source `4a6627a`, release
 `1a5c80ec8c7b9e6626c7ea2867edc1b295a5432c7aecb2bea135d094793d32cf`,
 passes six update/fourteen actual index API and separately reviewed worktree-scan
 checks. Staged bytes differ from the worktree; no source is returned, no grant or
@@ -132,7 +143,8 @@ authenticates its index witness. Six focused cases, four isolated groups/26
 scanner and exception checks, four groups/37 task/runner/stager checks and eight
 groups/fourteen ordinary host scanner checks pass; every child cleanup verifies.
 Index drift during preparation removes owned copies and starts no scanner.
-Installed staged-scan acceptance and Windows index staging remain unfinished.
+Installed Linux staged-scan acceptance passes at `11d8cc7`; Windows index staging
+remains unfinished.
 
 
 | Area | Implemented behavior and evidence | Practical limit |
