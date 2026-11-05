@@ -6,6 +6,7 @@ filesystem tests and physical/account acceptance are separate evidence.
 
 | Path | Accepted evidence | Practical limit |
 | --- | --- | --- |
+| Personal host setup API | Fifty transport/controller/suite/package/inventory checks pass locally. Includes authenticated HTTP, exact install/remove review, one-use approval, atomic admission and guarded receipt, replay prevention, uncertain-outcome retention, Work rejection and snapshot privacy. | Native ports are explicit doubles in controller tests. Native service/setup lifecycle evidence is separate; interactive UAC and bounded-volume operations remain unaccepted or unfinished. Frontend unchanged. |
 | Native protected setup lifecycle | At `d7872fb`, the native installer passes six lifecycle checks and all thirteen restricted-client/delayed-reader boundaries on the disposable Windows worker, workflow [41935114492](https://github.com/SquirmyWormy275/strathex-switchyard/actions/runs/41935114492). Digest-verified `windows-native-setup-d787-lifecycle.json` retained: protected staging, clean managed startup, signed metadata, exact service/native exit and known-file removal; every guardian independently exited. | Worker is already elevated. Actual UAC dialogue and approved-account behavior remain separate. A later filesystem exit re-observation failed after 26 checks; that failure is retained separately and does not turn the complete workflow green. |
 | Windows guardian identity regression | Exit observation now sends the original guardian PID and creation time to the fixed native status helper and also requires the original Job Object to be empty. The helper compiles without warnings; local runtime/controller checks pass and scratch was removed. | `windows-filesystem-d787-failed.json` retains the 26-check failure with original VHD attachment/detachment verified. The old PID-only shortcut could confuse a reused PID with the original guardian. A new actual Windows case tests a live unrelated PID against the old birth/Job scope; native rerun remains required. |
 | Native metadata broker lifecycle | The exact service lifecycle and all thirteen restricted-client/delayed-reader/private-cache/malformed-pipe checks pass at `f4ba916`, workflow [41934738389](https://github.com/SquirmyWormy275/strathex-switchyard/actions/runs/41934738389). The signed second metadata response, exact service/native exit and known-file removal now pass. | The workflow's later filesystem groups are still running. This pass used the direct already-elevated managed installer. Full native staging/removal is a separate new CI pass; normal-user UAC, application wiring and privileged volume effects remain unfinished. |
@@ -52,8 +53,9 @@ workstation mount change or account/tenant session is part of these backend
 checks. F77/B122 physical typing, configuration unlock, hotplug and print-fit
 acceptance remain open. The B122 acceptance gates remain **NOT ACCEPTED**.
 Supported interactive Windows Sandbox, approved Microsoft tenant/account and
-microphone checks remain separate. Privileged Windows setup, broader action
-connections and remaining device/attachment controls are unfinished software.
+microphone checks remain separate. Privileged Windows bounded-volume operations, broader action connections and
+remaining device/attachment controls are unfinished software. Host setup
+review/apply is implemented; actual interactive UAC acceptance remains separate.
 
 Follow the [requirement ledger](switchyard-requirements.md) for suite coverage,
 the [continuation record](switchyard-status.md) for current work, and the

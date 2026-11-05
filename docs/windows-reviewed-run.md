@@ -5,7 +5,8 @@ program run. Task authority, one-use approval, checkpoints and budgets precede
 native execution. The live repository is never writable inside the guest, and
 program exit never marks the provider's coding task complete.
 
-Normal personal-host privileged storage setup remains unfinished software.
+The Personal host setup review/apply API and fixed native installer are implemented.
+Privileged bounded-volume operations remain unfinished software.
 Actual interactive VM acceptance requires a supported Windows Sandbox host;
 filesystem CI and runner doubles do not establish that acceptance. The frontend
 remains frozen for review.
@@ -21,7 +22,7 @@ The Windows lane copies only the executable to a new empty directory, removes
 installed-runtime discovery paths, runs real metadata through its owned guardian,
 verifies the exact running image, absence of external CLR/JIT modules and
 independent exit, then removes only that proof's copy/cache. Native standalone
-acceptance is pending the corrected CI rerun; local runtime/package checks pass.
+acceptance passes at `cba5e2b`; local runtime/package checks pass.
 It does not establish privileged service or VM acceptance.
 
 The metadata-only broker bootstrap is now implemented behind explicit native
@@ -41,7 +42,7 @@ instance-creation rights for the ordinary client. Every reply is signed against
 the installed key and a fresh request nonce. The installer does not elevate the
 application, assign privileges to a user or expose any volume/shell verb. Its
 metadata continues to say `brokerImplemented: false` because bounded privileged
-storage effects and the normal-user setup path remain unfinished.
+storage effects remain unfinished.
 
 The client verifies each signed reply, then sends its SHA-256 digest as a bounded
 transport acknowledgement. The server retains the connection until that exact
@@ -60,7 +61,7 @@ runtime environment and extraction behavior require this actual native check;
 managed compilation cannot establish them. No broker service was installed on
 the Linux pilot.
 
-The normal-user elevation boundary is being implemented as a small native x64
+The normal-user elevation boundary is implemented as a small native x64
 installer, `apps/windows-setup/Setup.cpp`. It accepts fixed install/remove verbs,
 an exact user SID/installation UUID and source/original-broker digests. It derives
 the adjacent helper itself, pins image and parent-directory handles, and hashes
@@ -77,11 +78,8 @@ SDK is downloaded onto the Linux pilot. The linker uses
 to restrict startup DLL imports to System32. Its new no-effect native proof reads
 that field from the actual PE image, observes the current native user, and checks
 unknown commands/changed helper bytes are refused before elevation. Compilation
-and all five checks pass on native Windows at `39bc24f`. The managed bootstrap compiles and
-refuses Linux. A separate disposable native-setup lifecycle pass is now added to
-test protected staging, clean managed startup and exact removal on the already
-elevated worker. That pass remains pending. Application setup review/apply wiring, actual UAC interaction and
-privileged volume integration remain unfinished.
+and all five original checks pass on native Windows at `39bc24f`. The managed bootstrap compiles and
+refuses Linux. The separate native-setup lifecycle passes six lifecycle and thirteen restricted-client checks at `d7872fb`, including protected staging, clean managed startup and exact removal. The worker was already elevated; actual UAC interaction remains unaccepted. A sixth no-effect regression now binds exit to the original creation time and Job Object across PID reuse; its native rerun is pending. Privileged volume integration remains unfinished.
 
 The broker metadata wire contract is now implemented separately from the future
 privileged service. It accepts only a closed metadata request and binds a fresh
@@ -248,3 +246,44 @@ pass 30/30 locally; the actual Windows token query remains a native CI check.
 installed Linux demonstrations and all 30 native Windows filesystem checks.
 [The requirement ledger](switchyard-requirements.md) separates unfinished
 software from hardware/account acceptance.
+
+## Personal host setup API
+
+The authenticated local API exposes four fixed POST routes beneath
+`/api/suite/host/windows-storage/`: `inspect`, `list`, `review` and `apply`.
+Inspection accepts only `{"compartment":"personal"}`. On Linux it returns
+`setupSupported:false` without opening a native helper. Review requires Personal
+companion mode and the selected primary Personal compartment:
+
+```json
+{"compartment":"personal","requestId":"<new UUID>","action":"install-bootstrap"}
+```
+
+Removal uses the separate `remove-bootstrap` action and a new review. Apply
+accepts only the same request UUID and its returned one-use confirmation token.
+Neither endpoint accepts a path, executable, SID, installation override or caller
+assertion of approval. Work and imported task permissions cannot authorize setup.
+These are backend routes; the frozen frontend has no new setup control.
+
+Review pins current-user identity, both native image hashes, original signed
+installation state and the workspace/mode. Installation requires independently
+verified absence of the original protected root; unavailable service metadata
+alone is insufficient. Apply revalidates that scope, consumes the five-minute
+approval and atomically admits one attempt before invoking the fixed installer.
+The host limit is one concurrent attempt, six minutes per admission and four
+claims per hour. Native setup itself has a five-minute transport bound.
+
+Every helper invocation records exact Job guardian ownership before readiness
+acknowledgement and independently verifies exit. A passing setup receipt requires
+fresh signed metadata after installation or verified original-root absence after
+removal. Receipt, operation and budget settlement share a guarded encrypted-state
+transaction. General snapshots omit native ownership, reviews and journals;
+public setup views omit the raw SID and token. Uncertain elevation retains the
+original evidence and budget and blocks replacement or automatic replay. Stopping
+the unprivileged guardian cannot establish an unknown elevated worker's exit.
+
+Fifteen focused transport/controller checks and fifty combined suite/package/
+inventory checks pass locally, including the authenticated HTTP route, lost
+receipt-write recovery, admission failure and a scope change immediately before
+receipt commit. Native setup and service proofs are separate evidence; the full
+application review-to-UAC journey and volume effects are not accepted.

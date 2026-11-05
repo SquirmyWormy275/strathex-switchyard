@@ -145,6 +145,8 @@ export const requiredGroups = [
   { file: "tools/layout-studio/repository-execution-staging.test.mjs" },
   { file: "tools/layout-studio/repository-execution-stop.test.mjs" },
   { file: "tools/layout-studio/windows-reviewed-inputs.test.mjs", ...nativeTestOverrides("tools/layout-studio/windows-reviewed-inputs.test.mjs") },
+  { file: "tools/layout-studio/windows-storage-native.test.mjs" },
+  { file: "tools/layout-studio/windows-storage-setup.test.mjs" },
   { file: "tools/layout-studio/windows-sandbox-native.test.mjs", ...nativeTestOverrides("tools/layout-studio/windows-sandbox-native.test.mjs") },
   { file: "tools/layout-studio/windows-sandbox-sessions.test.mjs", ...nativeTestOverrides("tools/layout-studio/windows-sandbox-sessions.test.mjs") },
   { file: "tools/layout-studio/windows-guest-tools.test.mjs", ...nativeTestOverrides("tools/layout-studio/windows-guest-tools.test.mjs") },

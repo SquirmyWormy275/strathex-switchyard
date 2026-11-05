@@ -29,6 +29,11 @@ internal static class WindowsStorageBrokerFiles
         return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(sid))).ToLowerInvariant();
     }
     internal static string CurrentOwnerSid()=>WindowsIdentity.GetCurrent().User?.Value??throw Invalid();
+    internal static bool RootAbsent(string sid)
+    {
+        string path=Root(sid);NoRedirectedParents(path);using var handle=CreateFileW(path,ReadControl|0x80,3,IntPtr.Zero,OpenExisting,BackupSemantics|OpenReparsePoint,IntPtr.Zero);
+        int error=Marshal.GetLastWin32Error();return handle.IsInvalid&&error is 2 or 3;
+    }
     internal static string Root(string sid)
     {
         if(!Environment.Is64BitProcess)throw Invalid();

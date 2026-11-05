@@ -13,19 +13,27 @@ declared skips. Receipt `26d8a535-ec4e-45ea-b47c-2db8d3bdb7e7` retained; every
 child cleanup verified and the disposable worktree removed. Installed normal
 `25f9fe6` passes six update and eight pipeline checks with zero prompts, three
 independent guardian exits, restored state and removed staging/checkout.
-Windows standalone helper and all 32 broker crypto/protected-file checks pass
-at `cba5e2b`. The exact System service remains running when the second request
-receives an empty response; bounded first-failure phase diagnostics are being
-used to isolate that failed lifecycle. No service or volume acceptance is inferred.
+Windows standalone acceptance and all 32 crypto/protected-file checks pass. The
+metadata service passes six lifecycle and thirteen restricted-client/pipe/cache
+checks at `f4ba916`. The native protected installer repeats those checks at
+`d7872fb`; digest-verified receipts are retained. These were disposable Windows
+workers, with no interactive UAC acceptance or volume authorization inferred.
 
-The metadata-only Windows broker bootstrap now has exact SCM installation and
-removal, a System service, first-instance local pipe with kernel caller SID
-verification, signed challenge replies and a protected CLR extraction inventory.
-Both helper/proof compile with zero warnings/errors; all sixteen crypto checks,
-four package checks and the new Linux refusal guards pass. Scratch was removed.
-Actual service lifecycle and twelve restricted-client/cache/pipe checks await the
-new disposable Windows lane. Normal-user setup, bounded volume effects and
-application wiring remain unfinished; readiness still says brokerImplemented=false.
+Personal host setup now has authenticated inspect/list/review/apply routes,
+fixed hash-pinned native transport, one-use review, atomic pre-effect budget,
+guarded receipts, exact guardian exit and conservative uncertain-outcome
+recovery. Fifty focused transport/controller/suite/package/inventory checks pass.
+Work/task permissions cannot authorize setup; ordinary snapshots omit private
+records. The frontend remains frozen. Privileged bounded-volume operations,
+interactive UAC and the application-to-native setup journey remain separate
+unfinished implementation or acceptance checks as described in the
+[Windows contract](windows-reviewed-run.md#personal-host-setup-api).
+
+A later `d7872fb` filesystem pass failed while re-observing a stopped guardian,
+after verified image detach. The Windows exit observer previously treated any
+live process with that PID as the original guardian. Commit `21038f6` compares
+original creation time and Job emptiness; its new native regression and thirty
+filesystem checks are rerunning. The failed receipt remains failed and retained.
 
 Linux hosted run `41924141682` exposed a stop-readiness race: a durable running
 owner could become visible before its exact in-memory stop controller. The
@@ -43,8 +51,9 @@ still pass and scratch was removed. Sixteen actual Windows file/low-privilege
 checks now pass at `366d409`, workflow `41924140253`, alongside all sixteen
 crypto/parser and thirty existing filesystem checks. The broker archive digest
 was verified and `windows-broker-protected-files-366.json` retained. They use a restricted version of the existing worker token,
-create no account or service, and remove their new nonce directory. Privileged
-service/pipe/setup/volume integration remains unfinished.
+create no account or service, and remove their new nonce directory. At that historical checkpoint, privileged service/pipe/setup integration was
+unfinished; its later acceptance is recorded above. Volume integration remains
+unfinished.
 
 Complete Linux `5fd0186` passes 163/163 groups: 1,060 tests, 1,050 passed and ten
 declared skips. Receipt `b145a682-ed06-4a35-9f23-0218999afab9` retained, every child

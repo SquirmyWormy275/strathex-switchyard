@@ -138,7 +138,7 @@ export function createSuiteStore({ root = join(process.env.XDG_STATE_HOME || (pr
   }
   return {
     async withResourceLock(kind, identity, fn) {
-      if (!["voice-cpu", "repository-effects", "repository-execution", "client-launch"].includes(kind) || typeof identity !== "string" || identity.length > 1024) throw new Error("Unsupported private resource lease.");
+      if (!["voice-cpu", "repository-effects", "repository-execution", "client-launch", "windows-storage"].includes(kind) || typeof identity !== "string" || identity.length > 1024) throw new Error("Unsupported private resource lease.");
       return withStateLock(root, `${kind}-${createHash("sha256").update(identity).digest("hex").slice(0, 40)}`, fn);
     },
     async tryWithResourceLock(kind, identity, fn) {
