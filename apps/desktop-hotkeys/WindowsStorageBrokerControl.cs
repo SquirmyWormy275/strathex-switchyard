@@ -33,7 +33,8 @@ internal static class WindowsStorageBrokerControl
     private static void Administrator(){using var identity=WindowsIdentity.GetCurrent();if(!new WindowsPrincipal(identity).IsInRole(WindowsBuiltInRole.Administrator))throw Invalid();}
     private static Status ReadStatus(ServiceHandle service)
     {
-        if(!QueryServiceStatusEx(service,0,out var status,checked((uint)Marshal.SizeOf<Status>()),out uint required)||required!=Marshal.SizeOf<Status>()||status.Type!=16)throw Invalid();return status;
+        if(!QueryServiceStatusEx(service,0,out var status,checked((uint)Marshal.SizeOf<Status>()),out uint required))throw new Win32Exception(Marshal.GetLastWin32Error());
+        if(required!=Marshal.SizeOf<Status>()||status.Type!=16)throw Invalid();return status;
     }
     private static void VerifyEnvironment(WindowsStorageBrokerInstallation.Settings settings,bool allowDeleted=false)
     {
@@ -45,11 +46,14 @@ internal static class WindowsStorageBrokerControl
     private static void VerifyConfiguration(ServiceHandle service,WindowsStorageBrokerInstallation.Settings settings,bool allowDeletedEnvironment=false,Action<string>? phase=null)
     {
         phase?.Invoke("service-absence-query-configuration");
-        if(QueryServiceConfigW(service,IntPtr.Zero,0,out uint required)||Marshal.GetLastWin32Error()!=122||required<Marshal.SizeOf<Configuration>()||required>16384)throw Invalid();
+        bool initial=QueryServiceConfigW(service,IntPtr.Zero,0,out uint required);int error=Marshal.GetLastWin32Error();
+        if(initial)throw Invalid();if(error!=122)throw new Win32Exception(error);
+        if(required<Marshal.SizeOf<Configuration>()||required>16384)throw Invalid();
         IntPtr memory=Marshal.AllocHGlobal(checked((int)required));
         try
         {
-            if(!QueryServiceConfigW(service,memory,required,out uint returned)||returned>required)throw Invalid();var config=Marshal.PtrToStructure<Configuration>(memory);
+            if(!QueryServiceConfigW(service,memory,required,out uint returned))throw new Win32Exception(Marshal.GetLastWin32Error());
+            if(returned>required)throw Invalid();var config=Marshal.PtrToStructure<Configuration>(memory);
             string Text(IntPtr pointer)
             {
                 long offset=pointer.ToInt64()-memory.ToInt64();if(offset<0||offset>=required||(offset&1)!=0)throw Invalid();int maximum=checked((int)Math.Min((required-offset)/2,2049));
@@ -138,16 +142,24 @@ internal static class WindowsStorageBrokerControl
                 int error=Marshal.GetLastWin32Error();absent=observed.IsInvalid&&error==1060;
                 if(!observed.IsInvalid)
                 {
-                    phase?.Invoke("service-absence-configuration");
-                    // The original delete was accepted; its registry key may
-                    // disappear before the last SCM observation handle closes.
-                    // Missing environment here is pending, never absence. Any
-                    // present environment/configuration must still match.
-                    VerifyConfiguration(observed,settings,true,phase);
-                    phase?.Invoke("service-absence-status");var remaining=ReadStatus(observed);
-                    // The independently captured original process has exited.
-                    // STOPPED's dwProcessId is never a valid exit observation.
-                    if(remaining.State!=1)throw Invalid();
+                    try
+                    {
+                        phase?.Invoke("service-absence-configuration");
+                        // The original delete was accepted. SCM and registry
+                        // queries can observe a deleted/marked entry through a
+                        // still-valid handle; this is pending, never absence.
+                        VerifyConfiguration(observed,settings,true,phase);
+                        phase?.Invoke("service-absence-status");var remaining=ReadStatus(observed);
+                        // The original process handle already verified exit.
+                        if(remaining.State!=1)throw Invalid();
+                    }
+                    catch(Win32Exception pendingError)when(pendingError.NativeErrorCode is 2 or 3 or 1018 or 1060 or 1072)
+                    {
+                        // Close this original observation handle before retry.
+                        // Unexpected access/handle errors and any observable
+                        // configuration mismatch still preserve the installation.
+                        phase?.Invoke("service-absence-delete-pending");
+                    }
                 }
                 else if(!absent&&error!=1072)throw new Win32Exception(error);
             }

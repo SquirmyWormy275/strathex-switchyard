@@ -71,6 +71,12 @@ is an implementation contingency for token limits; no coding job was delegated.
 
 ## Latest verification and correction
 
+The corrected complete Linux lane at immutable `238592b` now passes all 172
+groups: 1,131 tests, 1,121 passed and ten declared skips. Receipt
+`9cc25902-466d-4ff1-a5a7-7a6bdcfb8c5d` retained; every child cleanup verified
+and owned fixtures/checkout removed. It predates the separate namespace quota
+closure, covered by the focused checks above. Current inventory is 173 groups.
+
 Native Windows `5d398d2`, workflow
 [41960677205](https://github.com/SquirmyWormy275/strathex-switchyard/actions/runs/41960677205),
 passes all sixteen jobs. Six pipeline policy/evidence/recovery cases have
@@ -90,6 +96,14 @@ phases preserve any further failure. Both actual C# targets compile without
 warnings and 112 portable checks pass; fresh native acceptance is pending.
 Stopped PIDs are not used as exit proof; the captured original process handle is.
 
+The later `238592b` native failure identifies the configuration query itself.
+Native query failures now retain their Win32 code. Only recognized missing,
+key-deleted or delete-pending errors after the original accepted deletion cause
+another bounded observation; any present mismatch, access denial or unknown
+handle error still preserves the installation. A pending query never establishes
+absence: only a new OpenService error 1060 does. Both actual C# targets compile
+with zero warnings and 112 portable checks pass; fresh native acceptance is pending.
+
 Last accepted complete Linux is `403e0c9`: 168/168 groups, 1,121 tests,
 1,111 passed and ten declared skips. Receipt
 `13be1a30-2e93-4b87-8a94-9a1953285b9f` retained with all child cleanup verified.
@@ -99,7 +113,7 @@ authority capability assertion expecting only Run. Receipt
 the exact Run-only grant from all three connected capabilities, while retaining
 unsupported-action and Work denials; all nine authority cases pass. Every child
 cleanup verified and failed checkout/fixtures are removed. The corrected complete
-172-group rerun is next; no assertion, platform skip or deadline was waived.
+172-group rerun above passes; no assertion, platform skip or deadline was waived.
 
 ## F77 and remaining work
 

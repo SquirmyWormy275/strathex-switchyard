@@ -175,3 +175,13 @@ establishes absence or permits file cleanup: SCM error 1060 is still required.
 Query-configuration/environment phases distinguish any remaining failure. Both
 actual targets compile without warnings and 112 portable checks pass; this
 correction still needs its fresh native lifecycle result.
+
+The next native failure at `238592b` is in the configuration query, before the
+environment check. Queries now retain their native Win32 error. After the
+original accepted delete only, missing-path, key-deleted and service-deleting
+errors remain pending until the next independently opened observation. This
+follows the [configuration API's documented registry-error behavior](https://learn.microsoft.com/en-us/windows/win32/api/winsvc/nf-winsvc-queryserviceconfigw).
+It does not accept a missing query as absence or accept mismatched metadata.
+Access denial, invalid handles and other unexpected errors preserve the original
+installation. The sole absence condition remains OpenService error 1060, after
+closing each observation handle and within the original bound.
