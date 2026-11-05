@@ -5,12 +5,19 @@ The F77 is the connected pilot, not a scope limit. The [requirement ledger](swit
 separates unfinished software from checks requiring an exact device, account or
 host. [Verification](verification.md) retains accepted and failed checkpoints.
 
-The latest accepted complete Linux checkpoint is immutable `d43721f`: 218/218
-groups, 1,324 tests, 1,314 passed and ten declared skips, with every child cleanup
-and owned fixture/alias/worktree removal verified. Later Python source `8108738`
-passes 52 focused checks and both normal installed Supply Chain/Release
-journeys (six update plus 16 and 16 scan checks); its separate complete Linux run
-is still in progress. [Python evidence](evidence/installed-pypi-summary.json).
+The latest accepted complete Linux checkpoint is immutable `8108738`: 221/221
+groups, 1,335 tests, 1,325 passed and ten declared skips, with every child cleanup
+and owned fixture/alias/worktree removal verified. Later CVSS source `7e252a1`
+passes 57 focused checks and both normal installed Supply Chain/Release journeys
+(six update plus 16 and 16 scan checks). All 5,184 base vectors match FIRST's
+independent reference; unsupported metrics stay unknown. Owned proof/tooling
+scratch is removed. [Severity evidence](evidence/installed-cvss-summary.json).
+
+State queues now span independent stores for the same root/compartment while
+retaining a kernel lease and original deadlines for every transaction; 41 checks
+pass. The restricted Windows test sets its intended SIDs before filtering and
+preserves every later token/Job check; its native confirmation remains pending.
+A separate complete 222-group run at `1701456` is in progress.
 
 Windows client source `04d9d6c` passes seven complete groups and 70 assertions
 under unchanged deadlines. Actual native NTFS/broker acceptance remains tied to

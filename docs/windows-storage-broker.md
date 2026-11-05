@@ -316,3 +316,12 @@ phase; no restriction or deadline is removed. This addresses an API-ordering
 problem; the original native failure cause is not established until retesting.
 Both managed targets build with zero warnings/errors and all 223 portable checks
 pass, with scratch removed (`windows-history-native-build-1793886535629.json`).
+
+Source `c8b1216` has [digest-verified native success](evidence/windows-c8b-native-summary.json)
+for the independent filesystem and setup lanes: thirty filesystem checks/39
+native calls, owned disk attach/detach and guardian cleanup, plus exact native
+setup install/retire, thirteen restricted metadata checks and all six lifecycle
+checks. The strict native C++ build succeeds. Earlier setup failures remain
+failed and their cause remains unestablished. The same overall workflow still
+fails the separate restricted-token and software contracts; it is not accepted
+as a whole. No ordinary-account/UAC or guest acceptance is inferred.

@@ -1,0 +1,41 @@
+{
+  "schema": "switchyard-installed-cvss-summary/v1",
+  "sourceCommit": "7e252a10dfee15807367e8fe8ee46246dc95c162",
+  "applicationRelease": "1b98c54e3be3380d8297ff192368c3b0dc5fc538f0a2d11dd3b134c8b3daa10f",
+  "success": true,
+  "updateChecks": 6,
+  "updateReceipt": "assignment-legends-1793886142727.json",
+  "proofs": [
+    {
+      "action": "release_shield",
+      "receipt": "installed-shield-baseline-1793886456364.json",
+      "checks": 16,
+      "scannerExitsVerified": 2,
+      "calculatedRecords": 8,
+      "outcomes": [
+        "failed",
+        "incomplete"
+      ]
+    },
+    {
+      "action": "shield_supply_chain",
+      "receipt": "installed-shield-baseline-1793886294086.json",
+      "checks": 16,
+      "scannerExitsVerified": 2,
+      "calculatedRecords": 8,
+      "outcomes": [
+        "failed",
+        "incomplete"
+      ]
+    }
+  ],
+  "originalSourceFreshnessPreserved": true,
+  "unknownSeverityRetained": true,
+  "validationRestored": true,
+  "frozenFrontendSha256": "24100ef601b810efb0cda95e4fe0842d2944560734b02c4cf482c25e19150543",
+  "ownedSourceSigningPackagesStagingBundleCheckoutRemoved": true,
+  "modelPromptsSubmitted": 0,
+  "keyboardOpened": false,
+  "microphoneOpened": false,
+  "completeShieldAccepted": false
+}

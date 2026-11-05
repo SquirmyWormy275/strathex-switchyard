@@ -74,3 +74,10 @@ Eight isolated calculator/collector/scanner/host/runner groups pass all 57
 checks, with every child cleanup verified; type checking passes. The [reference
 summary](evidence/cvss-v3-reference-summary.json) binds exhaustive result digests
 and the focused receipt. Normal installed severity acceptance remains separate.
+
+Normal installed source `7e252a1`, release `1b98c54…`, now passes six update
+and both 16-check Supply Chain/Release demonstrations. Each preserves eight
+calculated records and two unknown records, authenticated failed/incomplete
+outcomes, original freshness, feed retirement and four verified scanner exits.
+Original state/frozen Home restore and all owned source/signing/packages/staging/
+bundle/checkout are removed; zero prompts and no HID. [Installed evidence](evidence/installed-cvss-summary.json).
