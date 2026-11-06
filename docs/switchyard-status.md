@@ -7,10 +7,10 @@ a partial implementation.** The F77 is the pilot device; it does not limit scope
 The Linux backend has a passing complete test checkpoint, and a versioned
 application has separately verified installed metadata checks. Later archive
 identity work has focused source acceptance.
-The complete Linux `cadbccd` run passes all 310 groups, 1,861 tests and sixteen
-declared skips, including agent revocation, uncertain-outcome recovery and compact
-packaging. The later stopped-agent correction has separate 94-check focused and
-33-check installed metadata/synthetic evidence.
+The complete Linux `68bcc76` run passes all 310 groups, 1,875 tests and sixteen
+declared skips, including stopped-agent recovery, foreground-helper ownership,
+compact provenance and measured Windows scheduling. The later shortcut-helper
+correction has separate 89-check focused and 33-check installed evidence.
 The restricted Windows storage owner now passes all eight original checks with
 verified retirement. Complete Windows source `9f35961` passes 414 test/build groups,
 2,398 tests and 202 declared skips. Later credential and custom-agent changes have
@@ -28,7 +28,7 @@ there is no merge or public release acceptance.
 
 | Boundary | Verified result | Still open |
 | --- | --- | --- |
-| Complete Linux source | `cadbccd`: **310 groups, 1,861 passing tests, sixteen declared skips, zero failures.** Exact child/tree exit and owned checkout, nine aliases, 782 generated files, temporary parent and marker cleanup verify; all three other worktrees remain. [Receipt](evidence/linux-cadbccd-complete-summary.json). | Provider/guest doubles remain explicit. The later stopped-agent correction has separate 94-check focused and 33-check installed metadata/synthetic acceptance. |
+| Complete Linux source | `68bcc76`: **310 groups, 1,875 passing tests, sixteen declared skips, zero failures.** Exact child/tree exit and owned checkout, nine aliases, 782 generated files, temporary parent and marker cleanup verify; all three other worktrees remain. [Receipt](evidence/linux-68bcc76-complete-summary.json). | Provider/guest doubles remain explicit. The later shortcut-helper correction has separate 89-check focused and 33-check installed metadata/synthetic acceptance. |
 | Complete Windows release | `9f35961`: **414 groups, 2,398 passing tests, 202 declared skips, zero failures.** Archive/receipt digests, source/merge tree equality, original bounds and all child/tree cleanup verify. [Receipt](evidence/windows-complete-9f35961-summary.json). | Later credential ownership, revocation and outcome changes are outside this checkpoint. Provider/guest doubles and interactive acceptance remain separate. |
 | Windows backend batches | `9f35961`: **198 groups, 1,022 passing tests, 142 declared skips, zero failures.** Four digests, source/merge tree equality and all child/tree cleanup verify. [Receipts](evidence/windows-backend-9f35961-native-summary.json). | The combined release now passes separately above. Older `dbbcce8` backend and complete-release failures remain recorded; later passing batches do not relabel them. [Historical backend](evidence/windows-backend-dbbc-native-summary.json), [complete failure](evidence/windows-complete-dbbc-failed-summary.json). |
 | Restricted Windows owner | `6e967a3`: **8/8 original owner checks pass**, with 68 exact QUERY-mask-8 registrations, native tree exit, token recheck, private-desktop closure and fixture/service/file retirement. All six GUI setup checks pass. [Owner receipt](evidence/windows-restricted-owner-accepted-summary.json), [setup](evidence/setup-final-native-summary.json). | This controlled native CI proof does not accept an ordinary user account, interactive UAC or actual guest journey. |

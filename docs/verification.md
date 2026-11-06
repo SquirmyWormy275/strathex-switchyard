@@ -1,5 +1,14 @@
 # What has actually been verified
 
+Complete Linux `68bcc76` passes **310/310 groups, 1,875 tests, sixteen declared
+skips and zero failures**. It includes stopped-agent recovery, foreground-helper
+ownership, compact provenance and measured Windows scheduling; later shortcut
+changes retain separate focused/installed evidence. Every child/tree exits and
+the exact owned checkout, nine dependency aliases, 782 generated files
+(11,766,823 bytes), temporary parent and marker are removed. All three unrelated
+worktrees remain preserved.
+[Complete receipt](evidence/linux-68bcc76-complete-summary.json).
+
 Normal installed `f06674d` passes **33 metadata/synthetic checks**: thirteen
 owner checks, seven Copilot-journal checks and thirteen pure agent/helper/catalog
 checks. Nine installed module hashes match their source-tested evidence. The

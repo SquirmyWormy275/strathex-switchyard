@@ -91,13 +91,15 @@ checks, native Windows results, focused source checks and installed acceptance.
 The [verification record](verification.md) retains historical receipts and failed
 attempts; do not infer current status from an older passing checkpoint.
 
-The latest complete Linux run is `cadbccd`: 310 groups, 1,861 passing tests,
-sixteen declared skips and zero failures. All child/tree cleanup verifies, and
-its exact checkout, nine aliases, 782 generated files, temporary parent and marker
-are removed. All three other worktrees remain. Revocation, uncertain-outcome
-recovery and compact packaging are included. The later stopped-agent correction
-has separate focused and installed checks.
-[Receipt](evidence/linux-cadbccd-complete-summary.json).
+The latest complete Linux source is `68bcc76d031e06a8a655f39311f8f0eafdbe7645`.
+All 310 groups pass: 1,875 tests, sixteen declared skips, zero failures. This
+includes stopped-agent recovery, foreground-helper ownership, lossless provenance
+compaction and measured Windows scheduling. Every child/tree exits; the exact
+owned checkout, nine dependency aliases, 782 generated files, temporary parent
+and marker are removed. All three other worktrees remain unchanged. Later
+shortcut-helper source `f06674d` has its separate 89-check focused and 33-check
+installed acceptance.
+[Receipt](evidence/linux-68bcc76-complete-summary.json).
 
 The installed baseline is `f06674dce1cce5455486b621528bc003d2aad958`,
 release `db4c036d778247073a7be6f861ecdac49117ee1387349bfcd591a741a3108414`.

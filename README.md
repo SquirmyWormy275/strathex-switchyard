@@ -68,7 +68,7 @@ execution, offline repository scans and recoverable installation. The Home and
 Model F catalog provide the starting experience; complete task/IDE attachment,
 role/device controls and full scanner coverage remain unfinished.
 
-The accepted complete Linux checkpoint `cadbccd` passes **310 groups / 1,861
+The accepted complete Linux checkpoint `68bcc76` passes **310 groups / 1,875
 tests**, with sixteen declared skips and verified owned cleanup. The restricted
 Windows storage journey now passes all eight original checks, including exact
 exit and fixture/service retirement. Complete Windows source `9f35961` passes
