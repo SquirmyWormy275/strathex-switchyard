@@ -72,7 +72,16 @@ Native `f7fda6b` now reports the narrower failure: setup stops at
 creates its first pipe, then stops at descriptor readback before any descriptor
 fields are observed. The complete 36-check proof remains failed. No restricted
 owner journey runs. [Retained observations](evidence/private-pipe-readback-failed-summary.json).
-The next bounded observation includes handle-presence booleans and the returned
-buffer length before descriptor parsing, while retaining every descriptor guard.
-Its two managed builds and 2,101 portable checks pass. No descriptor cause is yet
-established. [Source receipt](evidence/pipe-buffer-and-task-source-summary.json).
+Native `9fde0a3` confirms that `GetKernelObjectSecurity` reports success but a
+zero-byte required length, which the unchanged bounds reject. Fifteen parser
+checks complete; the 36-check proof remains failed.
+[Bounded native observation](evidence/private-pipe-buffer-native-summary.json).
+
+The correction reads OWNER and DACL through [GetSecurityInfo](https://learn.microsoft.com/en-us/windows/win32/api/aclapi/nf-aclapi-getsecurityinfo)
+on the exact pipe handle. It validates the returned structure, self-relative
+revision and 20–4096-byte size before copying; all original descriptor checks
+remain. The OS allocation is released with LocalFree in finally. No permissions
+change. Two managed builds pass with zero warnings/errors and 2,101 portable
+checks; owned output is removed. The native 36-check proof and original owner
+journey still require acceptance.
+[Correction receipt](evidence/private-pipe-security-info-source-summary.json).

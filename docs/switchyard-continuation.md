@@ -59,7 +59,9 @@ source-only changes have not updated or restarted this installed application.
    the token default DACL, but `25f07e9` failed ordinary setup preflight before
    those checks ran. Independent `f7fda6b` readback then reported 15 parser checks
    and successful pipe creation, failing before descriptor fields were observed.
-   Inspect the bounded handle/buffer observation next; keep all descriptor guards.
+   Native `9fde0a3` confirms zero returned length after successful readback.
+   Source now uses exact-handle GetSecurityInfo, checks structure/revision/length
+   and retains every owner/DACL/ACE guard. Verify all 36 native checks next.
    [Contract](windows-private-command-pipes.md).
    Preserve all eight original owner checks, the ninety-second deadline and
    exact TOKEN_QUERY mask 8. No broader token/process/default-DACL/SID/privilege/
@@ -69,8 +71,11 @@ source-only changes have not updated or restarted this installed application.
    All 26 task-owner cases now have independent children with the original
    45-second bound; the original test assertions and two Linux-only skips remain.
    A dedicated task-owner Windows job now avoids waiting for the long release
-   lane. The earlier native four-job run finished within its job limits but one
-   file timed out. The previously reported lease case now passes.
+   lane. Native `9fde0a3` now completes all 26 cases: 24 passes and the original
+   two Linux-only skips, with exact cleanup and no extended deadlines. The earlier
+   four-job run remains failed evidence; complete release acceptance is separate.
+   [Task-owner receipt](evidence/task-owner-native-summary.json).
+   The previously reported lease case also passes.
    [Native batches](evidence/windows-backend-dbbc-native-summary.json),
    [case scheduling](evidence/task-owner-scenarios-source-summary.json).
 4. Continue other independently executable ledger requirements, including Shield

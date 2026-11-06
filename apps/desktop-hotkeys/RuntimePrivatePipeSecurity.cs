@@ -55,19 +55,33 @@ internal sealed class RuntimePrivatePipeSecurity : IDisposable
     {
         observe?.Invoke(new { stage = "handle-preflight", windows = OperatingSystem.IsWindows(), descriptorAllocated = Descriptor != IntPtr.Zero, pipePresent = pipe != IntPtr.Zero && pipe != new IntPtr(-1) });
         if (!OperatingSystem.IsWindows() || Descriptor == IntPtr.Zero || pipe == IntPtr.Zero || pipe == new IntPtr(-1)) throw Invalid();
-        byte[] bytes = new byte[4096];
+        IntPtr returned = IntPtr.Zero;
+        int copiedBytes = 0;
         try
         {
-            // OWNER_SECURITY_INFORMATION | DACL_SECURITY_INFORMATION. The
-            // returned pipe handles already include READ_CONTROL.
-            if (!GetKernelObjectSecurity(pipe, 5, bytes, checked((uint)bytes.Length), out uint length)) throw new Win32Exception(Marshal.GetLastWin32Error());
-            observe?.Invoke(new { stage = "descriptor-buffer", reportedBytes = length, capacity = bytes.Length });
+            // Pipes are file objects. Read only OWNER | DACL from this exact
+            // handle; GetSecurityInfo owns the returned allocation until LocalFree.
+            uint error = GetSecurityInfo(pipe, 1, 5, IntPtr.Zero, IntPtr.Zero, IntPtr.Zero, IntPtr.Zero, out returned);
+            if (error != 0) throw new Win32Exception(unchecked((int)error));
+            if (returned == IntPtr.Zero || !IsValidSecurityDescriptor(returned)
+                || !GetSecurityDescriptorControl(returned, out ushort control, out uint revision)
+                || revision != 1 || (control & 0x8000) == 0) throw Invalid();
+            uint length = GetSecurityDescriptorLength(returned);
+            observe?.Invoke(new { stage = "descriptor-buffer", reportedBytes = length, capacity = 4096 });
             if (length is < 20 or > 4096) throw Invalid();
-            byte[] exact = bytes.AsSpan(0, checked((int)length)).ToArray();
-            try { VerifyDescriptor(exact, user, observe); }
+            copiedBytes = checked((int)length);
+            byte[] exact = new byte[copiedBytes];
+            try { Marshal.Copy(returned, exact, 0, exact.Length); VerifyDescriptor(exact, user, observe); }
             finally { CryptographicOperations.ZeroMemory(exact); }
         }
-        finally { CryptographicOperations.ZeroMemory(bytes); }
+        finally
+        {
+            if (returned != IntPtr.Zero)
+            {
+                if (copiedBytes > 0) Clear(returned, copiedBytes);
+                LocalFree(returned);
+            }
+        }
     }
 
     internal static void VerifyDescriptor(byte[] bytes, string user, Action<object>? observe = null)
@@ -134,5 +148,9 @@ internal sealed class RuntimePrivatePipeSecurity : IDisposable
     [DllImport("advapi32.dll", SetLastError = true)] [return: MarshalAs(UnmanagedType.Bool)] private static extern bool GetTokenInformation(SafeAccessTokenHandle token, int informationClass, IntPtr information, uint bytes, out uint required);
     [DllImport("advapi32.dll")] [return: MarshalAs(UnmanagedType.Bool)] private static extern bool IsValidSid(IntPtr sid);
     [DllImport("advapi32.dll")] private static extern uint GetLengthSid(IntPtr sid);
-    [DllImport("advapi32.dll", SetLastError = true)] [return: MarshalAs(UnmanagedType.Bool)] private static extern bool GetKernelObjectSecurity(IntPtr handle, uint information, [Out] byte[] descriptor, uint bytes, out uint required);
+    [DllImport("advapi32.dll")] private static extern uint GetSecurityInfo(IntPtr handle, int objectType, uint information, IntPtr owner, IntPtr group, IntPtr dacl, IntPtr sacl, out IntPtr descriptor);
+    [DllImport("advapi32.dll")] [return: MarshalAs(UnmanagedType.Bool)] private static extern bool IsValidSecurityDescriptor(IntPtr descriptor);
+    [DllImport("advapi32.dll")] [return: MarshalAs(UnmanagedType.Bool)] private static extern bool GetSecurityDescriptorControl(IntPtr descriptor, out ushort control, out uint revision);
+    [DllImport("advapi32.dll")] private static extern uint GetSecurityDescriptorLength(IntPtr descriptor);
+    [DllImport("kernel32.dll")] private static extern IntPtr LocalFree(IntPtr memory);
 }

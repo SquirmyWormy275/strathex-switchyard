@@ -1,0 +1,41 @@
+{
+  "schema": "switchyard-private-pipe-security-info-source/v1",
+  "basis": "9fde0a3d4534193a5248ba9d89a2d6b0afbcfa72",
+  "sourceSha256": {
+    "apps/desktop-hotkeys/RuntimePrivatePipeSecurity.cs": "19b8bb02b7c41b7879223648e3f6edf54652e2b9e13ec5ed8618436390b771e4"
+  },
+  "managed": {
+    "receipt": "private-pipe-security-info-managed-1793987325816.json",
+    "builds": [
+      {
+        "name": "helper",
+        "warnings": 0,
+        "errors": 0,
+        "managedAssemblySha256": "31c544cbdc50d6660875a2b243327e1e12c9b96045e590d032845e8d20d92f1f",
+        "managedPeSubsystem": 2
+      },
+      {
+        "name": "proof",
+        "warnings": 0,
+        "errors": 0,
+        "managedAssemblySha256": "d86330206796cdc46bf822f5e0a88132328dacf16f9ba1a1665b2be098963069",
+        "managedPeSubsystem": 3
+      }
+    ],
+    "portableChecks": 2101,
+    "cleanup": {
+      "files": 149,
+      "bytes": 3384695,
+      "removed": true
+    }
+  },
+  "behavior": [
+    "GetSecurityInfo reads only OWNER and DACL from exact file handles.",
+    "Returned structure must be valid revision 1 and self-relative, with length 20..4096 before copying.",
+    "Original exact owner/protected-DACL/single-ACE rights checks remain; OS allocation is freed in finally."
+  ],
+  "permissionsChanged": false,
+  "nativeAcceptance": false,
+  "originalOwnerAcceptedChecks": 0,
+  "installedChanged": false
+}

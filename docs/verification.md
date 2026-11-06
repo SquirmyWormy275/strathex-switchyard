@@ -751,3 +751,26 @@ from [the isolated runner](../scripts/run-isolated-tests.mjs). The complete
 `requiredGroups` inventory includes Windows-specific cases and is not the Linux
 acceptance lane. The explicit inventory refuses missing, stale or silently
 skipped tests.
+
+
+## Native pipe length and task-owner completion (2026-11-06)
+
+Source `9fde0a3`, execution `304fb915`, identical tree `20f85744`: the independent
+pipe proof retains 15 completed parser checks and a successful read call returning
+zero descriptor bytes; setup independently fails at pipe-security-verify. Both
+remain failed, and the restricted owner remains 0/8.
+[Native pipe receipt](evidence/private-pipe-buffer-native-summary.json).
+
+The same source independently completes all 26 original task-owner cases on
+Windows: 24 passes and two declared Linux-only skips, every child within its
+original 45-second bound, all child/tree cleanup verified. Provider effects are
+controlled doubles. This closes that file timeout but does not accept the complete
+Windows release. [Native task receipt](evidence/task-owner-native-summary.json).
+
+The readback correction uses GetSecurityInfo on the exact file handle, validates
+structure/self-relative revision/bounded length, then applies the unchanged exact
+owner, protected DACL and single-ACE checks. It releases the OS allocation in
+finally. Two managed builds pass with zero warnings/errors, 2,101 portable checks
+and exact cleanup of 149 files / 3,384,695 bytes. All 36 native pipe checks and the
+eight original owner assertions remain required. Installed state is unchanged.
+[Source receipt](evidence/private-pipe-security-info-source-summary.json).
