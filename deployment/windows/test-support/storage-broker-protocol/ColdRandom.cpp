@@ -52,19 +52,41 @@ static void default_observation(DWORD flags, std::uint32_t* report) {
     report[3] = clear_and_verify(name, sizeof(name));
 }
 
+static void token_observation(DWORD access, std::uint32_t* report) {
+    HANDLE token = nullptr;
+    SetLastError(ERROR_SUCCESS);
+    BOOL opened = OpenProcessToken(GetCurrentProcess(), access, &token);
+    report[0] = opened ? 1u : 0u;
+    report[1] = opened ? 0u : GetLastError();
+    if (opened && token != nullptr) {
+        SetLastError(ERROR_SUCCESS);
+        BOOL closed = CloseHandle(token);
+        report[2] = closed ? 0u : GetLastError();
+        report[3] = closed ? 1u : 0u;
+    } else {
+        report[3] = !opened && token == nullptr ? 1u : 0u;
+        if (token != nullptr) (void)CloseHandle(token);
+    }
+}
+
 int wmain(int argc, wchar_t** argv) {
     if (argc != 2) return 64;
     unsigned char bytes[32] = {};
     BCRYPT_ALG_HANDLE provider = nullptr;
-    // V3: default legacy acquisition is first in a fresh native process.
+    // V4: default legacy acquisition is first in a fresh native process.
     // Read-only default-name lookup and one fixed explicit-provider observation
     // distinguish lookup from provider access. Nothing changes provider defaults.
     // Only fixed status/boolean/classification words leave; no names or entropy.
-    std::uint32_t report[32] = {0x53584352, 3};
+    std::uint32_t report[44] = {0x53584352, 4};
     legacy_observation(nullptr, report + 8);
     default_observation(CRYPT_USER_DEFAULT, report + 24);
     default_observation(CRYPT_MACHINE_DEFAULT, report + 28);
     legacy_observation(MS_ENHANCED_PROV_W, report + 16);
+    // Access checks only: no duplication, impersonation, token or DACL changes.
+    // These observations do not prove which operation a provider attempts.
+    token_observation(TOKEN_QUERY, report + 32);
+    token_observation(TOKEN_QUERY | TOKEN_DUPLICATE, report + 36);
+    token_observation(TOKEN_QUERY | TOKEN_DUPLICATE | TOKEN_IMPERSONATE, report + 40);
     report[2] = static_cast<std::uint32_t>(BCryptGenRandom(nullptr, bytes, static_cast<ULONG>(sizeof(bytes)), BCRYPT_USE_SYSTEM_PREFERRED_RNG));
     SecureZeroMemory(bytes, sizeof(bytes));
     report[3] = static_cast<std::uint32_t>(BCryptOpenAlgorithmProvider(&provider, BCRYPT_RNG_ALGORITHM, MS_PRIMITIVE_PROVIDER, 0));

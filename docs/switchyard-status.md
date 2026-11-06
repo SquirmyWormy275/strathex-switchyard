@@ -49,11 +49,17 @@ cases. Six groups / 58 tests include actual Linux scanner execution, Windows
 guest doubles and package/notice verification. Supplied context cannot clear a
 base finding. Normal installed metadata/offline acceptance also passes. [Evidence](evidence/cvss-v4-summary.json).
 
+The next Windows diagnostic observes three fixed self-token handle access
+requests in the same cold child. Managed builds, 1,936 portable checks and
+fourteen privacy-projection tests pass; native compilation/execution is pending.
+It changes no token or access policy and does not assert the provider uses these
+requests. [Source evidence](evidence/windows-self-token-source-summary.json).
+
 ## Latest verified checkpoints
 
 | Checkpoint | Result | Practical limit |
 | --- | --- | --- |
-| Complete Linux `1508ea9` | **246/246 groups; 1,575 passed tests; eleven declared skips.** Every child/tree and exact owned checkout, dependency, build and temporary-parent cleanup verifies. [Receipt](evidence/linux-1508-complete-summary.json). | Includes the signed client and editor launcher with provider/editor doubles. Later Windows import-observation source has separate focused/native evidence. |
+| Complete Linux `5a2c324` | **247/247 groups; 1,591 passed tests; eleven declared skips.** Every child/tree and exact owned checkout, dependency, build and temporary-parent cleanup verifies. [Receipt](evidence/linux-5a2-complete-summary.json). | Includes active-task editor return and CVSS 4, with provider/editor doubles. Later Windows V4 diagnostic source has separate focused evidence. |
 | Reviewed editor launcher `1508ea9` | Five groups / 54 tests, typecheck, extension build and compiled CommonJS load pass. Generated output is removed. [Evidence](evidence/editor-terminal-launch-summary.json). | Real signed HTTP, encrypted state and Linux leases compose with controlled provider/editor doubles. No actual terminal was launched. |
 | Installed Linux `5a2c324` | Six normal update, eleven owner/editor/severity and seven journal checks pass. All 54 semantic snapshots excluding audit match; 52 sealed files remain byte-identical. Launcher backups and exact bundle cleanup verify. [Evidence](evidence/installed-cvss4-summary.json). | Two verification workspaces receive only the expected recovery/journal audit entries. Offline CVSS 4 keeps critical base severity despite zero supplied environment scores. No live task/provider effects or activated editor. |
 | Earlier installed Linux `2c87c03` | Six update, ten owner/editor/severity and seven journal checks pass. All 54 workspace identities remain; 52 sealed files are byte-identical across update. Launcher backups and exact bundle cleanup verify. [Evidence](evidence/installed-editor-authorization-summary.json). | The two opened verification workspaces are resealed by existing restart recovery. Definitions/package/modes, historical pending bytes and metadata-check state verify separately. No full semantic before-snapshot was retained. Three signed authorization checks are unknown-owner refusals, with no new permit/task/provider effects. |

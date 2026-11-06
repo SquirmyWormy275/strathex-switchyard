@@ -1,0 +1,56 @@
+{
+  "schema": "switchyard-windows-self-token-source-summary/v1",
+  "basis": "c8d432db4a9c54dea800aae4965c7f1e3567f29d",
+  "sourceSha256": {
+    "deployment/windows/test-support/storage-broker-protocol/ColdRandom.cpp": "8a6c9c4608f1d2f3ba9bfac01a43e9648d067a0fd7377835ba3dcf1e1fec8a8a",
+    "deployment/windows/test-support/storage-broker-protocol/ColdRandomReport.cs": "9c2872edd57f304953a0137519fc18a17c9bbfd68bfc80211f7cad29ee4b1728",
+    "deployment/windows/test-support/storage-broker-protocol/ColdRandomProcess.cs": "4bb3320fb549b13103f451ba5245edaf29aa12cc018bf986a05b2119499c136c",
+    "scripts/windows-restricted-owner-report.mjs": "9c76055c3bc5b8e028de347f9ae16a8a806e5824d68758f21fbc32fad93a843c",
+    "scripts/windows-restricted-owner-report.test.mjs": "82ff659b1845d6b75b44cdcec4d95bca877e7ce6c231d301cbe4001f7eee3e6a",
+    "scripts/verify-windows-storage-broker.mjs": "34b09e086976db425103192ebb1a1caa4e647cc74afa40ae5a5bd39228dd5852"
+  },
+  "packet": {
+    "schema": "switchyard-cold-restricted-random/v4",
+    "bytes": 176,
+    "firstApi": "legacy-cryptoapi",
+    "selfTokenAccessMasks": [
+      "TOKEN_QUERY",
+      "TOKEN_QUERY | TOKEN_DUPLICATE",
+      "TOKEN_QUERY | TOKEN_DUPLICATE | TOKEN_IMPERSONATE"
+    ],
+    "observedFields": [
+      "opened",
+      "error",
+      "closeError",
+      "handlesClosedVerified"
+    ]
+  },
+  "managed": {
+    "receipt": "managed-source-build-1793953957622.json",
+    "builds": 2,
+    "warnings": 0,
+    "errors": 0,
+    "portableChecks": 1936,
+    "coldParserChecks": 80,
+    "sdkReused": "8.0.424",
+    "ownedScratchRemoved": true
+  },
+  "privacyProjection": {
+    "receipt": "isolated-test-c0b90ded-aecb-43c9-8301-c8ee6088920a.json",
+    "groups": 1,
+    "tests": 14,
+    "childAndTreeCleanupVerified": true
+  },
+  "typecheck": true,
+  "hypothesis": "Opening a handle to the child process token may be denied; the existing parent-side token query does not establish child self-access. This probe does not assert that a provider uses those particular access masks.",
+  "references": [
+    "https://learn.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-openprocesstoken",
+    "https://learn.microsoft.com/en-us/windows/win32/secauthz/access-rights-for-access-token-objects"
+  ],
+  "limits": [
+    "Native C++ compilation and actual child access observations remain pending Windows CI.",
+    "No duplication, impersonation, token mutation, DACL change, privilege/SID change, registry/default-provider edit or runtime/entropy fallback.",
+    "The original Node journey, executable digest, deadline, restricted primary token and owner assertions remain unchanged. Its latest observed startup remains exit 134 with no owner result.",
+    "Only fixed statuses and cleanup booleans leave the CI-only child; raw token data, identities and handle values are not collected."
+  ]
+}

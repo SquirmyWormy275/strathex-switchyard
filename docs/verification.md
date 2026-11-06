@@ -24,12 +24,12 @@ Switchyard is a partial implementation of the full Rev2 suite. The F77 is its
 pilot device. Software checks, installed Linux demonstrations, native Windows
 filesystem tests and physical/account acceptance are separate evidence.
 
-Latest complete Linux evidence is `1508ea9`: **246/246 groups, 1,575 passed
+Latest complete Linux evidence is `5a2c324`: **247/247 groups, 1,591 passed
 tests and eleven declared skips**, with every child/tree and exact owned checkout,
-dependency, build and temporary-parent cleanup verified. This includes signed
-editor authorization and the exact Terminal launcher with provider/editor doubles.
-[Complete run](evidence/linux-1508-complete-summary.json),
-[launcher scope](evidence/editor-terminal-launch-summary.json).
+dependency, build and temporary-parent cleanup verified. It includes active-task
+editor return and CVSS 4 scoring/collector support. Provider/editor doubles and
+later Windows diagnostic source remain separately identified.
+[Complete run](evidence/linux-5a2-complete-summary.json).
 
 The latest native cold CNG probe succeeds under the original restricted primary
 token; Node still aborts at CSPRNG with exit 134. This is a failed software

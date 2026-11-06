@@ -38,7 +38,7 @@ evidence, not instructions to reset. Publish regular commits. Do not merge or re
 | Signed editor client `2c87c03` | Exact instance/build/nonce/selection requests and replies; strict response validation; cancellation after durable consumption refuses replay. [Evidence](evidence/editor-authorization-client-summary.json). | The API bearer stays local. No automatic command registration or retries. |
 | Editor launcher `1508ea9` | One exact Terminal object per review, native executable SHA-256, filesystem/focus/admission checks, retained partial effect and joined shutdown. Five groups / 54 tests, build/typecheck/CommonJS checks and cleanup pass. [Evidence](evidence/editor-terminal-launch-summary.json). | Provider/editor doubles. A later scoped return method permits idle/active metadata only for the exact consumed editor selection and focuses the retained object without another launch; five groups/60 tests pass. [Return evidence](evidence/editor-active-return-summary.json). Command wiring and real terminal process/account/task acknowledgement remain unfinished. Do not infer attachment from focus, title or process ancestry alone. |
 | Installed app `5a2c324` | Release `9f70e2a8…`; six update, eleven owner/editor/severity and seven journal checks pass. All 54 non-audit semantic snapshots match; 52 sealed files are byte-identical. [Evidence](evidence/installed-cvss4-summary.json). | Backend gateway only, four unknown-owner signed refusals and offline severity checks. No active editor extension or live task. |
-| Complete Linux `1508ea9` | 246 groups, 1,575 passed tests and eleven declared skips; all exact checkout/dependency/build/temporary-parent cleanup verifies. [Receipt](evidence/linux-1508-complete-summary.json). | Its marker is removed. Later Windows import-observation source has separate focused/native evidence. |
+| Complete Linux `5a2c324` | 247 groups, 1,591 passed tests and eleven declared skips; all exact checkout/dependency/build/temporary-parent cleanup verifies. [Receipt](evidence/linux-5a2-complete-summary.json). | Marker removed. Later Windows V4 self-token diagnostic source has separate focused evidence. |
 | Windows cold startup | `83d4139` cold native CNG APIs pass under the exact primary token. Original Node exits 134 at CSPRNG, no owner result. [Native result](evidence/windows-cold-random-native-summary.json). | Failed native software validation, not unavailable hardware. Preserve the failed fixture and unchanged acceptance assertions. |
 | Windows import observation `78b640d` | Digest-verified artifacts show legacy CryptoAPI imports, no observed BCryptGenRandom import, cold CNG success and unchanged Node exit 134. [Native evidence](evidence/windows-node-rng-imports-native-summary.json). | Imports do not prove the executed branch. Earlier `164a622` build failure remains recorded; its exact cause was not recovered. |
 | Cold legacy-first probe `a37751c` | Native CryptAcquireContextW fails with error 5 before generation; later CNG calls pass. Digest/source/token/process cleanup verify. [Native evidence](evidence/windows-cold-legacy-random-native-summary.json). | Exact denied provider lookup/resource remains unknown. Original Node still exits 134; failed fixture preserved. |
@@ -63,12 +63,12 @@ cohorts, with six groups / 58 tests, typecheck and package attribution checks.
 The collector retains base severity separately from supplied context. Reference
 code and exact staging are removed. [Source evidence](evidence/cvss-v4-summary.json).
 The normal installed update and both `--read-only-metadata` verifiers now pass.
-A complete Linux run at `5a2c324` is in progress; inspect its owned marker before
-cleanup. Do not rerun the installed update or old live provider verifiers.
+Complete Linux `5a2c324` and its exact cleanup now pass. Do not repeat that run,
+the installed update or old live provider verifiers without a relevant new change.
 
 ## Continue independently
 
-1. Complete Linux `1508ea9` and its exact cleanup are accepted; do not rerun it
+1. Complete Linux `5a2c324` and its exact cleanup are accepted; do not rerun it
    merely to repeat success. For a future coherent checkpoint inspect
    `/tmp/switchyard-full-linux-path.json` first. Verify source, phase, process exit,
    root identities, receipt and dependency aliases before cleanup. Use an owned
@@ -82,6 +82,11 @@ cleanup. Do not rerun the installed update or old live provider verifiers.
    The exact denied resource during provider open remains unknown. Preserve the
    original token, provider defaults, registry, runtime image and failed fixture;
    do not substitute a broader account or entropy/runtime fallback.
+
+   A new V4 cold-child probe adds fixed self-token handle access checks. Two
+   managed builds, 1,936 portable checks (80 parser cases), fourteen projection
+   tests and typecheck pass. Native execution is pending; no access policy is
+   changed. [Source evidence](evidence/windows-self-token-source-summary.json).
 
 3. Implement native acknowledgement for the exact reviewed editor terminal and
    original owner/account/task. A separate observed connection or ordinary focus
