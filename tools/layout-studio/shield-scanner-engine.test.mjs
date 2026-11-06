@@ -69,7 +69,7 @@ test("npm locked inventory checks exact advisory versions and licenses without c
 });
 test("binary, unsupported ecosystems, workspace links and invalid locks cannot establish coverage", async () => {
   const r = await scannerFixture({ action: "release_shield", files: { "image.bin": Buffer.from([0, 255]), "Cargo.lock": "unsupported", "package-lock.json": JSON.stringify({ lockfileVersion: 3, packages: { "node_modules/local": { link: true } } }) } }).scan();
-  for (const gap of ["binary_or_non_utf8_input", "unsupported_dependency_ecosystem", "unsupported_npm_package"]) assert.ok(r.gaps.includes(gap)); assert.equal(r.outcome, "incomplete");
+  for (const gap of ["binary_or_non_utf8_input", "unsupported_cargo_lock", "unsupported_npm_package"]) assert.ok(r.gaps.includes(gap)); assert.equal(r.outcome, "incomplete");
 });
 test("aliased npm packages match advisories by their real locked identity and retain distinct reproducible CycloneDX references", async () => {
   const lock=JSON.stringify({lockfileVersion:3,packages:{"":{},"node_modules/alias":{name:"@example/real",version:"1.0.0",license:"MIT"},"node_modules/parent/node_modules/alias":{name:"@example/real",version:"1.0.0",license:"MIT"}}}),f=scannerFixture({action:"shield_supply_chain",files:{"package-lock.json":lock},advisory:[{ecosystem:"npm",name:"@example/real",version:"1.0.0",advisories:[{id:"GHSA-synthetic-alias",severity:"high"}]}]}),r=await f.scan();

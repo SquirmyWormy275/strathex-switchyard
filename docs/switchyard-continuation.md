@@ -31,6 +31,14 @@ evidence, not instructions to reset. Publish regular commits. Do not merge or re
 
 ## Current implementation and evidence
 
+Cargo declaration inventory now passes **eight groups / 81 tests**, including
+actual Linux Supply Chain/Release scans and explicitly doubled Windows guests.
+Forty-eight supported lockfile examples agree with the installed Python TOML
+reader. Typecheck, unchanged development BOM and exact child/scratch cleanup pass.
+Broader Cargo syntax, resolution, licenses and publisher provenance remain
+unfinished; installed and native Windows guest acceptance are unperformed.
+[Contract](cargo-supply-chain.md), [evidence](evidence/cargo-supply-chain-summary.json).
+
 The composed editor lifecycle and recovery now pass six groups / 64 tests,
 typecheck, JavaScript parse and package checks. The real protected journal records
 original host/boot, directory, upstream, ingress and terminal identities. Abrupt
@@ -119,32 +127,14 @@ the installed update or old live provider verifiers without a relevant new chang
    [Native comparison](evidence/windows-lease-console-native-summary.json),
    [verifier correction](evidence/windows-verifier-inventory-summary.json).
 
-3. Implement native acknowledgement for the exact reviewed editor terminal and
-   original owner/account/task. A separate observed connection or ordinary focus
-   must not be treated as that terminal's acknowledgement. Keep UI wiring frozen;
-   exercise the implementation with provider/editor doubles. Exact terminal PID,
-   birth and executable observation is now connected to the consumed selection,
-   with cancellation and no PID/title/ancestry fallback. Three groups / 38 tests
-   plus compiled extension checks pass. This is a process witness, not connection
-   or task acknowledgement. [Evidence](evidence/editor-process-summary.json).
-   A bounded protocol witness now matches the exact resume reply and account
-   samples before/after it, invalidating on boundary/replay/malformed frames.
-   Three groups / 33 tests and package/typecheck pass with synthetic frames.
-   It has no transport or forwarding authority. Connect a peer-bound stream
-   before claiming attachment. [Evidence](evidence/editor-protocol-summary.json).
-   The new Linux ingress carrier now checks that exact peer before HTTP upgrade
-   and bridges bounded masked WebSocket/JSONL frames. Eleven native synthetic
-   tests plus five package checks and typecheck pass, including parent loss,
-   deadline, substituted-name preservation and protocol-witness composition.
-   The parent lifecycle initially passed eight behavioral cases and five package checks,
-   including joined cancellation and exact uncertain cleanup. It requires caller
-   ownership callbacks, which remain doubled in this cohort. The later dedicated original upstream and restricted relay pass their synthetic
-   end-to-end check. The protected journal component also passes real-store tests.
-   The protected lifecycle and interrupted-host recovery now compose these components.
-   Signed routes, typed responses and retained Terminal composition are now connected;
-   production command activation and native TUI compatibility remain next;
-   no live task/IDE acknowledgement is granted. [Carrier](evidence/editor-ingress-summary.json),
-   [parent lifecycle](evidence/editor-ingress-owner-summary.json).
+3. The protected editor journal, signed client/routes, restricted upstream and
+   retained Terminal now compose through actual Linux carriers with controlled
+   provider/editor doubles. Exact PID/image, task acknowledgement, replay refusal,
+   focus, disconnect and late idempotent stop have focused acceptance. Keep
+   frontend/command activation frozen and do not equate synthetic wire success
+   with native TUI/account/IDE acceptance. The installed 0.167.0 CLI is still
+   outside the reviewed 0.166.0 gate. [Terminal proof](evidence/editor-terminal-connection-summary.json),
+   [retirement](evidence/editor-retired-stop-summary.json).
 4. Continue other ledger requirements, including remaining Shield coverage,
    ecosystems, publisher provenance, verified local vulnerability context and workflow observation. These are
    unfinished software, separate from hardware/account acceptance.

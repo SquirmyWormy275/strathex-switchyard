@@ -73,6 +73,85 @@ export function scannerPath(v) { if (typeof v !== "string" || v.length > 512 || 
 function array(v, limit) { if (!Array.isArray(v) || v.length > limit) throw Error("Scanner array exceeds its bound."); return v; }
 function utf8(bytes) { return new TextDecoder("utf-8", { fatal: true }).decode(bytes); }
 function json(bytes) { if (bytes.length > 2 * 1024 * 1024) throw Error("Scanner JSON exceeds its bound."); return JSON.parse(utf8(bytes)); }
+// Cargo lock parsing stays inside the one digest-pinned, dependency-free worker.
+const cargoRequire = value => { if (!value) throw Error('Unsupported bounded Cargo lock metadata.'); };
+const cargoDigest = value => typeof value === 'string' && /^[a-f0-9]{64}$/.test(value);
+export const cargoPublicSource = 'registry+https://github.com/rust-lang/crates.io-index';
+export const cargoPublicSourceSha256 = sha(cargoPublicSource);
+export const isCargoLockPath = path => typeof path === 'string' && path.length <= 512 && path.split('/').at(-1) === 'Cargo.lock' && path.split('/').every(part => part && !['.','..'].includes(part) && !/[\\\x00-\x1f\x7f:]/.test(part));
+export function cargoIdentity(name, version) {
+  cargoRequire(typeof name === 'string' && /^[A-Za-z_][A-Za-z0-9_-]{0,63}$/.test(name));
+  cargoRequire(typeof version === 'string' && version.length <= 64 && /^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$/.test(version) && version.split('.').every(part => BigInt(part) <= 18446744073709551615n));
+  return { name, version };
+}
+export function cratesIoIdentity(name,version) {
+  cargoIdentity(name,version);cargoRequire(/^[a-z][a-z0-9_-]{0,63}$/.test(name));return{ecosystem:'crates.io',name,version};
+}
+// This accepts the basic strings emitted by Cargo, not arbitrary TOML. In
+// particular, JSON-only escapes, multiline strings and extra tables refuse.
+const cargoQuoted = /^"(?:[^"\\\x00-\x1f]|\\(?:["\\bfnrt]|u(?![dD][89a-fA-F])[0-9a-fA-F]{4}))*"/;
+function cargoUncomment(line) {
+  let result = '', rest = line;
+  while (rest) {
+    if (rest[0] === '#') break;
+    if (rest[0] === '"') { const match=cargoQuoted.exec(rest);cargoRequire(match);result+=match[0];rest=rest.slice(match[0].length); }
+    else { cargoRequire(/^[\t\x20-\x7e]$/.test(rest[0]));result+=rest[0];rest=rest.slice(1); }
+  }
+  return result.trim();
+}
+function cargoString(value) {
+  cargoRequire(cargoQuoted.exec(value)?.[0] === value);const parsed=JSON.parse(value);
+  cargoRequire(parsed.length > 0 && parsed.length <= 2048 && parsed.isWellFormed() && !/[\x00-\x1f\x7f]/.test(parsed));return parsed;
+}
+function cargoDependencyList(value) {
+  cargoRequire(value[0] === '[' && value.at(-1) === ']');let rest=value.slice(1,-1).trim();const rows=[];
+  while(rest) { const match=cargoQuoted.exec(rest);cargoRequire(match);const item=cargoString(match[0]);cargoRequire(rows.length<4096);rows.push(item);rest=rest.slice(match[0].length).trim();if(!rest)break;cargoRequire(rest[0]===',');rest=rest.slice(1).trim(); }
+  cargoRequire(new Set(rows).size===rows.length);return rows;
+}
+export function parseCargoLock(text) {
+  cargoRequire(typeof text==='string' && text.isWellFormed() && Buffer.byteLength(text)<=1024*1024 && !/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/.test(text) && !/\r(?!\n)/.test(text));
+  const lines=text.replaceAll('\r\n','\n').split('\n');cargoRequire(lines.length<=32768 && lines.every(line=>line.length<=8192));
+  const packages=[];let version, row, list;
+  for(const raw of lines) {
+    const line=cargoUncomment(raw);if(!line)continue;
+    if(list!==undefined) { cargoRequire(list.length+line.length<=256*1024);list+=' '+line;if(line.endsWith(']')){row.dependencies=cargoDependencyList(list);list=undefined;}continue; }
+    if(line==='[[package]]'){cargoRequire(version!==undefined && packages.length<4096);row={};packages.push(row);continue;}
+    const match=/^([a-z][a-z0-9_-]*)\s*=\s*(.*)$/.exec(line);cargoRequire(match);const [,key,value]=match;
+    if(!row){cargoRequire(version===undefined && key==='version' && ['3','4'].includes(value));version=Number(value);continue;}
+    cargoRequire(['name','version','source','checksum','dependencies'].includes(key) && !Object.hasOwn(row,key));
+    if(key==='dependencies') { if(value==='['){list=value;row.dependencies=null;}else row.dependencies=cargoDependencyList(value); }
+    else row[key]=cargoString(value);
+  }
+  cargoRequire(version!==undefined && list===undefined);const identities=new Set();
+  return packages.map(p=>{
+    cargoIdentity(p.name,p.version);
+    const source=p.source??null, sourceKind=source===null?'local':source===cargoPublicSource?'crates.io':source.startsWith('registry+')?'registry':source.startsWith('git+')?'git':null;
+    cargoRequire(sourceKind && (source===null || /^[\x21-\x7e]{1,2048}$/.test(source) && !['git+','registry+'].includes(source)));
+    if(sourceKind==='crates.io')cratesIoIdentity(p.name,p.version);
+    cargoRequire(['registry','crates.io'].includes(sourceKind)?cargoDigest(p.checksum):p.checksum===undefined);
+    const sourceSha256=source===null?null:sha(source), key=JSON.stringify([p.name,p.version,sourceSha256]);cargoRequire(!identities.has(key));identities.add(key);
+    return {ecosystem:'Cargo',name:p.name,version:p.version,sourceKind,sourceSha256,declaredSha256:p.checksum??null,dependenciesSha256:sha(JSON.stringify(p.dependencies??[]))};
+  });
+}
+export function validateCargoComponent(c) {
+  cargoRequire(c && typeof c==='object' && !Array.isArray(c) && Object.keys(c).sort().join()==='declaredSha256,dependenciesSha256,ecosystem,lockPath,name,sourceKind,sourceSha256,version');
+  cargoRequire(c.ecosystem==='Cargo' && isCargoLockPath(c.lockPath));cargoIdentity(c.name,c.version);cargoRequire(cargoDigest(c.dependenciesSha256));
+  cargoRequire(['local','git','registry','crates.io'].includes(c.sourceKind));
+  cargoRequire(c.sourceKind==='local'?c.sourceSha256===null:cargoDigest(c.sourceSha256));
+  cargoRequire(['registry','crates.io'].includes(c.sourceKind)?cargoDigest(c.declaredSha256):c.declaredSha256===null);
+  if(c.sourceKind==='crates.io'){cratesIoIdentity(c.name,c.version);cargoRequire(c.sourceSha256===cargoPublicSourceSha256);}else cargoRequire(c.sourceSha256!==cargoPublicSourceSha256);
+  return c;
+}
+export function cargoCycloneDxComponent(c) {
+  validateCargoComponent(c);
+  return {type:'library','bom-ref':'switchyard:'+sha(JSON.stringify(['Cargo',c.lockPath,c.name,c.version,c.sourceSha256])),name:c.name,version:c.version,
+    ...(c.sourceKind==='crates.io'?{purl:`pkg:cargo/${c.name}@${c.version}`} : {}),properties:[
+      {name:'switchyard:ecosystem',value:'Cargo'},{name:'switchyard:lockfile',value:c.lockPath},{name:'switchyard:cargo-source-kind',value:c.sourceKind},
+      ...(c.sourceSha256?[{name:'switchyard:declared-source-sha256',value:c.sourceSha256}]:[]),...(c.declaredSha256?[{name:'switchyard:declared-sha256',value:c.declaredSha256}]:[]),
+      {name:'switchyard:declared-dependencies-sha256',value:c.dependenciesSha256},{name:'switchyard:cargo-resolution',value:'not-performed'}
+    ]};
+}
+
 const npmName = value => typeof value === "string" && ![".", ".."].includes(value) && /^(?:@[a-z0-9._-]+\/)?[a-z0-9._-]{1,128}$/.test(value);
 const npmVersion = value => typeof value === "string" && /^\d+\.\d+\.\d+(?:-[A-Za-z0-9.-]+)?(?:\+[A-Za-z0-9.-]+)?$/.test(value);
 // Bounded PEP 440 identifiers. Keep literal declarations in the BOM; compare
@@ -163,7 +242,7 @@ function workspaceLink(packages, link, cache) {
   const result = { metadata, workspace: { path, lockMetadataSha256: sha(JSON.stringify(metadata)) } };
   cache.set(path, result); return result;
 }
-export function shieldCycloneDxComponent(c) { return { type: "library", "bom-ref": "switchyard:" + sha(`${c.ecosystem}\0${c.lockPath??c.requirementsPath}\0${c.location??c.name}\0${c.name}\0${c.version}`), name: c.name, version: c.version,
+export function shieldCycloneDxComponent(c) { if(c.ecosystem==="Cargo")return cargoCycloneDxComponent(c); return { type: "library", "bom-ref": "switchyard:" + sha(`${c.ecosystem}\0${c.lockPath??c.requirementsPath}\0${c.location??c.name}\0${c.name}\0${c.version}`), name: c.name, version: c.version,
       ...(c.ecosystem === "PyPI" ? { purl: `pkg:pypi/${c.name}@${encodeURIComponent(c.version.toLowerCase()).replaceAll("!", "%21")}` } : {}),
       ...(c.license ? { licenses: [{ license: { name: c.license } }] } : {}), properties: [
         { name: "switchyard:ecosystem", value: c.ecosystem },
@@ -219,6 +298,7 @@ function parseAdvisories(bytes) {
     let identity;
     if (p.ecosystem === "npm" && npmName(p.name) && npmVersion(p.version)) identity = { ecosystem: "npm", name: p.name, version: p.version };
     else if (p.ecosystem === "PyPI") identity = pypiIdentity(p.name, p.version);
+    else if (p.ecosystem === "crates.io") identity = cratesIoIdentity(p.name,p.version);
     else throw Error("Unsupported advisory package identity.");
     const key = advisoryIdentityKey(identity); if (keys.has(key)) throw Error("Duplicate advisory package."); keys.add(key);
     const advisories = array(p.advisories, 32).map(a => { exact(a, ["id", "severity"]); identifier(a.id); if (!["low", "medium", "high", "critical", "unknown"].includes(a.severity)) throw Error("Invalid advisory severity."); return { id: a.id, severity: a.severity }; });
@@ -248,8 +328,22 @@ export async function scanShieldInputs(proposed, { readInput }) {
         if (findings.length >= 512) { gaps.add("finding_limit"); break; }
       }
     }
-    if (/(?:^|\/)(?:poetry\.lock|uv\.lock|Cargo\.lock|go\.sum|Gemfile\.lock|yarn\.lock|pnpm-lock\.yaml)$/.test(file.path)) gaps.add("unsupported_dependency_ecosystem");
+    if (/(?:^|\/)(?:poetry\.lock|uv\.lock|go\.sum|Gemfile\.lock|yarn\.lock|pnpm-lock\.yaml)$/.test(file.path)) gaps.add("unsupported_dependency_ecosystem");
     if (/(?:^|\/)requirements[^/]*\.(?:txt|lock)$/i.test(file.path) && !isPinnedRequirementsPath(file.path)) gaps.add("unsupported_dependency_ecosystem");
+    if (isCargoLockPath(file.path) && requested.includes("sbom")) {
+      let declared;
+      try { declared=parseCargoLock(text); } catch { gaps.add("unsupported_cargo_lock");continue; }
+      dependencyManifests++;gaps.add("cargo_resolution_not_performed");
+      if(declared.length){gaps.add("license_metadata");gaps.add("package_source_or_integrity");}
+      for(const component of declared){
+        if(components.length>=4096)throw Error("Aggregate dependency inventory exceeds its original component bound.");
+        components.push({...component,lockPath:file.path});
+        const known=component.sourceKind==="crates.io"?advisoryByIdentity.get(advisoryIdentityKey(cratesIoIdentity(component.name,component.version))):undefined;
+        if(!known)gaps.add("advisory_package_coverage");
+        if(known?.advisories.some(a=>a.severity==="unknown"))gaps.add("advisory_severity_unassessed");
+        for(const a of known?.advisories??[])add({ruleId:a.id,dimension:"vulnerabilities",severity:a.severity,path:file.path,line:null,fingerprint:sha(`${a.id}\0Cargo\0${file.path}\0${file.sha256}\0${component.name}\0${component.version}\0${component.sourceSha256}`)});
+      }
+    }
     if (isPinnedRequirementsPath(file.path) && requested.includes("sbom")) {
       let declared;
       try { declared = parsePinnedRequirements(text); } catch { gaps.add("unsupported_python_requirements"); continue; }
@@ -317,7 +411,7 @@ export async function scanShieldInputs(proposed, { readInput }) {
     metadata: { tools: { components: [{ type: "application", name: "switchyard-baseline-scanner", version: "1" }] }, properties: [
       { name: "switchyard:scope", value: request.scope }, { name: "switchyard:repository-scope", value: "unverified" },
       { name: "switchyard:dependency-graph", value: "not-collected" }, { name: "switchyard:publisher-provenance", value: "not-verified" },
-      ...inventory.filter(f=>f.path.split("/").at(-1)==="package-lock.json"||isPinnedRequirementsPath(f.path)).map(f=>({name:"switchyard:dependency-manifest:"+f.path,value:"sha256:"+f.sha256}))
+      ...inventory.filter(f=>f.path.split("/").at(-1)==="package-lock.json"||isPinnedRequirementsPath(f.path)||isCargoLockPath(f.path)).map(f=>({name:"switchyard:dependency-manifest:"+f.path,value:"sha256:"+f.sha256}))
     ] },
     components: components.map(shieldCycloneDxComponent), compositions: [{ aggregate: "unknown" }]
   };

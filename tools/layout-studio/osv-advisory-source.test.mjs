@@ -108,7 +108,7 @@ test("V2 package scope, source-method mismatch, zero impact and mixed unsupporte
 test("OSV calculates quantitative base severity only from complete supported vectors and preserves every source/algorithm hash", async () => {
   const source = record(); source.severity = [...severity(lowVector), ...severity(highVector)];
   const result = normalizeOsvRecord(source, query, now()); assert.equal(result.advisory.severity, "critical"); assert.equal(result.evidence.severityAssessment, "cvss-v3-base-calculated"); assert.equal(result.evidence.cvssV3Base.maximumScore, 9.8); assert.equal(result.evidence.cvssV3Base.scope, "record"); assert.equal(result.evidence.cvssV3Base.vectors.length, 2); assert.ok(result.evidence.cvssV3Base.vectors.every(row => /^[a-f0-9]{64}$/.test(row.vectorSha256))); assert.equal(JSON.stringify(result).includes("CVSS:3."), false);
-  const collected = await collectOsvAdvisories([query], { now, fetchImpl: async () => response({ vulns: [source] }) }); assert.equal(collected.provenance.collector, "switchyard-osv-collector/5");
+  const collected = await collectOsvAdvisories([query], { now, fetchImpl: async () => response({ vulns: [source] }) }); assert.equal(collected.provenance.collector, "switchyard-osv-collector/6");
   const f = scannerFixture({ action: "shield_supply_chain", files: { "package-lock.json": JSON.stringify({ lockfileVersion: 3, packages: { "node_modules/example": { version: "1.2.3", license: "MIT" } } }) }, advisory: collected.feed.packages }), report = await f.scan();
   assert.equal(report.outcome, "failed"); assert.equal(report.completeness, "incomplete"); assert.equal(report.findings[0].severity, "critical"); assert.equal(report.gaps.includes("advisory_severity_unassessed"), false); assert.deepEqual(parseShieldScannerReport(JSON.stringify(report), { engine: report.engine, requestSha256: report.requestSha256, request: f.request }, f.request.action), report);
 });
@@ -159,4 +159,13 @@ test("V4 mixed-version ratings, source scope, zero base, malformed ordering and 
     source.affected[0].severity = rows; const result = normalizeOsvRecord(source, query, now()); assert.equal(result.advisory.severity, "unknown"); assert.equal(result.evidence.cvssV4Base, undefined);
   }
   source.affected[0].severity = [{ type: "CVSS_V4", score: v4 + "/U:Red" }]; result = normalizeOsvRecord(source, query, now()); assert.equal(result.evidence.cvssV4Context.vectors[0].suppliedContextScore, undefined); assert.equal(result.evidence.cvssV4Context.vectors[0].supplementalMetricsSupplied, true);
+});
+
+
+test("explicit crates.io collection proves exact stable ranges and never borrows npm or private-source identities", async()=>{
+ const query={ecosystem:"crates.io",name:"example",version:"1.2.3"},at=Date.parse("2026-11-06T00:00:00Z"),record={id:"RUSTSEC-synthetic-only",modified:"2026-11-05T00:00:00Z",affected:[{package:{ecosystem:"crates.io",name:"example"},ranges:[{type:"SEMVER",events:[{introduced:"1.0.0"},{fixed:"1.2.4"}]}]}]};
+ assert.equal(normalizeOsvRecord(record,query,at).advisory.severity,"unknown");
+ for(const changed of [{...query,ecosystem:"npm"},{...query,version:"1.2.4"},{...query,name:"Example"},{...query,version:"1.2.3-beta"},{...query,source:"git+ssh://private.invalid"}])assert.throws(()=>normalizeOsvRecord(record,changed,at));
+ const requests=[];const result=await collectOsvAdvisories([query],{now:()=>at,fetchImpl:async(url,options)=>{requests.push({url,body:JSON.parse(options.body)});return new Response(JSON.stringify({vulns:[record]}),{status:200,headers:{"Content-Type":"application/json"}});}});
+ assert.equal(requests.length,1);assert.equal(requests[0].url,"https://api.osv.dev/v1/query");assert.deepEqual(requests[0].body,{package:{ecosystem:"crates.io",name:"example"},version:"1.2.3"});assert.equal(result.feed.packages[0].ecosystem,"crates.io");assert.equal(result.provenance.upstreamSignatureVerified,false);
 });

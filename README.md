@@ -68,12 +68,13 @@ execution, offline repository scans and recoverable installation. The Home and
 Model F catalog provide the starting experience; complete task/IDE attachment,
 role/device controls and full scanner coverage remain unfinished.
 
-The latest accepted complete Linux checkpoint, `1508ea9`, passes **246 groups**:
-**1,575 tests passed**, eleven declared skips, and every child/process-tree and owned
-checkout cleanup verified. The Windows native lease replacement at `ce5be6a`
-passes eighteen tests plus one declared skip, the Supply Chain scenario, and all
-23 policy-output tests. **Full Windows acceptance remains failed** because the
-restricted primary child still exits before its owner journey verifies.
+The latest accepted complete Linux checkpoint, `0ad510e`, passes **255 groups**:
+**1,682 tests passed**, eleven declared skips, and every child/process-tree and owned
+checkout cleanup verified. Later editor Terminal composition and cleanup have
+separate focused evidence. **Full Windows acceptance remains failed**: the
+restricted Node process reaches JavaScript but its state-lock helper fails during
+startup, before the eight owner checks. Installed and hardware acceptance remain
+separate from these source checks.
 [Current status and exact evidence](docs/switchyard-status.md).
 
 | Explore | Start here |
@@ -81,7 +82,7 @@ restricted primary child still exits before its owner journey verifies.
 | Return to a coding task | [Codex bindings](docs/coding-task-bindings.md), [Claude bindings](docs/claude-task-bindings.md), [reviewed text](docs/native-coding-tasks.md), [owned task loading](docs/coding-task-owners.md) |
 | Inspect a repository without starting work | [Installed `switchyard inspect` commands](docs/inspect-cli.md) |
 | Run reviewed inputs in a disposable workspace | [Task execution](docs/reviewed-task-execution.md), [bounded build workspace](docs/bounded-build-workspace.md) |
-| Understand findings and coverage | [Shield baseline](docs/shield-baseline-scanner.md), [SBOM example](docs/evidence/README.md), [CVSS context](docs/cvss-severity.md) |
+| Understand findings and coverage | [Shield baseline](docs/shield-baseline-scanner.md), [SBOM example](docs/evidence/README.md), [CVSS context](docs/cvss-severity.md), [Rust declarations](docs/cargo-supply-chain.md) |
 | Review recovery and platform boundaries | [Release recovery](docs/suite-release-recovery.md), [Windows storage](docs/windows-storage-broker.md), [complete requirement ledger](docs/switchyard-requirements.md) |
 
 Installed Linux scanner demonstrations verify actual process exits and restore

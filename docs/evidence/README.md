@@ -60,3 +60,8 @@ and both [Python requirement examples](../python-supply-chain.md); three invalid
 mutations fail validation. Receipt `pypi-cyclonedx-schema-1793885089361.json`
 retains exact schema/validator/BOM hashes. Prior BOM hashes above describe their
 historical checkpoints.
+
+The [Cargo checkpoint](cargo-supply-chain-summary.json) adds source-separated Rust
+lock declarations and reports 81 focused checks plus 48 independent TOML
+comparisons. Real Linux namespace scans and Windows guest-double checks are
+labelled separately; declared checksums are not artifact verification.

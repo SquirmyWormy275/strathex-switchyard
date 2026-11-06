@@ -1,10 +1,24 @@
 # What has actually been verified
 
-Latest complete Linux `7772cb3` **failed**: 249/250 groups, 1,622 passed tests,
+Latest complete Linux `0ad510e` passes **255/255 groups, 1,682 tests and eleven
+declared skips**, with every child/tree and exact owned checkout/build cleanup
+verified. It includes editor journal, recovery, signed routes and Suite transitions.
+[Receipt](evidence/linux-0ad-complete-summary.json). Later Terminal composition
+passes 46 focused checks; retired-stop correction passes 39.
+
+Cargo declaration inventory now passes **eight groups / 81 tests**, including
+actual Linux Supply Chain/Release scans and explicitly doubled Windows guests.
+Forty-eight supported lockfile examples agree with the installed Python TOML
+reader. Typecheck, unchanged development BOM and exact child/scratch cleanup pass.
+Broader Cargo syntax, resolution, licenses and publisher provenance remain
+unfinished; installed and native Windows guest acceptance are unperformed.
+[Contract](cargo-supply-chain.md), [evidence](evidence/cargo-supply-chain-summary.json).
+
+Earlier complete Linux `7772cb3` **failed**: 249/250 groups, 1,622 passed tests,
 one failure and eleven declared skips. An editor socket remained after child
 exit during teardown. Exact staging and every child/tree cleanup are verified.
-Signal-safe cleanup and parent lifecycle pass 26 focused checks; a new complete
-run is required. `d900499` remains the last accepted full Linux checkpoint.
+Signal-safe cleanup and parent lifecycle passed 26 focused checks; subsequent
+complete runs pass, including the current `0ad510e` checkpoint above.
 [Failure and correction](evidence/linux-777-complete-failure-summary.json).
 
 Native Windows `a061be0` clears the original random-startup abort with query-only
@@ -38,22 +52,22 @@ Switchyard is a partial implementation of the full Rev2 suite. The F77 is its
 pilot device. Software checks, installed Linux demonstrations, native Windows
 filesystem tests and physical/account acceptance are separate evidence.
 
-Latest editor transport source passes eleven Linux lifecycle/wire tests and five
+Earlier isolated editor transport source passed eleven Linux lifecycle/wire tests and five
 package checks, plus typecheck. Exact peer, deadline, parent loss and substituted
 socket cases verify with synthetic processes; a retained shutdown traceback
-failure is corrected and rerun. Final editor/upstream composition is unfinished.
+failure is corrected and rerun. That checkpoint predates the later composed lifecycle and retained Terminal checks.
 [Evidence](evidence/editor-ingress-summary.json). Native Windows `71614e0` isolates
 the remaining owner failure to its state-lock helper startup (`0xC0000142`), with
 no first worker marker. [Native failure](evidence/windows-state-lock-native-summary.json).
 
-Latest complete Linux evidence is `d900499`: **248/248 groups, 1,600 passed
+Earlier accepted complete Linux evidence at `d900499`: **248/248 groups, 1,600 passed
 tests and eleven declared skips**, with every child/tree and exact owned checkout,
 dependency, build and temporary-parent cleanup verified. It includes the exact
 editor process observer and Windows token-security diagnostic source. Later
 protocol-witness and query-only correction source has separate focused evidence.
 [Complete run](evidence/linux-d900-complete-summary.json).
 
-The latest native cold CNG probe succeeds under the original restricted primary
+The earlier native cold CNG probe succeeded under the original restricted primary
 token; Node still aborts at CSPRNG with exit 134. This is a failed software
 validation, not an unavailable-hardware check.
 [Exact Windows result](evidence/windows-cold-random-native-summary.json).

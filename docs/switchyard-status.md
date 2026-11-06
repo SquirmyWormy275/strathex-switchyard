@@ -1,5 +1,13 @@
 # Switchyard implementation and acceptance
 
+Cargo declaration inventory now passes **eight groups / 81 tests**, including
+actual Linux Supply Chain/Release scans and explicitly doubled Windows guests.
+Forty-eight supported lockfile examples agree with the installed Python TOML
+reader. Typecheck, unchanged development BOM and exact child/scratch cleanup pass.
+Broader Cargo syntax, resolution, licenses and publisher provenance remain
+unfinished; installed and native Windows guest acceptance are unperformed.
+[Contract](cargo-supply-chain.md), [evidence](evidence/cargo-supply-chain-summary.json).
+
 The retained Terminal launcher now reaches the restricted connection through the
 signed client and Suite. **Six groups / 46 tests** pass, including one owned
 synthetic terminal process through actual protected state and Linux carriers:
@@ -137,7 +145,8 @@ or attachment authority. [Earlier evidence](evidence/editor-protocol-summary.jso
 
 | Checkpoint | Result | Practical limit |
 | --- | --- | --- |
-| Complete Linux `072e066` | **252/252 groups; 1,649 passed tests; eleven declared skips.** Every child/tree and exact staging cleanup verifies. [Receipt](evidence/linux-072-complete-summary.json). | Includes the restricted relay and synthetic real-carrier demonstration. Later journal implementation and native IDE/account/hardware acceptance remain separate. |
+| Complete Linux `0ad510e` | **255/255 groups; 1,682 passed tests; eleven declared skips.** Every child/tree and exact staging cleanup verifies. [Receipt](evidence/linux-0ad-complete-summary.json). | Journal, recovery, signed routes and Suite transitions. Later Terminal, retired-stop and Cargo changes have separate focused evidence. |
+| Earlier complete Linux `072e066` | **252/252 groups; 1,649 passed tests; eleven declared skips.** Every child/tree and exact staging cleanup verifies. [Receipt](evidence/linux-072-complete-summary.json). | Includes the restricted relay and synthetic real-carrier demonstration. Later journal implementation and native IDE/account/hardware acceptance remain separate. |
 | Earlier complete Linux `d243d81` | **251/251 groups; 1,633 passed tests; eleven declared skips.** Every child/tree and exact staging cleanup verifies. [Receipt](evidence/linux-d243-complete-summary.json). | Includes signal-safe ingress and its parent lifecycle. Does not cover later Windows console diagnostics or live IDE/account/task attachment. |
 | Earlier complete Linux `d900499` | **248/248 groups; 1,600 passed tests; eleven declared skips.** Every child/tree and exact owned checkout, dependency, build and temporary-parent cleanup verifies. [Receipt](evidence/linux-d900-complete-summary.json). | Includes exact terminal process observation and token-security diagnostic source. Later protocol witness and query-only correction have separate focused evidence. |
 | Reviewed editor launcher `1508ea9` | Five groups / 54 tests, typecheck, extension build and compiled CommonJS load pass. Generated output is removed. [Evidence](evidence/editor-terminal-launch-summary.json). | Real signed HTTP, encrypted state and Linux leases compose with controlled provider/editor doubles. No actual terminal was launched. |
@@ -150,9 +159,9 @@ The internal Linux editor ingress now checks one exact terminal peer before
 WebSocket upgrade and carries bounded JSON frames. Eleven lifecycle/wire tests,
 five package checks and typecheck pass, including a synthetic account/task
 witness. The parent lifecycle also passes eight behavior cases and five package checks,
-with cancellation/cleanup joined and uncertainty retained. Production ownership
-journal, signed launcher and upstream composition remain unfinished; no real IDE
-attachment is claimed. [Carrier](evidence/editor-ingress-summary.json),
+with cancellation/cleanup joined and uncertainty retained. Later protected ownership, signed routes and retained Terminal composition now
+pass focused checks. Production command activation and real IDE attachment remain
+unfinished or unaccepted. [Carrier](evidence/editor-ingress-summary.json),
 [parent lifecycle](evidence/editor-ingress-owner-summary.json).
 
 ## Implemented backend capabilities

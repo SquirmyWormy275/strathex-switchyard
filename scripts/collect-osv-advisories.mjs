@@ -5,9 +5,9 @@ import { resolve, join } from "node:path";
 import { createHash } from "node:crypto";
 import { collectOsvAdvisories } from "../tools/layout-studio/osv-advisory-source.mjs";
 
-const flags = process.argv.slice(2), out = flags.filter(flag => flag.startsWith("--out=")), selected = flags.filter(flag => flag.startsWith("--package=") || flag.startsWith("--pypi="));
-if (out.length !== 1 || !selected.length || flags.length !== out.length + selected.length) throw Error("Usage: node scripts/collect-osv-advisories.mjs [--package=NPM_NAME@EXACT_STABLE_VERSION | --pypi=DISTRIBUTION@NUMERIC_RELEASE] [...] --out=NEW_DIRECTORY. Sends only these explicit public identities to OSV; output is unsigned.");
-const packages = selected.map(flag => { const pypi = flag.startsWith("--pypi="), value = flag.slice(pypi ? 7 : 10), index = value.lastIndexOf("@"); return { ecosystem: pypi ? "PyPI" : "npm", name: value.slice(0, index), version: value.slice(index + 1) }; }), directory = resolve(out[0].slice(6));
+const flags = process.argv.slice(2), out = flags.filter(flag => flag.startsWith("--out=")), selected = flags.filter(flag => flag.startsWith("--package=") || flag.startsWith("--pypi=") || flag.startsWith("--crate="));
+if (out.length !== 1 || !selected.length || flags.length !== out.length + selected.length) throw Error("Usage: node scripts/collect-osv-advisories.mjs [--package=NPM_NAME@EXACT_STABLE_VERSION | --pypi=DISTRIBUTION@PEP440_VERSION | --crate=CRATE@EXACT_STABLE_VERSION] [...] --out=NEW_DIRECTORY. Sends only these explicit public identities to OSV; output is unsigned.");
+const packages = selected.map(flag => { const pypi = flag.startsWith("--pypi="), crate=flag.startsWith("--crate="), value = flag.slice(pypi ? 7 : crate ? 8 : 10), index = value.lastIndexOf("@"); return { ecosystem: pypi ? "PyPI" : crate ? "crates.io" : "npm", name: value.slice(0, index), version: value.slice(index + 1) }; }), directory = resolve(out[0].slice(6));
 try { await lstat(directory); throw Error("Choose a new output directory; existing contents are preserved."); } catch (error) { if (error.code !== "ENOENT") throw error; }
 const collected = await collectOsvAdvisories(packages); await mkdir(directory, { mode: 0o700 });
 const hashes = {};
