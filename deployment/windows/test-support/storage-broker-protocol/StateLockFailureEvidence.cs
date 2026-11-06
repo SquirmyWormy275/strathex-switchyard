@@ -13,7 +13,7 @@ internal static class StateLockFailureEvidence
         if (Label("schema", "switchyard-state-lock-failure/v1") == null) return null;
         string? kind = Label("kind", "timeout", "child-exit", "spawn-error", "input-error", "invalid-reply", "output-bound", "not-live");
         string? phase = Label("phase", "worker-startup", "lease-acquire", "lease-release");
-        string? progress = Label("progress", "not-observed", "lease-entered", "lease-input-read", "lease-request-read", "lease-owner-found");
+        string? progress = Label("progress", "not-observed", "lease-entered", "lease-input-read", "lease-request-read", "lease-parent-open-denied", "lease-parent-open-failed", "lease-parent-opened", "lease-parent-query-denied", "lease-parent-query-failed", "lease-parent-birth-read", "lease-owner-found");
         string? signal = Label("signal", "SIGTERM", "SIGKILL", "SIGABRT", "SIGSEGV", "SIGILL", "SIGBUS", "SIGINT", "other");
         string? spawnCode = Label("spawnCode", "ENOENT", "EACCES", "EPERM", "EINVAL", "ENOMEM", "EAGAIN", "other");
         if (kind == null || phase == null || progress == null || signal == null && item.GetProperty("signal").ValueKind != JsonValueKind.Null || spawnCode == null && item.GetProperty("spawnCode").ValueKind != JsonValueKind.Null) return null;
@@ -40,6 +40,15 @@ internal static class StateLockFailureEvidence
         Check(valid, true);
         foreach (string json in new[] { "null", "[]", "{}", "{\"stateLockFailure\":null}", "{\"stateLockFailure\":[]}" }) Check(json, false);
         var source = JsonNode.Parse(valid)!.AsObject();
+        foreach (string progress in new[] { "lease-entered", "lease-input-read", "lease-request-read", "lease-parent-open-denied", "lease-parent-open-failed", "lease-parent-opened", "lease-parent-query-denied", "lease-parent-query-failed", "lease-parent-birth-read", "lease-owner-found" })
+        {
+            var changed = source.DeepClone(); changed["stateLockFailure"]!["progress"] = progress;
+            using var doc = JsonDocument.Parse(changed.ToJsonString());
+            var projected = JsonSerializer.SerializeToElement(Read(doc.RootElement));
+            if (projected.ValueKind != JsonValueKind.Object || projected.GetProperty("progress").GetString() != progress
+                || projected.GetProperty("kind").GetString() != "child-exit" || projected.GetProperty("exitCode").GetInt64() != 3221225794) throw new InvalidOperationException("State lock progress projection proof failed.");
+            checks++;
+        }
         foreach (string name in new[] { "schema", "kind", "phase", "progress", "signal", "spawnCode", "exitCode" })
         {
             var changed = source.DeepClone(); changed["stateLockFailure"]![name] = "PRIVATE_CONTENT"; Check(changed.ToJsonString(), false);

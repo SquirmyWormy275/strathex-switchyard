@@ -1,5 +1,14 @@
 # What has actually been verified
 
+Native Windows `f653827` passes both lease groups: **24 checks, one declared
+Linux-only skip**, and every child/tree cleanup verifies. The separate restricted
+owner still fails zero of eight checks. Its managed projection omitted the new
+progress labels; that reporting gap is now corrected and all ten emitted labels
+are tested through the managed projection. Two builds / 1,995 portable checks and
+exact staging cleanup pass. The precise restricted-parent failure remains unknown
+until the native follow-up. The client and policy workflows at `f653827` pass.
+[Retained failure, native lease pass and projection correction](evidence/windows-parent-projection-summary.json).
+
 Windows `fea2ca4` now clears canonical-path acceptance, then fails before the
 parent-process check completes; the original restricted owner still passes zero
 of eight checks. Ordinary owner (8), restricted metadata (13) and native exchange

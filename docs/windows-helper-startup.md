@@ -112,3 +112,20 @@ file replacement/hard-link/malformed-release and cleanup assertions. The origina
 failed native receipts remain retained. Two managed builds/1,985 portable checks,
 five isolated groups/53 passes/one Windows-only skip and typecheck pass; native
 acceptance is pending. [Evidence](evidence/windows-parent-observation-summary.json).
+
+
+## Preserve progress through the managed report
+
+The `f653827` native owner still fails. The managed report's closed progress list
+had not been extended with the new parent labels, so it discarded that detail.
+The report does not identify the exact failed parent operation. Its source
+projection now accepts those same fixed labels and tests all ten emitted labels
+through serialization, preserving the exact failure kind and exit code. No
+unknown text or private field is accepted. Two builds and 1,995 portable checks
+pass, with all owned staging removed.
+
+The separate ordinary-owner native lease lane now passes 24 checks with one
+declared Linux-only skip and all child/tree cleanup verified. File replacement,
+hard-link refusal, malformed release and parent-loss checks pass after correcting
+the stale diagnostic expectation. This is distinct from restricted-owner or
+guest acceptance. [Evidence](evidence/windows-parent-projection-summary.json).

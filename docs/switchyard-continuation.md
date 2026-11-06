@@ -31,6 +31,15 @@ evidence, not instructions to reset. Publish regular commits. Do not merge or re
 
 ## Current implementation and evidence
 
+Native Windows `f653827` passes both lease groups: **24 checks, one declared
+Linux-only skip**, and every child/tree cleanup verifies. The separate restricted
+owner still fails zero of eight checks. Its managed projection omitted the new
+progress labels; that reporting gap is now corrected and all ten emitted labels
+are tested through the managed projection. Two builds / 1,995 portable checks and
+exact staging cleanup pass. The precise restricted-parent failure remains unknown
+until the native follow-up. The client and policy workflows at `f653827` pass.
+[Retained failure, native lease pass and projection correction](evidence/windows-parent-projection-summary.json).
+
 Windows `fea2ca4` now clears canonical-path acceptance, then fails before the
 parent-process check completes; the original restricted owner still passes zero
 of eight checks. Ordinary owner (8), restricted metadata (13) and native exchange
@@ -175,17 +184,16 @@ the installed update or old live provider verifiers without a relevant new chang
    root identities, receipt and every owned alias/build/test parent. Never
    broaden cleanup or relax deadlines.
 
-2. Collect the native fixed parent-observation diagnostics. `fea2ca4` passes
-   canonical-path acceptance but fails before parent open/query/liveness completes.
-   The original owner remains zero of eight checks; preserve its receipt and all
-   restrictions. Exact parent access is still 0x00101000; no token/DACL/privilege,
-   SID, desktop, account, runtime or detached fallback is permitted. The separate
-   Windows lease test reached an outdated diagnostic-label assertion; its expected
-   full startup sequence is corrected without relaxing its security/cleanup checks.
-   [Current failure and source evidence](evidence/windows-parent-observation-summary.json).
-   The client lane at that commit failed downloading its pinned SDK archive
-   (ResponseEnded), before client checks; do not mislabel that as a native pass.
-   Earlier complete release workflows remain pending behind the active run.
+2. Collect the native result after correcting the managed progress projection.
+   At `f653827` the original restricted owner remains zero of eight checks;
+   its projection dropped an unknown new fixed label, so the exact parent failure
+   is still unknown. The ordinary Windows lease lane now passes 24 checks/one
+   declared skip with cleanup. Do not substitute that pass for the restricted
+   owner. Exact parent access remains 0x00101000; no token/DACL/privilege, SID,
+   desktop, account, runtime or detached fallback is permitted.
+   [Current failure, native leases and correction](evidence/windows-parent-projection-summary.json).
+   Client and policy workflows pass at `f653827`. Earlier complete release
+   workflows remain pending behind the active run.
 
 3. The protected editor journal, signed client/routes, restricted upstream and
    retained Terminal now compose through actual Linux carriers with controlled
