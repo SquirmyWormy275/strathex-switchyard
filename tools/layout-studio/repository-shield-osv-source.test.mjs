@@ -4,11 +4,12 @@ import { repositoryShieldFixture } from "./test-support/repository-shield-fixtur
 import { windowsExecutionFixture } from "./test-support/windows-execution-fixture.mjs";
 import { collectOsvAdvisories } from "./osv-advisory-source.mjs";
 
-async function verifyCalculated(t, factory, action, mixed) {
+async function verifyCalculated(t, factory, action, mixed, v4 = false) {
   const query = { ecosystem: "npm", name: "synthetic", version: "1.0.0" };
   const source = { id: "GHSA-synthetic-only", modified: new Date().toISOString(), affected: [{ package: { ecosystem: query.ecosystem, name: query.name }, versions: [query.version] }], severity: [{ type: "CVSS_V2", score: "AV:N/AC:L/Au:N/C:C/I:C/A:C/E:F/RL:OF/RC:C/TD:N" }, ...(mixed ? [{ type: "CVSS_V3", score: "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H" }] : [])] };
+  if (v4) source.severity = [{ type: "CVSS_V4", score: "CVSS:4.0/AV:N/AC:L/AT:N/PR:N/UI:N/VC:H/VI:H/VA:H/SC:N/SI:N/SA:N/E:U/MVC:N/MVI:N/MVA:N" }];
   const collected = await collectOsvAdvisories([query], { fetchImpl: async () => new Response(JSON.stringify({ vulns: [source] }), { headers: { "content-type": "application/json" } }) });
-  const severity = mixed ? "critical" : "high";
+  const severity = mixed || v4 ? "critical" : "high";
   assert.equal(collected.feed.packages[0].advisories[0].severity, severity);
   const f = await factory(t, { action, shield: true, advisorySeverity: collected.feed.packages[0].advisories[0].severity });
   const review = await f.execution.review("personal", f.proposed), input = { requestId: f.proposed.requestId, token: review.confirmation.token }, result = await f.execution.apply("personal", input);
@@ -38,4 +39,11 @@ test("Linux pinned Supply Chain authenticates unassessed source severity as a fa
 });
 test("Windows guest-double Supply Chain preserves unknown severity and its coverage gap in an authenticated failed receipt", async t => {
   await verify(await windowsExecutionFixture(t, { action: "shield_supply_chain", shield: true, advisorySeverity: "unknown" }));
+});
+
+test("Linux actual isolated Release retains V4 critical despite zero supplied context and preserves native exit and receipt", { skip: process.platform !== "linux" }, async t => {
+  await verifyCalculated(t, repositoryShieldFixture, "release_shield", false, true);
+});
+test("Windows guest-double Supply Chain retains V4 critical without granting complete coverage or a usable gate", async t => {
+  await verifyCalculated(t, windowsExecutionFixture, "shield_supply_chain", false, true);
 });

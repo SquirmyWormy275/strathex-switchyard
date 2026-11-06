@@ -23,6 +23,11 @@ test("suite bundles contain the actual offline backend, frozen frontend and lice
   assert.ok(manifest.files.some(file => file.path === "tools/layout-studio/catalog.mjs"), "The readout backend still needs its shared catalog.");
   const catalog = await import(pathToFileURL(join(bundle.directory, "tools/layout-studio/model-f-source.mjs")).href);
   assert.deepEqual(catalog.default, JSON.parse(await readFile(join(bundle.directory, "frontend/model-f-catalog.json"), "utf8")), "The packaged backend must consume the exact frozen catalog.");
+  const { cvssV4Metrics } = await import(pathToFileURL(join(bundle.directory, "tools/layout-studio/cvss-v4-metrics.mjs")).href);
+  const v4 = cvssV4Metrics("CVSS:4.0/AV:N/AC:L/AT:N/PR:N/UI:N/VC:H/VI:H/VA:H/SC:N/SI:N/SA:N/E:U/MVC:N/MVI:N/MVA:N");
+  assert.deepEqual([v4.baseScore, v4.score, v4.severity], [9.3, 0, "critical"]);
+  const scoringData = await readFile(join(bundle.directory, "tools/layout-studio/cvss-v4-data.mjs"), "utf8");
+  assert.match(scoringData, /SPDX-License-Identifier: BSD-2-Clause/); assert.match(scoringData, /Copyright \(c\) 2023 FIRST\.ORG, Inc\., Red Hat, and contributors/); assert.match(scoringData, /THIS SOFTWARE IS PROVIDED/);
   assert.ok(bundle.bytes < 5 * 1024 * 1024); assert.equal(manifest.integrity, "sha256-content-manifest-not-signed");
   assert.ok(manifest.files.some((f) => f.path.endsWith("mymakercorner/LICENSE"))); assert.ok(manifest.files.some((f) => f.path === "integrations/switchyard_agent.py"));
   for (const name of ["pure-template.svg", "template-faces.json", "pure-template.pdf", "README.md", "ReadMe.txt"]) assert.ok(manifest.files.some((f) => f.path === `third-party/cyber_engineer/${name}`));

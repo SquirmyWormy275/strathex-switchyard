@@ -109,7 +109,15 @@ Date accessed:
 Verification notes:
 ```
 
-CVSS base scoring is independently implemented from [FIRST’s published
-CVSS specification](https://www.first.org/cvss/v3.1/specification-document).
-FIRST reference calculators were used only for isolated exhaustive comparison;
-no reference calculator code is shipped. [Calculation and evidence](docs/cvss-severity.md).
+CVSS 2 and 3 scoring is independently implemented from FIRST's published
+specifications; their reference calculator code is not shipped.
+
+CVSS 4 uses the 270 score entries, highest vectors and interpolation depths from
+[FIRST's reference calculator at `c5b0d409`](https://github.com/FIRSTdotorg/cvss-v4-calculator/tree/c5b0d409ae9f57c44264c6ce5f27d89298e1d32a).
+The data is converted to an immutable module in
+`tools/layout-studio/cvss-v4-data.mjs`, which retains the complete BSD-2-Clause
+copyright, conditions and disclaimer for FIRST.ORG, Inc., Red Hat and contributors.
+The scoring implementation is separate; the temporary reference algorithm is
+used only for isolated comparison and is removed afterward. The attributed data
+and its notice ship in application bundles. This does not change the project's
+license. [Calculation and evidence](docs/cvss-severity.md).

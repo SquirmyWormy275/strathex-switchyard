@@ -57,6 +57,13 @@ is unchanged across the latest update. Do not select, initialize, cancel, repair
 or rewrite it just to clear a preflight warning. No current owner/recording was
 active in the update preflight.
 
+CVSS 4 now matches 463,204 independently compared vectors across the declared
+cohorts, with six groups / 58 tests, typecheck and package attribution checks.
+The collector retains base severity separately from supplied context. Reference
+code and exact staging are removed. [Source evidence](evidence/cvss-v4-summary.json).
+Installed verification for this checkpoint is the next step, using only the
+normal update and the two `--read-only-metadata` verifiers.
+
 ## Continue independently
 
 1. Complete Linux `1508ea9` and its exact cleanup are accepted; do not rerun it
@@ -79,7 +86,7 @@ active in the update preflight.
    must not be treated as that terminal's acknowledgement. Keep UI wiring frozen;
    exercise the implementation with provider/editor doubles.
 4. Continue other ledger requirements, including remaining Shield coverage,
-   ecosystems, publisher provenance, CVSS 4 and workflow observation. These are
+   ecosystems, publisher provenance, verified local vulnerability context and workflow observation. These are
    unfinished software, separate from hardware/account acceptance.
 5. Use the normal versioned update for coherent backend checkpoints and only
    permitted installed checks. The metadata verifiers require

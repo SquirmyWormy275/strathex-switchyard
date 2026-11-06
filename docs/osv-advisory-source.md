@@ -43,8 +43,9 @@ settles the collection without producing a partial success artifact.
 The [OSV schema](https://ossf.github.io/osv-schema/) exposes quantitative severity
 vectors. GitHub also publishes database-specific annotations, but
 [documents those fields as unstable](https://github.com/github/advisory-database#database_specific-values).
-Collector version 2 calculates supported complete CVSS 3.0/3.1 base vectors
-using independently verified equations and package-specific scope. It does not
+Collector version 5 calculates supported complete CVSS 2.0, 3.0/3.1 and 4.0 base vectors
+using independently verified scoring and package-specific scope. Optional source
+context remains separate and cannot lower the retained base rating. It does not
 rely on unstable labels. [Severity calculation and limits](cvss-severity.md)
 describe vector bounds, maximum-score selection and source hashes. Missing,
 unsupported or ambiguous metrics retain `severity: "unknown"`; the scanner still

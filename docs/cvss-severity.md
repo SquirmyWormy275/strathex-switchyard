@@ -1,15 +1,56 @@
 # Calculate severity from supported source metrics
 
 The [OSV collector](osv-advisory-source.md) can calculate a base severity from
-complete CVSS 2.0 and 3.0/3.1 vectors, including their optional temporal and environmental metric groups. It uses FIRST's published
+complete CVSS 2.0, 3.0/3.1 and 4.0 vectors, with their supported optional metric groups. It uses FIRST's published
 [equations, rounding and rating thresholds](https://www.first.org/cvss/v3.1/specification-document).
 It does not infer metrics from advisory prose or database-specific labels.
 Supported source data produces numeric scores and the highest applicable version-specific
 rating; matched advisories still fail Shield and retain incomplete coverage.
 
-For CVSS 3, the collector requires all eight base metrics and accepts the fourteen optional metrics in any order, within 128 characters. Omitted or explicit `X` metrics use the standard defaults without claiming a supplied environment. Missing, duplicate, unknown or invalid metrics refuse calculation. CVSS 4 and other unsupported methods remain unknown. The original base-only helper still accepts only its eight base metrics.
+For CVSS 3, the collector requires all eight base metrics and accepts the fourteen optional metrics in any order, within 128 characters. Omitted or explicit `X` metrics use the standard defaults without claiming a supplied environment. Missing, duplicate, unknown or invalid metrics refuse calculation. Other unsupported versions and methods remain unknown. The original base-only helper still accepts only its eight base metrics.
 
 The signed finding severity uses the highest applicable version-specific **base** rating; scores remain separated by version. Supported supplied context is retained separately as numeric temporal/environmental scores and vector hashes, with `advisory-supplied-metrics` provenance, `localEnvironmentVerified: false` and `baseSeverityReduced: false`. For example, a critical base score of 9.8 can retain supplied scores of 8.5 and 8.2 without lowering the signed critical finding. These calculations do not verify the source metrics against the user's environment or clear a vulnerability.
+
+## CVSS 4 support
+
+CVSS 4 requires all eleven base metrics in the exact order specified by
+[FIRST](https://www.first.org/cvss/v4.0/specification-document#vector-string).
+It accepts the optional Threat, Environmental and Supplemental metrics within
+256 characters. Missing, duplicate, out-of-order and unknown values refuse
+calculation. `MSI:S` and `MSA:S` support Safety; base `SI:S` and `SA:S` are invalid.
+Provider Urgency uses its case-sensitive standard values. Omitted and explicit
+`X` metrics inherit standard defaults without asserting local facts.
+
+The calculator separately returns CVSS-B, BT, BE and BTE numeric results and
+labels the supplied metric combination. The collector preserves the base rating:
+a 9.3 critical base with supplied scores 8.1 (BT), 0 (BE) and 0 (BTE) remains a
+critical, failed finding. Supplemental metrics do not affect any numeric score;
+only their presence and normalized vector digest are retained in provenance.
+
+The implementation matches FIRST's separately loaded, hash-pinned calculator at
+[`c5b0d409`](https://github.com/FIRSTdotorg/cvss-v4-calculator/tree/c5b0d409ae9f57c44264c6ce5f27d89298e1d32a)
+on **463,204 vectors**, comparing all four score forms:
+
+| Reference cohort | Vectors |
+| --- | ---: |
+| Every base combination | 104,976 |
+| Every base combination with each non-default threat value | 209,952 |
+| Sampled base vectors crossed with individual environmental inheritance values | 6,148 |
+| All modified impact, requirement and threat combinations at the declared base | 104,976 |
+| All modified exploitability/vulnerable-impact combinations with the declared requirement and safety contexts | 34,992 |
+| Every supplemental combination at the declared base | 2,160 |
+
+This is not the full cross-product of all optional metrics. Offline regression
+fixtures retain input generation and independent result digests. Reference code
+was removed after hash and directory-identity verification; only FIRST's required
+scoring data ships, with its complete BSD-2-Clause notice and
+[attribution](../ATTRIBUTION.md). No SDK or runtime was downloaded.
+
+Six isolated groups / 58 tests pass across the calculator, collector, actual
+Linux scanner execution, Windows guest doubles, packaging and verifier guards.
+Typecheck and child/tree/staging cleanup pass. The package loads the calculator
+and retains its data notice. Installed acceptance is separate.
+[Source and comparison evidence](evidence/cvss-v4-summary.json).
 
 ## CVSS 2 support
 
@@ -29,7 +70,7 @@ ratings cannot coexist with package-specific ratings; that ambiguity stays
 unknown. Missing package-specific ratings also stay unknown.
 
 Each applicable severity array is limited to eight entries and the combined
-selection to 32. Every applicable entry must use a supported complete CVSS 2 or 3 vector.
+selection to 32. Every applicable entry must use a supported complete CVSS 2, 3 or 4 vector.
 V2 uses low/medium/high bands and never invents a critical band. In a mixed record, V2 high at 10.0 cannot replace V3 critical at 9.8. Mixed supported/unsupported
 methods stay unknown. Source labels and optional source strings do not authorize
 a request, fetch, executable, publisher claim or metric. The signed finding
@@ -38,7 +79,7 @@ vectors remains unknown and failed, with `zero-base-score-not-a-clearance`.
 
 ## Retain the calculation evidence
 
-Collector version `switchyard-osv-collector/4` retains the exact public record
+Collector version `switchyard-osv-collector/5` retains the exact public record
 hash, package/version proof, calculation algorithm identity, normalized vector
 hashes, individual numeric base scores, applicable scope and maximum score.
 Unsupported cases retain fixed reasons without copying arbitrary source fields.

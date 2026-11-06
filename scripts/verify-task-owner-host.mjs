@@ -33,7 +33,7 @@ const definitions = state => hash(JSON.stringify([state.profile, state.workflow,
 const stateRoot = join(process.env.XDG_STATE_HOME || join(homedir(), ".local/state"), "strathex-switchyard/suite"), stateFile = join(stateRoot, selected + ".sealed.json");
 const evidence = { schema: "switchyard-installed-task-owner-metadata/v1", at: new Date().toISOString(), applicationRelease: installed.build, checks: [], nativeProviderStarts: 0, nativeTaskLoads: 0, modelPromptsSubmitted: 0, keyboardOpened: false, microphoneOpened: false, workspaceCreated: false, frontendChanged: false, nativeTaskLoadingAccepted: false, ideAttachmentAccepted: false }; let failure;
 try {
-  for (const path of ["tools/layout-studio/coding-task-owners.mjs", "tools/layout-studio/coding-editor-authorizations.mjs", "packages/control-plane/src/confirmations.ts", "tools/layout-studio/codex-owned-listener.mjs", "tools/layout-studio/codex-stdio-tasks.mjs", "tools/layout-studio/suite.mjs", "tools/layout-studio/suite-store.mjs", "tools/layout-studio/confirmations.mjs", "tools/layout-studio/instance.mjs", "tools/layout-studio/serve.mjs", "tools/layout-studio/cvss-v2-metrics.mjs", "tools/layout-studio/osv-advisory-source.mjs"]) assert.equal(hash(await readFile(join(installationRoot(), "versions", installed.build, path))), hash(await readFile(new URL("../" + path, import.meta.url))));
+  for (const path of ["tools/layout-studio/coding-task-owners.mjs", "tools/layout-studio/coding-editor-authorizations.mjs", "packages/control-plane/src/confirmations.ts", "tools/layout-studio/codex-owned-listener.mjs", "tools/layout-studio/codex-stdio-tasks.mjs", "tools/layout-studio/suite.mjs", "tools/layout-studio/suite-store.mjs", "tools/layout-studio/confirmations.mjs", "tools/layout-studio/instance.mjs", "tools/layout-studio/serve.mjs", "tools/layout-studio/cvss-v2-metrics.mjs", "tools/layout-studio/cvss-v4-metrics.mjs", "tools/layout-studio/cvss-v4-data.mjs", "tools/layout-studio/osv-advisory-source.mjs"]) assert.equal(hash(await readFile(join(installationRoot(), "versions", installed.build, path))), hash(await readFile(new URL("../" + path, import.meta.url))));
   evidence.checks.push("normal installed release contains the exact task owner, resume boundary, state and route source");
   assert.equal((before.observations ?? []).some(row => row.status === "recording") || (before.voice ?? []).some(row => row.status === "recording") || (before.conversations ?? []).some(row => row.status === "pending"), false, "Preserve active user work before normal workspace initialization.");
   const snapshot = await api("snapshot", { compartment: selected }); assert.equal(Object.hasOwn(snapshot, "codingTaskOwners"), false); assert.equal(Object.hasOwn(snapshot, "codingTaskLoads"), false); assert.equal(Object.hasOwn(snapshot, "codingEditorAuthorizations"), false);
@@ -68,8 +68,9 @@ try {
     await assert.rejects(editor.reviewEditor(input), /original Switchyard editor target did not authenticate or validate/);
     await assert.rejects(editor.issueEditor({ ...input, token: randomUUID() }), /original Switchyard editor target did not authenticate or validate/);
     await assert.rejects(editor.consumeEditor({ ...input, permit: randomUUID() }), /original Switchyard editor target did not authenticate or validate/);
-    evidence.signedEditorAuthorizationRefusals = 3;
-    evidence.checks.push("signed editor review, issue and consume refuse unknown ownership without confirmation, permit or terminal effects");
+    await assert.rejects(editor.returnEditorTarget(input), /original Switchyard editor target did not authenticate or validate/);
+    evidence.signedEditorAuthorizationRefusals = 4;
+    evidence.checks.push("signed editor review, issue, consume and return refuse unknown ownership without confirmation, permit or terminal effects");
   }
   finally { editor.close(); }
   evidence.signedEditorUnknownOwnerRefused = true; evidence.checks.push("exact-source editor consumer refuses an unknown installed target without a bearer, terminal or native task effect");
@@ -80,6 +81,13 @@ try {
   assert.equal(normalized.advisory.severity, "critical"); assert.equal(normalized.evidence.cvssV2Context.localEnvironmentVerified, false); assert.equal(normalized.evidence.cvssV2Context.baseSeverityReduced, false);
   evidence.installedCvssV2 = { baseScore: calculated.baseScore, temporalScore: calculated.temporalScore, environmentalScore: calculated.environmentalScore, nativeRating: calculated.severity, mixedRating: normalized.advisory.severity, publicQueries: 0, scannerExecuted: false };
   evidence.checks.push("installed V2 calculator and mixed-version collector retain base ratings from synthetic offline metrics without query or scan");
+  const { cvssV4Metrics } = await import(pathToFileURL(join(installedRoot, "tools/layout-studio/cvss-v4-metrics.mjs")));
+  const v4Vector = "CVSS:4.0/AV:N/AC:L/AT:N/PR:N/UI:N/VC:H/VI:H/VA:H/SC:N/SI:N/SA:N/E:U/MVC:N/MVI:N/MVA:N", v4 = cvssV4Metrics(v4Vector);
+  assert.deepEqual([v4.baseScore, v4.threatScore, v4.environmentalScore, v4.score, v4.severity], [9.3, 8.1, 0, 0, "critical"]);
+  const v4Record = { ...record, id: "OSV-synthetic-installed-v4", severity: [{ type: "CVSS_V4", score: v4Vector }] }, v4Normalized = normalizeOsvRecord(v4Record, { ecosystem: "npm", name: "synthetic", version: "1.0.0" }, Date.now());
+  assert.equal(v4Normalized.advisory.severity, "critical"); assert.equal(v4Normalized.evidence.cvssV4Context.localEnvironmentVerified, false); assert.equal(v4Normalized.evidence.cvssV4Context.baseSeverityReduced, false);
+  evidence.installedCvssV4 = { baseScore: v4.baseScore, threatScore: v4.threatScore, environmentalScore: v4.environmentalScore, suppliedContextScore: v4.score, retainedRating: v4Normalized.advisory.severity, publicQueries: 0, scannerExecuted: false };
+  evidence.checks.push("installed V4 calculator and collector retain critical base severity despite zero supplied context without a query, scanner or task");
   assert.equal(hash(await privateRead(stateFile)), sealed); assert.equal(definitions(await store.snapshot(selected)), definitions(before)); assert.equal(await store.selection(), selected); assert.equal(await privateRead(endpointFile), endpointBefore); assert.equal((await applicationStatus()).build, installed.build);
   const home = await fetch(binding.url.origin, { redirect: "error", signal: AbortSignal.timeout(15000) }); assert.equal(home.status, 200); evidence.homeSha256 = hash(await home.text()); assert.equal(evidence.homeSha256, "20ba0095a6b9650046df34541872aa7e0a7cdc7db5182f065abb009127c6c130");
   evidence.selectedStatePreserved = true; evidence.checks.push("tested routes preserve selected sealed bytes, definitions/mode/readouts, private endpoint and frozen Home");

@@ -1,5 +1,10 @@
 # What has actually been verified
 
+CVSS 4 source support matches 463,204 independently generated/reference-compared
+vectors. Six groups / 58 tests, typecheck and exact source/build cleanup pass;
+actual Linux scanner and Windows guest-double evidence remain distinct from
+installed acceptance. [Evidence](evidence/cvss-v4-summary.json).
+
 Latest focused backend checkpoint: the exact consumed-editor return path supports
 idle and active original tasks without another launch/resume. Five groups / 60
 tests, typecheck, compiled extension load and owned cleanup pass with controlled

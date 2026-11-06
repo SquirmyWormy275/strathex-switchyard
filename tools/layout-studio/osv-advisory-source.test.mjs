@@ -108,7 +108,7 @@ test("V2 package scope, source-method mismatch, zero impact and mixed unsupporte
 test("OSV calculates quantitative base severity only from complete supported vectors and preserves every source/algorithm hash", async () => {
   const source = record(); source.severity = [...severity(lowVector), ...severity(highVector)];
   const result = normalizeOsvRecord(source, query, now()); assert.equal(result.advisory.severity, "critical"); assert.equal(result.evidence.severityAssessment, "cvss-v3-base-calculated"); assert.equal(result.evidence.cvssV3Base.maximumScore, 9.8); assert.equal(result.evidence.cvssV3Base.scope, "record"); assert.equal(result.evidence.cvssV3Base.vectors.length, 2); assert.ok(result.evidence.cvssV3Base.vectors.every(row => /^[a-f0-9]{64}$/.test(row.vectorSha256))); assert.equal(JSON.stringify(result).includes("CVSS:3."), false);
-  const collected = await collectOsvAdvisories([query], { now, fetchImpl: async () => response({ vulns: [source] }) }); assert.equal(collected.provenance.collector, "switchyard-osv-collector/4");
+  const collected = await collectOsvAdvisories([query], { now, fetchImpl: async () => response({ vulns: [source] }) }); assert.equal(collected.provenance.collector, "switchyard-osv-collector/5");
   const f = scannerFixture({ action: "shield_supply_chain", files: { "package-lock.json": JSON.stringify({ lockfileVersion: 3, packages: { "node_modules/example": { version: "1.2.3", license: "MIT" } } }) }, advisory: collected.feed.packages }), report = await f.scan();
   assert.equal(report.outcome, "failed"); assert.equal(report.completeness, "incomplete"); assert.equal(report.findings[0].severity, "critical"); assert.equal(report.gaps.includes("advisory_severity_unassessed"), false); assert.deepEqual(parseShieldScannerReport(JSON.stringify(report), { engine: report.engine, requestSha256: report.requestSha256, request: f.request }, f.request.action), report);
 });
@@ -133,4 +133,30 @@ test("advisory temporal/environmental metrics remain separate evidence and canno
 test("unsupported, zero, malformed and ambiguous severity retains an explicit unknown finding without trusting labels or arbitrary source fields", () => {
   const vectors = [undefined, [], null, {}, severity("9.8"), severity(highVector + "/E:Z"), severity(highVector.replace("3.1", "4.0")), severity(highVector.replace("A:H", "C:H")), [{ type: "CVSS_V4", score: highVector }], [...severity(highVector), { type: "CVSS_V2", score: "AV:N" }], [{ ...severity(highVector)[0], executable: "NEVER_EXECUTE" }], [{ ...severity(highVector)[0], source: {} }], Array.from({ length: 9 }, () => severity(highVector)[0]), severity("CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:N")];
   for (const value of vectors) { const source = record(); source.severity = value; const result = normalizeOsvRecord(source, query, now()); assert.equal(result.advisory.severity, "unknown"); assert.equal(result.evidence.severityAssessment, "not-performed"); assert.equal(typeof result.evidence.severityReason, "string"); assert.equal(result.evidence.cvssV3Base, undefined); assert.equal(JSON.stringify(result).includes("NEVER_"), false); }
+});
+
+const v4 = "CVSS:4.0/AV:N/AC:L/AT:N/PR:N/UI:N/VC:H/VI:H/VA:H/SC:N/SI:N/SA:N";
+test("V4 source context and supplemental metrics preserve a critical base finding through the real scanner", async () => {
+  const source = record(), vector = v4 + "/E:U/MVC:N/MVI:N/MVA:N/S:P/U:Red";
+  source.severity = [{ type: "CVSS_V4", score: vector, source: "https://NEVER_FETCH.invalid" }];
+  const result = normalizeOsvRecord(source, query, now()), context = result.evidence.cvssV4Context;
+  assert.equal(result.advisory.severity, "critical"); assert.equal(result.evidence.severityAssessment, "cvss-v4-base-calculated"); assert.equal(result.evidence.cvssV4Base.maximumScore, 9.3);
+  assert.equal(context.localEnvironmentVerified, false); assert.equal(context.baseSeverityReduced, false); assert.equal(context.provenance, "advisory-supplied-metrics");
+  assert.deepEqual(context.vectors.map(row => [row.threatScore, row.environmentalScore, row.suppliedContextScore, row.nomenclature, row.supplementalMetricsSupplied]), [[8.1, 0, 0, "CVSS-BTE", true]]);
+  assert.equal(JSON.stringify(result).includes("NEVER_"), false); assert.equal(JSON.stringify(result).includes(vector), false);
+  const collected = await collectOsvAdvisories([query], { now, fetchImpl: async () => response({ vulns: [source] }) });
+  const f = scannerFixture({ action: "release_shield", files: { "package-lock.json": JSON.stringify({ lockfileVersion: 3, packages: { "node_modules/example": { version: "1.2.3", license: "MIT" } } }) }, advisory: collected.feed.packages }), report = await f.scan();
+  assert.equal(report.findings[0].severity, "critical"); assert.equal(report.outcome, "failed"); assert.equal(report.completeness, "incomplete"); assert.equal(report.gaps.includes("advisory_severity_unassessed"), false);
+  source.severity.push({ type: "CVSS_V4", score: v4 }, { type: "CVSS_V4", score: v4 + "/E:X" }); assert.equal(normalizeOsvRecord(source, query, now()).evidence.cvssV4Base.vectors.length, 1);
+});
+test("V4 mixed-version ratings, source scope, zero base, malformed ordering and unsupported methods remain distinct", () => {
+  const source = record(); source.affected[0].severity = [{ type: "CVSS_V4", score: v4 + "/E:U" }];
+  source.affected.push({ package: { ecosystem: "PyPI", name: query.name }, versions: [query.version], severity: severity(highVector) });
+  let result = normalizeOsvRecord(source, query, now()); assert.equal(result.evidence.cvssV4Base.scope, "affected-package"); assert.equal(result.evidence.cvssV3Base, undefined);
+  source.affected[0].severity.push({ type: "CVSS_V2", score: "AV:N/AC:L/Au:N/C:C/I:C/A:C" });
+  result = normalizeOsvRecord(source, query, now()); assert.equal(result.advisory.severity, "critical"); assert.equal(result.evidence.severityAssessment, "cvss-mixed-base-calculated"); assert.equal(result.evidence.cvssV2Base.maximumScore, 10);
+  for (const rows of [[{ type: "CVSS_V4", score: v4.replace("VC:H/VI:H/VA:H", "VC:N/VI:N/VA:N") + "/MVC:H" }], [{ type: "CVSS_V4", score: v4 + "/MSI:S/E:U" }], [{ type: "CVSS_V4", score: v4 }, { type: "unsupported", score: "critical" }], [{ type: "CVSS_V3", score: v4 }]]) {
+    source.affected[0].severity = rows; const result = normalizeOsvRecord(source, query, now()); assert.equal(result.advisory.severity, "unknown"); assert.equal(result.evidence.cvssV4Base, undefined);
+  }
+  source.affected[0].severity = [{ type: "CVSS_V4", score: v4 + "/U:Red" }]; result = normalizeOsvRecord(source, query, now()); assert.equal(result.evidence.cvssV4Context.vectors[0].suppliedContextScore, undefined); assert.equal(result.evidence.cvssV4Context.vectors[0].supplementalMetricsSupplied, true);
 });

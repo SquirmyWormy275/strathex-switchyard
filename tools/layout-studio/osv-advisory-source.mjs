@@ -4,6 +4,7 @@ import { shieldEngineVersion, pypiIdentity, parsePypiVersion, pypiVersionKey, co
 import { cvssV2Metrics, cvssV2BaseAlgorithm, cvssV2MetricsAlgorithm } from "./cvss-v2-metrics.mjs";
 import { cvssV3BaseAlgorithm } from "./cvss-v3-base.mjs";
 import { cvssV3Metrics, cvssV3MetricsAlgorithm } from "./cvss-v3-metrics.mjs";
+import { cvssV4Metrics, cvssV4BaseAlgorithm, cvssV4MetricsAlgorithm } from "./cvss-v4-metrics.mjs";
 
 const endpoint = "https://api.osv.dev/v1/query", sha = bytes => createHash("sha256").update(bytes).digest("hex");
 const object = value => value !== null && typeof value === "object" && !Array.isArray(value);
@@ -66,11 +67,18 @@ function severityAssessment(record, matched) {
   if (groups.reduce((count, group) => count + group.length, 0) > 32) return unknown("severity-vector-bound");
   const calculated = new Map(), contexts = new Map();
   for (const entry of groups.flat()) {
-    if (!object(entry) || Object.keys(entry).some(key => !["type", "score", "source"].includes(key)) || !["CVSS_V2", "CVSS_V3"].includes(entry.type) || entry.source !== undefined && (typeof entry.source !== "string" || entry.source.length > 256)) return unknown("unsupported-severity-method-or-fields");
+    if (!object(entry) || Object.keys(entry).some(key => !["type", "score", "source"].includes(key)) || !["CVSS_V2", "CVSS_V3", "CVSS_V4"].includes(entry.type) || entry.source !== undefined && (typeof entry.source !== "string" || entry.source.length > 256)) return unknown("unsupported-severity-method-or-fields");
     try {
-      const result = entry.type === "CVSS_V2" ? cvssV2Metrics(entry.score) : cvssV3Metrics(entry.score);
+      const result = entry.type === "CVSS_V2" ? cvssV2Metrics(entry.score) : entry.type === "CVSS_V3" ? cvssV3Metrics(entry.score) : cvssV4Metrics(entry.score);
       calculated.set(result.baseVector, { version: result.version, score: result.baseScore, severity: result.severity, vector: result.baseVector });
-      if (result.temporalSupplied || result.environmentalSupplied) contexts.set(result.vector, { version: result.version, baseVectorSha256: sha(result.baseVector), vectorSha256: sha(result.vector), temporalMetricsSupplied: result.temporalSupplied, environmentalMetricsSupplied: result.environmentalSupplied, ...(result.temporalSupplied ? { temporalScore: result.temporalScore } : {}), ...(result.environmentalSupplied ? { environmentalScore: result.environmentalScore } : {}) });
+      if (result.version === "4.0") {
+        if (result.threatSupplied || result.environmentalSupplied || result.supplementalSupplied) contexts.set(result.vector, {
+          version: result.version, baseVectorSha256: sha(result.baseVector), vectorSha256: sha(result.vector), nomenclature: result.nomenclature,
+          threatMetricsSupplied: result.threatSupplied, environmentalMetricsSupplied: result.environmentalSupplied, supplementalMetricsSupplied: result.supplementalSupplied,
+          ...(result.threatSupplied ? { threatScore: result.threatScore } : {}), ...(result.environmentalSupplied ? { environmentalScore: result.environmentalScore } : {}),
+          ...(result.threatSupplied || result.environmentalSupplied ? { suppliedContextScore: result.score } : {})
+        });
+      } else if (result.temporalSupplied || result.environmentalSupplied) contexts.set(result.vector, { version: result.version, baseVectorSha256: sha(result.baseVector), vectorSha256: sha(result.vector), temporalMetricsSupplied: result.temporalSupplied, environmentalMetricsSupplied: result.environmentalSupplied, ...(result.temporalSupplied ? { temporalScore: result.temporalScore } : {}), ...(result.environmentalSupplied ? { environmentalScore: result.environmentalScore } : {}) });
     }
     catch { return unknown("unsupported-or-malformed-cvss-vector"); }
   }
@@ -83,15 +91,15 @@ function severityAssessment(record, matched) {
   const severity = rank[Math.max(...[...calculated.values()].map(row => rank.indexOf(row.severity)))];
   const summary = {};
   const byHash = (a, b) => a.vectorSha256 < b.vectorSha256 ? -1 : a.vectorSha256 > b.vectorSha256 ? 1 : 0;
-  for (const [major, baseAlgorithm, contextAlgorithm] of [["2", cvssV2BaseAlgorithm, cvssV2MetricsAlgorithm], ["3", cvssV3BaseAlgorithm, cvssV3MetricsAlgorithm]]) {
+  for (const [major, baseAlgorithm, contextAlgorithm] of [["2", cvssV2BaseAlgorithm, cvssV2MetricsAlgorithm], ["3", cvssV3BaseAlgorithm, cvssV3MetricsAlgorithm], ["4", cvssV4BaseAlgorithm, cvssV4MetricsAlgorithm]]) {
     const rows = [...calculated.values()].filter(row => row.version.startsWith(major + "."));
     if (!rows.length) continue;
     summary["cvssV" + major + "Base"] = { algorithm: baseAlgorithm, scope: packageLevel ? "affected-package" : "record", maximumScore: Math.max(...rows.map(row => row.score)), vectors: rows.map(row => ({ version: row.version, score: row.score, vectorSha256: sha(row.vector) })).sort(byHash) };
     const supplied = [...contexts.values()].filter(row => row.version.startsWith(major + "."));
     if (supplied.length) summary["cvssV" + major + "Context"] = { algorithm: contextAlgorithm, provenance: "advisory-supplied-metrics", localEnvironmentVerified: false, baseSeverityReduced: false, vectors: supplied.sort(byHash) };
   }
-  const mixed = summary.cvssV2Base && summary.cvssV3Base;
-  return { severity, severityAssessment: mixed ? "cvss-mixed-base-calculated" : summary.cvssV2Base ? "cvss-v2-base-calculated" : "cvss-v3-base-calculated", severitySelection: "highest-version-specific-base-rating", ...summary };
+  const versions = ["2", "3", "4"].filter(major => summary["cvssV" + major + "Base"]);
+  return { severity, severityAssessment: versions.length > 1 ? "cvss-mixed-base-calculated" : `cvss-v${versions[0]}-base-calculated`, severitySelection: "highest-version-specific-base-rating", ...summary };
 
 }
 export function normalizeOsvRecord(record, query, observedAt) {
@@ -172,5 +180,5 @@ export async function collectOsvAdvisories(input, { fetchImpl = globalThis.fetch
   const finished = now();
   if (performance.now() > deadline || !Number.isFinite(finished) || finished < started || finished - started > totalTimeoutMs + 5000) throw Error("OSV collection clock or total deadline changed; no complete feed was produced.");
   const feed = { schema: "switchyard-shield-advisories/v1", version: 1, engine: shieldEngineVersion, packages };
-  return { feed, provenance: { schema: "switchyard-osv-collection/v1", collector: "switchyard-osv-collector/4", normalizedFeedSha256: sha(JSON.stringify(feed)), source: endpoint, startedAt, finishedAt: new Date(finished).toISOString(), unsigned: true, upstreamSignatureVerified: false, authorityGranted: false, completeRepositoryCoverage: false, severityAssessment: "cvss-v2-v3-base-when-supported", packages: observations } };
+  return { feed, provenance: { schema: "switchyard-osv-collection/v1", collector: "switchyard-osv-collector/5", normalizedFeedSha256: sha(JSON.stringify(feed)), source: endpoint, startedAt, finishedAt: new Date(finished).toISOString(), unsigned: true, upstreamSignatureVerified: false, authorityGranted: false, completeRepositoryCoverage: false, severityAssessment: "cvss-v2-v3-v4-base-when-supported", packages: observations } };
 }
