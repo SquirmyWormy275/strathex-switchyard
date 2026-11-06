@@ -6,7 +6,7 @@ a partial implementation.** The F77 is the pilot device; it does not limit scope
 
 The Linux backend has a passing complete test checkpoint, and a versioned
 application is installed. The source has since gained additional tested changes.
-Windows restricted-owner Job creation is an active software failure. Hardware,
+Windows restricted-owner startup is an active software failure. Hardware,
 account and visual acceptance remain separate from those implementation results.
 
 Use the [requirement ledger](switchyard-requirements.md) for the complete scope,
@@ -17,6 +17,27 @@ Work is published on [draft PR 20](https://github.com/SquirmyWormy275/strathex-s
 there is no merge or public release acceptance.
 
 ## Current evidence
+
+Native Windows `cff471e` verifies the first guardian's exact QUERY-mask-8
+allowance and reaches `probe-identity-created-native-self-birth`. That later
+phase establishes that named Job creation/configuration cleared, but the
+original owner remains **0/8**; worker and status registration were not exercised.
+[Retained native evidence](evidence/windows-descendant-query-native-summary.json).
+The next correction reads the guardian's creation time through Windows' current-
+process pseudo handle, preserving the original birth format and permissions.
+The coordinator now checks liveness through `GetExitCodeProcess`, because exit
+time is undefined for a live process. Nine focused groups pass **87 tests / four
+Windows-only skips**; two managed builds and **2,101 portable checks** pass.
+Native acceptance of this correction remains pending.
+[Source evidence](evidence/guardian-self-birth-source-summary.json).
+
+Complete Linux `dbbcce8` is **failed**: 280 groups, 1,770 passed tests,
+fifteen declared skips and two fixture write failures caused by `/tmp` user
+quota exhaustion. An exact owned 18-byte write probe confirmed `EDQUOT` and was
+removed. Socket fixtures now honor the isolated temporary directory, keeping the
+same socket path limit. The focused recovery tests pass. All owned test children,
+checkout, nine aliases and 782 generated files were retired; a corrected complete
+run remains pending. [Failed run and cleanup](evidence/linux-dbbc-failed-summary.json).
 
 A CI-only candidate now applies the existing QUERY-only token allowance to
 exact descendants of the original restricted owner. Job membership, process

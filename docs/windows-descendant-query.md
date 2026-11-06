@@ -3,8 +3,11 @@
 The disposable Windows proof now extends its existing QUERY-only token allowance
 to exact native descendants of the original restricted owner. This is a candidate
 correction for the helper's observed self-token QUERY denial before named Job
-creation. Native acceptance is pending; the original owner remains zero of eight
-accepted checks.
+creation. Native Windows `cff471e` verifies the first guardian allowance and
+reaches the later self-birth phase, clearing named Job creation/configuration.
+The original owner remains zero of eight accepted checks; worker and status
+registration were not exercised.
+[Native receipt](evidence/windows-descendant-query-native-summary.json).
 
 ## Bound the allowance
 
@@ -61,3 +64,16 @@ request parser checks pass. Typecheck and exact owned cleanup pass.
 These checks do not accept the native allowance or the original owner journey.
 The actual Windows CI lane must still execute the complete eight-check proof,
 including independently verified process exit and exact fixture retirement.
+
+## Self-birth follow-up
+
+The guardian now reads its own creation time through `GetCurrentProcess` and
+`GetProcessTimes`, preserving the UTC tick wire format without reopening its PID
+or changing its process DACL. The native proof checks liveness using
+`GetExitCodeProcess` before and after the QUERY allowance: Microsoft documents
+that a live process has an undefined exit-time field. Limited-query access stays
+unchanged. This source correction still needs native acceptance.
+[Source receipt](evidence/guardian-self-birth-source-summary.json).
+
+Primary references: [current-process pseudo handle](https://learn.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-getcurrentprocess)
+and [process creation and exit times](https://learn.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-getprocesstimes).

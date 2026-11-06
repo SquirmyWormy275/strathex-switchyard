@@ -125,7 +125,11 @@ internal static class RuntimeCommandRunner
         if (Convert.ToHexString(SHA256.HashData(executableLock)).ToLowerInvariant() != digest) throw NativeError();
         using var job = CreateJob(id, startup);
         startup.Phase = "self-birth";
-        string birth = Process.GetCurrentProcess().StartTime.ToUniversalTime().Ticks.ToString();
+        // The current-process pseudo handle identifies this exact guardian.
+        // Reopening its PID through Process.StartTime can be denied under the
+        // original restricted process DACL; no additional access is needed.
+        if (!GetSelfProcessTimes(GetCurrentProcess(), out long selfCreated, out _, out _, out _)) throw NativeError();
+        string birth = DateTime.FromFileTimeUtc(selfCreated).Ticks.ToString(System.Globalization.CultureInfo.InvariantCulture);
         startup.Phase = "ready-write";
         Write(new { schema = Schema, id, @event = "ready", guardianPid = Environment.ProcessId, birth, containment = "windows-job", capabilities = new[] { "bounded-stdin", "bounded-stdin-512k", "bounded-stderr", "suspended-worker-ack" } });
         startup.Ready = true;
@@ -292,6 +296,8 @@ internal static class RuntimeCommandRunner
     [DllImport("kernel32.dll", SetLastError = true)] private static extern uint ResumeThread(SafeFileHandle thread);
     [DllImport("kernel32.dll", SetLastError = true)] private static extern uint GetProcessId(SafeFileHandle process);
     [DllImport("kernel32.dll", SetLastError = true)] private static extern bool GetProcessTimes(SafeFileHandle process, out long created, out long exited, out long kernel, out long user);
+    [DllImport("kernel32.dll", EntryPoint = "GetProcessTimes", SetLastError = true)] private static extern bool GetSelfProcessTimes(IntPtr process, out long created, out long exited, out long kernel, out long user);
+    [DllImport("kernel32.dll")] private static extern IntPtr GetCurrentProcess();
     [DllImport("kernel32.dll", SetLastError = true)] private static extern uint WaitForSingleObject(SafeFileHandle process, uint timeout);
     [DllImport("kernel32.dll", SetLastError = true)] private static extern bool GetExitCodeProcess(SafeFileHandle process, out uint code);
     [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode)] private static extern SafeFileHandle CreateFileW(string path, uint access, uint share, IntPtr attributes, uint disposition, uint flags, IntPtr template);

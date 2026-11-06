@@ -1,0 +1,60 @@
+{
+  "schema": "switchyard-guardian-self-birth-source/v1",
+  "basis": "cff471eeb27a05300642bc9c0218362ea9756ae9",
+  "sourceSha256": {
+    "apps/desktop-hotkeys/RuntimeCommandRunner.cs": "2a6fa328b0878fccc13527c822d422798fdd936796ffc9ee8f9e0e097edfb00c",
+    "deployment/windows/test-support/storage-broker-protocol/DescendantSelfTokenQuery.cs": "0798cf2e3b31ab7edf1ce4ea30b66b4bac451d0e650d401005a195aade47a725",
+    "tools/layout-studio/codex-editor-recovery.test.mjs": "c7c7a6a15255d8466eb3c159ed43a49ec14e60d0914ecd087efd780321cabb6f",
+    "tools/layout-studio/coding-editor-connections.test.mjs": "134fd8ecb7ed502d7644d09c70bd2bc4e84a70511f4f2d7ae676b60b68c4eecf"
+  },
+  "focused": {
+    "receipt": "isolated-test-f329c33f-a264-4c8d-91fb-38787bf092f2.json",
+    "totals": {
+      "required": 9,
+      "passed": 9,
+      "failed": 0,
+      "tests": 91,
+      "passedTests": 87,
+      "failedTests": 0,
+      "skippedTests": 4,
+      "cancelledTests": 0,
+      "todoTests": 0
+    },
+    "allChildAndTreeCleanupVerified": true
+  },
+  "managed": {
+    "receipt": "guardian-self-birth-managed-1793984151664.json",
+    "builds": [
+      {
+        "name": "helper",
+        "warnings": 0,
+        "errors": 0,
+        "managedAssemblySha256": "7293ded97dd4064f8e27538558aafb76ba72d86038878706fda6d1106c972c55",
+        "managedPeSubsystem": 2
+      },
+      {
+        "name": "proof",
+        "warnings": 0,
+        "errors": 0,
+        "managedAssemblySha256": "5e959e0346f0c0edb152f068441eff6eb0b272c42926564543a1ba2057b1e4aa",
+        "managedPeSubsystem": 3
+      }
+    ],
+    "portableChecks": 2101,
+    "cleanup": {
+      "files": 147,
+      "bytes": 3304611,
+      "removed": true
+    },
+    "earlierIncompleteAttempt": "guardian-self-birth-managed-1793983870510.json"
+  },
+  "typecheckPassed": true,
+  "permissionChange": false,
+  "birthWireFormatChanged": false,
+  "socketPathLimitChanged": false,
+  "testTemporaryDirectoryHonored": true,
+  "installedChanged": false,
+  "newRuntimeOrSdkDownloads": false,
+  "nativeAcceptance": false,
+  "completeLinuxAcceptance": false
+}

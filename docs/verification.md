@@ -1,5 +1,27 @@
 # What has actually been verified
 
+Native Windows `cff471e` verifies the first guardian's exact QUERY-mask-8
+allowance and reaches `probe-identity-created-native-self-birth`. That later
+phase establishes that named Job creation/configuration cleared, but the
+original owner remains **0/8**; worker and status registration were not exercised.
+[Retained native evidence](evidence/windows-descendant-query-native-summary.json).
+The next correction reads the guardian's creation time through Windows' current-
+process pseudo handle, preserving the original birth format and permissions.
+The coordinator now checks liveness through `GetExitCodeProcess`, because exit
+time is undefined for a live process. Nine focused groups pass **87 tests / four
+Windows-only skips**; two managed builds and **2,101 portable checks** pass.
+Native acceptance of this correction remains pending.
+[Source evidence](evidence/guardian-self-birth-source-summary.json).
+
+Complete Linux `dbbcce8` is **failed**: 280 groups, 1,770 passed tests,
+fifteen declared skips and two fixture write failures caused by `/tmp` user
+quota exhaustion. An exact owned 18-byte write probe confirmed `EDQUOT` and was
+removed. Socket fixtures now honor the isolated temporary directory, keeping the
+same socket path limit. The focused recovery tests pass. All owned test children,
+checkout, nine aliases and 782 generated files were retired; a corrected complete
+run remains pending. [Failed run and cleanup](evidence/linux-dbbc-failed-summary.json).
+
+
 A CI-only candidate now applies the existing QUERY-only token allowance to
 exact descendants of the original restricted owner. Job membership, process
 birth, pinned image, original restrictions and exact mask-8 readback are required.

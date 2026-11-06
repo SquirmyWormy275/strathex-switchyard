@@ -59,7 +59,7 @@ internal static partial class NativeRestrictedHostProof
                     Phase = "descendant-query-job"; Native(!child.IsInvalid);
                     Native(IsProcessInJob(child, job, out bool member)); Require(member); evidence.originalJobVerified = true;
                     Phase = "descendant-query-birth";
-                    Native(GetProcessTimes(child, out long created, out long exited, out _, out _)); Require(exited == 0 && identities.Add((request.Pid, created)));
+                    Native(GetProcessTimes(child, out long created, out _, out _, out _)); Native(GetExitCodeProcess(child, out uint live)); Require(live == 259 && identities.Add((request.Pid, created)));
                     observedBirth = DateTime.FromFileTimeUtc(created).Ticks.ToString(CultureInfo.InvariantCulture);
                     Require(request.Birth == null || request.Birth == observedBirth); evidence.liveBirthVerified = true;
                     Phase = "descendant-query-image";
@@ -70,7 +70,7 @@ internal static partial class NativeRestrictedHostProof
                     Require(helperMatch || setupMatch); evidence.pinnedImageVerified = true;
                     Phase = "descendant-query-exact-allowance";
                     ApplyOwnTokenQuery(child, user, "descendant-" + request.Role, query => evidence.query = query);
-                    Native(GetProcessTimes(child, out long currentBirth, out exited, out _, out _)); Require(currentBirth == created && exited == 0 && WaitForSingleObject(owner, 0) == 258);
+                    Native(GetProcessTimes(child, out long currentBirth, out _, out _, out _)); Native(GetExitCodeProcess(child, out live)); Require(currentBirth == created && live == 259 && WaitForSingleObject(owner, 0) == 258);
                     Native(IsProcessInJob(child, job, out member)); Require(member); evidence.status = "verified";
                 }
                 finally { child.Dispose(); evidence.processHandleClosedVerified = child.IsClosed; }

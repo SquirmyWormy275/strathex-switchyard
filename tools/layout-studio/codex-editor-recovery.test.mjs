@@ -16,7 +16,7 @@ const native={skip:process.platform!=='linux'};
 async function until(fn){const end=Date.now()+10000;while(Date.now()<end){const value=await fn();if(value)return value;await new Promise(r=>setTimeout(r,15));}throw Error('The exact crash fixture checkpoint did not settle');}
 async function gone(pid){try{const s=await readFile('/proc/'+pid+'/stat','utf8');return s.slice(s.lastIndexOf(') ')+2).split(' ')[0]==='Z';}catch(e){if(['ENOENT','ESRCH'].includes(e.code))return true;throw e;}}
 async function fixture(t){
- const root=await mkdtemp(join(tmpdir(),'syerc-')),socketRoot=await mkdtemp('/tmp/syerc-'),providerRoot=join(root,'provider');await mkdir(providerRoot,{mode:0o700});
+ const root=await mkdtemp(join(tmpdir(),'syerc-')),socketRoot=await mkdtemp(join(tmpdir(),'e-')),providerRoot=join(root,'provider');await mkdir(providerRoot,{mode:0o700});
  await copyFile(new URL('./test-support/codex-owned-listener-fixture.cjs',import.meta.url),join(providerRoot,'app-server'));await writeFile(join(providerRoot,'account'),'synthetic@example.invalid');await writeFile(join(providerRoot,'fixture.json'),JSON.stringify({config:codexDesignConfig(),repositoryRoot:'/synthetic/repository'}));
  const child=spawn(process.execPath,[fileURLToPath(new URL('./test-support/editor-recovery-fixture.mjs',import.meta.url))],{stdio:['pipe','pipe','ignore']});let text='',proof,api;
  child.stdout.on('data',b=>{text+=b;assert.ok(Buffer.byteLength(text)<16384);});child.stdin.end(JSON.stringify({root,socketRoot,providerRoot})+'\n');
