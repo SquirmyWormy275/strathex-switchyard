@@ -1,5 +1,13 @@
 # Switchyard implementation and acceptance
 
+Windows release 97a7727 also failed because its archived test source omitted
+the native state-lock helper; the lease test reports ENOENT.
+The builder now compiles that helper from the pinned snapshot before tests,
+copies verified bytes into an absent destination and includes its build directory
+in exact cleanup. Four portable groups / 42 checks pass; native follow-up is
+pending. This staging omission is separate from restricted-token startup.
+[Failure and source correction](evidence/windows-archived-helper-summary.json).
+
 Cargo declaration inventory now passes **eight groups / 81 tests**, including
 actual Linux Supply Chain/Release scans and explicitly doubled Windows guests.
 Forty-eight supported lockfile examples agree with the installed Python TOML

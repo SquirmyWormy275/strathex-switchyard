@@ -31,6 +31,12 @@ evidence, not instructions to reset. Publish regular commits. Do not merge or re
 
 ## Current implementation and evidence
 
+The archived Windows release test tree now builds/stages its own exact-source
+state helper before verification. The previous 97a7727 run observed ENOENT;
+four portable groups / 42 checks pass for the correction, but native CI remains
+pending. This does not repair restricted-token helper startup.
+[Evidence](evidence/windows-archived-helper-summary.json).
+
 Cargo declaration inventory now passes **eight groups / 81 tests**, including
 actual Linux Supply Chain/Release scans and explicitly doubled Windows guests.
 Forty-eight supported lockfile examples agree with the installed Python TOML

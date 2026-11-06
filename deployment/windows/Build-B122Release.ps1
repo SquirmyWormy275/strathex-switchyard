@@ -328,6 +328,31 @@ if(-not(Test-Path -LiteralPath $tscCli -PathType Leaf)-or(Get-Item -LiteralPath 
 $nodeExecutableSha256=(Get-FileHash -LiteralPath $node.FullName -Algorithm SHA256).Hash.ToLowerInvariant();$npmCliSha256=(Get-FileHash -LiteralPath $npmCli.FullName -Algorithm SHA256).Hash.ToLowerInvariant();$tscSha256=(Get-FileHash -LiteralPath $tscCli -Algorithm SHA256).Hash.ToLowerInvariant()
 $npmVersion=(Invoke-B122IsolatedCapture -Executable $node.FullName -Arguments @($npmCli.FullName,'--version') -FailureMessage 'Bundled npm version probe failed.').Trim();$tscVersion=(Invoke-B122IsolatedCapture -Executable $node.FullName -Arguments @($tscCli,'--version') -FailureMessage 'Lockfile TypeScript version probe failed.').Trim();if($npmVersion-notmatch'^\d+\.\d+\.\d+'-or$tscVersion-notmatch'^Version \d+\.\d+\.\d+'){throw 'Bundled npm or lockfile TypeScript returned an invalid version.'}
 if (-not $SkipVerification) {
+  # git archive intentionally excludes runtime/. Build the lease helper from
+  # this same committed snapshot before source tests use their fixed path.
+  # Never borrow an ignored helper from the outer working tree.
+  $stateLeasePublish = Join-Path $output '.state-lease-helper-publish'
+  Invoke-B122PinnedDotNetPublish -Project (Join-Path $buildRoot 'apps\desktop-hotkeys\Switchyard.Hotkeys.csproj') -Destination $stateLeasePublish -FailureMessage 'Exact-source state lease helper build failed.'
+  $stateLeaseImage = Join-Path $stateLeasePublish 'Switchyard.Hotkeys.exe'
+  Assert-B122NoReparseAncestors -Path $stateLeaseImage
+  $stateLeaseItem = Get-Item -LiteralPath $stateLeaseImage -Force
+  if ($stateLeaseItem.PSIsContainer -or $stateLeaseItem.Length -lt 1 -or $stateLeaseItem.Length -gt 128MB) { throw 'The exact-source state lease image is invalid.' }
+  $stateLeaseRuntime = Join-Path $buildRoot 'runtime'
+  if (Test-Path -LiteralPath $stateLeaseRuntime) { throw 'Preserve an unexpected source runtime; state helper staging requires an absent destination.' }
+  $stateLeaseDestination = Join-Path $stateLeaseRuntime 'hotkeys\Switchyard.Hotkeys.exe'
+  New-Item -ItemType Directory -Path (Split-Path -Parent $stateLeaseDestination) | Out-Null
+  $stateLeaseSource = [IO.File]::Open($stateLeaseImage, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::Read)
+  try {
+    $stateLeaseHasher = [Security.Cryptography.SHA256]::Create()
+    try { $stateLeaseDigest = ([BitConverter]::ToString($stateLeaseHasher.ComputeHash($stateLeaseSource))).Replace('-', '').ToLowerInvariant() }
+    finally { $stateLeaseHasher.Dispose() }
+    $stateLeaseSource.Position = 0
+    $stateLeaseTarget = [IO.File]::Open($stateLeaseDestination, [IO.FileMode]::CreateNew, [IO.FileAccess]::Write, [IO.FileShare]::None)
+    try { $stateLeaseSource.CopyTo($stateLeaseTarget); $stateLeaseTarget.Flush($true) }
+    finally { $stateLeaseTarget.Dispose() }
+  } finally { $stateLeaseSource.Dispose() }
+  if ((Get-FileHash -LiteralPath $stateLeaseDestination -Algorithm SHA256).Hash.ToLowerInvariant() -cne $stateLeaseDigest) { throw 'Staged source state helper bytes changed.' }
+  Write-Utf8NoBom (Join-Path $output 'state-lease-test-helper.json') ([ordered]@{ schema='switchyard-state-lease-test-helper/v1'; sourceCommit=$sourceCommit; sha256=$stateLeaseDigest; bytes=$stateLeaseItem.Length; sourceAssembly='git-archive'; copiedBytesVerified=$true; nativeAcceptance=$false } | ConvertTo-Json)
   Invoke-B122PinnedNpm -Arguments @('run','typecheck') -FailureMessage 'Typecheck failed.'
   Invoke-B122PinnedNpm -Arguments @('test') -FailureMessage 'Test verification failed.'
   $firmwareVerificationReceipt = Join-Path $output 'firmware-verification.json'
@@ -605,7 +630,7 @@ if(Test-Path -LiteralPath $verificationReceiptSource -PathType Container){
     Copy-Item -LiteralPath $verificationReceiptFile.FullName -Destination (Join-Path $verificationReceiptDestination $verificationReceiptFile.Name)
   }
 }
-foreach($temporaryBuildTree in @($runtimeExtract,$vsixRoot,(Join-Path $output '.helper-publish'),(Join-Path $output '.sandbox-lifecycle-helper-publish'),(Join-Path $output '.repository-runtime-helper-publish'),(Join-Path $output '.companion-lifecycle-helper-publish'),(Join-Path $output '.raw-hid-helper-publish'),(Join-Path $output '.provider-desktop-helper-publish'),(Join-Path $output '.voice-helper-publish'),$testTempRoot,$buildRoot)){Remove-B122OwnedBuildTree -Path $temporaryBuildTree}
+foreach($temporaryBuildTree in @($runtimeExtract,$vsixRoot,(Join-Path $output '.state-lease-helper-publish'),(Join-Path $output '.helper-publish'),(Join-Path $output '.sandbox-lifecycle-helper-publish'),(Join-Path $output '.repository-runtime-helper-publish'),(Join-Path $output '.companion-lifecycle-helper-publish'),(Join-Path $output '.raw-hid-helper-publish'),(Join-Path $output '.provider-desktop-helper-publish'),(Join-Path $output '.voice-helper-publish'),$testTempRoot,$buildRoot)){Remove-B122OwnedBuildTree -Path $temporaryBuildTree}
 
 $portableSmokeResult=Invoke-B122WithIsolatedBuildEnvironment { $captured=@(& (Join-Path $scripts 'Test-B122PortableBundle.ps1') -BundleRoot $output);[pscustomobject]@{exitCode=$LASTEXITCODE;output=($captured-join[Environment]::NewLine)} }
 $portableSmoke=[string]$portableSmokeResult.output

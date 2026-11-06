@@ -1,0 +1,32 @@
+{
+  "schema": "switchyard-windows-archived-test-helper/v1",
+  "basis": "c7037b8a164a14ac53bad877b852b3c87a1743a8",
+  "sourceSha256": {
+    "deployment/windows/Build-B122Release.ps1": "a970c1ca9dac5396fca5f848042dfef5e66a9af95488d7158a8dbd9490363688",
+    "scripts/windows-scenario-groups.test.mjs": "28d8bfcc554c781ce6bba4ae431e22821e2ea6152a7d9852cd9d1134904e5791"
+  },
+  "failureObserved": {
+    "source": "97a7727514d0dfa3f12480c26b5326ef7aa9fd7b",
+    "run": 42212517341,
+    "job": 127875037776,
+    "receiptNameInLog": "isolated-test-aa50b853-ff37-43ed-b938-412c4fb18d70.json",
+    "sourceOfObservation": "GitHub decoded job log; artifact archive not imported",
+    "failedGroup": "tools/layout-studio/state-lock.test.mjs",
+    "error": "ENOENT starting runtime/hotkeys/Switchyard.Hotkeys.exe inside the archived .source-tree",
+    "failedGroupRecordsInLog": 92,
+    "limit": "The missing helper is directly observed; this does not attribute every failed group to that cause."
+  },
+  "change": "Before source verification, build the native helper from the exact committed snapshot through the existing pinned offline toolchain. Copy one held image into an absent runtime destination, verify bytes, retain source/hash evidence, and include the owned publish tree in exact cleanup. No ambient ignored helper is used.",
+  "localChecks": {
+    "receipt": "isolated-test-1432e594-d071-4d03-9af8-55806372d3b7.json",
+    "groups": 4,
+    "passed": 42,
+    "allChildAndTreeCleanupVerified": true,
+    "scope": "Portable workflow-order guard, existing restricted-report parser, keyless lease pool and Suite package tests. PowerShell/native Windows execution was not performed on Linux."
+  },
+  "limits": [
+    "Native Windows CI follow-up is pending; the prior release run remains failed.",
+    "The separate restricted-token helper startup failure is unchanged. No detached production fallback, token or privilege relaxation is introduced.",
+    "No installed update, hardware, account or model operation ran."
+  ]
+}

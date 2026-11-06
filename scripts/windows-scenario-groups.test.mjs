@@ -82,3 +82,21 @@ test("fresh native and contract lanes queue by exact ref and matrix identity ins
   assert.match(workflow, /^  build-state-helper:\n    uses: \.\/\.github\/workflows\/switchyard-windows-state-helper\.yml$/m);
   assert.equal([...workflow.matchAll(/^      cancel-in-progress: false$/gm)].length, 2);
 });
+
+test("archived Windows release tests stage their own pinned native lease helper before the manifest runs", async () => {
+  const source = await readFile(new URL("../deployment/windows/Build-B122Release.ps1", import.meta.url), "utf8");
+  const archive = source.indexOf("archive --format=zip");
+  const publish = source.indexOf("Invoke-B122PinnedDotNetPublish -Project (Join-Path $buildRoot 'apps\\desktop-hotkeys\\Switchyard.Hotkeys.csproj')");
+  const verified = source.indexOf("throw 'Staged source state helper bytes changed.'");
+  const tests = source.indexOf("Invoke-B122PinnedNpm -Arguments @('test')");
+  assert.ok(archive >= 0 && publish > archive && verified > publish && tests > verified);
+  const staging = source.slice(publish, tests);
+  assert.match(staging, /state helper staging requires an absent destination/);
+  assert.match(staging, /\[IO\.FileMode\]::CreateNew/);
+  assert.match(staging, /\$stateLeaseSource\.CopyTo\(\$stateLeaseTarget\)/);
+  assert.match(staging, /sourceCommit=\$sourceCommit; sha256=\$stateLeaseDigest/);
+  assert.doesNotMatch(staging, /Join-Path \$repo 'runtime/);
+  const cleanup = source.slice(source.indexOf("foreach($temporaryBuildTree"));
+  assert.match(cleanup, /\.state-lease-helper-publish/);
+  assert.match(cleanup, /\$testTempRoot,\$buildRoot\)\)\{Remove-B122OwnedBuildTree/);
+});
