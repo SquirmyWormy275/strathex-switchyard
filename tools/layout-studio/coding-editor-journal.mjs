@@ -1,6 +1,7 @@
 /** Durable editor ownership checkpoints. This journal opens no process, socket or task. */
 import { createHash } from 'node:crypto';
 import { posix } from 'node:path';
+import { appendEditorObservation } from './editor-observation.mjs';
 
 const field = 'codingEditorConnections';
 const uuid = v => typeof v === 'string' && /^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/.test(v);
@@ -95,7 +96,7 @@ export function createCodingEditorJournal({ store, authorizations, now=Date.now 
           const previous=rowFor(state,s);if(previous){saved=structuredClone(previous);return;}
           freshAuthorization(state,s,original);
           const rows=state[field]??=[];require(rows.length<64 && !rows.some(row=>row.status!=='stopped' && !leases.has(key(c,row))));
-          saved={schema:'switchyard-editor-connection/v1',...s,...(host?{host}:{}),taskId:original.target.taskId,targetDigest:original.targetDigest,policyDigest:original.policyDigest,status:'reserved',revision:0,createdAt:now()};rows.push(saved);inserted=true;
+          saved={schema:'switchyard-editor-connection/v1',...s,...(host?{host}:{}),taskId:original.target.taskId,targetDigest:original.targetDigest,policyDigest:original.policyDigest,status:'reserved',revision:0,createdAt:now()};rows.push(saved);appendEditorObservation(state,saved);inserted=true;
         },{provider:'codex'});
         // A saved row, including a stopped or interrupted one, never issues a
         // new handle after a lost reply or across host instances.
@@ -112,7 +113,7 @@ export function createCodingEditorJournal({ store, authorizations, now=Date.now 
             let copy;try {require(object(event) && Buffer.byteLength(JSON.stringify(event))<=16384);copy=structuredClone(event);if(copy.kind==='ingress' && object(copy.ownership))copy.ownership.socketIdentity??=null;}catch(error){return Promise.reject(error);}
             return track(()=>store.withResourceLock('client-launch',ownershipKey,async owned=>{
               await current(c,s,original);owned.assert();matches(await store.snapshot(c));const next=structuredClone(lease.row);change(next,copy,original.target);next.revision++;next.updatedAt=now();
-              await store.update(c,'coding-editor-connection-checkpoint',state=>{require(!closed && policy(state)===original.policyDigest);owned.assert();matches(state);Object.assign(rowFor(state,s),next);},{provider:'codex'});
+              await store.update(c,'coding-editor-connection-checkpoint',state=>{require(!closed && policy(state)===original.policyDigest);owned.assert();matches(state);const row=rowFor(state,s);Object.assign(row,next);appendEditorObservation(state,row);},{provider:'codex'});
               lease.row=next;await current(c,s,original);owned.assert();return view(next);
             }));
           },
@@ -124,7 +125,7 @@ export function createCodingEditorJournal({ store, authorizations, now=Date.now 
               await store.authorize(c);const state=await store.snapshot(c);matches(state);owned.assert();
               if(lease.row.status==='stopped')return {...view(lease.row),duplicatePrevented:true};
               const next={...structuredClone(lease.row),status:Object.values(copy).every(Boolean)?'stopped':'uncertain',retirement:copy,revision:lease.row.revision+1,updatedAt:now()};
-              await store.update(c,'coding-editor-connection-retire',state=>{owned.assert();matches(state);Object.assign(rowFor(state,s),next);});lease.row=next;return view(next);
+              await store.update(c,'coding-editor-connection-retire',state=>{owned.assert();matches(state);const row=rowFor(state,s);Object.assign(row,next);appendEditorObservation(state,row);});lease.row=next;return view(next);
             }));
           }
         });
@@ -144,7 +145,7 @@ export function createCodingEditorJournal({ store, authorizations, now=Date.now 
       require(exact(facts,['hostExitVerified','upstreamExitVerified','carrierExitVerified','socketRemovedVerified','directoryRemovedVerified']) && Object.values(facts).every(v=>typeof v==='boolean'));await current();
       if(!facts.hostExitVerified)return {...view(original),recoveryBlocked:true};
       const next={...original,status:Object.values(facts).every(Boolean)?'stopped':'uncertain',retirement:{...facts},revision:original.revision+1,updatedAt:now()};
-      await store.update(c,'coding-editor-connection-recover',state=>{require(!closed);lock.assert();require(hash(rowFor(state,s))===hash(original));Object.assign(rowFor(state,s),next);});return view(next);
+      await store.update(c,'coding-editor-connection-recover',state=>{require(!closed);lock.assert();require(hash(rowFor(state,s))===hash(original));const row=rowFor(state,s);Object.assign(row,next);appendEditorObservation(state,row);});return view(next);
     }));},
     async list(c) { await store.authorize(c);return ((await store.snapshot(c))[field]??[]).map(view); },
     stopped(c,input) {const s=selection(input);return track(async()=>{

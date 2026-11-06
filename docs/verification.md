@@ -1,5 +1,13 @@
 # What has actually been verified
 
+Editor workflow history now passes **seven groups / 84 tests**. Explicit Personal
+consent records four lifecycle states in the same encrypted journal transaction,
+with private correlation, pause/exclusion fences and no live attachment or
+completion claim. Actual Linux carriers and controlled provider/terminal checks
+verify cleanup; typecheck passes. Frontend, installed and native acceptance remain
+separate. [Contract](editor-workflow-observation.md),
+[evidence](evidence/editor-workflow-observation-summary.json).
+
 Latest complete Linux `0ad510e` passes **255/255 groups, 1,682 tests and eleven
 declared skips**, with every child/tree and exact owned checkout/build cleanup
 verified. It includes editor journal, recovery, signed routes and Suite transitions.

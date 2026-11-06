@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { randomUUID,createHash } from 'node:crypto';
-import { mkdtemp,rm } from 'node:fs/promises';
+import { mkdtemp,rm,readFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createSuiteStore } from './suite-store.mjs';
@@ -23,7 +23,7 @@ async function fixture(t) {
  const service=()=>{const s=createCodingEditorJournal({store,authorizations:auth,now:()=>at??Date.now()});services.push(s);return s;};const api=service();
  t.after(async()=>{hook=async()=>{};for(const s of services)await s.close();await auth.close();await rm(root,{recursive:true});});
  async function consume(){const review=await auth.review('personal',selected),issued=await auth.issue('personal',{...selected,token:review.confirmation.token});return auth.consume('personal',{...selected,permit:issued.permit});}
- return{store,selected,target,auth,api,service,consume,set active(v){active=v;},set hook(v){hook=v;},set at(v){at=v;}};
+ return{root,store,selected,target,auth,api,service,consume,set active(v){active=v;},set hook(v){hook=v;},set at(v){at=v;}};
 }
 const ingress=phase=>({kind:'ingress',ownership:{schema:'switchyard-editor-ingress-owner/v1',phase,directory:'/private/editor',directoryIdentity:{...identity},socketPath:'/private/editor/s',socketIdentity:['reserved','started'].includes(phase)?null:{...socketIdentity},pid:phase==='reserved'?null:300,birth:phase==='reserved'?null:'333'}});
 async function connected(handle){for(const event of [{kind:'directory',path:'/private/editor',identity},{kind:'upstream',pid:200,birth:'222'},ingress('reserved'),ingress('started'),ingress('ready'),{kind:'peer',pid:400,birth:'444',executable:'/native/codex',executableSha256:'b'.repeat(64)},ingress('peer-requested'),ingress('connected')])await handle.record(event);}
@@ -49,10 +49,24 @@ test('recovery rechecks protected ownership after independent verification and p
  assert.equal((await f.store.snapshot('personal')).codingEditorConnections[0].revision,99);assert.equal((await f.store.snapshot('personal')).codingEditorConnections[0].status,'reserved');
 });
 test('the complete journal records immutable process/socket checkpoints while exposing no live attachment authority',async t=>{
- const f=await fixture(t);await f.consume();const {handle}=await f.api.reserve('personal',f.selected);await connected(handle);await handle.record({kind:'acknowledged',observation:ack});await handle.assertCurrent();
+ const f=await fixture(t);await f.store.update('personal','fixture-consent',s=>{s.observations=[{id:'editor-history',status:'recording',sources:['editor-events'],exclusions:[],events:[],createdAt:Date.now(),updatedAt:Date.now()}];});await f.consume();const {handle}=await f.api.reserve('personal',f.selected);await connected(handle);await handle.record({kind:'acknowledged',observation:ack});await handle.assertCurrent();
  const row=(await f.store.snapshot('personal')).codingEditorConnections[0];assert.equal(row.revision,9);assert.equal(row.ingress.pid,300);assert.equal(row.upstream.pid,200);assert.equal(row.peer.pid,400);assert.deepEqual(row.directory.identity,identity);
  const listed=(await f.api.list('personal'))[0];assert.equal(listed.protocolAcknowledgementRecorded,true);assert.equal(listed.ideAttached,false);assert.equal(listed.authorityGranted,false);assert.equal(listed.terminalLaunched,false);assert.equal(Object.hasOwn(listed,'directory'),false);
  await handle.retire(clean);assert.equal(handle.observation().stoppedVerified,true);assert.equal((await f.service().reserve('personal',f.selected)).handle,undefined);
+ const events=(await f.store.snapshot('personal')).observations[0].events;assert.deepEqual(events.map(e=>e.status),['reserved','acknowledged','stopped']);assert.equal(new Set(events.map(e=>e.subjectDigest)).size,1);
+ assert.doesNotMatch(JSON.stringify(events),/\/synthetic|\/private|\/native/);assert.ok(events.every(e=>e.ideAttached===false&&e.taskCompletionVerified===false));
+ const sealed=await readFile(join(f.root,'personal.sealed.json'),'utf8');assert.equal(sealed.includes('editor-protocol-acknowledged'),false);
+});
+
+test('an aborted editor journal transaction cannot retain its observation or a partial reservation',async t=>{
+ const f=await fixture(t);await f.store.update('personal','fixture-consent',s=>{s.observations=[{id:'editor-history',status:'recording',sources:['editor-events'],exclusions:[],events:[],createdAt:Date.now(),updatedAt:Date.now()}];});await f.consume();
+ const original=f.store.update,before=await readFile(join(f.root,'personal.sealed.json'));
+ f.store.update=(c,op,fn,options)=>original(c,op,async state=>{const result=await fn(state);if(op==='coding-editor-connection-reserve')throw Error('Synthetic commit refusal');return result;},options);
+ try {await assert.rejects(f.api.reserve('personal',f.selected),/Synthetic commit refusal/);} finally {f.store.update=original;}
+ assert.deepEqual(await readFile(join(f.root,'personal.sealed.json')),before);assert.equal((await f.store.snapshot('personal')).observations[0].events.length,0);
+ const {handle}=await f.api.reserve('personal',f.selected);await f.store.update('personal','fixture-pause',s=>{s.observations[0].status='paused';});await connected(handle);await handle.record({kind:'acknowledged',observation:ack});
+ await f.store.update('personal','fixture-resume',s=>{s.observations[0].status='recording';});await handle.retire({...clean,carrierExitVerified:false});await handle.retire(clean);await handle.retire(clean);
+ assert.deepEqual((await f.store.snapshot('personal')).observations[0].events.map(e=>e.status),['reserved','uncertain','stopped']);
 });
 test('a planned directory pins its private parent and exact request name before creation is recorded',async t=>{
  const f=await fixture(t);await f.consume();const {handle}=await f.api.reserve('personal',f.selected),path='/private/'+f.selected.requestId;

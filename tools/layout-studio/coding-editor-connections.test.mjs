@@ -40,11 +40,13 @@ async function fixture(t){
 }
 
 test('protected reservation, real ingress and pinned provider compose through acknowledgement and exact retirement',native,async t=>{
- const f=await fixture(t),opened=await f.open();assert.equal(opened.status,'ready');const row=(await f.store.snapshot('personal')).codingEditorConnections[0];assert.equal(row.status,'ready');assert.equal(row.directoryIntent.path,row.directory.path);assert.ok(row.upstream.pid>0);assert.ok(row.ingress.pid>0);
+ const f=await fixture(t);await f.store.update('personal','fixture-consent',s=>{s.observations=[{id:'editor-history',status:'recording',sources:['editor-events'],exclusions:[],events:[],createdAt:Date.now(),updatedAt:Date.now()}];});const opened=await f.open();assert.equal(opened.status,'ready');const row=(await f.store.snapshot('personal')).codingEditorConnections[0];assert.equal(row.status,'ready');assert.equal(row.directoryIntent.path,row.directory.path);assert.ok(row.upstream.pid>0);assert.ok(row.ingress.pid>0);
  const terminal=await f.connect(opened.endpoint);terminal.send({id:1,method:'initialize',params:{clientInfo:{name:'codex_tui',version:'0.166.0'}}});assert.equal((await terminal.message()).id,1);terminal.send({method:'initialized',params:{}});
  terminal.send({id:2,method:'thread/resume',params:{threadId:f.target.sessionId,cwd:f.target.repositoryRoot,sandbox:'read-only',approvalPolicy:'on-request',excludeTurns:true}});assert.equal((await terminal.message()).result.thread.id,f.target.sessionId);
  await until(async()=>(await f.api.observe('personal',f.selected)).protocolAcknowledged);const saved=(await f.store.snapshot('personal')).codingEditorConnections[0];assert.equal(saved.status,'acknowledged');assert.equal(saved.acknowledgement.accountAfterVerified,true);assert.equal(saved.peer.pid,process.pid);
  const stopped=await f.api.stop('personal',f.selected);assert.equal(stopped.stoppedVerified,true);assert.deepEqual(await readdir(f.socketRoot),[]);assert.equal((await f.api.open('personal',f.selected)).endpoint,undefined);
+ const events=(await f.store.snapshot('personal')).observations[0].events;assert.deepEqual(events.map(e=>e.status),['reserved','acknowledged','stopped']);assert.equal(new Set(events.map(e=>e.subjectDigest)).size,1);assert.ok(events.every(e=>e.ideAttached===false&&e.taskCompletionVerified===false));
+ for(const secret of [f.selected.requestId,f.selected.editorId,f.target.sessionId,f.target.accountFingerprint,f.target.repositoryRoot])assert.equal(JSON.stringify(events).includes(secret),false);
 });
 test('a second host cannot obtain another endpoint for the same consumed selection',native,async t=>{
  const f=await fixture(t),other=f.service();const results=await Promise.all([f.open(),other.open('personal',f.selected)]);assert.equal(results.filter(r=>r.endpoint).length,1);assert.equal(results.filter(r=>r.duplicatePrevented).length,1);assert.equal(f.bridges,1);

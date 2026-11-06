@@ -31,6 +31,14 @@ evidence, not instructions to reset. Publish regular commits. Do not merge or re
 
 ## Current implementation and evidence
 
+Editor workflow history now passes **seven groups / 84 tests**. Explicit Personal
+consent records four lifecycle states in the same encrypted journal transaction,
+with private correlation, pause/exclusion fences and no live attachment or
+completion claim. Actual Linux carriers and controlled provider/terminal checks
+verify cleanup; typecheck passes. Frontend, installed and native acceptance remain
+separate. [Contract](editor-workflow-observation.md),
+[evidence](evidence/editor-workflow-observation-summary.json).
+
 The Windows helper now has a non-console executable candidate that preserves
 ordinary Node spawn and parent-loss containment. Both managed targets compile;
 1,975 portable protocol checks and four isolated groups / 42 checks pass with
