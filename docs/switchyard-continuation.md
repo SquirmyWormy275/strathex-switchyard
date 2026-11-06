@@ -31,6 +31,17 @@ evidence, not instructions to reset. Publish regular commits. Do not merge or re
 
 ## Current implementation and evidence
 
+Windows `fea2ca4` now clears canonical-path acceptance, then fails before the
+parent-process check completes; the original restricted owner still passes zero
+of eight checks. Ordinary owner (8), restricted metadata (13) and native exchange
+(31) continue to pass. New fixed diagnostics distinguish parent open/query failures
+without changing rights or containment. Two managed builds / 1,985 portable checks,
+five groups / 53 passes / one Windows-only skip and typecheck pass.
+A separate native lease test reached a stale diagnostic-label assertion, now
+corrected to require the exact full sequence. Both failed receipts are retained;
+the native follow-up is pending.
+[Current Windows evidence](evidence/windows-parent-observation-summary.json).
+
 Agent, host-action and editor recording now refuse metadata from before initial
 consent or the latest resume. The encrypted interval stays monotonic across
 duplicate resume and backward clock movement. Nine isolated groups / 105 tests,
@@ -164,17 +175,17 @@ the installed update or old live provider verifiers without a relevant new chang
    root identities, receipt and every owned alias/build/test parent. Never
    broaden cleanup or relax deadlines.
 
-2. Collect the native result for exact Windows lock-path canonicalization.
-   The non-console helper and pipe correction now reach entry, but the original
-   owner still fails before its canonical-path marker. Ordinary Node spawn and parent-loss
-   containment remain. Do not accept the correction without the original
-   restricted owner and lease cleanup checks. Detached EOF entry
-   is a diagnostic, not acceptance of a lease or the original eight-check owner.
-   No broader token rights, default-DACL/privilege/SID/account/runtime fallback
-   is permitted. Earlier `702897d` stopped at a stale parser-count guard; its
-   failed receipt and the correction from forty to fifty checks remain retained.
-   [Native comparison](evidence/windows-lease-console-native-summary.json),
-   [verifier correction](evidence/windows-verifier-inventory-summary.json).
+2. Collect the native fixed parent-observation diagnostics. `fea2ca4` passes
+   canonical-path acceptance but fails before parent open/query/liveness completes.
+   The original owner remains zero of eight checks; preserve its receipt and all
+   restrictions. Exact parent access is still 0x00101000; no token/DACL/privilege,
+   SID, desktop, account, runtime or detached fallback is permitted. The separate
+   Windows lease test reached an outdated diagnostic-label assertion; its expected
+   full startup sequence is corrected without relaxing its security/cleanup checks.
+   [Current failure and source evidence](evidence/windows-parent-observation-summary.json).
+   The client lane at that commit failed downloading its pinned SDK archive
+   (ResponseEnded), before client checks; do not mislabel that as a native pass.
+   Earlier complete release workflows remain pending behind the active run.
 
 3. The protected editor journal, signed client/routes, restricted upstream and
    retained Terminal now compose through actual Linux carriers with controlled

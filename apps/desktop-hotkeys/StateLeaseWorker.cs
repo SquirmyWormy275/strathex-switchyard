@@ -78,7 +78,19 @@ internal static class StateLeaseWorker
             // Pin the original process using only the rights needed to read its
             // birth time and wait for exit. No process/token ACL is changed.
             using var parent = OpenProcess(0x1000 | 0x00100000, false, request.ParentPid);
-            if (parent.IsInvalid || !GetProcessTimes(parent, out long birth, out _, out _, out _) || birth <= 0) throw Invalid();
+            if (parent.IsInvalid)
+            {
+                trace.WriteLine(Marshal.GetLastWin32Error() == 5 ? "lease-parent-open-denied" : "lease-parent-open-failed");
+                throw Invalid();
+            }
+            trace.WriteLine("lease-parent-opened");
+            if (!GetProcessTimes(parent, out long birth, out _, out _, out _))
+            {
+                trace.WriteLine(Marshal.GetLastWin32Error() == 5 ? "lease-parent-query-denied" : "lease-parent-query-failed");
+                throw Invalid();
+            }
+            if (birth <= 0) throw Invalid();
+            trace.WriteLine("lease-parent-birth-read");
             void Current()
             {
                 if (WaitForSingleObject(parent, 0) != 258 ||

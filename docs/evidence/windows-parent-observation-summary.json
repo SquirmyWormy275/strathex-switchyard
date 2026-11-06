@@ -1,0 +1,116 @@
+{
+  "schema": "switchyard-windows-parent-observation-source/v1",
+  "basis": "b42574ffa5a441ad4ece794e6f60fda05b3eee6c",
+  "sourceSha256": {
+    "apps/desktop-hotkeys/StateLeaseWorker.cs": "5a077ee9a0f5bb7ffef1da2c089cf138c68b3b93fefd064fb160a80a8cd233df",
+    "tools/layout-studio/keyless-lease-pool.mjs": "82eb202ea1e0db5368339564b9af68bcf6402abc5d5e86c9d981ea36343a9237",
+    "tools/layout-studio/keyless-lease-pool.test.mjs": "da8243c0f982e17dbececff4eaa590af29941b898e34b3072f39d7eb2f7db483",
+    "tools/layout-studio/state-lock.test.mjs": "03ccb28c5fe35dff6cb27c1d68a7d05378185114389af55e7661e2b2bfd1677a"
+  },
+  "retainedNativeFailure": {
+    "sourceCommit": "fea2ca47b34ff466c06313e2f28f523a24d430af",
+    "executionCommit": "e7ab19284c100c2ecd751ce9ba6969a60c8d4261",
+    "sourceAndExecutionTree": "15e3e298d413d4889e4a175f018ff9241c9ff010",
+    "runId": 42222323417,
+    "artifactId": 13504820170,
+    "archiveBytes": 4331,
+    "archiveSha256": "0588facecf9fa1e7966d7a92c799190b55c72ceee8e9ccd7e7d6644192803228",
+    "zipSavedLocally": false,
+    "restrictedJobId": 127907523547,
+    "privateReceipt": "windows-canonical-fea-native.json",
+    "helperSha256": "1979b20c27cd36adcb73c6462150fb9b01d76887a3a123ffeb3900327fb65cd4",
+    "failure": {
+      "waitResult": 0,
+      "exitCode": 2,
+      "resultAvailable": true,
+      "childReportedSuccess": false,
+      "ownerReportedSuccess": false,
+      "completedChecks": 0,
+      "failedPhase": "private-state-initialize",
+      "failureCategory": "Error",
+      "stateLockFailure": {
+        "schema": "switchyard-state-lock-failure/v1",
+        "kind": "child-exit",
+        "phase": "worker-startup",
+        "progress": "lease-request-read",
+        "exitCode": 2,
+        "signal": null,
+        "spawnCode": null
+      }
+    },
+    "ordinaryOwnerChecks": 8,
+    "restrictedMetadataChecks": 13,
+    "restrictedNativeExchangeChecks": 31,
+    "finding": "Canonical-path acceptance now passes. The last label is lease-request-read; parent open, birth query and initial liveness check still precede lease-owner-found. The exact failing native operation is not yet established."
+  },
+  "retainedLeaseTestFailure": {
+    "artifactId": 13504735913,
+    "archiveBytes": 2283,
+    "archiveSha256": "df120442fb7922e17d38a42b3d6a872f09a679c8cfa9fa5f11fa75c5499158a5",
+    "zipSavedLocally": false,
+    "privateReceipt": "windows-leases-fea-native.json",
+    "totals": {
+      "required": 2,
+      "passed": 1,
+      "failed": 1,
+      "tests": 24,
+      "passedTests": 22,
+      "failedTests": 1,
+      "skippedTests": 1,
+      "cancelledTests": 0,
+      "todoTests": 0
+    },
+    "allChildAndTreeCleanupVerified": true,
+    "finding": "The native file replacement, hard-link and malformed-release checks reach their diagnostics assertion. That assertion still allowed only the first two labels after request/owner labels became unconditional. It now requires the exact full successful-start sequence. Original security and cleanup assertions remain unchanged."
+  },
+  "diagnosticOnly": "Fixed labels distinguish parent open denial/other failure, a pinned handle, birth query denial/other failure and successful birth read. Access rights, token/DACL restrictions, birth/liveness assertions, ordinary launch and original owner checks remain unchanged. No repair or native owner acceptance is claimed.",
+  "isolated": {
+    "receipt": "isolated-test-71d223f7-9cc7-410e-913f-ddeb07da8e2c.json",
+    "totals": {
+      "required": 5,
+      "passed": 5,
+      "failed": 0,
+      "tests": 54,
+      "passedTests": 53,
+      "failedTests": 0,
+      "skippedTests": 1,
+      "cancelledTests": 0,
+      "todoTests": 0
+    },
+    "allChildAndTreeCleanupVerified": true
+  },
+  "managed": {
+    "receipt": "lease-parent-observe-managed-1793970656520.json",
+    "portableChecks": 1985,
+    "builds": [
+      {
+        "name": "helper",
+        "warnings": 0,
+        "errors": 0,
+        "managedAssemblySha256": "d138fc0a851dabb5983531ce68e0a7cfd8713119275b3041a6b49d8ed011744b",
+        "managedPeSubsystem": 2
+      },
+      {
+        "name": "proof",
+        "warnings": 0,
+        "errors": 0,
+        "managedAssemblySha256": "af15a2e72d3ba5c7c07aa26541ea7107a7e358cd026cd7c0cc270151e005a380",
+        "managedPeSubsystem": 3
+      }
+    ],
+    "ownedCleanup": {
+      "files": 124,
+      "bytes": 3190056,
+      "removed": true
+    },
+    "noDownloads": true
+  },
+  "typecheckPassed": true,
+  "nativeAcceptance": false,
+  "clientLaneFailure": {
+    "runId": 42222323419,
+    "jobId": 127907138434,
+    "stage": "Provision-B122DotnetToolchain.ps1:36 SDK archive download",
+    "cause": "Invoke-WebRequest response ended prematurely (ResponseEnded). Client checks were skipped, not accepted. No source compile failure is inferred."
+  }
+}

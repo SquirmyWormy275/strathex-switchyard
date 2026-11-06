@@ -8,6 +8,7 @@ import { createKeylessLeasePool, stateLockFailureEvidence } from "./keyless-leas
 // Actual Windows kernel locking is exercised separately by state-lock tests.
 const helper = `import{createInterface}from"node:readline";const mode=process.argv[1];let sequence=0,held=false,busy=true;
 process.stderr.write("lease-en");process.stderr.write("tered\\r\\nPRIVATE_ACCOUNT_AND_PATH\\n"+"X".repeat(1024)+"lease-owner-found\\nlease-input-read\\n");
+if(mode.startsWith("parent:")){process.stderr.write(mode.slice(7)+"\\n",()=>process.exit(2));await new Promise(()=>{});}
 if(mode==="bad-ready")console.log("UNEXPECTED");else if(mode==="oversized")console.log("X".repeat(257));else if(mode!=="drop-ready")console.log("READY");
 const input=createInterface({input:process.stdin});input.on("line",line=>{let match;if((match=/^ACQUIRE ([1-9][0-9]*) ([01])$/.exec(line))){if(held||Number(match[1])!==++sequence)process.exit(4);if(mode==="die-on-acquire")process.exit(5);if(mode==="drop-acquire")return;if(mode==="busy-first"&&busy){busy=false;console.log("BUSY "+sequence);return;}held=true;console.log("LOCKED "+sequence);}else if(line==="RELEASE "+sequence&&held){held=false;if(mode==="drop-release")return;console.log("RELEASED "+(mode==="stale-release"?0:sequence));}else process.exit(6);});`;
 function fixture(t, mode = "normal", options = {}) {
@@ -115,4 +116,16 @@ test("state lock failure projection refuses private and malformed fields without
   const value = { schema: "switchyard-state-lock-failure/v1", kind: "child-exit", phase: "worker-startup", progress: "not-observed", exitCode: 3221225794, signal: null, spawnCode: null };
   assert.deepEqual(stateLockFailureEvidence(value), value); assert.notEqual(stateLockFailureEvidence(value), value);
   for (const extra of [{ path: "PRIVATE" }, { kind: "PRIVATE" }, { phase: "PRIVATE" }, { progress: "PRIVATE" }, { signal: "PRIVATE" }, { spawnCode: "PRIVATE" }, { exitCode: 4294967296 }, { exitCode: -2147483649 }, { exitCode: 0.1 }, { exitCode: "5" }, { schema: "wrong" }]) assert.equal(stateLockFailureEvidence({ ...value, ...extra }), undefined);
+});
+
+test("parent observation failures retain only fixed labels and never admit or retry a lease", async t => {
+  for (const label of ["lease-parent-open-denied", "lease-parent-open-failed", "lease-parent-opened", "lease-parent-query-denied", "lease-parent-query-failed", "lease-parent-birth-read"]) {
+    const { pool, children } = fixture(t, "parent:" + label); let entered = false;
+    await assert.rejects(pool.withLease("PRIVATE_LOCK_PATH", () => { entered = true; }), error => {
+      const evidence = stateLockFailureEvidence(error.stateLockFailure);
+      assert.deepEqual(evidence, { schema: "switchyard-state-lock-failure/v1", kind: "child-exit", phase: "worker-startup", progress: label, exitCode: 2, signal: null, spawnCode: null });
+      assert.doesNotMatch(JSON.stringify(evidence), /PRIVATE|XXXX/); return true;
+    });
+    assert.equal(entered, false); assert.equal(children.length, 1); await children[0].closed;
+  }
 });

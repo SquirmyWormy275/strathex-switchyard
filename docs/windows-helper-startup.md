@@ -94,3 +94,21 @@ Five isolated groups pass 52 checks with one Windows-only skip; typecheck passes
 The native receipt contains no path spelling, so a particular short alias is
 not claimed as observed. The original owner journey remains unaccepted.
 [Failure and correction](evidence/windows-canonical-lock-source-summary.json).
+
+
+## Parent observation after canonical-path acceptance
+
+The `fea2ca4` native run reaches `lease-request-read`, so the caller path correction
+clears the preceding canonical-path comparison. The next operations open the
+parent handle, query its birth and check liveness. None is yet established as the
+specific failing operation; the original restricted owner still exits 2 with
+zero of eight checks. Fixed labels now separate open/query denial from other
+failure and record successful open/birth read. No private path, PID, account or
+exception text is exported, and all original restrictions remain.
+
+The separate native lease test reaches an outdated diagnostic-label assertion.
+Its new expectation requires the complete successful-start sequence, preserving
+file replacement/hard-link/malformed-release and cleanup assertions. The original
+failed native receipts remain retained. Two managed builds/1,985 portable checks,
+five isolated groups/53 passes/one Windows-only skip and typecheck pass; native
+acceptance is pending. [Evidence](evidence/windows-parent-observation-summary.json).

@@ -1,5 +1,16 @@
 # Switchyard implementation and acceptance
 
+Windows `fea2ca4` now clears canonical-path acceptance, then fails before the
+parent-process check completes; the original restricted owner still passes zero
+of eight checks. Ordinary owner (8), restricted metadata (13) and native exchange
+(31) continue to pass. New fixed diagnostics distinguish parent open/query failures
+without changing rights or containment. Two managed builds / 1,985 portable checks,
+five groups / 53 passes / one Windows-only skip and typecheck pass.
+A separate native lease test reached a stale diagnostic-label assertion, now
+corrected to require the exact full sequence. Both failed receipts are retained;
+the native follow-up is pending.
+[Current Windows evidence](evidence/windows-parent-observation-summary.json).
+
 Agent, host-action and editor recording now refuse metadata from before initial
 consent or the latest resume. The encrypted interval stays monotonic across
 duplicate resume and backward clock movement. Nine isolated groups / 105 tests,

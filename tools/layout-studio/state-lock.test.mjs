@@ -78,7 +78,7 @@ test("the native Windows lease worker refuses replaced and hard-linked lock file
   child.stdin.end(windowsLockRequest({ path: malformedPath, parentPid: process.pid }) + "ACQUIRE 1 0\nRELEASE 2\n");
   let output = "", diagnostic = ""; child.stdout.on("data", b => { output += b; }); child.stderr.on("data", b => { diagnostic += b; });
   const [code] = await exited; assert.equal(code, 2); assert.match(output, /LOCKED 1/); assert.doesNotMatch(output, /RELEASED/);
-  assert.equal(diagnostic.trim().split(/\r?\n/).every(line => ["lease-entered", "lease-input-read"].includes(line)), true);
+  assert.deepEqual(diagnostic.trim().split(/\r?\n/), ["lease-entered", "lease-input-read", "lease-request-read", "lease-parent-opened", "lease-parent-birth-read", "lease-owner-found"]);
   await pool.withLease(malformedPath, async lease => { lease.assert(); }); assert.equal(await readFile(malformedPath, "utf8"), "preserved");
 });
 

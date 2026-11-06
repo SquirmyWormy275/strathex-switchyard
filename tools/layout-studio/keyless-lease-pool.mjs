@@ -1,7 +1,7 @@
 /** Short-lived helpers retain only a kernel-lock path, never protected state or keys. */
 const failureKinds = ["timeout", "child-exit", "spawn-error", "input-error", "invalid-reply", "output-bound", "not-live"];
 const phases = ["worker-startup", "lease-acquire", "lease-release"];
-const progressLabels = ["not-observed", "lease-entered", "lease-input-read", "lease-request-read", "lease-owner-found"];
+const progressLabels = ["not-observed", "lease-entered", "lease-input-read", "lease-request-read", "lease-parent-open-denied", "lease-parent-open-failed", "lease-parent-opened", "lease-parent-query-denied", "lease-parent-query-failed", "lease-parent-birth-read", "lease-owner-found"];
 const signals = [null, "SIGTERM", "SIGKILL", "SIGABRT", "SIGSEGV", "SIGILL", "SIGBUS", "SIGINT", "other"];
 const spawnCodes = [null, "ENOENT", "EACCES", "EPERM", "EINVAL", "ENOMEM", "EAGAIN", "other"];
 export function stateLockFailureEvidence(value) {
@@ -63,7 +63,7 @@ export function createKeylessLeasePool({ spawnWorker, idleMs = 1000, timeoutMs =
       for (const character of chunk) {
         if (character === "\n") {
           const label = diagnostic.replace(/\r$/, "");
-          if (!discarding && ["lease-entered", "lease-input-read", "lease-request-read", "lease-owner-found"].includes(label)) worker.progress = label;
+          if (!discarding && label !== "not-observed" && progressLabels.includes(label)) worker.progress = label;
           diagnostic = ""; discarding = false;
         } else if (!discarding && diagnostic.length < 64) diagnostic += character;
         else { diagnostic = ""; discarding = true; }
