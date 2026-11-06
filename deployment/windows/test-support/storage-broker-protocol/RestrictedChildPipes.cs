@@ -8,6 +8,11 @@ using Microsoft.Win32.SafeHandles;
 
 internal static class RestrictedChildStderr
 {
+    internal static bool LeaseEntry(byte[] prefix)
+    {
+        if (prefix.Length > 8192) throw new InvalidOperationException("Child diagnostic prefix exceeds its bound.");
+        return prefix.AsSpan().StartsWith("lease-entered\n"u8) || prefix.AsSpan().StartsWith("lease-entered\r\n"u8);
+    }
     internal sealed record Summary(string category, string? function, string? code, string? sourceFile = null, int? sourceLine = null);
     internal static Summary Parse(byte[] prefix)
     {
@@ -66,6 +71,7 @@ internal sealed class RestrictedChildPipes : IDisposable
     internal IntPtr Input => clients[0].DangerousGetHandle();
     internal IntPtr Output => clients[1].DangerousGetHandle();
     internal IntPtr Error => clients[2].DangerousGetHandle();
+    internal bool LeaseEntryObserved { get; private set; }
     internal void Bind(IntPtr attributes) => Native(UpdateProcThreadAttribute(attributes, 0, new IntPtr(0x20002), handleList, new IntPtr(IntPtr.Size * 3), IntPtr.Zero, IntPtr.Zero));
 
     internal void ChildStarted()
@@ -95,6 +101,7 @@ internal sealed class RestrictedChildPipes : IDisposable
             ChildStarted();
             if (!Task.WaitAll(new Task[] { outputDrain, errorDrain }, 3000)) throw new InvalidOperationException("Child pipe drains did not finish after its owned Job exited.");
             var stdout = outputDrain.Result; var stderr = errorDrain.Result;
+            LeaseEntryObserved = RestrictedChildStderr.LeaseEntry(stderr.Prefix);
             output.Dispose(); error.Dispose();
             if (servers.Concat(clients).Any(handle => !handle.IsClosed)) throw new InvalidOperationException("An original standard pipe handle remains open.");
             evidence = new("switchyard-restricted-child-stdio/v1", 3, true, true, stdout.Bytes, stderr.Bytes, stdout.Bytes <= 65536 && stderr.Bytes <= 8192, true, true, RestrictedChildStderr.Parse(stderr.Prefix));

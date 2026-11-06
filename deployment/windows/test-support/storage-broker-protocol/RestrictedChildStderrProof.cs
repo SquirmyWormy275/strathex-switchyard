@@ -31,7 +31,10 @@ internal static class RestrictedChildStderrProof
             Require(refusedSource.sourceFile is null && refusedSource.sourceLine is null);
         }
         Require(RestrictedChildStderr.Parse(Encoding.UTF8.GetBytes(header.Replace(":1128", ":99999"))).sourceLine == 99999);
-        if (checks != 40) throw new InvalidOperationException("The complete child stderr parser inventory did not execute.");
+        foreach (string valid in new[] { "lease-entered\n", "lease-entered\r\nPRIVATE_NOT_RETURNED" }) Require(RestrictedChildStderr.LeaseEntry(Encoding.UTF8.GetBytes(valid)));
+        foreach (string invalid in new[] { "", "lease-entered", "prefix lease-entered\n", "\nlease-entered\n", "lease-enteredX\n", "lease-entered\r\r\n", "\u00fflease-entered\n" }) Require(!RestrictedChildStderr.LeaseEntry(Encoding.UTF8.GetBytes(invalid)));
+        bool entryBound = false; try { RestrictedChildStderr.LeaseEntry(new byte[8193]); } catch (InvalidOperationException) { entryBound = true; } Require(entryBound);
+        if (checks != 50) throw new InvalidOperationException("The complete child stderr parser inventory did not execute.");
         return checks;
     }
 }

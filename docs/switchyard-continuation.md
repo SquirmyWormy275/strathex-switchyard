@@ -97,6 +97,12 @@ the installed update or old live provider verifiers without a relevant new chang
    do not assume they match the parent or add broader rights/account/runtime
    fallbacks. [Latest failure](evidence/windows-state-lock-native-summary.json),
    [query-only result](evidence/windows-self-query-native-summary.json).
+   A CI-only comparison now launches the exact helper under both console modes,
+   retaining creation-time Job containment, query-only token access and all
+   original restrictions. EOF prevents any lease/state request. Two builds,
+   1,975 portable checks and eighteen projection tests pass; native results are
+   pending. Production spawn remains unchanged because libuv detached mode also
+   removes its child-Job assignment. [Comparison](evidence/windows-lease-console-source-summary.json).
 
 3. Implement native acknowledgement for the exact reviewed editor terminal and
    original owner/account/task. A separate observed connection or ordinary focus

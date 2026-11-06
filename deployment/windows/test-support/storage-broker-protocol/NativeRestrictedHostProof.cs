@@ -255,6 +255,7 @@ internal static partial class NativeRestrictedHostProof
                             environment = Marshal.StringToHGlobalUni(string.Join('\0', variables.Select(entry => entry.Key + "=" + entry.Value)) + "\0\0");
                             Phase = "cold-restricted-random-process";
                             ColdRandomDiagnostic = CaptureColdRandom(value.GetProperty("coldRandom").GetString() ?? "", value.GetProperty("coldRandomSha256").GetString() ?? "", Path.Combine(Path.GetDirectoryName(context)!, "cold-random.bin"), repository, desktopSpace.Name, environment, source, restricted, user, quota);
+                            ProbeLeaseConsoles(value.GetProperty("helper").GetString() ?? "", value.GetProperty("serviceImageSha256").GetString() ?? "", repository, desktopSpace.Name, environment, source, restricted, user, quota);
                             string command = string.Join(' ', new[] { node, script, context }.Select(Quote)); Require(command.Length < 1024);
                             Phase = "creator-assigned-quota-privilege"; Require(quota.Assigned);
                             ProcessInformation process = default;

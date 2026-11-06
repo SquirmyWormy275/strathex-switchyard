@@ -205,3 +205,13 @@ test("a cold restricted RNG report requires exact primary-token, process, pipe a
     const value = structuredClone(cold); mutate(value); assert.equal(storageBrokerFailureEvidence({ ...input, restrictedHostColdRandom: value }).restrictedHostColdRandom, undefined);
   }
 });
+
+test('CI console comparison retains bounded partial evidence and never substitutes for the original Node owner',()=>{
+ const observations=['no-window','detached'].map(mode=>({schema:'switchyard-lease-console-probe/v1',mode,executableSha256:'a'.repeat(64),stage:'retired',waitResult:0,exitCode:mode==='detached'?2:3221225794,entryObserved:mode==='detached',primaryTokenVerified:true,tokenRecheckedAfterExit:true,treeExitVerified:true,processHandlesClosedVerified:true,creatorQuotaRestoredVerified:true,queryAcl:{...sample().nativeRestrictedHostProof.selfTokenQueryAcl[0],scope:'lease-'+mode},standardIo:mode==='detached'?{...stdio(),stderrBytes:14,stderr:{category:'unclassified',function:null,code:null,sourceFile:null,sourceLine:null}}:stdio()}));
+ const source={schema:'switchyard-storage-broker-protocol-proof/v1',success:false,restrictedHostLeaseConsoles:observations};
+ assert.deepEqual(storageBrokerFailureEvidence(source).restrictedHostLeaseConsoles,observations);assert.throws(()=>verifyRestrictedOwnerReport(source));
+ for(const change of [{raw:'NEVER_RETAIN'},{mode:'unrestricted'},{stage:'untrusted'},{waitResult:-1},{waitResult:8},{entryObserved:true},{entryObserved:'yes'},{treeExitVerified:false},{queryAcl:{...observations[0].queryAcl,grantedMask:10}},{queryAcl:{...observations[0].queryAcl,scope:'node-owner'}},{standardIo:null},{executableSha256:'NEVER_RETAIN'}]){const r=storageBrokerFailureEvidence({...source,restrictedHostLeaseConsoles:[{...observations[0],...change},observations[1]]});assert.equal(r.restrictedHostLeaseConsoles,undefined);assert.equal(JSON.stringify(r).includes('NEVER_RETAIN'),false);}
+ const partial={...observations[0],stage:'reserved',waitResult:null,exitCode:null,queryAcl:null,standardIo:null,entryObserved:false,primaryTokenVerified:false,tokenRecheckedAfterExit:false,treeExitVerified:false,processHandlesClosedVerified:false,creatorQuotaRestoredVerified:false};assert.deepEqual(storageBrokerFailureEvidence({...source,restrictedHostLeaseConsoles:[partial]}).restrictedHostLeaseConsoles,[partial]);
+ assert.equal(storageBrokerFailureEvidence({...source,restrictedHostLeaseConsoles:[observations[1],observations[0]]}).restrictedHostLeaseConsoles,undefined);
+ assert.equal(storageBrokerFailureEvidence({...source,restrictedHostLeaseConsoles:[...observations,observations[1]]}).restrictedHostLeaseConsoles,undefined);
+});

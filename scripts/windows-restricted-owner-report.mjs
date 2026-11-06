@@ -3,11 +3,11 @@ import assert from "node:assert/strict";
 import { stateLockFailureEvidence } from "../tools/layout-studio/keyless-lease-pool.mjs";
 const object = value => value !== null && typeof value === "object" && !Array.isArray(value);
 const hashOrNull = value => value === null || typeof value === "string" && /^[a-f0-9]{64}$/.test(value);
-function validSelfQueryAcl(value, complete = false) {
+function validSelfQueryAcl(value, complete = false, scopes = ["cold-probe", "node-owner"]) {
   const flags = ["originalAcesPreserved", "exactQueryEntryVerified", "tokenRestrictionsRechecked", "handlesClosedVerified", "buffersClearedVerified"];
-  return Array.isArray(value) && value.length <= 2 && (!complete || value.length === 2) && value.every((r, i) => object(r)
+  return Array.isArray(value) && value.length <= scopes.length && (!complete || value.length === scopes.length) && value.every((r, i) => object(r)
     && Object.keys(r).sort().join() === ["schema", "scope", "status", "grantedMask", "changeRequested", "beforeAclSha256", "afterAclSha256", ...flags].sort().join()
-    && r.schema === "switchyard-child-self-query-acl/v1" && r.scope === ["cold-probe", "node-owner"][i]
+    && r.schema === "switchyard-child-self-query-acl/v1" && r.scope === scopes[i]
     && ["reserved", "apply-requested", "readback", "verified"].includes(r.status) && r.grantedMask === 8 && typeof r.changeRequested === "boolean"
     && hashOrNull(r.beforeAclSha256) && hashOrNull(r.afterAclSha256) && flags.every(k => typeof r[k] === "boolean")
     && (!complete || r.status === "verified" && flags.every(k => r[k] === true) && r.beforeAclSha256 !== null && r.afterAclSha256 !== null
@@ -50,6 +50,17 @@ export function storageBrokerFailureEvidence(value) {
   const fields = ["schema", "success", "errorCategory", "nativeCode", "errorHResult", "nativeExchangeChecks", "failedCheckPhase", "restrictedHostPhase", "restrictedHostCreatorPrivileges", "restrictedHostHistoricalFilterFlags", "restrictedHostHistoricalFilterBytes", "restrictedHostTokenRead"];
   const result = Object.fromEntries(fields.filter(key => Object.hasOwn(value, key)).map(key => [key, structuredClone(value[key])]));
   if (validSelfQueryAcl(value.restrictedHostSelfTokenQueryAcl)) result.restrictedHostSelfTokenQueryAcl = structuredClone(value.restrictedHostSelfTokenQueryAcl);
+  const consoles = value.restrictedHostLeaseConsoles;
+  const flags = ["entryObserved", "primaryTokenVerified", "tokenRecheckedAfterExit", "treeExitVerified", "processHandlesClosedVerified", "creatorQuotaRestoredVerified"];
+  const uintOrNull = x => x === null || Number.isSafeInteger(x) && x >= 0 && x <= 0xffffffff;
+  if (Array.isArray(consoles) && consoles.length <= 2 && consoles.every((r,i) => object(r)
+      && Object.keys(r).sort().join() === ["schema", "mode", "executableSha256", "stage", "waitResult", "exitCode", "queryAcl", "standardIo", ...flags].sort().join()
+      && r.schema === "switchyard-lease-console-probe/v1" && r.mode === ["no-window", "detached"][i] && typeof r.executableSha256 === "string" && /^[a-f0-9]{64}$/.test(r.executableSha256)
+      && ["reserved", "created-suspended", "token-verified", "query-verified", "resumed", "exited", "retired"].includes(r.stage) && uintOrNull(r.waitResult) && uintOrNull(r.exitCode)
+      && flags.every(k => typeof r[k] === "boolean") && (r.queryAcl === null || validSelfQueryAcl([r.queryAcl], false, ["lease-" + r.mode]))
+      && (r.standardIo === null || validStdio(r.standardIo))
+      && (!r.entryObserved || r.standardIo?.stderrBytes >= 14 && r.standardIo.stderr.category !== "empty")
+      && (r.stage !== "retired" || flags.filter(k=>k!=="entryObserved").every(k=>r[k]) && [0,258].includes(r.waitResult) && (r.waitResult === 0 ? r.exitCode !== null : r.exitCode === null) && r.standardIo?.outputBounded === true && validSelfQueryAcl([r.queryAcl], true, ["lease-"+r.mode])))) result.restrictedHostLeaseConsoles = structuredClone(consoles);
   const child = value.restrictedHostChildExit;
   const types = { waitResult: "uint", exitCode: "uint", resultAvailable: "boolean", childReportedSuccess: "boolean", ownerReportedSuccess: "boolean", completedChecks: "count", failedPhase: "label", failureCategory: "label", stateLockFailure: "state-lock" };
   if (object(child) && Object.hasOwn(child, "waitResult") && Object.hasOwn(child, "resultAvailable") && Object.entries(child).every(([key, item]) => Object.hasOwn(types, key) && (types[key] === "state-lock" ? item === null || !!stateLockFailureEvidence(item) : types[key] === "boolean" ? typeof item === "boolean" : types[key] === "label" ? item === null || typeof item === "string" && /^[A-Za-z0-9-]{1,80}$/.test(item) : Number.isSafeInteger(item) && item >= 0 && item <= (types[key] === "count" ? 8 : 0xffffffff)))) result.restrictedHostChildExit = structuredClone(child);
