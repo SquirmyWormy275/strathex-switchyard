@@ -115,7 +115,8 @@ async function startRunningProof(
 async function startRunningExecution(
   store: ProtectedJsonStore,
   observe: (binding: OperationReconciliationBinding) => Promise<OperationControllerObservation>,
-  deadlineScheduler?: Readonly<{ schedule(delayMs: number, callback: () => void): Readonly<{ cancel(): void }> }>
+  deadlineScheduler?: Readonly<{ schedule(delayMs: number, callback: () => void): Readonly<{ cancel(): void }> }>,
+  cancel = async () => ({ accepted: true, summary: "unused" })
 ) {
   const sessions = new SessionRegistry(store, { clock: () => now });
   const session = await sessions.register({
@@ -132,7 +133,7 @@ async function startRunningExecution(
   const runtime = new DurableMediatedExecutor({
     store, sessions, authorities, policyVersion: "policy-runtime", now: () => new Date(now), targetResolver: { resolve: async () => target },
     deadlineScheduler: deadlineScheduler ?? { schedule: () => ({ cancel: () => { cancelledSchedules += 1; } }) },
-    operationControl: { cancel: async () => ({ accepted: true, summary: "unused" }), observe },
+    operationControl: { cancel, observe },
     dependencies: (context) => {
       const execution = new InMemoryExecutionBroker(context.policy);
       execution.register("run_target", async () => ({ status: "running", summary: "The exact supervised execution remains live.", effectDisposition: "committed" }));
@@ -1206,3 +1207,55 @@ test("durable mediated executor never substitutes a target, authority, or accept
     assert.match(result.summary, /session|target/i);
   });
 });
+
+test("host observation shutdown joins an in-flight poll and cannot recreate timers or state after retirement", async () => {
+  await withStore(async store => {
+    const entered = shutdownLatch(), release = shutdownLatch();
+    const schedules: Array<{ delay: number; callback: () => void; cancelled: boolean }> = [];
+    let observations = 0;
+    const { runtime } = await startRunningExecution(store, async binding => {
+      observations++; entered.resolve(); await release.promise;
+      return { state: "active", ...binding, effectDisposition: "ambiguous", summary: "Still unresolved; never invent completion during shutdown." };
+    }, { schedule(delay, callback) { const item = { delay, callback, cancelled: false }; schedules.push(item); return { cancel() { item.cancelled = true; } }; } });
+    const poll = schedules.find(s => s.delay === 250)!; assert.ok(poll); poll.callback();
+    await entered.promise;
+    let stopped = false; const stopping = runtime.stopObservation().then(() => { stopped = true; });
+    try { await new Promise<void>(resolve => setImmediate(resolve)); assert.equal(stopped, false); }
+    finally { release.resolve(); await stopping; }
+    const count = schedules.length; assert.equal(observations, 1); assert.ok(schedules.filter(s => s !== poll).every(s => s.cancelled));
+    for (const item of schedules) item.callback();
+    await new Promise<void>(resolve => setImmediate(resolve));
+    assert.equal(observations, 1); assert.equal(schedules.length, count);
+    assert.equal((await runtime.budgets.list("run_target"))[0]?.state, "running");
+    await assert.rejects(runtime.recoverAfterRestart(), /lifecycle has stopped/);
+    await runtime.stopObservation();
+  });
+});
+
+test("host shutdown also joins original and recovered deadline callbacks already inside native cancellation", async () => {
+  for (const recovered of [false, true]) await withStore(async store => {
+    const entered = shutdownLatch(), release = shutdownLatch();
+    const schedules: Array<{ delay: number; callback: () => void }> = [];
+    let cancels = 0;
+    const cancel = async () => { cancels++; entered.resolve(); await release.promise; return { accepted: true, summary: "Exact controlled cancellation returned." }; };
+    const scheduler = { schedule(delay: number, callback: () => void) { schedules.push({ delay, callback }); return { cancel() {} }; } };
+    const observe = async (binding: OperationReconciliationBinding): Promise<OperationControllerObservation> => ({ state: "active", ...binding, effectDisposition: "ambiguous", summary: "Exact active work." });
+    const live = await startRunningExecution(store, observe, scheduler, cancel);
+    let runtime = live.runtime;
+    if (recovered) {
+      await runtime.stopObservation(); schedules.length = 0;
+      runtime = new DurableMediatedExecutor({ store, policyVersion: "policy-runtime", now: () => new Date(now), operationControl: { observe, cancel }, deadlineScheduler: scheduler, targetResolver: { resolve: async () => target } });
+      await runtime.recoverAfterRestart();
+    }
+    const deadline = schedules.find(s => s.delay > 1000)!; assert.ok(deadline); deadline.callback(); await entered.promise;
+    let stopped = false; const stopping = runtime.stopObservation().then(() => { stopped = true; });
+    try { await new Promise<void>(resolve => setImmediate(resolve)); assert.equal(stopped, false); }
+    finally { release.resolve(); await stopping; }
+    deadline.callback(); await new Promise<void>(resolve => setImmediate(resolve)); assert.equal(cancels, 1);
+  });
+});
+
+function shutdownLatch(): { promise: Promise<void>; resolve(): void } {
+  let resolve!: () => void; const promise = new Promise<void>(done => { resolve = done; });
+  return { promise, resolve };
+}

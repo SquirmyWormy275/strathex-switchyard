@@ -152,8 +152,8 @@ export function createRepositoryExecution({store,authority,stateDirectory,platfo
     async close(){closed=true;for(const c of seen)generations.set(c,(generations.get(c)??0)+1);let failure;
       try{await stops.close();await supervisors.close();}catch(error){failure=error;}
       await Promise.allSettled(pending.values());
-      try{for(const c of seen)await staging.cleanupCompartment(c);for(const host of runtimes.values())await host.runtime.reconcileBudgetedOperations();for(const host of recoveryHosts.values())await host.reconcileBudgetedOperations();}catch(error){failure??=error;}
-      finally{for(const host of runtimes.values())host.runtime.stopObservation();for(const host of recoveryHosts.values())host.stopObservation();runtimes.clear();recoveryHosts.clear();}
+      try{if(!failure)for(const host of runtimes.values())await host.repositoryRuntime()?.waitForManagedExitObservers();for(const c of seen){const result=await staging.cleanupCompartment(c);if(result.cleanupPending)throw Error("Owned execution staging still needs verified cleanup; preserve its state.");}for(const host of runtimes.values())await host.runtime.reconcileBudgetedOperations();for(const host of recoveryHosts.values())await host.reconcileBudgetedOperations();}catch(error){failure??=error;}
+      finally{await Promise.all([...runtimes.values()].map(host=>host.runtime.stopObservation()).concat([...recoveryHosts.values()].map(host=>host.stopObservation())));runtimes.clear();recoveryHosts.clear();}
       if(failure)throw failure;
     }
   };

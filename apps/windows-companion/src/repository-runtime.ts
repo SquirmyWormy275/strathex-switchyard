@@ -705,6 +705,8 @@ export class RepositoryRuntime {
   private readonly processSupervisor: RepositoryProcessSupervisor;
   private readonly temporaryBuilds: boolean;
   private readonly managed = new Map<string, ManagedRecord>();
+  private readonly managedObservers = new Set<Promise<void>>();
+  private managedObservationFailure?: unknown;
 
   constructor(
     verified: VerifiedRepositoryRuntimeManifest,
@@ -745,7 +747,7 @@ export class RepositoryRuntime {
         lease
       };
       this.managed.set(process.supervisorId, record);
-      void this.observeManagedExit(record);
+      this.startManagedExitObserver(record);
     }
     return this.listManagedProcesses();
   }
@@ -972,7 +974,7 @@ export class RepositoryRuntime {
         record.abortCleanup = () => signal.removeEventListener("abort", abort);
         if (signal.aborted) abort();
       }
-      void this.observeManagedExit(record);
+      this.startManagedExitObserver(record);
     }
     return { record };
   }
@@ -1060,6 +1062,18 @@ export class RepositoryRuntime {
       return;
     }
     record.public.state = terminal;
+  }
+
+  /** Call only after the exact host supervisors have independently exited. */
+  async waitForManagedExitObservers(): Promise<void> {
+    await Promise.all([...this.managedObservers]);
+    if (this.managedObservationFailure) throw this.managedObservationFailure;
+  }
+
+  private startManagedExitObserver(record: ManagedRecord): void {
+    const task = this.observeManagedExit(record).catch(error => { this.managedObservationFailure ??= error; });
+    this.managedObservers.add(task);
+    void task.finally(() => this.managedObservers.delete(task));
   }
 
   private async observeManagedExit(record: ManagedRecord): Promise<void> {

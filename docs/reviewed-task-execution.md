@@ -15,6 +15,12 @@ below. Writable build outputs, debug, web, environment and security-scanner
 connections remain implementation work. [Windows contract](windows-reviewed-run.md). Workspace
 shutdown, keyboard-only mode and application shutdown stop owned executions.
 
+Shutdown also joins active recovery/deadline callbacks and managed-process input
+lease release after verifying supervisor exit. Cancelling a timer alone is not
+a completed shutdown: already-running state writes must finish before the owner
+removes its protected directory. Unknown native exits or unconfirmed staging
+cleanup preserve state for recovery. [Lifecycle evidence](evidence/execution-shutdown-summary.json).
+
 ## Try the boundaries
 
 Use the pinned source runtime:

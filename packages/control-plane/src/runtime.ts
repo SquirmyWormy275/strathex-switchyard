@@ -344,6 +344,8 @@ export class DurableMediatedExecutor {
   private recoveryPoll?: DeadlineSchedule;
   private recoveryPollRunning = false;
   private recoveryPollingEnabled = false;
+  private observationStopped = false;
+  private readonly observationTasks = new Set<Promise<void>>();
 
   constructor(options: DurableMediatedExecutorOptions) {
     this.options = options;
@@ -455,6 +457,7 @@ export class DurableMediatedExecutor {
       now: this.now,
       deadlineScheduler: this.options.deadlineScheduler ?? systemDeadlineScheduler,
       deadlineSchedules: this.deadlineSchedules,
+      observeInBackground: callback => this.observeInBackground(callback),
       ...(this.options.budgetConfiguration ? { budgetConfiguration: this.options.budgetConfiguration } : {})
     });
     const dispatcher = new CommandDispatcher({
@@ -749,8 +752,10 @@ export class DurableMediatedExecutor {
   }
 
   private async resumeRecoveredBudgetLifecycle(): Promise<void> {
+    if (this.observationStopped) return;
     const active = (await this.budgets.list()).filter((claim) => ["running", "cancelling", "timed_out"].includes(claim.state));
     for (const claim of active) {
+      if (this.observationStopped) return;
       this.executionControls.bind(claim.operationId, claim.expiresAt, claim.id);
       if (claim.state === "running" && !this.deadlineSchedules.has(claim.id)) this.scheduleRecoveredDeadline(claim);
       if (claim.state === "cancelling" || claim.state === "timed_out") {
@@ -769,10 +774,11 @@ export class DurableMediatedExecutor {
   }
 
   private scheduleRecoveredDeadline(claim: BudgetClaim): void {
+    if (this.observationStopped) return;
     const delay = Math.max(0, Date.parse(claim.expiresAt) - this.now().getTime());
     const schedule = (this.options.deadlineScheduler ?? systemDeadlineScheduler).schedule(delay, () => {
       this.deadlineSchedules.delete(claim.id);
-      void this.handleRecoveredDeadline(claim.operationId, claim.id);
+      this.observeInBackground(() => this.handleRecoveredDeadline(claim.operationId, claim.id));
     });
     this.deadlineSchedules.set(claim.id, schedule);
   }
@@ -787,15 +793,15 @@ export class DurableMediatedExecutor {
   }
 
   private scheduleRecoveryPoll(): void {
-    if (!this.recoveryPollingEnabled || this.recoveryPoll || this.recoveryPollRunning || !this.options.operationControl?.observe) return;
+    if (this.observationStopped || !this.recoveryPollingEnabled || this.recoveryPoll || this.recoveryPollRunning || !this.options.operationControl?.observe) return;
     this.recoveryPoll = (this.options.deadlineScheduler ?? systemDeadlineScheduler).schedule(250, () => {
       this.recoveryPoll = undefined;
-      void this.runRecoveryPoll();
+      this.observeInBackground(() => this.runRecoveryPoll());
     });
   }
 
   private enableLiveOperationReconciliation(): void {
-    if (!this.options.operationControl?.observe) return;
+    if (this.observationStopped || !this.options.operationControl?.observe) return;
     this.recoveryPollingEnabled = true;
     this.scheduleRecoveryPoll();
   }
@@ -821,6 +827,7 @@ export class DurableMediatedExecutor {
 
   /** Recovery entry point for companion startup. It observes durable state and never replays a side effect. */
   async recoverAfterRestart(): Promise<Readonly<{ operations: readonly ReconciliationResult[]; budgets: readonly BudgetedOperationReconciliation[] }>> {
+    if (this.observationStopped) throw new Error("This runtime's observation lifecycle has stopped.");
     this.recoveryPollingEnabled = true;
     const operations = await this.recovery.recoverPending();
     const budgets = await this.reconcileBudgetedOperations();
@@ -831,12 +838,23 @@ export class DurableMediatedExecutor {
   /** Stop this instance's observation timers after its host lifecycle has stopped owned effects.
    * Durable claims and unknown outcomes remain intact for the next host instance.
    */
-  stopObservation(): void {
+  private observeInBackground(callback: () => Promise<void>): void {
+    if (this.observationStopped) return;
+    const task = Promise.resolve().then(async () => { if (!this.observationStopped) await callback(); });
+    this.observationTasks.add(task);
+    // Failed observation leaves its durable claims unresolved. Joining the task
+    // still prevents an asynchronous state write after host teardown returns.
+    void task.finally(() => this.observationTasks.delete(task)).catch(() => undefined);
+  }
+
+  async stopObservation(): Promise<void> {
+    this.observationStopped = true;
     this.recoveryPollingEnabled = false;
     this.recoveryPoll?.cancel();
     this.recoveryPoll = undefined;
     for (const timer of this.deadlineSchedules.values()) timer.cancel();
     this.deadlineSchedules.clear();
+    await Promise.allSettled([...this.observationTasks]);
   }
 
   /**
@@ -1370,6 +1388,7 @@ interface DurableRuntimeGovernanceOptions {
   readonly now: () => Date;
   readonly deadlineScheduler: DeadlineScheduler;
   readonly deadlineSchedules: Map<string, DeadlineSchedule>;
+  readonly observeInBackground: (callback: () => Promise<void>) => void;
 }
 
 interface RuntimeEffectGuardInput {
@@ -1587,7 +1606,7 @@ class DurableRuntimeGovernance implements DispatchGovernance {
   private scheduleDeadline(operationId: string, claimId: string, expiresAt: string): void {
     const delay = Math.max(0, Date.parse(expiresAt) - this.options.now().getTime());
     const timer = this.options.deadlineScheduler.schedule(delay, () => {
-      void this.handleDeadline(operationId, claimId);
+      this.options.observeInBackground(() => this.handleDeadline(operationId, claimId));
     });
     this.options.deadlineSchedules.set(claimId, timer);
   }

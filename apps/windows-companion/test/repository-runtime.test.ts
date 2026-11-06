@@ -405,3 +405,28 @@ test("each invocation may supply its exact dispatch effect guard without weakeni
   assert.match(allowed.pythonInterpreterIdentity?.inode ?? "", /^\d+$/);
   assert.equal(allowed.pythonInterpreterIdentity?.size, Buffer.byteLength("isolated-test-interpreter"));
 });
+
+test("managed child exit retirement waits for its asynchronous input lease release", async context => {
+  const setup = await fixture(context);
+  await writeFile(join(setup.repositoryRoot, "task.mjs"), "process.exit(0)");
+  const loaded = await writeVerifiedManifest(setup.hostRoot, manifest(setup.repositoryRoot, { run_target: processRecipe({ lifecycle: "managed", timeoutMs: 20000 }) }), setup.repositoryRoot);
+  const entered = shutdownLatch(), release = shutdownLatch();
+  let releases = 0;
+  const processSupervisor: RepositoryProcessSupervisor = {
+    async start(request) {
+      return { ...request, supervisorId: `managed:${"f".repeat(64)}`, pid: 12345, startedAt: "2026-08-25T12:00:00.000Z", stdout: Readable.from([]), stderr: Readable.from([]), recovered: false,
+        wait: async () => ({ code: 0, signal: null }), isAlive: async () => false, terminateTree: async () => undefined };
+    }, async recover() { return []; }, async observeOperation(request) { return { state: "not_owner", operationId: request.operationId, summary: "No live native process in this controlled proof." }; }
+  };
+  const runtime = new RepositoryRuntime(loaded, { effectGuard: allowEffects, processSupervisor, executionRoots: { async prepare() { return { root: loaded.canonicalRepositoryRoot, isolation: "repository", async release() { releases++; entered.resolve(); await release.promise; } }; } } });
+  const started = await runtime.execute("run_target", { targetSnapshotId }); assert.equal(started.status, "running"); await entered.promise;
+  let retired = false; const retiring = runtime.waitForManagedExitObservers().then(() => { retired = true; });
+  try { await new Promise<void>(resolve => setImmediate(resolve)); assert.equal(retired, false); assert.equal(runtime.listManagedProcesses()[0]?.state, "completed"); }
+  finally { release.resolve(); await retiring; }
+  await runtime.waitForManagedExitObservers(); assert.equal(releases, 1);
+});
+
+function shutdownLatch(): { promise: Promise<void>; resolve(): void } {
+  let resolve!: () => void; const promise = new Promise<void>(done => { resolve = done; });
+  return { promise, resolve };
+}

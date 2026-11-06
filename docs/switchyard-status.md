@@ -25,15 +25,19 @@ status 3221225794. This change is not an accepted repair. Its private desktop an
 namespace access probes complete, while the failed fixture is preserved.
 [Exact latest failure](evidence/windows-detached-native-summary.json).
 
-The next Windows candidate supplies exactly three inherited standard pipe
-handles, closes them after independently verified Job exit, and emits only fixed
-diagnostic labels. Both managed targets compile without warnings/errors; 1,847
-portable checks and seventeen focused JS tests pass, with one declared Windows
-skip. Native acceptance is pending. [Source evidence](evidence/windows-restricted-stdio-source-summary.json).
+The explicit standard pipes run natively at `7a75189`: only three handles are
+inherited, all are closed, and 663 stderr bytes classify as an assertion. The
+child still exits 134 without a result; its precise assertion remains unidentified.
+[Native evidence](evidence/windows-stdio-native-summary.json).
 
-The GitHub Linux release job at `efbaa52` separately failed while removing a
-test-owned authority directory (`ENOTEMPTY`). Its cleanup and cause need
-investigation; the newer complete local run is still in progress.
+The complete local `efbaa52` run finishes **240/241 groups**, 1,504 passed tests,
+one failure and eleven declared skips. A stale concurrency test rejects the new
+shared helper dependency; the correction now allows only that exact dependency.
+Every child/tree and owned checkout cleanup verifies. The separate GitHub Linux
+release failure is an authority-fixture `ENOTEMPTY` teardown. Shutdown now joins
+in-flight observation/deadline callbacks and managed input release; seven files
+pass 66 checks and typecheck. Full followup remains pending.
+[Failed run and lifecycle correction](evidence/execution-shutdown-summary.json).
 
 The task creator now verifies its own native account, original repository and
 exact durable reservation before thread effects, including after asynchronous

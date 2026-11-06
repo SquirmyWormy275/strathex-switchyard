@@ -72,6 +72,12 @@ test("fresh native and contract lanes queue by exact ref and matrix identity ins
   const native = workflow.slice(workflow.indexOf("  verify-native-filesystem:"), workflow.indexOf("  verify-storage-contracts:")), contracts = workflow.slice(workflow.indexOf("  verify-storage-contracts:"));
   assert.match(native, /    concurrency:\n      group: switchyard-windows-native-\$\{\{ github\.ref \}\}-\$\{\{ matrix\.lane \}\}\n      cancel-in-progress: false/);
   assert.match(contracts, /    concurrency:\n      group: switchyard-windows-storage-contract-\$\{\{ github\.ref \}\}-\$\{\{ matrix\.suite \}\}\n      cancel-in-progress: false/);
-  assert.doesNotMatch(workflow, /cancel-in-progress: true|^    needs:/m);
+  assert.doesNotMatch(workflow, /cancel-in-progress: true/);
+  // Every independent lane waits only for the exact-source helper artifact,
+  // never for another verification lane or an unrelated complete workflow.
+  assert.deepEqual([...workflow.matchAll(/^    needs: (.+)$/gm)].map(row => row[1]), ["build-state-helper", "build-state-helper"]);
+  assert.match(native, /^    needs: build-state-helper$/m);
+  assert.match(contracts, /^    needs: build-state-helper$/m);
+  assert.match(workflow, /^  build-state-helper:\n    uses: \.\/\.github\/workflows\/switchyard-windows-state-helper\.yml$/m);
   assert.equal([...workflow.matchAll(/^      cancel-in-progress: false$/gm)].length, 2);
 });
