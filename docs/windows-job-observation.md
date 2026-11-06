@@ -27,7 +27,11 @@ the owner, substitute a namespace or justify broader rights.
 
 Six isolated groups / 78 tests, two clean managed builds, 2,071 portable checks
 (including 145 packet checks), and typecheck pass. Native C++ build/execution
-remains pending; no local Windows SDK was downloaded.
+now passes for source ad4d5e6: all three new empty-Job cases succeed, as do the
+original token/RNG and cleanup checks. The actual guardian still fails Job creation
+with error 5; this result does not explain that descendant-context difference.
+No local Windows SDK was downloaded.
+[Native evidence](evidence/windows-cold-job-native-summary.json).
 [Source evidence](evidence/windows-cold-job-source-summary.json),
 [confirmed guardian failure](evidence/windows-guardian-job-native-summary.json).
 

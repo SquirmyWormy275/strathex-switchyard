@@ -58,7 +58,7 @@
     "Version 5 uses exactly 68 fixed words/272 bytes. Managed parser and closed JavaScript projection reject inconsistent status, any nonzero active count, missing cleanup or unknown fields. Names, PIDs, handles and raw errors are not exported.",
     "Original restricted owner, exact TOKEN_QUERY-only allowance, token checks, containment, deadlines and eight assertions remain unchanged. Observations cannot accept a failed owner or act as a runtime fallback."
   ],
-  "nativeAcceptance": "Pending native C++ build and execution. This change observes the confirmed CreateJobObjectW denial; it does not repair or establish its cause.",
+  "nativeAcceptance": "Source ad4d5e6 builds and runs the C++ probe on actual Windows. All three empty-Job naming cases pass with cleanup; the original guardian still fails Job creation with error 5. See windows-cold-job-native-summary.json.",
   "installedChanged": false,
   "permissionsChanged": false
 }

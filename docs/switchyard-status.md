@@ -46,8 +46,15 @@ remains pending. [Native lifecycle receipts](evidence/windows-336-lifecycle-nati
 
 The next CI-only empty-Job observation passes six groups / 78 tests, two managed
 builds / 2,071 portable checks and typecheck, without new permissions or a
-production fallback. Native C++ execution is pending.
+production fallback. Native ad4d5e6 creates and closes all three empty Job cases
+with the existing restricted-child QUERY allowance; the actual guardian still
+fails. [Native observation](evidence/windows-cold-job-native-summary.json).
 [Diagnostic contract](windows-job-observation.md).
+
+Selected npm artifact-byte comparison additionally passes 13 groups / 89 tests
+across behavior and corrected inventory checks, including six actual Linux and
+six Windows guest-double scans. Checksums do not establish publisher identity or
+archive contents. [Contract and evidence](npm-artifact-integrity.md).
 
 ## What the backend does
 

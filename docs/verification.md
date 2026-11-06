@@ -1,5 +1,21 @@
 # What has actually been verified
 
+Selected npm artifact comparison now joins the existing reviewed Supply Chain
+and Release paths. It compares raw bytes with one canonical SHA-512 declaration,
+retains high failed mismatch findings, and keeps archive contents/publisher
+identity and the complete Shield gate unverified. Thirteen groups / 89 tests are
+accepted across behavior and corrected inventory checks, including six actual
+Linux and six Windows guest-double scans; typecheck and owned cleanup pass.
+Native Windows host follow-up is pending. [Contract](npm-artifact-integrity.md),
+[evidence](evidence/npm-artifact-integrity-summary.json).
+
+Windows `ad4d5e6` builds and executes the cold native probe. Its restricted child
+with the existing TOKEN_QUERY-only allowance successfully creates/query-closes
+empty anonymous, Local and Global Jobs. Original token/RNG and cleanup checks
+pass. The actual setup-identity guardian still fails Job creation with error 5;
+the difference in descendant context remains unresolved. No broader access or
+fallback is enabled. [Native evidence](evidence/windows-cold-job-native-summary.json).
+
 Source `3363e8b` passes the complete Linux manifest: **260 groups, 1,734
 passed tests, eleven declared skips, zero failures**. Every owned child/tree,
 temporary checkout, nine dependency aliases and 782 generated files (11,766,655
@@ -15,8 +31,8 @@ is still pending. The restricted-owner Job creation failure remains open.
 A CI-only cold-process probe now observes anonymous, Local and Global empty Job
 creation after all original RNG/token checks. It grants no rights, assigns no
 process and changes no production fallback. Six groups / 78 tests, two managed
-builds / 2,071 portable checks, typecheck and owned cleanup pass; native C++
-build/execution is pending. [Contract](windows-job-observation.md),
+builds / 2,071 portable checks, typecheck and owned cleanup pass. Native C++
+execution now confirms all three empty-Job cases while the original owner still fails. [Contract](windows-job-observation.md),
 [source evidence](evidence/windows-cold-job-source-summary.json).
 
 Windows `fb265e7b` proves `CreateJobObjectW` fails with Win32 error 5 before

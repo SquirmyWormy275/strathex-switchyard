@@ -20,6 +20,14 @@ export function pinnedRequirementsFixture({ action, clean = false, requirementsV
     { ecosystem: "PyPI", name: "mixed-name", version: advisoryVersion, advisories: clean ? [] : [{ id: "PYSEC-synthetic-only", severity: "unknown" }] }
   ] });
 }
+export function npmArtifactFixture({ action = "shield_supply_chain", artifactStatus = "matched" } = {}) {
+  const original = Buffer.from([0x1f, 0x8b, 0, 0, 0x53, 0x58, 0x53, 0x59]);
+  const selected = Buffer.from(original); if (artifactStatus === "mismatched") selected[7] ^= 1;
+  const integrity = artifactStatus === "unsupported-integrity" ? "sha256-" + createHash("sha256").update(original).digest("base64") : "sha512-" + createHash("sha512").update(original).digest("base64");
+  const f = scannerFixture({ action, files: { "app.js": "const ordinary = 1;", "package-lock.json": JSON.stringify({ lockfileVersion: 3, packages: { "node_modules/synthetic": { version: "1.0.0", license: "MIT", resolved: "https://registry.npmjs.org/synthetic/-/synthetic-1.0.0.tgz", integrity } } }), "reviewed-package.tgz": selected }, advisory: [{ ecosystem: "npm", name: "synthetic", version: "1.0.0", advisories: [] }] });
+  f.request.packageArtifacts = [{ lockPath: "package-lock.json", location: "node_modules/synthetic", path: "reviewed-package.tgz" }];
+  return f;
+}
 export function scannerFixture({ action = "shield_change_scan", files = { "app.js": "const ordinary = 1;" }, rules, advisory, allowedLicenses = ["MIT", "Apache-2.0"] } = {}) {
   const content = new Map(Object.entries(files).map(([p, b]) => [p, Buffer.isBuffer(b) ? b : Buffer.from(b)]));
   const policy = { schema: "switchyard-shield-rules/v1", version: 1, engine: shieldEngineVersion, rules: rules ?? ["secret.private-key", "secret.github-token", "secret.aws-access-key", "pii.email", "javascript.dynamic-code", "config.tls-verification-disabled", "docker.privileged", "path.request-traversal"], allowedLicenses };

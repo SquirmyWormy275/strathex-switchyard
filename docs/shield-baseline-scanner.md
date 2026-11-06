@@ -25,6 +25,10 @@ excerpt or matched value. It never edits files or rotates a credential.
 | Binary input, unsupported lock or ambiguous/external workspace link, missing advisory package version or unknown license | Explicit coverage gap. |
 | Only a saved native zero exit survives restart | Incomplete higher-level observation; no program replay or passing recovery evidence. |
 
+Explicit [npm artifact comparisons](npm-artifact-integrity.md) can bind selected
+bytes to a declared SHA-512 checksum. Mismatches produce failed integrity findings;
+matched bytes still do not establish archive contents or publisher identity.
+
 Every report currently includes `repository_scope_unverified`. History and source
 permissions are not inferred from copied files; publisher provenance is not
 inferred from a registry URL or integrity string. The request scope is literally
@@ -77,7 +81,7 @@ An empty advisory list establishes only that feed's explicit observation of that
 exact package version. An absent package/version is a gap, never "no known issues."
 The offline scanner performs no online lookup or version-range interpretation. A
 separate [bounded public OSV collector](osv-advisory-source.md) can prepare exact
-stable-version data, with independent supported-range validation and full
+exact npm/Python/Rust version data, with independent supported-range validation and full
 pagination, for separate signing/review. Unknown severity remains a failed
 vulnerability plus an explicit unassessed-severity gap.
 
@@ -90,8 +94,8 @@ ecosystem identities and manifest provenance.
 
 Supply-chain scanning reads npm lockfile versions 2/3, including nested package
 locations, and returns a typed inventory with locked versions, license metadata
-and integrity-string hashes. It checks exact advisories and the signed simple
-license allowlist. Root-contained npm workspace links use the target entry's
+and integrity-string hashes. It checks exact advisories and the signed exact
+license/exception policy. Root-contained npm workspace links use the target entry's
 explicit name/version/license, retain the installed alias and hash its declared
 lock metadata. The scanner never opens that target directory or executes lifecycle
 scripts. External, missing, cyclic or ambiguous links remain unsupported; local

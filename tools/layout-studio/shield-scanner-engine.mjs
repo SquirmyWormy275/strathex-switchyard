@@ -271,6 +271,13 @@ function npmLocationName(location) {
   if (!npmName(name)) throw Error("Unsupported npm installed name.");
   return name;
 }
+/** Deliberately bounded declaration subset: one canonical SHA-512 SRI value. */
+export function npmArtifactSha512(value) {
+  if (typeof value !== "string" || !/^sha512-[A-Za-z0-9+/]{86}==$/.test(value)) return null;
+  const encoded = value.slice(7), bytes = Buffer.from(encoded, "base64");
+  return bytes.length === 64 && bytes.toString("base64") === encoded ? bytes.toString("hex") : null;
+}
+const artifactKey = (lockPath, location) => JSON.stringify([lockPath, location]);
 function workspaceLink(packages, link, cache) {
   if (!object(link) || link.link !== true || Object.keys(link).some(key => !["link", "resolved"].includes(key)) || typeof link.resolved !== "string") throw Error("Unsupported workspace link.");
   const path = scannerPath(link.resolved);
@@ -289,7 +296,8 @@ export function shieldCycloneDxComponent(c) { if(c.ecosystem==="Cargo")return ca
         { name: "switchyard:ecosystem", value: c.ecosystem },
         ...(c.ecosystem === "PyPI" ? [{ name: "switchyard:requirements-file", value: c.requirementsPath }, { name: "switchyard:declared-sha256", value: JSON.stringify(c.declaredSha256) }, { name: "switchyard:python-environment", value: "not-resolved" }] : [{ name: "switchyard:lockfile", value: c.lockPath }, { name: "switchyard:package-location", value: c.location }, { name: "switchyard:installed-as", value: c.installedAs }]),
         ...(c.workspace?[{name:"switchyard:source-kind",value:"workspace-link"},{name:"switchyard:workspace-path",value:c.workspace.path},{name:"switchyard:workspace-lock-metadata-sha256",value:c.workspace.lockMetadataSha256},{name:"switchyard:workspace-source",value:"not-verified"}]:[]),
-        ...(c.integritySha256 ? [{ name: "switchyard:integrity-string-sha256", value: c.integritySha256 }] : [])
+        ...(c.integritySha256 ? [{ name: "switchyard:integrity-string-sha256", value: c.integritySha256 }] : []),
+        ...(c.artifact ? [{ name: "switchyard:artifact-path", value: c.artifact.path }, { name: "switchyard:artifact-sha256", value: c.artifact.sha256 }, { name: "switchyard:artifact-observed-sha512", value: c.artifact.observedSha512 }, { name: "switchyard:artifact-integrity", value: c.artifact.status }, { name: "switchyard:artifact-content", value: "not-inspected" }] : [])
       ] }; }
 function feed(v) { exact(v, ["id", "path", "sha256"]); return { id: identifier(v.id), path: scannerPath(v.path), sha256: digest(v.sha256) }; }
 function indexSource(v) {
@@ -306,7 +314,7 @@ function historySource(v){
   return{kind:"git-history",path,commit:v.commit,objectId:v.objectId,mode:v.mode,depth:v.depth};
 }
 export function validateShieldRequest(v) {
-  exact(v, ["schema", "version", "action", "scope", "files", "scanner", "advisory"]);
+  exact(v, ["schema", "version", "action", "scope", "files", "scanner", "advisory", ...(Object.hasOwn(v ?? {}, "packageArtifacts") ? ["packageArtifacts"] : [])]);
   if (v.schema !== "switchyard-shield-scan/v1" || v.version !== 1 || !shieldActions.includes(v.action) || v.scope !== "reviewed-inputs") throw Error("Unsupported Shield request or scope.");
   const files = array(v.files, 512).map(f => {
     exact(f, ["path", "sha256", "size", ...(Object.hasOwn(f ?? {}, "source") ? ["source"] : [])]);
@@ -320,7 +328,20 @@ export function validateShieldRequest(v) {
   if(history.length&&(!["shield_codebase_audit","release_shield"].includes(v.action)||history.length>48||new Set(history.map(file=>file.source.path)).size>8||new Set(history.map(file=>file.source.depth)).size!==1||files.some(file=>file.source?.kind==="git-index")))throw Error("Historical scans require one bounded depth and a separate Codebase Audit or Release scope; mixed index/history requests are not connected.");
   const scanner = feed(v.scanner), advisory = v.advisory === null ? null : feed(v.advisory);
   if (advisory && (advisory.id === scanner.id || advisory.path.toLowerCase() === scanner.path.toLowerCase()) || files.some(f => [scanner.path, advisory?.path].includes(f.path))) throw Error("Ambiguous scanner inputs.");
-  return { schema: v.schema, version: 1, action: v.action, scope: v.scope, files, scanner, advisory };
+  let packageArtifacts;
+  if (Object.hasOwn(v, "packageArtifacts")) {
+    if (!["shield_supply_chain", "release_shield"].includes(v.action)) throw Error("Package artifacts require a supply-chain or release review.");
+    const sources = new Map(files.map(f => [f.path, f])), seen = new Set();
+    packageArtifacts = array(v.packageArtifacts, 128).map(row => {
+      exact(row, ["lockPath", "location", "path"]);
+      const lockPath = scannerPath(row.lockPath), path = scannerPath(row.path), location = scannerPath(row.location);
+      const key = artifactKey(lockPath, location).toLowerCase();
+      if (!sources.has(lockPath) || lockPath.split("/").at(-1) !== "package-lock.json" || !sources.has(path) || sources.get(path).size === 0 || path === lockPath || !npmLocationName(location) || seen.has(key)) throw Error("Artifact references require unique exact reviewed npm locations and file bytes.");
+      seen.add(key); return { lockPath, location, path };
+    });
+    if (!packageArtifacts.length || packageArtifacts.some(row => packageArtifacts.some(other => row.path === other.lockPath))) throw Error("Artifact content cannot double as a declared manifest.");
+  }
+  return { schema: v.schema, version: 1, action: v.action, scope: v.scope, files, scanner, advisory, ...(packageArtifacts ? { packageArtifacts } : {}) };
 }
 function parseRules(bytes) {
   const v = json(bytes); exact(v, ["schema", "version", "engine", "rules", "allowedLicenses"]);
@@ -355,6 +376,13 @@ export async function scanShieldInputs(proposed, { readInput }) {
   const policy = parseRules(await readFeed(request.scanner)), advisory = request.advisory ? parseAdvisories(await readFeed(request.advisory)) : [];
   const advisoryByIdentity = new Map(advisory.map(entry => [advisoryIdentityKey(entry), entry]));
   const add = finding => { if (findings.length < 512) findings.push(finding); else gaps.add("finding_limit"); };
+  const artifacts = new Map((request.packageArtifacts ?? []).map(row => [artifactKey(row.lockPath, row.location), row])), consumedArtifacts = new Set(), artifactDigests = new Map();
+  for (const row of artifacts.values()) if (!artifactDigests.has(row.path)) {
+    const file = request.files.find(file => file.path === row.path), bytes = await readInput(file.path, file.size);
+    if (bytes.length !== file.size || sha(bytes) !== file.sha256) throw Error("Reviewed artifact bytes changed.");
+    artifactDigests.set(row.path, { path: file.path, sha256: file.sha256, size: file.size, observedSha512: createHash("sha512").update(bytes).digest("hex") });
+  }
+  if (artifacts.size) gaps.add("artifact_contents_not_inspected");
   for (const file of request.files) {
     const bytes = await readInput(file.path, file.size); if (bytes.length !== file.size || sha(bytes) !== file.sha256) throw Error("Scanner input changed.");
     inventory.push({ path: file.path, sha256: file.sha256, bytes: file.size, ...(file.source ? { source: file.source } : {}) });
@@ -424,6 +452,16 @@ export async function scanShieldInputs(proposed, { readInput }) {
         if (!npmName(name)) { gaps.add("unsupported_npm_package"); continue; }
         const license = npmLicenseDeclaration(p.license, policy.allowedLicenses);
         const component = { ecosystem: "npm", name, installedAs, version: p.version, location, lockPath: file.path, license: license?.expression ?? null, integritySha256: !linked && typeof p.integrity === "string" ? sha(p.integrity) : null, ...(linked ? { workspace: linked.workspace } : {}) };
+        const reference = artifacts.get(artifactKey(file.path, location));
+        if (reference) {
+          if (linked) throw Error("Workspace links cannot attest a package artifact.");
+          consumedArtifacts.add(artifactKey(file.path, location));
+          const observed = artifactDigests.get(reference.path), expectedSha512 = npmArtifactSha512(p.integrity);
+          const status = expectedSha512 === null ? "unsupported-integrity" : expectedSha512 === observed.observedSha512 ? "matched" : "mismatched";
+          component.artifact = { ...observed, algorithm: "sha512", expectedSha512, status };
+          if (status !== "matched") gaps.add("package_artifact_not_verified");
+          if (status === "mismatched") add({ ruleId: "artifact.integrity-mismatch", dimension: "provenance", severity: "high", path: file.path, line: null, fingerprint: sha(`artifact.integrity-mismatch\0${file.path}\0${file.sha256}\0${location}\0${observed.path}\0${observed.sha256}`) });
+        } else gaps.add("package_artifact_not_verified");
         if (components.length >= 4096) throw Error("Aggregate dependency inventory exceeds its original component bound.");
         components.push(component);
         const known = advisoryByIdentity.get(advisoryIdentityKey({ ecosystem: "npm", name, version: p.version }));
@@ -435,12 +473,13 @@ export async function scanShieldInputs(proposed, { readInput }) {
         else if (!license.allowed) add({ ruleId: "license.disallowed", dimension: "licenses", severity: "high", path: file.path, line: null, fingerprint: sha(`license\0${file.path}\0${file.sha256}\0${location}\0${component.license}`) });
         if (license?.choice && license.allowed) gaps.add("license_choice_not_selected");
         let registry = false;
-        try { const u = new URL(p.resolved); registry = u.protocol === "https:" && u.hostname === "registry.npmjs.org" && !u.username && !u.password && !u.search && !u.hash && /^sha512-[A-Za-z0-9+/]{86}==$/.test(p.integrity); } catch {}
+        try { const u = new URL(p.resolved); registry = u.protocol === "https:" && u.hostname === "registry.npmjs.org" && !u.username && !u.password && !u.search && !u.hash && npmArtifactSha512(p.integrity) !== null; } catch {}
         if (linked) gaps.add("workspace_source_unverified");
         if (linked || !registry) gaps.add("package_source_or_integrity");
       }
     }
   }
+  if (consumedArtifacts.size !== artifacts.size) throw Error("A reviewed artifact reference did not resolve to an exact supported npm component.");
   if (requested.includes("history")) gaps.add(request.files.some(file=>file.source?.kind==="git-history")?"git_history_partially_scanned":"git_history_not_scanned");
   if (requested.includes("permissions")) gaps.add("source_permissions_not_witnessed");
   if (requested.includes("provenance")) gaps.add("publisher_provenance_not_verified");
