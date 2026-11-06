@@ -22,8 +22,11 @@ staging; a missing helper fails closed, without falling back to PowerShell.
 Both targets compile and 1,816 portable managed checks pass, including forty
 protocol cases. Four focused JS files pass 43 tests and one declared Windows-only
 skip. Native sharing, replacement/hard-link refusal, malformed release and
-parent-loss acceptance are pending Windows CI. The earlier timeout failures
-remain failed. [Source and limits](evidence/native-state-lease-source-summary.json).
+parent-loss checks now pass on native Windows at `ce5be6a`: eighteen passing
+tests and one declared Linux-only skip. The previously failing Supply Chain
+scenario and policy-output cohort also pass, with all artifact digests and
+child/tree cleanup verified. The original timeout receipts remain failed.
+[Native followup](evidence/native-state-lease-ce5-summary.json). [Source and limits](evidence/native-state-lease-source-summary.json).
 
 ## Earlier PowerShell worker reuse
 

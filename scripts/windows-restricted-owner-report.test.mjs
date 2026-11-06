@@ -48,3 +48,17 @@ test("missing/unclosed fields, wrong API, incomplete witnesses and account/guest
 test("incomplete inner owner/cleanup evidence cannot be upgraded by successful outer token claims", () => {
   for (const mutate of [o => { o.checks.pop(); }, o => { o.nativeExitVerified = false; }, o => { o.fixtureRemoved = false; }, o => { o.ordinaryUserToken = true; }, o => { o.setupRequested = true; }, o => { o.guestLaunched = true; }]) { const result = sample(); mutate(result.nativeRestrictedHostProof.hostOwner); assert.throws(() => verifyRestrictedOwnerReport(result)); }
 });
+
+test("namespace access diagnostics retain only the complete closed matrix, without paths or any upgrade of child acceptance", () => {
+  const access = { schema: "switchyard-restricted-namespace-access/v1", queryStatus: "completed", handlesClosedVerified: true,
+    entries: ["global", "session", "restricted-session"].flatMap(scope => ["query-traverse", "directory-operations", "all"].map(access => ({ scope, access, creatorStatus: 0, restrictedStatus: 0xc0000022 }))) };
+  const input = { schema: "switchyard-storage-broker-protocol-proof/v1", success: false, restrictedHostNamespaceAccess: access };
+  const result = storageBrokerFailureEvidence(input); assert.deepEqual(result.restrictedHostNamespaceAccess, access); assert.equal(result.success, false);
+  result.restrictedHostNamespaceAccess.entries[0].creatorStatus = 1; assert.equal(access.entries[0].creatorStatus, 0);
+  for (const mutate of [a => { a.path = "NEVER_RETAIN"; }, a => { a.entries[0].session = "NEVER_RETAIN"; }, a => { a.entries[0].scope = "NEVER_RETAIN"; }, a => { a.entries[0].access = "unrecognized"; }, a => { a.entries[0].creatorStatus = -1; }, a => { a.entries[0].restrictedStatus = 0x100000000; }, a => { a.entries[0].restrictedStatus = 0.5; }, a => { a.entries[0].restrictedStatus = "0"; }, a => { a.entries.reverse(); }, a => { a.entries.pop(); }, a => { a.entries.push(a.entries[0]); }, a => { a.handlesClosedVerified = false; }, a => { a.queryStatus = "unavailable"; }]) {
+    const invalid = structuredClone(access); mutate(invalid); const projection = storageBrokerFailureEvidence({ ...input, restrictedHostNamespaceAccess: invalid });
+    assert.equal(projection.restrictedHostNamespaceAccess, undefined); assert.equal(JSON.stringify(projection).includes("NEVER_RETAIN"), false); assert.equal(projection.success, false);
+  }
+  const unavailable = { ...access, queryStatus: "unavailable", entries: [] }; assert.deepEqual(storageBrokerFailureEvidence({ ...input, restrictedHostNamespaceAccess: unavailable }).restrictedHostNamespaceAccess, unavailable);
+  assert.throws(() => verifyRestrictedOwnerReport(input));
+});

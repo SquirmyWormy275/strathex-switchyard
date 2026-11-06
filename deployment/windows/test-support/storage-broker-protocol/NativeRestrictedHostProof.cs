@@ -20,6 +20,7 @@ internal static class NativeRestrictedHostProof
     internal static object? ChildExitDiagnostic;
     internal static object? ApplicationEventDiagnostic;
     internal static object? UserObjectAccessDiagnostic;
+    internal static object? NamespaceAccessDiagnostic;
     private static readonly List<bool> HistoricalFilteredFlags = new();
     private static readonly List<uint> HistoricalFilterBytes = new();
     internal static bool[] HistoricalFilterObservations => HistoricalFilteredFlags.ToArray();
@@ -208,6 +209,8 @@ internal static class NativeRestrictedHostProof
                         VerifyToken(restricted, user);
                         Phase = "restricted-private-user-object-access";
                         UserObjectAccessDiagnostic = desktopSpace.ProbeRestrictedAccess(restricted);
+                        Phase = "restricted-existing-namespace-access";
+                        NamespaceAccessDiagnostic = RestrictedNamespaceAccess.Capture(source, restricted);
                         Phase = "owned-job-before-process";
                         using var job = CreateJobObjectW(IntPtr.Zero, null); Native(!job.IsInvalid);
                         var limits = new ExtendedLimits { Basic = new BasicLimits { Flags = 0x2000 } };

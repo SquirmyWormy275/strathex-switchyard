@@ -39,6 +39,21 @@ at `7897835` opens both objects and verifies handle closure/namespace restoratio
 but the child still fails DLL initialization and its failed fixture is retained.
 [Exact source and separate native diagnostic](evidence/native-state-lease-source-summary.json).
 
+The native lease replacement now passes at `ce5be6a`: both complete lease files
+pass eighteen tests with one declared Linux-only skip; the formerly failing
+Supply Chain scenario passes, and the policy-output cohort passes all 23 tests.
+All three artifact digests and every child/tree cleanup verify. All seven policy
+jobs and both client-platform jobs succeed. Full Windows acceptance remains
+unaccepted because the separate restricted child still fails DLL initialization.
+[Exact native followup](evidence/native-state-lease-ce5-summary.json).
+
+A test-only followup now compares original/restricted access to existing OS
+namespace categories with fixed masks. It creates no object, changes no token or
+ACL and returns no path/session/account identity. Both targets compile, 1,816
+portable managed checks and two JS files/28 tests pass; native execution remains
+pending. The original child and every acceptance guard remain unchanged.
+[Diagnostic source and limits](evidence/windows-restricted-namespace-source-summary.json).
+
 Native Windows `4911642` passes thirty filesystem checks and both six-check
 service/setup lifecycles, including thirteen restricted metadata checks in each.
 The later `842416e` run identifies the intermittent removal failure as a disabled
