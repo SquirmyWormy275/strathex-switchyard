@@ -1249,3 +1249,16 @@ bounds pass, and the owned temporary root is removed. No live user credential,
 installed workspace, model, hardware or account operation is performed.
 [Contract](custom-agent-revocation.md),
 [receipt](evidence/custom-agent-revocation-source-summary.json).
+
+## Complete package size preflight — 2026-11-06
+
+Preparing source `6dceac0` exposed a distinction in the old release test: its
+payload passed the 5 MiB limit, but payload plus pretty-printed integrity manifest
+totalled 5,246,207 bytes, 3,327 over that limit. The prepared 535-file bundle was
+verified and removed without installation. The builder now writes the same JSON
+manifest without formatting whitespace, and the existing release test enforces
+the full payload-plus-manifest limit. No payload, integrity field, signature
+claim, deadline or file ceiling changes. Eighteen focused groups pass 26 tests,
+including all sixteen installation/recovery scenarios and application checks;
+all child/tree and owned temporary cleanup verify. Native Windows and the normal
+installed update remain separate. [Receipt](evidence/compact-release-manifest-summary.json).

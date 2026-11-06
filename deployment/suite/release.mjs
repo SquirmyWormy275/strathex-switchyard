@@ -114,7 +114,7 @@ export async function buildSuiteRelease({ sourceRoot, sourceFiles, outputRoot, f
   try {
     await mkdir(stage, { mode: 0o700 });
     for (const [name, b] of inputs) { const path = join(stage, name); await mkdir(dirname(path), { recursive: true, mode: 0o700 }); await writeFile(path, b, { flag: "wx", mode: 0o600 }); }
-    await writeFile(join(stage, "switchyard-release.json"), JSON.stringify(manifest, null, 2) + "\n", { flag: "wx", mode: 0o600 });
+    await writeFile(join(stage, "switchyard-release.json"), JSON.stringify(manifest) + "\n", { flag: "wx", mode: 0o600 });
     await verifySuiteRelease(stage, { expectedId: manifest.id, platform });
     try { await lstat(destination); await verifySuiteRelease(destination, { expectedId: manifest.id, platform }); }
     catch (e) { if (e.code !== "ENOENT") throw e; await rename(stage, destination); }
