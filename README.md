@@ -68,15 +68,12 @@ execution, offline repository scans and recoverable installation. The Home and
 Model F catalog provide the starting experience; complete task/IDE attachment,
 role/device controls and full scanner coverage remain unfinished.
 
-The latest accepted complete Linux checkpoint, `3363e8b`, passes **260 groups**:
-**1,734 tests passed**, eleven declared skips, and every child/process-tree and owned
-checkout cleanup verified. Subsequent changes have separate focused evidence.
-**Full Windows acceptance remains failed**: the restricted Node process now
-initializes private state and updates its mode, then fails at the read-only storage
-probe when CreateJobObjectW returns Access Denied before setup-identity readiness.
-Native Windows application and installation/recovery now pass all 21 checks.
-Installed and hardware acceptance
-remain separate from these source checks.
+The accepted complete Linux checkpoint `dad5400` passes **281 groups / 1,776
+tests**, with fifteen declared skips and verified owned cleanup. **Full Windows
+acceptance remains failed:** the restricted owner reaches guardian readiness,
+then Windows denies creation of its stdin pipe before worker creation.
+Independent Windows installation/recovery and fresh-runtime checks pass. Source,
+installed, hardware and account acceptance remain separate.
 [Current status and exact evidence](docs/switchyard-status.md).
 
 | Explore | Start here |

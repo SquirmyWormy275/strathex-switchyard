@@ -1,5 +1,22 @@
 # What has actually been verified
 
+Native Windows `d15285b` also passes all eight suspended-worker and creation-
+refusal checks without skips, including absent-cwd error 267, no execution,
+independent Job exit and unchanged malformed/overdue acknowledgement refusals.
+[Native receipt](evidence/worker-start-refusal-native-summary.json).
+
+Complete Linux `dad5400` passes **281 groups / 1,776 tests / fifteen declared
+skips / zero failures**. All owned children, checkout, nine aliases, 782 generated
+files and the run marker were removed; unrelated worktrees remain preserved.
+[Complete receipt](evidence/linux-dad-complete-summary.json).
+
+Native Windows `d15285b` identifies the original owner's next denial precisely:
+**CreatePipe / stdin / error 5**, after guardian readiness and its start
+acknowledgement. No suspended worker is registered; original owner acceptance
+remains **0/8**. This identifies the failed API, not the denied descriptor rule.
+[Native receipt](evidence/worker-start-native-summary.json).
+
+
 Native Windows `dad5400` verifies the guardian self-birth correction: readiness
 and the original start acknowledgement complete. One guardian and two status
 helpers verify exact QUERY-mask-8 registration; no suspended worker is registered.

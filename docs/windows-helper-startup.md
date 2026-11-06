@@ -208,5 +208,7 @@ It remains an unconfirmed-stop refusal, never execution or cleanup evidence.
 Observation ends before the worker acknowledgement and resume. The native test
 adds an absent working-directory case: readiness must occur, the worker callback
 must not occur, the marker must remain absent and original Job exit must verify
-independently. That Windows test is pending; portable validation and managed
-builds pass. [Source evidence](evidence/worker-start-observation-source-summary.json).
+independently. Actual Windows `d15285b` passes all eight acknowledgement/refusal
+tests without skips, including this failure case.
+[Native receipt](evidence/worker-start-refusal-native-summary.json). Portable
+validation and managed builds also pass. [Source evidence](evidence/worker-start-observation-source-summary.json).

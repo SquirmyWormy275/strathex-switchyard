@@ -18,197 +18,20 @@ there is no merge or public release acceptance.
 
 ## Current evidence
 
-Native Windows `dad5400` verifies the guardian self-birth correction: readiness
-and the original start acknowledgement complete. One guardian and two status
-helpers verify exact QUERY-mask-8 registration; no suspended worker is registered.
-The original owner remains **0/8**, failing at
-`probe-identity-committed-worker-exit`. Broader failed-fixture cleanup is not
-claimed. [Native receipt](evidence/guardian-self-birth-native-summary.json).
-A bounded worker-start failure frame now identifies only the fixed pipe,
-attribute, process-create or worker-identity stage and its numeric API error.
-It grants no permissions and cannot establish execution or cleanup. Seven
-focused groups pass **69 tests / five Windows-only skips**, two managed builds
-and **2,101 portable checks** pass, and typecheck/owned cleanup verify.
-Actual Windows acceptance remains pending.
-[Source receipt](evidence/worker-start-observation-source-summary.json).
-
-Native Windows `dbbcce8` finishes all four preliminary backend jobs within
-their twenty-minute limits: **170/171 groups accepted**, with 971 passing tests
-and 135 declared skips from completed plans. The remaining task-owner file
-reaches its original 45-second child deadline after 22 partial pass reports;
-no cases from that incomplete plan are accepted. The previously failing native
-state-lock group now passes ten tests with one Linux-only skip.
-[Native receipts](evidence/windows-backend-dbbc-native-summary.json).
-All 26 independent task-owner cases now have exact manifest entries and their
-original 45-second child bound; the two Linux-only skips remain explicit.
-The test file and production code are unchanged. Thirty focused groups pass
-**66 tests / one declared Windows-only skip**, including every task-owner case
-once. Native follow-up remains pending.
-[Source receipt](evidence/task-owner-scenarios-source-summary.json).
-
-Native Windows `cff471e` verifies the first guardian's exact QUERY-mask-8
-allowance and reaches `probe-identity-created-native-self-birth`. That later
-phase establishes that named Job creation/configuration cleared, but the
-original owner remains **0/8**; worker and status registration were not exercised.
-[Retained native evidence](evidence/windows-descendant-query-native-summary.json).
-The next correction reads the guardian's creation time through Windows' current-
-process pseudo handle, preserving the original birth format and permissions.
-The coordinator now checks liveness through `GetExitCodeProcess`, because exit
-time is undefined for a live process. Nine focused groups pass **87 tests / four
-Windows-only skips**; two managed builds and **2,101 portable checks** pass.
-Native acceptance of this correction remains pending.
-[Source evidence](evidence/guardian-self-birth-source-summary.json).
-
-Complete Linux `dbbcce8` is **failed**: 280 groups, 1,770 passed tests,
-fifteen declared skips and two fixture write failures caused by `/tmp` user
-quota exhaustion. An exact owned 18-byte write probe confirmed `EDQUOT` and was
-removed. Socket fixtures now honor the isolated temporary directory, keeping the
-same socket path limit. The focused recovery tests pass. All owned test children,
-checkout, nine aliases and 782 generated files were retired; a corrected complete
-run remains pending. [Failed run and cleanup](evidence/linux-dbbc-failed-summary.json).
-
-A CI-only candidate now applies the existing QUERY-only token allowance to
-exact descendants of the original restricted owner. Job membership, process
-birth, pinned image, original restrictions and exact mask-8 readback are required.
-The original two cold/Node observations, eight owner checks and ninety-second
-deadline remain. Nine focused groups pass **88 tests / four declared Windows-only
-skips**, a final 45-test follow-up passes, and two managed builds verify **2,101
-portable checks** (30 new parser cases). Typecheck and owned cleanup pass.
-Native acceptance is pending; the original owner remains **0/8**.
-[Contract](windows-descendant-query.md), [source receipt](evidence/windows-descendant-query-source-summary.json).
-
-The complete Linux run at `d551ccf` is **failed**: 278 groups, 1,767
-passed tests, eleven declared skips and one crash-fixture failure. EOF cleanup
-could remove the socket before the fixture substituted it. The corrected fixture
-holds the exact carrier before abrupt host loss; 42 recovery/ingress tests pass.
-All children, the temporary checkout, nine dependency aliases and 782 generated
-files were removed. A corrected complete run remains pending.
-[Failed run](evidence/linux-d551-failed-summary.json).
-
-Windows `b600a6d` also remains a **failed complete release**. Its preliminary
-backend exceeded twenty minutes and reported one lease-case failure without a
-complete plan; later steps continued by design. The release build then refused
-the non-scalar `TestPythonPath` argument before starting. Source now assigns all
-171 preliminary backend groups exactly once across four isolated jobs, retaining
-every declared child bound and a twenty-minute limit per job. Python is selected
-directly from the pinned setup action, preserving version/hash/reparse checks.
-The scheduling/harness/lease follow-up passes 39 tests with one Windows-only
-skip; native scheduling and the reported lease failure remain unaccepted.
-[Retained failure](evidence/windows-b600-release-failed-summary.json),
-[correction](evidence/release-scheduling-recovery-summary.json).
-
-Independent Windows `b600a6d` runtime installation, 49-package imports and offline
-CPU model load/recheck pass, with its temporary runtime removed.
-[Runtime receipt](evidence/windows-runtime-b600-native-summary.json).
-This does not accept the failed backend batch or complete release.
-
-An optional Windows worker acknowledgement now holds the exact process suspended
-while its owner registers PID, birth and executable hash. Callback refusal,
-cancellation and malformed or overdue acknowledgement cannot authorize execution.
-Seven focused groups pass **82 tests / four declared Windows-only skips**;
-27 harness follow-up tests, two managed builds, 2,071 portable proof checks,
-typecheck and owned cleanup pass. Actual Windows `7dd2c36` now passes all six
-native acknowledgement tests without skips. [Native receipt](evidence/windows-suspended-worker-native-summary.json).
-This step grants no permissions and does not repair the original
-restricted owner, which remains **0/8**.
-[Contract](windows-worker-acknowledgement.md), [source evidence](evidence/windows-suspended-worker-source-summary.json).
-
-Selected Python artifact comparison now supports exact requirements pins and
-multiple declared SHA-256 alternatives through Supply Chain and Release. Fourteen
-behavior/harness groups pass 98 checks; the initial packaging guard correctly
-fails at 1,006 bytes above 5 MiB. Removing three implementations reached only
-through erased types from the app bundle restores it to **5,096,071 bytes**;
-their repository source remains unchanged. The corrected packaging, application,
-sixteen installation cases and Python execution follow-up passes **19 groups /
-37 tests**, with typecheck and exact cleanup. Six actual Linux and six Windows
-guest-double scans retain original bytes and receipts. Native Windows host `d551ccf` now passes nine tests with two declared
-Linux-only skips and verified cleanup under the original 300-second bound;
-the guest remains doubled. [Native receipt](evidence/python-artifact-windows-native-summary.json).
-[Contract](python-artifact-integrity.md), [evidence](evidence/python-artifact-integrity-summary.json).
-
-Native Windows `b600a6d` now passes all sixteen original installation/recovery
-cases exactly once, with unchanged assertions, original 120-second child bounds
-and verified child/tree cleanup. The earlier timeout and local zero-plan attempt
-remain failed evidence. The complete Windows release subsequently failed as recorded above; restricted
-owner acceptance remains separate and failed.
-[Native installation receipt](evidence/installation-scenarios-native-summary.json).
-
-Native Windows `c367dff` also passes nine Cargo artifact tests with two declared
-Linux-only skips under the original 300-second bound. The guest remains doubled.
-[Cargo native receipt](evidence/cargo-artifact-windows-native-summary.json).
-
-Installation scheduling now uses sixteen exact case names, each in its own
-bounded child, with the original 120-second child limit and six-minute CI step.
-The original test file and production code are unchanged. Nineteen groups /
-48 tests pass, including every installation case exactly once and exact cleanup.
-An initial regex-selector attempt selected no cases and correctly failed; that
-receipt is retained. Native Windows scheduling acceptance now passes all sixteen cases; see the receipt above.
-[Scheduling evidence](evidence/installation-scenarios-source-summary.json).
-
-Windows `7e5c495` also retains a separate installation-group timeout: fifteen
-case reports succeeded before the original 120-second deadline, but there was no
-complete TAP plan, so the group is failed with zero accepted cases. The earlier
-`3363e8b` sixteen-case acceptance remains source-specific. Independent-case scheduling now passes native acceptance above. This is a CI failure, not unavailable hardware.
-[Timeout evidence](evidence/windows-installation-timeout-summary.json).
-
-| Area | Verified result | What it establishes |
+| Boundary | Verified result | Still open |
 | --- | --- | --- |
-| Complete Linux source `0a0dd11` | **261 groups, 1,745 passed tests, eleven declared skips, zero failures.** All owned children, temporary checkout, dependency aliases and generated builds were retired. [Receipt](evidence/linux-0a-complete-summary.json). | Backend integration, including editor lifecycle, Terminal composition, artifact-byte comparison and guardian failure reporting. Provider/editor doubles and Windows-only skips remain explicit; this is not native account or hardware acceptance. |
-| Later recording boundary `b42574f` | Nine groups / 105 tests, typecheck and exact cleanup pass. [Receipt](evidence/observation-window-summary.json). | Agent, host-action and editor metadata cannot enter a session from before its start or latest resume. Duplicate resume and a backward clock cannot lower that boundary. |
-| Windows source and native CI | `4faa8a1` clears restricted state initialization and mode update. Native pipe/lease tests pass **24 checks / one declared skip**, including EOF and parent-loss cleanup. [Evidence](evidence/windows-lease-pipe-native-summary.json). | The original restricted owner now fails later at its read-only storage probe, still **zero of eight checks**. Complete owner, guest and interactive acceptance remain open. |
-| Rust scanning | Nine groups / 94 checks and 146,326 independent Rust SemVer comparisons pass. Four Windows-host contracts also pass with controlled guests. [Source](evidence/cargo-semver-summary.json), [Windows](evidence/windows-cargo-contract-summary.json). | Bounded declaration and advisory matching. Actual Windows guest scanning, dependency resolution and publisher provenance remain unverified or unfinished. |
-| npm prerelease scanning | Twelve groups / 101 tests, 556 grammar cases, 276,676 independent comparisons and typecheck pass. [Evidence](evidence/npm-semver-summary.json). | Collector, signed feeds, inventory and host validation preserve exact build identity. Actual Linux scans and Windows guest doubles verify receipts and cleanup; installed/native guest acceptance remains open. |
-| License declaration exceptions | Seven groups / 59 tests, a 26-test engine follow-up, typecheck and exact cleanup pass. [Evidence](evidence/license-exception-declaration-summary.json). | Signed policy matches complete license/exception pairs without borrowing permission for a base or another pair. Actual Linux and Windows guest-double scans are not legal/publisher or installed acceptance. |
-| Installed Linux `5a2c324` | Six update, eleven owner/editor/severity and seven journal checks pass. All 54 non-audit semantic snapshots match; 52 sealed files are byte-identical. [Receipt](evidence/installed-cvss4-summary.json). | The last accepted installed checkpoint, not the latest source. Two verification workspaces received only expected audit additions. No live task or activated editor is inferred. |
+| Complete Linux source | `dad5400`: **281 groups, 1,776 passing tests, fifteen declared skips, zero failures.** All owned children, checkout, dependency aliases and generated files were removed. [Receipt](evidence/linux-dad-complete-summary.json). | Provider/guest doubles remain explicit. Later task scheduling and Windows-only diagnostics have separate focused evidence. |
+| Windows backend batches | `dbbcce8`: 170 of 171 groups accepted, 971 passing tests and 135 declared skips. The native lease group passes. [Receipts](evidence/windows-backend-dbbc-native-summary.json). | One task-owner file timed out without a complete plan. All 26 original cases now run independently under the same 45-second child bound; all pass locally. Native follow-up is pending. [Correction](evidence/task-owner-scenarios-source-summary.json). |
+| Restricted Windows owner | `d15285b` identifies the failure as **CreatePipe / stdin / Access Denied (5)**, after guardian readiness and the start acknowledgement. [Receipt](evidence/worker-start-native-summary.json). | **0/8 original checks accepted.** No worker is created. The denied API is established; the pipe-descriptor cause remains under investigation. |
+| Installation and runtime | All sixteen original Windows installation/recovery cases pass at `b600a6d`; its independent fresh runtime installs 49 packages and loads/rechecks the offline CPU model, then removes its temporary runtime. [Installation](evidence/installation-scenarios-native-summary.json), [runtime](evidence/windows-runtime-b600-native-summary.json). | These independent passes do not accept the failed complete Windows release or ordinary-user/guest journeys. |
+| Latest diagnostic source | Seven focused groups pass 69 tests with five Windows-only skips. Two managed builds, 2,101 portable checks, typecheck and exact owned cleanup pass. [Receipt](evidence/worker-start-observation-source-summary.json). | Actual Windows `d15285b` passes all eight acknowledgement/refusal tests without skips. [Native receipt](evidence/worker-start-refusal-native-summary.json). The original owner journey remains open. |
+| Installed app | Linux source `5a2c324` has installed metadata/owner/editor/severity checks and preserves all 54 original workspace identities. [Receipt](evidence/installed-cvss4-summary.json). | Later source checks do not establish installed acceptance; frontend and extension activation remain frozen. |
 
-The restricted native result at `fb265e7b` identifies **Access Denied in
-`CreateJobObjectW`** before setup-identity readiness. The exact permission or
-namespace cause remains under investigation; no access widening or fallback is
-enabled. [Native evidence](evidence/windows-guardian-job-native-summary.json).
-
-The older complete Windows release `1fc9d7f` fails **four of 366 groups**:
-2,296 tests pass, eight fail and 183 are declared skips. All child/tree cleanup
-verifies; complete build cleanup is not claimed. Application/recovery fixtures
-used a nonexecutable helper, and two Python checks lacked their prerequisite
-on the isolated PATH. [Retained failure](evidence/windows-release-1fc-failure-summary.json).
-The source corrections pass eight groups / 113 tests plus 29 lane/package
-follow-up checks and typecheck on Linux. Source 3363e8b additionally passes all
-21 application/installation tests on actual Windows. A newer complete release
-remains pending. [Native lifecycle receipts](evidence/windows-336-lifecycle-native-summary.json).
-[Correction evidence](evidence/windows-release-prerequisite-summary.json).
-
-The next CI-only empty-Job observation passes six groups / 78 tests, two managed
-builds / 2,071 portable checks and typecheck, without new permissions or a
-production fallback. Native ad4d5e6 creates and closes all three empty Job cases
-with the existing restricted-child QUERY allowance; the actual guardian still
-fails. [Native observation](evidence/windows-cold-job-native-summary.json).
-[Diagnostic contract](windows-job-observation.md).
-
-Selected npm artifact-byte comparison additionally passes 13 groups / 89 tests
-across behavior and corrected inventory checks, including six actual Linux and
-six Windows guest-double scans. Checksums do not establish publisher identity or
-archive contents. [Contract and evidence](npm-artifact-integrity.md).
-
-A subsequent guardian failure observation checks only its existing self-token
-QUERY access after Job creation is denied. Six groups / 79 tests, two managed
-builds / 2,071 portable checks and typecheck pass, with cleanup. Native 0a0dd11
-confirms self-query denial in the same guardian; permissions and refusal remain unchanged.
-[Native evidence](evidence/windows-guardian-query-native-summary.json).
-[Source evidence](evidence/windows-guardian-query-source-summary.json).
-
-A CI-only comparison now runs one additional cold child without the existing
-QUERY allowance, then leaves the original cold/Node checks intact. It grants no
-additional access. Six groups / 79 tests and managed/type checks pass. Native
-comparison ties the named-Job denial to withholding that allowance in the cold
-image; the actual guardian remains failed. [Native comparison](evidence/windows-unmodified-cold-native-summary.json). [Source](evidence/windows-unmodified-cold-source-summary.json).
-
-Selected Cargo artifact-byte comparison is implemented through reviewed Supply
-Chain and Release execution. Exact package/version/source binding, mismatch
-findings, receipt replay and cleanup pass fifteen groups / 105 tests and a
-21-test manifest-alias follow-up; typecheck passes. Four actual Linux scans and
-four Windows guest-double runs preserve original bytes/index/HEAD. Native Windows host acceptance now passes nine tests and two declared Linux skips;
-publisher/archive-content verification remains open.
-[Contract](cargo-artifact-integrity.md), [evidence](evidence/cargo-artifact-integrity-summary.json).
+Failed runs remain failed evidence. Partial test output is excluded when the
+final plan is missing. Provider and guest doubles are explicitly identified in
+their receipts. The [verification record](verification.md) retains the detailed
+chronology; the [requirement ledger](switchyard-requirements.md) tracks the full
+Rev2 scope independently of these checkpoints.
 
 ## What the backend does
 
@@ -224,8 +47,8 @@ publisher/archive-content verification remains open.
 
 ## Unfinished implementation
 
-- Windows restricted-owner Job creation and the rest of its original owner journey;
-  complete release verification of the isolated Python prerequisite remains pending.
+- Windows restricted-owner worker startup and the rest of its original owner
+  journey; corrected complete Windows release verification remains pending.
 - Production editor command activation and remaining guided role/device wiring.
   Frontend and command activation are deliberately frozen for owner review.
 - Broader Shield coverage and dependency syntax/resolution, publisher provenance,
