@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { requiredGroups } from "./run-isolated-tests.mjs";
-import { windowsScenarioGroups, selectWindowsContractGroups, selectWindowsStorageScenario, windowsStorageScenarioSuites, windowsShieldScenarios, windowsStopScenarios } from "./windows-scenario-groups.mjs";
+import { windowsScenarioGroups, selectWindowsContractGroups, selectWindowsStorageScenario, windowsStorageScenarioSuites, windowsShieldScenarios, windowsStopScenarios, windowsInstallationScenarios } from "./windows-scenario-groups.mjs";
 
 const shield = "tools/layout-studio/repository-windows-shield.test.mjs", stop = "tools/layout-studio/repository-windows-execution-stop.test.mjs";
 test("both Windows verification entry points select all eight independent Shield and stop scenarios with their unchanged child bounds", () => {
@@ -104,4 +104,19 @@ test("archived Windows release tests stage their own pinned native lease helper 
   const cleanup = source.slice(source.indexOf("foreach($temporaryBuildTree"));
   assert.match(cleanup, /\.state-lease-helper-publish/);
   assert.match(cleanup, /\$testTempRoot,\$buildRoot\)\)\{Remove-B122OwnedBuildTree/);
+});
+
+test("installation selections cover every original case exactly once without changing assertions or deadlines", async () => {
+  const file = "deployment/suite/installation.test.mjs", source = await readFile(new URL("../" + file, import.meta.url), "utf8");
+  const names = [...source.matchAll(/^test\("([^"]+)"/gm)].map(row => row[1]);
+  assert.deepEqual(names, windowsInstallationScenarios); assert.equal(new Set(names).size, 16);
+  const selected = selectWindowsContractGroups([file], requiredGroups);
+  assert.equal(selected.length, 16); assert.deepEqual(selected.map(g => g.pattern), windowsInstallationScenarios);
+  for (const group of selected) {
+    assert.equal(group.timeoutMs, 120000); assert.equal(group.expectedSkipped, undefined);
+    assert.equal(names.filter(name => group.pattern === name).length, 1);
+    assert.equal(group.pattern.startsWith("^"), false); assert.equal(group.pattern.endsWith("$"), false);
+  }
+  for (const name of names) assert.equal(selected.filter(group => group.pattern === name).length, 1);
+  for (const broken of [selected.slice(1), [...selected, selected[0]], selected.map((g, i) => i ? g : { ...g, pattern: ".*" })]) assert.throws(() => selectWindowsContractGroups([file], broken));
 });

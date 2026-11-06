@@ -18,11 +18,19 @@ there is no merge or public release acceptance.
 
 ## Current evidence
 
+Installation scheduling now uses sixteen exact case names, each in its own
+bounded child, with the original 120-second child limit and six-minute CI step.
+The original test file and production code are unchanged. Nineteen groups /
+48 tests pass, including every installation case exactly once and exact cleanup.
+An initial regex-selector attempt selected no cases and correctly failed; that
+receipt is retained. Native Windows scheduling acceptance remains pending.
+[Scheduling evidence](evidence/installation-scenarios-source-summary.json).
+
 Windows `7e5c495` also retains a separate installation-group timeout: fifteen
 case reports succeeded before the original 120-second deadline, but there was no
 complete TAP plan, so the group is failed with zero accepted cases. The earlier
-`3363e8b` sixteen-case acceptance remains source-specific. Scheduling the original
-cases independently is pending; this is a CI failure, not unavailable hardware.
+`3363e8b` sixteen-case acceptance remains source-specific. Independent-case scheduling is now source-tested above; native acceptance
+remains pending. This is a CI failure, not unavailable hardware.
 [Timeout evidence](evidence/windows-installation-timeout-summary.json).
 
 | Area | Verified result | What it establishes |

@@ -157,7 +157,7 @@ export const requiredGroups = [
   { file: "deployment/suite/application.test.mjs" },
   { file: "deployment/suite/runtime-maintenance.test.mjs" },
   { file: "deployment/suite/connection-restoration.test.mjs" },
-  { file: "deployment/suite/installation.test.mjs", timeoutMs: 120_000 },
+  ...windowsScenarioGroups("deployment/suite/installation.test.mjs").map(group => ({ ...group, timeoutMs: 120_000 })),
   { file: "scripts/install-workflow-shortcut.test.mjs", ...(process.platform !== "linux" ? { expectedSkipped: 2 } : {}) },
   { file: "scripts/workflow-capture.test.mjs" },
   { file: "scripts/codex-thread-status.test.mjs" },

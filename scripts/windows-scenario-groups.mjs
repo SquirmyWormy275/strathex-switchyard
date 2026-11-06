@@ -8,7 +8,28 @@ export const windowsStopScenarios = Object.freeze([
   "a failed atomic Windows stop admission sends no cancellation and cannot reuse its consumed approval",
   "a lost final Windows stop write recovers only its existing protected receipt and exact exit without another cancellation"
 ]);
+// Exact named cases retain every installation assertion and the original
+// 120-second child bound; no case or production check is shortened.
+export const windowsInstallationScenarios = Object.freeze([
+  "installation keeps current and one rollback version, records dated backups, preserves data and removes only owned entries",
+  "unowned or edited desktop entries and corrupted new releases preserve the current application",
+  "a failed persistent write restores every earlier launcher and the exact previous installation record",
+  "forced owner exit leaves a durable journal; another installer restores the exact before state without touching unrelated files",
+  "recovery preflights all edits before writing, and respects a committed update whose pending marker survived",
+  "active host connections block uninstall before any application stop or persistent mutation",
+  "uninstall verifies exact owner exit and restores host connections before removing persistent program entries",
+  "a restoration conflict retains all program entries and resumes the previous running application",
+  "a second registered instance blocks uninstall without stopping either owner",
+  "unconfirmed owner exit leaves a durable removal journal and blocks restoration until recovery",
+  "a failed uninstall write restores the owned program and keeps restart recovery durable",
+  "a dated verified recovery entry restores an interrupted uninstall even after the main loader was removed",
+  "an explicit no-start update stops the previous generation without restarting the new one",
+  "the stable installed loader verifies and addresses the actual application across update and rollback",
+  "pre-promotion owner loss recovers only verified staging copies and exact incomplete source prefixes",
+  "interrupted installation recovery accepts the full release file ceiling plus its manifest and preserves unrelated edits"
+]);
 const scenarios = Object.freeze({
+  "deployment/suite/installation.test.mjs": windowsInstallationScenarios,
   "tools/layout-studio/repository-windows-shield.test.mjs": windowsShieldScenarios,
   "tools/layout-studio/repository-windows-execution-stop.test.mjs": windowsStopScenarios
 });
