@@ -1,0 +1,93 @@
+{
+  "schema": "switchyard-windows-native-checkpoint-summary/v1",
+  "sourceHead": "49116421df846c815fd1d7ef36f06fb903839366",
+  "executionMerge": "ffa9b4199505b00f53f0ca4926eda67069c8ef20",
+  "runId": 42133719519,
+  "workflowAccepted": false,
+  "filesystem": {
+    "jobId": 127616447315,
+    "success": true,
+    "checks": 30,
+    "ownedVirtualDiskAttached": true,
+    "ownedVirtualDiskDetached": true,
+    "guestLaunched": false,
+    "keyboardOpened": false,
+    "accountOpened": false
+  },
+  "serviceLifecycle": {
+    "success": true,
+    "checks": 6,
+    "restrictedMetadataChecks": 13,
+    "nativeExitVerified": true,
+    "normalUserSetupAccepted": false
+  },
+  "nativeSetupLifecycle": {
+    "jobId": 127616447172,
+    "success": true,
+    "checks": 6,
+    "restrictedMetadataChecks": 13,
+    "nativeExitVerified": true,
+    "normalUserSetupAccepted": false
+  },
+  "restrictedOwner": {
+    "jobId": 127616446850,
+    "success": false,
+    "priorRestrictedMetadataChecks": 13,
+    "priorRestrictedExchangeChecks": 31,
+    "priorJavascriptOwnerChecks": 8,
+    "phase": "bounded-owner-journey",
+    "childExitCode": 3221225794,
+    "childExitName": "STATUS_DLL_INIT_FAILED",
+    "resultAvailable": false,
+    "privateDesktopCandidateAccepted": false,
+    "originalProtectedInstallationPreserved": true
+  },
+  "fixtureInvalidation": {
+    "jobId": 127616449801,
+    "success": false,
+    "reportedTests": 5,
+    "passedTests": 4,
+    "failedTests": 1,
+    "childCleanupCompleted": true,
+    "originalTimeoutMs": 15000,
+    "failure": "STATE_LOCK_TIMEOUT",
+    "phaseNotAvailableInOriginalReceipt": true
+  },
+  "limits": [
+    "Actual guest, interactive UAC, ordinary account and physical acceptance remain separate.",
+    "Later passing service removal does not establish the cause or resolution of the original header failure.",
+    "The private desktop candidate did not resolve the restricted child DLL initialization failure."
+  ],
+  "artifacts": [
+    {
+      "id": 13465615483,
+      "archiveSha256": "ad9a63fee5a89a092b1a99488d63ff68852d6fbafd53b79c6353ad7deb1cd606",
+      "receipt": "windows-filesystem-491-native.json",
+      "receiptSha256": "e94cb92c3594bdd042da8f938af4998e3a2c30620eb79e210c9638a7643c3de4"
+    },
+    {
+      "id": 13465860100,
+      "archiveSha256": "1630452b9c064dabd7421d92670fd23aac96cae76515b9a555c3cdef5c4a6ab1",
+      "receipt": "windows-broker-bootstrap-491-native.json",
+      "receiptSha256": "d75ea9f1c10cdd173de4c5e4dcfb18e3e1c36f7628d422115093065176ac9875"
+    },
+    {
+      "id": 13464908763,
+      "archiveSha256": "a14a99b9f95c24ee875c79b7c294302e1c2715d4d04276aab145a1f9d95703fe",
+      "receipt": "windows-native-setup-491-lifecycle.json",
+      "receiptSha256": "8c5b4d10c2278582ae8600c2d041e3c763ee77429b2ad6837f77b1f221727691"
+    },
+    {
+      "id": 13464009638,
+      "archiveSha256": "3fda7a20d71cd30c04f047ff714cfc15888b380cea1302e4368933f2b67be3fb",
+      "receipt": "windows-restricted-owner-491-native.json",
+      "receiptSha256": "b651abee888370e93f6dd583d02920e859f743ab8e8a69e8a147452697126b3a"
+    },
+    {
+      "id": 13466145021,
+      "archiveSha256": "c935a060eeddeb6e109998869044bd550fbf22d54684e63c37ac1c2c52419992",
+      "receipt": "windows-fixture-invalidation-491-native.json",
+      "receiptSha256": "ef23ab6bbf29ca1dc86f4945c2d0d87e460677794317221de9f4eec4cc6a667a"
+    }
+  ]
+}

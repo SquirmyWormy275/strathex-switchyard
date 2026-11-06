@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { randomUUID } from "node:crypto";
 import test from "node:test";
-import { CodexClient, codexDesignConfig } from "./agents.mjs";
+import { CodexClient, codexDesignConfig, codexRestrictedProcessArguments } from "./agents.mjs";
 import { createCodexStdioTasks } from "./codex-stdio-tasks.mjs";
 import { createCodingSessions } from "./coding-sessions.mjs";
 import { createSuiteStore } from "./suite-store.mjs";
@@ -202,3 +202,13 @@ test("an unconfirmed owned-process exit blocks replacement without closing an un
     await driver.list("personal"); assert.equal(starts, 3);
   } finally { owned.forEach((c) => stopped.add(c)); await driver.close(); }
 }));
+
+test("restricted private transports retain every native restriction and refuse network, alias or absent socket identities before spawn", () => {
+  const executable = "/fixed/codex", socketPath = "/run/user/1000/sy-codex/s";
+  const stdio = codexRestrictedProcessArguments(executable, ["fixture"]), listener = codexRestrictedProcessArguments(executable, ["fixture"], { mode: "unix-listener", socketPath });
+  assert.deepEqual(stdio.slice(0, 2), ["app-server", "--stdio"]); assert.deepEqual(listener.slice(0, 3), ["app-server", "--listen", "unix://" + socketPath]);
+  assert.deepEqual(listener.slice(3), stdio.slice(2)); assert.ok(listener.includes("features.daemon_auto_start=false")); assert.ok(listener.includes("features.hooks=false")); assert.ok(listener.includes('mcp_servers.fixture={command="/fixed/codex",args=["--version"],enabled=false}'));
+  for (const invalid of [null, "", "/", "relative.sock", "ws://127.0.0.1:9", "/run/../other/s", "/run//s", "/run/s\n", "/run/s?redirect", "/run/" + "x".repeat(101)]) assert.throws(() => codexRestrictedProcessArguments(executable, [], { mode: "unix-listener", socketPath: invalid }), /socket/);
+  for (const mode of ["proxy", "global-daemon"]) assert.throws(() => codexRestrictedProcessArguments(executable, [], { mode }), /transport/);
+  assert.throws(() => codexRestrictedProcessArguments(executable, [], { socketPath }), /transport/);
+});

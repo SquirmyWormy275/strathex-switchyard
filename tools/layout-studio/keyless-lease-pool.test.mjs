@@ -7,8 +7,9 @@ import { createKeylessLeasePool } from "./keyless-lease-pool.mjs";
 // Real independently exited children double only the closed lock protocol.
 // Actual Windows kernel locking is exercised separately by state-lock tests.
 const helper = `import{createInterface}from"node:readline";const mode=process.argv[1];let sequence=0,held=false,busy=true;
-if(mode==="bad-ready")console.log("UNEXPECTED");else if(mode==="oversized")console.log("X".repeat(257));else console.log("READY");
-const input=createInterface({input:process.stdin});input.on("line",line=>{let match;if((match=/^ACQUIRE ([1-9][0-9]*) ([01])$/.exec(line))){if(held||Number(match[1])!==++sequence)process.exit(4);if(mode==="die-on-acquire")process.exit(5);if(mode==="busy-first"&&busy){busy=false;console.log("BUSY "+sequence);return;}held=true;console.log("LOCKED "+sequence);}else if(line==="RELEASE "+sequence&&held){held=false;if(mode==="drop-release")return;console.log("RELEASED "+(mode==="stale-release"?0:sequence));}else process.exit(6);});`;
+process.stderr.write("lease-en");process.stderr.write("tered\\r\\nPRIVATE_ACCOUNT_AND_PATH\\n"+"X".repeat(1024)+"lease-owner-found\\nlease-input-read\\n");
+if(mode==="bad-ready")console.log("UNEXPECTED");else if(mode==="oversized")console.log("X".repeat(257));else if(mode!=="drop-ready")console.log("READY");
+const input=createInterface({input:process.stdin});input.on("line",line=>{let match;if((match=/^ACQUIRE ([1-9][0-9]*) ([01])$/.exec(line))){if(held||Number(match[1])!==++sequence)process.exit(4);if(mode==="die-on-acquire")process.exit(5);if(mode==="drop-acquire")return;if(mode==="busy-first"&&busy){busy=false;console.log("BUSY "+sequence);return;}held=true;console.log("LOCKED "+sequence);}else if(line==="RELEASE "+sequence&&held){held=false;if(mode==="drop-release")return;console.log("RELEASED "+(mode==="stale-release"?0:sequence));}else process.exit(6);});`;
 function fixture(t, mode = "normal", options = {}) {
   const children = [], wire = [];
   const pool = createKeylessLeasePool({ idleMs: 100, timeoutMs: 5000, ...options, spawnWorker(key) {
@@ -83,4 +84,16 @@ test("worker capacity refuses another path without disturbing a held lease and c
   await pool.withLease("one", async lease => { await assert.rejects(pool.withLease("two", () => assert.fail("over-capacity callback")), /unavailable/); lease.assert(); });
   assert.equal(children.length, 1);
   for (const invalid of [{ idleMs: 2001 }, { idleMs: 0 }, { timeoutMs: 15001 }, { timeoutMs: NaN }, { maxWorkers: 65 }, { maxWorkers: 0 }]) assert.throws(() => createKeylessLeasePool({ spawnWorker: () => {}, ...invalid }), /configuration/);
+});
+
+test("bounded timeout diagnostics distinguish startup, acquisition and release without exposing native stderr or replaying a callback", async t => {
+  for (const [mode, phase, calls] of [["drop-ready", "worker-startup", 0], ["drop-acquire", "lease-acquire", 0], ["drop-release", "lease-release", 1]]) {
+    const { pool, children } = fixture(t, mode, { timeoutMs: 1000 }); let invoked = 0;
+    await assert.rejects(pool.withLease("PRIVATE_LOCK_PATH", () => { invoked++; }), error => {
+      assert.equal(error.code, "STATE_LOCK_TIMEOUT"); assert.equal(error.lockPhase, phase); assert.equal(error.workerProgress, "lease-input-read");
+      assert.ok(error.message.includes(phase)); assert.equal(/PRIVATE|XXXX|lease-owner-found/.test(error.message), false); return true;
+    });
+    assert.equal(invoked, calls); await children[0].closed;
+    assert.equal(children.length, 1, "A failed transaction never creates a replacement helper");
+  }
 });

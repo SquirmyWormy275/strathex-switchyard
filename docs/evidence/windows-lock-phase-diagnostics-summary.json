@@ -1,0 +1,23 @@
+{
+  "schema": "switchyard-lock-phase-diagnostic-summary/v1",
+  "softwareReceipt": "isolated-test-4a42b26a-fd36-4943-99d8-b3a85a38755e.json",
+  "completeGroups": 3,
+  "passedTests": 23,
+  "allChildAndTreeCleanupVerified": true,
+  "typecheckPassed": true,
+  "fixedPhases": [
+    "worker-startup",
+    "lease-acquire",
+    "lease-release"
+  ],
+  "onlyAllowlistedWorkerProgressRetained": true,
+  "rawStderrRetained": false,
+  "deadlinesChanged": false,
+  "callbackReplayAdded": false,
+  "nativeDiagnosticAcceptance": false,
+  "originalNativeFailure": "windows-fixture-invalidation-491-native.json",
+  "sourceSha256": {
+    "tools/layout-studio/keyless-lease-pool.mjs": "7887a83d0d2b13b67167473cb81ab2f7b18799a7593646e1f55716b3997a8582",
+    "tools/layout-studio/keyless-lease-pool.test.mjs": "3de5734def016fcfa1d164f25ef0e7e8a61588bd47fa6d777160f43a92e40bc1"
+  }
+}

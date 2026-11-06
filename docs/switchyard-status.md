@@ -5,38 +5,39 @@ The F77 is the connected pilot, not a scope limit. The [requirement ledger](swit
 separates unfinished software from checks requiring an exact device, account or
 host. [Verification](verification.md) retains accepted and failed checkpoints.
 
-The latest accepted complete Linux checkpoint is immutable `4700d9a`: 225/225
-groups, 1,355 tests, 1,345 passed and ten declared skips. Every child cleanup
-and owned fixture/dependency-alias/worktree removal verifies
-(`isolated-test-4057ed5a-1702-44c7-a9f6-34eee6f0604b.json`). Later license and
-Copilot changes have separate focused/installed evidence, not a complete newer
-run. CVSS source `7e252a1` also passes both normal installed Supply Chain/Release
-journeys with all owned scratch removed.
-[Severity evidence](evidence/installed-cvss-summary.json).
+The latest accepted complete Linux checkpoint is immutable `d4128e6`: 238/238
+groups, 1,471 passed tests and ten declared skips. Every child/process-tree exit
+and owned fixture/dependency-alias/worktree removal verifies. Later source changes
+have separate focused evidence. [Exact complete checkpoint](evidence/linux-d412-complete-summary.json).
 
-Shared state queues retain an independent kernel lease and original deadlines
-per transaction; the native Windows `59a73de` lease group now passes five tests
-and one declared skip. Separate cold lock failures remain failed. The next
-Windows helper removes module/JSON loading from acquisition and preserves the
-original bounds; 36 local checks pass. Native `4700d9a` now passes eight Sandbox
-transport, three ignored-tree authority and six lease checks plus one declared
-skip, with three archive digests and all cleanup verified.
-[Lock evidence](private-state-locking.md).
+Native Windows `4911642` passes thirty filesystem checks and both six-check
+service/setup lifecycles, including thirteen restricted metadata checks in each.
+The workflow remains failed: the restricted primary child exits during DLL
+initialization (`STATUS_DLL_INIT_FAILED`), and fixture invalidation times out
+within the unchanged private-lock bound. The private-desktop candidate has not
+resolved the child failure. The later removal pass does not establish the cause
+or resolution of the earlier service-header failure. [Exact artifacts and limits](evidence/windows-491-native-summary.json).
 
-The restricted Windows primary-process check remains failed before child creation.
-Its concrete token restrictions pass up to a historical metadata query; no
-boolean flag was observed in `03a6065`. The earlier false-flag inference is
-withdrawn. Fixed class/stage/native-error/size diagnostics compile warning-free
-and pass all 223 portable checks; native retesting remains required on available
-CI infrastructure. [Exact failed result](evidence/windows-03a-restricted-failed-summary.json).
+Windows keyless workers pass both complete native lease files at `0740791`:
+sixteen tests plus one declared platform skip. Fresh encrypted state and keys
+remain independently read for every transaction; each kernel handle is acquired
+and released separately. New fixed timeout diagnostics distinguish startup,
+acquisition and release without retaining raw stderr or changing deadlines.
+Three Linux files pass 23 checks; native diagnostic retesting remains open.
+[Lock contract](private-state-locking.md).
 
-Windows client source `04d9d6c` passes seven complete groups and 70 assertions
-under unchanged deadlines. Actual native NTFS/broker acceptance remains tied to
-its named historical sources; recent native setup removal and restricted token
-failures remain failed. CI now runs filesystem, setup and restricted exchange on
-independent workers, preserving all original checks/bounds. Actual guest,
-ordinary-account, work-tenant and physical acceptance remain separate. See the
-[verification ledger](verification.md) for exact artifacts and pending software.
+CVSS 3.0/3.1 temporal and environmental calculations match 899,880 independent
+reference cases. Installed Supply Chain and Release demonstrations each pass
+fifteen checks with actual scanner exits, signed provenance, retained critical
+base severity and exact cleanup. Other CVSS versions and verified local context
+remain unfinished. [Calculation contract](cvss-severity.md).
+
+The owned private Codex Unix listener now has read-only native metadata evidence:
+two matching account reads, exact socket/process identity and clean retirement,
+with no task or model turn. The advertised stdio proxy did not initialize and is
+not exposed by the app. Full Studio task/IDE attachment, continuous Unix account
+fencing and parent-loss acceptance remain unfinished. Existing production Codex
+connections continue using the restricted stdio adapter.
 
 The later immutable `82eb764` full run remains failed at interrupted-install
 recovery: 213/214 groups pass, 1,266 tests pass, one fails and ten skips. Recovery
@@ -62,13 +63,15 @@ and broader history remain unfinished software. [Witness](git-history-inputs.md)
 
 ## Installed application
 
-Current installed source is `402dd7e`, release
-`55d42108e755139ba94871a19b15181b2706c8764b7c86393e7ef6327ac18fbe`.
-Six normal update, 14 Supply Chain and 14 Release checks verify actual declared
-license findings, unselected alternatives, unsupported exceptions, four scanner
-exits, signed-feed retirement and restoration. All owned source/signing/packages/
-staging/bundle/checkout are removed; zero prompts or keyboard access.
-[Installed license evidence](evidence/installed-license-summary.json).
+Current installed source is `c5d2d28`, release
+`1d037efe0d0c6a56f5bfc7d6657ac3eec2ea3b57ac8c9c49c119bc5d31b822f5`.
+Six normal update/seven privacy checks and fifteen checks each for Supply Chain
+and Release verify actual offline CVSS-context findings, duplicate refusal,
+source retirement and four independent scanner exits. Two new proof workspaces
+were reversibly archived after verified app stop; all original 54 workspace IDs,
+private endpoint, selection and frozen Home were restored. Owned signing, quota,
+package and checkout staging was removed. Zero prompts/public advisory queries,
+HID, microphone or account changes. [Installed evidence](evidence/installed-cvss-context-summary.json).
 
 Earlier installed source `c2fe4d8` reaches native Claude workspace trust without
 submitting a prompt. Account availability verifies, but registered tmux session

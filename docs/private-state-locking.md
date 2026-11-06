@@ -6,6 +6,16 @@ Every protected mutation still holds an exclusive kernel file lock. Each state
 read still retrieves its compartment key and authenticates fresh encrypted bytes.
 Switchyard does not cache decrypted state or credentials.
 
+Timeout reports now distinguish worker startup, kernel acquisition and release
+acknowledgement. They retain only fixed worker progress labels; raw stderr,
+paths and account content are discarded. This changes diagnostics, not lease
+authority, retry behavior or the original deadlines. Three complete Linux files
+pass 23 checks, including missing replies at every phase and oversized/private
+stderr rejection (`isolated-test-4a42b26a-fd36-4943-99d8-b3a85a38755e.json`).
+The later native Windows fixture-invalidation timeout remains failed and needs
+these diagnostics on a new native run; its original receipt cannot identify the
+phase. [Exact Windows checkpoint](evidence/windows-491-native-summary.json).
+
 Windows can now reuse a keyless PowerShell worker for successive leases on one
 validated lock path. Repeated repository inspections previously started a fresh
 PowerShell process for every small journal update. Reuse removes that repeated

@@ -10,7 +10,7 @@ import { runOwnedNativeCommand, guardianScope } from "./owned-native-command.mjs
 import { scopeHash, suiteConfirmations } from "./confirmations.mjs";
 import { lstat, realpath, readFile } from "node:fs/promises";
 import { homedir, userInfo } from "node:os";
-import { join } from "node:path";
+import { join, posix } from "node:path";
 import { randomUUID, createHash } from "node:crypto";
 import { modifiers, families, consequences, parsePlan, analyzePlan } from "./model.mjs";
 import { proposalSchema } from "./workspace.mjs";
@@ -88,6 +88,18 @@ function reviewedCodexVersion(hello, name) {
   if (version !== "0.166.0") throw new Error("This Codex version is not verified by the restricted adapter (0.166.0). Saved work was preserved.");
   return version;
 }
+/** Transport selection never adds a native tool, hook, model call or daemon fallback. */
+export function codexRestrictedProcessArguments(executable, serverNames = [], { mode = "stdio", socketPath } = {}) {
+  codexDesignConfig(serverNames);
+  if (typeof executable !== "string" || !executable || executable.length > 4096 || /[\0\r\n]/.test(executable)) throw Error("The native Codex executable identity is invalid.");
+  if (!["stdio", "unix-listener"].includes(mode) || mode === "stdio" && socketPath !== undefined) throw Error("Choose one exact restricted native transport.");
+  if (mode !== "stdio" && (typeof socketPath !== "string" || !/^\/[A-Za-z0-9_./-]+$/.test(socketPath) || socketPath.endsWith("/") || posix.normalize(socketPath) !== socketPath || Buffer.byteLength(socketPath) > 100)) throw Error("Choose the exact private local Codex socket; no global or network fallback is available.");
+  const prefix = mode === "stdio" ? ["app-server", "--stdio"] : ["app-server", "--listen", `unix://${socketPath}`];
+  // A complete disabled native transport also handles generated MCP entries.
+  const restrictions = [...Object.entries(codexDesignConfig().features).map(([name, value]) => `features.${name}=${value}`), "project_doc_max_bytes=0", "approvals_reviewer=\"user\"", "web_search=\"disabled\"", ...serverNames.map(name => `mcp_servers.${name}={command=${JSON.stringify(executable)},args=[\"--version\"],enabled=false}`)];
+  return [...prefix, ...restrictions.flatMap(value => ["-c", value])];
+}
+
 export class CodexClient extends EventEmitter {
   constructor(executable, cwd, serverNames = [], { spawnProcess = spawn, clientInfo = { name: "switchyard_design", title: "Switchyard design", version: "0.2.0" } } = {}) {
     super(); this.sequence = 0; this.pending = new Map(); this.buffer = ""; this.closed = false; this.accountEpoch = 0;
@@ -96,8 +108,7 @@ export class CodexClient extends EventEmitter {
     // Generated native MCP entries need a complete parseable transport override;
     // adding only `.enabled=false` can create a table with no transport. Replace
     // it with an explicitly disabled fixed native command; it is never launched.
-    const restrictions = [...Object.entries(codexDesignConfig().features).map(([name, value]) => `features.${name}=${value}`), "project_doc_max_bytes=0", "approvals_reviewer=\"user\"", "web_search=\"disabled\"", ...serverNames.map((name) => `mcp_servers.${name}={command=${JSON.stringify(executable)},args=[\"--version\"],enabled=false}`)];
-    this.child = spawnProcess(executable, ["app-server", "--stdio", ...restrictions.flatMap((c) => ["-c", c])], { cwd, shell: false, stdio: ["pipe", "pipe", "ignore"], windowsHide: true, env: desktopEnvironment() });
+    this.child = spawnProcess(executable, codexRestrictedProcessArguments(executable, serverNames), { cwd, shell: false, stdio: ["pipe", "pipe", "ignore"], windowsHide: true, env: desktopEnvironment() });
     this.child.stdout.setEncoding("utf8");
     this.child.stdout.on("data", (chunk) => {
       if (this.closed) return;
