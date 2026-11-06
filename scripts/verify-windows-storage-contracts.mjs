@@ -26,6 +26,7 @@ const suites = {
   "pypi-scanner": "tools/layout-studio/repository-windows-shield-pypi.test.mjs",
   "cargo-scanner": "tools/layout-studio/repository-windows-shield-cargo.test.mjs",
   "artifact-scanner": "tools/layout-studio/repository-shield-artifacts.test.mjs",
+  "archive-scanner": "tools/layout-studio/repository-shield-npm-archives.test.mjs",
   "cargo-artifact-scanner": "tools/layout-studio/repository-shield-cargo-artifacts.test.mjs",
   "pypi-artifact-scanner": "tools/layout-studio/repository-shield-pypi-artifacts.test.mjs",
   "license-scanner": "tools/layout-studio/repository-windows-shield-licenses.test.mjs",

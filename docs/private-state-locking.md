@@ -184,3 +184,12 @@ and 7.05 ms after, with both owned fixtures removed
 `linux-lock-latency-after-1793899235545.json`). This is a local measurement under
 changing workstation load, not a universal benchmark or proof of the earlier
 full-run failure's cause. The later `9dc0a94` checkpoint passes all 235 Linux groups; `7c44f05` subsequently fails one history-fixture cleanup in 236 groups. That fixture is corrected, with nine focused groups/85 checks passing, and a new complete 237-group run is in progress. [Original failed full run](evidence/linux-host-recording-full-failure-summary.json).
+
+## Native lease regression checkpoint
+
+Actual Windows source `6b4089c` passes both original lease groups: fourteen keyless
+pool tests and ten state-lock tests, with the one declared Linux-only lock skip.
+All children/process trees and owned staging retire. The bounded artifact digest
+and equal source/merge tree verify. This controlled CI evidence does not establish
+ordinary-user account or installed workstation acceptance.
+[Native lease evidence](evidence/native-history-index-leases-summary.json).

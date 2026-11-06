@@ -91,8 +91,21 @@ was removed after manifest verification. [Receipt](evidence/installed-spdx-osv-s
    offline npm output also passes after its portable omitted-owner fields were
    accounted for. Initial failed source/zero-plan receipts remain recorded.
    [Archive evidence](evidence/npm-archive-identity-summary.json). Reconcile the
-   next complete Linux run marker when present; native Windows acceptance of
-   this extension remains pending. Installed source remains d8a0a96.
+   active complete Linux 7e45654 run marker before exact owned cleanup. Native
+   Windows 7e45654 times out the combined artifact file at its original 300-second
+   bound; all other 65 boundary jobs pass. The correction separates byte/identity
+   cases into independent files and CI lanes, preserving original assertions
+   and deadlines. Five distinct groups/53 checks pass across the initial scanner
+   groups and corrected harness inventory; four report-bound cases also pass.
+   [Scheduling evidence](evidence/npm-archive-scheduling-summary.json). Reconcile
+   its native follow-up evidence.
+   Installed source remains d8a0a96.
+   Native NTFS index/history staging now each pass six original checks and
+   three independent guardian exits at 6b4089c. Their Windows scanner files
+   separately pass two cases each with guest doubles; leases pass 24 cases and
+   one Linux-only skip. Packet Git witnesses are synthetic and no actual guest,
+   installed Windows or ordinary-user journey is accepted by those receipts.
+   [Native evidence](evidence/native-history-index-leases-summary.json).
    Continue other independently executable ledger requirements, including Shield
    coverage, ecosystems, publisher provenance, verified local vulnerability
    context and workflow observation. These are unfinished implementation,

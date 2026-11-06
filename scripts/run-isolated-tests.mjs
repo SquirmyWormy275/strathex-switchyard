@@ -126,7 +126,7 @@ export function nativeTestOverrides(file, platform = process.platform) {
   if (file === "tools/layout-studio/repository-shield-osv-source.test.mjs") return { timeoutMs: platform === "win32" ? 300_000 : 120_000 };
   if (file === "tools/layout-studio/repository-shield-ignored-trees.test.mjs") return { timeoutMs: platform === "win32" ? 300_000 : 120_000 };
   if (file === "tools/layout-studio/task-authority-ignored-trees.test.mjs") return { timeoutMs: platform === "win32" ? 300_000 : 120_000 };
-  if (["tools/layout-studio/repository-shield-pypi-artifacts.test.mjs", "tools/layout-studio/repository-shield-cargo-artifacts.test.mjs", "tools/layout-studio/repository-shield-artifacts.test.mjs", "tools/layout-studio/repository-shield-workspaces.test.mjs"].includes(file)) return { timeoutMs: platform === "win32" ? 300_000 : 120_000 };
+  if (["tools/layout-studio/repository-shield-pypi-artifacts.test.mjs", "tools/layout-studio/repository-shield-cargo-artifacts.test.mjs", "tools/layout-studio/repository-shield-artifacts.test.mjs", "tools/layout-studio/repository-shield-npm-archives.test.mjs", "tools/layout-studio/repository-shield-workspaces.test.mjs"].includes(file)) return { timeoutMs: platform === "win32" ? 300_000 : 120_000 };
   if (file === "tools/layout-studio/repository-receipt-authority.test.mjs") return { timeoutMs: platform === "win32" ? 300_000 : 120_000 };
   if (file === "tools/layout-studio/receipt-authority-state.test.mjs" && platform === "win32") return { timeoutMs: 240_000 };
   if (file === "tools/layout-studio/repository-windows-shield-exceptions.test.mjs") return { timeoutMs: platform === "win32" ? 300_000 : 120_000 };
@@ -247,6 +247,7 @@ export const requiredGroups = [
   { file: "tools/layout-studio/repository-shield-ignored-trees.test.mjs", ...nativeTestOverrides("tools/layout-studio/repository-shield-ignored-trees.test.mjs"), expectedSkipped: process.platform === "linux" ? 0 : 1 },
   { file: "tools/layout-studio/task-authority-ignored-trees.test.mjs", ...nativeTestOverrides("tools/layout-studio/task-authority-ignored-trees.test.mjs") },
   { file: "tools/layout-studio/repository-shield-artifacts.test.mjs", ...nativeTestOverrides("tools/layout-studio/repository-shield-artifacts.test.mjs"), expectedSkipped: process.platform === "linux" ? 0 : 2 },
+  { file: "tools/layout-studio/repository-shield-npm-archives.test.mjs", ...nativeTestOverrides("tools/layout-studio/repository-shield-npm-archives.test.mjs"), expectedSkipped: process.platform === "linux" ? 0 : 2 },
   { file: "tools/layout-studio/repository-shield-cargo-artifacts.test.mjs", ...nativeTestOverrides("tools/layout-studio/repository-shield-cargo-artifacts.test.mjs"), expectedSkipped: process.platform === "linux" ? 0 : 2 },
   { file: "tools/layout-studio/repository-shield-pypi-artifacts.test.mjs", ...nativeTestOverrides("tools/layout-studio/repository-shield-pypi-artifacts.test.mjs"), expectedSkipped: process.platform === "linux" ? 0 : 2 },
   { file: "tools/layout-studio/repository-shield-workspaces.test.mjs", ...nativeTestOverrides("tools/layout-studio/repository-shield-workspaces.test.mjs"), expectedSkipped: process.platform === "linux" ? 0 : 1 },

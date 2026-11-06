@@ -982,3 +982,49 @@ SDK, runtime, model, account, installed app, frontend or HID changes.
 Native Windows and installed acceptance remain separate; this does not establish
 publisher provenance, source-member scanning or license compliance.
 [Source, failed attempts and cleanup evidence](evidence/npm-archive-identity-summary.json).
+
+## Native index, history and lease reconciliation (2026-11-06)
+
+Source `6b4089cab2a741e64e964829aab3a6f19df1438e` and execution
+`440148795e3da4a2d1176ea4b0f0d99ec199f5c9` share tree
+`567287bea743473de4b669199e236f8b19b2a30c`. All 66 jobs in Windows boundary
+workflow 42274732782 completed successfully. Five specific small artifacts were
+then imported and independently digest/schema/cleanup verified; this does not
+assert that every other workflow artifact was downloaded.
+
+Native index and history staging each pass six original checks with three exact
+guardian exits, protected ACL/hash readback, native rejection of changed packets
+and exact fixture removal. These native packets use synthetic Git witnesses;
+actual repository observation and guest execution are not inferred. The separate
+actual-Windows index and history scanner files each pass two cases using guest
+doubles. The two lease groups pass 24 tests and one declared Linux-only skip.
+All child/tree cleanup verifies. ZIPs were checked in memory and not retained.
+Actual guest, installed Windows and ordinary-user acceptance remain separate.
+[Selected source-bound native evidence](evidence/native-history-index-leases-summary.json).
+
+## Archive report bounds and native scheduling correction (2026-11-06)
+
+The host refuses a declared member count that cannot fit the claimed expanded
+USTAR size: each entry needs a header, the manifest needs at least one payload
+block, and two termination blocks remain mandatory. Four exact selected cases
+pass with child/tree cleanup; the actual npm fixture and existing valid reports
+remain accepted. This tightens report admission without changing parser bounds.
+
+Windows source `7e45654`, equal-tree execution `e9dbade1`, completes 65 of 66
+boundary jobs. The combined artifact file hits its original 300-second deadline;
+partial output is excluded, with zero accepted tests from that unfinished plan.
+Exact native process-tree termination and owned-root cleanup verify. Its small
+ZIP SHA-256 and source/merge tree were checked before private receipt retention.
+Byte-integrity and archive-identity scenarios are now split into independent
+required files and CI jobs. Their shared assertions preserve original evidence,
+repository bytes/index/HEAD, receipts/replay, native exit and cleanup. Original
+Windows/Linux child deadlines and the six-minute CI step bound are unchanged.
+[Original native failure](evidence/npm-archive-native-timeout-summary.json).
+
+The corrected split now accepts **five distinct groups / 53 tests** across the
+initial four passing groups and corrected 20-test harness run. Both byte and
+archive composed files pass; their shared helper preserves all twelve actual
+Linux and twelve Windows guest-double scenarios. The initial harness failure
+was its explicit timeout inventory missing the new file; the original receipt
+remains failed. No timeout was extended. Four earlier report-bound checks also
+pass with exact cleanup. [Correction evidence](evidence/npm-archive-scheduling-summary.json).

@@ -27,6 +27,7 @@ there is no merge or public release acceptance.
 | Restricted Windows owner | `6e967a3`: **8/8 original owner checks pass**, with 68 exact QUERY-mask-8 registrations, native tree exit, token recheck, private-desktop closure and fixture/service/file retirement. All six GUI setup checks pass. [Owner receipt](evidence/windows-restricted-owner-accepted-summary.json), [setup](evidence/setup-final-native-summary.json). | This controlled native CI proof does not accept an ordinary user account, interactive UAC or actual guest journey. |
 | Installation and runtime | All sixteen original Windows installation/recovery cases pass at `b600a6d`; its independent fresh runtime installs 49 packages and loads/rechecks the offline CPU model, then removes its temporary runtime. [Installation](evidence/installation-scenarios-native-summary.json), [runtime](evidence/windows-runtime-b600-native-summary.json). | These independent passes do not accept the failed complete Windows release or ordinary-user/guest journeys. |
 | Latest diagnostic source | Seven focused groups pass 69 tests with five Windows-only skips. Two managed builds, 2,101 portable checks, typecheck and exact owned cleanup pass. [Receipt](evidence/worker-start-observation-source-summary.json). | Actual Windows `d15285b` passes all eight acknowledgement/refusal tests without skips. [Native receipt](evidence/worker-start-refusal-native-summary.json). The full restricted-owner journey is now separately accepted above. |
+| Windows index/history/leases | Native NTFS index and history packets each pass six checks and three independent guardian exits. Both Windows scanner files pass two cases with guest execution doubled; lease groups pass 24 tests and one Linux-only skip. [Evidence](evidence/native-history-index-leases-summary.json). | Packet Git witnesses are synthetic. Actual guest, installed Windows and ordinary-user acceptance remain separate. |
 | Installed app | Linux source `d8a0a96` passes 20 installed owner/editor/journal/offline-severity/SPDX/OSV metadata checks. All 54 workspace semantic snapshots and frozen frontend bytes are preserved. [Receipt](evidence/installed-spdx-osv-summary.json). | This read-only metadata update starts no scanner, task, provider or public query. Frontend and extension activation remain frozen. |
 
 Failed runs remain failed evidence. Partial test output is excluded when the
@@ -57,6 +58,8 @@ Rev2 scope independently of these checkpoints.
   complete archive contents, actual license texts and verified local vulnerability context.
   Selected npm archive identity comparison is implemented with bounded, non-extracting
   gzip/USTAR parsing: six groups/78 checks plus one exact alias/version check pass.
+  Native Windows hit the original combined-file deadline; the corrected split
+  passes 53 distinct source checks and awaits native acceptance.
   [Artifact contract](npm-artifact-integrity.md).
   Pinned SPDX identifier membership now passes source and native Windows host
   checks (guest execution doubled), with explicit unknown

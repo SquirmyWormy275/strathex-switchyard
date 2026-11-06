@@ -135,3 +135,24 @@ source run failed on misplaced host validation and concurrent source drift;
 its original receipt remains failed. An incorrectly abbreviated test selector
 was rejected for a zero plan and is also retained, separate from the corrected
 exact-selector pass. [Source evidence](evidence/npm-archive-identity-summary.json).
+
+## Native timeout and independent scheduling
+
+The first native Windows archive extension at `7e45654` hit the existing
+300-second file deadline: the first six-scenario action finished, while the
+second action did not produce a final plan. Partial output is not accepted.
+The runner verified tree termination and removed its owned test root; the
+original failed artifact and source/merge digests are retained.
+[Native failure](evidence/npm-archive-native-timeout-summary.json).
+
+Byte-integrity scenarios and archive-identity scenarios now occupy separate
+required files and independent Windows jobs. Each keeps the original 300-second
+Windows/120-second Linux child bound and six-minute CI step limit. Shared
+assertions preserve every original checksum and archive scenario, original
+repository state, exact receipt/replay and child/fixture retirement. The host
+also rejects member counts that cannot fit the claimed expanded archive size.
+Native acceptance of the corrected schedule remains pending.
+
+The corrected schedule passes five distinct groups / 53 tests across the
+initial scanner/scheduling results and the corrected harness inventory check.
+Every child and process tree exits. [Scheduling evidence](evidence/npm-archive-scheduling-summary.json).

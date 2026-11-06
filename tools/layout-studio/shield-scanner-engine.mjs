@@ -430,7 +430,7 @@ export function validateNpmArchiveObservation(value, name, version) {
   exact(value, ["status", "name", "version", "manifestSha256", "entries", "expandedBytes"]);
   if (!npmName(value.name) || !npmVersion(value.version) || !/^[a-f0-9]{64}$/.test(value.manifestSha256 ?? "")
       || !Number.isSafeInteger(value.entries) || value.entries < 1 || value.entries > 1024
-      || !Number.isSafeInteger(value.expandedBytes) || value.expandedBytes < 1536 || value.expandedBytes > archiveLimit || value.expandedBytes % 512
+      || !Number.isSafeInteger(value.expandedBytes) || value.expandedBytes < (value.entries + 3) * 512 || value.expandedBytes > archiveLimit || value.expandedBytes % 512
       || value.status !== (value.name === name && value.version === version ? "matched" : "mismatched")) throw Error("Archive identity observation is inconsistent.");
 }
 function archiveProperties(archive) {

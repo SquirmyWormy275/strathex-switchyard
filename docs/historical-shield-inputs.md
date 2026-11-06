@@ -97,3 +97,20 @@ exact provenance, replay/feed retirement and full restoration verify. Receipts
 packages/staging/bundle/proof checkout removed; one empty task, zero prompts,
 no keyboard access. It creates only a synthetic repository and
 one empty native task, submits no model prompts and opens no keyboard.
+
+## Native Windows staging acceptance
+
+Source `6b4089c`, equal-tree execution `44014879`, passes six original native
+NTFS history packet checks with the built Windows helper. Private ACL/root
+identity, exact object/content/packet hashes, native rejection after JavaScript
+validation, all three independent guardian exits and owned scratch retirement
+verify. Original worktree/physical alias/unselected bytes and the helper image
+remain unchanged. The packet witness is synthetic; this proof does not observe
+an actual Git repository or launch a task/guest.
+
+The corresponding Windows scanner file separately passes both original cases
+on an actual Windows host, with the guest doubled and child/tree cleanup verified.
+Both artifact ZIP SHA-256 values, original proof schemas and equal source/merge
+tree are verified; no ZIP is retained. Actual guest and installed Windows
+acceptance remain separate.
+[Native evidence](evidence/native-history-index-leases-summary.json).

@@ -146,6 +146,7 @@ test("only explicitly slow integration or release groups extend the bounded defa
       ...["repository-shield-cargo", "repository-windows-shield-cargo", "repository-shield-pypi", "repository-windows-shield-pypi", "repository-shield-licenses", "repository-windows-shield-licenses"].map(name => [`tools/layout-studio/${name}.test.mjs`, process.platform === "win32" ? 300_000 : 120_000]),
       ["tools/layout-studio/repository-shield-workspaces.test.mjs", process.platform === "win32" ? 300_000 : 120_000],
       ["tools/layout-studio/repository-shield-artifacts.test.mjs", process.platform === "win32" ? 300_000 : 120_000],
+      ["tools/layout-studio/repository-shield-npm-archives.test.mjs", process.platform === "win32" ? 300_000 : 120_000],
       ["tools/layout-studio/repository-shield-cargo-artifacts.test.mjs", process.platform === "win32" ? 300_000 : 120_000],
       ["tools/layout-studio/repository-shield-pypi-artifacts.test.mjs", process.platform === "win32" ? 300_000 : 120_000],
       ...["repository-windows-shield","repository-windows-shield-recovery"].map(name=>[`tools/layout-studio/${name}.test.mjs`,process.platform==="win32"?300_000:120_000]),
@@ -193,6 +194,10 @@ test("only explicitly slow integration or release groups extend the bounded defa
     assert.deepEqual(nativeTestOverrides("tools/layout-studio/repository-ignored-scanner-inputs.test.mjs", "linux"), { timeoutMs: 120_000 });
     assert.deepEqual(nativeTestOverrides("tools/layout-studio/task-authority-ignored-inputs.test.mjs", "win32"), { timeoutMs: 240_000 });
     assert.deepEqual(nativeTestOverrides("tools/layout-studio/task-authority-ignored-inputs.test.mjs", "linux"), {});
+    for (const name of ["repository-shield-artifacts", "repository-shield-npm-archives"]) {
+      assert.deepEqual(nativeTestOverrides("tools/layout-studio/" + name + ".test.mjs", "win32"), { timeoutMs: 300_000 });
+      assert.deepEqual(nativeTestOverrides("tools/layout-studio/" + name + ".test.mjs", "linux"), { timeoutMs: 120_000 });
+    }
     assert.deepEqual(nativeTestOverrides("unreviewed.test.mjs", "win32"), {});
     assert.deepEqual(nativeTestOverrides("tools/layout-studio/repository-execution.test.mjs", "win32"), { timeoutMs: 480_000 });
     const delayed = ["-e", "setTimeout(() => process.exit(0), 150)"];

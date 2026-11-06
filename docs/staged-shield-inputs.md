@@ -101,3 +101,20 @@ Receipts `assignment-legends-1793871636105.json` and
 provenance, replay/feed retirement and full restoration. Owned source/signing/
 packages/staging/bundle/proof checkout are removed; one empty task, zero prompts,
 no keyboard access. This Linux run does not accept native Windows execution.
+
+## Native Windows staging acceptance
+
+Source `6b4089c`, equal-tree execution `44014879`, passes six original native
+NTFS index packet checks with the built Windows helper. Private ACL/root
+identity, exact object/content/packet hashes, native rejection after JavaScript
+validation, all three independent guardian exits and owned scratch retirement
+verify. Original worktree/physical alias/unselected bytes and the helper image
+remain unchanged. The packet witness is synthetic; this proof does not observe
+an actual Git repository or launch a task/guest.
+
+The corresponding Windows scanner file separately passes both original cases
+on an actual Windows host, with the guest doubled and child/tree cleanup verified.
+Both artifact ZIP SHA-256 values, original proof schemas and equal source/merge
+tree are verified; no ZIP is retained. Actual guest and installed Windows
+acceptance remain separate.
+[Native evidence](evidence/native-history-index-leases-summary.json).
