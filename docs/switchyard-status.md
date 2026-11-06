@@ -49,11 +49,17 @@ cases. Six groups / 58 tests include actual Linux scanner execution, Windows
 guest doubles and package/notice verification. Supplied context cannot clear a
 base finding. Normal installed metadata/offline acceptance also passes. [Evidence](evidence/cvss-v4-summary.json).
 
-The next Windows diagnostic observes three fixed self-token handle access
-requests in the same cold child. Managed builds, 1,936 portable checks and
-fourteen privacy-projection tests pass; native compilation/execution is pending.
-It changes no token or access policy and does not assert the provider uses these
-requests. [Source evidence](evidence/windows-self-token-source-summary.json).
+Native V4 at `32eba3c` observes Access Denied from all three self-token handle
+requests, including query-only access, under the original restricted primary.
+Source/merge/archive identity and native cleanup verify. The original Node
+failure remains; a provider's exact failing operation is still unproved.
+[Native evidence](evidence/windows-self-token-native-summary.json).
+
+The editor launcher can now observe the exact retained terminal's kernel PID,
+process birth and original executable identity while rechecking its consumed
+selection. Three groups / 38 tests and compiled extension checks pass with owned
+synthetic processes and provider/editor doubles. Actual connection/account/task
+acknowledgement remains unfinished. [Evidence](evidence/editor-process-summary.json).
 
 ## Latest verified checkpoints
 

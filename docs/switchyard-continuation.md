@@ -83,15 +83,20 @@ the installed update or old live provider verifiers without a relevant new chang
    original token, provider defaults, registry, runtime image and failed fixture;
    do not substitute a broader account or entropy/runtime fallback.
 
-   A new V4 cold-child probe adds fixed self-token handle access checks. Two
-   managed builds, 1,936 portable checks (80 parser cases), fourteen projection
-   tests and typecheck pass. Native execution is pending; no access policy is
-   changed. [Source evidence](evidence/windows-self-token-source-summary.json).
+   V4 at `32eba3c` now verifies all three self-token handle requests fail with
+   Access Denied, including TOKEN_QUERY alone. No token/DACL mutation occurred.
+   This does not establish that CryptoAPI attempted that operation. Original
+   Node remains exit 134; source/merge/archive and native cleanup verify.
+   [Native evidence](evidence/windows-self-token-native-summary.json).
 
 3. Implement native acknowledgement for the exact reviewed editor terminal and
    original owner/account/task. A separate observed connection or ordinary focus
    must not be treated as that terminal's acknowledgement. Keep UI wiring frozen;
-   exercise the implementation with provider/editor doubles.
+   exercise the implementation with provider/editor doubles. Exact terminal PID,
+   birth and executable observation is now connected to the consumed selection,
+   with cancellation and no PID/title/ancestry fallback. Three groups / 38 tests
+   plus compiled extension checks pass. This is a process witness, not connection
+   or task acknowledgement. [Evidence](evidence/editor-process-summary.json).
 4. Continue other ledger requirements, including remaining Shield coverage,
    ecosystems, publisher provenance, verified local vulnerability context and workflow observation. These are
    unfinished software, separate from hardware/account acceptance.

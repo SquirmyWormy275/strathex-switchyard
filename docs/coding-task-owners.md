@@ -296,3 +296,22 @@ compiled extension checks and exact generated-output cleanup pass. Command wirin
 and native terminal/account/task acknowledgement remain unfinished; these checks
 make no IDE attachment claim.
 [Source-specific evidence](evidence/editor-active-return-summary.json).
+
+## Observe the retained terminal process
+
+`StudioEditorLauncher.processIdentity(review)` reads only the exact retained
+Terminal object's `processId`. It rechecks the consumed editor selection and
+current account/task/repository/socket/policy, then compares current-user kernel
+process birth and the original opened executable identity twice. Shell wrappers,
+PID replacement, exit, missing objects, changed contexts and shutdown refuse.
+Missing PID promises have a five-second bound; cancellation joins context reads.
+A successful observation retains one process identity for later comparison.
+
+This is historical process evidence only. It does not prove the process opened a
+particular connection, received an account or resumed a thread. The result keeps
+`nativeTaskLoaded` and `ideAttached` false. A relay with peer credentials and
+account/thread acknowledgements from that same terminal connection is unfinished.
+The three-group, 38-test cohort uses real owned Node children with provider/editor
+doubles, and the compiled extension performs a read-only observation of its own
+check process. No actual IDE or native provider task is started.
+[Exact evidence](evidence/editor-process-summary.json).

@@ -2,7 +2,8 @@ import test, { type TestContext } from "node:test";
 import assert from "node:assert/strict";
 import { createHash, randomUUID } from "node:crypto";
 import { once } from "node:events";
-import { chmod, lstat, mkdir, mkdtemp, rename, rm, symlink, writeFile } from "node:fs/promises";
+import { spawn } from "node:child_process";
+import { chmod, lstat, mkdir, mkdtemp, readFile, realpath, rename, rm, symlink, writeFile } from "node:fs/promises";
 import { createServer } from "node:http";
 import { createServer as socketServer } from "node:net";
 import { tmpdir } from "node:os";
@@ -16,10 +17,12 @@ import { createInstanceGateway } from "../../../tools/layout-studio/instance.mjs
 import { createSuiteStore } from "../../../tools/layout-studio/suite-store.mjs";
 // @ts-expect-error Exercise real durable permission consumption.
 import { createCodingEditorAuthorizations } from "../../../tools/layout-studio/coding-editor-authorizations.mjs";
+// @ts-expect-error Use exact owned synthetic process retirement.
+import { stopOwnedChild } from "../../../tools/layout-studio/owned-process.mjs";
 
-async function fixture(t: TestContext) {
-  const root = await mkdtemp(join(tmpdir(), "sel-")), repositoryRoot = join(root, "repo"), executable = join(root, "codex"), socketPath = join(root, "s"), endpointPath = join(root, "endpoint.json");
-  await mkdir(repositoryRoot); const image = "synthetic executable bytes; never executed\n"; await writeFile(executable, image, { mode: 0o700 });
+async function fixture(t: TestContext, nativeImage = false) {
+  const root = await mkdtemp(join(tmpdir(), "sel-")), repositoryRoot = join(root, "repo"), executable = nativeImage ? await realpath(process.execPath) : join(root, "codex"), socketPath = join(root, "s"), endpointPath = join(root, "endpoint.json");
+  await mkdir(repositoryRoot); const image = nativeImage ? await readFile(executable) : "synthetic executable bytes; never executed\n"; if (!nativeImage) await writeFile(executable, image, { mode: 0o700 });
   const socket = socketServer(() => { throw Error("No native connection is permitted in this proof"); }); socket.listen(socketPath); await once(socket, "listening"); await chmod(socketPath, 0o600);
   const repoInfo = await lstat(repositoryRoot), socketInfo = await lstat(socketPath), selected = { compartment: "personal", ownerRequestId: randomUUID(), loadRequestId: randomUUID() };
   const target = { schema: "switchyard-codex-editor-target/v1", ownerRequestId: selected.ownerRequestId, loadRequestId: selected.loadRequestId, taskId: randomUUID(), sessionId: randomUUID(), repositoryRoot, repositoryIdentity: { device: String(repoInfo.dev), inode: String(repoInfo.ino) }, accountFingerprint: "b".repeat(64), permissions: "read-only/on-request", endpoint: { socketPath, socketDevice: String(socketInfo.dev), socketInode: String(socketInfo.ino), peerPid: process.pid, peerBirth: "1", peerExecutableSha256: createHash("sha256").update(image).digest("hex") } };
@@ -48,6 +51,21 @@ test("reviewed signed permission reaches one exact Terminal object without claim
   assert.deepEqual(f.calls[0],{name:"Switchyard · Codex task",cwd:f.repositoryRoot,shellPath:f.executable,shellArgs:["resume","--remote","unix://"+f.socketPath,"--sandbox","read-only","--ask-for-approval","on-request","--cd",f.repositoryRoot,f.target.sessionId]});
   assert.equal(result.focusVerified,true);assert.equal(result.terminalObjectReturned,true);assert.equal(result.ideAttached,false);assert.equal(result.nativeTaskLoaded,false);assert.equal(result.modelPromptSubmitted,false);assert.equal(f.window.activeTerminal,f.terminals[0]);
   assert.equal((await f.store.snapshot("personal")).codingEditorAuthorizations[0].status,"consumed");await assert.rejects(f.launcher.launch(review));await assert.rejects(f.launcher.launch(structuredClone(review)));assert.equal(f.calls.length,1);
+});
+
+test("signed exact terminal process observation retains a real synthetic PID without claiming native task attachment",linux,async t=>{
+  const f=await fixture(t,true),child=spawn(f.executable,["-e","setInterval(()=>{},1000)"],{stdio:"ignore"});t.after(async()=>{assert.equal((await stopOwnedChild(child)).stopped,true);});
+  const review=await f.launcher.review(f.selected);await f.launcher.launch(review);Object.defineProperty(f.terminals[0],"processId",{value:Promise.resolve(child.pid)});
+  const before=await f.store.snapshot("personal"),first=await f.launcher.processIdentity(review);assert.equal(first.pid,child.pid);assert.deepEqual(await f.launcher.processIdentity(review),first);assert.deepEqual(await f.store.snapshot("personal"),before);
+  const observed=f.launcher.observation(review);assert.equal(observed.nativeProcessObserved,true);assert.equal(observed.ideAttached,false);assert.equal(observed.nativeTaskLoaded,false);assert.equal(f.calls.length,1);assert.ok(f.routes.slice(3).every(r=>r==="return-target"));
+  assert.equal((await stopOwnedChild(child)).stopped,true);await assert.rejects(f.launcher.processIdentity(review));assert.equal(f.calls.length,1);
+});
+test("terminal process observation refuses an unlaunched, removed or account-drifted exact object without creating another",linux,async t=>{
+  for(const phase of ["unlaunched","removed","account"]){const f=await fixture(t),review=await f.launcher.review(f.selected);if(phase!=="unlaunched")await f.launcher.launch(review);const count=f.calls.length;if(phase==="removed")f.terminals.splice(0);if(phase==="account")f.target.accountFingerprint="e".repeat(64);await assert.rejects(f.launcher.processIdentity(review));assert.equal(f.calls.length,count);assert.equal(f.launcher.observation(review).nativeProcessObserved,false);}
+});
+test("launcher shutdown cancels an absent process PID and joins the observation",linux,async t=>{
+  const f=await fixture(t),review=await f.launcher.review(f.selected);await f.launcher.launch(review);Object.defineProperty(f.terminals[0],"processId",{value:new Promise<number>(()=>{})});
+  const pending=assert.rejects(f.launcher.processIdentity(review));await f.launcher.close();await pending;assert.equal(f.calls.length,1);assert.equal(f.launcher.observation(review).nativeProcessObserved,false);
 });
 test("concurrent launches reserve the exact review before awaiting authorization",linux,async t=>{
   const f=await fixture(t),review=await f.launcher.review(f.selected),results=await Promise.allSettled([f.launcher.launch(review),f.launcher.launch(review)]);

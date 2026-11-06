@@ -1,0 +1,34 @@
+{
+  "schema": "switchyard-editor-process-summary/v1",
+  "basis": "32eba3c38a373be18bc6c7fe7684d1b0888582f2",
+  "sourceSha256": {
+    "apps/vscode-extension/src/studio-terminal-process.ts": "cee37621ad7e3e5a4883bbeaf92f46305ceb4d03c2e3024c8c267c54a2d525a2",
+    "apps/vscode-extension/src/studio-editor-launch.ts": "fce7b0095f61213f3fa90322e6967cb268647e06fb7d532e6752b7087a6ab7ef",
+    "apps/vscode-extension/test/studio-terminal-process.test.ts": "a5d16303c1ab04f623cfdf638e8e9b058af3c9b541d7c78481772b7be1102703",
+    "apps/vscode-extension/test/studio-editor-launch.test.ts": "0de879a01945b43f82a62c6338494dfa7d1c70f9d0aafbde850c8df6b60e6b73",
+    "scripts/run-isolated-tests.mjs": "cf2c1a7a603fa5aefb4e53dee55ead2e6775b250f16804751ff405c88005d16e"
+  },
+  "focused": {
+    "receipt": "isolated-test-de944ed5-c396-4a5a-857f-55008451c73d.json",
+    "groups": 3,
+    "passedTests": 38,
+    "childAndTreeCleanupVerified": true
+  },
+  "compiled": {
+    "receipt": "editor-process-compiled-1793954467309.json",
+    "typecheck": true,
+    "extensionBuild": true,
+    "commonJsLoadAndKernelObservation": true,
+    "ownedDistRemoved": true
+  },
+  "behavior": [
+    "Observe only the exact retained Terminal object processId, bound current-user /proc identity, process birth and original executable inode/stat witness. No title, shell-child search or ancestry fallback.",
+    "Recheck the consumed editor selection, original account/task/repository/socket and active policy before and after asynchronous observations. Retain one process birth and refuse replacement or exit.",
+    "Missing PID replies have bounded timeout/cancellation; context callbacks remain joined during close. No review/permit refresh, terminal creation, task resume, model request or user-state mutation."
+  ],
+  "limits": [
+    "Provider and VS Code are controlled doubles; native kernel observations use owned synthetic Node children or the compiled check process. No real native task or editor terminal is started.",
+    "Historical process observation is not live connection authentication. A peer-credential-bound relay and account/thread acknowledgement on that exact terminal connection remain unfinished.",
+    "nativeTaskLoaded and ideAttached remain false. No command or frontend wiring is activated."
+  ]
+}

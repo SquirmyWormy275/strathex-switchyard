@@ -4,22 +4,24 @@ import { lstat, open, realpath } from "node:fs/promises";
 import { isAbsolute, normalize } from "node:path";
 import { codexTerminalResumeArguments } from "./codex-terminal.ts";
 import { revealExactTerminal } from "./terminal-focus.ts";
+import { nativeImageIdentity, observeTerminalProcess, type StudioTerminalProcess } from "./studio-terminal-process.ts";
 import type { StudioEditorRequest, StudioEditorReview, StudioEditorSelection, StudioEditorTarget, StudioTaskClient } from "./studio-task-client.ts";
 import type { TerminalLike, VscodeLike } from "./vscode-like.ts";
 
 type Client = Pick<StudioTaskClient, "editorTarget" | "returnEditorTarget" | "reviewEditor" | "issueEditor" | "consumeEditor" | "close">;
 type Host = Pick<VscodeLike, "window" | "workspace">;
 const digest = (value: unknown) => createHash("sha256").update(JSON.stringify(value)).digest("hex");
-const identity = (s: BigIntStats) => [s.dev, s.ino, s.size, s.uid, s.mode, s.mtimeNs, s.ctimeNs].join(":");
+const identity = (s: BigIntStats) => nativeImageIdentity(s);
 function requireCurrent(value: unknown): asserts value { if (!value) throw Error("The original reviewed editor launch is no longer current."); }
 interface Prepared {
   readonly selection: StudioEditorRequest; readonly review: StudioEditorReview;
   readonly targetDigest: string; readonly executable: string; readonly executableIdentity: string;
-  attempted: boolean; createCalled: boolean; terminal?: TerminalLike; focusVerified: boolean;
+  attempted: boolean; createCalled: boolean; terminal?: TerminalLike; focusVerified: boolean; process?: StudioTerminalProcess;
 }
 export interface StudioEditorLaunchObservation {
   readonly requestId: string; readonly launchAttempted: boolean; readonly terminalCreationRequested: boolean;
   readonly terminalObjectReturned: boolean; readonly focusVerified: boolean;
+  readonly nativeProcessObserved: boolean;
   readonly nativeTaskLoaded: false; readonly ideAttached: false; readonly modelPromptSubmitted: false; readonly completionVerified: false;
 }
 
@@ -28,6 +30,7 @@ export class StudioEditorLauncher {
   private readonly editorId = randomUUID();
   private readonly reviews = new Map<StudioEditorReview, Prepared>();
   private readonly pending = new Set<Promise<unknown>>();
+  private readonly processAbort = new AbortController();
   private closed = false;
   private readonly options: Readonly<{ client: Client; host: Host; executable: string; assertCurrent: (target: StudioEditorTarget) => void | Promise<void> }>;
   constructor(options: { client: Client; host: Host; executable: string; assertCurrent: (target: StudioEditorTarget) => void | Promise<void> }) {
@@ -122,9 +125,24 @@ export class StudioEditorLauncher {
       p.focusVerified = true; return this.observation(review);
     });
   }
+  /** Local process evidence only; the exact connection must still acknowledge its account and task. */
+  processIdentity(review: StudioEditorReview): Promise<StudioTerminalProcess> {
+    return this.track(async () => {
+      const p = this.reviews.get(review); requireCurrent(!this.closed && p?.terminal && p.createCalled);
+      const current = async () => {
+        await this.current(review.target, p); requireCurrent(this.options.host.window.terminals.includes(p.terminal!));
+        const observed = await this.options.client.returnEditorTarget(p.selection);
+        requireCurrent(observed.targetDigest === p.targetDigest && digest(observed.target) === p.targetDigest);
+        await this.current(review.target, p); requireCurrent(this.options.host.window.terminals.includes(p.terminal!));
+      };
+      const observed = await observeTerminalProcess({ terminal: p.terminal, executable: p.executable, executableIdentity: p.executableIdentity, expected: p.process, assertCurrent: current, signal: this.processAbort.signal });
+      // Concurrent observations cannot replace an earlier retained process birth.
+      requireCurrent(!this.closed && this.options.host.window.terminals.includes(p.terminal) && (!p.process || digest(p.process) === digest(observed))); p.process = observed; return observed;
+    });
+  }
   observation(review: StudioEditorReview): StudioEditorLaunchObservation {
     const p = this.reviews.get(review); requireCurrent(p);
-    return Object.freeze({ requestId: p.selection.requestId, launchAttempted: p.attempted, terminalCreationRequested: p.createCalled, terminalObjectReturned: Boolean(p.terminal), focusVerified: p.focusVerified, nativeTaskLoaded: false, ideAttached: false, modelPromptSubmitted: false, completionVerified: false });
+    return Object.freeze({ requestId: p.selection.requestId, launchAttempted: p.attempted, terminalCreationRequested: p.createCalled, terminalObjectReturned: Boolean(p.terminal), focusVerified: p.focusVerified, nativeProcessObserved: Boolean(p.process), nativeTaskLoaded: false, ideAttached: false, modelPromptSubmitted: false, completionVerified: false });
   }
-  async close(): Promise<void> { this.closed = true; this.options.client.close(); await Promise.allSettled([...this.pending]); }
+  async close(): Promise<void> { this.closed = true; this.processAbort.abort(); this.options.client.close(); await Promise.allSettled([...this.pending]); }
 }
