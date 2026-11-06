@@ -1,5 +1,26 @@
 # What has actually been verified
 
+## npm prereleases and native Windows probe result
+
+Collector 8 now accepts bounded literal npm SemVer including prerelease/build
+identities; scanner and host report validation share that grammar. Twelve groups
+/ 101 tests, typecheck, 556 independent grammar cases and 276,676 node-semver
+precedence comparisons pass. Linux actual execution and Windows guest doubles
+join collected synthetic advisories to signed feeds and protected receipts, with
+original bytes/index/HEAD preserved and owned staging/processes retired.
+The first local group selector stopped before staging because a Windows file
+expands to multiple manifest groups; the selector was corrected.
+[Contract](npm-semver.md), [evidence](evidence/npm-semver-summary.json).
+
+Native Windows `6f2097b` now reports `probe-identity-created-worker-exit`,
+after protected initialization and mode update. The exact setup-identity command
+guardian is created but exits before readiness. Its 4,260-byte archive hash and
+source/merge tree verify; no archive is retained locally. Original owner 0/8
+remains failed, while ordinary owner 8, restricted metadata 13 and restricted
+exchange 31 pass. This identifies the command boundary, not its underlying
+managed operation or a new permission requirement.
+[Native artifact evidence](evidence/windows-owner-probe-native-summary.json).
+
 ## Windows read-only probe observation
 
 The native 4faa8a1 owner clears private state and mode update but fails its

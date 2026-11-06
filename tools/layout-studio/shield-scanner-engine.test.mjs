@@ -6,10 +6,31 @@ import { createHash } from "node:crypto";
 import { mkdtemp, readFile, writeFile, symlink, link, rm, realpath } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { scanShieldInputs, shieldActions, shieldEngineVersion, validateShieldRequest, createShieldFileReader, parsePinnedRequirements, pypiIdentity, parsePypiVersion, pypiVersionKey, comparePypiVersions, npmLicenseDeclaration } from "./shield-scanner-engine.mjs";
+import { scanShieldInputs, shieldActions, shieldEngineVersion, validateShieldRequest, createShieldFileReader, parsePinnedRequirements, pypiIdentity, parsePypiVersion, pypiVersionKey, comparePypiVersions, npmLicenseDeclaration, parseNpmVersion, compareNpmVersions } from "./shield-scanner-engine.mjs";
 const sha = b => createHash("sha256").update(b).digest("hex");
 import { parseShieldScannerReport } from "./repository-shield.mjs";
 import {scannerFixture} from "./test-support/shield-scanner-fixture.mjs";
+
+test("npm SemVer keeps exact build identity and rejects malformed or imprecise inventory and report versions", async () => {
+  const order = ["1.0.0-alpha", "1.0.0-alpha.1", "1.0.0-alpha.beta", "1.0.0-beta", "1.0.0-beta.2", "1.0.0-beta.11", "1.0.0-rc.1", "1.0.0"];
+  for (let i = 1; i < order.length; i++) assert.equal(compareNpmVersions(order[i - 1], order[i]), -1);
+  assert.equal(compareNpmVersions("1.0.0+first", "1.0.0+second"), 0);
+  assert.equal(compareNpmVersions("9007199254740990.0.0", "9007199254740991.0.0"), -1);
+  const version = "1.2.3-rc.2+build.01", file = v => JSON.stringify({ lockfileVersion: 3, packages: { "node_modules/example": { version: v, license: "MIT" } } });
+  const f = scannerFixture({ action: "shield_supply_chain", files: { "package-lock.json": file(version) }, advisory: [
+    { ecosystem: "npm", name: "example", version, advisories: [{ id: "GHSA-exact-build", severity: "high" }] },
+    { ecosystem: "npm", name: "example", version: "1.2.3-rc.2+other", advisories: [{ id: "GHSA-other-build", severity: "critical" }] },
+  ] }), report = await f.scan(), shield = { engine: report.engine, requestSha256: report.requestSha256, request: f.request };
+  assert.deepEqual(report.findings.map(f => f.ruleId), ["GHSA-exact-build"]); assert.equal(report.sbom.components[0].version, version);
+  assert.deepEqual(parseShieldScannerReport(JSON.stringify(report), shield, f.request.action), report);
+  for (const invalid of ["01.2.3", "1.2.3-01", "1.2.3-a..b", "1.2.3+..", "1.2.3+" + "x".repeat(251), "9007199254740992.0.0", "1.0.0-9007199254740992", "v1.2.3", "1.2.3 "]) {
+    assert.throws(() => parseNpmVersion(invalid));
+    const bad = scannerFixture({ action: "shield_supply_chain", files: { "package-lock.json": file(invalid) } }), scanned = await bad.scan();
+    assert.equal(scanned.sbom.components.length, 0); assert.ok(scanned.gaps.includes("unsupported_npm_package"));
+    const altered = structuredClone(report); altered.sbom.components[0].version = invalid;
+    assert.throws(() => parseShieldScannerReport(JSON.stringify(altered), shield, f.request.action));
+  }
+});
 
 test("license exceptions are exact atomic policy entries with precedence above AND and OR", () => {
   const pair = "GPL-2.0-only WITH Classpath-exception-2.0";

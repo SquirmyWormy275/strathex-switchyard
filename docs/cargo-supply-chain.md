@@ -56,7 +56,7 @@ final releases, numeric identifiers compare without floating-point conversion,
 and build metadata does not change range precedence. Literal query, inventory
 and advisory identities retain build metadata; an explicit affected-version list
 cannot borrow another build identity. Collection, signing and trust enrollment
-remain separate operations. npm collection retains its earlier stable-only bound.
+remain separate operations. npm collection uses its separate [bounded literal SemVer contract](npm-semver.md).
 
 `switchyard-lock-inventory/v2` Cargo components include their witnessed lockfile,
 source kind, source-string hash, declared checksum and dependency-array hash.

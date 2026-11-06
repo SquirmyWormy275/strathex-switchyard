@@ -183,7 +183,18 @@ export function cargoCycloneDxComponent(c) {
 }
 
 const npmName = value => typeof value === "string" && ![".", ".."].includes(value) && /^(?:@[a-z0-9._-]+\/)?[a-z0-9._-]{1,128}$/.test(value);
-const npmVersion = value => typeof value === "string" && /^\d+\.\d+\.\d+(?:-[A-Za-z0-9.-]+)?(?:\+[A-Za-z0-9.-]+)?$/.test(value);
+/** Strict literal SemVer; numeric identifiers stay within npm's precise integer range. */
+export function parseNpmVersion(value) {
+  try {
+    const parsed = parseCargoVersion(value);
+    if ([...parsed.core, ...parsed.pre.filter(part => /^[0-9]+$/.test(part))].some(part => BigInt(part) > 9007199254740991n)) throw Error();
+    return parsed;
+  } catch { throw Error("Choose a literal npm SemVer of at most 256 characters with precise numeric identifiers."); }
+}
+export function compareNpmVersions(left, right) {
+  parseNpmVersion(left); parseNpmVersion(right); return compareCargoVersions(left, right);
+}
+export function npmVersion(value) { try { parseNpmVersion(value); return true; } catch { return false; } }
 // Bounded PEP 440 identifiers. Keep literal declarations in the BOM; compare
 // identities by normalized numeric and suffix semantics, never lexicographic order.
 const pythonVersionPattern = /^v?(?:([0-9]+)!)?([0-9]+(?:\.[0-9]+)*)(?:[-_.]?(alpha|beta|preview|pre|rc|a|b|c)[-_.]?([0-9]+)?)?(?:(?:-([0-9]+))|(?:[-_.]?(post|rev|r)[-_.]?([0-9]+)?))?(?:[-_.]?(dev)[-_.]?([0-9]+)?)?(?:\+([a-z0-9]+(?:[-_.][a-z0-9]+)*))?$/i;

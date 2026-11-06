@@ -31,6 +31,18 @@ evidence, not instructions to reset. Publish regular commits. Do not merge or re
 
 ## Current implementation and evidence
 
+npm prerelease/build handling now joins collector, signed feed, scanner inventory
+and strict host verification. Twelve groups / 101 tests plus 556 grammar cases
+and 276,676 existing node-semver reference comparisons pass with typecheck and
+exact cleanup. No new dependency, SDK, runtime or reference download.
+[Contract](npm-semver.md), [evidence](evidence/npm-semver-summary.json).
+
+Native Windows `6f2097b` reports `probe-identity-created-worker-exit`: the actual
+setup-identity guardian child is created but exits before a readiness frame.
+The original owner still passes zero of eight checks. Narrow the managed startup
+operation without inferring a specific permission failure or widening access.
+[Verified native artifact](evidence/windows-owner-probe-native-summary.json).
+
 CI-only probe observation now labels reconcile, setup identity or broker capability
 and the first failing command lifecycle stage without changing native behavior,
 permissions or the eight owner assertions. Five groups / 60 tests and typecheck

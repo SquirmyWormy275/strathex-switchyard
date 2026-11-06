@@ -25,15 +25,15 @@ pagination tokens are not copied into the normalized output.
 
 OSV documents version-query fuzzy matching. The collector independently requires
 the returned ecosystem/name and either an explicit literal affected version or
-a supported interval containing that exact query. npm accepts stable
-`major.minor.patch` releases and `SEMVER` intervals. crates.io accepts
+a supported interval containing that exact query. npm accepts [bounded literal SemVer](npm-semver.md), including prereleases and
+build metadata, with `SEMVER` intervals. crates.io accepts
 [bounded Cargo SemVer](cargo-supply-chain.md), including prereleases, u64 core
 numbers and build metadata. Range precedence ignores builds while literal
 queries and explicit affected-version lists retain exact build identity.
 PyPI accepts the [bounded PEP 440 version scheme](python-supply-chain.md) and
 `ECOSYSTEM` intervals, with trailing zero components compared equivalently.
-Only ordered `introduced`/`fixed` boundaries are supported. npm prereleases and
-build metadata, other ecosystems and unsupported range boundaries fail collection;
+Only ordered `introduced`/`fixed` boundaries are supported. Unsupported versions,
+other ecosystems and unsupported range boundaries fail collection;
 they are not converted into an empty advisory list.
 
 All pages must complete. Repeated pagination, duplicate IDs, unsupported records,
@@ -46,7 +46,7 @@ settles the collection without producing a partial success artifact.
 The [OSV schema](https://ossf.github.io/osv-schema/) exposes quantitative severity
 vectors. GitHub also publishes database-specific annotations, but
 [documents those fields as unstable](https://github.com/github/advisory-database#database_specific-values).
-Collector version 7 retains the existing calculation of supported complete CVSS 2.0, 3.0/3.1 and 4.0 base vectors
+Collector version 8 retains the existing calculation of supported complete CVSS 2.0, 3.0/3.1 and 4.0 base vectors
 using independently verified scoring and package-specific scope. Optional source
 context remains separate and cannot lower the retained base rating. It does not
 rely on unstable labels. [Severity calculation and limits](cvss-severity.md)

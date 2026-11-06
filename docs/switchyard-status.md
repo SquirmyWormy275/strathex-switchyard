@@ -24,6 +24,7 @@ there is no merge or public release acceptance.
 | Later recording boundary `b42574f` | Nine groups / 105 tests, typecheck and exact cleanup pass. [Receipt](evidence/observation-window-summary.json). | Agent, host-action and editor metadata cannot enter a session from before its start or latest resume. Duplicate resume and a backward clock cannot lower that boundary. |
 | Windows source and native CI | `4faa8a1` clears restricted state initialization and mode update. Native pipe/lease tests pass **24 checks / one declared skip**, including EOF and parent-loss cleanup. [Evidence](evidence/windows-lease-pipe-native-summary.json). | The original restricted owner now fails later at its read-only storage probe, still **zero of eight checks**. Complete owner, guest and interactive acceptance remain open. |
 | Rust scanning | Nine groups / 94 checks and 146,326 independent Rust SemVer comparisons pass. Four Windows-host contracts also pass with controlled guests. [Source](evidence/cargo-semver-summary.json), [Windows](evidence/windows-cargo-contract-summary.json). | Bounded declaration and advisory matching. Actual Windows guest scanning, dependency resolution and publisher provenance remain unverified or unfinished. |
+| npm prerelease scanning | Twelve groups / 101 tests, 556 grammar cases, 276,676 independent comparisons and typecheck pass. [Evidence](evidence/npm-semver-summary.json). | Collector, signed feeds, inventory and host validation preserve exact build identity. Actual Linux scans and Windows guest doubles verify receipts and cleanup; installed/native guest acceptance remains open. |
 | License declaration exceptions | Seven groups / 59 tests, a 26-test engine follow-up, typecheck and exact cleanup pass. [Evidence](evidence/license-exception-declaration-summary.json). | Signed policy matches complete license/exception pairs without borrowing permission for a base or another pair. Actual Linux and Windows guest-double scans are not legal/publisher or installed acceptance. |
 | Installed Linux `5a2c324` | Six update, eleven owner/editor/severity and seven journal checks pass. All 54 non-audit semantic snapshots match; 52 sealed files are byte-identical. [Receipt](evidence/installed-cvss4-summary.json). | The last accepted installed checkpoint, not the latest source. Two verification workspaces received only expected audit additions. No live task or activated editor is inferred. |
 
@@ -32,8 +33,11 @@ The `f653827` follow-up passes its file replacement, hard-link, malformed releas
 and parent-loss checks, with exact process cleanup. Its client and policy
 workflows also pass; the prior SDK-download failure remains retained.
 Complete release CI is still pending. CI-only fixed probe-stage observation now
-passes five groups / 60 tests and typecheck. It preserves the original calls and
-eight checks; native follow-up is pending.
+passes five groups / 60 tests and typecheck. Native `6f2097b` now identifies
+`probe-identity-created-worker-exit`: the setup-identity guardian starts and exits
+before reporting readiness. The exact managed startup operation remains unknown;
+the original owner still passes zero of eight checks.
+[Native failure](evidence/windows-owner-probe-native-summary.json).
 [Observation evidence](evidence/windows-owner-probe-observation-summary.json).
 
 ## What the backend does
