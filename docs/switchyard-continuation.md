@@ -32,7 +32,7 @@ evidence, not instructions to reset. Publish regular commits. Do not merge or re
 ## Current implementation and evidence
 
 Read [current status](switchyard-status.md) first. It separates complete Linux
-checks, native Windows failures, focused source checks and installed acceptance.
+checks, native Windows results, focused source checks and installed acceptance.
 The [verification record](verification.md) retains historical receipts and failed
 attempts; do not infer current status from an older passing checkpoint.
 
@@ -51,30 +51,37 @@ source-only changes have not updated or restarted this installed application.
    Do not repeat a complete run without relevant changes or unresolved concerns.
    Future runs use an exact owned home-directory temporary root; this machine's
    `/tmp` user quota was exhausted. Do not alter mounts or delete unrelated data.
-2. Native `c9a858a` verifies GUI setup and completes seven of eight original
-   restricted-owner checks. The final independent guardian-exit/fixture-retirement
-   assertion fails after all 64 CI descendant registrations; 17 commands and
-   17 final exit checks require 68. Four additional status-only registrations
-   are implemented, with two clean managed builds / 2,114 portable checks and
-   four isolated groups / 50 tests. Inspect the next native candidate.
-   [Native result](evidence/setup-gui-native-summary.json),
-   [correction](windows-descendant-query.md#final-retirement-registration).
-   Preserve all eight owner checks, the ninety-second deadline and exact QUERY
-   mask 8. No broader token/process/default-DACL/SID/privilege/account rights or
-   runtime fallback. The installed app and original production command creation
-   remain unchanged. [Setup startup](windows-setup-metadata-startup.md).
+2. Native `6e967a3` passes all eight original restricted-owner checks. Exactly
+   68 descendants (17 guardians, 17 workers, 34 status helpers) verify QUERY
+   mask 8. Native tree/token/desktop readback and inner/outer fixture, service
+   and file retirement pass. All six actual GUI setup checks pass separately.
+   This closes the restricted startup/retirement defect in controlled CI.
+   [Owner receipt](evidence/windows-restricted-owner-accepted-summary.json),
+   [setup](evidence/setup-final-native-summary.json).
+   Preserve the 68-request bound, status-only slots 65–68, original eight
+   assertions, ninety-second deadline and exact QUERY mask 8. No broader
+   token/process/default-DACL/SID/privilege/account rights or runtime fallback.
+   Interactive ordinary-user/UAC/guest acceptance remains separate.
 3. Verify the corrected Windows backend scheduling and full release separately.
    All 26 task-owner cases now have independent children with the original
    45-second bound; the original test assertions and two Linux-only skips remain.
-   A dedicated task-owner Windows job now avoids waiting for the long release
-   lane. Native `9fde0a3` now completes all 26 cases: 24 passes and the original
+   A dedicated task-owner Windows job avoids waiting for the long release
+   lane. The older complete `dbbcce8` release has now finished failed: 385/386
+   groups, 2,336 accepted tests and 195 declared skips, with only that original
+   task-owner timeout. [Receipt](evidence/windows-complete-dbbc-failed-summary.json). Native `9fde0a3` now completes all 26 cases: 24 passes and the original
    two Linux-only skips, with exact cleanup and no extended deadlines. The earlier
    four-job run remains failed evidence; complete release acceptance is separate.
    [Task-owner receipt](evidence/task-owner-native-summary.json).
    The previously reported lease case also passes.
    [Native batches](evidence/windows-backend-dbbc-native-summary.json),
    [case scheduling](evidence/task-owner-scenarios-source-summary.json).
-4. Continue other independently executable ledger requirements, including Shield
+4. The complete Linux rerun of `6e967a3` is active after the advisory range
+   change. Reconcile its home-cache marker and exact owned checkout before
+   cleanup; do not confuse it with the already removed `a5520be` run. Native
+   Windows advisory source checks pass 23 tests; composed guest-double scans
+   remain pending in their separate lane. The installed metadata verifier now
+   contains pure SPDX/OSV checks, which await normal versioned update.
+   Continue other independently executable ledger requirements, including Shield
    coverage, ecosystems, publisher provenance, verified local vulnerability
    context and workflow observation. These are unfinished implementation,
    separate from unavailable hardware, accounts or interactive environments.

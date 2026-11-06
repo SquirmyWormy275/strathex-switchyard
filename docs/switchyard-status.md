@@ -6,8 +6,8 @@ a partial implementation.** The F77 is the pilot device; it does not limit scope
 
 The Linux backend has a passing complete test checkpoint, and a versioned
 application is installed. The source has since gained additional tested changes.
-The Windows restricted owner now reaches its final retirement check, which
-still fails under the CI registration bound. Hardware,
+The restricted Windows storage owner now passes all eight original checks with
+verified retirement. Complete Windows release acceptance remains pending. Hardware,
 account and visual acceptance remain separate from those implementation results.
 
 Use the [requirement ledger](switchyard-requirements.md) for the complete scope,
@@ -22,8 +22,8 @@ there is no merge or public release acceptance.
 | Boundary | Verified result | Still open |
 | --- | --- | --- |
 | Complete Linux source | `a5520be`: **306 groups, 1,782 passing tests, sixteen declared skips, zero failures.** All owned children, checkout, dependency aliases and generated files were removed. [Receipt](evidence/linux-a552-complete-summary.json). | Provider/guest doubles remain explicit. This includes the SPDX catalog and all independently scheduled task-owner cases. Later Windows-only diagnostics have focused evidence. |
-| Windows backend batches | `dbbcce8`: 170 of 171 groups accepted, 971 passing tests and 135 declared skips. The native lease group passes. [Receipts](evidence/windows-backend-dbbc-native-summary.json). | One task-owner file timed out without a complete plan. All 26 original cases now run independently under the same 45-second child bound; all pass locally. Native `9fde0a3` now completes all 26 independent cases: 24 pass, two declared Linux-only skips, original 45-second bounds and verified cleanup. [Native receipt](evidence/task-owner-native-summary.json). [Correction](evidence/task-owner-scenarios-source-summary.json), [independent job](evidence/pipe-buffer-and-task-source-summary.json). |
-| Restricted Windows owner | `c9a858a` verifies native GUI setup and completes **7/8 original owner checks**, including actual disk lifecycle and replay refusal. All 64 observed descendants verify exact QUERY mask 8. [Receipt](evidence/setup-gui-native-summary.json). | Final independent exit/fixture retirement fails when registration 65 exceeds the old CI bound. Four additional status-only slots are implemented and source-tested; complete native owner acceptance remains pending. [Correction](windows-descendant-query.md#final-retirement-registration). |
+| Windows backend batches | `dbbcce8`: 170 of 171 groups accepted, 971 passing tests and 135 declared skips. The native lease group passes. [Receipts](evidence/windows-backend-dbbc-native-summary.json). | The older complete release also finishes 385/386 groups with 2,336 accepted tests and 195 declared skips; its sole failure is that same task-owner file timeout, excluded from accepted totals. [Complete failed receipt](evidence/windows-complete-dbbc-failed-summary.json). All 26 original cases now run independently under the same 45-second child bound; all pass locally. Native `9fde0a3` now completes all 26 independent cases: 24 pass, two declared Linux-only skips, original 45-second bounds and verified cleanup. [Native receipt](evidence/task-owner-native-summary.json). [Correction](evidence/task-owner-scenarios-source-summary.json), [independent job](evidence/pipe-buffer-and-task-source-summary.json). |
+| Restricted Windows owner | `6e967a3`: **8/8 original owner checks pass**, with 68 exact QUERY-mask-8 registrations, native tree exit, token recheck, private-desktop closure and fixture/service/file retirement. All six GUI setup checks pass. [Owner receipt](evidence/windows-restricted-owner-accepted-summary.json), [setup](evidence/setup-final-native-summary.json). | This controlled native CI proof does not accept an ordinary user account, interactive UAC or actual guest journey. |
 | Installation and runtime | All sixteen original Windows installation/recovery cases pass at `b600a6d`; its independent fresh runtime installs 49 packages and loads/rechecks the offline CPU model, then removes its temporary runtime. [Installation](evidence/installation-scenarios-native-summary.json), [runtime](evidence/windows-runtime-b600-native-summary.json). | These independent passes do not accept the failed complete Windows release or ordinary-user/guest journeys. |
 | Latest diagnostic source | Seven focused groups pass 69 tests with five Windows-only skips. Two managed builds, 2,101 portable checks, typecheck and exact owned cleanup pass. [Receipt](evidence/worker-start-observation-source-summary.json). | Actual Windows `d15285b` passes all eight acknowledgement/refusal tests without skips. [Native receipt](evidence/worker-start-refusal-native-summary.json). The original owner journey remains open. |
 | Installed app | Linux source `5a2c324` has installed metadata/owner/editor/severity checks and preserves all 54 original workspace identities. [Receipt](evidence/installed-cvss4-summary.json). | Later source checks do not establish installed acceptance; frontend and extension activation remain frozen. |
@@ -48,8 +48,8 @@ Rev2 scope independently of these checkpoints.
 
 ## Unfinished implementation
 
-- Final Windows restricted-owner exit/fixture retirement acceptance; corrected
-  complete Windows release verification remains pending.
+- Corrected complete Windows release verification; the separate restricted
+  storage-owner journey is now accepted in controlled native CI.
 - Production editor command activation and remaining guided role/device wiring.
   Frontend and command activation are deliberately frozen for owner review.
 - Broader Shield coverage and dependency syntax/resolution, publisher provenance,
@@ -74,7 +74,7 @@ adapter gate; static schema generation does not justify changing that gate.
 | F77 physical behavior | Cached read-only discovery and complete readout pass: VIA 9, Vial 4, three 8 × 11 layers and pinned `wcass:f77` identity. New typing/hotplug/write/readback acceptance is unperformed; no new HID, unlock, reset, flash or solenoid operation is authorized in this backend work. Preserve firmware Dvorak and US host input. [Source audit](solenoid-capability-audit.md). |
 | B122 hardware and cap fit | Exact hardware is unavailable. All 27 physical gates remain open. |
 | Microsoft work Copilot | No approved work tenant is available. Synthetic Graph/policy checks do not establish tenant, license or account acceptance. [Request boundary](copilot-request-recovery.md). |
-| Windows user/guest journeys | Headless CI does not establish interactive UAC, ordinary-user setup or complete guest behavior. This is separate from the restricted-owner software defect above. |
+| Windows user/guest journeys | Headless CI does not establish interactive UAC, ordinary-user setup or complete guest behavior. The passing restricted-owner CI journey does not establish these interactive checks. |
 | Claude/tmux and native task attachment | The real Claude attempt stopped at workspace trust, restored focus and retired its owned processes. No bypass, live account change or new native task is authorized here. [Receipt](evidence/installed-tmux-trust-boundary-summary.json). |
 | Home/catalog and voice UI | Frontend bytes remain frozen. Visual acceptance, microphone interaction and remaining UI implementation are separate from backend tests. |
 

@@ -1,0 +1,34 @@
+{
+  "schema": "switchyard-complete-windows-dbbc/v1",
+  "sourceCommit": "dbbcce84ad397e90a10b7ea3e1f5a9884f6b2ffe",
+  "executionCommit": "b07c0340e6134f0bd0722de86571aeac53b092b7",
+  "sourceAndExecutionTree": "3aedd953c2d473b1eb0b605fffcc95ffbcd33bf6",
+  "runId": 42253093548,
+  "jobId": 128027203691,
+  "artifactId": 13527148412,
+  "archiveBytes": 44653,
+  "archiveSha256": "9564db61baf7fa78159146a488ca0126619b06e9a9e150eebeea41c149b5a47a",
+  "zipSavedLocally": false,
+  "privateReceipt": "windows-complete-dbbc-failed.json",
+  "success": false,
+  "acceptedGroups": 385,
+  "requiredGroups": 386,
+  "acceptedTests": {
+    "total": 2531,
+    "passed": 2336,
+    "failed": 0,
+    "skipped": 195,
+    "cancelled": 0,
+    "todo": 0
+  },
+  "failedGroup": {
+    "file": "tools/layout-studio/coding-task-owners.test.mjs",
+    "timeout": true,
+    "effectiveTimeoutMs": 45000,
+    "durationMs": 45180,
+    "cleanupCompleted": true
+  },
+  "partialFailedPlanExcluded": true,
+  "allChildAndTreeCleanupVerified": true,
+  "installedChanged": false
+}

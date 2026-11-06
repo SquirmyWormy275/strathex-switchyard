@@ -88,6 +88,20 @@ try {
   assert.equal(v4Normalized.advisory.severity, "critical"); assert.equal(v4Normalized.evidence.cvssV4Context.localEnvironmentVerified, false); assert.equal(v4Normalized.evidence.cvssV4Context.baseSeverityReduced, false);
   evidence.installedCvssV4 = { baseScore: v4.baseScore, threatScore: v4.threatScore, environmentalScore: v4.environmentalScore, suppliedContextScore: v4.score, retainedRating: v4Normalized.advisory.severity, publicQueries: 0, scannerExecuted: false };
   evidence.checks.push("installed V4 calculator and collector retain critical base severity despite zero supplied context without a query, scanner or task");
+  assert.equal(hash(await readFile(join(installedRoot, "tools/layout-studio/shield-scanner-engine.mjs"))), hash(await readFile(new URL("../tools/layout-studio/shield-scanner-engine.mjs", import.meta.url))));
+  const { spdxLicenseMembership } = await import(pathToFileURL(join(installedRoot, "tools/layout-studio/shield-scanner-engine.mjs")));
+  for (const [expression, listed, deprecated] of [["MIT", true, false], ["Apache-2.0 WITH LLVM-exception", true, false], ["GPL-2.0+", true, true], ["MIT OR Unlisted-Synthetic-License", false, false], ["MIT WITH Unlisted-Synthetic-Exception", false, false]]) {
+    assert.deepEqual(spdxLicenseMembership(expression), { version: "3.29.0", listed, deprecated });
+  }
+  evidence.installedSpdxCatalog = { version: "3.29.0", cases: 5, unknownTermsRetained: true, deprecationObserved: true, licenseTextVerified: false, publicQueries: 0 };
+  evidence.checks.push("installed SPDX membership preserves separate license/exception IDs, unknown alternatives and deprecation without claiming text or publisher verification");
+  for (const ecosystem of ["npm", "PyPI", "crates.io"]) {
+    const source = { id: "OSV-synthetic-installed-boundaries", modified: new Date().toISOString(), affected: [{ package: { ecosystem, name: "synthetic" }, ranges: [{ type: ecosystem === "PyPI" ? "ECOSYSTEM" : "SEMVER", events: [{ limit: "1.2.3" }, { introduced: "1.2.0" }, { last_affected: "1.2.3" }, { limit: "2.0.0" }] }] }] };
+    assert.equal(normalizeOsvRecord(source, { ecosystem, name: "synthetic", version: "1.2.3" }, Date.now()).advisory.severity, "unknown");
+    for (const version of ["1.1.9", "1.2.4"]) assert.throws(() => normalizeOsvRecord(source, { ecosystem, name: "synthetic", version }, Date.now()));
+  }
+  evidence.installedOsvBoundaries = { ecosystems: ["npm", "PyPI", "crates.io"], inclusiveEndpointVerified: true, unionLimitsVerified: true, excludedVersionsRefused: true, publicQueries: 0, scannerExecuted: false };
+  evidence.checks.push("installed advisory matching retains inclusive endpoints and union limits without a public query or scanner effect");
   assert.equal(hash(await privateRead(stateFile)), sealed); assert.equal(definitions(await store.snapshot(selected)), definitions(before)); assert.equal(await store.selection(), selected); assert.equal(await privateRead(endpointFile), endpointBefore); assert.equal((await applicationStatus()).build, installed.build);
   const home = await fetch(binding.url.origin, { redirect: "error", signal: AbortSignal.timeout(15000) }); assert.equal(home.status, 200); evidence.homeSha256 = hash(await home.text()); assert.equal(evidence.homeSha256, "20ba0095a6b9650046df34541872aa7e0a7cdc7db5182f065abb009127c6c130");
   evidence.selectedStatePreserved = true; evidence.checks.push("tested routes preserve selected sealed bytes, definitions/mode/readouts, private endpoint and frozen Home");

@@ -892,3 +892,36 @@ refusal, original lock/index/HEAD and exact cleanup. Typecheck and the unchanged
 application/release packaging limits pass. No public query, installed update,
 model task or account change occurred.
 [Source receipt](evidence/osv-range-boundaries-source-summary.json).
+
+### Complete restricted Windows owner accepted at 6e967a3
+
+Source `6e967a3d45e46aafd36da85a86bf73b7693e241d` executes as equal-tree merge
+`da80bf1660af8b220ddac54232f775972db8b208` in workflow 42271740559.
+All **eight original restricted-owner assertions** and nine outer exchange
+checks pass. The separate 13 restricted-client, 31 native exchange and eight
+ordinary owner checks also pass. Exactly 68 descendant registrations verify
+QUERY mask 8 (17 guardians, 17 workers, 34 status helpers). Original token/tree,
+creator quota and desktop readback, both fixtures, service and captured files
+retire. The strict original report parser accepts the imported receipt.
+No account was created, no guest launched and no workstation app changed.
+[Native owner receipt](evidence/windows-restricted-owner-accepted-summary.json).
+
+The same source passes six actual GUI setup preflight checks and 23 native
+Windows advisory-source tests with exact child/tree cleanup. Artifact ZIP hashes
+and source/merge binding verify in memory; archives are not retained.
+[Setup](evidence/setup-final-native-summary.json),
+[advisory source](evidence/osv-boundaries-native-source-summary.json).
+
+### Older complete Windows release remains failed evidence
+
+The `dbbcce8` complete release finishes **385 of 386 groups**, accepting 2,336
+tests and 195 declared skips from complete plans. Its sole failed group is the
+original 45-second task-owner file timeout; partial output is excluded. All child
+and process-tree cleanup verifies. Later independently scheduled task-owner
+acceptance does not relabel this complete release as passed.
+[Complete failed receipt](evidence/windows-complete-dbbc-failed-summary.json).
+
+The installed metadata verifier now includes five pure SPDX observations and
+three-ecosystem inclusive-endpoint/union-limit checks. Syntax checking passes;
+installed execution awaits the next normal versioned update. It creates no
+account, provider, task, keyboard, microphone or public-network effect.

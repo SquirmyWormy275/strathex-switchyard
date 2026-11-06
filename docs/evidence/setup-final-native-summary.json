@@ -1,0 +1,23 @@
+{
+  "schema": "switchyard-retirement-native/v1",
+  "sourceCommit": "6e967a3d45e46aafd36da85a86bf73b7693e241d",
+  "executionCommit": "da80bf1660af8b220ddac54232f775972db8b208",
+  "sourceAndExecutionTree": "e78b3ad17174b3f68521ec514fcd6e27e3c35110",
+  "runId": 42271740559,
+  "jobId": 128078152270,
+  "artifactId": 13530951002,
+  "archiveBytes": 1065,
+  "archiveSha256": "84773addd4852b0305c1c8cec5d1ce56ab6806f0cbe69dfd69c4b0d261fa0233",
+  "zipSavedLocally": false,
+  "success": true,
+  "checks": 6,
+  "image": {
+    "imageSubsystem": "windows-gui",
+    "dependentLoadFlags": 2048,
+    "deferredUiImportsVerified": true,
+    "runtimeModuleIsolationVerified": false
+  },
+  "nativeExitVerified": true,
+  "privateReceipt": "windows-setup-6e967a3-native.json",
+  "installedChanged": false
+}

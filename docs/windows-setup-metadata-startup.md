@@ -82,3 +82,18 @@ This narrows the observed startup failure to a console-subsystem dependency
 under this restricted native environment. It still does not identify a specific
 failing DLL, accept an ordinary user account or establish an interactive UAC/guest
 journey.
+
+## Complete restricted-owner acceptance
+
+Native `6e967a3` passes **all eight original owner checks**. Its 68 verified
+registrations comprise 17 guardians, 17 workers and 34 status helpers, with mask
+8 throughout and only status helpers in the final four slots. Exact native tree
+exit, original restricted-token recheck, creator quota restoration, private desktop
+closure and both owned fixture removals pass. The outer proof also verifies
+service and captured file removal. The original deadline and assertions remain.
+
+Six actual GUI setup preflight checks pass separately. These results accept
+the controlled native CI boundary; they do not accept an ordinary user account,
+interactive UAC or a launched Windows guest.
+[Owner receipt](evidence/windows-restricted-owner-accepted-summary.json),
+[setup receipt](evidence/setup-final-native-summary.json).

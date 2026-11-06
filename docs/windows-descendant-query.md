@@ -103,3 +103,18 @@ pass, including the original parser cases and 13 final-slot checks. Four isolate
 groups pass 50 tests with exact cleanup. Native CI must still verify all eight
 original owner checks and final fixture retirement.
 [Source evidence](evidence/descendant-retirement-source-summary.json).
+
+## Complete restricted-owner acceptance
+
+Native `6e967a3` passes **all eight original owner checks**. Its 68 verified
+registrations comprise 17 guardians, 17 workers and 34 status helpers, with mask
+8 throughout and only status helpers in the final four slots. Exact native tree
+exit, original restricted-token recheck, creator quota restoration, private desktop
+closure and both owned fixture removals pass. The outer proof also verifies
+service and captured file removal. The original deadline and assertions remain.
+
+Six actual GUI setup preflight checks pass separately. These results accept
+the controlled native CI boundary; they do not accept an ordinary user account,
+interactive UAC or a launched Windows guest.
+[Owner receipt](evidence/windows-restricted-owner-accepted-summary.json),
+[setup receipt](evidence/setup-final-native-summary.json).

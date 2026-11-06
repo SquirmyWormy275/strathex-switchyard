@@ -69,9 +69,10 @@ Model F catalog provide the starting experience; complete task/IDE attachment,
 role/device controls and full scanner coverage remain unfinished.
 
 The accepted complete Linux checkpoint `a5520be` passes **306 groups / 1,782
-tests**, with sixteen declared skips and verified owned cleanup. **Full Windows
-acceptance remains failed:** the restricted owner reaches guardian readiness,
-then Windows denies creation of its stdin pipe before worker creation.
+tests**, with sixteen declared skips and verified owned cleanup. The restricted
+Windows storage journey now passes all eight original checks, including exact
+exit and fixture/service retirement. Complete Windows release acceptance remains
+pending after correction of an older task-owner scheduling timeout.
 Independent Windows installation/recovery and fresh-runtime checks pass. Source,
 installed, hardware and account acceptance remain separate.
 [Current status and exact evidence](docs/switchyard-status.md).
