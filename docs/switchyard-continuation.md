@@ -36,18 +36,21 @@ checks, native Windows results, focused source checks and installed acceptance.
 The [verification record](verification.md) retains historical receipts and failed
 attempts; do not infer current status from an older passing checkpoint.
 
-The installed baseline remains `5a2c3243b223c657d81b190745ad43440b4e013c`,
-release `9f70e2a819488f8ce04a0f5c978544f3e16a08bd6d9d47dffafa0ca2dd8b8146`.
+The installed baseline is `d8a0a9657afc4df189aa6b6e75252b7682adc054`,
+release `ea1e1770c05bca00c932ad2e77fd28dc9fa4ac6e378992be4f7b437cf902cba1`.
 Preserve all 54 original workspace identities, the pending keyboard-only Codex
-workspace, private connection information and the frozen Home bytes. Later
-source-only changes have not updated or restarted this installed application.
+workspace, private connection information and the frozen Home bytes. The
+normal versioned update passed 20 read-only metadata checks. All 54 semantic
+snapshots match; 52 sealed files are byte-identical and two changed only audit
+metadata. Keep the current release and its one rollback. The prepared bundle
+was removed after manifest verification. [Receipt](evidence/installed-spdx-osv-summary.json).
 
 ## Continue independently
 
-1. Complete Linux `a5520be` passes all 306 groups: 1,782 passing tests, sixteen
+1. Complete Linux `6e967a3` passes all 306 groups: 1,793 passing tests, sixteen
    declared skips and no failures. Its owned checkout, nine dependency aliases,
    782 generated files, temporary parent and run marker were removed; other
-   worktrees were preserved. [Receipt](evidence/linux-a552-complete-summary.json).
+   worktrees were preserved. [Receipt](evidence/linux-6e967a3-complete-summary.json).
    Do not repeat a complete run without relevant changes or unresolved concerns.
    Future runs use an exact owned home-directory temporary root; this machine's
    `/tmp` user quota was exhausted. Do not alter mounts or delete unrelated data.
@@ -75,12 +78,13 @@ source-only changes have not updated or restarted this installed application.
    The previously reported lease case also passes.
    [Native batches](evidence/windows-backend-dbbc-native-summary.json),
    [case scheduling](evidence/task-owner-scenarios-source-summary.json).
-4. The complete Linux rerun of `6e967a3` is active after the advisory range
-   change. Reconcile its home-cache marker and exact owned checkout before
-   cleanup; do not confuse it with the already removed `a5520be` run. Native
-   Windows advisory source checks pass 23 tests; composed guest-double scans
-   remain pending in their separate lane. The installed metadata verifier now
-   contains pure SPDX/OSV checks, which await normal versioned update.
+4. Complete Linux `6e967a3` and its exact owned cleanup are finished. The run
+   marker, checkout, nine dependency aliases, 782 generated files and temporary
+   parent are removed; all three other worktrees are preserved. Native Windows
+   advisory source checks pass 23 tests. Composed scanner checks pass seven
+   tests with eight declared Linux-only skips and guest execution doubled.
+   [Scanner receipt](evidence/osv-boundaries-native-scanner-summary.json).
+   The installed SPDX/OSV metadata checks now pass through the normal update.
    Continue other independently executable ledger requirements, including Shield
    coverage, ecosystems, publisher provenance, verified local vulnerability
    context and workflow observation. These are unfinished implementation,

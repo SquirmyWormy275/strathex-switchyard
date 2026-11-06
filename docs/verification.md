@@ -925,3 +925,31 @@ The installed metadata verifier now includes five pure SPDX observations and
 three-ecosystem inclusive-endpoint/union-limit checks. Syntax checking passes;
 installed execution awaits the next normal versioned update. It creates no
 account, provider, task, keyboard, microphone or public-network effect.
+
+## Complete Linux range checkpoint and installed metadata (2026-11-06)
+
+Source `6e967a3d45e46aafd36da85a86bf73b7693e241d` passes **306/306 groups,
+1,793 passing tests, sixteen declared skips, zero failures** (1,809 total).
+Every child and process tree exits. Exact source/tree/root identities and all
+ignored files were checked before removing the owned checkout, nine dependency
+aliases, five output directories, 782 generated files / 11,766,655 bytes, empty
+temporary parent and marker. The other three worktrees are preserved.
+[Complete source and cleanup receipt](evidence/linux-6e967a3-complete-summary.json).
+
+The same source's actual Windows OSV composed scanner job passes seven tests
+with eight declared Linux-only skips. Guest execution remains doubled; all
+child/tree cleanup verifies. The bounded artifact ZIP SHA-256 and equal source/
+merge tree were checked in memory; no ZIP is retained.
+[Native scanner receipt](evidence/osv-boundaries-native-scanner-summary.json).
+
+Normal versioned installation of source `d8a0a96` produces release `ea1e1770…`,
+532 files / 5,104,714 bytes with development mode disabled. Dated launcher and
+installation backups, reason journal, current symlinks and the previous release
+verify. Thirteen owner/editor/offline severity/SPDX/OSV checks and seven Copilot
+journal metadata checks pass. All 54 workspace content/settings snapshots and
+the pending keyboard-only conversation are preserved: 52 sealed files are
+byte-identical, while two contain only audit changes. Frozen Home/frontend hashes
+match. No scanner, native task, model prompt, public query, Microsoft request or
+keyboard operation occurs. Only current plus one rollback are retained; the
+prepared bundle's 533 files / 5,219,707 bytes are removed after manifest checks.
+[Installed receipt](evidence/installed-spdx-osv-summary.json).
