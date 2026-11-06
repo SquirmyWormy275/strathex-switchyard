@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import { verifyRestrictedOwnerReport, storageBrokerFailureEvidence } from "./windows-restricted-owner-report.mjs";
 import {createHash,randomUUID} from "node:crypto";
 import {readFile,mkdtemp,rm} from "node:fs/promises";
-import {join,isAbsolute} from "node:path";
+import {join,isAbsolute,dirname} from "node:path";
 import {tmpdir} from "node:os";
 import {desktopEnvironment} from "../tools/layout-studio/process-environment.mjs";
 import {runRuntimeCommand,runtimeGuardianStopped} from "../tools/layout-studio/runtime-command.mjs";
@@ -18,7 +18,7 @@ async function owned(executable,args,{inputText,environment=desktopEnvironment()
  const result=await runRuntimeCommand(executable,args,{windowsHelper:helper,expectedExecutableSha256:sha(await readFile(executable)),env:environment,inputText,detailed:true,captureStderrBytes:2048,timeout:120000,maxOutputBytes:65536,onGuardianReady:async frame=>{owners.push(frame);await save();}});
  if(result.exitCode!==0){evidence.commandFailure={exitCode:result.exitCode,status:result.status,diagnostic:(result.stderr??"").split(/\r?\n/)[0].slice(0,512)};if(executable===dotnet&&args[0]===assembly){try{const parsed=JSON.parse(result.stdout);const proof=storageBrokerFailureEvidence(parsed);if(proof)evidence.commandFailure.proof=proof;}catch{}}}
  const exited=await runtimeGuardianStopped(owners.at(-1),{windowsHelper:helper});if(!exited){evidence.ownershipFailure={command:executable===helper?args[0]:executable===dotnet?"compiled-proof":"identity-observation",scope:owners.at(-1),exitCode:result.exitCode,status:result.status};await save();}
- assert.equal(exited,true,"The exact proof command has no independently verified exit.");assert.equal(result.exitCode,0,"A bootstrap proof command failed.");if(executable===dotnet&&args[0]===assembly){const proof=JSON.parse(result.stdout);assert.equal(proof.serviceHeaderChecks,1541,"The complete service lifecycle header guard inventory did not execute.");assert.equal(proof.restrictedChildEventChecks,12,"The complete restricted child application-event parser inventory did not execute.");assert.equal(proof.stateLeaseProtocolChecks,40,"The complete native lease parser inventory did not execute.");assert.equal(proof.restrictedChildStderrChecks,40,"The complete restricted child stderr parser inventory did not execute.");}return result.stdout;
+ assert.equal(exited,true,"The exact proof command has no independently verified exit.");assert.equal(result.exitCode,0,"A bootstrap proof command failed.");if(executable===dotnet&&args[0]===assembly){const proof=JSON.parse(result.stdout);assert.equal(proof.serviceHeaderChecks,1541,"The complete service lifecycle header guard inventory did not execute.");assert.equal(proof.restrictedChildEventChecks,12,"The complete restricted child application-event parser inventory did not execute.");assert.equal(proof.stateLeaseProtocolChecks,40,"The complete native lease parser inventory did not execute.");assert.equal(proof.coldRandomParserChecks,12,"The cold random parser inventory did not execute.");assert.equal(proof.restrictedChildStderrChecks,40,"The complete restricted child stderr parser inventory did not execute.");}return result.stdout;
 }
 const receipt=join(process.env.RUNNER_TEMP||tmpdir(),setup?"switchyard-native-setup-lifecycle-verification.json":exchange?"switchyard-storage-broker-exchange-verification.json":"switchyard-storage-broker-bootstrap-verification.json");
 async function save(){await privateWrite(receipt,JSON.stringify({...evidence,nativeOwners:owners},null,2)+"\n");}
@@ -40,7 +40,8 @@ try{
   checks.push("actual JavaScript owner and native transport completed eight scope, consumer-lease, exit and retirement checks without a guest or setup request");
   const restrictedRoot=await mkdtemp(join(process.env.RUNNER_TEMP||tmpdir(),"sxbr-")),original=await directoryIdentity(restrictedRoot),contextPath=join(restrictedRoot,"context.json");
   evidence.restrictedHostFixture={root:restrictedRoot,removed:false};await save();
-  await privateWrite(contextPath,JSON.stringify({schema:"switchyard-restricted-host-context/v1",helper,installationId,serviceImageSha256:helperSha256,node:process.execPath,nodeSha256:sha(await readFile(process.execPath)),nonce:randomUUID().replaceAll("-","")}));
+  const coldRandom=join(dirname(helper),"Switchyard.ColdRandom.exe"),coldRandomSha256=sha(await readFile(coldRandom));
+  await privateWrite(contextPath,JSON.stringify({coldRandom,coldRandomSha256,schema:"switchyard-restricted-host-context/v1",helper,installationId,serviceImageSha256:helperSha256,node:process.execPath,nodeSha256:sha(await readFile(process.execPath)),nonce:randomUUID().replaceAll("-","")}));
   const restricted=JSON.parse(await owned(dotnet,[assembly,"--native-host-owner"],{environment:{...desktopEnvironment(),GITHUB_ACTIONS:"true",RUNNER_OS:"Windows",GITHUB_WORKSPACE:process.env.GITHUB_WORKSPACE,SWITCHYARD_TEST_BROKER_INSTALLATION_ID:installationId,SWITCHYARD_TEST_RESTRICTED_HOST_CONTEXT:contextPath}}));
   const processProof=verifyRestrictedOwnerReport(restricted);evidence.restrictedHostExchangeProof=processProof;
   const current=await directoryIdentity(restrictedRoot);assert.equal(current.dev,original.dev);assert.equal(current.ino,original.ino);await rm(restrictedRoot,{recursive:true});evidence.restrictedHostFixture.removed=true;

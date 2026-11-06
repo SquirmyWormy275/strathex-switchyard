@@ -101,3 +101,18 @@ test("cold-child environment observations retain only exact OS-match flags and c
   for(const changed of [{secret:"NEVER_RETAIN"},{systemRoot:"C:/NEVER_RETAIN"},{entryCount:0},{entryCount:65},{entryCount:1.5},{systemRootPresent:false},{windirPresent:false},{nodeOptionsPresent:"false"},{schema:"foreign"}]){const projected=storageBrokerFailureEvidence({...input,restrictedHostEnvironment:{...environment,...changed}});assert.equal(projected.restrictedHostEnvironment,undefined);assert.equal(JSON.stringify(projected).includes("NEVER_RETAIN"),false);assert.equal(projected.restrictedHostChildExit.exitCode,134);}
   const absent={...environment,systemRootPresent:false,systemRootMatchesWindows:false,windirPresent:false,windirMatchesWindows:false};assert.deepEqual(storageBrokerFailureEvidence({...input,restrictedHostEnvironment:absent}).restrictedHostEnvironment,absent);
 });
+
+test("a cold restricted RNG report requires exact primary-token, process, pipe and buffer witnesses without accepting Node startup", () => {
+  const cold = { schema: "switchyard-cold-restricted-random/v1", executableSha256: "d".repeat(64), waitResult: 0, exitCode: 0, reportValid: true,
+    report: { systemStatus: 0xc0000022, providerOpenStatus: 0xc0000022, providerStatus: null, providerCloseStatus: null, handlesClosedVerified: true, buffersClearedVerified: true },
+    primaryTokenVerified: true, tokenRecheckedAfterExit: true, treeExitVerified: true, processHandlesClosedVerified: true, creatorQuotaRestoredVerified: true, standardIo: stdio(), nodeStartupAccepted: false };
+  const input = { schema: "switchyard-storage-broker-protocol-proof/v1", success: false, restrictedHostColdRandom: cold, restrictedHostChildExit: { waitResult: 0, exitCode: 134, resultAvailable: false } };
+  const projected = storageBrokerFailureEvidence(input); assert.deepEqual(projected.restrictedHostColdRandom, cold); assert.equal(projected.success, false); assert.throws(() => verifyRestrictedOwnerReport(input));
+  projected.restrictedHostColdRandom.report.systemStatus = 0; assert.equal(cold.report.systemStatus, 0xc0000022);
+  for (const mutate of [c => { c.path = "NEVER_RETAIN"; }, c => { c.report.entropy = "NEVER_RETAIN"; }, c => { c.report = null; }, c => { c.reportValid = false; }, c => { c.exitCode = 1; }, c => { c.waitResult = 258; }, c => { c.exitCode = -1; }, c => { c.executableSha256 = "NEVER_RETAIN"; }, c => { c.nodeStartupAccepted = true; }, c => { c.report.providerStatus = 0; }, c => { c.report.systemStatus = 0x100000000; }, c => { c.report.systemStatus = 0.5; }, c => { c.report.handlesClosedVerified = false; }, c => { c.report.buffersClearedVerified = false; }, c => { c.standardIo.handlesClosedVerified = false; }, ...["primaryTokenVerified", "tokenRecheckedAfterExit", "treeExitVerified", "processHandlesClosedVerified", "creatorQuotaRestoredVerified"].map(key => c => { c[key] = false; })]) {
+    const invalid = structuredClone(cold); mutate(invalid); const result = storageBrokerFailureEvidence({ ...input, restrictedHostColdRandom: invalid }); assert.equal(result.restrictedHostColdRandom, undefined); assert.equal(JSON.stringify(result).includes("NEVER_RETAIN"), false); assert.equal(result.restrictedHostChildExit.exitCode, 134);
+  }
+  for (const change of [{ waitResult: 258, exitCode: null, reportValid: false, report: null }, { exitCode: 134, reportValid: false, report: null }, { report: { ...cold.report, systemStatus: 0, providerOpenStatus: 0, providerStatus: 0, providerCloseStatus: 0 } }]) {
+    const value = { ...cold, ...change }; assert.deepEqual(storageBrokerFailureEvidence({ ...input, restrictedHostColdRandom: value }).restrictedHostColdRandom, value);
+  }
+});

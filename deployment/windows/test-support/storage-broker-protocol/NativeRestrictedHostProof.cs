@@ -12,7 +12,7 @@ using Microsoft.Win32.SafeHandles;
 // Thread impersonation does not establish a child's primary token: use the
 // explicit restricted-token creation API, then inspect the actual child token.
 [SupportedOSPlatform("windows")]
-internal static class NativeRestrictedHostProof
+internal static partial class NativeRestrictedHostProof
 {
     internal static string Phase = "not-started";
     internal static object? CreatorPrivileges;
@@ -57,7 +57,7 @@ internal static class NativeRestrictedHostProof
     {
         IntPtr buffer = TokenInformation(token, kind); try { return read(buffer); } finally { Marshal.FreeHGlobal(buffer); }
     }
-    private static bool ReadHistoricalFilter(SafeAccessTokenHandle token)
+    private static bool ReadHistoricalFilter(SafeAccessTokenHandle token, bool recordHistory)
     {
         // Native Windows can return this historical BOOLEAN as one byte. Do not
         // read a DWORD beyond that buffer or relax any other token decoder.
@@ -75,7 +75,7 @@ internal static class NativeRestrictedHostProof
             if (!read) throw new Win32Exception(readError);
             Require(used == size);
             bool value = size == 1 ? Marshal.ReadByte(buffer) != 0 : Marshal.ReadInt32(buffer) != 0;
-            HistoricalFilterBytes.Add(used); return value;
+            if (recordHistory) HistoricalFilterBytes.Add(used); return value;
         }
         finally { Marshal.FreeHGlobal(buffer); }
     }
@@ -94,7 +94,7 @@ internal static class NativeRestrictedHostProof
             return (false, false);
         });
     }
-    private static void VerifyToken(SafeAccessTokenHandle token, string user)
+    private static void VerifyToken(SafeAccessTokenHandle token, string user, bool recordHistory = true)
     {
         string stage = Phase;
         Phase = stage + "/same-user";
@@ -108,7 +108,8 @@ internal static class NativeRestrictedHostProof
         // Historical filter metadata is not the actual restricting SID list.
         // Observe it without substituting it for the public restriction proof.
         Phase = stage + "/historical-filter-observation";
-        HistoricalFilteredFlags.Add(ReadHistoricalFilter(token));
+        bool historical = ReadHistoricalFilter(token, recordHistory);
+        if (recordHistory) HistoricalFilteredFlags.Add(historical);
         Phase = stage + "/restricting-sid-count";
         var restrictions = ReadToken(token, 11, pointer =>
         {
@@ -149,7 +150,7 @@ internal static class NativeRestrictedHostProof
         string context = Environment.GetEnvironmentVariable("SWITCHYARD_TEST_RESTRICTED_HOST_CONTEXT") ?? "", repository = Environment.GetEnvironmentVariable("GITHUB_WORKSPACE") ?? "";
         Require(Path.IsPathFullyQualified(context) && Path.IsPathFullyQualified(repository));
         using var document = JsonDocument.Parse(ReadBounded(context)); var value = document.RootElement;
-        Require(value.EnumerateObject().Select(property => property.Name).Order().SequenceEqual(new[] { "helper", "installationId", "node", "nodeSha256", "nonce", "schema", "serviceImageSha256" }));
+        Require(value.EnumerateObject().Select(property => property.Name).Order().SequenceEqual(new[] { "coldRandom", "coldRandomSha256", "helper", "installationId", "node", "nodeSha256", "nonce", "schema", "serviceImageSha256" }));
         Require(value.GetProperty("schema").GetString() == "switchyard-restricted-host-context/v1");
         string node = value.GetProperty("node").GetString() ?? "", digest = value.GetProperty("nodeSha256").GetString() ?? "", nonce = value.GetProperty("nonce").GetString() ?? "";
         Require(Path.IsPathFullyQualified(node) && Path.GetFileName(node).Equals("node.exe", StringComparison.OrdinalIgnoreCase) && digest.Length == 64 && digest.All(c => char.IsAsciiHexDigit(c) && !char.IsUpper(c)) && Guid.TryParseExact(nonce, "N", out _));
@@ -252,6 +253,8 @@ internal static class NativeRestrictedHostProof
                             bool rootPresent = variables.TryGetValue("SystemRoot", out var systemRoot), windirPresent = variables.TryGetValue("WINDIR", out var windir);
                             EnvironmentDiagnostic = new { schema = "switchyard-restricted-child-environment/v1", entryCount = variables.Count, systemRootPresent = rootPresent, systemRootMatchesWindows = MatchesWindows(systemRoot), windirPresent, windirMatchesWindows = MatchesWindows(windir), openSslConfigPresent = variables.ContainsKey("OPENSSL_CONF"), openSslModulesPresent = variables.ContainsKey("OPENSSL_MODULES"), nodeOptionsPresent = variables.ContainsKey("NODE_OPTIONS") };
                             environment = Marshal.StringToHGlobalUni(string.Join('\0', variables.Select(entry => entry.Key + "=" + entry.Value)) + "\0\0");
+                            Phase = "cold-restricted-random-process";
+                            ColdRandomDiagnostic = CaptureColdRandom(value.GetProperty("coldRandom").GetString() ?? "", value.GetProperty("coldRandomSha256").GetString() ?? "", Path.Combine(Path.GetDirectoryName(context)!, "cold-random.bin"), repository, desktopSpace.Name, environment, source, restricted, user, quota);
                             string command = string.Join(' ', new[] { node, script, context }.Select(Quote)); Require(command.Length < 1024);
                             Phase = "creator-assigned-quota-privilege"; Require(quota.Assigned);
                             ProcessInformation process = default;

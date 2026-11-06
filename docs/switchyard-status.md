@@ -12,6 +12,8 @@ The latest Windows environment observation confirms both Windows directory varia
 
 The backend now prepares an exact editor target only from an acknowledged load on its original live owner. Fresh socket/alias/process checks refuse a replaced endpoint even when the old metadata bridge survives. Four groups / 75 checks pass with cleanup and typecheck. This grants no terminal authority or IDE attachment; the read-only signed editor metadata consumer now passes six groups / 63 checks. Command wiring, terminal creation and native attachment acknowledgement remain unfinished. [Contract](coding-task-owners.md#prepare-an-exact-editor-target).
 
+A cold native CNG probe is prepared for Windows CI: it uses the same restricted primary token, private desktop and environment, with independent Job/pipe/process retirement. Both managed targets and 1,868 portable checks pass; two isolated groups pass 31 checks with cleanup and typecheck. The C++ build/native run remain pending. This is diagnostic work, not a repair or Node startup acceptance. [Source evidence](evidence/windows-cold-random-source-summary.json).
+
 ## Latest verified checkpoints
 
 | Checkpoint | Result | What it establishes |

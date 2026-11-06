@@ -6,10 +6,10 @@ import { privateWrite } from "../tools/layout-studio/private-fs.mjs";
 import { verifyWindowsBrokerOwner } from "./windows-broker-owner-proof.mjs";
 
 export function validateRestrictedHostContext(value) {
-  const keys = ["schema", "helper", "installationId", "serviceImageSha256", "node", "nodeSha256", "nonce"];
+  const keys = ["schema", "helper", "installationId", "serviceImageSha256", "node", "nodeSha256", "nonce", "coldRandom", "coldRandomSha256"];
   const path = value => typeof value === "string" && win32.isAbsolute(value) && win32.normalize(value) === value && !/[\0\r\n]/.test(value);
   const sha = value => typeof value === "string" && /^[a-f0-9]{64}$/.test(value);
-  if (!value || typeof value !== "object" || Array.isArray(value) || Object.keys(value).sort().join() !== keys.sort().join() || value.schema !== "switchyard-restricted-host-context/v1" || !path(value.helper) || win32.basename(value.helper) !== "Switchyard.Hotkeys.exe" || !path(value.node) || win32.basename(value.node).toLowerCase() !== "node.exe" || !sha(value.serviceImageSha256) || !sha(value.nodeSha256) || typeof value.installationId !== "string" || !/^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/.test(value.installationId) || value.installationId === "00000000-0000-0000-0000-000000000000" || typeof value.nonce !== "string" || !/^[a-f0-9]{32}$/.test(value.nonce)) throw Error("Use only the exact restricted-host fixture context.");
+  if (!value || typeof value !== "object" || Array.isArray(value) || Object.keys(value).sort().join() !== keys.sort().join() || value.schema !== "switchyard-restricted-host-context/v1" || !path(value.helper) || win32.basename(value.helper) !== "Switchyard.Hotkeys.exe" || !path(value.node) || win32.basename(value.node).toLowerCase() !== "node.exe" || !sha(value.serviceImageSha256) || !sha(value.nodeSha256) || !path(value.coldRandom) || win32.basename(value.coldRandom) !== "Switchyard.ColdRandom.exe" || !sha(value.coldRandomSha256) || typeof value.installationId !== "string" || !/^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/.test(value.installationId) || value.installationId === "00000000-0000-0000-0000-000000000000" || typeof value.nonce !== "string" || !/^[a-f0-9]{32}$/.test(value.nonce)) throw Error("Use only the exact restricted-host fixture context.");
   return structuredClone(value);
 }
 

@@ -160,6 +160,13 @@ jobs:
           & node scripts/verify-windows-storage-broker.mjs --synthetic "--helper=$(Join-Path $output 'Switchyard.Hotkeys.exe')" "--dotnet=$dotnet" "--proof=$proof" "--setup=$(Join-Path $output 'Switchyard.Setup.exe')"
           if ($LASTEXITCODE -ne 0) { throw 'The exact native setup did not settle; preserve its protected staging and original service evidence.' }
 
+      - name: Build the fixed cold random probe with the existing C++ toolchain
+        if: matrix.lane == 'restricted-exchange'
+        shell: pwsh
+        timeout-minutes: 2
+        run: |
+          .\deployment\windows\test-support\storage-broker-protocol\Build-ColdRandom.ps1 -OutputDirectory (Join-Path $env:RUNNER_TEMP 'switchyard-windows-hotkeys')
+
       - name: Verify bounded storage through a client without volume privilege
         if: matrix.lane == 'restricted-exchange'
         shell: pwsh

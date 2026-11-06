@@ -33,6 +33,18 @@ export function storageBrokerFailureEvidence(value) {
   if (validStdio(value.restrictedHostStdio)) result.restrictedHostStdio = structuredClone(value.restrictedHostStdio);
   const environment = value.restrictedHostEnvironment, environmentFlags = ["systemRootPresent", "systemRootMatchesWindows", "windirPresent", "windirMatchesWindows", "openSslConfigPresent", "openSslModulesPresent", "nodeOptionsPresent"];
   if (object(environment) && Object.keys(environment).sort().join() === ["schema", "entryCount", ...environmentFlags].sort().join() && environment.schema === "switchyard-restricted-child-environment/v1" && Number.isInteger(environment.entryCount) && environment.entryCount >= 1 && environment.entryCount <= 64 && environmentFlags.every(key => typeof environment[key] === "boolean") && (!environment.systemRootMatchesWindows || environment.systemRootPresent) && (!environment.windirMatchesWindows || environment.windirPresent)) result.restrictedHostEnvironment = structuredClone(environment);
+  const cold = value.restrictedHostColdRandom;
+  const coldVerified = ["primaryTokenVerified", "tokenRecheckedAfterExit", "treeExitVerified", "processHandlesClosedVerified", "creatorQuotaRestoredVerified"];
+  if (object(cold) && Object.keys(cold).sort().join() === ["schema", "executableSha256", "waitResult", "exitCode", "reportValid", "report", "standardIo", "nodeStartupAccepted", ...coldVerified].sort().join()
+      && cold.schema === "switchyard-cold-restricted-random/v1" && typeof cold.executableSha256 === "string" && /^[a-f0-9]{64}$/.test(cold.executableSha256)
+      && coldVerified.every(key => cold[key] === true) && cold.nodeStartupAccepted === false && validStdio(cold.standardIo) && cold.standardIo.outputBounded
+      && (cold.waitResult === 0 ? uint(cold.exitCode) : cold.waitResult === 258 && cold.exitCode === null) && typeof cold.reportValid === "boolean") {
+    const r = cold.report;
+    const valid = object(r) && Object.keys(r).sort().join() === "buffersClearedVerified,handlesClosedVerified,providerCloseStatus,providerOpenStatus,providerStatus,systemStatus"
+      && r.handlesClosedVerified === true && r.buffersClearedVerified === true && uint(r.systemStatus) && uint(r.providerOpenStatus)
+      && (r.providerOpenStatus === 0 ? uint(r.providerStatus) && r.providerCloseStatus === 0 : r.providerStatus === null && r.providerCloseStatus === null);
+    if (cold.reportValid ? cold.waitResult === 0 && cold.exitCode === 0 && valid : r === null) result.restrictedHostColdRandom = structuredClone(cold);
+  }
   return result;
 }
 const verified = ["privateDesktopClosedVerified", "success", "primaryTokenVerified", "sameUserVerified", "mediumIntegrityVerified", "administratorsDenyOnlyVerified", "volumePrivilegeAbsentVerified", "onlyTraversePrivilegeAssignedVerified", "tokenRecheckedAfterExit", "treeExitVerified", "creatorQuotaRestoredVerified", "restrictingSidListVerified"];
