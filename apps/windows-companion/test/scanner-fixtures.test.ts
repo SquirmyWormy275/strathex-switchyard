@@ -1,17 +1,37 @@
 import assert from "node:assert/strict";
 import { createHash, createPublicKey, generateKeyPairSync, sign } from "node:crypto";
-import { mkdir, mkdtemp, rm, writeFile, readFile, readdir } from "node:fs/promises";
+import { execFileSync } from "node:child_process";
+import { mkdir, mkdtemp, rm, writeFile, readFile, readdir, realpath } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 
 import { createScannerFixtureAdministration, DurableScannerFixtureRegistry } from "../src/scanner-fixtures.ts";
+import { fixtureDirectory } from "../src/scanner-fixture-files.ts";
 import { ProtectedJsonStore, type JournalEntry, type JsonValue } from "../../../packages/control-plane/src/store.ts";
 import { HostReceiptEvidenceFactory } from "../src/receipt-evidence.ts";
 import { targetSnapshotDigest } from "../../../packages/control-plane/src/snapshot.ts";
 import { commandForAction } from "../../../packages/control-plane/src/command-catalog.ts";
 
 const observedAt = new Date("2026-08-24T12:00:00.000Z");
+
+test("native directory spellings preserve fixture identity and child creation without accepting redirected parents", async context => {
+  const root = await realpath(await mkdtemp(join(tmpdir(), "sxsy-fixture-alias-"))), selected = join(root, "Fixture directory with spaces");
+  context.after(async () => { await rm(root, { recursive: true, force: true }); }); await mkdir(selected);
+  let spelling = selected;
+  if (process.platform === "win32") {
+    // Existing test Python calls only the native path API; no shell parses paths.
+    const program = "import ctypes,json,sys; from ctypes import wintypes; api=ctypes.WinDLL('kernel32',use_last_error=True).GetShortPathNameW; api.argtypes=[wintypes.LPCWSTR,wintypes.LPWSTR,wintypes.DWORD]; api.restype=wintypes.DWORD; out=ctypes.create_unicode_buffer(32768); size=api(sys.argv[1],out,len(out)); assert 0<size<len(out); print(json.dumps(out.value))";
+    spelling = JSON.parse(execFileSync("python.exe", ["-I", "-B", "-c", program, selected], { encoding: "utf8", windowsHide: true, timeout: 5000, maxBuffer: 131072 }));
+    assert.equal(await realpath(spelling), await realpath(selected));
+    context.diagnostic(`Native short-name spelling differs: ${spelling.toLowerCase() !== selected.toLowerCase()}`);
+  }
+  assert.deepEqual(await fixtureDirectory(spelling, false), await fixtureDirectory(selected, false));
+  const created = await fixtureDirectory(join(spelling, "child"), true); assert.deepEqual(created, await fixtureDirectory(join(selected, "child"), false));
+  const fs = await import("node:fs/promises"), alias = join(root, "redirected"); await fs.symlink(selected, alias, process.platform === "win32" ? "junction" : "dir");
+  try { await assert.rejects(fixtureDirectory(join(alias, "unexpected"), true), /Preserve/); await assert.rejects(fs.stat(join(selected, "unexpected")), { code: "ENOENT" }); }
+  finally { await fs.unlink(alias); }
+});
 
 async function fixture(context: test.TestContext, trustExpiresAt = "2027-08-24T12:00:00.000Z") {
   const root = await mkdtemp(join(tmpdir(), "sxsy-b122-scanner-fixture-"));

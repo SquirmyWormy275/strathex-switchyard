@@ -55,6 +55,15 @@ removes its duplicate without changing UI bytes. Five local files/52 tests pass,
 with native package followup still pending.
 [Exact focused evidence](evidence/windows-2d0-focused-native-summary.json).
 
+The shared-catalog correction passes native Windows client verification at
+`5fe6e95`: seven files/73 tests with digest-verified receipt and cleanup. The
+policy output cohort separately fails one lock-worker startup before any progress
+label; its original 15-second deadline and failed result are retained. Scanner
+fixture directories now also validate DOS aliases by exact filesystem identity,
+including unchanged parent identity and link rejection. Four local files/39 tests
+and the final registry file/20 tests pass; native alias followup is pending.
+[Exact source and separate native outcomes](evidence/windows-fixture-alias-followup-summary.json).
+
 Windows keyless workers pass both complete native lease files at `0740791`:
 sixteen tests plus one declared platform skip. Fresh encrypted state and keys
 remain independently read for every transaction; each kernel handle is acquired

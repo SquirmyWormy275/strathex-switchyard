@@ -17,7 +17,6 @@ export interface FixtureRemovalSnapshot {
 }
 const identity = (s: { dev: bigint; ino: bigint; birthtimeNs: bigint }): FixtureStorageIdentity => ({ device: s.dev.toString(), inode: s.ino.toString(), birth: s.birthtimeNs.toString() });
 const same = (a: FixtureStorageIdentity, b: FixtureStorageIdentity) => a.device === b.device && a.inode === b.inode && a.birth === b.birth;
-const samePath = (a: string, b: string) => process.platform === "win32" ? a.toLowerCase() === b.toLowerCase() : a === b;
 const invalid = () => new Error("Preserve an unfamiliar, changed or substituted fixture storage path or file.");
 const sha = (v: string) => createHash("sha256").update(v).digest("hex");
 
@@ -38,7 +37,15 @@ export async function fixtureDirectory(path: string, create: boolean): Promise<F
       try { await mkdir(current, { mode: 0o700 }); } catch (error) { if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error; }
       value = await lstat(current, { bigint: true });
     }
-    if (!value.isDirectory() || value.isSymbolicLink() || !samePath(await realpath(current), current)) throw invalid();
+    if (!value.isDirectory() || value.isSymbolicLink()) throw invalid();
+    const canonical = await realpath(current), resolved = await lstat(canonical, { bigint: true });
+    // DOS short names and case aliases may spell the same NTFS directory
+    // differently. Every traversed component must still be an unlinked directory
+    // with its original identity, on the same local drive.
+    if (!resolved.isDirectory() || resolved.isSymbolicLink() || !same(identity(value), identity(resolved)) ||
+      (process.platform === "win32" ? parse(canonical).root.toLowerCase() !== root.toLowerCase() : canonical !== current)) throw invalid();
+    const parentAfter = await lstat(resolve(current, ".."), { bigint: true });
+    if (!parentAfter.isDirectory() || parentAfter.isSymbolicLink() || !same(previous, identity(parentAfter))) throw invalid();
     previous = identity(value);
   }
   return previous;

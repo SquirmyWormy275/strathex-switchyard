@@ -1,0 +1,66 @@
+{
+  "schema": "switchyard-windows-fixture-alias-followup/v1",
+  "basis": "5fe6e95b7c83842898762afd2f0951df7bb2cdfb",
+  "sourceSha256": "6a9b7ad0c50157a6b18455ad228b8338219ed160e8a91a26787a8488b4018a29",
+  "correction": "Accept canonical DOS/case aliases through exact directory device/inode/birth while rejecting all linked components, cross-drive resolution and changed parent identities.",
+  "regression": "Native Windows GetShortPathNameW through existing test Python exercises any available DOS spelling; every platform verifies child identity and rejection of a redirected parent before creation. No shell parses paths.",
+  "local": {
+    "relatedReceipt": "isolated-test-4a7d2f47-2e8a-434a-931b-9cbddefd3974.json",
+    "relatedGroups": 4,
+    "relatedTestsPassed": 39,
+    "finalRegistryReceipt": "isolated-test-aa6f1a9b-af67-4f5c-8d77-807379495186.json",
+    "finalRegistryTestsPassed": 20,
+    "allCleanupVerified": true,
+    "typecheck": true
+  },
+  "nativeAcceptance": "pending",
+  "separateNativePackageFollowup": {
+    "source": "5fe6e95b7c83842898762afd2f0951df7bb2cdfb",
+    "executionMerge": "9a37ed336241bd245fd42b755d53274c3ed43f46",
+    "runId": 42153725024,
+    "artifactId": 13473372642,
+    "sha256": "3d4d3dc242accf75b84a927b20bae379fce86888cf7fee07dae821f69190eaac",
+    "receipt": "windows-client-platform-5fe-native.json",
+    "totals": {
+      "required": 7,
+      "passed": 7,
+      "failed": 0,
+      "tests": 73,
+      "passedTests": 73,
+      "failedTests": 0,
+      "skippedTests": 0,
+      "cancelledTests": 0,
+      "todoTests": 0
+    },
+    "allCleanupVerified": true,
+    "success": true
+  },
+  "separateNativePolicyFailure": {
+    "runId": 42153725015,
+    "jobId": 127682816120,
+    "artifactId": 13473008177,
+    "sha256": "e66223558a27ec737b19c707774c4c74d3ab4e3ef651608d70be553730500ab1",
+    "receipt": "windows-policy-output-5fe-native.json",
+    "totals": {
+      "required": 2,
+      "passed": 1,
+      "failed": 1,
+      "tests": 23,
+      "passedTests": 22,
+      "failedTests": 1,
+      "skippedTests": 0,
+      "cancelledTests": 0,
+      "todoTests": 0
+    },
+    "failedFile": "tools/layout-studio/repository-windows-execution-output.test.mjs",
+    "phase": "worker-startup",
+    "workerProgress": "not-observed",
+    "timeoutExtended": false,
+    "success": false
+  },
+  "limits": [
+    "Scanner alias correction does not explain the independent lock-worker startup timeout or native restricted-child DLL initialization failure.",
+    "The original full Windows run stays failed; focused native passes do not replace complete acceptance."
+  ],
+  "nativePathReference": "https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-getshortpathnamew"
+}
