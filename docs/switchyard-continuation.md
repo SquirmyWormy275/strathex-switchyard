@@ -29,6 +29,8 @@ Keep commits on GitHub regularly. Do not merge or release.
   unfinished validation, separate from actual guest, UAC, account and hardware
   checks. B122 hardware and its 27 physical gates remain unaccepted.
 
+The `359a825` full Linux run now passes 242 groups / 1,534 tests with eleven declared skips and exact staging cleanup. At `d798f4f`, native Windows environment observation rejects the missing-SystemRoot hypothesis; cold restricted Node still fails at `ncrypto::CSPRNG`. [Receipt](evidence/windows-environment-native-summary.json).
+
 ## Current executable state
 
 Use `mise exec node@24.14.0 -- …`. Reuse `.tools/dotnet-8.0.424`; do not download
@@ -38,7 +40,7 @@ Keep small receipts and source; retire exact owned staging after exit verifies.
 
 | Source | Accepted evidence | Limit |
 | --- | --- | --- |
-| Linux `74d0d04` | Complete 242-group run: 1,529 passed tests, eleven declared skips; all child/tree and owned checkout/dependency/build cleanup verifies. [Receipt](evidence/linux-74d-complete-summary.json). | Later changes have focused evidence. Its full-run marker and checkout are removed. Inspect `/tmp/switchyard-full-linux-path.json` before starting any later full run. |
+| Linux `359a825` | Complete 242-group run: 1,534 passed tests, eleven declared skips; all child/tree and owned checkout/dependency/build cleanup verifies. [Receipt](evidence/linux-359-complete-summary.json). | Later changes have focused evidence. Its full-run marker and checkout are removed. Inspect `/tmp/switchyard-full-linux-path.json` before starting any later full run. |
 | Native Windows `ce5be6a` | Eighteen lease tests and one declared skip; Supply Chain scenario and 23 policy-output tests pass. Digests and child/tree cleanup verify. [Receipts](evidence/native-state-lease-ce5-summary.json). | The restricted primary-child journey still fails; its latest detached run exits 134. Earlier PowerShell startup failures remain recorded. |
 | Installed Linux `4b5e3cc` | Six update/seven owner metadata/seven existing metadata checks, original 54 workspace identities, selected sealed bytes and frozen Home preserved. Dated launcher backup hashes verify; owned bundle removed. [Receipt](evidence/installed-task-owner-summary.json). | Metadata/refusal acceptance only. No native provider starts, task loads or model turns; IDE handoff remains unfinished. Prior c5d2d28 scanner journeys remain source-specific. |
 | Owned Codex Unix task adapter | Actual installed CLI: two read-only account operations, verifier permission revocation and exact listener/bridge/socket retirement. [Evidence](evidence/codex-unix-task-adapter-summary.json). | Separate owned task routes now compose this adapter; existing creation/text APIs remain stdio. IDE attachment remains unfinished. No native thread, prompt or account change is authorized in the current backend work. |
@@ -67,17 +69,17 @@ retains no entropy and verifies handle/buffer cleanup. Both managed builds and
 Native execution at `a9cefaf` captures success for both CNG API forms under both tokens, yet the cold restricted Node child still fails. This parent-process observation is not a startup repair. [Native receipt](evidence/windows-random-access-native-summary.json). No weaker entropy or token relaxation is introduced.
 [Probe and final owner-retirement guard](evidence/random-access-owner-retirement-summary.json). [Native evidence](evidence/windows-random-assertion-native-summary.json).
 
-The earlier complete `370c21e` run passed 241/241 groups. The newer `74d0d04`
+The earlier complete `370c21e` run passed 241/241 groups. The newer `359a825`
 run passes all 242 groups, as recorded below; its marker is removed.
 Inspect `/tmp/switchyard-full-linux-path.json` before starting or cleaning a run. The preceding `efbaa52` full run
 remains failed; its concurrency assertion and shutdown lifecycle corrections are
 included in the accepted source.
 
-The subsequent complete **`74d0d04` run passes 242/242 groups**, 1,529 tests
+The subsequent complete **`359a825` run passes 242/242 groups**, 1,534 tests
 and eleven declared skips. Its private temporary parent uses available storage
 without changing mount rules, quota settings, deadlines or assertions. Every
 child/tree and exact temporary parent, checkout, alias, build and marker cleanup
-verifies. [Complete acceptance](evidence/linux-74d-complete-summary.json). Later
+verifies. [Complete acceptance](evidence/linux-359-complete-summary.json). Later
 Studio owner-route composition has separate 91-test and forty-case evidence.
 
 The complete `a9cefaf` run is **failed: 236/242 groups**, 1,508 passed tests,
@@ -108,7 +110,7 @@ The explicit `createCodingTaskOwners` service now persists original owner stages
 and task/account/repository binding under real private leases. Five files pass 76
 tests; final eight registry and five packaging checks pass with exact cleanup and
 typecheck. Actual Unix listener/bridge composition uses a controlled provider double.
-The manifest has 242 Linux groups; the latest `74d0d04` complete run passes.
+The manifest now has 243 Linux groups after CVSS 2 support; the latest `359a825` complete run passes its original 242 groups. CVSS 2 has separate focused evidence in [severity](cvss-severity.md).
 Existing creation/text APIs still use stdio; the separate owner/load routes have
 composition evidence above and grant no IDE attachment. [Contract](coding-task-owners.md).
 
