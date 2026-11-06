@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Reflection.PortableExecutable;
 using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
 using System.Security.Cryptography;
@@ -10,7 +11,8 @@ internal static partial class NativeRestrictedHostProof
 {
     private sealed class LeaseConsoleObservation(string creationMode, string imageHash)
     {
-        public string schema { get; } = "switchyard-lease-console-probe/v1";
+        public string schema { get; } = "switchyard-lease-console-probe/v2";
+        public string imageSubsystem { get; } = "windows-gui";
         public string mode { get; } = creationMode;
         public string executableSha256 { get; } = imageHash;
         public string stage { get; set; } = "reserved";
@@ -37,6 +39,9 @@ internal static partial class NativeRestrictedHostProof
         Require(expectedHash.Length == 64 && expectedHash.All(c => char.IsAsciiHexDigit(c) && !char.IsUpper(c)) && (File.GetAttributes(executable) & (FileAttributes.Directory | FileAttributes.ReparsePoint)) == 0);
         using var image = new FileStream(executable, FileMode.Open, FileAccess.Read, FileShare.Read);
         Require(image.Length is > 0 and <= 134217728 && Convert.ToHexString(SHA256.HashData(image)).ToLowerInvariant() == expectedHash);
+        Phase = "lease-helper-image-subsystem";
+        image.Position = 0;
+        using (var pe = new PEReader(image, PEStreamOptions.LeaveOpen)) Require(pe.PEHeaders.PEHeader?.Subsystem == Subsystem.WindowsGui);
         foreach (string mode in new[] { "no-window", "detached" })
         {
             Phase = "lease-console-" + mode;

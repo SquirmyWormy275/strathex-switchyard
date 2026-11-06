@@ -1,5 +1,13 @@
 # Switchyard implementation and acceptance
 
+The Windows helper now has a non-console executable candidate that preserves
+ordinary Node spawn and parent-loss containment. Both managed targets compile;
+1,975 portable protocol checks and four isolated groups / 42 checks pass with
+typecheck and exact cleanup. The native proof requires the digest-pinned PE's
+Windows GUI subsystem. Restricted startup and the original eight owner checks
+remain unaccepted pending Windows CI. [Candidate](windows-helper-startup.md),
+[source evidence](evidence/windows-winexe-source-summary.json).
+
 Windows release 97a7727 also failed because its archived test source omitted
 the native state-lock helper; the lease test reports ENOENT.
 The builder now compiles that helper from the pinned snapshot before tests,

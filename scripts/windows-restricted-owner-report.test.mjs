@@ -214,4 +214,11 @@ test('CI console comparison retains bounded partial evidence and never substitut
  const partial={...observations[0],stage:'reserved',waitResult:null,exitCode:null,queryAcl:null,standardIo:null,entryObserved:false,primaryTokenVerified:false,tokenRecheckedAfterExit:false,treeExitVerified:false,processHandlesClosedVerified:false,creatorQuotaRestoredVerified:false};assert.deepEqual(storageBrokerFailureEvidence({...source,restrictedHostLeaseConsoles:[partial]}).restrictedHostLeaseConsoles,[partial]);
  assert.equal(storageBrokerFailureEvidence({...source,restrictedHostLeaseConsoles:[observations[1],observations[0]]}).restrictedHostLeaseConsoles,undefined);
  assert.equal(storageBrokerFailureEvidence({...source,restrictedHostLeaseConsoles:[...observations,observations[1]]}).restrictedHostLeaseConsoles,undefined);
+ const gui = observations.map(row => ({ ...row, schema: 'switchyard-lease-console-probe/v2', imageSubsystem: 'windows-gui' }));
+ assert.deepEqual(storageBrokerFailureEvidence({...source, restrictedHostLeaseConsoles:gui}).restrictedHostLeaseConsoles,gui);
+ assert.throws(()=>verifyRestrictedOwnerReport({...source, restrictedHostLeaseConsoles:gui}));
+ for(const change of [{imageSubsystem:'windows-console'},{imageSubsystem:undefined},{imageSubsystem:'NEVER_RETAIN'},{schema:'switchyard-lease-console-probe/v1'},{schema:'switchyard-lease-console-probe/v3'}]) {
+   const rejected=storageBrokerFailureEvidence({...source,restrictedHostLeaseConsoles:[{...gui[0],...change},gui[1]]});
+   assert.equal(rejected.restrictedHostLeaseConsoles,undefined);assert.equal(JSON.stringify(rejected).includes('NEVER_RETAIN'),false);
+ }
 });

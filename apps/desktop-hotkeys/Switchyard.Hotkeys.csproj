@@ -1,6 +1,9 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <OutputType>Exe</OutputType>
+    <!-- All helper modes use inherited pipes or native APIs, not a console.
+         Avoid console initialization on the restricted private desktop while
+         retaining ordinary Node spawn and its parent-loss Job containment. -->
+    <OutputType>WinExe</OutputType>
     <StartupObject>Program</StartupObject>
     <TargetFramework>net8.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>

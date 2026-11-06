@@ -31,6 +31,14 @@ evidence, not instructions to reset. Publish regular commits. Do not merge or re
 
 ## Current implementation and evidence
 
+The Windows helper now has a non-console executable candidate that preserves
+ordinary Node spawn and parent-loss containment. Both managed targets compile;
+1,975 portable protocol checks and four isolated groups / 42 checks pass with
+typecheck and exact cleanup. The native proof requires the digest-pinned PE's
+Windows GUI subsystem. Restricted startup and the original eight owner checks
+remain unaccepted pending Windows CI. [Candidate](windows-helper-startup.md),
+[source evidence](evidence/windows-winexe-source-summary.json).
+
 The archived Windows release test tree now builds/stages its own exact-source
 state helper before verification. The previous 97a7727 run observed ENOENT;
 four portable groups / 42 checks pass for the correction, but native CI remains
@@ -124,8 +132,10 @@ the installed update or old live provider verifiers without a relevant new chang
    Verify source, phase, process exit, root identities, receipt and every owned
    alias/build/test parent. Never broaden cleanup or relax deadlines.
 
-2. Use the observed `700e7f2` console-mode difference to repair restricted helper
-   startup while retaining explicit parent-loss containment. Detached EOF entry
+2. Collect the native result for the current non-console helper candidate. It
+   addresses the observed console-mode difference while retaining ordinary Node
+   spawn and parent-loss containment. Do not accept it without the original
+   restricted owner and lease cleanup checks. Detached EOF entry
    is a diagnostic, not acceptance of a lease or the original eight-check owner.
    No broader token rights, default-DACL/privilege/SID/account/runtime fallback
    is permitted. Earlier `702897d` stopped at a stale parser-count guard; its

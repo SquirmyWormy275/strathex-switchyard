@@ -54,8 +54,8 @@ export function storageBrokerFailureEvidence(value) {
   const flags = ["entryObserved", "primaryTokenVerified", "tokenRecheckedAfterExit", "treeExitVerified", "processHandlesClosedVerified", "creatorQuotaRestoredVerified"];
   const uintOrNull = x => x === null || Number.isSafeInteger(x) && x >= 0 && x <= 0xffffffff;
   if (Array.isArray(consoles) && consoles.length <= 2 && consoles.every((r,i) => object(r)
-      && Object.keys(r).sort().join() === ["schema", "mode", "executableSha256", "stage", "waitResult", "exitCode", "queryAcl", "standardIo", ...flags].sort().join()
-      && r.schema === "switchyard-lease-console-probe/v1" && r.mode === ["no-window", "detached"][i] && typeof r.executableSha256 === "string" && /^[a-f0-9]{64}$/.test(r.executableSha256)
+      && Object.keys(r).sort().join() === ["schema", "mode", "executableSha256", "stage", "waitResult", "exitCode", "queryAcl", "standardIo", ...(r.schema === "switchyard-lease-console-probe/v2" ? ["imageSubsystem"] : []), ...flags].sort().join()
+      && (r.schema === "switchyard-lease-console-probe/v1" || r.schema === "switchyard-lease-console-probe/v2" && r.imageSubsystem === "windows-gui") && r.mode === ["no-window", "detached"][i] && typeof r.executableSha256 === "string" && /^[a-f0-9]{64}$/.test(r.executableSha256)
       && ["reserved", "created-suspended", "token-verified", "query-verified", "resumed", "exited", "retired"].includes(r.stage) && uintOrNull(r.waitResult) && uintOrNull(r.exitCode)
       && flags.every(k => typeof r[k] === "boolean") && (r.queryAcl === null || validSelfQueryAcl([r.queryAcl], false, ["lease-" + r.mode]))
       && (r.standardIo === null || validStdio(r.standardIo))
