@@ -20,6 +20,8 @@ The signed editor review/issue/consume client now reaches the protected backend 
 
 Installed source `2c87c03` passes six update, ten owner/editor/severity and seven journal checks. Three signed authorization routes refuse unknown ownership without effects. All 54 workspace identities remain; 52 sealed files are byte-identical across the update. The two opened verification workspaces are resealed by existing restart recovery; their definitions/package/modes pass comparison, and selected bytes remain unchanged during metadata checks. The historical pending conversation stays byte-identical. Dated launcher backups verify and temporary packaging is removed. [Installed evidence and failed extra assertions](evidence/installed-editor-authorization-summary.json).
 
+The reviewed editor launcher now composes signed authorization with one exact Terminal creation. Five groups/54 tests cover context drift, executable/socket replacement, duplicate calls, partial creation and shutdown joins; extension build and compiled loading pass. Provider/editor effects use doubles. Command wiring and native task/account acknowledgement remain unfinished. [Evidence](evidence/editor-terminal-launch-summary.json).
+
 ## Latest verified checkpoints
 
 | Checkpoint | Result | What it establishes |

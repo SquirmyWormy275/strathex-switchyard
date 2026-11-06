@@ -238,3 +238,26 @@ opened verification workspaces; definitions/package/modes and the historical
 pending conversation remain verified separately. Selected bytes stay unchanged
 during the metadata checks. Dated launcher backups and exact bundle cleanup
 verify. [Installed evidence](evidence/installed-editor-authorization-summary.json).
+
+## One reviewed editor terminal creation
+
+`StudioEditorLauncher` now connects the signed client to one exact VS Code
+`createTerminal` call per returned review. It binds the original focused workspace
+and admission callback, repository and socket identities, plus an executable
+whose SHA-256 matches the original native owner. Every asynchronous authorization
+boundary rechecks those local identities. The command uses the original task
+UUID and explicit Unix socket with `read-only` / `on-request`; it sends no text.
+
+The local attempt is reserved before awaiting authorization. Concurrent calls,
+lost replies, failed creation and later focus failures cannot reuse that review.
+If VS Code returns a Terminal object, the launcher retains that exact object even
+when activation fails. Shutdown joins pending operations without closing user
+terminals. Successful activation reports only object/focus evidence; native
+task loading, account acknowledgement, IDE attachment and completion remain
+unverified. Command wiring and the native acknowledgement path are unfinished.
+
+Five isolated groups pass 54 tests, composing the real signed HTTP gateway,
+encrypted authorization store and kernel leases with controlled provider/editor
+doubles. Typecheck, extension build, compiled CommonJS load and exact generated
+output cleanup pass. No actual editor terminal or provider task was opened.
+[Source-specific evidence](evidence/editor-terminal-launch-summary.json).
