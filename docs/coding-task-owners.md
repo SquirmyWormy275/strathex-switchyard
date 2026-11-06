@@ -161,3 +161,11 @@ provider behavior. Typecheck passes. This consumer has no automatic command
 registration or terminal effect: editor command wiring, separately authorized
 terminal creation and native attachment acknowledgement remain unfinished.
 [Consumer evidence](evidence/editor-metadata-client-summary.json).
+
+The read-only installed verifier now checks the exact signed route and V2
+calculator source, rejects an unknown target through the editor client, and
+calculates synthetic V2/mixed-version metrics using installed modules. It creates
+no workspace or provider task and executes no scanner. Its updated argument
+refusals pass two isolated tests (13 invalid invocations), receipt
+`isolated-test-be1a40ec-36bc-4880-b9a2-ab5c77f98138.json`; installed execution
+requires its separate receipt.

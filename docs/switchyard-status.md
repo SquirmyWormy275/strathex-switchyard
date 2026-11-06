@@ -16,7 +16,7 @@ The backend now prepares an exact editor target only from an acknowledged load o
 
 | Checkpoint | Result | What it establishes |
 | --- | --- | --- |
-| Complete Linux source `359a825` | **242/242 groups; 1,534 passed tests; eleven declared skips.** | Every child/process-tree exit and exact owned fixture, dependency, build and checkout cleanup verifies. [Receipt](evidence/linux-359-complete-summary.json). Later source changes have separate focused evidence. |
+| Complete Linux source `2eeb2f9` | **243/243 groups; 1,548 passed tests; eleven declared skips.** | Every child/process-tree exit and exact owned fixture, dependency, build and checkout cleanup verifies. [Receipt](evidence/linux-2eeb-complete-summary.json). Later source changes have separate focused evidence. |
 | Windows state leases `ce5be6a` | Eighteen native tests pass; one declared Linux-only skip. Supply Chain scenario and all 23 policy-output tests also pass. | The shipped native helper exercises real kernel sharing, replacement/hard-link refusal, malformed release, detached owners and parent loss. Three archive digests and child/tree cleanup verify. [Receipts](evidence/native-state-lease-ce5-summary.json). |
 | Windows packaging and scanner directories | Client/package cohort: 73 native tests pass at `5fe6e95`; scanner registry: twenty pass at `ec3afe7`. | Package size and filesystem identity corrections pass their complete focused cohorts. [Package](evidence/windows-fixture-alias-followup-summary.json), [registry](evidence/linux-startup-windows-user-object-summary.json). |
 | Installed Linux application `4b5e3cc` | Six update checks and seven each for task-owner and existing journal metadata. | All 54 workspace identities, selected sealed bytes, private endpoint and frozen Home are preserved. Dated launcher backups verify and temporary bundle is removed. No native task or provider starts. [Receipt](evidence/installed-task-owner-summary.json). |
@@ -50,7 +50,7 @@ The subsequent complete **`359a825` run passes 242/242 groups**, 1,534 tests
 and eleven declared skips. Its private temporary parent uses available storage
 without changing mount rules, quota settings, deadlines or assertions. Every
 child/tree and exact temporary parent, checkout, alias, build and marker cleanup
-verifies. [Complete acceptance](evidence/linux-359-complete-summary.json). Later
+verifies. [Complete acceptance](evidence/linux-2eeb-complete-summary.json). Later
 Studio owner-route composition has separate 91-test and forty-case evidence.
 
 The complete `a9cefaf` run is **failed: 236/242 groups**, 1,508 passed tests,
