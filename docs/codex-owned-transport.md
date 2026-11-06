@@ -67,8 +67,58 @@ Three read-only account requests include the existing bounded startup settle;
 two final pinned samples verify. No login, task or model request is made.
 [Exact current source and native evidence](evidence/codex-pinned-unix-summary.json).
 
-Account-change fencing on this carrier is implemented and software-tested.
-Live controlled account switching remains unaccepted. Production task/design
-routes still use stdio; owned listener lifecycle and complete Studio/task/IDE
-attachment remain unfinished software. No saved task authority is inferred from
-socket ownership, native version or matching account snapshots.
+## Own the provider lifetime
+
+The lifetime controller now reserves a private directory, authenticates the
+original CLI bytes through an open executable descriptor, and records the exact
+guardian before acknowledging native startup. Admission runs again before that
+acknowledgement and connection initialization. Startup refuses repositories,
+project configuration and instruction markers; repository permission checks
+remain explicit later operations.
+
+```mermaid
+flowchart LR
+  Caller[Authorized caller] -->|private lifetime pipe| Guardian[Owned session guardian]
+  Guardian -->|pinned executable| Provider[Restricted Codex App Server]
+  Caller --> Client[Account-fenced protocol client]
+  Client -->|private JSONL| Bridge[Pinned Unix bridge]
+  Bridge -->|kernel peer and socket verification| Provider
+```
+
+This persistent role lives only while its original parent pipe remains open;
+generic native commands keep their existing deadlines. Its fixed protocol
+accepts no arbitrary command or provider arguments. Account boundaries close all
+connections and the owner, and later connections cannot replace the original
+fingerprint. Loss of the last control connection also closes the owner.
+
+Stop first closes bridges, then independently verifies the original guardian and
+owned session have exited. Only matching socket, native alias and directory
+identities may retire. Unfamiliar entries remain intact and retirement stays
+unconfirmed. Saved ownership can retire after parent loss only once independent
+scope readback confirms exit; recovery never adopts or kills another process.
+This is a fixed provider lifetime, rather than general workload containment.
+
+Eight related software files pass 104 tests, including the complete nine-case
+lifetime file. It covers admission-before-effect, pending-start cancellation,
+account revocation, unsafe configuration, unfamiliar-file preservation, recovery
+and a descendant in another process group within the owned session. Eight
+Linux-only cases have declared Windows skips; incomplete-request validation is
+portable. Typecheck and the expanded manifest pass.
+
+The installed CLI passes four native checks across two owned lifetimes, three
+persistent metadata clients, normal stop and abrupt parent loss/recovery. The
+normal phase makes five account-read requests. No thread, model turn, login
+change, global daemon command or hardware access is requested. All owned stages
+and markers retire. Run the explicit proof with:
+
+```sh
+node scripts/verify-codex-owned-lifecycle.mjs --read-only-lifetime
+```
+
+[Exact lifetime source and evidence](evidence/codex-owned-lifetime-summary.json).
+
+Account-change fencing and owned lifetime management are implemented and
+software-tested. Live controlled account switching remains unaccepted.
+Production task/design routes still use stdio; complete Studio/task/IDE wiring
+remains unfinished software. No saved task authority is inferred from socket
+ownership, native version or matching account snapshots.

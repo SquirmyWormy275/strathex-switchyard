@@ -62,8 +62,14 @@ tests, and the installed CLI passes four checks on one persistent connection
 with effective configuration, bounded startup account settling, pinned account
 revalidation, peer exit and exact owned cleanup. Account-event fencing is
 implemented and tested with provider doubles; live account switching remains
-unaccepted. Production stays stdio; owned listener/task/IDE lifecycle wiring
-remains unfinished software.
+unaccepted. The owned lifetime controller now reserves neutral private startup,
+pins executable bytes through a descriptor, rechecks admission before native
+acknowledgement, and preserves unknown entries during exact retirement. Eight
+related files pass 104 tests; the installed CLI passes four checks across two
+lifetimes/three persistent clients with normal stop and parent-loss recovery.
+No thread, model turn or account change is requested; all owned stages retire.
+[Lifetime evidence](evidence/codex-owned-lifetime-summary.json). Production stays
+stdio; complete Studio/task/IDE wiring remains unfinished software.
 [Pinned stream evidence](evidence/codex-pinned-unix-summary.json). The unproven
 native CLI proxy is not exposed. [Guardian contract and evidence](codex-owned-transport.md).
 
