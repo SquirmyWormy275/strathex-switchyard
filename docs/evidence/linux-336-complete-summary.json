@@ -1,0 +1,45 @@
+{
+  "schema": "switchyard-complete-linux-summary/v1",
+  "sourceCommit": "3363e8b0caccc993406d761d6d0574c91d8e4c03",
+  "verificationReceipt": "isolated-test-326c1659-0b48-4981-93bc-7662aeb0a5f2.json",
+  "totals": {
+    "required": 260,
+    "passed": 260,
+    "failed": 0,
+    "tests": 1745,
+    "passedTests": 1734,
+    "failedTests": 0,
+    "skippedTests": 11,
+    "cancelledTests": 0,
+    "todoTests": 0
+  },
+  "allChildAndTreeCleanupVerified": true,
+  "ownedCleanup": {
+    "schema": "switchyard-owned-full-linux-cleanup/v1",
+    "sourceCommit": "3363e8b0caccc993406d761d6d0574c91d8e4c03",
+    "verificationReceipt": "isolated-test-326c1659-0b48-4981-93bc-7662aeb0a5f2.json",
+    "generatedFiles": 782,
+    "generatedBytes": 11766655,
+    "generatedDirectories": [
+      "apps/linux-companion/dist",
+      "apps/provider-adapter-host/dist",
+      "apps/vscode-extension/dist",
+      "apps/windows-companion/dist",
+      "packages/protocol/dist"
+    ],
+    "dependencyAliasCount": 9,
+    "trackedTreeClean": true,
+    "testChildrenExited": true,
+    "testParentEmpty": true,
+    "rootIdentityVerified": true,
+    "testParentIdentityVerified": true,
+    "worktreeRemoved": true,
+    "rootRemoved": true,
+    "testParentRemoved": true,
+    "markerRemoved": true,
+    "otherWorktreesPreserved": true
+  },
+  "installedAcceptance": false,
+  "nativeWindowsAcceptance": false,
+  "hardwareOrAccountAcceptance": false
+}

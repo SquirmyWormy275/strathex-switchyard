@@ -44,7 +44,7 @@
     "On actual Windows, application/installation fixtures bundle the same-source compiled native helper. Linux packaging simulations and the unexecuted setup fixture retain inert placeholders. No test assertion or deadline is removed.",
     "Independent Windows suite-application and suite-installation lanes select the complete original manifest groups with the same-source helper."
   ],
-  "nativeAcceptance": "Pending. Local checks are Linux software acceptance, not execution of PowerShell or native Windows application/recovery. The complete 1fc9d7f release failure and fb265e7b restricted Job-creation failure remain retained.",
+  "nativeAcceptance": "Source 3363e8b passes all five application and sixteen installation/recovery tests on actual Windows with the same-source helper and original deadlines. See windows-336-lifecycle-native-summary.json. The isolated Python prerequisite still awaits a complete release result; restricted Job creation remains failed.",
   "installedChanged": false,
   "newDownloads": false
 }

@@ -31,6 +31,25 @@ evidence, not instructions to reset. Publish regular commits. Do not merge or re
 
 ## Current implementation and evidence
 
+Source `3363e8b` passes the complete Linux manifest: **260 groups, 1,734
+passed tests, eleven declared skips, zero failures**. Every owned child/tree,
+temporary checkout, nine dependency aliases and 782 generated files (11,766,655
+bytes) were retired. Installed and hardware/account acceptance remain separate.
+[Linux receipt](evidence/linux-336-complete-summary.json).
+
+The same source passes **five application and sixteen installation/recovery
+tests on actual Windows**, with the same-source helper and original deadlines.
+The complete Windows release, including isolated Python prerequisite verification,
+is still pending. The restricted-owner Job creation failure remains open.
+[Native lifecycle receipts](evidence/windows-336-lifecycle-native-summary.json).
+
+A CI-only cold-process probe now observes anonymous, Local and Global empty Job
+creation after all original RNG/token checks. It grants no rights, assigns no
+process and changes no production fallback. Six groups / 78 tests, two managed
+builds / 2,071 portable checks, typecheck and owned cleanup pass; native C++
+build/execution is pending. [Contract](windows-job-observation.md),
+[source evidence](evidence/windows-cold-job-source-summary.json).
+
 Windows `fb265e7b` proves `CreateJobObjectW` fails with Win32 error 5 before
 setup-identity readiness. The original restricted owner remains 0/8. Do not
 infer whether its object DACL or namespace caused denial and do not add broader
@@ -43,8 +62,8 @@ and recovery fixtures still bundle inert helper text. The source now admits one
 explicit existing, version/hash-checked Python 3.13.3 test executable and bundles
 the exact-source helper for actual Windows lifecycle tests. Eight groups / 113
 tests plus 29 lane/package follow-up checks, typecheck and exact test cleanup
-pass on Linux. Native follow-up remains pending; new independent application
-and installation lanes preserve all original checks and deadlines.
+pass on Linux. Source 3363e8b now passes both native application and installation
+lanes with every original check and deadline; the complete release remains pending.
 [Original failure](evidence/windows-release-1fc-failure-summary.json),
 [corrections](evidence/windows-release-prerequisite-summary.json).
 
@@ -53,8 +72,8 @@ The Windows guardian now reports only fixed pre-readiness startup phases, with
 API-specific numeric codes for Job create/configure failures. The host preserves
 refusal and all ownership checks; it does not turn diagnostic output into exit
 or execution acceptance. Six groups / 78 tests, two managed builds / 2,006
-portable checks, typecheck and exact owned cleanup pass. Native follow-up is
-pending. [Contract](windows-helper-startup.md),
+portable checks, typecheck and exact owned cleanup pass. Native fb265e7b
+identifies the Job-creation error described above. [Contract](windows-helper-startup.md),
 [evidence](evidence/runtime-startup-observation-summary.json).
 
 npm prerelease/build handling now joins collector, signed feed, scanner inventory
@@ -239,27 +258,18 @@ the installed update or old live provider verifiers without a relevant new chang
 
 ## Continue independently
 
-1. Complete Linux `701f915` passes 260/260 groups, 1,713 tests, eleven declared
-   skips and zero failures. All exact child/tree/staging cleanup verifies and the
-   marker is removed. [Receipt](evidence/linux-701-complete-summary.json).
-   It includes editor lifecycle history, retained Terminal composition, exact
-   retirement and Cargo prerelease/build matching. The later Windows path
-   correction has separate focused evidence. Do not repeat this accepted run
-   without a relevant change. Before another justified run, inspect
-   `/tmp/switchyard-full-linux-path.json`. Verify source, phase, process exit,
-   root identities, receipt and every owned alias/build/test parent. Never
-   broaden cleanup or relax deadlines.
-
-2. Continue the native restricted-owner read-only storage probe failure.
-   `4faa8a1` clears protected state initialization/mode update through version 2
-   inherited pipe ownership. Both native lease groups pass 24 checks/one declared
-   skip, including EOF, partial input, contention, non-pipe input refusal and
-   parent loss. Original owner still fails later at `read-only-probe`, zero of
-   eight checks; do not accept the entire owner from the lease result.
-   [Current native result](evidence/windows-lease-pipe-native-summary.json).
-   Preserve original normal spawn/Job, file guards and all eight owner assertions.
-   No token/DACL/privilege/SID, desktop, account, runtime or detached fallback
-   is permitted. Complete release workflows remain separate.
+1. Complete Linux `3363e8b` passes all 260 groups, 1,734 tests, eleven declared
+   skips and zero failures. Exact owned cleanup is complete, including the marker.
+   [Receipt](evidence/linux-336-complete-summary.json). Do not repeat a complete
+   run without relevant changes. A future run must inspect its own marker, source,
+   process exit, root identities, aliases and generated outputs before cleanup.
+2. Obtain the CI-only empty-Job observations and continue the confirmed restricted
+   guardian `CreateJobObjectW` error 5. No namespace/DACL cause is yet established.
+   Preserve all eight original owner checks and the current TOKEN_QUERY-only mask.
+   No broader token/process/default-DACL/SID/privilege/account rights or runtime
+   fallback. [Diagnostic contract](windows-job-observation.md).
+   Both native application/recovery lanes now pass all 21 tests; the newer complete
+   Windows release and its isolated Python prerequisite remain separate.
 
 3. The protected editor journal, signed client/routes, restricted upstream and
    retained Terminal now compose through actual Linux carriers with controlled

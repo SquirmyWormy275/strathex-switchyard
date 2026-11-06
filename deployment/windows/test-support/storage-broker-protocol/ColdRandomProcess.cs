@@ -90,6 +90,6 @@ internal static partial class NativeRestrictedHostProof
                 && !access.queryDuplicate.opened && access.queryDuplicate.error == 5
                 && !access.queryDuplicateImpersonate.opened && access.queryDuplicateImpersonate.error == 5;
         }
-        return new { schema = "switchyard-cold-restricted-random/v4", executableSha256 = expectedHash, waitResult = wait, exitCode = code, reportValid = validReport, report, primaryTokenVerified = true, tokenRecheckedAfterExit = true, treeExitVerified = true, processHandlesClosedVerified = true, creatorQuotaRestoredVerified = true, standardIo = stdio, nodeStartupAccepted = false };
+        return new { schema = "switchyard-cold-restricted-random/v5", executableSha256 = expectedHash, waitResult = wait, exitCode = code, reportValid = validReport, report, primaryTokenVerified = true, tokenRecheckedAfterExit = true, treeExitVerified = true, processHandlesClosedVerified = true, creatorQuotaRestoredVerified = true, standardIo = stdio, nodeStartupAccepted = false };
     }
 }

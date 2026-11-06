@@ -1,0 +1,64 @@
+{
+  "schema": "switchyard-windows-cold-job-source/v1",
+  "basis": "3363e8b0caccc993406d761d6d0574c91d8e4c03",
+  "sourceSha256": {
+    "deployment/windows/test-support/storage-broker-protocol/ColdRandom.cpp": "0ca20beff1fce85d2018aa927360fcbdca85156eb33d73c7788f6066ada64190",
+    "deployment/windows/test-support/storage-broker-protocol/ColdRandomProcess.cs": "ae135abc0c5802a775eb7dbe6b8c10738d98e34e001d9abd360a7bd574144140",
+    "deployment/windows/test-support/storage-broker-protocol/ColdRandomReport.cs": "10245f101574b22e722d65c01fe0ca6f600610fb208eacc94e57f8930da0a34b",
+    "scripts/verify-windows-storage-broker.mjs": "c069b76b74a53f90690990d4a5d5ed942bb8c7fed61a01a14d5b20894860ef87",
+    "scripts/windows-restricted-owner-report.mjs": "fe10e837e0258b55fd9e2eea954fd909de8437779a3b82bc7722f5756943d6ba",
+    "scripts/windows-restricted-owner-report.test.mjs": "5885595c05ada5307563c5911b1b05656c20fa4eab0f47c2dc04c430c7f597d4"
+  },
+  "isolated": {
+    "receipt": "isolated-test-e713a88c-aef1-464d-aa4b-c368bbc0805e.json",
+    "totals": {
+      "required": 6,
+      "passed": 6,
+      "failed": 0,
+      "tests": 78,
+      "passedTests": 78,
+      "failedTests": 0,
+      "skippedTests": 0,
+      "cancelledTests": 0,
+      "todoTests": 0
+    },
+    "allChildAndTreeCleanupVerified": true
+  },
+  "managed": {
+    "receipt": "cold-job-observation-managed-1793975951183.json",
+    "builds": [
+      {
+        "name": "helper",
+        "warnings": 0,
+        "errors": 0,
+        "managedAssemblySha256": "53334e42842921ea3c22ec979039624fc2e96f6528742947eba0f576b7d51d6f",
+        "managedPeSubsystem": 2
+      },
+      {
+        "name": "proof",
+        "warnings": 0,
+        "errors": 0,
+        "managedAssemblySha256": "0fff4a13214d7c4f47a4f1c54daf9a8610645d909d79acdac7dc71f6051be156",
+        "managedPeSubsystem": 3
+      }
+    ],
+    "portableChecks": 2071,
+    "coldParserChecks": 145,
+    "ownedCleanup": {
+      "files": 124,
+      "bytes": 3230717,
+      "removed": true
+    },
+    "noDownloads": true
+  },
+  "typecheckPassed": true,
+  "behavior": [
+    "CI-only cold process retains the original legacy/CNG/provider/token observations first, then creates anonymous, Local and Global empty Jobs without assigning a process, configuring a Job or changing security.",
+    "Collision handling closes the returned handle without querying the existing object. Only newly created Jobs are queried for empty accounting. Every returned handle is closed.",
+    "Version 5 uses exactly 68 fixed words/272 bytes. Managed parser and closed JavaScript projection reject inconsistent status, any nonzero active count, missing cleanup or unknown fields. Names, PIDs, handles and raw errors are not exported.",
+    "Original restricted owner, exact TOKEN_QUERY-only allowance, token checks, containment, deadlines and eight assertions remain unchanged. Observations cannot accept a failed owner or act as a runtime fallback."
+  ],
+  "nativeAcceptance": "Pending native C++ build and execution. This change observes the confirmed CreateJobObjectW denial; it does not repair or establish its cause.",
+  "installedChanged": false,
+  "permissionsChanged": false
+}

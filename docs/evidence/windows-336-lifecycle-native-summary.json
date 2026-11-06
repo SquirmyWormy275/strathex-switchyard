@@ -1,0 +1,63 @@
+{
+  "schema": "switchyard-windows-lifecycle-native-summary/v1",
+  "lanes": [
+    {
+      "sourceCommit": "3363e8b0caccc993406d761d6d0574c91d8e4c03",
+      "executionCommit": "c92c35adf6f4f7fb4202371aace3e85cbbe17b61",
+      "sourceAndExecutionTree": "6da30ead452faad4e710766302141e09ab18cd8d",
+      "runId": 42233760170,
+      "jobId": 127946343393,
+      "artifactId": 13509898963,
+      "archiveBytes": 964,
+      "archiveSha256": "1cb6b78670fdc34e253f15ed7db48138b5faef4858c4e70f64eeb06081fe7a06",
+      "zipSavedLocally": false,
+      "privateReceipt": "windows-336-suite-application-native.json",
+      "file": "deployment/suite/application.test.mjs",
+      "totals": {
+        "required": 1,
+        "passed": 1,
+        "failed": 0,
+        "tests": 5,
+        "passedTests": 5,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "outputDigest": "6cec864f92226f5fd4495a77a4b10b0b7ed62e247ca0c8ef1c2acf6b7c20a966",
+      "allChildAndTreeCleanupVerified": true,
+      "originalTimeoutMs": 45000
+    },
+    {
+      "sourceCommit": "3363e8b0caccc993406d761d6d0574c91d8e4c03",
+      "executionCommit": "c92c35adf6f4f7fb4202371aace3e85cbbe17b61",
+      "sourceAndExecutionTree": "6da30ead452faad4e710766302141e09ab18cd8d",
+      "runId": 42233760170,
+      "jobId": 127946342210,
+      "artifactId": 13510298856,
+      "archiveBytes": 971,
+      "archiveSha256": "21f82235c0b453e6abbfd03ac5cc5ae659d39aaafd6d732b022b1d077d103118",
+      "zipSavedLocally": false,
+      "privateReceipt": "windows-336-suite-installation-native.json",
+      "file": "deployment/suite/installation.test.mjs",
+      "totals": {
+        "required": 1,
+        "passed": 1,
+        "failed": 0,
+        "tests": 16,
+        "passedTests": 16,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "outputDigest": "e178678f37d128482fdc5263ed8796cded89e81bf2df2a5b2961d307c57acac7",
+      "allChildAndTreeCleanupVerified": true,
+      "originalTimeoutMs": 120000
+    }
+  ],
+  "finding": "Same-source native helper fixtures pass all five application and sixteen installation/recovery tests on actual Windows, with original deadlines and verified child/tree cleanup.",
+  "fullWindowsReleaseAccepted": false,
+  "restrictedOwnerAccepted": false,
+  "interactiveOrGuestAcceptance": false
+}

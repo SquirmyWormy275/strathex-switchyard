@@ -220,12 +220,13 @@ test("suspended child token security preserves only ordered classified ACEs and 
 });
 
 test("a cold restricted RNG report requires exact primary-token, process, pipe and buffer witnesses without accepting Node startup", () => {
-  const cold = { schema: "switchyard-cold-restricted-random/v4", executableSha256: "d".repeat(64), waitResult: 0, exitCode: 0, reportValid: true,
+  const cold = { schema: "switchyard-cold-restricted-random/v5", executableSha256: "d".repeat(64), waitResult: 0, exitCode: 0, reportValid: true,
     report: { systemStatus: 0xc0000022, providerOpenStatus: 0xc0000022, providerStatus: null, providerCloseStatus: null, handlesClosedVerified: true, buffersClearedVerified: true, firstApi: "legacy-cryptoapi", legacy: { providerOpened: false, providerOpenError: 5, generated: null, generateError: null, providerCloseError: null, handlesClosedVerified: true, buffersClearedVerified: true } },
     primaryTokenVerified: true, tokenRecheckedAfterExit: true, treeExitVerified: true, processHandlesClosedVerified: true, creatorQuotaRestoredVerified: true, standardIo: stdio(), nodeStartupAccepted: false };
   cold.report.enhancedProvider = { providerOpened: true, providerOpenError: 0, generated: true, generateError: 0, providerCloseError: 0, handlesClosedVerified: true, buffersClearedVerified: true };
   cold.report.providerLookups = { user: { succeeded: true, error: 0, providerClass: "enhanced", bufferClearedVerified: true }, machine: { succeeded: false, error: 5, providerClass: null, bufferClearedVerified: true } };
   cold.report.selfTokenAccess = Object.fromEntries(["query", "queryDuplicate", "queryDuplicateImpersonate"].map(key => [key, { opened: true, error: 0, closeError: 0, handlesClosedVerified: true }]));
+  cold.report.emptyJobs = Object.fromEntries(["anonymous", "local", "global"].map(key => [key, { opened: true, createError: 0, createdNew: true, querySucceeded: true, queryError: 0, activeProcesses: 0, closeError: 0, handlesClosedVerified: true }]));
   const input = { schema: "switchyard-storage-broker-protocol-proof/v1", success: false, restrictedHostColdRandom: cold, restrictedHostChildExit: { waitResult: 0, exitCode: 134, resultAvailable: false } };
   const projected = storageBrokerFailureEvidence(input); assert.deepEqual(projected.restrictedHostColdRandom, cold); assert.equal(projected.success, false); assert.throws(() => verifyRestrictedOwnerReport(input));
   projected.restrictedHostColdRandom.report.systemStatus = 0; assert.equal(cold.report.systemStatus, 0xc0000022);
@@ -262,6 +263,31 @@ test("a cold restricted RNG report requires exact primary-token, process, pipe a
     assert.equal(storageBrokerFailureEvidence({ ...input, restrictedHostColdRandom: missing }).restrictedHostColdRandom, undefined);
   }
   for (const mutate of [c => { c.schema = "switchyard-cold-restricted-random/v3"; }, c => { delete c.report.selfTokenAccess; }, c => { c.report.selfTokenAccess.extra = {}; }, c => { c.report.selfTokenAccess = []; }]) {
+    const value = structuredClone(cold); mutate(value); assert.equal(storageBrokerFailureEvidence({ ...input, restrictedHostColdRandom: value }).restrictedHostColdRandom, undefined);
+  }
+  for (const key of ["anonymous", "local", "global"]) {
+    const denied = { opened: false, createError: 5, createdNew: false, querySucceeded: null, queryError: null, activeProcesses: null, closeError: null, handlesClosedVerified: true };
+    const collision = { ...denied, opened: true, createError: 183, closeError: 0 };
+    const queryFailed = { ...cold.report.emptyJobs[key], querySucceeded: false, queryError: 5, activeProcesses: null };
+    for (const row of [denied, { ...denied, createError: 0xffffffff }, queryFailed, ...(key === "anonymous" ? [] : [collision])]) {
+      const value = structuredClone(cold); value.report.emptyJobs[key] = row;
+      const projected = storageBrokerFailureEvidence({ ...input, restrictedHostColdRandom: value });
+      assert.deepEqual(projected.restrictedHostColdRandom, value); assert.equal(projected.success, false); assert.throws(() => verifyRestrictedOwnerReport(projected));
+    }
+    for (const row of [
+      ...[{ opened: 1 }, { createdNew: 1 }, { createError: 5 }, { createError: -1 }, { createError: 0x100000000 }, { createError: 0.5 }, { createdNew: false }, { querySucceeded: 1 }, { querySucceeded: false }, { queryError: 5 }, { activeProcesses: 1 }, { activeProcesses: null }, { closeError: null }, { closeError: 5 }, { handlesClosedVerified: false }, { name: "NEVER_RETAIN" }].map(change => ({ ...cold.report.emptyJobs[key], ...change })),
+      ...[{ createError: 0 }, { createError: 183 }, { createdNew: true }, { querySucceeded: false }, { queryError: 0 }, { activeProcesses: 0 }, { closeError: 0 }, { handlesClosedVerified: false }].map(change => ({ ...denied, ...change })),
+      ...[{ queryError: 0 }, { queryError: -1 }, { activeProcesses: 0 }].map(change => ({ ...queryFailed, ...change })),
+      ...(key === "anonymous" ? [collision] : [{ ...collision, querySucceeded: true, queryError: 0, activeProcesses: 0 }, { ...collision, createError: 0 }])
+    ]) {
+      const value = structuredClone(cold); value.report.emptyJobs[key] = row;
+      const projected = storageBrokerFailureEvidence({ ...input, restrictedHostColdRandom: value });
+      assert.equal(projected.restrictedHostColdRandom, undefined); assert.equal(JSON.stringify(projected).includes("NEVER_RETAIN"), false); assert.equal(projected.restrictedHostChildExit.exitCode, 134);
+    }
+    const missing = structuredClone(cold); delete missing.report.emptyJobs[key];
+    assert.equal(storageBrokerFailureEvidence({ ...input, restrictedHostColdRandom: missing }).restrictedHostColdRandom, undefined);
+  }
+  for (const mutate of [c => { c.schema = "switchyard-cold-restricted-random/v4"; }, c => { delete c.report.emptyJobs; }, c => { c.report.emptyJobs.extra = {}; }, c => { c.report.emptyJobs = []; }]) {
     const value = structuredClone(cold); mutate(value); assert.equal(storageBrokerFailureEvidence({ ...input, restrictedHostColdRandom: value }).restrictedHostColdRandom, undefined);
   }
 });

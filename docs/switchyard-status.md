@@ -20,7 +20,7 @@ there is no merge or public release acceptance.
 
 | Area | Verified result | What it establishes |
 | --- | --- | --- |
-| Complete Linux source `701f915` | **260 groups, 1,713 passed tests, eleven declared skips, zero failures.** All owned children, temporary checkout, dependency aliases and generated builds were retired. [Receipt](evidence/linux-701-complete-summary.json). | Backend integration, including editor lifecycle, retained Terminal composition and Cargo version handling. Provider/editor doubles and Windows-only skips remain explicit; this is not native account or hardware acceptance. |
+| Complete Linux source `3363e8b` | **260 groups, 1,734 passed tests, eleven declared skips, zero failures.** All owned children, temporary checkout, dependency aliases and generated builds were retired. [Receipt](evidence/linux-336-complete-summary.json). | Backend integration, including editor lifecycle, retained Terminal composition and Cargo version handling. Provider/editor doubles and Windows-only skips remain explicit; this is not native account or hardware acceptance. |
 | Later recording boundary `b42574f` | Nine groups / 105 tests, typecheck and exact cleanup pass. [Receipt](evidence/observation-window-summary.json). | Agent, host-action and editor metadata cannot enter a session from before its start or latest resume. Duplicate resume and a backward clock cannot lower that boundary. |
 | Windows source and native CI | `4faa8a1` clears restricted state initialization and mode update. Native pipe/lease tests pass **24 checks / one declared skip**, including EOF and parent-loss cleanup. [Evidence](evidence/windows-lease-pipe-native-summary.json). | The original restricted owner now fails later at its read-only storage probe, still **zero of eight checks**. Complete owner, guest and interactive acceptance remain open. |
 | Rust scanning | Nine groups / 94 checks and 146,326 independent Rust SemVer comparisons pass. Four Windows-host contracts also pass with controlled guests. [Source](evidence/cargo-semver-summary.json), [Windows](evidence/windows-cargo-contract-summary.json). | Bounded declaration and advisory matching. Actual Windows guest scanning, dependency resolution and publisher provenance remain unverified or unfinished. |
@@ -39,9 +39,15 @@ verifies; complete build cleanup is not claimed. Application/recovery fixtures
 used a nonexecutable helper, and two Python checks lacked their prerequisite
 on the isolated PATH. [Retained failure](evidence/windows-release-1fc-failure-summary.json).
 The source corrections pass eight groups / 113 tests plus 29 lane/package
-follow-up checks and typecheck on Linux. Native application/installation lanes
-and a newer complete release remain pending.
+follow-up checks and typecheck on Linux. Source 3363e8b additionally passes all
+21 application/installation tests on actual Windows. A newer complete release
+remains pending. [Native lifecycle receipts](evidence/windows-336-lifecycle-native-summary.json).
 [Correction evidence](evidence/windows-release-prerequisite-summary.json).
+
+The next CI-only empty-Job observation passes six groups / 78 tests, two managed
+builds / 2,071 portable checks and typecheck, without new permissions or a
+production fallback. Native C++ execution is pending.
+[Diagnostic contract](windows-job-observation.md).
 
 ## What the backend does
 
@@ -57,7 +63,8 @@ and a newer complete release remain pending.
 
 ## Unfinished implementation
 
-- Windows restricted-owner Job creation and the rest of its original owner journey;\n  native application/recovery and complete release verification of the new fixture corrections.
+- Windows restricted-owner Job creation and the rest of its original owner journey;
+  complete release verification of the isolated Python prerequisite remains pending.
 - Production editor command activation and remaining guided role/device wiring.
   Frontend and command activation are deliberately frozen for owner review.
 - Broader Shield coverage and dependency syntax/resolution, publisher provenance,

@@ -69,15 +69,40 @@ static void token_observation(DWORD access, std::uint32_t* report) {
     }
 }
 
+// Empty diagnostic Jobs only. Never assign a process, configure limits, change
+// security, or inspect an existing named object. Every returned handle is closed.
+static void job_observation(LPCWSTR name, std::uint32_t* report) {
+    SetLastError(ERROR_SUCCESS);
+    HANDLE job = CreateJobObjectW(nullptr, name);
+    DWORD error = GetLastError();
+    report[0] = job != nullptr ? 1u : 0u;
+    report[1] = error;
+    report[2] = job != nullptr && error == ERROR_SUCCESS ? 1u : 0u;
+    if (report[2] == 1) {
+        JOBOBJECT_BASIC_ACCOUNTING_INFORMATION accounting = {};
+        SetLastError(ERROR_SUCCESS);
+        BOOL queried = QueryInformationJobObject(job, JobObjectBasicAccountingInformation, &accounting, static_cast<DWORD>(sizeof(accounting)), nullptr);
+        report[3] = queried ? 1u : 0u;
+        report[4] = queried ? 0u : GetLastError();
+        report[5] = queried ? accounting.ActiveProcesses : 0u;
+    }
+    if (job != nullptr) {
+        SetLastError(ERROR_SUCCESS);
+        BOOL closed = CloseHandle(job);
+        report[6] = closed ? 0u : GetLastError();
+        report[7] = closed ? 1u : 0u;
+    } else report[7] = 1;
+}
+
 int wmain(int argc, wchar_t** argv) {
     if (argc != 2) return 64;
     unsigned char bytes[32] = {};
     BCRYPT_ALG_HANDLE provider = nullptr;
-    // V4: default legacy acquisition is first in a fresh native process.
+    // V5: default legacy acquisition is first in a fresh native process.
     // Read-only default-name lookup and one fixed explicit-provider observation
     // distinguish lookup from provider access. Nothing changes provider defaults.
     // Only fixed status/boolean/classification words leave; no names or entropy.
-    std::uint32_t report[44] = {0x53584352, 4};
+    std::uint32_t report[68] = {0x53584352, 5};
     legacy_observation(nullptr, report + 8);
     default_observation(CRYPT_USER_DEFAULT, report + 24);
     default_observation(CRYPT_MACHINE_DEFAULT, report + 28);
@@ -99,6 +124,16 @@ int wmain(int argc, wchar_t** argv) {
         if (provider != nullptr) (void)BCryptCloseAlgorithmProvider(provider, 0);
     }
     report[7] = clear_and_verify(bytes, sizeof(bytes));
+    // Observe namespaces only after all original RNG/token checks. Names stay
+    // private; a collision is recorded and closed without querying that Job.
+    wchar_t localName[96] = {}, globalName[96] = {};
+    DWORD processId = GetCurrentProcessId();
+    ULONGLONG tick = GetTickCount64();
+    if (swprintf_s(localName, 96, L"Local\\Switchyard.ColdJob.%lu.%llu", processId, tick) < 0
+        || swprintf_s(globalName, 96, L"Global\\Switchyard.ColdJob.%lu.%llu", processId, tick) < 0) return 67;
+    job_observation(nullptr, report + 44);
+    job_observation(localName, report + 52);
+    job_observation(globalName, report + 60);
     HANDLE output = CreateFileW(argv[1], GENERIC_WRITE, 0, nullptr, CREATE_NEW, FILE_ATTRIBUTE_NORMAL, nullptr);
     if (output == INVALID_HANDLE_VALUE) return 65;
     DWORD written = 0;
