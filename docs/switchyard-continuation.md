@@ -52,6 +52,13 @@ checks, native Windows results, focused source checks and installed acceptance.
 The [verification record](verification.md) retains historical receipts and failed
 attempts; do not infer current status from an older passing checkpoint.
 
+The latest complete Linux run is `8786f83`: 309 groups, 1,847 passing tests,
+sixteen declared skips and zero failures. All child/tree cleanup verifies, and
+its exact checkout, nine aliases, 782 generated files, temporary parent and marker
+are removed. All three other worktrees remain. Newer revocation/compact-package
+changes retain separate focused and installed checks; they are not included in
+that complete run. [Receipt](evidence/linux-8786f83-complete-summary.json).
+
 The installed baseline is `b3ce0a9c27a76547bb03956f7ae99fcde28a4e2f`,
 release `8858cf1d017215ebdb01813ceab4c6821bbe3766b469da5e5a2ea550d9d8d6c0`.
 Preserve all 54 original workspace identities, the pending keyboard-only Codex

@@ -1,0 +1,49 @@
+{
+  "schema": "switchyard-full-linux-source-summary/v1",
+  "sourceCommit": "8786f832b0b62a4a6733f689a8831713bf81543e",
+  "sourceTree": "7d5e37ba290b47d706e0befabe42dd43beb97067",
+  "verificationReceipt": "isolated-test-05903ee2-69c8-4587-b8b4-d18689352481.json",
+  "verificationReceiptSha256": "d8166c7f99a5793d5f9b1197c453c11ff233a8e042235d18de42a245e10d8993",
+  "success": true,
+  "totals": {
+    "required": 309,
+    "passed": 309,
+    "failed": 0,
+    "tests": 1863,
+    "passedTests": 1847,
+    "failedTests": 0,
+    "skippedTests": 16,
+    "cancelledTests": 0,
+    "todoTests": 0
+  },
+  "allChildAndTreeCleanupVerified": true,
+  "cleanupReceipt": "linux-8786f83-cleanup-1793999252899.json",
+  "cleanup": {
+    "schema": "switchyard-owned-full-linux-cleanup/v1",
+    "sourceCommit": "8786f832b0b62a4a6733f689a8831713bf81543e",
+    "verificationReceipt": "isolated-test-05903ee2-69c8-4587-b8b4-d18689352481.json",
+    "generatedFiles": 782,
+    "generatedBytes": 11766655,
+    "generatedDirectories": [
+      "apps/linux-companion/dist",
+      "apps/provider-adapter-host/dist",
+      "apps/vscode-extension/dist",
+      "apps/windows-companion/dist",
+      "packages/protocol/dist"
+    ],
+    "dependencyAliasCount": 9,
+    "trackedTreeClean": true,
+    "testChildrenExited": true,
+    "testParentEmpty": true,
+    "rootIdentityVerified": true,
+    "testParentIdentityVerified": true,
+    "worktreeRemoved": true,
+    "rootRemoved": true,
+    "testParentRemoved": true,
+    "markerRemoved": true,
+    "otherWorktreesPreserved": true,
+    "cleanupPreflightAdjustment": "The first preflight refused the exact owned .tools symlink because directory-only Git ignore rules classify it as untracked. It deleted nothing. Cleanup now accepts only aliases whose original identity and target were independently verified."
+  },
+  "providersAndWindowsGuestsDoubledWhereDeclared": true,
+  "installedChanged": false
+}

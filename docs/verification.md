@@ -1273,3 +1273,19 @@ including the compact manifest, and is removed after exact verification. No live
 agent revocation/enrollment, provider, task, recording, model, public query,
 Microsoft request or HID operation is performed.
 [Installed evidence](evidence/installed-agent-security-summary.json).
+
+## Complete Linux credential and lifecycle checkpoint — 2026-11-06
+
+Immutable source `8786f83` passes all 309 groups: 1,847 tests, sixteen declared
+skips and zero failures, cancellations or todo tests. This includes the bundled
+agent lifecycle, command observation, credential runner and shortcut diagnostics.
+Provider and Windows guest doubles remain explicit; later revocation and compact
+manifest changes have separate focused/installed acceptance.
+
+All child/tree exits and cleanup verify. Exact cleanup removes the temporary
+checkout, nine dependency aliases, 782 generated files (11,766,655 bytes), empty
+test parent and marker while preserving all three unrelated worktrees. Its first
+cleanup preflight rejected the owned `.tools` symlink because Git's directory-only
+ignore rule reported it as untracked; no deletion occurred. The corrected preflight
+accepts only aliases with independently verified original identity and target.
+[Complete receipt](evidence/linux-8786f83-complete-summary.json).

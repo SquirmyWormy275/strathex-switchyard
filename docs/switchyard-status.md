@@ -7,10 +7,10 @@ a partial implementation.** The F77 is the pilot device; it does not limit scope
 The Linux backend has a passing complete test checkpoint, and a versioned
 application has separately verified installed metadata checks. Later archive
 identity work has focused source acceptance.
-The corrected complete Linux `5a8d159` run passes all 308 groups, 1,823 tests
-and sixteen declared skips, covering combined archive, shortcut and Python changes.
-The newer bundled-agent retirement correction has separate 72-check acceptance;
-credential-worker retirement has 69 focused passing checks.
+The complete Linux `8786f83` run passes all 309 groups, 1,847 tests and sixteen
+declared skips, covering bundled-agent retirement, command observation,
+credential-worker ownership and shortcut diagnostics. Newer agent revocation and
+compact packaging have separate focused and installed evidence.
 The restricted Windows storage owner now passes all eight original checks with
 verified retirement. Complete Windows release acceptance remains pending. Hardware,
 account and visual acceptance remain separate from those implementation results.
@@ -26,7 +26,7 @@ there is no merge or public release acceptance.
 
 | Boundary | Verified result | Still open |
 | --- | --- | --- |
-| Complete Linux source | `5a8d159`: **308 groups, 1,823 passing tests, sixteen declared skips, zero failures.** Exact child/tree exit and owned checkout, nine aliases, 782 generated files, temporary parent and marker cleanup verify; all three other worktrees remain. [Receipt](evidence/linux-5a8d159-complete-summary.json). | Provider/guest doubles remain explicit. The newer bundled-agent correction has a separate 72-check pass. |
+| Complete Linux source | `8786f83`: **309 groups, 1,847 passing tests, sixteen declared skips, zero failures.** Exact child/tree exit and owned checkout, nine aliases, 782 generated files, temporary parent and marker cleanup verify; all three other worktrees remain. [Receipt](evidence/linux-8786f83-complete-summary.json). | Provider/guest doubles remain explicit. Newer agent revocation and compact packaging have separate 86-check and 26-check focused passes plus installed metadata acceptance. |
 | Windows backend batches | `9f35961`: **198 groups, 1,022 passing tests, 142 declared skips, zero failures.** Four digests, source/merge tree equality and all child/tree cleanup verify. [Receipts](evidence/windows-backend-9f35961-native-summary.json). | The combined release remains active. Older `dbbcce8` backend and complete-release failures remain recorded; later passing batches do not relabel them. [Historical backend](evidence/windows-backend-dbbc-native-summary.json), [complete failure](evidence/windows-complete-dbbc-failed-summary.json). |
 | Restricted Windows owner | `6e967a3`: **8/8 original owner checks pass**, with 68 exact QUERY-mask-8 registrations, native tree exit, token recheck, private-desktop closure and fixture/service/file retirement. All six GUI setup checks pass. [Owner receipt](evidence/windows-restricted-owner-accepted-summary.json), [setup](evidence/setup-final-native-summary.json). | This controlled native CI proof does not accept an ordinary user account, interactive UAC or actual guest journey. |
 | Installation and runtime | All sixteen original Windows installation/recovery cases pass at `b600a6d`; its independent fresh runtime installs 49 packages and loads/rechecks the offline CPU model, then removes its temporary runtime. [Installation](evidence/installation-scenarios-native-summary.json), [runtime](evidence/windows-runtime-b600-native-summary.json). | These independent passes do not accept the failed complete Windows release or ordinary-user/guest journeys. |
