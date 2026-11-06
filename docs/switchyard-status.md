@@ -22,7 +22,7 @@ there is no merge or public release acceptance.
 | --- | --- | --- |
 | Complete Linux source `701f915` | **260 groups, 1,713 passed tests, eleven declared skips, zero failures.** All owned children, temporary checkout, dependency aliases and generated builds were retired. [Receipt](evidence/linux-701-complete-summary.json). | Backend integration, including editor lifecycle, retained Terminal composition and Cargo version handling. Provider/editor doubles and Windows-only skips remain explicit; this is not native account or hardware acceptance. |
 | Later recording boundary `b42574f` | Nine groups / 105 tests, typecheck and exact cleanup pass. [Receipt](evidence/observation-window-summary.json). | Agent, host-action and editor metadata cannot enter a session from before its start or latest resume. Duplicate resume and a backward clock cannot lower that boundary. |
-| Windows source and native CI | `fea2ca4` passes canonical-path acceptance, then fails during parent-process observation with **zero of eight original owner checks**. Ordinary owner (8), restricted metadata (13) and native exchange (31) pass. `f653827` still fails, and its managed report dropped the new progress labels; that projection is corrected with native follow-up pending. [Evidence](evidence/windows-parent-projection-summary.json). | A narrowed, retained software failure. Ordinary native lease tests now pass 24 checks with one declared skip. Two managed builds / 1,995 portable checks verify the projection correction; neither result accepts the restricted owner. |
+| Windows source and native CI | `da28b5c` identifies **Access Denied opening the parent process**; the original restricted owner remains **zero of eight checks**. The new version 2 source supervises its inherited pipe instead of that lookup. [Evidence](evidence/windows-lease-pipe-owner-source-summary.json). | Two managed builds / 2,006 portable checks and five groups / 53 passes / one Windows-only skip pass. Ordinary native leases passed 24 checks at `f653827`. The new pipe protocol and complete restricted owner still require native acceptance. |
 | Rust scanning | Nine groups / 94 checks and 146,326 independent Rust SemVer comparisons pass. Four Windows-host contracts also pass with controlled guests. [Source](evidence/cargo-semver-summary.json), [Windows](evidence/windows-cargo-contract-summary.json). | Bounded declaration and advisory matching. Actual Windows guest scanning, dependency resolution and publisher provenance remain unverified or unfinished. |
 | Installed Linux `5a2c324` | Six update, eleven owner/editor/severity and seven journal checks pass. All 54 non-audit semantic snapshots match; 52 sealed files are byte-identical. [Receipt](evidence/installed-cvss4-summary.json). | The last accepted installed checkpoint, not the latest source. Two verification workspaces received only expected audit additions. No live task or activated editor is inferred. |
 
@@ -46,7 +46,7 @@ Complete release CI is still pending.
 
 ## Unfinished implementation
 
-- Windows restricted-owner initialization and its original lease/cleanup journey.
+- Windows restricted-owner initialization and native acceptance of the new inherited-pipe lease/cleanup journey.
 - Production editor command activation and remaining guided role/device wiring.
   Frontend and command activation are deliberately frozen for owner review.
 - Broader Shield coverage and dependency syntax/resolution, publisher provenance,

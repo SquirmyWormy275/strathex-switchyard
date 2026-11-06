@@ -31,6 +31,15 @@ evidence, not instructions to reset. Publish regular commits. Do not merge or re
 
 ## Current implementation and evidence
 
+Windows `da28b5c` identifies the restricted failure as **Access Denied opening the
+parent process**. The next source protocol binds worker lifetime to its private
+inherited input pipe instead of that lookup. It checks EOF while idle, reading
+partial frames, holding a lease and waiting for a lock, with one reader and no
+new process/token rights. File identity, sharing, sequencing, Job containment and
+the original eight owner assertions remain. Two managed builds / 2,006 portable
+checks, five groups / 53 passes / one Windows-only skip and typecheck pass; native
+acceptance is pending. [Failure and source](evidence/windows-lease-pipe-owner-source-summary.json).
+
 Native Windows `f653827` passes both lease groups: **24 checks, one declared
 Linux-only skip**, and every child/tree cleanup verifies. The separate restricted
 owner still fails zero of eight checks. Its managed projection omitted the new
@@ -184,16 +193,16 @@ the installed update or old live provider verifiers without a relevant new chang
    root identities, receipt and every owned alias/build/test parent. Never
    broaden cleanup or relax deadlines.
 
-2. Collect the native result after correcting the managed progress projection.
-   At `f653827` the original restricted owner remains zero of eight checks;
-   its projection dropped an unknown new fixed label, so the exact parent failure
-   is still unknown. The ordinary Windows lease lane now passes 24 checks/one
-   declared skip with cleanup. Do not substitute that pass for the restricted
-   owner. Exact parent access remains 0x00101000; no token/DACL/privilege, SID,
-   desktop, account, runtime or detached fallback is permitted.
-   [Current failure, native leases and correction](evidence/windows-parent-projection-summary.json).
-   Client and policy workflows pass at `f653827`. Earlier complete release
-   workflows remain pending behind the active run.
+2. Collect the native result for the version 2 inherited-pipe lease protocol.
+   `da28b5c` proves parent OpenProcess fails with Access Denied; original owner
+   remains zero of eight checks. Source now supervises EOF through the private
+   inherited pipe, with one nonblocking observation/read loop and no PID lookup.
+   File identity, exclusive sharing, original normal spawn/Job and all original
+   owner assertions remain. Native EOF/partial-frame/contended-lock/file-input,
+   crash, detached-owner and complete restricted-owner acceptance is required.
+   No token/DACL/privilege/SID, desktop, account, runtime or detached fallback
+   is permitted. [Failure and source evidence](evidence/windows-lease-pipe-owner-source-summary.json).
+   Complete release workflows remain separate; inspect their actual CI state.
 
 3. The protected editor journal, signed client/routes, restricted upstream and
    retained Terminal now compose through actual Linux carriers with controlled

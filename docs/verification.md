@@ -1,5 +1,14 @@
 # What has actually been verified
 
+Windows `da28b5c` identifies the restricted failure as **Access Denied opening the
+parent process**. The next source protocol binds worker lifetime to its private
+inherited input pipe instead of that lookup. It checks EOF while idle, reading
+partial frames, holding a lease and waiting for a lock, with one reader and no
+new process/token rights. File identity, sharing, sequencing, Job containment and
+the original eight owner assertions remain. Two managed builds / 2,006 portable
+checks, five groups / 53 passes / one Windows-only skip and typecheck pass; native
+acceptance is pending. [Failure and source](evidence/windows-lease-pipe-owner-source-summary.json).
+
 Native Windows `f653827` passes both lease groups: **24 checks, one declared
 Linux-only skip**, and every child/tree cleanup verifies. The separate restricted
 owner still fails zero of eight checks. Its managed projection omitted the new

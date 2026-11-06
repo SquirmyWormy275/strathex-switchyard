@@ -1,7 +1,7 @@
 /** Short-lived helpers retain only a kernel-lock path, never protected state or keys. */
 const failureKinds = ["timeout", "child-exit", "spawn-error", "input-error", "invalid-reply", "output-bound", "not-live"];
 const phases = ["worker-startup", "lease-acquire", "lease-release"];
-const progressLabels = ["not-observed", "lease-entered", "lease-input-read", "lease-request-read", "lease-parent-open-denied", "lease-parent-open-failed", "lease-parent-opened", "lease-parent-query-denied", "lease-parent-query-failed", "lease-parent-birth-read", "lease-owner-found"];
+const progressLabels = ["not-observed", "lease-entered", "lease-input-read", "lease-request-read", "lease-parent-open-denied", "lease-parent-open-failed", "lease-parent-opened", "lease-parent-query-denied", "lease-parent-query-failed", "lease-parent-birth-read", "lease-owner-found", "lease-owner-pipe-bound"];
 const signals = [null, "SIGTERM", "SIGKILL", "SIGABRT", "SIGSEGV", "SIGILL", "SIGBUS", "SIGINT", "other"];
 const spawnCodes = [null, "ENOENT", "EACCES", "EPERM", "EINVAL", "ENOMEM", "EAGAIN", "other"];
 export function stateLockFailureEvidence(value) {

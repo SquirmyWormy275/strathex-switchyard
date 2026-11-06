@@ -12,18 +12,18 @@ let windowsLeases;
 function reusableWindowsLeases() {
   return windowsLeases ??= createKeylessLeasePool({ spawnWorker(path) {
     const child = spawn(fileURLToPath(new URL("../../runtime/hotkeys/Switchyard.Hotkeys.exe", import.meta.url)), ["--state-lease-worker"], { shell: false, windowsHide: true, stdio: ["pipe", "pipe", "pipe"] });
-    child.stdin.write(windowsLockRequest({ path, parentPid: process.pid }));
+    child.stdin.write(windowsLockRequest({ path }));
     return child;
   } });
 }
 
 /** A closed line protocol avoids loading a JSON/module engine to acquire a lock. */
-export function windowsLockRequest({ path, parentPid, trace = false, nonBlocking = false }) {
-  if (typeof path !== "string" || !path || /[\0\r\n]/u.test(path) || Buffer.byteLength(path, "utf8") > 16384 || !Number.isInteger(parentPid) || parentPid < 1 || parentPid > 2147483647 || typeof trace !== "boolean" || typeof nonBlocking !== "boolean") throw new Error("The private lock request is invalid.");
+export function windowsLockRequest({ path, trace = false, nonBlocking = false }) {
+  if (typeof path !== "string" || !path || /[\0\r\n]/u.test(path) || Buffer.byteLength(path, "utf8") > 16384 || typeof trace !== "boolean" || typeof nonBlocking !== "boolean") throw new Error("The private lock request is invalid.");
   // Reject lone surrogates instead of silently changing the named private path.
   const bytes = Buffer.from(path, "utf8");
   if (bytes.toString("utf8") !== path) throw new Error("The private lock path is not valid Unicode.");
-  return `SXSY-LOCK/1\t${parentPid}\t${trace ? 1 : 0}\t${nonBlocking ? 1 : 0}\t${bytes.toString("base64")}\n`;
+  return `SXSY-LOCK/2\tpipe\t${trace ? 1 : 0}\t${nonBlocking ? 1 : 0}\t${bytes.toString("base64")}\n`;
 }
 
 /** Resolve an existing Windows spelling (including 8.3 names) to the same file.

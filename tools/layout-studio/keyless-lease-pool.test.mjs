@@ -119,7 +119,7 @@ test("state lock failure projection refuses private and malformed fields without
 });
 
 test("parent observation failures retain only fixed labels and never admit or retry a lease", async t => {
-  for (const label of ["lease-parent-open-denied", "lease-parent-open-failed", "lease-parent-opened", "lease-parent-query-denied", "lease-parent-query-failed", "lease-parent-birth-read"]) {
+  for (const label of ["lease-parent-open-denied", "lease-parent-open-failed", "lease-parent-opened", "lease-parent-query-denied", "lease-parent-query-failed", "lease-parent-birth-read", "lease-owner-pipe-bound"]) {
     const { pool, children } = fixture(t, "parent:" + label); let entered = false;
     await assert.rejects(pool.withLease("PRIVATE_LOCK_PATH", () => { entered = true; }), error => {
       const evidence = stateLockFailureEvidence(error.stateLockFailure);

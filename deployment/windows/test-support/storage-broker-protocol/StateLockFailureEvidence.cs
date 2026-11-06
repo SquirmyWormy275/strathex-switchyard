@@ -13,7 +13,7 @@ internal static class StateLockFailureEvidence
         if (Label("schema", "switchyard-state-lock-failure/v1") == null) return null;
         string? kind = Label("kind", "timeout", "child-exit", "spawn-error", "input-error", "invalid-reply", "output-bound", "not-live");
         string? phase = Label("phase", "worker-startup", "lease-acquire", "lease-release");
-        string? progress = Label("progress", "not-observed", "lease-entered", "lease-input-read", "lease-request-read", "lease-parent-open-denied", "lease-parent-open-failed", "lease-parent-opened", "lease-parent-query-denied", "lease-parent-query-failed", "lease-parent-birth-read", "lease-owner-found");
+        string? progress = Label("progress", "not-observed", "lease-entered", "lease-input-read", "lease-request-read", "lease-parent-open-denied", "lease-parent-open-failed", "lease-parent-opened", "lease-parent-query-denied", "lease-parent-query-failed", "lease-parent-birth-read", "lease-owner-found", "lease-owner-pipe-bound");
         string? signal = Label("signal", "SIGTERM", "SIGKILL", "SIGABRT", "SIGSEGV", "SIGILL", "SIGBUS", "SIGINT", "other");
         string? spawnCode = Label("spawnCode", "ENOENT", "EACCES", "EPERM", "EINVAL", "ENOMEM", "EAGAIN", "other");
         if (kind == null || phase == null || progress == null || signal == null && item.GetProperty("signal").ValueKind != JsonValueKind.Null || spawnCode == null && item.GetProperty("spawnCode").ValueKind != JsonValueKind.Null) return null;
@@ -40,7 +40,7 @@ internal static class StateLockFailureEvidence
         Check(valid, true);
         foreach (string json in new[] { "null", "[]", "{}", "{\"stateLockFailure\":null}", "{\"stateLockFailure\":[]}" }) Check(json, false);
         var source = JsonNode.Parse(valid)!.AsObject();
-        foreach (string progress in new[] { "lease-entered", "lease-input-read", "lease-request-read", "lease-parent-open-denied", "lease-parent-open-failed", "lease-parent-opened", "lease-parent-query-denied", "lease-parent-query-failed", "lease-parent-birth-read", "lease-owner-found" })
+        foreach (string progress in new[] { "lease-entered", "lease-input-read", "lease-request-read", "lease-parent-open-denied", "lease-parent-open-failed", "lease-parent-opened", "lease-parent-query-denied", "lease-parent-query-failed", "lease-parent-birth-read", "lease-owner-found", "lease-owner-pipe-bound" })
         {
             var changed = source.DeepClone(); changed["stateLockFailure"]!["progress"] = progress;
             using var doc = JsonDocument.Parse(changed.ToJsonString());

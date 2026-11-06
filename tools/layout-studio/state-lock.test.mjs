@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { once } from "node:events";
-import { mkdtemp, rm, symlink, readFile, readdir, writeFile, rename, link } from "node:fs/promises";
+import { mkdtemp, rm, symlink, readFile, readdir, writeFile, rename, link, open } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { createInterface } from "node:readline";
 import { createKeylessLeasePool } from "./keyless-lease-pool.mjs";
@@ -13,17 +13,17 @@ import { withStateLock, windowsLockRequest, canonicalWindowsLockPath } from "./s
 import { stopOwnedChild } from "./owned-process.mjs";
 import { applicationEnvironment } from "../../deployment/suite/application.mjs";
 
-test("the Windows kernel-lock wire preserves literal Unicode paths and refuses injection, invalid identities and oversized input", () => {
+test("the Windows kernel-lock wire preserves literal Unicode paths and refuses injection, invalid flags and oversized input", () => {
   const path = 'C:\\Users\\Synthetic user\\私用\\literal\t$() `";.lock';
   for (const trace of [false, true]) for (const nonBlocking of [false, true]) {
-    const wire = windowsLockRequest({ path, parentPid: 2147483647, trace, nonBlocking });
+    const wire = windowsLockRequest({ path, trace, nonBlocking });
     assert.equal(wire.endsWith("\n"), true); assert.equal(wire.split("\n").length, 2);
     const [schema, parent, traced, nonblock, encoded] = wire.trimEnd().split("\t");
-    assert.equal(schema, "SXSY-LOCK/1"); assert.equal(parent, "2147483647"); assert.equal(traced, trace ? "1" : "0"); assert.equal(nonblock, nonBlocking ? "1" : "0");
+    assert.equal(schema, "SXSY-LOCK/2"); assert.equal(parent, "pipe"); assert.equal(traced, trace ? "1" : "0"); assert.equal(nonblock, nonBlocking ? "1" : "0");
     assert.equal(Buffer.from(encoded, "base64").toString("utf8"), path); assert.equal(wire.includes("literal"), false);
   }
-  const good = { path: "C:\\private\\personal.lock", parentPid: 1 };
-  for (const changed of [{ path: "" }, { path: "x\n1" }, { path: "x\r1" }, { path: "x\u00001" }, { path: "x\ud800" }, { path: "界".repeat(5462) }, { parentPid: 0 }, { parentPid: 2147483648 }, { parentPid: 1.5 }, { parentPid: "1" }, { trace: 1 }, { nonBlocking: "false" }]) assert.throws(() => windowsLockRequest({ ...good, ...changed }));
+  const good = { path: "C:\\private\\personal.lock" };
+  for (const changed of [{ path: "" }, { path: "x\n1" }, { path: "x\r1" }, { path: "x\u00001" }, { path: "x\ud800" }, { path: "界".repeat(5462) }, { trace: 1 }, { nonBlocking: "false" }]) assert.throws(() => windowsLockRequest({ ...good, ...changed }));
   assert.ok(windowsLockRequest({ ...good, path: "x".repeat(16384) }).length < 22000);
 });
 
@@ -33,7 +33,7 @@ test("Windows short-name spelling resolves to the same exact file before the nat
   const ports = { readStats: async (path, options) => { calls.push(path); assert.deepEqual(options, { bigint: true }); return lockStats(); }, resolvePath: async value => { assert.equal(value, path); return canonical; } };
   assert.equal(await canonicalWindowsLockPath(path, ports), canonical);
   assert.deepEqual(calls, [path, canonical]);
-  const wire = windowsLockRequest({ path: canonical, parentPid: 42 });
+  const wire = windowsLockRequest({ path: canonical });
   assert.equal(Buffer.from(wire.trimEnd().split("\t")[4], "base64").toString("utf8"), canonical);
 });
 test("Windows lock path resolution refuses alternate drives, namespaces and changed file identities", async () => {
@@ -59,27 +59,72 @@ test("the native Windows lease worker refuses replaced and hard-linked lock file
   const root = await mkdtemp(join(tmpdir(), "switchyard-native-lease-")), helper = fileURLToPath(new URL("../../runtime/hotkeys/Switchyard.Hotkeys.exe", import.meta.url));
   const workers = [], pool = createKeylessLeasePool({ spawnWorker(path) {
     const child = spawn(helper, ["--state-lease-worker"], { windowsHide: true, stdio: ["pipe", "pipe", "pipe"] });
-    workers.push(child); child.stdin.write(windowsLockRequest({ path, parentPid: process.pid })); return child;
+    workers.push(child); child.stdin.write(windowsLockRequest({ path })); return child;
   } });
   t.after(async () => { await pool.close(); for (const child of workers) await stopOwnedChild(child); await rm(root, { recursive: true, force: true }); });
   const path = join(root, "私用 literal $() `';.lock"); await writeFile(path, "original");
   const pinned = spawn(helper, ["--state-lease-worker"], { windowsHide: true, stdio: ["pipe", "pipe", "pipe"] }); workers.push(pinned);
   const pinnedExit = once(pinned, "close"), lines = createInterface({ input: pinned.stdout, crlfDelay: Infinity }), replies = lines[Symbol.asyncIterator]();
-  pinned.stdin.on("error", () => {}); pinned.stderr.resume(); pinned.stdin.write(windowsLockRequest({ path, parentPid: process.pid }));
+  pinned.stdin.on("error", () => {}); pinned.stderr.resume(); pinned.stdin.write(windowsLockRequest({ path }));
   assert.equal((await replies.next()).value, "READY");
   await rename(path, join(root, "original.lock")); await writeFile(path, "replacement");
-  pinned.stdin.end("ACQUIRE 1 0\n"); assert.equal((await pinnedExit)[0], 2); assert.equal((await replies.next()).done, true); lines.close();
+  pinned.stdin.write("ACQUIRE 1 0\n"); assert.equal((await pinnedExit)[0], 2); assert.equal((await replies.next()).done, true); lines.close();
   let entered = false; assert.equal(await readFile(path, "utf8"), "replacement");
   const linked = join(root, "hard-linked.lock"); await link(path, linked);
   await assert.rejects(pool.withLease(linked, async () => { entered = true; }), /unavailable/); assert.equal(entered, false);
   const malformedPath = join(root, "malformed.lock"); await writeFile(malformedPath, "preserved");
   const child = spawn(helper, ["--state-lease-worker"], { windowsHide: true, stdio: ["pipe", "pipe", "pipe"] }); workers.push(child);
   const exited = once(child, "close"); child.stdin.on("error", () => {});
-  child.stdin.end(windowsLockRequest({ path: malformedPath, parentPid: process.pid }) + "ACQUIRE 1 0\nRELEASE 2\n");
   let output = "", diagnostic = ""; child.stdout.on("data", b => { output += b; }); child.stderr.on("data", b => { diagnostic += b; });
+  const malformedLines = createInterface({ input: child.stdout, crlfDelay: Infinity }), malformedReplies = malformedLines[Symbol.asyncIterator]();
+  child.stdin.write(windowsLockRequest({ path: malformedPath }));
+  assert.equal((await malformedReplies.next()).value, "READY");
+  child.stdin.write("ACQUIRE 1 0\n");
+  assert.equal((await malformedReplies.next()).value, "LOCKED 1");
+  child.stdin.end("RELEASE 2\n");
+  malformedLines.close();
   const [code] = await exited; assert.equal(code, 2); assert.match(output, /LOCKED 1/); assert.doesNotMatch(output, /RELEASED/);
-  assert.deepEqual(diagnostic.trim().split(/\r?\n/), ["lease-entered", "lease-input-read", "lease-request-read", "lease-parent-opened", "lease-parent-birth-read", "lease-owner-found"]);
+  assert.deepEqual(diagnostic.trim().split(/\r?\n/), ["lease-entered", "lease-input-read", "lease-request-read", "lease-owner-pipe-bound"]);
   await pool.withLease(malformedPath, async lease => { lease.assert(); }); assert.equal(await readFile(malformedPath, "utf8"), "preserved");
+  function peer() {
+    const process = spawn(helper, ["--state-lease-worker"], { windowsHide: true, stdio: ["pipe", "pipe", "pipe"] }); workers.push(process);
+    const closed = once(process, "close"), lines = createInterface({ input: process.stdout, crlfDelay: Infinity });
+    process.stdin.on("error", () => {}); process.stderr.resume();
+    return { process, closed, lines, replies: lines[Symbol.asyncIterator]() };
+  }
+  async function endPeer(p, expected) {
+    let timer;
+    try {
+      p.process.stdin.end();
+      const [exit] = await Promise.race([p.closed, new Promise((_, reject) => { timer = setTimeout(() => reject(Error("The inherited lease pipe did not release on EOF.")), 1500); })]);
+      assert.equal(exit, expected);
+    } finally { clearTimeout(timer); p.lines.close(); }
+  }
+  for (const phase of ["idle", "held", "partial-command", "partial-release"]) {
+    const p = peer(); p.process.stdin.write(windowsLockRequest({ path: malformedPath }));
+    assert.equal((await p.replies.next()).value, "READY");
+    if (["held", "partial-release"].includes(phase)) { p.process.stdin.write("ACQUIRE 1 0\n"); assert.equal((await p.replies.next()).value, "LOCKED 1"); }
+    if (phase === "partial-command") p.process.stdin.write("ACQUIRE 1");
+    if (phase === "partial-release") p.process.stdin.write("RELEASE");
+    await endPeer(p, phase.startsWith("partial-") ? 2 : 0);
+    await pool.withLease(malformedPath, lease => lease.assert());
+  }
+  const incomplete = peer(); incomplete.process.stdin.write("SXSY-LOCK/2\tpipe\t0"); await endPeer(incomplete, 2);
+  const requestFile = join(root, "file-is-not-an-owner.txt");
+  await writeFile(requestFile, windowsLockRequest({ path: malformedPath }) + "ACQUIRE 1 0\n");
+  const inputFile = await open(requestFile, "r");
+  try {
+    const fromFile = spawn(helper, ["--state-lease-worker"], { windowsHide: true, stdio: [inputFile.fd, "pipe", "pipe"] }); workers.push(fromFile);
+    let result = ""; fromFile.stdout.on("data", b => { result += b; }); fromFile.stderr.resume();
+    assert.equal((await once(fromFile, "close"))[0], 2); assert.equal(result, "");
+  } finally { await inputFile.close(); }
+  await pool.withLease(malformedPath, async held => {
+    const p = peer(); p.process.stdin.write(windowsLockRequest({ path: malformedPath }));
+    assert.equal((await p.replies.next()).value, "READY");
+    p.process.stdin.write("ACQUIRE 1 0\n"); await new Promise(resolve => setTimeout(resolve, 100));
+    await endPeer(p, 2); held.assert();
+  });
+  assert.equal(await readFile(malformedPath, "utf8"), "preserved");
 });
 
 test("independent store instances serialize initialization and updates without replacing a compartment key or losing writes", async () => {

@@ -2,15 +2,26 @@
 
 ## Current native Windows worker
 
-The default Windows path now invokes the existing shipped helper with only
-`--state-lease-worker`. The helper accepts the bounded pipe protocol described
-below, with no PowerShell startup, shell parsing or executable-path override.
-It pins the original parent process handle and the lock file's volume, index and
-creation time. Each transaction reopens that exact ordinary single-link file with
-exclusive sharing and reparse-point refusal; replacement cannot redirect a lease.
-The idle worker retains no file handle, compartment data or key. Parent loss/EOF
-retires the worker; watcher disposal joins any pending observation before closing
-the original process handle. Acquisition/release and pool bounds are unchanged.
+The Windows source invokes the shipped helper with only `--state-lease-worker`.
+The version 2 protocol carries a fixed `pipe` owner mode, an encoded local lock
+path and bounded sequenced commands. It rejects version 1 and PID owner requests.
+
+Ownership is the already-inherited input channel. One reader uses
+[PeekNamedPipe](https://learn.microsoft.com/en-us/windows/win32/api/namedpipeapi/nf-namedpipeapi-peeknamedpipe)
+before consuming bytes and polls EOF during lock contention. There is no competing
+background read, parent-process lookup or new process/token permission. EOF
+retires idle workers and releases held files; partial frames refuse. Ordinary
+files cannot supply the input channel. Normal Node spawn and its Job behavior
+remain. [Node's pinned pipe construction](https://github.com/nodejs/node/blob/v24.14.0/deps/uv/src/win/pipe.c)
+keeps the parent server end and passes the paired client end as child standard input.
+
+The lock file's volume, index and creation time stay pinned. Each transaction
+reopens that exact ordinary single-link file with exclusive sharing and reparse
+refusal. The idle worker retains no file handle, compartment data or key.
+Sequencing, pool limits and the acquisition deadline remain unchanged.
+This source correction follows a native Access Denied result for the earlier
+parent handle lookup. Its native acceptance is pending.
+[Source and retained failure](evidence/windows-lease-pipe-owner-source-summary.json).
 
 Windows source runs now require the same helper at
 `runtime/hotkeys/Switchyard.Hotkeys.exe`, built from
@@ -19,7 +30,7 @@ Windows source runs now require the same helper at
 once per workflow run and verifies its source revision, size and digest before
 staging; a missing helper fails closed, without falling back to PowerShell.
 
-Both targets compile and 1,816 portable managed checks pass, including forty
+The earlier PID-based checkpoint compiled both targets and passed 1,816 portable managed checks, including forty
 protocol cases. Four focused JS files pass 43 tests and one declared Windows-only
 skip. Native sharing, replacement/hard-link refusal, malformed release and
 parent-loss checks now pass on native Windows at `ce5be6a`: eighteen passing

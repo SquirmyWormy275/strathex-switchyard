@@ -1,12 +1,23 @@
 # Windows helper startup candidate
 
+Windows `da28b5c` identifies the restricted failure as **Access Denied opening the
+parent process**. The next source protocol binds worker lifetime to its private
+inherited input pipe instead of that lookup. It checks EOF while idle, reading
+partial frames, holding a lease and waiting for a lock, with one reader and no
+new process/token rights. File identity, sharing, sequencing, Job containment and
+the original eight owner assertions remain. Two managed builds / 2,006 portable
+checks, five groups / 53 passes / one Windows-only skip and typecheck pass; native
+acceptance is pending. [Failure and source](evidence/windows-lease-pipe-owner-source-summary.json).
+
+## Earlier startup checkpoints
+
 The restricted Windows owner currently reaches JavaScript, then fails during
 state-lock initialization. An earlier exact-image comparison observed
 `CREATE_NO_WINDOW` exit `0xc0000142` before helper entry; detached startup reached
 entry under the same restricted token and explicit creation-time Job.
 [Retained native failure](evidence/windows-lease-console-native-summary.json).
 
-The current candidate builds the existing pipe-driven helper as `WinExe` instead
+The earlier WinExe candidate builds the existing pipe-driven helper as `WinExe` instead
 of a console executable. Microsoft distinguishes those
 [output types](https://learn.microsoft.com/en-us/visualstudio/msbuild/common-msbuild-project-properties?view=visualstudio)
 and documents that
