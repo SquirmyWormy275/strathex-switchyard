@@ -418,3 +418,23 @@ The test retention callback is not the protected production journal. Native TUI
 message/capability compatibility is unverified, and the installed 0.167.0 CLI
 remains outside the adapter's reviewed 0.166.0 version. No actual task attachment
 or model request is claimed by this demonstration.
+
+## Retain editor ownership before effects
+
+The journal component now reserves the consumed reviewed selection in the actual
+protected store, under a separate kernel lease. Creation must still fall within
+the original thirty-second permit window. A lost reply, restarted host, stopped
+record or duplicate request cannot obtain a second handle. Checkpoints preserve
+the original private directory, upstream process, carrier/socket, exact terminal
+peer and historical protocol acknowledgement. Only the retained in-memory handle
+can advance that record; caller-supplied protocol messages are never stored.
+
+Cleanup records remain writable after cancellation and distinguish uncertain
+retirement from verified process/socket/directory cleanup. Journal metadata does
+not establish current IDE attachment. Nine journal cases, ten authorization cases
+and five package checks pass with the real encrypted store and kernel leases.
+[Exact evidence](evidence/editor-journal-summary.json).
+
+Production composition, signed routes, retained Terminal activation and recovery
+after an interrupted host remain unfinished. No native task/account/hardware
+operation was performed by these tests.

@@ -31,14 +31,28 @@ evidence, not instructions to reset. Publish regular commits. Do not merge or re
 
 ## Current implementation and evidence
 
-Latest Windows result: `a061be0` verifies the query-only child token ACL, preserves
-all restrictions, denies duplicate/impersonation access and starts the original
-Node image. Both legacy cold providers succeed. The original owner journey now
-fails at private-state initialization, exit 2, zero of eight checks. Preserve
-its fixture; investigate the bounded lease-helper diagnostic next. The source now
-retains exact fixed phases/exit codes with 37 JS tests (one declared skip) and
-1,965 portable managed checks; native followup isolates the helper startup failure. [Diagnostic source](evidence/windows-state-lock-failure-source-summary.json). Do not add
-rights or change accounts to clear this failure. [Receipt](evidence/windows-self-query-native-summary.json).
+Latest published relay checkpoint is `072e066`: seven groups / 79 tests,
+typecheck and package import pass. Real Linux ingress and a dedicated pinned
+upstream carry one synthetic task resume bracketed by account samples; a model
+turn is refused. The later protected journal component passes three groups /
+24 tests. Compose it with the actual lifecycle, signed routes and retained
+Terminal next; native TUI compatibility remains unaccepted.
+[Relay](evidence/editor-relay-summary.json),
+[journal](evidence/editor-journal-summary.json).
+
+The installed CLI is now 0.167.0. Only offline schemas were generated; scratch
+files are removed. Keep the existing 0.166.0 gate until actual compatibility is
+accepted. No live task/account/model effect is authorized by the static check.
+[Version drift](evidence/codex-0167-static-summary.json).
+
+Windows `700e7f2` demonstrates that CREATE_NO_WINDOW fails before helper entry,
+whereas DETACHED_PROCESS reaches the fixed entry marker with the same restricted
+token, query-only correction and explicit creation-time Job. Both trees retire.
+The unchanged restricted Node journey still fails before its eight owner checks;
+ordinary Node, restricted metadata/exchange and separate filesystem/setup checks
+pass. Production detached mode is not enabled because libuv skips its child Job
+in that mode. Preserve containment and all acceptance assertions when fixing
+launch. [Native comparison](evidence/windows-lease-console-native-summary.json).
 
 | Area | Current state | Next boundary |
 | --- | --- | --- |
@@ -47,7 +61,7 @@ rights or change accounts to clear this failure. [Receipt](evidence/windows-self
 | Signed editor client `2c87c03` | Exact instance/build/nonce/selection requests and replies; strict response validation; cancellation after durable consumption refuses replay. [Evidence](evidence/editor-authorization-client-summary.json). | The API bearer stays local. No automatic command registration or retries. |
 | Editor launcher `1508ea9` | One exact Terminal object per review, native executable SHA-256, filesystem/focus/admission checks, retained partial effect and joined shutdown. Five groups / 54 tests, build/typecheck/CommonJS checks and cleanup pass. [Evidence](evidence/editor-terminal-launch-summary.json). | Provider/editor doubles. A later scoped return method permits idle/active metadata only for the exact consumed editor selection and focuses the retained object without another launch; five groups/60 tests pass. [Return evidence](evidence/editor-active-return-summary.json). Command wiring and real terminal process/account/task acknowledgement remain unfinished. Do not infer attachment from focus, title or process ancestry alone. |
 | Installed app `5a2c324` | Release `9f70e2a8…`; six update, eleven owner/editor/severity and seven journal checks pass. All 54 non-audit semantic snapshots match; 52 sealed files are byte-identical. [Evidence](evidence/installed-cvss4-summary.json). | Backend gateway only, four unknown-owner signed refusals and offline severity checks. No active editor extension or live task. |
-| Complete Linux `d900499` | 248 groups, 1,600 passed tests and eleven declared skips; all exact checkout/dependency/build/temporary-parent cleanup verifies. [Receipt](evidence/linux-d900-complete-summary.json). | Marker removed. Later protocol witness/query-only correction has separate focused evidence. |
+| Earlier complete Linux `d900499` | 248 groups, 1,600 passed tests and eleven declared skips; all exact checkout/dependency/build/temporary-parent cleanup verifies. [Receipt](evidence/linux-d900-complete-summary.json). | Marker removed. Later protocol witness/query-only correction has separate focused evidence. |
 | Windows cold startup | `83d4139` cold native CNG APIs pass under the exact primary token. Original Node exits 134 at CSPRNG, no owner result. [Native result](evidence/windows-cold-random-native-summary.json). | Failed native software validation, not unavailable hardware. Preserve the failed fixture and unchanged acceptance assertions. |
 | Windows import observation `78b640d` | Digest-verified artifacts show legacy CryptoAPI imports, no observed BCryptGenRandom import, cold CNG success and unchanged Node exit 134. [Native evidence](evidence/windows-node-rng-imports-native-summary.json). | Imports do not prove the executed branch. Earlier `164a622` build failure remains recorded; its exact cause was not recovered. |
 | Cold legacy-first probe `a37751c` | Native CryptAcquireContextW fails with error 5 before generation; later CNG calls pass. Digest/source/token/process cleanup verify. [Native evidence](evidence/windows-cold-legacy-random-native-summary.json). | Exact denied provider lookup/resource remains unknown. Original Node still exits 134; failed fixture preserved. |
@@ -77,32 +91,21 @@ the installed update or old live provider verifiers without a relevant new chang
 
 ## Continue independently
 
-1. Complete Linux `7772cb3` failed one editor socket teardown case: 249/250 groups,
-   1,622 passes, one failure, eleven skips. Every child/tree and exact worktree,
-   alias/build/temp-parent cleanup verifies; the marker is removed. Signal-safe
-   cleanup plus parent lifecycle pass 26 focused checks, including deterministic
-   signal delivery during final cleanup. Run a new full checkpoint; do not
-   retroactively accept `7772cb3`. [Failure](evidence/linux-777-complete-failure-summary.json).
-   Last accepted full source remains `d900499`. Before starting another run inspect
-   `/tmp/switchyard-full-linux-path.json` first. Verify source, phase, process exit,
-   root identities, receipt and dependency aliases before cleanup. Use an owned
-   home temporary parent because `/tmp` has per-user quotas. Never broaden cleanup
-   or relax deadlines to turn a failure into a pass.
-2. Native `a061be0` verifies the exact query-only child token correction and
-   starts the original Node. At `71614e0`, the remaining failure is the state-lock
-   helper: exit `0xC0000142` during worker-startup, with no entry marker observed.
-   Node reports private-state initialization failure and zero of eight owner
-   checks. Preserve the failed fixture and every restriction/owner assertion.
-   The failing DLL/resource and descendant token descriptor are not yet known;
-   do not assume they match the parent or add broader rights/account/runtime
-   fallbacks. [Latest failure](evidence/windows-state-lock-native-summary.json),
-   [query-only result](evidence/windows-self-query-native-summary.json).
-   A CI-only comparison now launches the exact helper under both console modes,
-   retaining creation-time Job containment, query-only token access and all
-   original restrictions. EOF prevents any lease/state request. Two builds,
-   1,975 portable checks and eighteen projection tests pass; native results are
-   pending. Production spawn remains unchanged because libuv detached mode also
-   removes its child-Job assignment. [Comparison](evidence/windows-lease-console-source-summary.json).
+1. Complete Linux `d243d81` passes 251/251 groups, 1,633 tests, eleven declared
+   skips and zero failures. All exact child/tree/staging cleanup verifies.
+   [Receipt](evidence/linux-d243-complete-summary.json). The earlier `7772cb3`
+   failure remains failed. A separate full run for `072e066` was started; inspect
+   `/tmp/switchyard-full-linux-path.json` before any new full run or cleanup.
+   Verify source, phase, process exit, root identities, receipt and every owned
+   alias/build/test parent. Never broaden cleanup or relax deadlines.
+2. Use the observed `700e7f2` console-mode difference to repair restricted helper
+   startup while retaining explicit parent-loss containment. Detached EOF entry
+   is a diagnostic, not acceptance of a lease or the original eight-check owner.
+   No broader token rights, default-DACL/privilege/SID/account/runtime fallback
+   is permitted. Earlier `702897d` stopped at a stale parser-count guard; its
+   failed receipt and the correction from forty to fifty checks remain retained.
+   [Native comparison](evidence/windows-lease-console-native-summary.json),
+   [verifier correction](evidence/windows-verifier-inventory-summary.json).
 
 3. Implement native acknowledgement for the exact reviewed editor terminal and
    original owner/account/task. A separate observed connection or ordinary focus
@@ -121,11 +124,12 @@ the installed update or old live provider verifiers without a relevant new chang
    and bridges bounded masked WebSocket/JSONL frames. Eleven native synthetic
    tests plus five package checks and typecheck pass, including parent loss,
    deadline, substituted-name preservation and protocol-witness composition.
-   The parent lifecycle now passes eight behavioral cases and five package checks,
+   The parent lifecycle initially passed eight behavioral cases and five package checks,
    including joined cancellation and exact uncertain cleanup. It requires caller
-   ownership callbacks, which remain doubled in this cohort. Wire the production
-   journal, signed editor routes, retained Terminal and original upstream next;
-   no task/IDE acknowledgement is granted. [Carrier](evidence/editor-ingress-summary.json),
+   ownership callbacks, which remain doubled in this cohort. The later dedicated original upstream and restricted relay pass their synthetic
+   end-to-end check. The protected journal component also passes real-store tests.
+   Compose these into production lifecycle/routes and the retained Terminal next;
+   no live task/IDE acknowledgement is granted. [Carrier](evidence/editor-ingress-summary.json),
    [parent lifecycle](evidence/editor-ingress-owner-summary.json).
 4. Continue other ledger requirements, including remaining Shield coverage,
    ecosystems, publisher provenance, verified local vulnerability context and workflow observation. These are

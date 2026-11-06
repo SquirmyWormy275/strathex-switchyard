@@ -1,0 +1,25 @@
+{
+  "schema": "switchyard-editor-journal-summary/v1",
+  "basis": "072e0669f78ec2780016fd7234124a557a9ec079",
+  "sourceSha256": {
+    "tools/layout-studio/coding-editor-journal.mjs": "44dd67d1a9c55c7c3b327870fb9f3ecf9b5ec3d9c76b4eebba4d9eb703fe1631",
+    "tools/layout-studio/coding-editor-journal.test.mjs": "b179b98dc63df6a4ec56bb8832ab0b0cbb4e95ec211788b2cf5a81baa9b32250"
+  },
+  "receipt": "isolated-test-474e539b-469b-4d66-ac4a-833ad5f539c7.json",
+  "groups": 3,
+  "passed": 24,
+  "allChildAndTreeCleanupVerified": true,
+  "typecheckPassed": true,
+  "packageImportPassed": true,
+  "implemented": [
+    "Real protected-store reservation requires the original consumed editor authorization, exact target/policy and unexpired creation window. Existing records never issue a second handle, including across host instances or after a lost final reply.",
+    "Closed ordered directory, upstream, carrier, exact-peer and protocol-acknowledgement checkpoints pin original identities and reject substituted or unrelated data. Only the in-memory original handle can advance its protected record.",
+    "Immutable input snapshots, exact record comparisons and separate kernel leases prevent lost updates. Shutdown joins pending journal operations.",
+    "Retirement remains recordable after workspace/policy cancellation; incomplete process/socket/directory cleanup remains uncertain. Metadata never claims live terminal attachment or task completion."
+  ],
+  "limits": [
+    "The journal component is implemented and tested with the real encrypted store and kernel leases. Production composition with ingress/relay, signed routes, retained Terminal activation and interrupted-host recovery remain unfinished.",
+    "No process, socket, provider or task is opened by this journal itself. Provider/editor observations in this cohort are controlled doubles.",
+    "The separate full Linux run at 072e066 excludes this later journal implementation. Native Windows/account/hardware checks remain separately reported."
+  ]
+}

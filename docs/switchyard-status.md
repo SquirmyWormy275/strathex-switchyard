@@ -22,6 +22,12 @@ bracket the single exact resume; a model-turn attempt is refused. Production
 journal/routes, retained Terminal activation and native TUI compatibility remain
 unfinished. [Evidence](evidence/editor-relay-summary.json).
 
+The protected editor ownership journal passes **three groups / 24 tests** using
+the actual encrypted store and kernel leases. It prevents duplicate creation and
+expired-permit reuse, pins ordered ownership checkpoints and retains uncertain
+cleanup. Production composition/routes and interrupted-host recovery remain
+unfinished. [Evidence](evidence/editor-journal-summary.json).
+
 The installed Codex CLI is now **0.167.0**. Offline schema generation succeeds and
 its scratch files are removed; the reviewed adapter still refuses versions other
 than **0.166.0**. Runtime compatibility has not been accepted.
