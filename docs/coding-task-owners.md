@@ -169,3 +169,10 @@ no workspace or provider task and executes no scanner. Its updated argument
 refusals pass two isolated tests (13 invalid invocations), receipt
 `isolated-test-be1a40ec-36bc-4880-b9a2-ab5c77f98138.json`; installed execution
 requires its separate receipt.
+
+Normal installed source `e768d18` now passes six update checks, nine owner/editor/
+severity checks and seven existing journal checks. The signed editor check uses
+the exact-source repository consumer against the installed server and requires
+unknown-owner refusal; it does not attach a task or editor. All 54 workspace
+identities, selected state and frozen Home are preserved. Dated launcher backups
+verify and temporary packaging is removed. [Installed evidence](evidence/installed-editor-metadata-summary.json).

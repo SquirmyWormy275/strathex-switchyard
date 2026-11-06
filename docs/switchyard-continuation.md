@@ -33,6 +33,8 @@ The `2eeb2f9` full Linux run now passes 243 groups / 1,548 tests with eleven dec
 
 The backend now prepares an exact editor target only from an acknowledged load on its original live owner. Fresh socket/alias/process checks refuse a replaced endpoint even when the old metadata bridge survives. Four groups / 75 checks pass with cleanup and typecheck. This grants no terminal authority or IDE attachment; the read-only signed editor metadata consumer now passes six groups / 63 checks. Command wiring, terminal creation and native attachment acknowledgement remain unfinished. [Contract](coding-task-owners.md#prepare-an-exact-editor-target).
 
+Installed source is now `e768d18`, release `a3c9295…`: six update, nine owner/editor/severity and seven journal checks pass. No provider, task, terminal, scanner or public query starts. An old unselected keyboard-only conversation retains its pending marker; its sealed file timestamps remain October 30. [Installed evidence](evidence/installed-editor-metadata-summary.json).
+
 ## Current executable state
 
 Use `mise exec node@24.14.0 -- …`. Reuse `.tools/dotnet-8.0.424`; do not download
