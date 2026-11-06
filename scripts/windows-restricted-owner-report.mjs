@@ -21,11 +21,11 @@ const verified = ["privateDesktopClosedVerified", "success", "primaryTokenVerifi
 export function verifyRestrictedOwnerReport(result) {
   assert.equal(result?.success, true); const proof = result.nativeRestrictedHostProof;
   assert.ok(object(proof));
-  const fields = ["schema", ...verified, "processCreationApi", "startupDesktop", "interactiveDesktopInherited", "creatorPrivileges", "restrictingSidCount", "historicalFilteredFlags", "historicalFilterBytes", "hostOwnerChecks", "hostOwner", "ordinaryUserAccountAccepted", "guestLaunched", "accountCreated"];
+  const fields = ["schema", ...verified, "processCreationApi", "consoleCreationMode", "startupDesktop", "interactiveDesktopInherited", "creatorPrivileges", "restrictingSidCount", "historicalFilteredFlags", "historicalFilterBytes", "hostOwnerChecks", "hostOwner", "ordinaryUserAccountAccepted", "guestLaunched", "accountCreated"];
   assert.deepEqual(Object.keys(proof).sort(), fields.sort());
   assert.equal(proof.schema, "switchyard-restricted-host-process-proof/v1");
   for (const key of verified) assert.equal(proof[key], true);
-  assert.equal(proof.processCreationApi, "CreateProcessAsUserW"); assert.equal(proof.startupDesktop, "owned-noninteractive"); assert.equal(proof.interactiveDesktopInherited, false); assert.equal(proof.restrictingSidCount, 4); assert.equal(proof.hostOwnerChecks, 8);
+  assert.equal(proof.processCreationApi, "CreateProcessAsUserW"); assert.equal(proof.consoleCreationMode, "detached-process"); assert.equal(proof.startupDesktop, "owned-noninteractive"); assert.equal(proof.interactiveDesktopInherited, false); assert.equal(proof.restrictingSidCount, 4); assert.equal(proof.hostOwnerChecks, 8);
   for (const key of ["ordinaryUserAccountAccepted", "guestLaunched", "accountCreated"]) assert.equal(proof[key], false);
   assert.ok(Array.isArray(proof.historicalFilteredFlags)); assert.equal(proof.historicalFilteredFlags.length, 3); assert.ok(proof.historicalFilteredFlags.every(value => typeof value === "boolean"));
   assert.ok(Array.isArray(proof.historicalFilterBytes)); assert.equal(proof.historicalFilterBytes.length, 3); assert.ok(proof.historicalFilterBytes.every(value => value === 1 || value === 4));

@@ -1,6 +1,6 @@
 # Switchyard
 
-**Give your keyboard a familiar place to return to work.**
+**A keyboard control surface for returning to tasks, reviewing changes and handing work between tools.**
 
 Switchyard is a local keyboard workspace for people who move between coding
 agents, editors and conversations. It starts with a ready-made arrangement:
@@ -8,7 +8,7 @@ return to your task, check progress, review work, and leave a handoff. Choose yo
 Model F Labs keyboard, use the recommended setup, then connect your tools.
 The configurator stays behind **Customize**.
 
-## Try the starting experience
+## Try the starting experience on Linux
 
 ```sh
 mise exec node@24.14.0 -- npm ci --ignore-scripts
@@ -63,92 +63,32 @@ Copilot-only policy. Imported layouts never enable providers or recording.
 ## What works, and what remains
 
 This is a **partial development suite**, built and exercised on Omarchy Linux.
-The current branch combines the existing B122 control plane and Layout Studio
-with a new local product shell, model catalog, configuration conversations,
-protected compartments, local transcription, device transactions, custom-agent
-SDK and separate Microsoft 365 Copilot adapter. Real installed-account design
-requests have been exercised with Codex and Claude Code, and real custom and
-LangChain example processes have exchanged authenticated intents.
-The separate task backend has also created/resumed an empty read-only Codex
-thread and created/stopped a tools-disabled Claude background session, with
-exact identity checks and durable duplicate prevention. Those metadata/lifecycle host checks sent
-no model prompts and do not establish completion of coding work. Reviewed Codex
-text submission, exact cancellation and uncertain-outcome review are now
-software-tested. Both installed native task APIs now pass reviewed text journeys.
-Codex retains its exact turn acknowledgement; Claude supports exact creation,
-continuation and separately approved resume-only recovery after an uncertain
-first turn. Owned guardian exit, duplicate/replay handling and keyboard-only
-cleanup are verified. Separately approved host commits now pass a normal installed
-journey with an actual empty native task, exact binary bytes, explicit author,
-unowned-edit preservation and durable duplicate/receipt readback. No model prompt
-is sent by that journey. Separately approved metadata recovery also passes an
-installed journey after a deliberate native post-reference fault in a disposable
-repository: the exact index is reconciled without another commit, and original
-uncertain outcomes remain unchanged. Provider replies do not establish coding-task completion.
+The backend connects protected compartments, exact task identities, reviewed
+execution, offline repository scans and recoverable installation. The Home and
+Model F catalog provide the starting experience; complete task/IDE attachment,
+role/device controls and full scanner coverage remain unfinished.
 
-These checks do not prove a finished keyboard/agent appliance. General coding-task
-controls, physical role shortcut selection in the frontend, platform lifecycle acceptance, profile-library visual acceptance,
-expanded device editing controls, complete device settings and final UI acceptance remain unfinished.
-The complete Linux runner checkpoint at `3cb0897` passes 200 groups: 1,197 tests passed and
-ten declared platform skips. Earlier Windows filesystem CI passes all 30 native checks,
-including bounded volume disk-full, exact detach and mapping admission. An earlier full
-Windows worker/runtime checkpoint passes 261 groups: 1,690 tests passed and 48
-declared skips. Studio Windows Run and separate stop approval have native host contract proofs
-with an explicit guest runner double. [Current Windows results](docs/evidence/windows6a-validation-summary.json)
-retain newer service-removal and group-timeout failures separately. Linux
-also connects separately reviewed local-gate and clean-reproduction recipes to
-the isolated runner and authenticated evidence. An explicit [bounded build workspace](docs/bounded-build-workspace.md)
-lets reviewed recipes build in a disposable writable copy while preserving the live repository;
-its source/kernel checks and normal installed Run/stop demonstration pass with zero model prompts. The [Windows pipeline path](docs/windows-pipelines.md)
-now uses reviewed guest inputs and authenticated reports with signed feeds;
-native guest execution is doubled in its current tests. [Signed fixture maintenance](docs/signed-fixtures.md)
-connects operator-reviewed public trust and exact feed metadata to these pipelines.
-[Receipt invalidation](docs/validation-receipt-invalidation.md) retires previous validation
-results when that policy changes and checks the policy again inside receipt commit.
-Linux [Shield baseline scans](docs/shield-baseline-scanner.md) run pinned code and signed
-rule/advisory data with explicit findings and coverage gaps. The [development SBOM example](docs/evidence/README.md)
-shows standard CycloneDX output and its limits. [Exact Python requirements](docs/python-supply-chain.md)
-add declared PyPI inventory with explicit unresolved environment and provenance gaps. The [public OSV collector](docs/osv-advisory-source.md)
-produces unsigned exact-version advisory data for separate signing and review. A [task-bound input preview](docs/scanner-input-inventory.md)
-identifies relevant ignored names and groups build trees before a separate exact
-scan review; its metadata remains incomplete and grants no authority. A separate
-[index byte witness](docs/git-index-inputs.md) verifies explicitly named staged
-blobs without returning source text or treating that observation as a scan.
-The installed [read-only inspector](docs/inspect-cli.md) exposes these readers as
-`switchyard inspect`; start with `switchyard inspect --help`. It creates no tasks, grants,
-prompts or scans. Its normal installed-launcher demonstration passes with the
-actual selected workspace, independent query exits and full restoration.
-[Native application focus](docs/native-client-focus.md) now verifies the repaired
-ChatGPT and VS Code main windows through the installed gateway, with exact process
-birth, address and current-workspace policy checks. It establishes navigation;
-account, repository and agent-session control remain separate capabilities.
-The [history witness](docs/git-history-inputs.md) verifies bounded raw commit,
-tree and selected old blob identities without disclosing source or messages.
-[Linux historical scans](docs/historical-shield-inputs.md) now inspect reviewed
-first-parent versions, retaining incomplete scope and original Git provenance.
-[Explicit staged scans](docs/staged-shield-inputs.md) inspect both index and
-worktree copies: Linux has installed acceptance; the Windows reviewed connection
-has software checks and independently verified native NTFS staging. Guest
-execution and ordinary-user account acceptance remain separate.
-The [Windows scanner path](docs/windows-shield.md)
-uses the same pinned engine through reviewed guest execution; its tests double the guest.
-[Explicit ignored inputs](docs/ignored-scanner-inputs.md) let the pinned scanner
-inspect a separately approved `.env` without commit or general execution access.
-[Reviewed exceptions](docs/shield-exceptions.md) retain raw findings, require exact
-scope/reason/expiry and keep mandatory missing coverage incomplete.
-Full Shield scope remains unfinished.
-Personal host setup now has reviewed install/remove and a fixed native boundary.
-The bounded storage service and normal
-task/guest connection are implemented; native complete-journey acceptance remains open. [Verification details](docs/verification.md)
-identify each source checkpoint and practical limit. Interactive Windows acceptance remains open. Current F77 discovery and readout pass; ordinary typing, hotplug and physical writes remain unaccepted. B122
-physical acceptance and approved Microsoft tenant tests remain open. All 27 B122
-acceptance gates remain **NOT ACCEPTED**. Source availability is not acceptance.
+The latest accepted complete Linux checkpoint, `7897835`, passes **241 groups**:
+**1,501 tests passed**, ten declared skips, and every child/process-tree and owned
+checkout cleanup verified. The Windows native lease replacement at `ce5be6a`
+passes eighteen tests plus one declared skip, the Supply Chain scenario, and all
+23 policy-output tests. **Full Windows acceptance remains failed** because the
+restricted primary child still fails DLL initialization.
+[Current status and exact evidence](docs/switchyard-status.md).
 
-The latest complete Linux code checkpoint, `9dc0a944`, passes **235 groups** with
-**1,445 passed tests** and ten declared skips. Windows client contracts pass
-**73 checks**; the corrected Windows authority/state cohort now passes **31 checks** under its
-original deadlines. Its earlier file-timeout attempt remains failed.
-[Source-specific evidence and remaining limits](docs/verification.md).
+| Explore | Start here |
+| --- | --- |
+| Return to a coding task | [Codex bindings](docs/coding-task-bindings.md), [Claude bindings](docs/claude-task-bindings.md), [reviewed text](docs/native-coding-tasks.md) |
+| Inspect a repository without starting work | [Installed `switchyard inspect` commands](docs/inspect-cli.md) |
+| Run reviewed inputs in a disposable workspace | [Task execution](docs/reviewed-task-execution.md), [bounded build workspace](docs/bounded-build-workspace.md) |
+| Understand findings and coverage | [Shield baseline](docs/shield-baseline-scanner.md), [SBOM example](docs/evidence/README.md), [CVSS context](docs/cvss-severity.md) |
+| Review recovery and platform boundaries | [Release recovery](docs/suite-release-recovery.md), [Windows storage](docs/windows-storage-broker.md), [complete requirement ledger](docs/switchyard-requirements.md) |
+
+Installed Linux scanner demonstrations verify actual process exits and restore
+all original workspace identities and frontend bytes. Provider replies alone do
+not establish completion of coding work. The F77 is the pilot; physical typing,
+hotplug and write acceptance remain separate. No approved Microsoft work tenant
+is available, and all 27 B122 physical gates remain **NOT ACCEPTED**.
 
 ## Engineering and contribution
 
@@ -265,6 +205,11 @@ Full Sandbox, rebuild Full Sandbox, and Quarantine. No control silently commits,
 pushes, merges, force-pushes, approves a permission, or submits a prompt.
 
 ## Local development
+
+Windows source runs require the reviewed native helper at
+`runtime/hotkeys/Switchyard.Hotkeys.exe`; Windows bundles include it.
+[Build and lock-worker contract](docs/private-state-locking.md). CI builds and
+verifies the helper from the same source revision before backend tests.
 
 Use the reviewed Node.js **24.14.0** runtime recorded in `.node-version` (for
 example, `mise exec node@24.14.0 -- npm test`). Node 26 removed the

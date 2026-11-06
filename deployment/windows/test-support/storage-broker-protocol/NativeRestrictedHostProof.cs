@@ -244,7 +244,11 @@ internal static class NativeRestrictedHostProof
                                 // Direct creation accepts the creation-time Job
                                 // attribute. No secondary-logon fallback, profile
                                 // load, new account or post-creation job gap.
-                                Native(CreateProcessAsUserW(restricted, node, new StringBuilder(command), IntPtr.Zero, IntPtr.Zero, false, 0x4 | 0x8000000 | 0x80000 | 0x400, environment, repository, ref startup, out process));
+                                // This file/pipe-only owner needs no console. DETACHED_PROCESS
+                                // explicitly avoids inheriting one; CREATE_NO_WINDOW was the
+                                // previous failed mode. Keep the private desktop, suspended
+                                // token inspection and creation-time Job assignment unchanged.
+                                Native(CreateProcessAsUserW(restricted, node, new StringBuilder(command), IntPtr.Zero, IntPtr.Zero, false, 0x4 | 0x8 | 0x80000 | 0x400, environment, repository, ref startup, out process));
                             }
                             finally
                             {
@@ -291,7 +295,7 @@ internal static class NativeRestrictedHostProof
                                 Require(report.GetProperty("schema").GetString() == "switchyard-restricted-host-result/v1" && report.GetProperty("nonce").GetString() == nonce && report.GetProperty("success").GetBoolean());
                                 var owner = report.GetProperty("owner"); Require(owner.GetProperty("success").GetBoolean() && owner.GetProperty("checks").GetArrayLength() == 8 && owner.GetProperty("nativeExitVerified").GetBoolean() && owner.GetProperty("fixtureRemoved").GetBoolean() && !owner.GetProperty("ordinaryUserToken").GetBoolean());
                                 Phase = "complete";
-                                return new { schema = "switchyard-restricted-host-process-proof/v1", success = true, processCreationApi = "CreateProcessAsUserW", startupDesktop = "owned-noninteractive", interactiveDesktopInherited = false, privateDesktopClosedVerified = true, creatorPrivileges = CreatorPrivileges, creatorQuotaRestoredVerified = true, restrictingSidListVerified = true, restrictingSidCount = 4, primaryTokenVerified = true, sameUserVerified = true, mediumIntegrityVerified = true, administratorsDenyOnlyVerified = true, volumePrivilegeAbsentVerified = true, onlyTraversePrivilegeAssignedVerified = true, historicalFilteredFlags = HistoricalFilteredFlags.ToArray(), historicalFilterBytes = HistoricalFilterBytes.ToArray(), tokenRecheckedAfterExit = true, treeExitVerified = true, hostOwnerChecks = 8, hostOwner = owner.Clone(), ordinaryUserAccountAccepted = false, guestLaunched = false, accountCreated = false };
+                                return new { schema = "switchyard-restricted-host-process-proof/v1", success = true, processCreationApi = "CreateProcessAsUserW", consoleCreationMode = "detached-process", startupDesktop = "owned-noninteractive", interactiveDesktopInherited = false, privateDesktopClosedVerified = true, creatorPrivileges = CreatorPrivileges, creatorQuotaRestoredVerified = true, restrictingSidListVerified = true, restrictingSidCount = 4, primaryTokenVerified = true, sameUserVerified = true, mediumIntegrityVerified = true, administratorsDenyOnlyVerified = true, volumePrivilegeAbsentVerified = true, onlyTraversePrivilegeAssignedVerified = true, historicalFilteredFlags = HistoricalFilteredFlags.ToArray(), historicalFilterBytes = HistoricalFilterBytes.ToArray(), tokenRecheckedAfterExit = true, treeExitVerified = true, hostOwnerChecks = 8, hostOwner = owner.Clone(), ordinaryUserAccountAccepted = false, guestLaunched = false, accountCreated = false };
                             }
                             finally
                             {

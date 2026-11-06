@@ -1,16 +1,16 @@
 # Continue the full Switchyard suite
 
-The full October 29 Rev2 assignment is incomplete. Continue all independently
+The full October 29 Rev2 assignment is incomplete. Continue independently
 executable implementation and validation; a passing subset is not completion.
-The [requirement ledger](switchyard-requirements.md) is authoritative for scope,
-and [verification](verification.md) distinguishes exact source passes and failures.
+The [requirement ledger](switchyard-requirements.md) defines scope. Start with
+[current status](switchyard-status.md) and [verification](verification.md) for
+accepted and failed source checkpoints.
 
-Work in the existing `feat/switchyard-configuration-loop` checkout and keep
+Use the existing `feat/switchyard-configuration-loop` checkout and keep
 [draft PR 20](https://github.com/SquirmyWormy275/strathex-switchyard/pull/20)
-updated. Latest published implementation is `ea5a0f71b8ade5551aa42d23e8eb06d8cca399d4`; use Git to read the newest checkpoint.
-This checkpoint adds the F77 source protocol audit, omits redundant backend
-HTML/CSS while preserving the frozen frontend, and records newer installed
-metadata evidence. Keep commits on GitHub regularly; do not merge or release.
+updated. Read `git status` and `git log` for the newest published implementation;
+checkpoint hashes below identify evidence, not an instruction to reset the branch.
+Keep commits on GitHub regularly. Do not merge or release.
 
 ## Decisions to preserve
 
@@ -32,76 +32,63 @@ metadata evidence. Keep commits on GitHub regularly; do not merge or release.
 ## Current executable state
 
 Use `mise exec node@24.14.0 -- …`. Reuse `.tools/dotnet-8.0.424`; do not download
-another SDK, runtime or voice model. The normal installed application uses its
-existing versioned update and launcher path; do not print its private access URL
-or token. Private verification receipts live outside Git under
-`~/.local/state/strathex-switchyard/runtime-verification/`.
+another SDK, runtime or voice model onto the workstation. Private verification
+receipts live under `~/.local/state/strathex-switchyard/runtime-verification/`.
+Keep small receipts and source; retire exact owned staging after exit verifies.
 
-- Normal installed source `ea5a0f7`, release `7096e4c8e00128ad732937d1e4c5f3b1acc3b3db15b578738d84b27bb550d824`,
-  passes six update/seven metadata/privacy checks, including all 54 saved
-  workspace identities. Selected sealed state and frozen frontend are preserved,
-  with zero provider requests, prompts, new workspaces or HID. Owned bundle and
-  checkout are removed. [Receipts](evidence/installed-copilot-journal-summary.json).
-- The immutable **232-group Linux run at `514bf68` passes**: 1,401 tests,
-  1,391 passed and ten declared skips. Every child cleanup verifies, and owned
-  fixtures/dependency aliases/checkout/marker are removed. No full run is active.
-  [Exact summary](evidence/linux-514-complete-summary.json). Later F77 audit and
-  workspace inventory changes have separate focused and installed evidence.
-- The prior `0cfe82c` run failed: 209/230 groups accepted and 21 deadline failures,
-  with all child cleanup verified. Its owned checkout/fixtures are removed and
-  its failed receipt retained. [Exact summary](evidence/linux-0cfe-timeout-summary.json).
-- Linux locks now use a fixed pipe reader under the existing kernel lock.
-  Twenty-eight Suite/commit/lock tests pass under original bounds, including
-  owner loss; the previously timed-out commit file finishes in 43,621 ms.
-  [Contract and receipts](private-state-locking.md). The latest complete accepted
-  run is the 232-group `514bf68` checkpoint.
-- Copilot durable uncertainty/recovery has 90 surrounding software checks and
-  later final-message handling passes 44 checks. Exact echoed requests and
-  absent/non-text final messages remain unconfirmed, without automatic resend.
-  [Account boundary](copilot-account-binding.md), [recovery](copilot-request-recovery.md).
-- The Windows restricted-token decoder accepts only exact one-byte/four-byte
-  historical results. Both managed targets compile without warnings; 223 portable
-  and 25 report/runner/selector checks pass. Corrected native execution remains
-  pending. All concrete SID, privilege, integrity, identity, Job and exit checks
-  remain required. [Failure and correction](windows-storage-broker.md#actual-restrictions-and-historical-token-metadata).
-- Native `a87f048` filesystem and setup lanes independently pass, with archive
-  digests verified; the separate restricted-primary-process lane remains failed.
-  [Artifacts](evidence/windows-a87-native-summary.json).
-- The F77 source audit verifies hashes for 26 files across two exact builds.
-  No direct haptic state/control route is exposed in their audited VIA/Vial
-  handlers, setting tables or keyboard extensions. This does not authenticate
-  running firmware or establish electrical limits. Five focused groups pass
-  46 checks. Normal installed release `f49d611e…` passes six update/four cached
-  checks, with no HID/control operation and all owned scratch removed.
-  [Installed summary](evidence/installed-haptic-protocol-summary.json),
-  [audit and limits](solenoid-capability-audit.md).
-- Real Claude/tmux registered navigation remains blocked at the CLI's workspace
-  trust dialog. Do not retry with an override or prompt. Latest refusal restores
-  workspace/focus and retires its owned processes/socket/cache; earlier recovery
-  limits remain recorded. [Evidence](evidence/installed-tmux-trust-boundary-summary.json).
+| Source | Accepted evidence | Limit |
+| --- | --- | --- |
+| Linux `7897835` | Complete 241-group run: 1,501 passed tests, ten declared skips; all child/tree and owned checkout/dependency/build cleanup verifies. [Receipt](evidence/linux-789-complete-summary.json). | Later changes have focused evidence. Its full-run marker and checkout are removed. Inspect `/tmp/switchyard-full-linux-path.json` before starting any later full run. |
+| Native Windows `ce5be6a` | Eighteen lease tests and one declared skip; Supply Chain scenario and 23 policy-output tests pass. Digests and child/tree cleanup verify. [Receipts](evidence/native-state-lease-ce5-summary.json). | Restricted primary-child DLL initialization still fails. Earlier PowerShell startup failures remain recorded. |
+| Installed Linux `c5d2d28` | Six update/seven metadata checks, fifteen checks each for Supply Chain/Release, four actual scanner exits and original 54 workspace identities restored. [Installed evidence](evidence/installed-cvss-context-summary.json). | Published source is newer than the installed application. Do not confuse source verification with installed acceptance. |
+| Owned Codex Unix task adapter | Actual installed CLI: two read-only account operations, verifier permission revocation and exact listener/bridge/socket retirement. [Evidence](evidence/codex-unix-task-adapter-summary.json). | Explicit adapter; main Studio uses stdio. Complete task/IDE composition remains unfinished. No native thread, prompt or account change is authorized in the current backend work. |
+
+The Windows lock path now invokes only the shipped helper's
+`--state-lease-worker` mode. Source CI builds it once per run using the existing
+pinned toolchain and verifies source/size/digest before staging at the fixed
+runtime path. There is no PowerShell fallback. Keep the original acquisition,
+release and child/test deadlines. [Contract](private-state-locking.md).
+
+Both managed targets compile with zero warnings/errors; 1,816 portable checks
+pass. The native namespace diagnostic at `b83b1a0` completes, closes every handle
+and reports matching original/restricted access outcomes; its child still fails.
+The next candidate changes only file/pipe-owner startup to `DETACHED_PROCESS`,
+keeping all token/desktop/Job/exit requirements. Eight report tests and typecheck
+pass; exact-source native execution is pending. No causal repair claim is made.
+[Observation and candidate](evidence/windows-restricted-console-candidate-summary.json).
+
+The separate private USER-object diagnostic at `7897835` passes access, closure
+and namespace restoration, while the child still fails `STATUS_DLL_INIT_FAILED`.
+Its failed native fixture is preserved. A passing diagnostic is not child or
+ordinary-account acceptance. Do not relax SID, privilege, integrity, Job, exact
+process identity or exit requirements to make that proof pass.
+
+F77 source research verifies 26 pinned files across two builds with no allowed
+haptic operations. Use cached readouts only. Real Claude/tmux registered navigation
+stopped at workspace trust; do not bypass it. The latest attempt restores original
+workspace/focus and retires owned processes/socket/cache.
+[Hardware audit](solenoid-capability-audit.md),
+[trust boundary](evidence/installed-tmux-trust-boundary-summary.json).
 
 ## Next executable tasks
 
-1. The gated installed observation demonstration now passes four actual native
-   checks at `ea5a0f7` after six update/seven metadata checks. One empty Codex task,
-   zero model prompts/new workspaces/HID; retained native metadata process exit,
-   exact proof data/staging removal and definition/selection/frontend restoration
-   verify. Owned bundle/checkout are removed; fresh mode fences remain. Publish
-   this evidence while the complete immutable 233-group `ea5a0f7` run remains
-   active. Its marker is `/tmp/switchyard-broker-full-linux-path.json`; inspect
-   that run before starting another. Configuration request/reply/failure metadata
-   additionally passes 39 software checks with provider doubles and no new model
-   request. Continue broader runtime/external event and exact IDE attachment
-   implementation independently; normal installation of these later hooks is
-   separate from the accepted `ea5a0f7` native task demonstration.
-2. Collect the corrected native Windows token-width run and independent journal
-   workers. Verify archive digests/source/merge identities before accepting any
-   result. Recent superseded pending runs are cancelled, not passing. Continue
-   executable fixes while the latest source waits for CI capacity.
-3. Continue exact IDE/task attachments through a supported extension connection.
-   Process ancestry alone cannot select an exact IDE terminal tab. Preserve
-   explicit unsupported behavior and continue other independent ledger work.
+1. Collect exact-source native Windows detached-startup results. Verify
+   artifact digest and source/merge identity, distinguish access observations from
+   child acceptance, and repair the actual initialization failure without broadening
+   token/desktop/service authority. Continue other work while CI runs.
+2. Connect the owned Unix listener/task adapter to durable exact task ownership
+   and supported IDE/terminal attachment. Recheck compartment, account, repository
+   and original native owner before every effect. Process ancestry alone cannot
+   identify an IDE terminal tab. Use provider doubles for task/model operations
+   unless their native execution is separately authorized.
+3. Continue the remaining ledger requirements, including complete Shield scope,
+   additional input/severity/ecosystem semantics and broader workflow observation.
+   These are unfinished software, not excuses to wait for unavailable hardware.
+4. When a coherent source checkpoint is ready, verify the normal versioned
+   application update and a permitted installed journey. Restore the original
+   workspace identities, selection, endpoint and frozen frontend; independently
+   verify all owned process exits and remove only exact owned staging.
 
-Then continue the remaining ledger requirements, including full scanner scope,
-additional input semantics and exact IDE/task attachments. These three tasks are
-the immediate continuation sequence, not a limit on the full-suite assignment.
+The frontend remains frozen, including browser automation/reloads. Do not expand
+permissions, alter desktop configuration, request models, switch accounts or touch
+HID while verifying these backend changes. Report the scope actually exercised.
