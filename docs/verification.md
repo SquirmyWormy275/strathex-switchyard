@@ -1,5 +1,18 @@
 # What has actually been verified
 
+Selected Python wheel RECORD declarations now compare supported SHA-256/384/512
+hashes and sizes against every required member in memory. A matching outer hash
+and package identity cannot conceal an internal mismatch. Thirty independent
+ZIP/CSV/hash cases and 30 focused groups yield **147 distinct passing checks**,
+including six new actual Linux scanner journeys and six Windows guest doubles.
+The original package limit initially failed; removing duplicate browser files and
+a build-only recipe restores the full synthetic bundle to 5,234,726 bytes. Exact
+frozen-asset HTTP readback, all sixteen installation/recovery scenarios, typecheck
+and owned cleanup pass. No extraction, package execution, signature verification
+or complete safety claim occurs. Installed/native Windows RECORD acceptance
+remains pending. [Contract](python-wheel-records.md),
+[source evidence](evidence/pypi-wheel-record-source-summary.json).
+
 Windows fixture-registry source 2ab67fc fails one of twenty tests because its
 native Python path-spelling probe reaches the original five-second startup
 deadline. The unchanged test at 39db1fe subsequently passes all twenty checks,
@@ -36,8 +49,9 @@ plus a final unit follow-up pass 101 distinct checks, including six actual Linux
 scanner journeys and six Windows guest doubles. Fifteen independent Python ZIP
 fixtures, malformed inputs, expansion limits, protected receipts and exact cleanup
 verify; typecheck and the original package budget pass. No extraction or execution
-occurs. RECORD hashes, compatibility tags, license/code contents and publisher
-provenance remain unverified. Installed metadata acceptance now passes; native Windows wheel acceptance remains pending.
+occurs. That identity-only checkpoint left RECORD hashes unverified; the newer source
+checks above cover supported hashes. Compatibility tags, license/code contents
+and publisher provenance remain unverified. Installed metadata acceptance now passes; native Windows wheel acceptance remains pending.
 [Wheel contract](python-wheel-identity.md),
 [source evidence](evidence/pypi-wheel-identity-source-summary.json).
 

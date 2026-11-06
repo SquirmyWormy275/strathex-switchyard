@@ -26,8 +26,8 @@ of publisher identity or installation compatibility.
 `artifact.archive` distinguishes `matched`, `mismatched` and `unsupported`.
 Unsupported or mismatched identity requires `python_wheel_identity_not_verified`.
 Byte integrity retains its own status and findings. Reports and CycloneDX include
-only bounded identity fields, the metadata digest and explicit unverified RECORD
-status; private summaries, descriptions, source and other metadata are omitted.
+only bounded identity fields, metadata/RECORD digests and the separate internal
+hash result; private summaries, descriptions, source and other metadata are omitted.
 The host validates the closed observation, exact BOM, mandatory gaps and failed
 finding, including the original finding ceiling.
 
@@ -48,9 +48,10 @@ lines. Wheel and npm inspection share a 32-MiB expansion budget. The reader rese
 an allowance before decompression; failed attempts retain that charge. Forged
 small sizes cannot remove the decompressor's output bound.
 
-RECORD presence and ZIP CRC checks do **not** verify RECORD's cryptographic hashes.
-Compatibility tags, signatures, dependency graphs, executable behavior, actual
-license texts and publisher provenance remain unfinished implementation. Broader
+[RECORD member-hash checks](python-wheel-records.md) now compare supported internal
+hashes separately from ZIP CRC and package identity. Compatibility tags, signatures,
+dependency graphs, executable behavior, actual license texts and publisher
+provenance remain unfinished implementation. Broader
 ZIP variants also remain unsupported. `artifact_contents_not_inspected` and
 publisher/environment gaps remain mandatory where already required.
 
@@ -65,8 +66,8 @@ Installed metadata acceptance now passes; native Windows wheel acceptance remain
 [Source evidence](evidence/pypi-wheel-identity-source-summary.json).
 
 The existing `scripts/verify-python-inventory-host.mjs --read-only-metadata`
-verifier now pins the wheel implementation and adds the fifteen ZIP facts,
-six in-memory wheel reports and host-forgery refusals. Its ten checks start no
+verifier pins the tested implementation and covers the fifteen ZIP facts,
+six in-memory wheel reports and host-forgery refusals. These checks start no
 scanner process or account action. Four flag-guard tests and all ten installed checks pass at source 39db1fe,
 within its 44-check update. All 54 workspace snapshots and frozen frontend verify;
 only current plus one rollback remain and the prepared bundle is removed.

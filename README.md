@@ -71,10 +71,11 @@ role/device controls and full scanner coverage remain unfinished.
 The accepted complete Linux checkpoint `68bcc76` passes **310 groups / 1,875
 tests**, with sixteen declared skips and verified owned cleanup. The restricted
 Windows storage journey now passes all eight original checks, including exact
-exit and fixture/service retirement. Complete Windows source `9f35961` passes
-**414 test/build groups / 2,398 tests**, with 202 declared skips and exact cleanup.
+exit and fixture/service retirement. Complete Windows source `cadbccd` passes its separate
+**416-group / 2,443-test packet**, with 204 declared skips and exact cleanup; its
+overall workflow still fails because a preliminary shard was cancelled.
 The latest agent and helper ownership corrections have focused checks and a
-34-check installed demonstration; a
+44-check installed metadata demonstration; a
 recurring first-install shortcut timeout remains under investigation. Source,
 installed, interactive, hardware and account acceptance remain separate.
 [Current status and exact evidence](docs/switchyard-status.md).
@@ -84,7 +85,7 @@ installed, interactive, hardware and account acceptance remain separate.
 | Return to a coding task | [Codex bindings](docs/coding-task-bindings.md), [Claude bindings](docs/claude-task-bindings.md), [reviewed text](docs/native-coding-tasks.md), [owned task loading](docs/coding-task-owners.md) |
 | Inspect a repository without starting work | [Installed `switchyard inspect` commands](docs/inspect-cli.md) |
 | Run reviewed inputs in a disposable workspace | [Task execution](docs/reviewed-task-execution.md), [bounded build workspace](docs/bounded-build-workspace.md) |
-| Understand findings and coverage | [Shield baseline](docs/shield-baseline-scanner.md), [SBOM example](docs/evidence/README.md), [CVSS context](docs/cvss-severity.md), [Rust declarations](docs/cargo-supply-chain.md) |
+| Understand findings and coverage | [Shield baseline](docs/shield-baseline-scanner.md), [SBOM example](docs/evidence/README.md), [CVSS context](docs/cvss-severity.md), [Rust declarations](docs/cargo-supply-chain.md), [Python wheels and internal hashes](docs/python-wheel-records.md) |
 | Review recovery and platform boundaries | [Release recovery](docs/suite-release-recovery.md), [Windows storage](docs/windows-storage-broker.md), [complete requirement ledger](docs/switchyard-requirements.md) |
 
 Installed Linux scanner demonstrations verify actual process exits and restore

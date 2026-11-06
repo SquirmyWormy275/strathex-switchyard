@@ -16,7 +16,7 @@ const sha = bytes => createHash("sha256").update(bytes).digest("hex"), app = awa
 assert.equal(app.status, "ready");
 const root = join(installationRoot(), "versions", app.build), manifest = await verifySuiteRelease(root, { expectedId: app.build, platform: "linux", checkRuntime: true });
 assert.equal(manifest.development, false);
-const sourceEvidence = JSON.parse(await readFile(new URL("../docs/evidence/pypi-wheel-identity-source-summary.json", import.meta.url), "utf8")), markerEvidence = JSON.parse(await readFile(new URL("../docs/evidence/pypi-markers-source-summary.json", import.meta.url), "utf8")), moduleDigests = {}, checks = [];
+const sourceEvidence = JSON.parse(await readFile(new URL("../docs/evidence/pypi-wheel-record-source-summary.json", import.meta.url), "utf8")), markerEvidence = JSON.parse(await readFile(new URL("../docs/evidence/pypi-markers-source-summary.json", import.meta.url), "utf8")), moduleDigests = {}, checks = [];
 for (const name of ["tools/layout-studio/shield-scanner-engine.mjs", "tools/layout-studio/repository-shield.mjs"]) {
   const digest = sha(await readFile(join(root, name))); assert.equal(digest, sourceEvidence.sourceFiles[name]); moduleDigests[name] = digest;
 }
@@ -64,7 +64,7 @@ assert.equal(sha(wheelOracleBytes), sourceEvidence.sourceFiles[wheelOraclePath])
 for (const [index, row] of wheelOracle.cases.entries()) {
   const bytes = Buffer.from(row.bytesBase64, "base64"); assert.equal(sha(bytes), row.sha256);
   const observed = inspectPypiWheel(bytes);
-  if (index < 7) assert.deepEqual(observed, { status: "inspected", ...row.identity });
+  if (index < 7) { const { record, ...identity } = observed; assert.deepEqual(identity, { status: "inspected", ...row.identity }); assert.equal(record.status, "verified"); }
   else assert.equal(observed.status, "unsupported");
 }
 checks.push("fifteen-independent-zip-facts-including-unsafe-and-over-budget-wheels");
@@ -80,11 +80,32 @@ for (const action of ["shield_supply_chain", "release_shield"]) for (const [arch
   if (status === "mismatched") mismatch = { report: r, context, action };
 }
 checks.push("six-in-memory-wheel-reports-bind-identity-without-copying-private-metadata");
-for (const mutate of [r => { r.sbom.components[0].artifact.archive.status = "matched"; }, r => { r.gaps = r.gaps.filter(g => g !== "python_wheel_identity_not_verified"); }, r => { r.cycloneDx.components[0].properties.find(p => p.name === "switchyard:wheel-record-verification").value = "verified"; }]) {
+for (const mutate of [r => { r.sbom.components[0].artifact.archive.status = "matched"; }, r => { r.gaps = r.gaps.filter(g => g !== "python_wheel_identity_not_verified"); }, r => { r.cycloneDx.components[0].properties.find(p => p.name === "switchyard:wheel-record-verification").value = "not-verified"; }]) {
   const changed = structuredClone(mismatch.report); mutate(changed); assert.throws(() => parseShieldScannerReport(JSON.stringify(changed), mismatch.context, mismatch.action));
 }
 checks.push("wheel-identity-and-record-verification-forgeries-refuse-admission");
-const evidence = { schema: "switchyard-installed-python-inventory-metadata/v2", at: new Date().toISOString(), sourceCommit: manifest.sourceCommit, applicationRelease: manifest.id, moduleDigests, verifierSourceSha256: sha(await readFile(new URL(import.meta.url))), markerOracleSha256: sha(oracleBytes), extrasOracleSha256: sha(oldOracleBytes), wheelOracleSha256: sha(wheelOracleBytes), checks, success: true, pureInMemoryOnly: true, markerExpressionsEvaluated: 0, actualScannerProcesses: 0, nativeProcessesStarted: 0, archiveExtractionOrExecution: false, wheelRecordHashesVerified: false, providerOrModelRequests: 0, publicRequests: 0, liveAccountChanges: 0, hardwareOperations: 0 };
+const recordOraclePath = "scripts/fixtures/pypi-wheel-record-oracle.json", recordBytes = await readFile(new URL("../" + recordOraclePath, import.meta.url)), recordOracle = JSON.parse(recordBytes);
+assert.equal(sha(recordBytes), sourceEvidence.sourceFiles[recordOraclePath]); assert.equal(recordOracle.cases.length, 30); assert.equal(recordOracle.baseOracleSha256, sha(wheelOracleBytes));
+const verified = new Set(["sha256", "sha384", "sha512", "quoted-crlf", "signatures"]), mismatched = new Set(["changed-content", "wrong-size", "missing-member", "extra-member", "duplicate-member", "self-hash", "self-size", "missing-self", "listed-signature", "directory-row", "missing-hash"]);
+for (const row of recordOracle.cases) {
+  const b = Buffer.from(row.bytesBase64, "base64"), id = row.id.slice(7); assert.equal(sha(b), row.sha256); const observed = inspectPypiWheel(b);
+  if (id === "empty-record") { assert.equal(observed.status, "unsupported"); continue; }
+  assert.equal(observed.status, "inspected"); assert.equal(observed.record.sha256, row.recordSha256);
+  assert.equal(observed.record.status, verified.has(id) ? "verified" : mismatched.has(id) ? "mismatched" : "unsupported");
+}
+checks.push("thirty-independent-csv-zip-and-internal-hash-facts-without-extraction");
+for (const action of ["shield_supply_chain", "release_shield"]) for (const [archiveCase, status] of [["record-quoted-crlf", "verified"], ["record-changed-content", "mismatched"], ["record-weak-hash", "unsupported"]]) {
+  const f = pypiWheelFixture({ action, archiveCase }), r = await scanShieldInputs(f.request, { readInput: f.readInput }), context = { engine: r.engine, requestSha256: r.requestSha256, request: f.request };
+  assert.equal(r.sbom.components[0].artifact.archive.status, "matched"); assert.equal(r.sbom.components[0].artifact.archive.record.status, status);
+  assert.equal(r.outcome, status === "mismatched" ? "failed" : "incomplete"); assert.equal(r.completeness, "incomplete"); assert.equal(JSON.stringify(r).includes("NEVER_"), false);
+  assert.deepEqual(parseShieldScannerReport(JSON.stringify(r), context, action), r);
+  if (status === "mismatched") {
+    const changed = structuredClone(r); changed.findings = []; changed.outcome = "incomplete"; changed.coverage.forEach(c => c.findings = 0);
+    assert.throws(() => parseShieldScannerReport(JSON.stringify(changed), context, action));
+  }
+}
+checks.push("six-in-memory-record-results-bind-failures-and-incomplete-coverage");
+const evidence = { schema: "switchyard-installed-python-inventory-metadata/v3", at: new Date().toISOString(), sourceCommit: manifest.sourceCommit, applicationRelease: manifest.id, moduleDigests, verifierSourceSha256: sha(await readFile(new URL(import.meta.url))), markerOracleSha256: sha(oracleBytes), extrasOracleSha256: sha(oldOracleBytes), wheelOracleSha256: sha(wheelOracleBytes), wheelRecordOracleSha256: sha(recordBytes), checks, success: true, pureInMemoryOnly: true, markerExpressionsEvaluated: 0, actualScannerProcesses: 0, nativeProcessesStarted: 0, archiveExtractionOrExecution: false, wheelRecordHashesVerifiedInMemory: true, providerOrModelRequests: 0, publicRequests: 0, liveAccountChanges: 0, hardwareOperations: 0 };
 const { privateDirectory } = await import("../tools/layout-studio/private-fs.mjs");
 const outputRoot = join(process.env.XDG_STATE_HOME || join(homedir(), ".local/state"), "strathex-switchyard/runtime-verification"); await privateDirectory(outputRoot);
 const out = join(outputRoot, "installed-python-inventory-metadata-" + Date.now() + ".json");

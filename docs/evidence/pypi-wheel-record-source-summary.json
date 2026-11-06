@@ -1,0 +1,128 @@
+{
+  "schema": "switchyard-pypi-wheel-record-source/v1",
+  "baseCommit": "c2489a5fc4aff85377a9f0687bd56a274ef8f2a3",
+  "sourceFiles": {
+    "tools/layout-studio/shield-scanner-engine.mjs": "865bb004d183e5be533512540d01a5b3eeece56fd4ef62c5f26fb8936ac0454a",
+    "tools/layout-studio/repository-shield.mjs": "5aeae53278e1ab6dff78eec79d479ac86b5002e7599ebfd1956b0b22ad0b7b85",
+    "tools/layout-studio/pypi-wheel-record.test.mjs": "457e6ab7c6a801ab5c97f39d198616810bb2066038b775357e854b2cad5712ca",
+    "tools/layout-studio/pypi-wheel-identity.test.mjs": "71ff17c6c19f14a3852a7f09417fb54f967a22b105bcbf964388422087b67c15",
+    "tools/layout-studio/repository-shield-python-records.test.mjs": "a02ff353ef6ce1a001553744594b04b85e038063a2277bb8d8af6aab7fb77378",
+    "tools/layout-studio/repository-windows-shield-python-records.test.mjs": "4ab8d9e1f64110d8302f6c2fac3765d82319a34ff4e0208ead9ef58988a6e7fb",
+    "tools/layout-studio/test-support/pypi-wheel-fixture.mjs": "af5ed954a0c8d32b72c10e4eb8ff771742d7cb88a01d13bb3eaf51b552947e96",
+    "tools/layout-studio/test-support/assert-python-wheel-shield.mjs": "180d96f811c79f4532ef3ce8f34ea4368b09085159827a36cf6f3f0ebbc3f6d5",
+    "scripts/fixtures/pypi-wheel-oracle.json": "fad40e5432c47dc0d1aad1cb2ea6d41ded275b57d6e0ba708fe92588072327f5",
+    "scripts/fixtures/pypi-wheel-record-oracle.json": "a38f314da3777e4e58c444eb6fb4d32f976ba250eae6b45eac256f2b47ee583c",
+    "scripts/generate-pypi-wheel-record-oracle.py": "f2d40781e56d4c5c4c9723f750610443462dbd4117d61052f2ffedf296b12734",
+    "scripts/verify-python-inventory-host.mjs": "451f69cf2f453284bdb973a1bb660f2eb4592dfbd978cca1e252cb79531c45b1",
+    "scripts/run-isolated-tests.mjs": "a5527fdbafc855a63af082e64296db2b7e8b4bd56e5ff68ea09d81d7d9a4a170",
+    "scripts/run-isolated-tests.test.mjs": "ef9ba59fd2f5f8b253e9a8a0145d347cc35ffbb9e7139a79e8b96735bfebb455",
+    "deployment/suite/release.mjs": "53ec632c47bb051b6601edecfc7bb72ec6ba7bc994f06fd85f6010c314428ed3",
+    "deployment/suite/release.test.mjs": "915d15143d15d20a50c5c5088ad3e3c26983364e278d116a63e5f9a45dad39f0"
+  },
+  "beforeRegression": {
+    "name": "isolated-test-fc0f6b29-d9d8-46f1-8477-c37c52a17145.json",
+    "sha256": "cb5d5679faac9aaaeface048a787b82985b7ca5b2aef33e8e0b879d3145a61a4",
+    "success": false,
+    "totals": {
+      "required": 1,
+      "passed": 0,
+      "failed": 1,
+      "tests": 2,
+      "passedTests": 0,
+      "failedTests": 2,
+      "skippedTests": 0,
+      "cancelledTests": 0,
+      "todoTests": 0
+    }
+  },
+  "initialFocusedPackageFailure": {
+    "name": "isolated-test-2a80e599-a64a-4781-9c30-59cabea65b35.json",
+    "sha256": "57ab2349271dd4391433f70620f2d5f5f87b6c9c5dff190d8cb8b066e9cbff8b",
+    "success": false,
+    "totals": {
+      "required": 11,
+      "passed": 10,
+      "failed": 1,
+      "tests": 111,
+      "passedTests": 110,
+      "failedTests": 1,
+      "skippedTests": 0,
+      "cancelledTests": 0,
+      "todoTests": 0
+    }
+  },
+  "packageCorrection": {
+    "name": "isolated-test-169df7ee-d613-419f-ba74-588baeb40604.json",
+    "sha256": "ada3da8af90cd69c942ed91be4ee65ecad16b95b2e41bc74f58f06340f707cd3",
+    "success": true,
+    "totals": {
+      "required": 1,
+      "passed": 1,
+      "failed": 0,
+      "tests": 5,
+      "passedTests": 5,
+      "failedTests": 0,
+      "skippedTests": 0,
+      "cancelledTests": 0,
+      "todoTests": 0
+    }
+  },
+  "installedVerifierGuards": {
+    "name": "isolated-test-97e906c2-b55d-4801-ae86-25abc2ad4872.json",
+    "sha256": "be39839a6a0b05a252daae9f41784516c1cd049e45339ee67097c93a58c7530a",
+    "success": true,
+    "totals": {
+      "required": 1,
+      "passed": 1,
+      "failed": 0,
+      "tests": 4,
+      "passedTests": 4,
+      "failedTests": 0,
+      "skippedTests": 0,
+      "cancelledTests": 0,
+      "todoTests": 0
+    }
+  },
+  "installationApplicationAndInspectFollowup": {
+    "name": "isolated-test-f3a4c2a6-d6ad-4262-acf8-99e7f5c7e801.json",
+    "sha256": "57a900b1d722282a04bfe3208c0900ee788da0ab45b77b84ecaf9d6df1043478",
+    "success": true,
+    "totals": {
+      "required": 18,
+      "passed": 18,
+      "failed": 0,
+      "tests": 32,
+      "passedTests": 32,
+      "failedTests": 0,
+      "skippedTests": 0,
+      "cancelledTests": 0,
+      "todoTests": 0
+    }
+  },
+  "distinctAcceptedGroups": 30,
+  "distinctPassedTests": 147,
+  "skippedTests": 0,
+  "oracleCases": 30,
+  "originalIdentityOracleCases": 15,
+  "newActualLinuxScannerJourneys": 6,
+  "newWindowsGuestDoubleJourneys": 6,
+  "archiveExtractionOrExecution": false,
+  "publisherSignaturesVerified": false,
+  "typecheckPassed": true,
+  "manifestInventoryVerified": 317,
+  "syntheticLinuxPackage": {
+    "files": 527,
+    "payloadBytes": 5139197,
+    "manifestBytes": 95529,
+    "totalBytes": 5234726,
+    "originalBudgetBytes": 5242880,
+    "headroomBytes": 8154
+  },
+  "packagedFrozenAssetHttpReadback": true,
+  "upstreamBytesAndNoticesPreserved": true,
+  "allChildAndTreeCleanupVerified": true,
+  "exactOwnedRootRemoved": true,
+  "installedRecordAcceptancePending": true,
+  "nativeWindowsRecordAcceptancePending": true,
+  "noLiveAccountTaskAgentOrHardwareOperation": true
+}

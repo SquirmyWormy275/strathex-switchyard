@@ -123,7 +123,7 @@ export function nativeTestOverrides(file, platform = process.platform) {
   if (file === "tools/layout-studio/repository-windows-shield-index.test.mjs") return { timeoutMs: platform === "win32" ? 300_000 : 120_000 };
   if (file === "tools/layout-studio/task-index-inputs.test.mjs") return { timeoutMs: platform === "win32" ? 300_000 : 120_000 };
   if (["tools/layout-studio/repository-shield-cargo.test.mjs", "tools/layout-studio/repository-windows-shield-cargo.test.mjs", "tools/layout-studio/repository-shield-pypi.test.mjs", "tools/layout-studio/repository-windows-shield-pypi.test.mjs", "tools/layout-studio/repository-shield-licenses.test.mjs", "tools/layout-studio/repository-windows-shield-licenses.test.mjs"].includes(file)) return { timeoutMs: platform === "win32" ? 300_000 : 120_000 };
-  if (["tools/layout-studio/repository-shield-python-wheels.test.mjs", "tools/layout-studio/repository-windows-shield-python-wheels.test.mjs"].includes(file)) return { timeoutMs: platform === "win32" ? 300_000 : 120_000 };
+  if (["tools/layout-studio/repository-shield-python-wheels.test.mjs", "tools/layout-studio/repository-windows-shield-python-wheels.test.mjs", "tools/layout-studio/repository-shield-python-records.test.mjs", "tools/layout-studio/repository-windows-shield-python-records.test.mjs"].includes(file)) return { timeoutMs: platform === "win32" ? 300_000 : 120_000 };
   if (file === "tools/layout-studio/repository-shield-osv-source.test.mjs") return { timeoutMs: platform === "win32" ? 300_000 : 120_000 };
   if (file === "tools/layout-studio/repository-shield-ignored-trees.test.mjs") return { timeoutMs: platform === "win32" ? 300_000 : 120_000 };
   if (file === "tools/layout-studio/task-authority-ignored-trees.test.mjs") return { timeoutMs: platform === "win32" ? 300_000 : 120_000 };
@@ -225,6 +225,9 @@ export const requiredGroups = [
   { file: "tools/layout-studio/repository-windows-shield-cargo.test.mjs", ...nativeTestOverrides("tools/layout-studio/repository-windows-shield-cargo.test.mjs") },
   { file: "tools/layout-studio/shield-scanner-engine.test.mjs" },
   { file: "tools/layout-studio/pypi-wheel-identity.test.mjs" },
+  { file: "tools/layout-studio/pypi-wheel-record.test.mjs" },
+  { file: "tools/layout-studio/repository-shield-python-records.test.mjs", ...nativeTestOverrides("tools/layout-studio/repository-shield-python-records.test.mjs"), expectedSkipped: process.platform === "linux" ? 0 : 2 },
+  { file: "tools/layout-studio/repository-windows-shield-python-records.test.mjs", ...nativeTestOverrides("tools/layout-studio/repository-windows-shield-python-records.test.mjs") },
   { file: "tools/layout-studio/repository-shield-python-wheels.test.mjs", ...nativeTestOverrides("tools/layout-studio/repository-shield-python-wheels.test.mjs"), expectedSkipped: process.platform === "linux" ? 0 : 2 },
   { file: "tools/layout-studio/repository-windows-shield-python-wheels.test.mjs", ...nativeTestOverrides("tools/layout-studio/repository-windows-shield-python-wheels.test.mjs") },
   { file: "tools/layout-studio/repository-shield-index.test.mjs", timeoutMs: 120_000, expectedSkipped: process.platform === "linux" ? 0 : 3 },

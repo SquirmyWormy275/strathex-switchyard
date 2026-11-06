@@ -22,7 +22,8 @@ test("bounded wheel ZIP identities match independent Python zipfile and email pa
   for (const row of wheelOracle.cases.slice(0, 7)) {
     const bytes = Buffer.from(row.bytesBase64, "base64"), budget = { remaining: 4 * 1024 * 1024 };
     assert.equal(sha(bytes), row.sha256);
-    assert.deepEqual(engine.inspectPypiWheel(bytes, budget), { status: "inspected", ...row.identity });
+    const { record, ...identity } = engine.inspectPypiWheel(bytes, budget);
+    assert.deepEqual(identity, { status: "inspected", ...row.identity }); assert.equal(record.status, "verified");
     assert.equal(budget.remaining, 4 * 1024 * 1024 - row.identity.expandedBytes);
   }
   for (const row of wheelOracle.cases.slice(7)) assert.equal(engine.inspectPypiWheel(Buffer.from(row.bytesBase64, "base64")).status, "unsupported", row.id);
@@ -69,13 +70,13 @@ test("ZIP truncations and falsified expansion sizes stay inside the original dec
   assert.deepEqual(engine.inspectPypiWheel(bytes, budget), { status: "unsupported", reason: "budget" });
 });
 
-test("wheel identity and selected byte integrity remain separate and never resolve conditional applicability or RECORD", async () => {
+test("wheel identity, byte integrity and internal hashes remain separate from conditional applicability", async () => {
   for (const action of ["shield_supply_chain", "release_shield"]) for (const artifactStatus of ["matched", "mismatched", "unsupported-integrity"]) {
     const f = pypiWheelFixture({ action, artifactStatus, archiveCase: "equivalent", pinVersion: "1!2.0rc1.post2.dev3+local.1", marker: 'python_version < "0"' }), report = await f.scan(), artifact = report.sbom.components[0].artifact;
     assert.equal(artifact.status, artifactStatus); assert.equal(artifact.archive.status, "matched");
     assert.equal(report.outcome, artifactStatus === "mismatched" ? "failed" : "incomplete");
     for (const gap of ["python_markers_not_evaluated", "python_environment_not_resolved", "artifact_contents_not_inspected", "publisher_provenance_not_verified"]) assert.ok(report.gaps.includes(gap));
-    assert.equal(report.cycloneDx.components[0].properties.find(p => p.name === "switchyard:wheel-record-verification").value, "not-verified");
+    assert.equal(report.cycloneDx.components[0].properties.find(p => p.name === "switchyard:wheel-record-verification").value, "verified");
     assert.equal(report.cycloneDx.components[0].properties.find(p => p.name === "switchyard:archive-manifest-sha256").value, artifact.archive.manifestSha256);
     assert.deepEqual(admit(report, f), report);
   }

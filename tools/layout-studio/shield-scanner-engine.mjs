@@ -501,7 +501,34 @@ function wheelHeaders(bytes, selected) {
   if (result.size !== selected.length) archiveRefuse("manifest");
   return result;
 }
-/** Bounded ZIP/metadata identity only: never extracts, imports or installs a wheel. */
+function inspectWheelRecord(bytes, rows, prefix) {
+  const digest = sha(bytes), unsupported = reason => ({ status: "unsupported", sha256: digest, reason });
+  if (bytes.length > 256 * 1024) return unsupported("bounds");
+  if (bytes.some(b => b !== 10 && b !== 13 && (b < 32 || b > 126))) return unsupported("format");
+  const text = bytes.toString("ascii"); if (/\r(?!\n)/.test(text)) return unsupported("format");
+  const lines = text.replaceAll("\r\n", "\n").split("\n"); if (lines.at(-1) === "") lines.pop();
+  if (!lines.length || lines.length > 1024) return unsupported("bounds");
+  const self = prefix + "/RECORD", signatures = new Set([self + ".jws", self + ".p7s"]), members = new Map(rows.filter(r => !r.directory).map(r => [r.path, r])), seen = new Set();
+  const files = [...members.keys()].filter(p => p !== self && !signatures.has(p)).length;
+  let mismatch = false, gap;
+  for (const line of lines) {
+    if (line.length > 1024) return unsupported("bounds");
+    const match = /^(?:"([^"]*)"|([^",]*)),(?:"([^"]*)"|([^",]*)),(?:"([^"]*)"|([^",]*))$/.exec(line);
+    if (!match) return unsupported("format");
+    const path = match[1] ?? match[2], hash = match[3] ?? match[4], size = match[5] ?? match[6], row = members.get(path);
+    if (seen.has(path) || !row || signatures.has(path)) { mismatch = true; continue; } seen.add(path);
+    if (path === self) { if (hash || size) mismatch = true; continue; }
+    if (!hash) { mismatch = true; continue; }
+    const parts = /^(sha256|sha384|sha512)=([A-Za-z0-9_-]+)$/.exec(hash);
+    if (!parts) { gap = "algorithm"; continue; }
+    const digest = Buffer.from(parts[2], "base64url");
+    if (digest.length !== Number(parts[1].slice(3)) / 8 || digest.toString("base64url") !== parts[2] || !/^(?:0|[1-9][0-9]{0,6})$/.test(size)) { gap = "format"; continue; }
+    if (Number(size) !== row.size || !createHash(parts[1]).update(row.content).digest().equals(digest)) mismatch = true;
+  }
+  if ([...members.keys()].some(p => !signatures.has(p) && !seen.has(p))) mismatch = true;
+  return mismatch ? { status: "mismatched", sha256: digest, files } : gap ? unsupported(gap) : { status: "verified", sha256: digest, files };
+}
+/** Bounded ZIP/metadata and RECORD checks: never extracts, imports or installs a wheel. */
 export function inspectPypiWheel(bytes, budget = { remaining: archiveLimit }) {
   try {
     if (!Number.isSafeInteger(budget.remaining) || budget.remaining < 0 || budget.remaining > 32 * 1024 * 1024 || !Buffer.isBuffer(bytes) || bytes.length > 2 * 1024 * 1024) archiveRefuse("bounds");
@@ -543,6 +570,7 @@ export function inspectPypiWheel(bytes, budget = { remaining: archiveLimit }) {
         if (result.engine.bytesWritten !== content.length) archiveRefuse("compression"); content = result.buffer;
       }
       if (content.length !== row.size || crc32(content) !== row.crc) archiveRefuse("headers");
+      row.content = content;
       expanded += content.length; offset = stop;
       if (/^[^/]+\.dist-info\/(?:METADATA|WHEEL|RECORD)$/.test(row.path)) { if (row.directory) archiveRefuse("manifest"); metadata.set(row.path, content); }
     }
@@ -556,13 +584,15 @@ export function inspectPypiWheel(bytes, budget = { remaining: archiveLimit }) {
     try { identity = pypiIdentity(fields.get("name"), fields.get("version")); if (pypiIdentity(match[1], match[2]).name !== identity.name || pypiVersionKey(match[2]) !== pypiVersionKey(identity.version)) archiveRefuse("manifest"); } catch { archiveRefuse("manifest"); }
     if (!wheelMetadataVersions.includes(metadataVersion) || wheelVersion !== "1.0") archiveRefuse("manifest");
     budget.remaining += allowance - expanded;
-    return { status: "inspected", name: identity.name, version: identity.version, metadataVersion, wheelVersion, manifestSha256: sha(manifest), entries: count, expandedBytes: expanded };
+    return { status: "inspected", name: identity.name, version: identity.version, metadataVersion, wheelVersion, manifestSha256: sha(manifest), entries: count, expandedBytes: expanded, record: inspectWheelRecord(metadata.get(prefix + "/RECORD"), rows, prefix) };
   } catch (error) { if (!archiveReasons.includes(error.archiveReason)) throw error; return { status: "unsupported", reason: error.archiveReason }; }
 }
 export function validatePypiWheelObservation(value, name, version) {
   if (value?.status === "unsupported") { exact(value, ["status", "reason"]); if (!archiveReasons.includes(value.reason)) throw Error("Invalid wheel coverage gap."); return; }
-  exact(value, ["status", "name", "version", "metadataVersion", "wheelVersion", "manifestSha256", "entries", "expandedBytes"]);
+  exact(value, ["status", "name", "version", "metadataVersion", "wheelVersion", "manifestSha256", "entries", "expandedBytes", "record"]);
   if (pypiIdentity(value.name, value.version).name !== value.name || !wheelMetadataVersions.includes(value.metadataVersion) || value.wheelVersion !== "1.0" || !/^[a-f0-9]{64}$/.test(value.manifestSha256 ?? "") || !Number.isSafeInteger(value.entries) || value.entries < 3 || value.entries > 1024 || !Number.isSafeInteger(value.expandedBytes) || value.expandedBytes < 1 || value.expandedBytes > archiveLimit || value.status !== (value.name === name && pypiVersionKey(value.version) === pypiVersionKey(version) ? "matched" : "mismatched")) throw Error("Wheel identity observation is inconsistent.");
+  const r = value.record; exact(r, ["status", "sha256", r?.status === "unsupported" ? "reason" : "files"]);
+  if (!/^[a-f0-9]{64}$/.test(r.sha256 ?? "") || (r.status === "unsupported" ? !["bounds", "format", "algorithm"].includes(r.reason) : !["verified", "mismatched"].includes(r.status) || !Number.isSafeInteger(r.files) || r.files < 2 || r.files >= value.entries)) throw Error("Invalid wheel RECORD observation.");
 }
 function archiveProperties(archive) {
   return archive ? [{ name: "switchyard:archive-identity", value: archive.status },
@@ -570,7 +600,7 @@ function archiveProperties(archive) {
       { name: "switchyard:archive-manifest-sha256", value: archive.manifestSha256 },
       { name: "switchyard:archive-declared-name", value: archive.name },
       { name: "switchyard:archive-declared-version", value: archive.version },
-      ...(archive.metadataVersion ? [{ name: "switchyard:wheel-metadata-version", value: archive.metadataVersion }, { name: "switchyard:wheel-format-version", value: archive.wheelVersion }, { name: "switchyard:wheel-record-verification", value: "not-verified" }] : [])])] : [];
+      ...(archive.metadataVersion ? [{ name: "switchyard:wheel-metadata-version", value: archive.metadataVersion }, { name: "switchyard:wheel-format-version", value: archive.wheelVersion }, { name: "switchyard:wheel-record-verification", value: archive.record.status }, { name: "switchyard:wheel-record-sha256", value: archive.record.sha256 }, ...(archive.record.status === "unsupported" ? [{ name: "switchyard:wheel-record-gap", value: archive.record.reason }] : [{ name: "switchyard:wheel-record-files", value: String(archive.record.files) }])] : [])])] : [];
 }
 export const shieldArtifactReferenceKey = row => row.ecosystem === "Cargo"
   ? JSON.stringify(["Cargo", row.lockPath, row.name, row.version, row.sourceSha256])
@@ -756,6 +786,8 @@ export async function scanShieldInputs(proposed, { readInput }) {
           const inspected = wheelIdentities.get(reference.path), archive = inspected.status === "unsupported" ? inspected : { ...inspected, status: inspected.name === component.name && pypiVersionKey(inspected.version) === pypiVersionKey(component.version) ? "matched" : "mismatched" };
           component.artifact = { path: observed.path, sha256: observed.sha256, size: observed.size, algorithm: "sha256", acceptedSha256, status, archive };
           if (archive.status !== "matched") gaps.add("python_wheel_identity_not_verified");
+          if (archive.record?.status !== "verified") gaps.add("python_wheel_record_not_verified");
+          if (archive.record?.status === "mismatched") add({ ruleId: "artifact.record-mismatch", dimension: "provenance", severity: "high", path: file.path, line: null, fingerprint: sha(["artifact.record-mismatch", "PyPI", file.path, file.sha256, component.name, component.version, observed.path, observed.sha256, archive.record.sha256].join("\0")) });
           if (archive.status === "mismatched") add({ ruleId: "artifact.identity-mismatch", dimension: "provenance", severity: "high", path: file.path, line: null, fingerprint: sha(["artifact.identity-mismatch", "PyPI", file.path, file.sha256, component.name, component.version, observed.path, observed.sha256, archive.manifestSha256].join("\0")) });
           consumedArtifacts.add(referenceKey);
           if (status !== "matched") gaps.add("package_artifact_not_verified");
