@@ -29,10 +29,14 @@ Run the focused software proof with the pinned runtime:
 mise exec node@24.14.0 -- node --experimental-transform-types --test tools/layout-studio/coding-task-owners.test.mjs
 ```
 
-Eight registry cases cover real encrypted state and kernel leases, concurrent
+Nine registry cases cover real encrypted state and kernel leases, concurrent
 instances, changed account/repository/task/owner, failed persistence, late shutdown,
 no replay and exact recovery. One case composes the actual Unix listener and bridge
 with a controlled provider double. The complete related cohort passes 76 tests;
 final registry and package checks pass thirteen with exact cleanup. These checks
 create no real provider task and do not establish live account or IDE acceptance.
 [Exact evidence](evidence/coding-task-owner-summary.json).
+
+Retirement also compares the protected native identity with the original live
+owner. A substituted saved owner stays uncertain even if the in-memory process
+has exited. [Final guard evidence](evidence/random-access-owner-retirement-summary.json).

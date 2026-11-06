@@ -22,6 +22,7 @@ internal static class NativeRestrictedHostProof
     internal static object? UserObjectAccessDiagnostic;
     internal static object? NamespaceAccessDiagnostic;
     internal static object? StdioDiagnostic;
+    internal static object? RandomAccessDiagnostic;
     private static readonly List<bool> HistoricalFilteredFlags = new();
     private static readonly List<uint> HistoricalFilterBytes = new();
     internal static bool[] HistoricalFilterObservations => HistoricalFilteredFlags.ToArray();
@@ -212,6 +213,8 @@ internal static class NativeRestrictedHostProof
                         UserObjectAccessDiagnostic = desktopSpace.ProbeRestrictedAccess(restricted);
                         Phase = "restricted-existing-namespace-access";
                         NamespaceAccessDiagnostic = RestrictedNamespaceAccess.Capture(source, restricted);
+                        Phase = "restricted-random-access";
+                        RandomAccessDiagnostic = RestrictedRandomAccess.Capture(source, restricted);
                         Phase = "owned-standard-pipes";
                         using var pipes = new RestrictedChildPipes();
                         Phase = "owned-job-before-process";

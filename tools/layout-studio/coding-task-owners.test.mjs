@@ -113,3 +113,11 @@ test("late ownership drift and stopped startup cannot acknowledge a retained con
   const stopping=service.stopCompartment("personal");release();assert.ok(await opening instanceof Error);assert.equal((await stopping).stopped,true);
   const row=(await f.store.snapshot("personal")).codingTaskOwners.find(r=>r.requestId===second.requestId);assert.equal(row.status,"stopped");assert.equal(row.stoppedVerified,true);
 });
+
+test("verified exit of an in-memory owner cannot retire a substituted protected native identity",async t=>{
+  const f=await fixture(t),service=f.service(),request=f.request();await service.open("personal",request);
+  const original=(await f.store.snapshot("personal")).codingTaskOwners[0].privateOwnership;
+  await f.store.update("personal","fixture-substitute-native-owner",s=>{s.codingTaskOwners[0].privateOwnership.root=join(f.root,"unrelated-owner");});
+  try { assert.equal((await service.stopCompartment("personal")).stopped,false);const row=(await f.store.snapshot("personal")).codingTaskOwners[0];assert.equal(row.stoppedVerified,false);assert.equal(row.privateOwnership.root,join(f.root,"unrelated-owner")); }
+  finally { await f.store.update("personal","fixture-restore-original-native-owner",s=>{s.codingTaskOwners[0].privateOwnership=original;});assert.equal((await service.stopCompartment("personal")).stopped,true); }
+});

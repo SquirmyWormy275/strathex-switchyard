@@ -30,6 +30,13 @@ assertion: `ncrypto::CSPRNG`, source `node.cc:1221`. It still exits 134 with no
 owner result. All three standard pipe handles close, but its underlying Windows
 random-source failure remains unconfirmed. [Exact failure](evidence/windows-random-assertion-native-summary.json).
 
+A fixed CNG diagnostic now compares native status codes under the original and
+restricted tokens, closing explicit provider handles and clearing buffers. It
+compiles in both managed targets; 1,856 portable checks and twenty focused
+registry/report tests pass with cleanup and typecheck. Native execution is pending.
+The registry also refuses retirement of a substituted saved owner.
+[Source and evidence](evidence/random-access-owner-retirement-summary.json).
+
 The accepted complete Linux `370c21e` checkpoint includes the corrected CI dependency
 guard and shutdown joins for active polls, deadlines and managed input release.
 All exact owned checkout/dependency/build cleanup verifies; its marker is removed.

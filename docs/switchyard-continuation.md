@@ -52,12 +52,17 @@ release and child/test deadlines. [Contract](private-state-locking.md).
 The restricted child at `8c6f91a` identifies its assertion as `ncrypto::CSPRNG`,
 `node.cc:1221`. Exact artifact digest, fixed source location and pipe retirement
 verify; the child still exits 134 with no result. Determine the Windows random
-source failure next, using read-only diagnostics without weaker entropy or token
-relaxation. [Native evidence](evidence/windows-random-assertion-native-summary.json).
+source failure next. The prepared fixed CNG probe compares system-preferred
+and explicit-provider RNG statuses under restricted and original tokens; it
+retains no entropy and verifies handle/buffer cleanup. Both managed builds and
+1,856 portable checks pass; twenty registry/report cases and typecheck pass.
+Native execution is pending. No weaker entropy or token relaxation is introduced.
+[Probe and final owner-retirement guard](evidence/random-access-owner-retirement-summary.json). [Native evidence](evidence/windows-random-assertion-native-summary.json).
 
 The complete local `370c21e` run passes 241/241 groups, 1,509 tests and eleven
 declared skips. All child/tree and owned checkout/alias/build/marker cleanup verifies.
-No full run remains active at this checkpoint. The preceding `efbaa52` full run
+A new complete 242-group run is starting at the next published checkpoint; inspect
+`/tmp/switchyard-full-linux-path.json` before starting or cleaning a run. The preceding `efbaa52` full run
 remains failed; its concurrency assertion and shutdown lifecycle corrections are
 included in the accepted source.
 

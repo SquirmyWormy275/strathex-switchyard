@@ -80,3 +80,16 @@ test("namespace access diagnostics retain only the complete closed matrix, witho
   const unavailable = { ...access, queryStatus: "unavailable", entries: [] }; assert.deepEqual(storageBrokerFailureEvidence({ ...input, restrictedHostNamespaceAccess: unavailable }).restrictedHostNamespaceAccess, unavailable);
   assert.throws(() => verifyRestrictedOwnerReport(input));
 });
+
+test("random-source diagnostics retain only fixed API statuses and verified handle/buffer cleanup", () => {
+  const random = { schema: "switchyard-restricted-random-access/v1", handlesClosedVerified: true, buffersClearedVerified: true, entries: [
+    { token: "restricted", systemStatus: 0xc0000022, providerOpenStatus: 0xc0000022, providerStatus: null, providerCloseStatus: null },
+    { token: "creator", systemStatus: 0, providerOpenStatus: 0, providerStatus: 0, providerCloseStatus: 0 }
+  ] };
+  const input = { schema: "switchyard-storage-broker-protocol-proof/v1", success: false, restrictedHostRandomAccess: random };
+  const projected = storageBrokerFailureEvidence(input); assert.deepEqual(projected.restrictedHostRandomAccess, random); assert.equal(projected.success, false);
+  projected.restrictedHostRandomAccess.entries[0].systemStatus = 0; assert.equal(random.entries[0].systemStatus, 0xc0000022);
+  for (const mutate of [r => { r.buffer = "NEVER_RETAIN"; }, r => { r.entries[0].sid = "NEVER_RETAIN"; }, r => { r.entries.reverse(); }, r => { r.entries[0].providerStatus = 0; }, r => { r.entries[1].providerCloseStatus = 1; }, r => { r.entries[1].systemStatus = -1; }, r => { r.entries[1].systemStatus = 0x100000000; }, r => { r.entries[1].providerOpenStatus = 0.5; }, r => { r.handlesClosedVerified = false; }, r => { r.buffersClearedVerified = false; }, r => { r.entries.pop(); }]) {
+    const invalid = structuredClone(random); mutate(invalid); const result = storageBrokerFailureEvidence({ ...input, restrictedHostRandomAccess: invalid }); assert.equal(result.restrictedHostRandomAccess, undefined); assert.equal(JSON.stringify(result).includes("NEVER_RETAIN"), false);
+  }
+});

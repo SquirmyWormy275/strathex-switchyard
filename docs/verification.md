@@ -6,6 +6,7 @@ filesystem tests and physical/account acceptance are separate evidence.
 
 | Path | Accepted evidence | Practical limit |
 | --- | --- | --- |
+| CNG diagnostics and exact owner retirement | Both managed builds, 1,856 portable checks and twenty registry/report tests pass, with typecheck and exact cleanup. [Evidence](evidence/random-access-owner-retirement-summary.json). | Native RNG status capture pending; child startup remains failed. Owner registry is explicit metadata-only software, not IDE attachment. |
 | Complete Linux `370c21e` | 241/241 groups, 1,509 passed tests and eleven declared skips; all child/tree and owned checkout cleanup verifies. [Receipt](evidence/linux-370-complete-summary.json). | Later 242-group task-owner source has focused evidence only; Windows/hardware/accounts remain separate. |
 | Protected task metadata owners | Five files/76 tests, then final eight registry/five package cases pass with cleanup and typecheck. Actual listener/bridge composes with a controlled provider double. [Evidence](evidence/coding-task-owner-summary.json). | Explicit metadata-only service; task loading, authenticated IDE attachment and normal installed routing remain unfinished. |
 | Native restricted child assertion `8c6f91a` | Digest-verified artifact identifies `ncrypto::CSPRNG` at `node.cc:1221`; all standard handles close. [Failed receipt](evidence/windows-random-assertion-native-summary.json). | Exit 134/no owner result persists; underlying Windows RNG failure remains unidentified. No weaker entropy or token relaxation. |

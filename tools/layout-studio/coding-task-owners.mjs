@@ -36,7 +36,13 @@ export function createCodingTaskOwners({ store, root, runtimeRoot, resolveCli, r
       let result;
       try { const exits = await resource.driver.close(); result = Array.isArray(exits) && exits.every(e => e?.stopped === true) && (!resource.owner || (await resource.owner.stop()).stopped === true); }
       catch { result = false; }
-      await update(c, id, "coding-owner-retirement", row => { row.status = result ? "stopped" : "uncertain"; row.stoppedVerified = result; row.updatedAt = now(); });
+      await update(c, id, "coding-owner-retirement", row => {
+        // Native exit belongs to this in-memory owner, never a replacement
+        // protected record. Earlier startup checkpoints may omit later fields.
+        const actual = resource.owner?.privateOwnership;
+        if (row.bindingDigest !== digest(resource.original) || row.scope && digest(row.scope) !== digest(resource.owner?.scope) || row.privateOwnership && (!actual || Object.entries(row.privateOwnership).some(([name, value]) => digest(value) !== digest(actual[name])))) result = false;
+        row.status = result ? "stopped" : "uncertain"; row.stoppedVerified = result; row.updatedAt = now();
+      });
       if (result && live.get(key(c, id)) === resource) live.delete(key(c, id));
       return { stopped: result };
     })();
