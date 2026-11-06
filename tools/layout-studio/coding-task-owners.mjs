@@ -164,6 +164,16 @@ export function createCodingTaskOwners({ store, root, runtimeRoot, resolveCli, r
     },
     editorTarget(c, selected) { return editorObservation(c, selected); },
     editorReturnTarget(c, selected) { return editorObservation(c, selected, true); },
+    async openEditorClient(c, selected, { onClient } = {}) {
+      if (typeof onClient !== "function") throw Error("Retain the exact editor bridge before requesting its protocol.");
+      const initial = await editorObservation(c, selected, true);
+      const resource = live.get(key(c, selected.ownerRequestId));
+      if (!resource || typeof resource.owner.openEditorClient !== "function") throw Error("The original task owner cannot open a dedicated editor connection.");
+      return resource.owner.openEditorClient({ onClient: async client => {
+        await onClient(client);
+        if (digest(await editorObservation(c, selected, true)) !== digest(initial)) throw Error("The exact editor target changed during bridge registration.");
+      } });
+    },
     async load(c, { ownerRequestId, requestId, token }) {
       if (![ownerRequestId, requestId, token].every(uuid)) throw Error("Use the exact owner UUID, stable load UUID and one-use review token.");
       await store.authorize(c, { provider: "codex" });

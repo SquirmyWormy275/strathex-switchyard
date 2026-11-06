@@ -438,3 +438,24 @@ and five package checks pass with the real encrypted store and kernel leases.
 Production composition, signed routes, retained Terminal activation and recovery
 after an interrupted host remain unfinished. No native task/account/hardware
 operation was performed by these tests.
+
+## Compose the owned connection
+
+The internal connection service now records its intended private directory
+before creation, obtains the dedicated client through the original acknowledged
+task owner, and joins the journal with the actual ingress and restricted relay.
+The acknowledgement is saved in protected state before reaching the synthetic
+terminal. Duplicate requests across service instances cannot create another
+endpoint. Workspace stop, explicit stop and shutdown join pending work; socket
+substitution preserves the foreign entry and leaves retirement uncertain.
+Ordinary Studio snapshots omit these private ownership records.
+
+Five complete files pass 57 tests, including seven real Linux lifecycle cases,
+the task-owner guard and package import. Typecheck and JavaScript parse checks
+pass. An earlier import failure remains recorded.
+[Exact evidence](evidence/editor-connections-summary.json).
+
+Signed routes, typed client responses, retained Terminal activation and recovery
+after an interrupted host remain unfinished. The provider and terminal in this
+demonstration are controlled doubles; native TUI and 0.167.0 compatibility are
+unaccepted. No live account, native task, model or keyboard operation ran.

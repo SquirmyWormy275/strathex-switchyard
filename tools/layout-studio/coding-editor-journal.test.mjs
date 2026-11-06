@@ -40,6 +40,13 @@ test('the complete journal records immutable process/socket checkpoints while ex
  const listed=(await f.api.list('personal'))[0];assert.equal(listed.protocolAcknowledgementRecorded,true);assert.equal(listed.ideAttached,false);assert.equal(listed.authorityGranted,false);assert.equal(listed.terminalLaunched,false);assert.equal(Object.hasOwn(listed,'directory'),false);
  await handle.retire(clean);assert.equal(handle.observation().stoppedVerified,true);assert.equal((await f.service().reserve('personal',f.selected)).handle,undefined);
 });
+test('a planned directory pins its private parent and exact request name before creation is recorded',async t=>{
+ const f=await fixture(t);await f.consume();const {handle}=await f.api.reserve('personal',f.selected),path='/private/'+f.selected.requestId;
+ await assert.rejects(handle.record({kind:'directory-intent',parent:{path:'/private',identity},path:'/private/other'}));
+ await handle.record({kind:'directory-intent',parent:{path:'/private',identity},path});assert.equal(handle.observation().status,'directory-planned');
+ await assert.rejects(handle.record({kind:'directory',path,identity}));await assert.rejects(handle.record({kind:'directory',path:path+'-changed',identity:{...identity,inode:'99'}}));
+ await handle.record({kind:'directory',path,identity:{...identity,inode:'99'}});const row=(await f.store.snapshot('personal')).codingEditorConnections[0];assert.equal(row.directoryIntent.path,path);assert.equal(row.directory.path,path);
+});
 test('reservation cannot revive an expired consumed creation permit, while an existing connection can still record its lifetime',async t=>{
  for(const at of [0,Date.now()+60000]){const f=await fixture(t);await f.consume();f.at=at;await assert.rejects(f.api.reserve('personal',f.selected));assert.equal((await f.store.snapshot('personal')).codingEditorConnections,undefined);}
  const f=await fixture(t);await f.consume();const {handle}=await f.api.reserve('personal',f.selected);f.at=Date.now()+60000;await handle.record({kind:'directory',path:'/private/editor',identity});assert.equal(handle.observation().status,'private');

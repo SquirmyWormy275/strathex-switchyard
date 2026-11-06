@@ -42,8 +42,14 @@ export function createCodingEditorJournal({ store, authorizations, now=Date.now 
   async function current(c,s,original) { require(hash(await capture(c,s))===hash(original)); }
   function change(row,event,target) {
     require(object(event));
+    if(event.kind==='directory-intent') {
+      require(row.status==='reserved' && exact(event,['kind','parent','path']) && exact(event.parent,['path','identity']) && path(event.parent.path) && identity(event.parent.identity)
+        && (BigInt(event.parent.identity.mode)&0o170000n)===0o040000n && path(event.path) && event.path===posix.join(event.parent.path,row.requestId) && Buffer.byteLength(event.path+'/s')<=100);
+      row.directoryIntent={parent:event.parent,path:event.path};row.status='directory-planned';return;
+    }
     if(event.kind==='directory') {
-      require(row.status==='reserved' && exact(event,['kind','path','identity']) && path(event.path) && Buffer.byteLength(event.path+'/s')<=100 && identity(event.identity) && (BigInt(event.identity.mode)&0o170000n)===0o040000n);
+      require(['reserved','directory-planned'].includes(row.status) && exact(event,['kind','path','identity']) && path(event.path) && Buffer.byteLength(event.path+'/s')<=100 && identity(event.identity) && (BigInt(event.identity.mode)&0o170000n)===0o040000n);
+      if(row.directoryIntent)require(event.path===row.directoryIntent.path && event.identity.uid===row.directoryIntent.parent.identity.uid && hash(event.identity)!==hash(row.directoryIntent.parent.identity));
       row.directory={path:event.path,identity:event.identity};row.status='private';return;
     }
     if(event.kind==='upstream') {

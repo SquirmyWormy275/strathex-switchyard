@@ -273,6 +273,7 @@ export const requiredGroups = [
   { file: "tools/layout-studio/coding-sessions.test.mjs" },
   { file: "tools/layout-studio/coding-editor-authorizations.test.mjs" },
   { file: "tools/layout-studio/coding-editor-journal.test.mjs" },
+  { file: "tools/layout-studio/coding-editor-connections.test.mjs", ...(process.platform !== "linux" ? { expectedSkipped: 7 } : {}) },
   { file: "tools/layout-studio/coding-task-owners.test.mjs", ...(process.platform !== "linux" ? { expectedSkipped: 2 } : {}) },
   { file: "tools/layout-studio/codex-stdio-tasks.test.mjs" },
   { file: "tools/layout-studio/codex-unix-tasks.test.mjs", ...(process.platform !== "linux" ? { expectedSkipped: 6 } : {}) },

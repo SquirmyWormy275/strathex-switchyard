@@ -35,10 +35,13 @@ Latest published relay checkpoint is `072e066`: seven groups / 79 tests,
 typecheck and package import pass. Real Linux ingress and a dedicated pinned
 upstream carry one synthetic task resume bracketed by account samples; a model
 turn is refused. The later protected journal component passes three groups /
-24 tests. Compose it with the actual lifecycle, signed routes and retained
-Terminal next; native TUI compatibility remains unaccepted.
+24 tests. The internal lifecycle composition now passes five groups / 57 tests with the
+real journal and carriers. Wire signed routes, typed responses and the retained
+Terminal next; interrupted-host recovery and native TUI compatibility remain
+unaccepted.
 [Relay](evidence/editor-relay-summary.json),
 [journal](evidence/editor-journal-summary.json).
+[Composed lifecycle](evidence/editor-connections-summary.json).
 
 The installed CLI is now 0.167.0. Only offline schemas were generated; scratch
 files are removed. Keep the existing 0.166.0 gate until actual compatibility is

@@ -34,6 +34,8 @@ test("suite bundles contain the actual offline backend, frozen frontend and lice
   assert.equal(typeof createCodexEditorRelay, "function");
   const { createCodingEditorJournal } = await import(pathToFileURL(join(bundle.directory, "tools/layout-studio/coding-editor-journal.mjs")).href);
   assert.equal(typeof createCodingEditorJournal, "function");
+  const { createCodingEditorConnections } = await import(pathToFileURL(join(bundle.directory, "tools/layout-studio/coding-editor-connections.mjs")).href);
+  assert.equal(typeof createCodingEditorConnections, "function");
   const ingressPath = "tools/layout-studio/codex-editor-ingress.py";
   assert.equal(await readFile(join(bundle.directory, ingressPath), "utf8"), await readFile(join(sourceRoot, ingressPath), "utf8"));
   const { createCodexEditorProtocol } = await import(pathToFileURL(join(bundle.directory, "tools/layout-studio/codex-editor-protocol.mjs")).href);

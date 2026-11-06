@@ -253,6 +253,15 @@ async function editorFixture(t) {
   await f.api("load", load);
   return { ...f, owner, load, input: { ownerRequestId: owner.requestId, loadRequestId: load.requestId }, endpoint };
 }
+test("a dedicated editor client uses only the original acknowledged task owner and rechecks after registration", async t => {
+  const f=await fixture(t),service=f.service();f.controls.allowResume=true;f.task.sessionId=randomUUID();await f.store.update('personal','fixture-editor-id',s=>{s.codingSessions[0].sessionId=f.task.sessionId;});
+  const request=f.request();await service.open('personal',request);const owner=f.owners[0];owner.binding={socketPath:'/tmp/synthetic-editor',socketDevice:'1',socketInode:'3',peerPid:1234,peerBirth:'1',peerExecutableSha256:'c'.repeat(64)};owner.inspectBinding=async()=>structuredClone(owner.binding);
+  const review=await service.reviewLoad('personal',request.requestId),load={ownerRequestId:request.requestId,requestId:randomUUID(),token:review.confirmation.token};await service.load('personal',load);
+  let created=0,registered=0;const client={synthetic:true};owner.openEditorClient=async({onClient})=>{created++;await onClient(client);return client;};const input={ownerRequestId:request.requestId,loadRequestId:load.requestId};
+  await assert.rejects(service.openEditorClient('personal',{...input,loadRequestId:randomUUID()},{onClient:async()=>{registered++;}}));assert.equal(created,0);
+  assert.equal(await service.openEditorClient('personal',input,{onClient:async c=>{assert.equal(c,client);registered++;}}),client);assert.equal(registered,1);
+  await assert.rejects(service.openEditorClient('personal',input,{onClient:async()=>{f.controls.login='b'.repeat(64);}}));assert.equal(created,2);f.controls.login=f.task.accountFingerprint;
+});
 test("authenticated editor routes consume one reviewed launch permission without launching a terminal or exposing its protected record", async t => {
   const f = await editorFixture(t), token = "e".repeat(43), server = createStudioServer({ suite: f.suite, token, bridge: { close() {} } });
   server.listen(0, "127.0.0.1"); await once(server, "listening");
@@ -268,7 +277,8 @@ test("authenticated editor routes consume one reviewed launch permission without
   const issued = await api("issue", { ...input, token: review.body.confirmation.token }); assert.equal(issued.status, 200); assert.equal(issued.body.terminalLaunchAuthorized, false);
   const consumed = await api("consume", { ...input, permit: issued.body.permit }); assert.equal(consumed.status, 200); assert.equal(consumed.body.terminalLaunchAuthorized, true); assert.equal(consumed.body.terminalLaunched, false); assert.equal(consumed.body.ideAttached, false);
   const duplicate = await api("consume", { ...input, permit: issued.body.permit }); assert.equal(duplicate.body.terminalLaunchAuthorized, false); assert.equal(duplicate.body.duplicatePrevented, true);
-  const snapshot = await f.suite.handle("/api/suite/snapshot", { compartment: "personal" }); assert.equal(snapshot.codingEditorAuthorizations, undefined); assert.equal(JSON.stringify(snapshot).includes(issued.body.permit), false);
+  await f.store.update("personal", "fixture-private-editor-record", state => { state.codingEditorConnections = [{ requestId: input.requestId, privateOwnership: "PRIVATE_EDITOR_OWNERSHIP" }]; });
+  const snapshot = await f.suite.handle("/api/suite/snapshot", { compartment: "personal" }); assert.equal(snapshot.codingEditorAuthorizations, undefined); assert.equal(snapshot.codingEditorConnections, undefined); assert.equal(JSON.stringify(snapshot).includes("PRIVATE_EDITOR_OWNERSHIP"), false); assert.equal(JSON.stringify(snapshot).includes(issued.body.permit), false);
   assert.equal((await f.store.snapshot("personal")).codingEditorAuthorizations[0].status, "consumed"); assert.equal(f.calls.filter(c => c === "resume").length, 1);
   f.controls.login = "f".repeat(64); assert.equal((await api("review", { ...input, requestId: randomUUID() })).status, 409);
 });

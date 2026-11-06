@@ -29,6 +29,13 @@ expired-permit reuse, pins ordered ownership checkpoints and retains uncertain
 cleanup. Production composition/routes and interrupted-host recovery remain
 unfinished. [Evidence](evidence/editor-journal-summary.json).
 
+The internal editor connection service now composes the protected journal, real
+Linux carriers and restricted relay: **five groups / 57 tests pass**. It records
+directory intent before creation and acknowledgement before delivery, prevents a
+second endpoint, joins workspace/shutdown work and preserves substituted sockets.
+Signed routes, client/Terminal wiring and interrupted-host recovery remain
+unfinished. [Evidence](evidence/editor-connections-summary.json).
+
 The installed Codex CLI is now **0.167.0**. Offline schema generation succeeds and
 its scratch files are removed; the reviewed adapter still refuses versions other
 than **0.166.0**. Runtime compatibility has not been accepted.
