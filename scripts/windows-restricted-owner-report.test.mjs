@@ -113,8 +113,8 @@ test("cold-child environment observations retain only exact OS-match flags and c
 });
 
 test("a cold restricted RNG report requires exact primary-token, process, pipe and buffer witnesses without accepting Node startup", () => {
-  const cold = { schema: "switchyard-cold-restricted-random/v1", executableSha256: "d".repeat(64), waitResult: 0, exitCode: 0, reportValid: true,
-    report: { systemStatus: 0xc0000022, providerOpenStatus: 0xc0000022, providerStatus: null, providerCloseStatus: null, handlesClosedVerified: true, buffersClearedVerified: true },
+  const cold = { schema: "switchyard-cold-restricted-random/v2", executableSha256: "d".repeat(64), waitResult: 0, exitCode: 0, reportValid: true,
+    report: { systemStatus: 0xc0000022, providerOpenStatus: 0xc0000022, providerStatus: null, providerCloseStatus: null, handlesClosedVerified: true, buffersClearedVerified: true, firstApi: "legacy-cryptoapi", legacy: { providerOpened: false, providerOpenError: 5, generated: null, generateError: null, providerCloseError: null, handlesClosedVerified: true, buffersClearedVerified: true } },
     primaryTokenVerified: true, tokenRecheckedAfterExit: true, treeExitVerified: true, processHandlesClosedVerified: true, creatorQuotaRestoredVerified: true, standardIo: stdio(), nodeStartupAccepted: false };
   const input = { schema: "switchyard-storage-broker-protocol-proof/v1", success: false, restrictedHostColdRandom: cold, restrictedHostChildExit: { waitResult: 0, exitCode: 134, resultAvailable: false } };
   const projected = storageBrokerFailureEvidence(input); assert.deepEqual(projected.restrictedHostColdRandom, cold); assert.equal(projected.success, false); assert.throws(() => verifyRestrictedOwnerReport(input));
@@ -124,5 +124,13 @@ test("a cold restricted RNG report requires exact primary-token, process, pipe a
   }
   for (const change of [{ waitResult: 258, exitCode: null, reportValid: false, report: null }, { exitCode: 134, reportValid: false, report: null }, { report: { ...cold.report, systemStatus: 0, providerOpenStatus: 0, providerStatus: 0, providerCloseStatus: 0 } }]) {
     const value = { ...cold, ...change }; assert.deepEqual(storageBrokerFailureEvidence({ ...input, restrictedHostColdRandom: value }).restrictedHostColdRandom, value);
+  }
+  for (const mutate of [c => { c.schema = "switchyard-cold-restricted-random/v1"; }, c => { c.report.firstApi = "bcrypt"; }, c => { c.report.legacy.entropy = "NEVER_RETAIN"; }, c => { c.report.legacy.providerOpened = true; }, c => { c.report.legacy.generated = false; }, c => { c.report.legacy.generateError = 0; }, c => { c.report.legacy.providerOpenError = -1; }, c => { c.report.legacy.providerCloseError = 0; }, c => { c.report.legacy.handlesClosedVerified = false; }, c => { c.report.legacy.buffersClearedVerified = false; }]) {
+    const invalid = structuredClone(cold); mutate(invalid); assert.equal(storageBrokerFailureEvidence({ ...input, restrictedHostColdRandom: invalid }).restrictedHostColdRandom, undefined);
+  }
+  for (const generated of [true, false]) {
+    const value = structuredClone(cold); value.report.legacy = { providerOpened: true, providerOpenError: 0, generated, generateError: generated ? 0 : 0x80090020, providerCloseError: 0, handlesClosedVerified: true, buffersClearedVerified: true };
+    assert.deepEqual(storageBrokerFailureEvidence({ ...input, restrictedHostColdRandom: value }).restrictedHostColdRandom, value);
+    value.report.legacy.providerCloseError = 1; assert.equal(storageBrokerFailureEvidence({ ...input, restrictedHostColdRandom: value }).restrictedHostColdRandom, undefined);
   }
 });

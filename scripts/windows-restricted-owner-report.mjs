@@ -55,11 +55,16 @@ export function storageBrokerFailureEvidence(value) {
   const cold = value.restrictedHostColdRandom;
   const coldVerified = ["primaryTokenVerified", "tokenRecheckedAfterExit", "treeExitVerified", "processHandlesClosedVerified", "creatorQuotaRestoredVerified"];
   if (object(cold) && Object.keys(cold).sort().join() === ["schema", "executableSha256", "waitResult", "exitCode", "reportValid", "report", "standardIo", "nodeStartupAccepted", ...coldVerified].sort().join()
-      && cold.schema === "switchyard-cold-restricted-random/v1" && typeof cold.executableSha256 === "string" && /^[a-f0-9]{64}$/.test(cold.executableSha256)
+      && cold.schema === "switchyard-cold-restricted-random/v2" && typeof cold.executableSha256 === "string" && /^[a-f0-9]{64}$/.test(cold.executableSha256)
       && coldVerified.every(key => cold[key] === true) && cold.nodeStartupAccepted === false && validStdio(cold.standardIo) && cold.standardIo.outputBounded
       && (cold.waitResult === 0 ? uint(cold.exitCode) : cold.waitResult === 258 && cold.exitCode === null) && typeof cold.reportValid === "boolean") {
     const r = cold.report;
-    const valid = object(r) && Object.keys(r).sort().join() === "buffersClearedVerified,handlesClosedVerified,providerCloseStatus,providerOpenStatus,providerStatus,systemStatus"
+    const legacy = r?.legacy;
+    const validLegacy = object(legacy) && Object.keys(legacy).sort().join() === "buffersClearedVerified,generateError,generated,handlesClosedVerified,providerCloseError,providerOpenError,providerOpened"
+      && legacy.handlesClosedVerified === true && legacy.buffersClearedVerified === true && typeof legacy.providerOpened === "boolean" && uint(legacy.providerOpenError)
+      && (legacy.providerOpened ? legacy.providerOpenError === 0 && typeof legacy.generated === "boolean" && uint(legacy.generateError) && (!legacy.generated || legacy.generateError === 0) && legacy.providerCloseError === 0 : legacy.generated === null && legacy.generateError === null && legacy.providerCloseError === null);
+    const valid = object(r) && Object.keys(r).sort().join() === "buffersClearedVerified,firstApi,handlesClosedVerified,legacy,providerCloseStatus,providerOpenStatus,providerStatus,systemStatus"
+      && r.firstApi === "legacy-cryptoapi" && validLegacy
       && r.handlesClosedVerified === true && r.buffersClearedVerified === true && uint(r.systemStatus) && uint(r.providerOpenStatus)
       && (r.providerOpenStatus === 0 ? uint(r.providerStatus) && r.providerCloseStatus === 0 : r.providerStatus === null && r.providerCloseStatus === null);
     if (cold.reportValid ? cold.waitResult === 0 && cold.exitCode === 0 && valid : r === null) result.restrictedHostColdRandom = structuredClone(cold);

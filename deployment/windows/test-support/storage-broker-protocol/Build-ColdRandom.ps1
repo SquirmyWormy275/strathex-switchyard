@@ -25,7 +25,7 @@ call "$developer" -arch=x64 -host_arch=x64
 if errorlevel 1 exit /b 71
 dumpbin.exe /nologo /imports "$node" > "$imports"
 if errorlevel 1 exit /b 72
-cl.exe /nologo /O2 /EHsc /std:c++17 /MT /W4 /WX /guard:cf /sdl /DUNICODE /D_UNICODE /D_WIN32_WINNT=0x0A00 "$source" /Fe:"$image" /Fo:"$object" /link bcrypt.lib /DYNAMICBASE /NXCOMPAT /HIGHENTROPYVA /DEPENDENTLOADFLAG:0x800 /guard:cf /Brepro
+cl.exe /nologo /O2 /EHsc /std:c++17 /MT /W4 /WX /guard:cf /sdl /DUNICODE /D_UNICODE /D_WIN32_WINNT=0x0A00 "$source" /Fe:"$image" /Fo:"$object" /link bcrypt.lib advapi32.lib /DYNAMICBASE /NXCOMPAT /HIGHENTROPYVA /DEPENDENTLOADFLAG:0x800 /guard:cf /Brepro
 if errorlevel 1 exit /b 73
 exit /b 0
 "@ | Set-Content -LiteralPath $build -Encoding ascii

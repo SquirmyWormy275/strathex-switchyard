@@ -17,16 +17,18 @@ rechecked. **Command wiring and native task/account acknowledgement remain
 unfinished.** Passing editor/provider doubles does not establish IDE attachment.
 [Contract and evidence](coding-task-owners.md#one-reviewed-editor-terminal-creation).
 
-**Windows startup remains a failed software validation.** The cold CNG probe
-succeeds under the exact restricted primary token, while Node aborts at
-`ncrypto::CSPRNG`, exit 134, before producing an owner result. The import
-observation at `164a622` failed earlier in its build wrapper; its original Node
-journey did not run. A followup pins the running Node image and retains bounded
-build-phase errors. Static imports alone cannot establish the executed OpenSSL
-branch. No token, desktop or entropy requirement
-has been relaxed. [Native failure](evidence/windows-cold-random-native-summary.json),
-[import observation](evidence/windows-node-rng-imports-source-summary.json),
-[build failure and followup](evidence/windows-node-import-build-failure-summary.json).
+**Windows startup remains a failed software validation.** At `78b640d`, the
+exact Node image imports the three legacy CryptoAPI random functions; its dump
+does not list `BCryptGenRandom`. The cold CNG probe succeeds, but Node still
+aborts at `ncrypto::CSPRNG`, exit 134, before its owner result. Both artifact
+digests and source/merge identity verify. Imports do not prove the executed
+OpenSSL branch. [Native evidence](evidence/windows-node-rng-imports-native-summary.json).
+
+A new cold probe observes the legacy API calls first under the same original
+restricted token, then the CNG calls. Both managed targets compile; 1,884 portable
+checks and nineteen focused tests pass with owned cleanup. Native execution is
+pending. No privilege, account, desktop or RNG fallback is added.
+[Source evidence](evidence/windows-cold-legacy-random-source-summary.json).
 
 ## Latest verified checkpoints
 
@@ -35,7 +37,7 @@ has been relaxed. [Native failure](evidence/windows-cold-random-native-summary.j
 | Complete Linux `1508ea9` | **246/246 groups; 1,575 passed tests; eleven declared skips.** Every child/tree and exact owned checkout, dependency, build and temporary-parent cleanup verifies. [Receipt](evidence/linux-1508-complete-summary.json). | Includes the signed client and editor launcher with provider/editor doubles. Later Windows import-observation source has separate focused/native evidence. |
 | Reviewed editor launcher `1508ea9` | Five groups / 54 tests, typecheck, extension build and compiled CommonJS load pass. Generated output is removed. [Evidence](evidence/editor-terminal-launch-summary.json). | Real signed HTTP, encrypted state and Linux leases compose with controlled provider/editor doubles. No actual terminal was launched. |
 | Installed Linux `2c87c03` | Six update, ten owner/editor/severity and seven journal checks pass. All 54 workspace identities remain; 52 sealed files are byte-identical across update. Launcher backups and exact bundle cleanup verify. [Evidence](evidence/installed-editor-authorization-summary.json). | The two opened verification workspaces are resealed by existing restart recovery. Definitions/package/modes, historical pending bytes and metadata-check state verify separately. No full semantic before-snapshot was retained. Three signed authorization checks are unknown-owner refusals, with no new permit/task/provider effects. |
-| Native Windows `83d4139` | Both cold CNG API forms succeed; token, process/tree, pipe, provider and buffer checks verify. Separate filesystem/setup jobs pass. [Receipt](evidence/windows-cold-random-native-summary.json). | The original restricted Node journey still fails and its fixture is preserved. Cold CNG success does not identify the OpenSSL cause. |
+| Native Windows `78b640d` | Exact Node import flags and cold CNG success are observed; token, process/tree, pipe, provider and buffer checks verify. Separate filesystem/setup jobs pass. [Receipt](evidence/windows-node-rng-imports-native-summary.json). | Original Node still exits 134 with no owner result; the failed fixture is preserved. The legacy-first probe awaits separate native acceptance. |
 | Windows state leases `ce5be6a` | Eighteen native tests, one declared skip, the Supply Chain scenario and 23 policy-output checks pass. [Evidence](evidence/native-state-lease-ce5-summary.json). | This verifies exact lease boundaries, not complete Windows guest or ordinary-user setup acceptance. |
 
 ## Implemented backend capabilities

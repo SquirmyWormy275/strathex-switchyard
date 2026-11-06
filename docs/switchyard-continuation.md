@@ -40,7 +40,8 @@ evidence, not instructions to reset. Publish regular commits. Do not merge or re
 | Installed app `2c87c03` | Release `39c7b555…`; six update, ten owner/editor/severity and seven journal checks pass. [Evidence](evidence/installed-editor-authorization-summary.json). | This installs the backend gateway, not an active editor extension. Signed checks only refuse unknown owners. |
 | Complete Linux `1508ea9` | 246 groups, 1,575 passed tests and eleven declared skips; all exact checkout/dependency/build/temporary-parent cleanup verifies. [Receipt](evidence/linux-1508-complete-summary.json). | Its marker is removed. Later Windows import-observation source has separate focused/native evidence. |
 | Windows cold startup | `83d4139` cold native CNG APIs pass under the exact primary token. Original Node exits 134 at CSPRNG, no owner result. [Native result](evidence/windows-cold-random-native-summary.json). | Failed native software validation, not unavailable hardware. Preserve the failed fixture and unchanged acceptance assertions. |
-| Windows import observation `164a622` | Existing `dumpbin` records four fixed RNG import flags and exact Node image hash. Two groups / 19 checks pass. [Source](evidence/windows-node-rng-imports-source-summary.json). | Native build failed before the original Node journey. Exact tool error was unavailable; followup pins the running image and retains bounded phase diagnostics. [Failure](evidence/windows-node-import-build-failure-summary.json). |
+| Windows import observation `78b640d` | Digest-verified artifacts show legacy CryptoAPI imports, no observed BCryptGenRandom import, cold CNG success and unchanged Node exit 134. [Native evidence](evidence/windows-node-rng-imports-native-summary.json). | Imports do not prove the executed branch. Earlier `164a622` build failure remains recorded; its exact cause was not recovered. |
+| Cold legacy-first probe | Both managed targets, 1,884 portable checks and nineteen focused tests pass; exact staging removed. [Source](evidence/windows-cold-legacy-random-source-summary.json). | Native execution pending. The original Node acceptance and token restrictions remain unchanged. |
 
 The latest installed update preserves all 54 workspace identities and 52 sealed
 files byte-for-byte. Existing restart recovery reseals `personal` and
@@ -64,11 +65,11 @@ active in the update preflight.
    root identities, receipt and dependency aliases before cleanup. Use an owned
    home temporary parent because `/tmp` has per-user quotas. Never broaden cleanup
    or relax deadlines to turn a failure into a pass.
-2. Follow up the failed `164a622` Windows import build. It produced no import or
-   exchange artifact and did not retest Node startup. Import the next exact-source
-   artifact only after source/merge and archive digest checks. The followup pins
-   the running Node executable and retains fixed build-phase/LNK error metadata.
-   Prior CNG success does not prove Node uses that path or explain the failure.
+2. Import the next exact-source Windows legacy-first probe result after checking
+   source/merge identity and both archive digests. The `78b640d` artifact confirms
+   legacy CryptoAPI imports and repeats the CSPRNG failure; it does not prove the
+   executing OpenSSL branch. The V2 probe observes those legacy calls first in a
+   cold native child, then CNG, while retaining original Node/token acceptance.
 3. Implement native acknowledgement for the exact reviewed editor terminal and
    original owner/account/task. A separate observed connection or ordinary focus
    must not be treated as that terminal's acknowledgement. Keep UI wiring frozen;
