@@ -65,11 +65,13 @@ active in the update preflight.
    root identities, receipt and dependency aliases before cleanup. Use an owned
    home temporary parent because `/tmp` has per-user quotas. Never broaden cleanup
    or relax deadlines to turn a failure into a pass.
-2. Diagnose the exact legacy-provider access denial now observed at `a37751c`.
-   CryptAcquireContextW with the upstream flags fails with Win32 error 5 before
-   generation; subsequent CNG calls succeed. Node still exits 134. Distinguish
-   default-provider lookup from provider implementation/resource access without
-   changing token restrictions, privileges, provider defaults or registry state.
+2. Import the next exact-source V3 provider-lookup probe after checking archive
+   digest and source/merge identity. Both managed targets, 1,912 portable checks
+   and nineteen focused tests pass. [Source](evidence/windows-provider-lookup-source-summary.json).
+   Default CryptAcquireContextW remains the first cold call; user/machine lookup
+   and one fixed Enhanced-provider comparison follow. At `a37751c`, the initial
+   call fails with Win32 error 5 and Node exits 134. No token, privilege, provider
+   default or registry change is part of this observation.
 3. Implement native acknowledgement for the exact reviewed editor terminal and
    original owner/account/task. A separate observed connection or ordinary focus
    must not be treated as that terminal's acknowledgement. Keep UI wiring frozen;

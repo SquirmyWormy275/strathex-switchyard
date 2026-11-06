@@ -113,9 +113,11 @@ test("cold-child environment observations retain only exact OS-match flags and c
 });
 
 test("a cold restricted RNG report requires exact primary-token, process, pipe and buffer witnesses without accepting Node startup", () => {
-  const cold = { schema: "switchyard-cold-restricted-random/v2", executableSha256: "d".repeat(64), waitResult: 0, exitCode: 0, reportValid: true,
+  const cold = { schema: "switchyard-cold-restricted-random/v3", executableSha256: "d".repeat(64), waitResult: 0, exitCode: 0, reportValid: true,
     report: { systemStatus: 0xc0000022, providerOpenStatus: 0xc0000022, providerStatus: null, providerCloseStatus: null, handlesClosedVerified: true, buffersClearedVerified: true, firstApi: "legacy-cryptoapi", legacy: { providerOpened: false, providerOpenError: 5, generated: null, generateError: null, providerCloseError: null, handlesClosedVerified: true, buffersClearedVerified: true } },
     primaryTokenVerified: true, tokenRecheckedAfterExit: true, treeExitVerified: true, processHandlesClosedVerified: true, creatorQuotaRestoredVerified: true, standardIo: stdio(), nodeStartupAccepted: false };
+  cold.report.enhancedProvider = { providerOpened: true, providerOpenError: 0, generated: true, generateError: 0, providerCloseError: 0, handlesClosedVerified: true, buffersClearedVerified: true };
+  cold.report.providerLookups = { user: { succeeded: true, error: 0, providerClass: "enhanced", bufferClearedVerified: true }, machine: { succeeded: false, error: 5, providerClass: null, bufferClearedVerified: true } };
   const input = { schema: "switchyard-storage-broker-protocol-proof/v1", success: false, restrictedHostColdRandom: cold, restrictedHostChildExit: { waitResult: 0, exitCode: 134, resultAvailable: false } };
   const projected = storageBrokerFailureEvidence(input); assert.deepEqual(projected.restrictedHostColdRandom, cold); assert.equal(projected.success, false); assert.throws(() => verifyRestrictedOwnerReport(input));
   projected.restrictedHostColdRandom.report.systemStatus = 0; assert.equal(cold.report.systemStatus, 0xc0000022);
@@ -132,5 +134,8 @@ test("a cold restricted RNG report requires exact primary-token, process, pipe a
     const value = structuredClone(cold); value.report.legacy = { providerOpened: true, providerOpenError: 0, generated, generateError: generated ? 0 : 0x80090020, providerCloseError: 0, handlesClosedVerified: true, buffersClearedVerified: true };
     assert.deepEqual(storageBrokerFailureEvidence({ ...input, restrictedHostColdRandom: value }).restrictedHostColdRandom, value);
     value.report.legacy.providerCloseError = 1; assert.equal(storageBrokerFailureEvidence({ ...input, restrictedHostColdRandom: value }).restrictedHostColdRandom, undefined);
+  }
+  for (const mutate of [c => { c.report.enhancedProvider.generated = null; }, c => { c.report.enhancedProvider.providerCloseError = 1; }, c => { c.report.enhancedProvider.buffersClearedVerified = false; }, c => { c.report.providerLookups.user.rawName = "NEVER_RETAIN"; }, c => { c.report.providerLookups.user.providerClass = "NEVER_RETAIN"; }, c => { c.report.providerLookups.user.error = 5; }, c => { c.report.providerLookups.machine.providerClass = "base"; }, c => { c.report.providerLookups.machine.bufferClearedVerified = false; }, c => { c.report.providerLookups.machine.error = -1; }, c => { c.report.providerLookups.extra = {}; }]) {
+    const invalid = structuredClone(cold); mutate(invalid); assert.equal(storageBrokerFailureEvidence({ ...input, restrictedHostColdRandom: invalid }).restrictedHostColdRandom, undefined);
   }
 });

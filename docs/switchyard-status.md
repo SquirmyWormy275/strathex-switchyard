@@ -37,6 +37,8 @@ extension checks pass with provider/editor doubles. Closed or same-title objects
 cannot trigger replacement. Command wiring and native acknowledgement remain
 unfinished. [Evidence](evidence/editor-return-summary.json).
 
+The next diagnostic retains that first cold call and compares read-only user/machine provider lookup with one fixed explicit Enhanced-provider call. Both managed targets, 1,912 portable checks and nineteen focused tests pass with exact cleanup; native execution is pending. No provider default, registry, account or token state is changed. [Source evidence](evidence/windows-provider-lookup-source-summary.json).
+
 ## Latest verified checkpoints
 
 | Checkpoint | Result | Practical limit |

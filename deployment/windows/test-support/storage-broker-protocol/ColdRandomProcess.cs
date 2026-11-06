@@ -81,6 +81,6 @@ internal static partial class NativeRestrictedHostProof
             }
         }
         Require(child != null && token != null && child.IsClosed && thread!.IsClosed && token.IsClosed);
-        return new { schema = "switchyard-cold-restricted-random/v2", executableSha256 = expectedHash, waitResult = wait, exitCode = code, reportValid = validReport, report, primaryTokenVerified = true, tokenRecheckedAfterExit = true, treeExitVerified = true, processHandlesClosedVerified = true, creatorQuotaRestoredVerified = true, standardIo = stdio, nodeStartupAccepted = false };
+        return new { schema = "switchyard-cold-restricted-random/v3", executableSha256 = expectedHash, waitResult = wait, exitCode = code, reportValid = validReport, report, primaryTokenVerified = true, tokenRecheckedAfterExit = true, treeExitVerified = true, processHandlesClosedVerified = true, creatorQuotaRestoredVerified = true, standardIo = stdio, nodeStartupAccepted = false };
     }
 }

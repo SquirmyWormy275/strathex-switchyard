@@ -3,38 +3,54 @@ using System.Buffers.Binary;
 internal static class ColdRandomReport
 {
     internal sealed record LegacyEvidence(bool providerOpened, uint providerOpenError, bool? generated, uint? generateError, uint? providerCloseError, bool handlesClosedVerified, bool buffersClearedVerified);
-    internal sealed record Evidence(uint systemStatus, uint providerOpenStatus, uint? providerStatus, uint? providerCloseStatus, bool handlesClosedVerified, bool buffersClearedVerified, string firstApi, LegacyEvidence legacy);
+    internal sealed record LookupEvidence(bool succeeded, uint error, string? providerClass, bool bufferClearedVerified);
+    internal sealed record LookupPair(LookupEvidence user, LookupEvidence machine);
+    internal sealed record Evidence(uint systemStatus, uint providerOpenStatus, uint? providerStatus, uint? providerCloseStatus, bool handlesClosedVerified, bool buffersClearedVerified, string firstApi, LegacyEvidence legacy, LegacyEvidence enhancedProvider, LookupPair providerLookups);
+    private static LegacyEvidence Legacy(uint[] w, int i)
+    {
+        if (w[i] > 1 || w[i+2] > 1 || w[i+4] > 1 || w[i+6] != 1 || w[i+7] != 1
+            || (w[i] == 0 ? w[i+2] != 0 || w[i+3] != 0 || w[i+4] != 0 || w[i+5] != 0 : w[i+1] != 0 || w[i+4] != 1 || w[i+5] != 0 || w[i+2] == 1 && w[i+3] != 0))
+            throw new InvalidOperationException("The fixed legacy report did not verify statuses and cleanup.");
+        return new(w[i] == 1, w[i+1], w[i] == 1 ? w[i+2] == 1 : null, w[i] == 1 ? w[i+3] : null, w[i] == 1 ? w[i+5] : null, true, true);
+    }
+    private static LookupEvidence Lookup(uint[] w, int i)
+    {
+        if (w[i] > 1 || w[i+2] > 3 || w[i+3] != 1 || (w[i] == 1 ? w[i+1] != 0 : w[i+2] != 0)) throw new InvalidOperationException("The fixed provider lookup did not verify.");
+        return new(w[i] == 1, w[i+1], w[i] == 1 ? new[] { "other", "enhanced", "strong", "base" }[w[i+2]] : null, true);
+    }
     internal static Evidence Parse(byte[] bytes)
     {
-        if (bytes.Length != 64) throw new InvalidOperationException("The fixed cold random report length changed.");
-        var w = Enumerable.Range(0, 16).Select(i => BinaryPrimitives.ReadUInt32LittleEndian(bytes.AsSpan(i * 4, 4))).ToArray();
-        if (w[0] != 0x53584352 || w[1] != 2 || w[6] != 1 || w[7] != 1 || w[5] != 0 || w[3] != 0 && w[4] != 0
-            || w[8] > 1 || w[10] > 1 || w[12] > 1 || w[14] != 1 || w[15] != 1
-            || (w[8] == 0 ? w[10] != 0 || w[11] != 0 || w[12] != 0 || w[13] != 0 : w[9] != 0 || w[12] != 1 || w[13] != 0 || w[10] == 1 && w[11] != 0))
-            throw new InvalidOperationException("The fixed cold random report did not verify statuses and cleanup.");
-        return new(w[2], w[3], w[3] == 0 ? w[4] : null, w[3] == 0 ? w[5] : null, true, true, "legacy-cryptoapi",
-            new(w[8] == 1, w[9], w[8] == 1 ? w[10] == 1 : null, w[8] == 1 ? w[11] : null, w[8] == 1 ? w[13] : null, true, true));
+        if (bytes.Length != 128) throw new InvalidOperationException("The fixed cold random report length changed.");
+        var w = Enumerable.Range(0, 32).Select(i => BinaryPrimitives.ReadUInt32LittleEndian(bytes.AsSpan(i * 4, 4))).ToArray();
+        if (w[0] != 0x53584352 || w[1] != 3 || w[6] != 1 || w[7] != 1 || w[5] != 0 || w[3] != 0 && w[4] != 0) throw new InvalidOperationException("The fixed CNG report did not verify cleanup.");
+        return new(w[2], w[3], w[3] == 0 ? w[4] : null, w[3] == 0 ? w[5] : null, true, true, "legacy-cryptoapi", Legacy(w, 8), Legacy(w, 16), new(Lookup(w, 24), Lookup(w, 28)));
     }
     internal static int VerifyParser()
     {
         int checks = 0;
-        byte[] Packet(params uint[] words) { var result = new byte[words.Length * 4]; for (int i = 0; i < words.Length; i++) BinaryPrimitives.WriteUInt32LittleEndian(result.AsSpan(i * 4, 4), words[i]); return result; }
-        uint[] good = { 0x53584352, 2, 0, 0, 0, 0, 1, 1, 1, 0, 1, 0, 1, 0, 1, 1 };
-        byte[] Changed(int index, uint value) { var words = (uint[])good.Clone(); words[index] = value; return Packet(words); }
-        byte[] Unopened(int index = 9, uint value = 5) { var words = (uint[])good.Clone(); words[8] = words[10] = words[12] = 0; words[index] = value; return Packet(words); }
+        byte[] Packet(uint[] words) { var result = new byte[words.Length * 4]; for (int i = 0; i < words.Length; i++) BinaryPrimitives.WriteUInt32LittleEndian(result.AsSpan(i * 4, 4), words[i]); return result; }
+        uint[] good = { 0x53584352, 3, 0, 0, 0, 0, 1, 1, 1, 0, 1, 0, 1, 0, 1, 1, 1, 0, 1, 0, 1, 0, 1, 1, 1, 0, 1, 1, 1, 0, 1, 1 };
+        byte[] Changed(params (int i, uint v)[] changes) { var w = (uint[])good.Clone(); foreach (var (i,v) in changes) w[i] = v; return Packet(w); }
+        byte[] Unopened(int i, int relative = 1, uint value = 5) => Changed((i,0),(i+2,0),(i+4,0),(i+relative,value));
         void Check(bool value) { if (!value) throw new InvalidOperationException("Cold random parser proof failed."); checks++; }
-        Check(Parse(Packet(good)) == new Evidence(0, 0, 0, 0, true, true, "legacy-cryptoapi", new(true, 0, true, 0, 0, true, true)));
-        Check(Parse(Unopened()).legacy == new LegacyEvidence(false, 5, null, null, null, true, true));
-        Check(Parse(Packet(0x53584352, 2, 0xc0000022, 0xc0000022, 0, 0, 1, 1, 1, 0, 1, 0, 1, 0, 1, 1)).providerStatus == null);
-        Check(Parse(Packet(0x53584352, 2, 0, 0, 0xc0000022, 0, 1, 1, 1, 0, 0, 0x80090020, 1, 0, 1, 1)).legacy == new LegacyEvidence(true, 0, false, 0x80090020, 0, true, true));
-        Check(Parse(Unopened(9, 0)).legacy.providerOpened == false);
-        foreach (var invalid in new[] {
-            new byte[0], new byte[63], new byte[65], Changed(0, 0), Changed(1, 1), Changed(1, 3), Changed(6, 0), Changed(7, 0), Changed(5, 1), Packet(0x53584352, 2, 0, 1, 1, 0, 1, 1, 1, 0, 1, 0, 1, 0, 1, 1),
-            Changed(8, 2), Changed(10, 2), Changed(12, 2), Changed(9, 1), Changed(11, 1), Changed(12, 0), Changed(13, 1), Changed(14, 0), Changed(15, 0), Unopened(10, 1), Unopened(11, 1), Unopened(12, 1), Unopened(13, 1) })
+        void Refuse(byte[] bytes) { bool refused = false; try { Parse(bytes); } catch (InvalidOperationException) { refused = true; } Check(refused); }
+        Check(Parse(Packet(good)).providerLookups == new LookupPair(new(true,0,"enhanced",true),new(true,0,"enhanced",true)));
+        Check(Parse(Changed((2,0xc0000022),(3,0xc0000022))).providerStatus == null);
+        foreach (int i in new[] { 8,16 })
         {
-            bool refused = false; try { Parse(invalid); } catch (InvalidOperationException) { refused = true; } Check(refused);
+            LegacyEvidence Select(Evidence e) => i == 8 ? e.legacy : e.enhancedProvider;
+            Check(Select(Parse(Unopened(i))) == new LegacyEvidence(false,5,null,null,null,true,true));
+            Check(Select(Parse(Changed((i+2,0),(i+3,0x80090020)))) == new LegacyEvidence(true,0,false,0x80090020,0,true,true));
+            Check(Select(Parse(Unopened(i,1,0))).providerOpened == false);
+            foreach (var invalid in new[] { Changed((i,2)),Changed((i+2,2)),Changed((i+4,2)),Changed((i+1,1)),Changed((i+3,1)),Changed((i+4,0)),Changed((i+5,1)),Changed((i+6,0)),Changed((i+7,0)),Unopened(i,2,1),Unopened(i,3,1),Unopened(i,4,1),Unopened(i,5,1) }) Refuse(invalid);
         }
-        if (checks != 28) throw new InvalidOperationException("Incomplete cold random parser inventory.");
+        foreach (var invalid in new[] { new byte[0],new byte[127],new byte[129],Changed((0,0)),Changed((1,2)),Changed((1,4)),Changed((6,0)),Changed((7,0)),Changed((5,1)),Changed((3,1),(4,1)) }) Refuse(invalid);
+        foreach (int i in new[] { 24,28 })
+        {
+            var e = Parse(Changed((i,0),(i+1,5),(i+2,0))); Check((i == 24 ? e.providerLookups.user : e.providerLookups.machine) == new LookupEvidence(false,5,null,true));
+            foreach (var invalid in new[] { Changed((i,2)),Changed((i+1,1)),Changed((i+2,4)),Changed((i+3,0)),Changed((i,0),(i+2,1)) }) Refuse(invalid);
+        }
+        if (checks != 56) throw new InvalidOperationException("Incomplete cold random parser inventory.");
         return checks;
     }
 }
