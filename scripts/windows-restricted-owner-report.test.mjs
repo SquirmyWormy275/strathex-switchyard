@@ -12,6 +12,17 @@ test("fixed Node imports retain only known method presence and exact image hash,
   for (const extra of [{ nodeStartupAccepted: true }, { runtimeBranchVerified: true }, { nodeSha256: "b".repeat(64) }, { path: "NEVER_RETAIN" }, { imports: { ...value.imports, extra: true } }, { imports: { ...value.imports, CryptGenRandom: 1 } }]) assert.throws(() => verifyNodeRngImports({ ...value, ...extra }, "a".repeat(64)));
 });
 function stdio() { return { schema: "switchyard-restricted-child-stdio/v1", standardHandles: 3, inheritanceRestricted: true, stdinEof: true, stdoutBytes: 0, stderrBytes: 0, outputBounded: true, handlesClosedVerified: true, drainsCompleted: true, stderr: { category: "empty", function: null, code: null, sourceFile: null, sourceLine: null } }; }
+test("restricted child preserves only closed state-lock failure evidence", () => {
+  const stateLockFailure = { schema: "switchyard-state-lock-failure/v1", kind: "child-exit", phase: "worker-startup", progress: "not-observed", exitCode: 3221225794, signal: null, spawnCode: null };
+  const child = { waitResult: 0, exitCode: 2, resultAvailable: true, stateLockFailure };
+  const report = { schema: "switchyard-storage-broker-protocol-proof/v1", success: false, restrictedHostChildExit: child };
+  assert.deepEqual(storageBrokerFailureEvidence(report).restrictedHostChildExit, child);
+  assert.equal(storageBrokerFailureEvidence({ ...report, restrictedHostChildExit: { ...child, stateLockFailure: null } }).restrictedHostChildExit.stateLockFailure, null);
+  for (const extra of [{ raw: "NEVER_RETAIN" }, { kind: "NEVER_RETAIN" }, { exitCode: 4294967296 }]) {
+    const result = storageBrokerFailureEvidence({ ...report, restrictedHostChildExit: { ...child, stateLockFailure: { ...stateLockFailure, ...extra } } });
+    assert.equal(result.restrictedHostChildExit, undefined); assert.equal(JSON.stringify(result).includes("NEVER_RETAIN"), false);
+  }
+});
 function sample() { return { success: true, nativeRestrictedHostProof: {
   standardIo: stdio(),
   selfTokenQueryAccessVerified: true,

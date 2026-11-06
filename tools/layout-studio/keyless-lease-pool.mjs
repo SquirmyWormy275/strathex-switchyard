@@ -1,4 +1,18 @@
 /** Short-lived helpers retain only a kernel-lock path, never protected state or keys. */
+const failureKinds = ["timeout", "child-exit", "spawn-error", "input-error", "invalid-reply", "output-bound", "not-live"];
+const phases = ["worker-startup", "lease-acquire", "lease-release"];
+const progressLabels = ["not-observed", "lease-entered", "lease-input-read", "lease-request-read", "lease-owner-found"];
+const signals = [null, "SIGTERM", "SIGKILL", "SIGABRT", "SIGSEGV", "SIGILL", "SIGBUS", "SIGINT", "other"];
+const spawnCodes = [null, "ENOENT", "EACCES", "EPERM", "EINVAL", "ENOMEM", "EAGAIN", "other"];
+export function stateLockFailureEvidence(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)
+      || Object.keys(value).sort().join() !== "exitCode,kind,phase,progress,schema,signal,spawnCode"
+      || value.schema !== "switchyard-state-lock-failure/v1" || !failureKinds.includes(value.kind)
+      || !phases.includes(value.phase) || !progressLabels.includes(value.progress)
+      || !(value.exitCode === null || Number.isInteger(value.exitCode) && value.exitCode >= -2147483648 && value.exitCode <= 4294967295)
+      || !signals.includes(value.signal) || !spawnCodes.includes(value.spawnCode)) return undefined;
+  return Object.freeze({ ...value });
+}
 export function createKeylessLeasePool({ spawnWorker, idleMs = 1000, timeoutMs = 15000, maxWorkers = 64 }) {
   if (typeof spawnWorker !== "function" || !Number.isInteger(idleMs) || idleMs < 1 || idleMs > 2000 || !Number.isInteger(timeoutMs) || timeoutMs < 50 || timeoutMs > 15000 || !Number.isInteger(maxWorkers) || maxWorkers < 1 || maxWorkers > 64) throw new Error("The bounded private lease pool configuration is invalid.");
   const workers = new Map(); let stopped = false;
@@ -7,7 +21,14 @@ export function createKeylessLeasePool({ spawnWorker, idleMs = 1000, timeoutMs =
   function start(key) {
     if (stopped || workers.size >= maxWorkers) throw unavailable();
     const child = spawnWorker(key);
-    const worker = { child, alive: true, closing: false, exited: false, held: false, sequence: 0, depth: 0, tail: Promise.resolve(), buffer: "", progress: "not-observed", pending: undefined };
+    const worker = { child, alive: true, closing: false, exited: false, held: false, sequence: 0, depth: 0, tail: Promise.resolve(), buffer: "", phase: "worker-startup", progress: "not-observed", pending: undefined };
+    function failure(kind, error = unavailable(), exitCode = null, signal = null, spawnCode = null) {
+      error.code ??= "STATE_LOCK_UNAVAILABLE";
+      error.stateLockFailure = stateLockFailureEvidence({ schema: "switchyard-state-lock-failure/v1", kind, phase: worker.phase,
+        progress: worker.progress, exitCode: Number.isInteger(exitCode) && exitCode >= -2147483648 && exitCode <= 4294967295 ? exitCode : null,
+        signal: signals.includes(signal) ? signal : "other", spawnCode: spawnCodes.includes(spawnCode) ? spawnCode : "other" });
+      return error;
+    }
     let closed; worker.closed = new Promise(resolve => { closed = resolve; });
     function fail(error) {
       worker.pending?.reject(error); worker.pending = undefined;
@@ -16,20 +37,21 @@ export function createKeylessLeasePool({ spawnWorker, idleMs = 1000, timeoutMs =
       if (child.exitCode === null) child.kill();
     }
     worker.wait = (expected, limit = timeoutMs, phase = "worker-startup") => new Promise((resolve, reject) => {
-      if (!worker.alive || worker.pending) { reject(unavailable()); return; }
-      const timer = setTimeout(() => fail(Object.assign(new Error(`Private state lock timed out during ${phase} (worker progress: ${worker.progress}). Existing data was preserved.`), { code: "STATE_LOCK_TIMEOUT", lockPhase: phase, workerProgress: worker.progress })), Math.max(1, limit));
+      if (!worker.alive || worker.pending) { reject(failure("not-live")); return; }
+      worker.phase = phase;
+      const timer = setTimeout(() => fail(failure("timeout", Object.assign(new Error(`Private state lock timed out during ${phase} (worker progress: ${worker.progress}). Existing data was preserved.`), { code: "STATE_LOCK_TIMEOUT", lockPhase: phase, workerProgress: worker.progress }))), Math.max(1, limit));
       worker.pending = { expected, resolve: value => { clearTimeout(timer); resolve(value); }, reject: error => { clearTimeout(timer); reject(error); } };
     });
     worker.ready = worker.wait(["READY"]);
     child.stdout.setEncoding("utf8");
     child.stdout.on("data", chunk => {
       worker.buffer += chunk;
-      if (Buffer.byteLength(worker.buffer) > 256) { fail(unavailable()); return; }
+      if (Buffer.byteLength(worker.buffer) > 256) { fail(failure("output-bound")); return; }
       let end;
       while ((end = worker.buffer.indexOf("\n")) >= 0) {
         const line = worker.buffer.slice(0, end).replace(/\r$/, ""); worker.buffer = worker.buffer.slice(end + 1);
         const pending = worker.pending;
-        if (!pending || !pending.expected.includes(line)) { fail(unavailable()); return; }
+        if (!pending || !pending.expected.includes(line)) { fail(failure("invalid-reply")); return; }
         worker.pending = undefined; pending.resolve(line);
       }
     });
@@ -47,10 +69,10 @@ export function createKeylessLeasePool({ spawnWorker, idleMs = 1000, timeoutMs =
         else { diagnostic = ""; discarding = true; }
       }
     });
-    child.stdin.on("error", () => fail(unavailable()));
-    child.once("error", () => fail(unavailable()));
-    child.once("close", () => { clearTimeout(worker.idle); worker.alive = false; worker.closing = true; worker.exited = true; worker.pending?.reject(unavailable()); worker.pending = undefined; if (workers.get(key) === worker) workers.delete(key); closed(); });
-    worker.exchange = async (request, expected, limit, phase) => { const answer = worker.wait(expected, limit, phase); try { child.stdin.write(request + "\n"); } catch { fail(unavailable()); } return answer; };
+    child.stdin.on("error", () => fail(failure("input-error")));
+    child.once("error", error => fail(failure("spawn-error", unavailable(), null, null, error.code)));
+    child.once("close", (code, signal) => { clearTimeout(worker.idle); worker.alive = false; worker.closing = true; worker.exited = true; worker.pending?.reject(failure("child-exit", unavailable(), code, signal)); worker.pending = undefined; if (workers.get(key) === worker) workers.delete(key); closed(); });
+    worker.exchange = async (request, expected, limit, phase) => { const answer = worker.wait(expected, limit, phase); try { child.stdin.write(request + "\n"); } catch { fail(failure("input-error")); } return answer; };
     workers.set(key, worker); return worker;
   }
   async function closeWorker(worker) {

@@ -31,6 +31,15 @@ evidence, not instructions to reset. Publish regular commits. Do not merge or re
 
 ## Current implementation and evidence
 
+Latest Windows result: `a061be0` verifies the query-only child token ACL, preserves
+all restrictions, denies duplicate/impersonation access and starts the original
+Node image. Both legacy cold providers succeed. The original owner journey now
+fails at private-state initialization, exit 2, zero of eight checks. Preserve
+its fixture; investigate the bounded lease-helper diagnostic next. The source now
+retains exact fixed phases/exit codes with 37 JS tests (one declared skip) and
+1,965 portable managed checks; native followup is pending. [Diagnostic source](evidence/windows-state-lock-failure-source-summary.json). Do not add
+rights or change accounts to clear this failure. [Receipt](evidence/windows-self-query-native-summary.json).
+
 | Area | Current state | Next boundary |
 | --- | --- | --- |
 | Original task owners and loading | Authenticated owner/load routes bind the original live account, repository, task, socket and process. Durable reviews prevent replay; stop/workspace/shutdown paths join owned work. [Contract](coding-task-owners.md). | Existing creation/text routes remain stdio. No new real task loading is authorized by this work. |

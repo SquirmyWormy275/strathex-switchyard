@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { once } from "node:events";
-import { createKeylessLeasePool } from "./keyless-lease-pool.mjs";
+import { createKeylessLeasePool, stateLockFailureEvidence } from "./keyless-lease-pool.mjs";
 
 // Real independently exited children double only the closed lock protocol.
 // Actual Windows kernel locking is exercised separately by state-lock tests.
@@ -91,9 +91,28 @@ test("bounded timeout diagnostics distinguish startup, acquisition and release w
     const { pool, children } = fixture(t, mode, { timeoutMs: 1000 }); let invoked = 0;
     await assert.rejects(pool.withLease("PRIVATE_LOCK_PATH", () => { invoked++; }), error => {
       assert.equal(error.code, "STATE_LOCK_TIMEOUT"); assert.equal(error.lockPhase, phase); assert.equal(error.workerProgress, "lease-input-read");
+      assert.equal(error.stateLockFailure.kind, "timeout"); assert.equal(error.stateLockFailure.phase, phase);
       assert.ok(error.message.includes(phase)); assert.equal(/PRIVATE|XXXX|lease-owner-found/.test(error.message), false); return true;
     });
     assert.equal(invoked, calls); await children[0].closed;
     assert.equal(children.length, 1, "A failed transaction never creates a replacement helper");
   }
+});
+
+test("child exit and malformed lock replies retain fixed failure facts without stdout, stderr or paths", async t => {
+  for (const [mode, kind, phase, exitCode] of [["die-on-acquire", "child-exit", "lease-acquire", 5], ["bad-ready", "invalid-reply", "worker-startup", null], ["oversized", "output-bound", "worker-startup", null], ["stale-release", "invalid-reply", "lease-release", null]]) {
+    const { pool } = fixture(t, mode);
+    await assert.rejects(pool.withLease("PRIVATE_LOCK_PATH", () => {}), error => {
+      assert.equal(error.code, "STATE_LOCK_UNAVAILABLE");
+      const evidence = stateLockFailureEvidence(error.stateLockFailure);
+      assert.ok(evidence); assert.equal(evidence.kind, kind); assert.equal(evidence.phase, phase); assert.equal(evidence.exitCode, exitCode);
+      assert.equal(/PRIVATE|UNEXPECTED|XXXX/.test(JSON.stringify(evidence)), false); return true;
+    });
+  }
+});
+
+test("state lock failure projection refuses private and malformed fields without granting a lease", () => {
+  const value = { schema: "switchyard-state-lock-failure/v1", kind: "child-exit", phase: "worker-startup", progress: "not-observed", exitCode: 3221225794, signal: null, spawnCode: null };
+  assert.deepEqual(stateLockFailureEvidence(value), value); assert.notEqual(stateLockFailureEvidence(value), value);
+  for (const extra of [{ path: "PRIVATE" }, { kind: "PRIVATE" }, { phase: "PRIVATE" }, { progress: "PRIVATE" }, { signal: "PRIVATE" }, { spawnCode: "PRIVATE" }, { exitCode: 4294967296 }, { exitCode: -2147483649 }, { exitCode: 0.1 }, { exitCode: "5" }, { schema: "wrong" }]) assert.equal(stateLockFailureEvidence({ ...value, ...extra }), undefined);
 });

@@ -1,5 +1,12 @@
 # What has actually been verified
 
+Native Windows `a061be0` clears the original random-startup abort with query-only
+access to the owned child token. Original ACL entries/restrictions and denied
+duplicate/impersonation checks verify. The same Node image reaches JavaScript,
+then fails private-state initialization (exit 2, zero owner checks). Separate
+filesystem/setup jobs pass. The failed fixture is preserved; the whole owner
+journey remains unaccepted. [Source-bound artifact](evidence/windows-self-query-native-summary.json).
+
 Installed `5a2c324` passes six update, eleven owner/editor/severity and seven
 journal checks. All 54 non-audit semantic snapshots match the fixed-clock
 preflight; 52 sealed files are identical, and two have only expected recovery

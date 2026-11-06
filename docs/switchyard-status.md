@@ -17,12 +17,17 @@ rechecked. **Command wiring and native task/account acknowledgement remain
 unfinished.** Passing editor/provider doubles does not establish IDE attachment.
 [Contract and evidence](coding-task-owners.md#one-reviewed-editor-terminal-creation).
 
-**Windows startup remains a failed software validation.** At `78b640d`, the
-exact Node image imports the three legacy CryptoAPI random functions; its dump
-does not list `BCryptGenRandom`. The cold CNG probe succeeds, but Node still
-aborts at `ncrypto::CSPRNG`, exit 134, before its owner result. Both artifact
-digests and source/merge identity verify. Imports do not prove the executed
-OpenSSL branch. [Native evidence](evidence/windows-node-rng-imports-native-summary.json).
+**Windows restricted Node now starts, but the owner journey still fails.**
+At `a061be0`, query-only access to each owned child token makes both cold legacy
+random providers succeed. Duplicate/impersonation access remains denied; the
+original ACEs and token restrictions verify. The unchanged pinned Node reaches
+JavaScript and reports exit 2 at `private-state-initialize`, before any of its
+eight owner checks. This is failed software validation, not a hardware/account
+blocker. The original failed fixture is preserved. [Native evidence](evidence/windows-self-query-native-summary.json).
+
+The earlier `78b640d` CSPRNG exit 134 remains recorded as failed historical
+evidence. Static imports did not prove the executed OpenSSL branch.
+[Historical result](evidence/windows-node-rng-imports-native-summary.json).
 
 At `a37751c`, the legacy-first native probe reports **Access Denied (Win32 error
 5)** from `CryptAcquireContextW` before generation. Later CNG calls succeed.
@@ -56,7 +61,7 @@ failure remains; a provider's exact failing operation is still unproved.
 [Native evidence](evidence/windows-self-token-native-summary.json). Native
 `d900499` descriptor readback shows only Administrators, SYSTEM and logon ACEs,
 with no allow entry for the four restricting identities. The direct query denial
-is explained; a minimal query-only correction now passes two builds and sixteen projection tests; native execution remains pending. [Correction source](evidence/windows-self-query-source-summary.json). [Readback](evidence/windows-token-security-native-summary.json).
+is explained; the later query-only correction passes native ACL and random-startup checks, with private-state initialization now the failing phase. [Correction source](evidence/windows-self-query-source-summary.json). [Readback](evidence/windows-token-security-native-summary.json).
 
 The editor launcher can now observe the exact retained terminal's kernel PID,
 process birth and original executable identity while rechecking its consumed

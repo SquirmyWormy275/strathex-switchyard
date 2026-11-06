@@ -25,6 +25,7 @@ internal static class Program
             int stateLeaseProtocolChecks = StateLeaseProtocolProof.Run();
             int restrictedChildStderrChecks = RestrictedChildStderrProof.Run();
             int coldRandomParserChecks = ColdRandomReport.VerifyParser();
+            int stateLockFailureChecks = StateLockFailureEvidence.VerifyParser();
             int checks = 0;
             void Require(bool value) { if (!value) throw new InvalidOperationException("Storage broker protocol proof failed."); checks++; }
             void Refuses(Action action)
@@ -65,7 +66,7 @@ internal static class Program
                 else if(args[0]=="--native-host-owner")nativeRestrictedHostProof=NativeRestrictedHostProof.Run();
                 else throw new InvalidOperationException("The native proof flag is not recognized.");
             }
-            Console.WriteLine(JsonSerializer.Serialize(new {schema="switchyard-storage-broker-protocol-proof/v1",success=true,checks,serviceHeaderChecks,restrictedChildEventChecks,stateLeaseProtocolChecks,restrictedChildStderrChecks,coldRandomParserChecks,exchangeProtocolChecks,exchangeJournalChecks,exchangeFactsChecks,indexInputChecks,historyInputChecks,protectedFilesChecks,nativeServiceChecks,nativeExchangeChecks,nativeRestrictedHostProof,serviceInstalled=false,volumeOpened=nativeExchangeChecks>0||nativeRestrictedHostProof!=null,guestLaunched=false}));
+            Console.WriteLine(JsonSerializer.Serialize(new {schema="switchyard-storage-broker-protocol-proof/v1",success=true,checks,serviceHeaderChecks,restrictedChildEventChecks,stateLeaseProtocolChecks,restrictedChildStderrChecks,coldRandomParserChecks, stateLockFailureChecks,exchangeProtocolChecks,exchangeJournalChecks,exchangeFactsChecks,indexInputChecks,historyInputChecks,protectedFilesChecks,nativeServiceChecks,nativeExchangeChecks,nativeRestrictedHostProof,serviceInstalled=false,volumeOpened=nativeExchangeChecks>0||nativeRestrictedHostProof!=null,guestLaunched=false}));
             return 0;
         }
         catch(Exception error)
