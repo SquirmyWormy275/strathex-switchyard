@@ -459,3 +459,25 @@ Signed routes, typed client responses, retained Terminal activation and recovery
 after an interrupted host remain unfinished. The provider and terminal in this
 demonstration are controlled doubles; native TUI and 0.167.0 compatibility are
 unaccepted. No live account, native task, model or keyboard operation ran.
+
+## Recover only the original interrupted connection
+
+Protected ownership now includes the original host PID, process birth, UID and
+kernel boot identity. A fresh service cannot adopt a living host or obtain a new
+endpoint while an unknown prior reservation remains unfinished. After that host
+and its recorded carriers have exited, recovery checks the original protected
+record, parent, directory and stale socket before removing those exact names.
+It makes no provider/account request and signals no process. Unknown spawn
+windows, missing host proof, replacement names and foreign contents stay preserved.
+
+The demonstration abruptly kills an owned synthetic host, observes actual carrier
+exit, and recovers its stale socket through a fresh service. Separate tests
+preserve substituted and unrelated entries. Terminal disconnect now withdraws
+acknowledgement immediately and joins dedicated connection cleanup while leaving
+the original task owner alive. Six complete files pass 64 tests, with typecheck,
+parse checks, package import and exact test cleanup. The earlier ESRCH fixture
+failure is retained. [Evidence](evidence/editor-recovery-summary.json).
+
+Signed routes, typed client responses and retained Terminal activation remain
+unfinished. Native TUI and installed 0.167.0 compatibility are unaccepted. These
+controlled demonstrations do not exercise live accounts, tasks, models or hardware.

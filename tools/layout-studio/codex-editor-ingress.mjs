@@ -20,7 +20,7 @@ export async function openCodexEditorIngress({ socketPath, assertCurrent, onOwne
   const directoryIdentity=identity(dir);
   try { await lstat(socketPath); throw Error('The editor socket name already exists.'); } catch(error){if(error.code!=='ENOENT')throw error;}
   let child, childBirth, childExited=false, phase='reserved', peerAttempted=false, peerVerified=false, closed=false, failure, socketIdentity, stopPending, pump=Promise.resolve(), timer, queuedBytes=0, ownershipAttempted=false;
-  const ready=deferred(), peer=deferred(), exited=deferred(), operations=new Set(), controller=new AbortController();
+  const ready=deferred(), peer=deferred(), exited=deferred(), closedSignal=deferred(), operations=new Set(), controller=new AbortController();
   const live=()=>{require(!closed&&!failure&&!signal.aborted&&!childExited);};
   const admission=async()=>{live();await assertCurrent();live();require(same(identity(await lstat(directory,{bigint:true})),directoryIdentity));if(socketIdentity){const named=await lstat(socketPath,{bigint:true});require(named.isSocket()&&!named.isSymbolicLink()&&same(identity(named),socketIdentity));}live();};
   const ownership=()=>Object.freeze({schema:'switchyard-editor-ingress-owner/v1',phase,directory,directoryIdentity:{...directoryIdentity},socketPath,socketIdentity:socketIdentity&&{...socketIdentity},pid:child?.pid??null,birth:childBirth??null});
@@ -28,6 +28,8 @@ export async function openCodexEditorIngress({ socketPath, assertCurrent, onOwne
   function fail(error){failure??=error instanceof Error?error:Error('The editor carrier failed.');owner.close();}
   async function write(value){const text=JSON.stringify(value);require(typeof text==='string'&&Buffer.byteLength(text)<=LIMIT);await new Promise((resolve,reject)=>{child.stdin.write(text+'\n',error=>error?reject(Error('The editor carrier input closed.')):resolve());});}
   const owner=Object.freeze({
+    get closed(){return closed;},
+    whenClosed:closedSignal.promise,
     get privateOwnership(){return ownership();},
     observation(){return Object.freeze({schema:'switchyard-editor-ingress-observation/v1',phase,peerVerified:peerVerified&&!closed&&!childExited&&!failure,processExitVerified:childExited,socketCleanupVerified:phase==='stopped',protocolAcknowledged:false,ideAttached:false,authorityGranted:false});},
     pinPeer(input){
@@ -44,7 +46,7 @@ export async function openCodexEditorIngress({ socketPath, assertCurrent, onOwne
       live();require(peerVerified&&object(message));const text=JSON.stringify(message),size=Buffer.byteLength(text);require(size<=MAX&&queuedBytes+size<=2*MAX&&operations.size<64);const copied=JSON.parse(text);require(object(copied));queuedBytes+=size;
       return track(async()=>{try{await admission();require(peerVerified);await write({kind:'send',message:copied});await admission();}catch(error){fail(error);throw error;}finally{queuedBytes-=size;}});
     },
-    close(){if(closed)return;closed=true;controller.abort();clearTimeout(timer);signal.removeEventListener('abort',abort);ready.reject(failure??Error('The editor carrier was stopped.'));peer.reject(failure??Error('The editor carrier was stopped.'));child?.stdin.end();},
+    close(){if(closed)return;closed=true;closedSignal.resolve();controller.abort();clearTimeout(timer);signal.removeEventListener('abort',abort);ready.reject(failure??Error('The editor carrier was stopped.'));peer.reject(failure??Error('The editor carrier was stopped.'));child?.stdin.end();},
     stop(){
       if(stopPending)return stopPending;owner.close();
       stopPending=(async()=>{

@@ -15,6 +15,7 @@ const path = v => typeof v === 'string' && posix.isAbsolute(v) && posix.normaliz
 const numeric = v => typeof v === 'string' && /^[0-9]{1,20}$/.test(v);
 const identity = v => exact(v,['device','inode','uid','mode']) && Object.values(v).every(numeric) && BigInt(v.inode)>0n && (BigInt(v.mode)&0o077n)===0n;
 const processIdentity = v => Number.isSafeInteger(v.pid) && v.pid>0 && v.pid<=2147483647 && typeof v.birth==='string' && /^[1-9][0-9]{0,19}$/.test(v.birth);
+const hostIdentity = v => exact(v,['pid','birth','uid','bootId']) && processIdentity(v) && numeric(v.uid) && uuid(v.bootId);
 const digest = v => typeof v==='string' && /^[a-f0-9]{64}$/.test(v);
 const view = row => Object.freeze({ requestId:row.requestId, editorId:row.editorId, ownerRequestId:row.ownerRequestId, loadRequestId:row.loadRequestId, status:row.status,
   protocolAcknowledgementRecorded:row.acknowledgement!==undefined, stoppedVerified:row.status==='stopped', terminalLaunched:false, ideAttached:false, authorityGranted:false, completionVerified:false });
@@ -84,7 +85,7 @@ export function createCodingEditorJournal({ store, authorizations, now=Date.now 
     throw Error('This editor ownership checkpoint is not supported.');
   }
   return Object.freeze({
-    reserve(c,input) {const s=selection(input);return track(async()=>{
+    reserve(c,input,options={}) {const s=selection(input);require(exact(options,[]) || exact(options,['host']) && hostIdentity(options.host));const host=options.host&&structuredClone(options.host);return track(async()=>{
       const original=await capture(c,s);
       return store.withResourceLock('client-launch',key(c,s),async lock=>{
         await current(c,s,original);lock.assert();let saved,inserted=false;
@@ -93,8 +94,8 @@ export function createCodingEditorJournal({ store, authorizations, now=Date.now 
           require(!closed && policy(state)===original.policyDigest);lock.assert();
           const previous=rowFor(state,s);if(previous){saved=structuredClone(previous);return;}
           freshAuthorization(state,s,original);
-          const rows=state[field]??=[];require(rows.length<64);
-          saved={schema:'switchyard-editor-connection/v1',...s,taskId:original.target.taskId,targetDigest:original.targetDigest,policyDigest:original.policyDigest,status:'reserved',revision:0,createdAt:now()};rows.push(saved);inserted=true;
+          const rows=state[field]??=[];require(rows.length<64 && !rows.some(row=>row.status!=='stopped' && !leases.has(key(c,row))));
+          saved={schema:'switchyard-editor-connection/v1',...s,...(host?{host}:{}),taskId:original.target.taskId,targetDigest:original.targetDigest,policyDigest:original.policyDigest,status:'reserved',revision:0,createdAt:now()};rows.push(saved);inserted=true;
         },{provider:'codex'});
         // A saved row, including a stopped or interrupted one, never issues a
         // new handle after a lost reply or across host instances.
@@ -131,6 +132,19 @@ export function createCodingEditorJournal({ store, authorizations, now=Date.now 
         return { ...view(saved), duplicatePrevented:false, handle };
       });
     });},
+    recover(c,input,verify) {const s=selection(input);require(typeof verify==='function');return track(()=>store.withResourceLock('client-launch',key(c,s),async lock=>{
+      require(!closed && !leases.has(key(c,s)));await store.authorize(c);const original=structuredClone(rowFor(await store.snapshot(c),s));
+      require(original?.schema==='switchyard-editor-connection/v1' && uuid(original.taskId) && digest(original.targetDigest) && digest(original.policyDigest) && Number.isSafeInteger(original.revision) && original.revision>=0);
+      if(original.status==='stopped')return {...view(original),duplicatePrevented:true};
+      require(['reserved','directory-planned','private','upstream','ingress-reserved','ingress-started','ready','peer-pinned','peer-requested','connected','acknowledged','uncertain'].includes(original.status));
+      if(!hostIdentity(original.host))return {...view(original),recoveryBlocked:true};
+      const current=async()=>{require(!closed);await store.authorize(c);lock.assert();require(hash(rowFor(await store.snapshot(c),s))===hash(original));};
+      await current();const facts=await verify(structuredClone(original),current);
+      require(exact(facts,['hostExitVerified','upstreamExitVerified','carrierExitVerified','socketRemovedVerified','directoryRemovedVerified']) && Object.values(facts).every(v=>typeof v==='boolean'));await current();
+      if(!facts.hostExitVerified)return {...view(original),recoveryBlocked:true};
+      const next={...original,status:Object.values(facts).every(Boolean)?'stopped':'uncertain',retirement:{...facts},revision:original.revision+1,updatedAt:now()};
+      await store.update(c,'coding-editor-connection-recover',state=>{require(!closed);lock.assert();require(hash(rowFor(state,s))===hash(original));Object.assign(rowFor(state,s),next);});return view(next);
+    }));},
     async list(c) { await store.authorize(c);return ((await store.snapshot(c))[field]??[]).map(view); },
     async close() {closed=true;await Promise.allSettled([...pending]);}
   });

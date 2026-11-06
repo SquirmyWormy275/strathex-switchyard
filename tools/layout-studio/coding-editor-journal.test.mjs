@@ -34,6 +34,20 @@ test('only a consumed reviewed selection can reserve ownership, and another host
  const saved=(await f.store.snapshot('personal')).codingEditorConnections;assert.equal(saved.length,1);assert.equal(saved[0].status,'reserved');
  const again=await f.service().reserve('personal',f.selected);assert.equal(again.handle,undefined);assert.equal(again.duplicatePrevented,true);
 });
+test('an unknown unfinished host record prevents a new reviewed connection without affecting a locally retained owner',async t=>{
+ const f=await fixture(t);await f.consume();await f.api.reserve('personal',f.selected);f.selected.requestId=randomUUID();await f.consume();
+ await assert.rejects(f.service().reserve('personal',f.selected));assert.equal((await f.store.snapshot('personal')).codingEditorConnections.length,1);
+ assert.ok((await f.api.reserve('personal',f.selected)).handle);assert.equal((await f.store.snapshot('personal')).codingEditorConnections.length,2);
+});
+test('recovery cannot adopt a live local handle or a record without its original host identity',async t=>{
+ const f=await fixture(t);await f.consume();await f.api.reserve('personal',f.selected);let checks=0;const verify=async()=>{checks++;return{hostExitVerified:true,...clean};};
+ await assert.rejects(f.api.recover('personal',f.selected,verify));assert.equal((await f.service().recover('personal',f.selected,verify)).recoveryBlocked,true);assert.equal(checks,0);
+});
+test('recovery rechecks protected ownership after independent verification and preserves a replacement record',async t=>{
+ const f=await fixture(t);await f.consume();await f.api.reserve('personal',f.selected,{host:{pid:1,birth:'100',uid:'1000',bootId:'11111111-1111-4111-8111-111111111111'}});
+ await assert.rejects(f.service().recover('personal',f.selected,async()=>{await f.store.update('personal','fixture-substitution',s=>{s.codingEditorConnections[0].revision=99;});return{hostExitVerified:true,...clean};}));
+ assert.equal((await f.store.snapshot('personal')).codingEditorConnections[0].revision,99);assert.equal((await f.store.snapshot('personal')).codingEditorConnections[0].status,'reserved');
+});
 test('the complete journal records immutable process/socket checkpoints while exposing no live attachment authority',async t=>{
  const f=await fixture(t);await f.consume();const {handle}=await f.api.reserve('personal',f.selected);await connected(handle);await handle.record({kind:'acknowledged',observation:ack});await handle.assertCurrent();
  const row=(await f.store.snapshot('personal')).codingEditorConnections[0];assert.equal(row.revision,9);assert.equal(row.ingress.pid,300);assert.equal(row.upstream.pid,200);assert.equal(row.peer.pid,400);assert.deepEqual(row.directory.identity,identity);

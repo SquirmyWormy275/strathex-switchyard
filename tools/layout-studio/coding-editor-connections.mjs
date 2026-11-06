@@ -6,6 +6,7 @@ import { createCodingEditorJournal } from './coding-editor-journal.mjs';
 import { openCodexEditorIngress } from './codex-editor-ingress.mjs';
 import { createCodexEditorRelay } from './codex-editor-relay.mjs';
 import { stopOwnedChild } from './owned-process.mjs';
+import { retireStoppedEditorConnection } from './codex-editor-recovery.mjs';
 
 const hash=v=>createHash('sha256').update(JSON.stringify(v)).digest('hex');
 const uuid=v=>typeof v==='string' && /^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/.test(v);
@@ -29,12 +30,12 @@ export function createCodingEditorConnections({ store, authorizations, owners, r
   const generation=c=>generations.get(c)??0;
   const track=(c,fn)=>{const work=Promise.resolve().then(fn);pending.set(work,c);void work.then(()=>pending.delete(work),()=>pending.delete(work));return work;};
   async function current(r) {
-    require(!closed && !transitions.has(r.c) && r.g===generation(r.c) && !r.stopping && !r.abort.signal.aborted);await r.handle.assertCurrent();require(hash(await directory(root))===hash(r.parent));
+    require(!closed && !transitions.has(r.c) && r.g===generation(r.c) && !r.stopping && !r.abort.signal.aborted && !r.ingress?.closed);await r.handle.assertCurrent();require(hash(await directory(root))===hash(r.parent));
     if(r.directoryIdentity)require(hash(await directory(r.directory))===hash(r.directoryIdentity));
-    require(!closed && !transitions.has(r.c) && r.g===generation(r.c) && !r.stopping && !r.abort.signal.aborted);
+    require(!closed && !transitions.has(r.c) && r.g===generation(r.c) && !r.stopping && !r.abort.signal.aborted && !r.ingress?.closed);
   }
-  const observation=r=>({requestId:r.s.requestId,status:r.stopping?'closing':r.relay?.observation().protocolAcknowledged?'acknowledged':r.ingress?.observation().phase??'preparing',
-    peerVerified:r.ingress?.observation().peerVerified===true,protocolAcknowledged:r.relay?.observation().protocolAcknowledged===true,
+  const observation=r=>({requestId:r.s.requestId,status:r.stopping?'closing':r.ingress?.closed?'closed':r.ingress?.observation().peerVerified && r.relay?.observation().protocolAcknowledged?'acknowledged':r.ingress?.observation().phase??'preparing',
+    peerVerified:r.ingress?.observation().peerVerified===true,protocolAcknowledged:r.ingress?.observation().peerVerified===true && r.relay?.observation().protocolAcknowledged===true,
     terminalLaunched:false,ideAttached:false,authorityGranted:false,completionVerified:false});
   async function stop(r) {
     if(r.stopping)return r.stopping;
@@ -53,7 +54,8 @@ export function createCodingEditorConnections({ store, authorizations, owners, r
   return Object.freeze({
     open(c,input) {const s=selected(input),g=generation(c);return track(c,async()=>{
       require(!closed && !transitions.has(c) && g===generation(c));const parent=await directory(root),target=await authorizations.returnTarget(c,s);require(!closed && !transitions.has(c) && g===generation(c));
-      const reservation=await journal.reserve(c,s);if(!reservation.handle)return reservation;
+      const bootId=(await readFile('/proc/sys/kernel/random/boot_id','utf8')).trim();require(uuid(bootId));
+      const reservation=await journal.reserve(c,s,{host:{pid:process.pid,birth:await birth(process.pid),uid:String(process.getuid()),bootId}});if(!reservation.handle)return reservation;
       const r={c,s,g,parent,target:structuredClone(target),handle:reservation.handle,directory:posix.join(root,s.requestId),abort:new AbortController(),directoryAttempted:false,ingressAttempted:false};
       require(!live.has(key(c,s)));live.set(key(c,s),r);
       try{
@@ -70,6 +72,7 @@ export function createCodingEditorConnections({ store, authorizations, owners, r
         r.ingressAttempted=true;
         r.ingress=await openCodexEditorIngress({socketPath:r.directory+'/s',signal:r.abort.signal,assertCurrent:()=>current(r),onMessage:message=>r.relay.receive(message),
           onOwnership:async ownership=>{if(ownership.phase!=='stopped')await r.handle.record({kind:'ingress',ownership});}});
+        void r.ingress.whenClosed.then(()=>{void stop(r).catch(()=>{});});
         await current(r);const o=r.ingress.privateOwnership;return{...observation(r),duplicatePrevented:false,endpoint:{socketPath:o.socketPath,socketDevice:o.socketIdentity.device,socketInode:o.socketIdentity.inode}};
       }catch(error){try{await stop(r);}catch{error.editorRetirementUnconfirmed=true;}throw error;}
     });},
@@ -79,6 +82,10 @@ export function createCodingEditorConnections({ store, authorizations, owners, r
     });},
     observe(c,input) {const s=selected(input);return track(c,async()=>{const r=live.get(key(c,s));require(r && hash(r.s)===hash(s));await current(r);return observation(r);});},
     stop(c,input) {const s=selected(input);return track(c,async()=>{const r=live.get(key(c,s));require(r && hash(r.s)===hash(s));return stop(r);});},
+    recover(c,input) {const s=selected(input);return track(c,async()=>{
+      require(!closed && !transitions.has(c) && !live.has(key(c,s)));
+      return journal.recover(c,s,(row,beforeEffect)=>retireStoppedEditorConnection({root,row,beforeEffect}));
+    });},
     stopCompartment(c) {
       require(typeof c==='string' && /^[a-z0-9][a-z0-9-]{0,63}$/.test(c));if(transitions.has(c))return transitions.get(c);
       generations.set(c,generation(c)+1);

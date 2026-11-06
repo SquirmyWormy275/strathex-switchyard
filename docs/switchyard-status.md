@@ -5,7 +5,7 @@ eleven declared skips and zero failures**. Every child/tree and the exact owned
 checkout, dependencies, builds and temporary parent are retired.
 [Complete result](evidence/linux-072-complete-summary.json).
 It includes the restricted editor relay and synthetic carrier demonstration.
-The later protected journal has separate focused evidence; the earlier
+The later protected journal, composition and recovery have separate focused evidence; the earlier
 `7772cb3` socket-cleanup failure remains retained.
 
 Windows `700e7f2` reaches the console comparison: the hidden-console helper
@@ -16,25 +16,12 @@ the ordinary eight-check journey and separate filesystem/setup jobs pass.
 [Native result](evidence/windows-lease-console-native-summary.json).
 The earlier stale verifier inventory failure remains retained.
 
-The internal editor relay now passes **seven groups / 79 tests**, including a
-real Linux socket path from an exact synthetic terminal peer through the ingress
-and a dedicated pinned provider-double connection. Original account samples
-bracket the single exact resume; a model-turn attempt is refused. Production
-journal/routes, retained Terminal activation and native TUI compatibility remain
-unfinished. [Evidence](evidence/editor-relay-summary.json).
-
-The protected editor ownership journal passes **three groups / 24 tests** using
-the actual encrypted store and kernel leases. It prevents duplicate creation and
-expired-permit reuse, pins ordered ownership checkpoints and retains uncertain
-cleanup. Production composition/routes and interrupted-host recovery remain
-unfinished. [Evidence](evidence/editor-journal-summary.json).
-
-The internal editor connection service now composes the protected journal, real
-Linux carriers and restricted relay: **five groups / 57 tests pass**. It records
-directory intent before creation and acknowledgement before delivery, prevents a
-second endpoint, joins workspace/shutdown work and preserves substituted sockets.
-Signed routes, client/Terminal wiring and interrupted-host recovery remain
-unfinished. [Evidence](evidence/editor-connections-summary.json).
+The composed editor lifecycle and crash recovery pass **six groups / 64 tests**,
+including abrupt loss of an owned synthetic host, exact stale-socket retirement,
+preservation of foreign files and acknowledgement withdrawal on terminal disconnect.
+Real encrypted state and Linux carriers are exercised with provider/editor doubles.
+Signed routes, typed client/Terminal wiring and native TUI compatibility remain
+unfinished. [Recovery evidence](evidence/editor-recovery-summary.json).
 
 The installed Codex CLI is now **0.167.0**. Offline schema generation succeeds and
 its scratch files are removed; the reviewed adapter still refuses versions other

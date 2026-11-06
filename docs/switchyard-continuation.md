@@ -31,17 +31,17 @@ evidence, not instructions to reset. Publish regular commits. Do not merge or re
 
 ## Current implementation and evidence
 
-Latest published relay checkpoint is `072e066`: seven groups / 79 tests,
-typecheck and package import pass. Real Linux ingress and a dedicated pinned
-upstream carry one synthetic task resume bracketed by account samples; a model
-turn is refused. The later protected journal component passes three groups /
-24 tests. The internal lifecycle composition now passes five groups / 57 tests with the
-real journal and carriers. Wire signed routes, typed responses and the retained
-Terminal next; interrupted-host recovery and native TUI compatibility remain
-unaccepted.
-[Relay](evidence/editor-relay-summary.json),
-[journal](evidence/editor-journal-summary.json).
-[Composed lifecycle](evidence/editor-connections-summary.json).
+The composed editor lifecycle and recovery now pass six groups / 64 tests,
+typecheck, JavaScript parse and package checks. The real protected journal records
+original host/boot, directory, upstream, ingress and terminal identities. Abrupt
+synthetic host loss permits exact stale-socket retirement without provider/account
+access. Live hosts, unidentified spawn windows, missing original-host proof and
+foreign entries remain preserved. Terminal disconnect withdraws acknowledgement
+and joins exact dedicated cleanup. Signed routes, typed responses and the retained
+Terminal still need wiring; native TUI compatibility remains unaccepted.
+[Recovery evidence](evidence/editor-recovery-summary.json),
+[composed lifecycle](evidence/editor-connections-summary.json),
+[relay](evidence/editor-relay-summary.json).
 
 The installed CLI is now 0.167.0. Only offline schemas were generated; scratch
 files are removed. Keep the existing 0.166.0 gate until actual compatibility is
@@ -133,7 +133,8 @@ the installed update or old live provider verifiers without a relevant new chang
    including joined cancellation and exact uncertain cleanup. It requires caller
    ownership callbacks, which remain doubled in this cohort. The later dedicated original upstream and restricted relay pass their synthetic
    end-to-end check. The protected journal component also passes real-store tests.
-   Compose these into production lifecycle/routes and the retained Terminal next;
+   The protected lifecycle and interrupted-host recovery now compose these components.
+   Wire signed routes and the retained Terminal next;
    no live task/IDE acknowledgement is granted. [Carrier](evidence/editor-ingress-summary.json),
    [parent lifecycle](evidence/editor-ingress-owner-summary.json).
 4. Continue other ledger requirements, including remaining Shield coverage,
