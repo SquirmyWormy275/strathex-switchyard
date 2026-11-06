@@ -69,9 +69,11 @@ member inconsistencies and parser-limit cases. The original fifteen wheel-identi
 fixtures remain unchanged. Portable checks consume these committed facts without
 requiring Python.
 
-Installed and native Windows RECORD acceptance are pending. The current installed
-39db1fe release has separate wheel-identity metadata acceptance and predates this
-implementation. Actual source scanner journeys and Windows guest doubles have
+Installed 7dbb0b8 passes twelve Python metadata/in-memory checks inside its
+46-check update. All fourteen module hashes, 54 workspace snapshots and frozen
+frontend verify. Its prepared bundle is removed; only current plus one rollback
+remain. [Installed evidence](evidence/installed-python-records-summary.json).
+Native Windows RECORD acceptance remains pending. Actual source scanner journeys and Windows guest doubles have
 separate results; a double does not establish native guest execution.
 
 Thirty focused groups pass 147 distinct checks, including six actual Linux scans,

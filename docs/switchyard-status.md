@@ -26,6 +26,23 @@ there is no merge or public release acceptance.
 
 ## Current evidence
 
+Normal installed 7dbb0b8 passes **46 metadata/synthetic checks**: thirteen
+task-owner, seven Copilot-journal, fourteen agent/helper/SDK and twelve Python
+inventory/archive checks. Fourteen exact installed module hashes, thirty RECORD
+reference cases and six in-memory RECORD reports verify. All 54 semantic
+workspaces, selected state, pending keyboard-only conversation and frozen frontend
+remain intact; 53 sealed files are byte-identical and one changes only audit
+metadata. Dated backup/readback, current plus one rollback and removal of the
+528-file, 5,224,239-byte prepared bundle verify. No live scanner process, provider
+task, agent, account, model request or hardware operation starts.
+[Installed evidence](evidence/installed-python-records-summary.json).
+
+The agent metadata verifier initially refused the newly tested package-builder
+hash because it still referenced older scanner-review evidence. It now pins the
+builder to its new passing package/installation evidence; four guard tests and
+all fourteen installed checks pass. No validation bypass or broader permissions
+were introduced. [Verifier correction](evidence/installed-record-verifier-pin-summary.json).
+
 Selected Python wheel RECORD declarations now compare supported SHA-256/384/512
 hashes and sizes against every required member in memory. A matching outer hash
 and package identity cannot conceal an internal mismatch. Thirty independent
@@ -35,7 +52,7 @@ The original package limit initially failed; removing duplicate browser files an
 a build-only recipe restores the full synthetic bundle to 5,234,726 bytes. Exact
 frozen-asset HTTP readback, all sixteen installation/recovery scenarios, typecheck
 and owned cleanup pass. No extraction, package execution, signature verification
-or complete safety claim occurs. Installed/native Windows RECORD acceptance
+or complete safety claim occurs. Installed metadata acceptance now passes; native Windows RECORD acceptance
 remains pending. [Contract](python-wheel-records.md),
 [source evidence](evidence/pypi-wheel-record-source-summary.json).
 
@@ -133,7 +150,7 @@ Installed metadata checks now pass separately; native Windows marker acceptance 
 | Installation and runtime | All sixteen original Windows installation/recovery cases pass at `b600a6d`; its independent fresh runtime installs 49 packages and loads/rechecks the offline CPU model, then removes its temporary runtime. [Installation](evidence/installation-scenarios-native-summary.json), [runtime](evidence/windows-runtime-b600-native-summary.json). | Complete Windows `9f35961` now passes separately; ordinary-user/guest journeys remain open. |
 | Latest diagnostic source | Seven focused groups pass 69 tests with five Windows-only skips. Two managed builds, 2,101 portable checks, typecheck and exact owned cleanup pass. [Receipt](evidence/worker-start-observation-source-summary.json). | Actual Windows `d15285b` passes all eight acknowledgement/refusal tests without skips. [Native receipt](evidence/worker-start-refusal-native-summary.json). The full restricted-owner journey is now separately accepted above. |
 | Windows index/history/leases | Native NTFS index and history packets each pass six checks and three independent guardian exits. Both Windows scanner files pass two cases with guest execution doubled; lease groups pass 24 tests and one Linux-only skip. [Evidence](evidence/native-history-index-leases-summary.json). | Packet Git witnesses are synthetic. Actual guest, installed Windows and ordinary-user acceptance remain separate. |
-| Installed app | Linux source `39db1fe` passes **44 metadata/synthetic checks** and fourteen tested module hashes. All 54 semantic snapshots and frozen frontend bytes verify. Only current plus one rollback remain; the 5,231,889-byte prepared bundle is removed. [Evidence](evidence/installed-python-wheels-summary.json). | Pure in-memory examples start no scanner process, live task, agent or account action. Frontend/editor activation remains frozen. |
+| Installed app | Linux source `7dbb0b8` passes **46 metadata/synthetic checks** and fourteen exact module hashes. All 54 semantic snapshots and frozen frontend verify. Current plus one rollback remain; the 5,224,239-byte prepared bundle is removed. [Evidence](evidence/installed-python-records-summary.json). | Pure in-memory examples start no scanner process, live task, agent or account action. Frontend/editor activation remains frozen. |
 | Windows npm archive identity | Corrected `55515d1` completes ten archive tests plus eight original byte-comparison tests, each file with two original Linux-only skips inside its original 300-second bound; guest execution is doubled. [Archive](evidence/npm-archive-native-summary.json), [bytes](evidence/npm-artifact-split-native-summary.json). | Complete Windows release remains separate. |
 | Windows shortcut retirement | `80601e9` passes all sixteen original installation/recovery scenarios and twelve writer checks, no skips and verified cleanup. The fixed stage diagnostics execute with the original bounds. [Native pass](evidence/shortcut-stage-diagnostics-native-summary.json). | `9193471` and `4b2daed` each fail the first installation scenario at the original ten-second shortcut deadline: 24/25 tests pass, all cleanup verifies. The latest pass does not reproduce or establish the cause of the intermittent timeout. [Recurring failures](evidence/windows-shortcut-recurring-timeout-summary.json), [diagnostic source](evidence/shortcut-stage-diagnostics-source-summary.json). |
 | Credential worker retirement | Six groups/69 checks pass, including ten worker tests and two controlled real children. Errors join exact-child retirement; unconfirmed exit blocks replacement. Installed pure synthetic checks also pass within the 27-check update. [Contract](credential-worker-lifecycle.md), [source](evidence/credential-process-source-summary.json), [installed](evidence/installed-agent-security-summary.json). | Live credential failure injection and native Windows acceptance remain separate. No user key is replaced. |

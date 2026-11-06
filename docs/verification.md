@@ -1,5 +1,22 @@
 # What has actually been verified
 
+Normal installed 7dbb0b8 passes **46 metadata/synthetic checks**: thirteen
+task-owner, seven Copilot-journal, fourteen agent/helper/SDK and twelve Python
+inventory/archive checks. Fourteen exact installed module hashes, thirty RECORD
+reference cases and six in-memory RECORD reports verify. All 54 semantic
+workspaces, selected state, pending keyboard-only conversation and frozen frontend
+remain intact; 53 sealed files are byte-identical and one changes only audit
+metadata. Dated backup/readback, current plus one rollback and removal of the
+528-file, 5,224,239-byte prepared bundle verify. No live scanner process, provider
+task, agent, account, model request or hardware operation starts.
+[Installed evidence](evidence/installed-python-records-summary.json).
+
+The agent metadata verifier initially refused the newly tested package-builder
+hash because it still referenced older scanner-review evidence. It now pins the
+builder to its new passing package/installation evidence; four guard tests and
+all fourteen installed checks pass. No validation bypass or broader permissions
+were introduced. [Verifier correction](evidence/installed-record-verifier-pin-summary.json).
+
 Selected Python wheel RECORD declarations now compare supported SHA-256/384/512
 hashes and sizes against every required member in memory. A matching outer hash
 and package identity cannot conceal an internal mismatch. Thirty independent
@@ -9,7 +26,7 @@ The original package limit initially failed; removing duplicate browser files an
 a build-only recipe restores the full synthetic bundle to 5,234,726 bytes. Exact
 frozen-asset HTTP readback, all sixteen installation/recovery scenarios, typecheck
 and owned cleanup pass. No extraction, package execution, signature verification
-or complete safety claim occurs. Installed/native Windows RECORD acceptance
+or complete safety claim occurs. Installed metadata acceptance now passes; native Windows RECORD acceptance
 remains pending. [Contract](python-wheel-records.md),
 [source evidence](evidence/pypi-wheel-record-source-summary.json).
 
