@@ -24,7 +24,10 @@ groups pass 69 tests, including encrypted-state, packaging and harness checks;
 typecheck and owned temporary cleanup pass. [Evidence](evidence/credential-process-source-summary.json).
 
 These tests do not read or replace user credentials. Secret Service/DPAPI
-arguments, targets and storage remain unchanged. Native Windows and installed
-acceptance are separate. Direct-child retirement does not establish arbitrary
+arguments, targets and storage remain unchanged. Installed module hashes and pure
+synthetic checks now pass inside the 27-check `b3ce0a9` update, with all 54
+workspaces preserved. [Installed evidence](evidence/installed-agent-security-summary.json).
+Live credential failure injection and native Windows acceptance remain separate.
+Direct-child retirement does not establish arbitrary
 descendant containment or abrupt-parent-loss cleanup, and an already completed
 Secret Service write cannot be claimed to roll back after a later timeout.

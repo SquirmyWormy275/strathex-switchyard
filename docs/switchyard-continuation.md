@@ -34,14 +34,15 @@ evidence, not instructions to reset. Publish regular commits. Do not merge or re
 The custom-agent backend now supports reviewed revocation, credential replacement
 and enrollment-generation fences for messages, claims and roles. Eight groups/86
 checks pass, including encrypted-state failures and an actual authenticated HTTP
-revoke/reenroll/rebind journey with two verified Node child exits. Native Windows,
-installed and frontend acceptance remain separate. [Contract](custom-agent-revocation.md).
+revoke/reenroll/rebind journey with two verified Node child exits. Installed pure
+synthetic checks pass within the 27-check metadata update. Native Windows, live
+installed revocation and frontend acceptance remain separate. [Contract](custom-agent-revocation.md).
 
 Credential workers now join exact-child retirement on timeout/error, reject
 signal-only status and block concurrent replacement while exit is uncertain.
 Six groups/69 checks pass, including two real controlled children, without using
-live credentials. Typecheck, package bounds and owned cleanup pass. Native and
-installed acceptance remain separate. [Contract](credential-worker-lifecycle.md).
+live credentials. Typecheck, package bounds and owned cleanup pass. Installed pure
+synthetic checks now pass; native Windows and live failure injection remain separate. [Contract](credential-worker-lifecycle.md).
 Native shortcut diagnostics at `80601e9` pass all sixteen original installation
 scenarios and twelve writer cases with cleanup. The intermittent ten-second
 timeout did not reproduce; its cause remains open. [Evidence](evidence/shortcut-stage-diagnostics-native-summary.json).
@@ -51,16 +52,18 @@ checks, native Windows results, focused source checks and installed acceptance.
 The [verification record](verification.md) retains historical receipts and failed
 attempts; do not infer current status from an older passing checkpoint.
 
-The installed baseline is `e7cec91d1b28c87e8ed2a92a15f3b021cd9767fe`,
-release `33eed82b8249d733d3f86ec1affb6bc304ccd2c88c9caa4736d290626c455870`.
+The installed baseline is `b3ce0a9c27a76547bb03956f7ae99fcde28a4e2f`,
+release `8858cf1d017215ebdb01813ceab4c6821bbe3766b469da5e5a2ea550d9d8d6c0`.
 Preserve all 54 original workspace identities, the pending keyboard-only Codex
 workspace, private connection information and the frozen Home bytes. The normal
-versioned update passes 20 owner/journal metadata checks plus six pure in-memory
-command-history checks. Exact tested module hashes verify. It starts no bundled
-example, recording or provider. All 54 semantic snapshots match; 53 sealed files
+versioned update passes 20 owner/journal metadata checks plus seven pure in-memory
+credential/revocation checks. Six exact tested module hashes verify. It starts no
+bundled example, recording or provider and revokes no live agent. All 54 semantic snapshots match; 53 sealed files
 are byte-identical and one changed only audit metadata. Keep the current release
-and its one rollback. The 534-file prepared bundle was verified and removed.
-[Receipt](evidence/installed-command-observation-summary.json).
+and its one rollback. The 535-file, 5,227,326-byte prepared bundle was verified and
+removed. Compact manifest JSON keeps the complete package below the original
+5 MiB limit; all sixteen installation scenarios pass after that change.
+[Receipt](evidence/installed-agent-security-summary.json).
 Earlier installed `4b2daed` and `5a8d159` retain separate lifecycle/archive/extras evidence.
 
 Latest source work closes the bundled-example uncertain-stop/replacement/shutdown

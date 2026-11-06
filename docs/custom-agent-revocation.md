@@ -53,6 +53,11 @@ preserve durable revocation after uncertain exit or an unavailable stop journal.
 Typecheck, original package bounds and owned cleanup pass.
 [Source evidence](evidence/custom-agent-revocation-source-summary.json).
 
-The tests use synthetic credentials and isolated workspaces. Installed acceptance,
-native Windows execution and frontend controls remain separate; the frontend is
-still frozen. This is authorization retirement, not deletion of unresolved history.
+The tests use synthetic credentials and isolated workspaces. Normal installed
+`b3ce0a9` additionally passes seven pure in-memory credential/revocation checks
+inside its 27-check metadata update, with six exact tested module hashes and all
+54 workspaces preserved. No live agent is revoked or started by that update.
+[Installed evidence](evidence/installed-agent-security-summary.json).
+Live installed revocation, native Windows execution and frontend controls remain
+separate; the frontend is still frozen. This is authorization retirement, not
+deletion of unresolved history.

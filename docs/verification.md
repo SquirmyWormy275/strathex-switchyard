@@ -1262,3 +1262,14 @@ claim, deadline or file ceiling changes. Eighteen focused groups pass 26 tests,
 including all sixteen installation/recovery scenarios and application checks;
 all child/tree and owned temporary cleanup verify. Native Windows and the normal
 installed update remain separate. [Receipt](evidence/compact-release-manifest-summary.json).
+
+Normal installed source `b3ce0a9`, release `8858cf1`, now passes thirteen owner,
+seven journal and seven pure credential/revocation metadata checks. Six installed
+modules match the source-tested hashes. All 54 workspace semantic snapshots and
+selection remain unchanged; 53 sealed files remain byte-identical and one changes
+only audit metadata. Dated backup, launcher readback, frozen frontend and current
+plus one rollback verify. Its 535-file prepared bundle totals 5,227,326 bytes,
+including the compact manifest, and is removed after exact verification. No live
+agent revocation/enrollment, provider, task, recording, model, public query,
+Microsoft request or HID operation is performed.
+[Installed evidence](evidence/installed-agent-security-summary.json).
