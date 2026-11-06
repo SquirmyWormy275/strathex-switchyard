@@ -67,6 +67,16 @@ Windows and live installed command execution remain separate.
 [Contract](agent-lifecycle-observation.md#custom-agent-command-history),
 [evidence](evidence/custom-agent-command-observation-summary.json).
 
+The Windows first installation scenario times out again at `9193471` and `4b2daed`,
+with 24/25 tests passing and all child/tree cleanup verified in both packets.
+The original ten-second shortcut deadline remains. Its cause is unresolved; the
+earlier `9f35961` pass does not establish stability. Fixed stage diagnostics now
+pass 19 groups/36 source checks (all original sixteen installation scenarios,
+twelve writer cases and existing release/direct-child checks). Native follow-up
+must inspect the fixed last-stage label without extending deadlines or changing
+permissions. [Failure packets](evidence/windows-shortcut-recurring-timeout-summary.json),
+[diagnostic evidence](evidence/shortcut-stage-diagnostics-source-summary.json).
+
 ## Continue independently
 
 1. Complete Linux `6e967a3` passes all 306 groups: 1,793 passing tests, sixteen
@@ -163,7 +173,9 @@ Windows and live installed command execution remain separate.
    Linux scans and two Windows guest-double journeys retain original state,
    receipt/replay and cleanup guarantees. Typecheck/package bounds pass. Five
    installed extras metadata checks now pass inside the 31-check update; native
-   Windows extras acceptance remains pending. The complete immutable Linux run at
+   Windows `9193471` passes four composed scanner and ten artifact tests, with two
+   declared Linux-only skips and guest execution doubled. [Native receipt](evidence/pypi-extras-native-summary.json).
+   The complete immutable Linux run at
    `5a8d159` now passes all 308 groups: 1,823 tests, sixteen declared skips and
    zero failures. Exact cleanup removed its checkout, nine aliases, 782 generated
    files, temporary parent and marker; all three other worktrees remain.

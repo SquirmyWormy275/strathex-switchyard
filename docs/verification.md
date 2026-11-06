@@ -1173,3 +1173,36 @@ rollback inventory verify. The 534-file, 5,236,896-byte prepared bundle is remov
 after exact manifest verification. No live recording, bundled example, scanner,
 task, provider, public query or HID operation is started.
 [Installed evidence](evidence/installed-command-observation-summary.json).
+
+## Repeated native shortcut timeout and Python acceptance — 2026-11-06
+
+Both newer installation packets fail the same first original scenario:
+`9193471` / workflow 42284298707 / job 128121665116 / artifact 13537198081, and
+`4b2daed` / workflow 42286195659 / job 128127959063 / artifact 13538022127.
+Each accepts 24 passing tests and one failure, no skips; all children and process
+trees retire. The native writer hits its original 10,000 ms execution deadline;
+neither 120,000 ms installation child bound expires. Exact archive digests and
+source/merge tree equality verify. The prior 25-test pass remains historical
+evidence, and does not resolve this recurring failure.
+[Packets](evidence/windows-shortcut-recurring-timeout-summary.json).
+
+The writer now emits only six fixed progress labels from script entry through
+module load, request validation, COM creation, save and exact readback. Timeout
+errors expose only the last contiguous recognized label, or `not-observed`. The
+10-second deadline, 8 KiB request and 1 KiB output bounds, System32 executable,
+COM readback and joined retirement remain unchanged. This adds diagnostics,
+not a claimed fix for the underlying timeout. Nineteen isolated groups pass
+36 tests: all sixteen original installation scenarios, twelve writer cases and
+existing release/direct-child checks. Two actual controlled Node writers pass;
+PowerShell/native acceptance remains pending. The original preflight rejected
+a mistaken selected-file count before launching any child; the corrected
+selection preserved all original scenarios. Exact owned staging is removed.
+[Source evidence](evidence/shortcut-stage-diagnostics-source-summary.json).
+
+Separately, source `9193471` passes four native Windows composed Python scanner
+tests and ten artifact checks, with two declared Linux-only skips and guest
+execution doubled. Both artifacts verify declared sizes/digests, source/merge
+tree equality, original deadlines and complete child/tree cleanup. This accepts
+the bounded extras/continuation and artifact checks, not an actual guest,
+installed Windows journey or the failed installation/full-release boundary.
+[Python receipts](evidence/pypi-extras-native-summary.json).

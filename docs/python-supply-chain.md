@@ -185,3 +185,9 @@ verified, and the owned checkout/bundle are removed.
 [Installed receipts](evidence/installed-pep440-summary.json).
 The [earlier verifier failure](evidence/pep440-first-installed-failed-summary.json)
 remains a failed attempt; its legacy npm-name assertion was corrected separately.
+
+Native Windows source `9193471` now passes all four composed Python scanner cases
+and ten artifact checks, with two original Linux-only skips. Exact archive
+digests, source/merge tree equality, original deadlines and child/tree cleanup
+verify. Guest execution is doubled; actual guest and installed Windows acceptance
+remain separate. [Native evidence](evidence/pypi-extras-native-summary.json).

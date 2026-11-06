@@ -1,7 +1,9 @@
 $ErrorActionPreference = 'Stop'
+[Console]::Out.WriteLine('SXSY-SHORTCUT/1 script-started')
 $env:PSModulePath = [IO.Path]::Combine($PSHOME, 'Modules')
 $PSModuleAutoLoadingPreference = 'None'
 Import-Module -Name ([IO.Path]::Combine($PSHOME, 'Modules', 'Microsoft.PowerShell.Utility', 'Microsoft.PowerShell.Utility.psd1')) -ErrorAction Stop
+[Console]::Out.WriteLine('SXSY-SHORTCUT/1 utility-loaded')
 $utf8 = [Text.UTF8Encoding]::new($false)
 $inputPipe = [IO.StreamReader]::new([Console]::OpenStandardInput(), $utf8)
 $outputPipe = [IO.StreamWriter]::new([Console]::OpenStandardOutput(), $utf8)
@@ -13,8 +15,10 @@ foreach ($path in @($v.path, $v.nodePath, $v.loader, $v.directory)) {
     if ($path -notmatch '^[A-Za-z]:[\\/]' -or $path -match '[\x00\r\n"]') { throw 'Unsupported exact shortcut path.' }
 }
 if ([IO.Path]::GetExtension($v.path) -cne '.lnk' -or [IO.File]::Exists($v.path)) { throw 'A new owned shortcut path is required.' }
+[Console]::Out.WriteLine('SXSY-SHORTCUT/1 input-validated')
 $arguments = '"' + $v.loader + '" launch'
 $shell = New-Object -ComObject WScript.Shell
+[Console]::Out.WriteLine('SXSY-SHORTCUT/1 com-created')
 try {
     $shortcut = $shell.CreateShortcut($v.path)
     $shortcut.TargetPath = $v.nodePath
@@ -23,10 +27,12 @@ try {
     $shortcut.Description = 'Switchyard: return to the same task'
     $shortcut.WindowStyle = 7
     $shortcut.Save()
+    $outputPipe.WriteLine('SXSY-SHORTCUT/1 shortcut-saved')
     [Runtime.InteropServices.Marshal]::FinalReleaseComObject($shortcut) | Out-Null
     $read = $shell.CreateShortcut($v.path)
     try {
         if ($read.TargetPath -ine $v.nodePath -or $read.Arguments -cne $arguments -or $read.WorkingDirectory -ine $v.directory) { throw 'Native shortcut target readback failed.' }
     } finally { [Runtime.InteropServices.Marshal]::FinalReleaseComObject($read) | Out-Null }
+    $outputPipe.WriteLine('SXSY-SHORTCUT/1 readback-verified')
     $outputPipe.WriteLine('VERIFIED')
 } finally { [Runtime.InteropServices.Marshal]::FinalReleaseComObject($shell) | Out-Null }

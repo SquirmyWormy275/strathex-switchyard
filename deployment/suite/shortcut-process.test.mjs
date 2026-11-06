@@ -7,6 +7,8 @@ import { mkdtemp, readFile, writeFile, lstat, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { prepareWindowsShortcut, shortcutExecutionTimeoutMs } from "./shortcut-process.mjs";
+const stages = ["script-started", "utility-loaded", "input-validated", "com-created", "shortcut-saved", "readback-verified"];
+const progress = count => stages.slice(0, count).map(stage => `SXSY-SHORTCUT/1 ${stage}\r\n`).join("");
 
 async function fixture(t) {
   const root = await mkdtemp(join(tmpdir(), "sx-shortcut-"));
@@ -48,6 +50,38 @@ test("timeout joins direct-child exit before removing a shortcut written after t
   assert.equal(await readFile(f.request.path, "utf8"), "late owned output");
   f.close(0); await rejected;
   await assert.rejects(lstat(f.request.path), { code: "ENOENT" });
+});
+
+test("ordered native progress tolerates fragmented pipes while verified output still waits for exact exit", async t => {
+  const f = await fixture(t); await writeFile(f.request.path, "synthetic native shortcut");
+  let settled = false; const pending = prepareWindowsShortcut(f.request, { spawnProcess: f.spawnProcess }); pending.finally(() => { settled = true; });
+  for (const byte of Buffer.from(progress(stages.length) + "VERIFIED\r\n")) f.child.stdout.write(Buffer.from([byte]));
+  await new Promise(resolve => setImmediate(resolve)); assert.equal(settled, false);
+  f.close(0); assert.equal((await pending).toString(), "synthetic native shortcut");
+  await assert.rejects(lstat(f.request.path), { code: "ENOENT" });
+});
+
+test("shortcut timeout diagnostics contain only the last ordered fixed stage and never raw native output", async t => {
+  for (let count = 0; count <= stages.length; count++) {
+    const f = await fixture(t); await writeFile(f.request.path, "owned output");
+    const pending = prepareWindowsShortcut(f.request, { spawnProcess: f.spawnProcess, timeoutMs: 10 });
+    const rejected = assert.rejects(pending, error => {
+      assert.equal(error.message, `Native shortcut creation timed out. Last observed stage: ${count ? stages[count - 1] : "not-observed"}.`);
+      assert.equal(error.message.includes("PRIVATE_DIAGNOSTIC"), false); return true;
+    });
+    f.child.stdout.write(progress(count) + "SXSY-SHORTCUT/1 PRIVATE_DIAGNOSTIC\n");
+    await f.killRequested; assert.equal(await readFile(f.request.path, "utf8"), "owned output");
+    f.close(1); await rejected; await assert.rejects(lstat(f.request.path), { code: "ENOENT" });
+  }
+});
+
+test("partial, reordered and forged progress cannot establish successful shortcut readback", async t => {
+  for (const output of [progress(1), progress(2).split("\r\n").reverse().join("\r\n"), progress(stages.length) + "PRIVATE_DIAGNOSTIC\n", "SXSY-SHORTCUT/1 readback-verified\n"]) {
+    const f = await fixture(t); await writeFile(f.request.path, "owned output");
+    const pending = prepareWindowsShortcut(f.request, { spawnProcess: f.spawnProcess }), rejected = assert.rejects(pending, /exact readback failed/);
+    f.child.stdout.write(output + "VERIFIED\n"); f.close(0); await rejected;
+    await assert.rejects(lstat(f.request.path), { code: "ENOENT" });
+  }
 });
 
 test("excess output cannot hide behind a VERIFIED prefix or a later successful close", async t => {

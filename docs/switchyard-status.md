@@ -33,7 +33,7 @@ there is no merge or public release acceptance.
 | Windows index/history/leases | Native NTFS index and history packets each pass six checks and three independent guardian exits. Both Windows scanner files pass two cases with guest execution doubled; lease groups pass 24 tests and one Linux-only skip. [Evidence](evidence/native-history-index-leases-summary.json). | Packet Git witnesses are synthetic. Actual guest, installed Windows and ordinary-user acceptance remain separate. |
 | Installed app | Linux source `e7cec91` passes 20 owner/journal metadata checks and six pure in-memory command-history checks. Exact tested module hashes, all 54 workspace semantic snapshots, 53 sealed files and frozen frontend bytes verify. Only current plus one rollback remain; prepared staging is removed. [Receipt](evidence/installed-command-observation-summary.json). Earlier lifecycle/archive/extras receipts remain source-specific evidence. | No bundled example, recording, scanner, task, provider or public query is started by this update. Frontend and extension activation remain frozen. |
 | Windows npm archive identity | Corrected `55515d1` completes ten archive tests plus eight original byte-comparison tests, each file with two original Linux-only skips inside its original 300-second bound; guest execution is doubled. [Archive](evidence/npm-archive-native-summary.json), [bytes](evidence/npm-artifact-split-native-summary.json). | Complete Windows release remains separate. |
-| Windows shortcut retirement | `9f35961` passes all sixteen original installation/recovery scenarios and nine writer checks, with no skips and verified cleanup. The execution deadline remains ten seconds. [Receipt](evidence/shortcut-writer-native-summary.json). | The historical timeout and cancelled unchanged-source retry remain recorded; their cause is not established. Interactive user/installed Windows acceptance is separate. [Failure](evidence/windows-shortcut-timeout-summary.json). |
+| Windows shortcut retirement | `9f35961` passes all sixteen original installation/recovery scenarios and nine writer checks, no skips and verified cleanup. [Earlier pass](evidence/shortcut-writer-native-summary.json). | Newer `9193471` and `4b2daed` each fail the first installation scenario at the original ten-second shortcut deadline: 24/25 tests pass, all cleanup verifies. The cause remains unresolved. Fixed stage diagnostics now pass 19 groups/36 source checks, preserving all deadlines and bounds; native follow-up is pending. [Recurring failures](evidence/windows-shortcut-recurring-timeout-summary.json), [diagnostic source](evidence/shortcut-stage-diagnostics-source-summary.json). |
 
 Failed runs remain failed evidence. Partial test output is excluded when the
 final plan is missing. Provider and guest doubles are explicitly identified in
@@ -79,6 +79,9 @@ the 26-check update; native Windows and live installed command execution remain 
   removing its owned output, and unconfirmed exits preserve staging. Twenty-three
   focused groups/69 distinct checks and all 25 native Windows checks pass.
   [Cleanup evidence](evidence/shortcut-writer-retirement-source-summary.json).
+  The original shortcut startup timeout recurs in two later checkpoints; cleanup
+  remains verified, but the cause is unresolved. Fixed bounded stage diagnostics
+  await native execution. [Failures](evidence/windows-shortcut-recurring-timeout-summary.json).
 - Production editor command activation and remaining guided role/device wiring.
   Frontend and command activation are deliberately frozen for owner review.
 - Broader Shield coverage and dependency syntax/resolution, publisher provenance,
@@ -86,8 +89,9 @@ the 26-check update; native Windows and live installed command execution remain 
   Exact Python pins now retain bounded normalized extras and process continuations
   before comments. Ten groups/106 checks and 39 independent pip/PyPA cases pass,
   including actual Linux scans and Windows guest doubles. Optional dependencies
-  remain explicitly unresolved. Five installed extras metadata checks now pass;
-  native Windows extras acceptance is pending.
+  remain explicitly unresolved. Five installed extras metadata checks pass. Native Windows `9193471` now passes
+  four composed scanner and ten artifact tests, with two declared Linux-only
+  skips and guest execution doubled. [Native evidence](evidence/pypi-extras-native-summary.json).
   [Python evidence](evidence/pypi-extras-source-summary.json).
   Selected npm archive identity comparison is implemented with bounded, non-extracting
   gzip/USTAR parsing: six groups/78 checks plus one exact alias/version check pass.

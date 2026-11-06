@@ -72,7 +72,7 @@ The accepted complete Linux checkpoint `5a8d159` passes **308 groups / 1,823
 tests**, with sixteen declared skips and verified owned cleanup. The restricted
 Windows storage journey now passes all eight original checks, including exact
 exit and fixture/service retirement. Complete Windows release acceptance remains
-pending after correction of an older task-owner scheduling timeout.
+pending; a recurring first-install shortcut timeout is still under investigation.
 Independent Windows installation/recovery and fresh-runtime checks pass. Source,
 installed, hardware and account acceptance remain separate.
 [Current status and exact evidence](docs/switchyard-status.md).
