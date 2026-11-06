@@ -1,0 +1,52 @@
+{
+  "schema": "switchyard-windows-full-followup/v1",
+  "failedSource": "6f7e5952315cc617f63763cf20677daabe461a7f",
+  "executionMerge": "b37cb86c7e6624a1217f35e8a4d05b78f693d72b",
+  "runId": 42142720040,
+  "jobId": 127650091433,
+  "artifact": {
+    "id": 13471991719,
+    "sha256": "e2b8e038d1498c4e1abb19ba8b51bc93f262e256a1fa1a54849a7ca4c6baac3e"
+  },
+  "isolated": {
+    "receipt": "windows-full-6f7-3b04d1ff-6e52-41ee-aaa7-a6ec0dc872eb.json",
+    "groups": 344,
+    "passedGroups": 343,
+    "tests": 2252,
+    "passedTests": 2169,
+    "failedTests": 1,
+    "declaredSkips": 82,
+    "childCleanupVerified": true,
+    "failedFile": "tools/layout-studio/devices.test.mjs",
+    "cause": "First failure block was outside the old bounded tail; not yet established."
+  },
+  "nonisolated": {
+    "status": "failed",
+    "knownFailure": "Installed setup/helper pin rejects Windows DOS short path aliases by string comparison.",
+    "otherFailuresRemain": true
+  },
+  "followup": {
+    "basis": "354b4b85633c6c2e80f92d5deca73dfb23668591",
+    "corrections": [
+      "Retain first TAP failure and final totals within unchanged private diagnostic bound.",
+      "Validate native images and all parent directories by filesystem identity, preserving link rejection and image digest checks.",
+      "Run complete device and native storage files as focused Windows cohorts without additional skips or relaxed deadlines."
+    ],
+    "local": {
+      "receipt": "isolated-test-02590479-ca9f-4539-869f-f4b2f8bf73d2.json",
+      "groups": 4,
+      "tests": 56,
+      "passed": 56,
+      "skips": 0,
+      "cleanupVerified": true,
+      "typecheck": true
+    },
+    "nativeAcceptance": "pending"
+  },
+  "constraints": {
+    "hardwareActions": 0,
+    "accountChanges": 0,
+    "modelTurns": 0,
+    "frontendChanges": 0
+  }
+}

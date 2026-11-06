@@ -337,7 +337,11 @@ export const linuxGroups = requiredGroups
 const limit = 64 * 1024;
 const diagnosticLimit = 4096;
 function failureDiagnostic(chunks) {
-  return Buffer.concat(chunks).toString("utf8").slice(-diagnosticLimit)
+  const output = Buffer.concat(chunks).toString("utf8"), firstFailure = output.search(/^\s*not ok [0-9]+ -/m);
+  // A later passing plan must not displace the original error from the bounded
+  // receipt. Preserve its failing block and the final totals under the same cap.
+  const excerpt = firstFailure < 0 || output.length <= diagnosticLimit ? output.slice(-diagnosticLimit) : output.slice(firstFailure, firstFailure + diagnosticLimit - 768) + "\n[bounded final output]\n" + output.slice(-720);
+  return excerpt.slice(0, diagnosticLimit)
     .replace(/[A-Za-z0-9+\/_=-]{32,}/g, "[redacted]")
     .replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g, "?");
 }

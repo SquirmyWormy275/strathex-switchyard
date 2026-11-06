@@ -36,6 +36,16 @@ the actual DLL-initialization repair remains unfinished.
 [Native query evidence](evidence/windows-restricted-child-events-native-summary.json).
 [Source evidence](evidence/windows-restricted-child-events-source-summary.json).
 
+The complete Windows isolated run at `6f7e595` remains failed: 343/344 groups,
+2,169 passed tests, one failure and 82 declared skips. The device group's first
+failure was lost outside the old diagnostic tail. The corrected runner retains
+that block plus totals within the same bound. A separate nonisolated storage
+failure exposed DOS short-path aliases rejected by string equality; the image
+pin now checks filesystem identity and rejects linked parent directories.
+Four local files pass all 56 tests and typecheck. Focused complete Windows
+device/storage jobs await native results; other full-run failures remain open.
+[Exact failed receipt and followup](evidence/windows-full-followup-summary.json).
+
 Windows keyless workers pass both complete native lease files at `0740791`:
 sixteen tests plus one declared platform skip. Fresh encrypted state and keys
 remain independently read for every transaction; each kernel handle is acquired

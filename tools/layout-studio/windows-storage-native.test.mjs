@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {randomUUID,createHash} from "node:crypto";
-import {mkdtemp,writeFile,rm} from "node:fs/promises";
+import {mkdtemp,writeFile,rm,symlink} from "node:fs/promises";
 import {join} from "node:path";
 import {tmpdir} from "node:os";
 import {createSuiteStore} from "./suite-store.mjs";
@@ -34,6 +34,11 @@ test("fixed storage transport persists readiness and independent exit for metada
 test("changed reviewed helper/setup bytes and invalid scope fail before any setup action",async t=>{
  for(const target of ["helperPath","setupPath"]){const f=await fixture(t),binding=await f.native.identity(),before=f.calls.length;await writeFile(f[target],"changed installed image");await assert.rejects(f.native.perform({action:"install-bootstrap",installationId:randomUUID(),brokerImageSha256:binding.helperSha256,binding}),/changed/);assert.equal(f.calls.length,before);assert.equal(f.effects(),0);}
  const f=await fixture(t),binding=await f.native.identity();for(const extra of [{action:"shell"},{installationId:"foreign"},{brokerImageSha256:"b".repeat(64)}])await assert.rejects(f.native.perform({action:"install-bootstrap",installationId:randomUUID(),brokerImageSha256:binding.helperSha256,binding,...extra}));assert.equal(f.effects(),0);
+});
+test("a linked installation directory cannot reach metadata or setup commands",async t=>{
+ const f=await fixture(t),alias=join(f.root,"linked-installation");await symlink(f.root,alias,process.platform==="win32"?"junction":"dir");let calls=0;
+ const native=createWindowsStorageNative({store:f.store,platform:"win32",helperPath:join(alias,"Switchyard.Hotkeys.exe"),setupPath:join(alias,"Switchyard.Setup.exe"),command:async()=>{calls++;throw Error("A redirected installation reached a native command");}});
+ try{await assert.rejects(native.identity());assert.equal(calls,0);assert.equal(f.effects(),0);}finally{await native.close();await rm(alias,{force:true});}
 });
 test("failed protected readiness prevents the native action and retains a conservative no-start observation",async t=>{
  const f=await fixture(t),binding=await f.native.identity(),update=f.store.update;let fault=true;f.store.update=async(...args)=>{if(fault&&args[1]==="windows-storage-native-ready"){fault=false;throw Error("Synthetic lost readiness");}return update(...args);};

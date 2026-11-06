@@ -51,6 +51,16 @@ test("test groups fail closed on zero-match patterns, skipped tests, and todo te
   } finally { await rm(directory, { recursive: true, force: true }); }
 });
 
+test("bounded failure receipts retain the first failing test even when many later cases pass", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "sxsy-first-failure-"));
+  try {
+    const fixture = await group(directory, "first-failure", "import test from 'node:test';test('FIRST_BOUNDED_FAILURE',()=>{throw Error('ORIGINAL_FAILURE_REASON')});for(let i=0;i<50;i++)test('later '+i+' '+'z'.repeat(60),()=>{});");
+    const result = await verify([fixture], directory, 5000), child = result.receipt.children[0];
+    assert.equal(result.receipt.success, false); assert.equal(child.testCounts.failed, 1); assert.equal(child.testCounts.passed, 50); assert.equal(child.outputTruncated, false);
+    assert.match(child.failureDiagnostic, /FIRST_BOUNDED_FAILURE/); assert.match(child.failureDiagnostic, /ORIGINAL_FAILURE_REASON/); assert.match(child.failureDiagnostic, /# fail 1/); assert.ok(child.failureDiagnostic.length <= 4096); assert.equal(child.cleanupCompleted, true);
+  } finally { await rm(directory, { recursive: true, force: true }); }
+});
+
 test("platform groups accept only their exact declared skip count", async () => {
   const directory = await mkdtemp(join(tmpdir(), "sxsy-receipt-platform-skip-"));
   try {
