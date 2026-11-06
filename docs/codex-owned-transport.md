@@ -20,8 +20,25 @@ describes WebSocket framing over Unix sockets. The CLI's separately advertised
 stdio proxy did not complete initialization in either bounded trial; those
 failures remain retained and that route is not exposed by the app.
 
-This demonstration establishes read-only access to the owned listener. Effective
-configuration readback, continuous account-event fencing, parent-loss acceptance
-and complete Studio/task/IDE attachment remain unfinished. Two matching account
-snapshots do not establish continuous login identity or permission to resume a
-task. Existing saved task/account authority is not inferred from the socket.
+The subsequent guardian demonstration also reads back the effective restricted
+configuration and kills only its own wrapper. Independent readback confirms that
+the existing guardian contains parent loss, with no live member left in its
+owned session. Exact socket, native alias, directory and marker retirement pass.
+Four native checks and eighteen software checks pass; the initial alias-cleanup
+failure stays failed. [Exact guardian evidence](evidence/codex-owned-guardian-summary.json).
+
+Run the explicit read-only proof from the repository with its supported Node:
+
+```sh
+node scripts/verify-codex-owned-listener.mjs --read-only-parent-loss
+```
+
+The proof pins the reviewed native CLI digest and refuses a pre-existing socket
+or active marker. It creates no thread or turn and never starts/stops a global
+daemon. It reads existing account metadata and deliberately kills only its new
+wrapper; interrupted cleanup preserves exact owned scope metadata for recovery.
+
+Continuous account-event fencing and complete Studio/task/IDE attachment remain
+unfinished software. Two matching account snapshots do not establish continuous
+login identity or permission to resume a task. Existing saved task/account
+authority is not inferred from the socket. Production connections remain stdio.

@@ -32,12 +32,14 @@ fifteen checks with actual scanner exits, signed provenance, retained critical
 base severity and exact cleanup. Other CVSS versions and verified local context
 remain unfinished. [Calculation contract](cvss-severity.md).
 
-The owned private Codex Unix listener now has read-only native metadata evidence:
-two matching account reads, exact socket/process identity and clean retirement,
-with no task or model turn. The advertised stdio proxy did not initialize and is
-not exposed by the app. Full Studio task/IDE attachment, continuous Unix account
-fencing and parent-loss acceptance remain unfinished. Existing production Codex
-connections continue using the restricted stdio adapter.
+The owned private Codex Unix listener passes four actual native checks: exact
+socket/process identity, effective restricted configuration, two matching
+read-only account snapshots and containment after abrupt parent loss. Exact
+socket/alias/directory/marker retirement passes; two software files pass eighteen
+tests. The first alias-cleanup failure remains failed with its separate recovery
+receipt. Full Studio task/IDE attachment and continuous Unix account fencing
+remain unfinished software. Production connections stay restricted stdio; the
+unproven proxy is not exposed. [Guardian contract and evidence](codex-owned-transport.md).
 
 The later immutable `82eb764` full run remains failed at interrupted-install
 recovery: 213/214 groups pass, 1,266 tests pass, one fails and ten skips. Recovery

@@ -160,6 +160,16 @@ async function readCodexDaemonAccount(socketPath, options = {}) {
   }, options);
 }
 
+// Private verifier input only: returning configuration is not permission to run
+// a thread. Callers must validate their complete expected restriction contract.
+async function readCodexDaemonConfiguration(socketPath, options = {}) {
+  if (!options || typeof options !== "object" || Array.isArray(options) || Object.keys(options).some(key => key !== "deadlineMs")) throw new Error("Choose only the read-only configuration deadline; no follow-up command is available.");
+  return requestCodexDaemon(socketPath, { id: 2, method: "config/read", params: { includeLayers: false } }, result => {
+    if (!result?.config || typeof result.config !== "object" || Array.isArray(result.config)) throw new Error("The Codex runtime configuration is unavailable.");
+    return Object.freeze(result.config);
+  }, options);
+}
+
 async function resumeExactCodexDaemonThread(socketPath, threadId, repositoryRoot, options = {}) {
   if (typeof threadId !== "string" || !/^[A-Za-z0-9_-]{1,128}$/.test(threadId) || typeof repositoryRoot !== "string" || !isAbsolute(repositoryRoot) || repositoryRoot.length > 4096 || /[\0\r\n]/.test(repositoryRoot)) throw new Error("An exact thread and repository root are required for Codex resume.");
   return requestCodexDaemon(socketPath, { id: 2, method: "thread/resume", params: { threadId, excludeTurns: true, sandbox: "read-only", approvalPolicy: "on-request" } }, (result) => {
@@ -253,4 +263,4 @@ async function readBoundCodexThreads(directory = defaultBindingDirectory()) {
   return Object.freeze(result);
 }
 
-module.exports = { readCodexDaemonThreads, readExactCodexDaemonThread, readCodexDaemonAccount, resumeExactCodexDaemonThread, startCodexDaemonThread, persistBoundCodexThread, readBoundCodexThreads };
+module.exports = { readCodexDaemonThreads, readExactCodexDaemonThread, readCodexDaemonAccount, readCodexDaemonConfiguration, resumeExactCodexDaemonThread, startCodexDaemonThread, persistBoundCodexThread, readBoundCodexThreads };
