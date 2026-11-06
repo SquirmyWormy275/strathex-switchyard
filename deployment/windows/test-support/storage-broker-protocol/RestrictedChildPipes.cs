@@ -3,19 +3,24 @@ using System.IO.Pipes;
 using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
 using System.Text;
+using System.Text.RegularExpressions;
 using Microsoft.Win32.SafeHandles;
 
 internal static class RestrictedChildStderr
 {
-    internal sealed record Summary(string category, string? function, string? code);
+    internal sealed record Summary(string category, string? function, string? code, string? sourceFile = null, int? sourceLine = null);
     internal static Summary Parse(byte[] prefix)
     {
         if (prefix.Length > 8192) throw new InvalidOperationException("Child diagnostic prefix exceeds its bound.");
         string text = Encoding.UTF8.GetString(prefix);
         string category = prefix.Length == 0 ? "empty" : text.Contains("Assertion failed", StringComparison.OrdinalIgnoreCase) ? "assertion" : text.Contains("node::", StringComparison.Ordinal) ? "node-native" : text.Contains("Error:", StringComparison.Ordinal) ? "javascript" : "unclassified";
-        string[] functions = { "uv_thread_create", "uv_os_get_passwd", "uv_loop_init", "uv_tty_init", "uv_pipe_init", "uv_pipe_open", "uv_guess_handle", "uv_disable_stdio_inheritance", "uv_signal_init", "uv_mutex_init" };
+        string[] functions = { "uv_thread_create", "uv_os_get_passwd", "uv_loop_init", "uv_tty_init", "uv_pipe_init", "uv_pipe_open", "uv_guess_handle", "uv_disable_stdio_inheritance", "uv_signal_init", "uv_mutex_init", "ncrypto::CSPRNG" };
         string[] codes = { "UV_UNKNOWN", "EACCES", "EPERM", "EBADF", "EINVAL", "ENOENT", "ENOMEM" };
-        return new(category, functions.FirstOrDefault(value => text.Contains(value, StringComparison.Ordinal)), codes.FirstOrDefault(value => text.Contains(value, StringComparison.Ordinal)));
+        // Node's assertion header includes its compiler source location. Retain
+        // only known upstream basenames and a bounded line number, never paths,
+        // function signatures, assertion expressions or stack addresses.
+        var location = category == "assertion" ? Regex.Match(text, @" at (?:[^\r\n]{0,1024}[\\/])?src[\\/](?:crypto[\\/])?(?<file>node\.cc|node_main\.cc|node_platform\.cc|node_errors\.cc|node_api\.cc|node_file\.cc|node_process_methods\.cc|node_process_object\.cc|env\.cc|env-inl\.h|util\.cc|util\.h|util-inl\.h|crypto_util\.cc):(?<line>[1-9][0-9]{0,4})(?:\r?\n|$)", RegexOptions.CultureInvariant, TimeSpan.FromMilliseconds(100)) : Match.Empty;
+        return new(category, functions.FirstOrDefault(value => text.Contains(value, StringComparison.Ordinal)), codes.FirstOrDefault(value => text.Contains(value, StringComparison.Ordinal)), location.Success ? location.Groups["file"].Value : null, location.Success ? int.Parse(location.Groups["line"].Value, System.Globalization.CultureInfo.InvariantCulture) : null);
     }
 }
 

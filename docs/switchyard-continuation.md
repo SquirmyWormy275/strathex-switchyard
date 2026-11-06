@@ -52,12 +52,17 @@ release and child/test deadlines. [Contract](private-state-locking.md).
 The explicit pipe candidate `7a75189` executes on Windows: only three standard
 handles are inherited and all close; 663 stderr bytes classify as an assertion.
 The child still exits 134 without a result. Its precise assertion is unidentified.
+A fixed Node source-basename/line parser is now prepared: 1,856 managed checks and
+ten JS report cases pass, both managed builds have zero warnings/errors, and
+typecheck/cleanup verify. Native location capture is pending.
+[Source diagnostic](evidence/windows-assertion-location-source-summary.json).
 [Native evidence](evidence/windows-stdio-native-summary.json).
 
 The full local `efbaa52` run finishes 240/241 groups, 1,504 passed tests, one failure
 and eleven declared skips. Its stale CI dependency assertion is corrected to allow
 only the exact-source helper build. All child/tree and exact checkout/alias/build/
-marker cleanup verifies; no full local run remains active at this checkpoint.
+marker cleanup verifies. A fresh complete `370c21e` run is active; inspect its
+`/tmp/switchyard-full-linux-path.json` marker before starting another run.
 Separately, the GitHub Linux release job `127706968318` failed with `ENOTEMPTY`.
 Observation shutdown now joins active polls and original/recovered deadline callbacks;
 managed input-release observers also retire before staging cleanup. Seven files pass

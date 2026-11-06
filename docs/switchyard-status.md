@@ -28,7 +28,10 @@ namespace access probes complete, while the failed fixture is preserved.
 The explicit standard pipes run natively at `7a75189`: only three handles are
 inherited, all are closed, and 663 stderr bytes classify as an assertion. The
 child still exits 134 without a result; its precise assertion remains unidentified.
-[Native evidence](evidence/windows-stdio-native-summary.json).
+[Native evidence](evidence/windows-stdio-native-summary.json). The next diagnostic
+keeps only known upstream source basenames and bounded line numbers: both managed
+targets compile, 1,856 portable and ten JS checks pass, with typecheck and owned
+cleanup. Native location capture is pending. [Diagnostic](evidence/windows-assertion-location-source-summary.json).
 
 The complete local `efbaa52` run finishes **240/241 groups**, 1,504 passed tests,
 one failure and eleven declared skips. A stale concurrency test rejects the new

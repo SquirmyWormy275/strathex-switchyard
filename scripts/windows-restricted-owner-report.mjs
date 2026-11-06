@@ -7,9 +7,11 @@ function validStdio(value) {
   if (!["inheritanceRestricted", "stdinEof", "handlesClosedVerified", "drainsCompleted"].every(key => value[key] === true)) return false;
   if (![value.stdoutBytes, value.stderrBytes].every(count => Number.isSafeInteger(count) && count >= 0) || value.outputBounded !== (value.stdoutBytes <= 65536 && value.stderrBytes <= 8192)) return false;
   const error = value.stderr;
-  if (!object(error) || Object.keys(error).sort().join() !== "category,code,function" || !["empty", "assertion", "node-native", "javascript", "unclassified"].includes(error.category)) return false;
+  if (!object(error) || Object.keys(error).sort().join() !== "category,code,function,sourceFile,sourceLine" || !["empty", "assertion", "node-native", "javascript", "unclassified"].includes(error.category)) return false;
+  const sources = ["node.cc", "node_main.cc", "node_platform.cc", "node_errors.cc", "node_api.cc", "node_file.cc", "node_process_methods.cc", "node_process_object.cc", "env.cc", "env-inl.h", "util.cc", "util.h", "util-inl.h", "crypto_util.cc"];
+  if (!(error.sourceFile === null && error.sourceLine === null) && !(error.category === "assertion" && sources.includes(error.sourceFile) && Number.isInteger(error.sourceLine) && error.sourceLine >= 1 && error.sourceLine <= 99999)) return false;
   if ((error.category === "empty") !== (value.stderrBytes === 0) || error.category === "empty" && (error.function !== null || error.code !== null)) return false;
-  return [null, "uv_thread_create", "uv_os_get_passwd", "uv_loop_init", "uv_tty_init", "uv_pipe_init", "uv_pipe_open", "uv_guess_handle", "uv_disable_stdio_inheritance", "uv_signal_init", "uv_mutex_init"].includes(error.function) && [null, "UV_UNKNOWN", "EACCES", "EPERM", "EBADF", "EINVAL", "ENOENT", "ENOMEM"].includes(error.code);
+  return [null, "uv_thread_create", "uv_os_get_passwd", "uv_loop_init", "uv_tty_init", "uv_pipe_init", "uv_pipe_open", "uv_guess_handle", "uv_disable_stdio_inheritance", "uv_signal_init", "uv_mutex_init", "ncrypto::CSPRNG"].includes(error.function) && [null, "UV_UNKNOWN", "EACCES", "EPERM", "EBADF", "EINVAL", "ENOENT", "ENOMEM"].includes(error.code);
 }
 /** Retain the bounded child diagnostic through the coordinator's privacy projection. */
 export function storageBrokerFailureEvidence(value) {

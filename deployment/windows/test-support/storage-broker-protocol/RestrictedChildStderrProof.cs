@@ -20,7 +20,18 @@ internal static class RestrictedChildStderrProof
         Require(RestrictedChildStderr.Parse(Enumerable.Repeat((byte)0xff, 8192).ToArray()) == new RestrictedChildStderr.Summary("unclassified", null, null));
         bool refused = false; try { RestrictedChildStderr.Parse(new byte[8193]); } catch (InvalidOperationException) { refused = true; }
         Require(refused);
-        if (checks != 31) throw new InvalidOperationException("The complete child stderr parser inventory did not execute.");
+        const string header = "  #  C:/NEVER_RETAIN/node.exe: NEVER_RETAIN_SIGNATURE at C:\\NEVER_RETAIN\\src\\node.cc:1128\r\n  #  Assertion failed: ncrypto::CSPRNG(nullptr, 0)\n";
+        var source = RestrictedChildStderr.Parse(Encoding.UTF8.GetBytes(header));
+        Require(source.sourceFile == "node.cc" && source.sourceLine == 1128);
+        Require(!JsonSerializer.Serialize(source).Contains("NEVER_RETAIN", StringComparison.Ordinal));
+        Require(source.function == "ncrypto::CSPRNG");
+        foreach (string invalid in new[] { header.Replace("node.cc", "NEVER_RETAIN.cc"), header.Replace(":1128", ":0"), header.Replace(":1128", ":100000"), header.Replace(" at ", " around "), header.Replace("Assertion failed", "unclassified error") })
+        {
+            var refusedSource = RestrictedChildStderr.Parse(Encoding.UTF8.GetBytes(invalid));
+            Require(refusedSource.sourceFile is null && refusedSource.sourceLine is null);
+        }
+        Require(RestrictedChildStderr.Parse(Encoding.UTF8.GetBytes(header.Replace(":1128", ":99999"))).sourceLine == 99999);
+        if (checks != 40) throw new InvalidOperationException("The complete child stderr parser inventory did not execute.");
         return checks;
     }
 }
