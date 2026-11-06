@@ -6,7 +6,7 @@ a partial implementation.** The F77 is the pilot device; it does not limit scope
 
 The Linux backend has a passing complete test checkpoint, and a versioned
 application is installed. The source has since gained additional tested changes.
-Windows restricted-owner storage probing is an active software failure. Hardware,
+Windows restricted-owner Job creation is an active software failure. Hardware,
 account and visual acceptance remain separate from those implementation results.
 
 Use the [requirement ledger](switchyard-requirements.md) for the complete scope,
@@ -28,17 +28,20 @@ there is no merge or public release acceptance.
 | License declaration exceptions | Seven groups / 59 tests, a 26-test engine follow-up, typecheck and exact cleanup pass. [Evidence](evidence/license-exception-declaration-summary.json). | Signed policy matches complete license/exception pairs without borrowing permission for a base or another pair. Actual Linux and Windows guest-double scans are not legal/publisher or installed acceptance. |
 | Installed Linux `5a2c324` | Six update, eleven owner/editor/severity and seven journal checks pass. All 54 non-audit semantic snapshots match; 52 sealed files are byte-identical. [Receipt](evidence/installed-cvss4-summary.json). | The last accepted installed checkpoint, not the latest source. Two verification workspaces received only expected audit additions. No live task or activated editor is inferred. |
 
-The `fea2ca4` native lease failure was a stale diagnostic-label expectation.
-The `f653827` follow-up passes its file replacement, hard-link, malformed release
-and parent-loss checks, with exact process cleanup. Its client and policy
-workflows also pass; the prior SDK-download failure remains retained.
-Complete release CI is still pending. CI-only fixed probe-stage observation now
-passes five groups / 60 tests and typecheck. Native `6f2097b` now identifies
-`probe-identity-created-worker-exit`: the setup-identity guardian starts and exits
-before reporting readiness. The exact managed startup operation remains unknown;
-the original owner still passes zero of eight checks.
-[Native failure](evidence/windows-owner-probe-native-summary.json).
-[Observation evidence](evidence/windows-owner-probe-observation-summary.json).
+The latest restricted native result, `fb265e7b`, identifies **Access Denied in
+`CreateJobObjectW`** before setup-identity readiness. The exact permission or
+namespace cause remains under investigation; no access widening or fallback is
+enabled. [Native evidence](evidence/windows-guardian-job-native-summary.json).
+
+The older complete Windows release `1fc9d7f` fails **four of 366 groups**:
+2,296 tests pass, eight fail and 183 are declared skips. All child/tree cleanup
+verifies; complete build cleanup is not claimed. Application/recovery fixtures
+used a nonexecutable helper, and two Python checks lacked their prerequisite
+on the isolated PATH. [Retained failure](evidence/windows-release-1fc-failure-summary.json).
+The source corrections pass eight groups / 113 tests plus 29 lane/package
+follow-up checks and typecheck on Linux. Native application/installation lanes
+and a newer complete release remain pending.
+[Correction evidence](evidence/windows-release-prerequisite-summary.json).
 
 ## What the backend does
 
@@ -54,7 +57,7 @@ the original owner still passes zero of eight checks.
 
 ## Unfinished implementation
 
-- Windows restricted-owner read-only storage probe and the rest of its original owner journey.
+- Windows restricted-owner Job creation and the rest of its original owner journey;\n  native application/recovery and complete release verification of the new fixture corrections.
 - Production editor command activation and remaining guided role/device wiring.
   Frontend and command activation are deliberately frozen for owner review.
 - Broader Shield coverage and dependency syntax/resolution, publisher provenance,

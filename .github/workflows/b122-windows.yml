@@ -240,7 +240,8 @@ jobs:
             .\deployment\windows\Build-B122Release.ps1 `
               -NodeRuntimeZip $env:NODE_RUNTIME_ARCHIVE `
               -NodeRuntimeSha256 $env:NODE_RUNTIME_SHA256 `
-              -NodeRuntimeSourceUri $env:NODE_RUNTIME_URI
+              -NodeRuntimeSourceUri $env:NODE_RUNTIME_URI `
+              -TestPythonPath (Get-Command python.exe -CommandType Application -ErrorAction Stop).Source
           } finally {
             Set-Location $env:GITHUB_WORKSPACE
             subst $buildDrive /d

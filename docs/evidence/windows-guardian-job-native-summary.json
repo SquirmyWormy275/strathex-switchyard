@@ -1,0 +1,31 @@
+{
+  "sourceCommit": "fb265e7b91750a060e2617a25a8fc3a946bad38c",
+  "executionCommit": "5a17192fcad9b65c90c0748ba8097cb9f9ef5514",
+  "sourceAndExecutionTree": "785e1592020164b53da9f8e031463e6a4559babd",
+  "artifactId": 13510985899,
+  "archiveBytes": 4269,
+  "runId": 42232149328,
+  "archiveSha256": "a334af0d480ea457621c602aca015f93f6a91f034b9e333fb056c385184ff2e0",
+  "zipSavedLocally": false,
+  "schema": "switchyard-windows-guardian-job-native/v1",
+  "jobId": 127940887568,
+  "privateReceipt": "windows-guardian-job-fb-native.json",
+  "helperSha256": "dcf8a08d33f59c3766965f814208e15ca4f47ce81bedf13c39b23e1d1d0f682d",
+  "failure": {
+    "waitResult": 0,
+    "exitCode": 2,
+    "resultAvailable": true,
+    "childReportedSuccess": false,
+    "ownerReportedSuccess": false,
+    "completedChecks": 0,
+    "failedPhase": "probe-identity-created-native-job-create-code5",
+    "failureCategory": "Error",
+    "stateLockFailure": null
+  },
+  "ordinaryOwnerChecks": 8,
+  "restrictedMetadataChecks": 13,
+  "restrictedNativeExchangeChecks": 31,
+  "finding": "CreateJobObjectW fails with immediate Win32 error 5 (Access Denied) in the restricted setup-identity guardian, before readiness. No specific DACL or namespace cause is yet established.",
+  "restrictedOwnerAccepted": false,
+  "permissionsChanged": false
+}

@@ -7,6 +7,8 @@ import { requiredGroups, runVerification, assertRequiredTestManifest } from "./r
 const suites = {
   ...Object.fromEntries(Object.entries(windowsStorageScenarioSuites).map(([suite, group]) => [suite, group.file])),
   "inspect-cli": "deployment/suite/inspect.test.mjs",
+  "suite-application": "deployment/suite/application.test.mjs",
+  "suite-installation": "deployment/suite/installation.test.mjs",
   "history-windows-scanner": "tools/layout-studio/repository-windows-shield-history.test.mjs",
   "history-bytes": "tools/layout-studio/windows-history-inputs.test.mjs",
   "history-staging": "tools/layout-studio/windows-history-staging.test.mjs",

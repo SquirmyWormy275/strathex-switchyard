@@ -19,6 +19,7 @@ On a clean checkout, provision the repository-local .NET SDK and offline package
   -NodeRuntimeZip C:\reviewed\node-v24-win-x64.zip `
   -NodeRuntimeSha256 <reviewed-64-character-sha256> `
   -NodeRuntimeSourceUri https://nodejs.org/dist/v24.14.0/node-v24.14.0-win-x64.zip `
+  -TestPythonPath C:\reviewed\Python313\python.exe `
   -SandboxHelperPath C:\reviewed\b122-sandbox-worker.exe `
   -SandboxHelperSha256 <reviewed-64-character-sha256> `
   -RawHidHelperPath C:\reviewed\strathex-b122-hid-helper.exe `
@@ -28,6 +29,20 @@ On a clean checkout, provision the repository-local .NET SDK and offline package
   -VoiceHelperPath C:\reviewed\sxsy-b122-voice-helper.exe `
   -VoiceHelperSha256 <reviewed-64-character-sha256>
 ```
+
+Verified builds also require an existing Python **3.13.3** executable supplied
+through `-TestPythonPath`. CI reuses the documentation Python it already installs.
+The builder checks the concrete path, version and image hash, adds only its exact
+directory to the isolated test path, and checks its bytes again after tests.
+Its version/hash appear in build provenance; this test prerequisite is not copied
+into the product and adds no implicit download. Test subprocesses continue to
+receive the strict environment without ambient Python injection variables.
+
+Native Windows application and recovery fixtures now bundle the same-source
+compiled lease helper. The inert fixture remains for Linux packaging simulations
+and the unexecuted setup image. Independent `suite-application` and
+`suite-installation` CI lanes retain the original assertions and deadlines;
+complete release verification remains separate.
 
 The builder pins one exact `HEAD` commit at entry and rejects every staged, unstaged, or untracked worktree change. It creates an immutable Git archive for that commit, expands it into isolated staging, installs the lockfile-pinned dependencies there, and builds and copies only from that snapshot. It checks both `HEAD` and the complete worktree status again before and after final artifact validation, so a concurrent edit or commit aborts the build rather than mixing source identities.
 
@@ -179,3 +194,8 @@ unforgeable boundary against another process already running as the same
 Windows user; same-user hostile-process acceptance remains outside this
 software-only release until an OS-separated service or hardware/NCrypt-backed
 authority is independently accepted.
+
+The earlier `1fc9d7f` complete release remains a failed checkpoint. The prerequisite
+and native-fixture corrections pass Linux source checks; their native lanes and
+complete Windows release are pending. [Failure](evidence/windows-release-1fc-failure-summary.json),
+[source checks](evidence/windows-release-prerequisite-summary.json).

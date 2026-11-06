@@ -22,7 +22,10 @@ export async function fixture(fn, platform = "linux") {
   await mkdir(frontendRoot, { recursive: true, mode: 0o700 }); await writeFile(join(root, "fault-helper.exe"), "Synthetic fixture; never executed as a native helper.", {mode:0o600}); const files = [];
   for (const name of new Set([...studioAssets.values()].map((v) => v[0]))) { const data = await readFile(join(sourceRoot, "tools/layout-studio", name)); await writeFile(join(frontendRoot, name), data, { mode: 0o600 }); files.push({ file: name, sha256: hash(data) }); }
   const digest = hash(JSON.stringify(files)); await writeFile(join(frontendRoot, "manifest.json"), JSON.stringify({ schema: "switchyard-front-end-review/v1", digest, files }), { mode: 0o600 });
-  const options = { sourceRoot, sourceFiles, frontendRoot, outputRoot: join(root, "bundles"), sourceCommit: "a".repeat(40), development: true, platform, windowsHotkeys: join(root, "fault-helper.exe"), ...(platform==="win32"?{windowsSetup:join(root,"fault-helper.exe")}: {}) };
+  // Native Windows application/recovery tests execute their bundled lease worker.
+  // Use the helper built from this source snapshot, never the nonexecutable placeholder.
+  const windowsHotkeys = process.platform === "win32" && platform === "win32" ? join(sourceRoot, "runtime/hotkeys/Switchyard.Hotkeys.exe") : join(root, "fault-helper.exe");
+  const options = { sourceRoot, sourceFiles, frontendRoot, outputRoot: join(root, "bundles"), sourceCommit: "a".repeat(40), development: true, platform, windowsHotkeys, ...(platform==="win32"?{windowsSetup:join(root,"fault-helper.exe")}: {}) };
   try { await fn({ root, frontendRoot, options, bundle: await buildSuiteRelease(options) }); }
   finally { await rm(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 }); }
 }

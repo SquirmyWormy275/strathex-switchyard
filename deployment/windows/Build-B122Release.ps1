@@ -4,6 +4,7 @@ param(
   [Parameter(Mandatory = $true)][ValidatePattern('^[0-9a-fA-F]{64}$')][string]$NodeRuntimeSha256,
   [Parameter(Mandatory = $true)][string]$NodeRuntimeSourceUri,
   [string]$OutputDirectory,
+  [string]$TestPythonPath,
   [string]$SandboxHelperPath,
   [ValidatePattern('^[0-9a-fA-F]{64}$')][string]$SandboxHelperSha256,
   [string]$SandboxLifecycleHelperPath,
@@ -193,6 +194,15 @@ foreach($trustedBuildExecutable in @($trustedGitExe,(Join-Path $systemDirectory 
   if(-not(Test-Path -LiteralPath $trustedBuildExecutable -PathType Leaf)-or((Get-Item -LiteralPath $trustedBuildExecutable -Force).Attributes-band[IO.FileAttributes]::ReparsePoint)){throw "A required fixed build executable is missing or unsafe: $trustedBuildExecutable"}
 }
 $trustedGitSha256=(Get-FileHash -LiteralPath $trustedGitExe -Algorithm SHA256).Hash.ToLowerInvariant()
+$testPython = $null
+if (-not $SkipVerification) {
+  if ([string]::IsNullOrWhiteSpace($TestPythonPath) -or -not [IO.Path]::IsPathFullyQualified($TestPythonPath)) { throw 'Verification requires the explicit existing Python 3.13.3 executable via -TestPythonPath.' }
+  $TestPythonPath = [IO.Path]::GetFullPath($TestPythonPath)
+  Assert-B122NoReparseAncestors -Path $TestPythonPath
+  $testPythonItem = Get-Item -LiteralPath $TestPythonPath -Force
+  if ($testPythonItem.PSIsContainer -or $testPythonItem.Name -cne 'python.exe') { throw 'The verification Python must be a concrete python.exe.' }
+  $testPython = [ordered]@{ version='3.13.3'; executableSha256=(Get-FileHash -LiteralPath $TestPythonPath -Algorithm SHA256).Hash.ToLowerInvariant(); purpose='isolated-test-prerequisite'; packaged=$false }
+}
 $sourceSnapshotArchive = Join-Path $output '.source-commit.zip'
 $buildRoot = Join-Path $output '.source-tree'
 Assert-Child $output $sourceSnapshotArchive
@@ -250,6 +260,7 @@ Write-Utf8NoBom $npmGlobalConfig "`n"
 $trustedPowerShellDirectory=if([IO.Path]::GetFileName((Get-Process -Id $PID).Path)-ieq'pwsh.exe'){Split-Path -Parent (Get-Process -Id $PID).Path}else{Join-Path $systemDirectory 'WindowsPowerShell\v1.0'}
 $windowsPowerShellDirectory=Join-Path $systemDirectory 'WindowsPowerShell\v1.0'
 $isolatedPath=@($reviewedRuntimeBin,(Join-Path $buildRoot 'node_modules\.bin'),(Split-Path -Parent $dotnetExe),(Split-Path -Parent $trustedGitExe),$trustedPowerShellDirectory,$windowsPowerShellDirectory,$systemDirectory)|Select-Object -Unique
+if ($null -ne $testPython) { $isolatedPath += (Split-Path -Parent $TestPythonPath) }
 $isolatedPath=$isolatedPath-join';'
 $buildEnvironment=[ordered]@{
   'PATH'=$isolatedPath;'PATHEXT'='.COM;.EXE;.BAT;.CMD';'SystemRoot'=$windowsDirectory;'WINDIR'=$windowsDirectory;'ComSpec'=(Join-Path $systemDirectory 'cmd.exe');'OS'='Windows_NT'
@@ -316,6 +327,10 @@ function Invoke-B122IsolatedHost([string]$Executable,[string[]]$Arguments,[strin
   $exitCode=Invoke-B122WithIsolatedBuildEnvironment { & $Executable @Arguments|Out-Host;return $LASTEXITCODE }
   if([int]$exitCode-ne0){throw $FailureMessage}
 }
+if ($null -ne $testPython) {
+  $testPythonVersion = (Invoke-B122IsolatedCapture -Executable $TestPythonPath -Arguments @('-I','-B','-c','import sys;print(str.join(chr(46),map(str,sys.version_info[:3])))') -FailureMessage 'Isolated verification Python failed.').Trim()
+  if ($testPythonVersion -cne $testPython.version -or (Get-FileHash -LiteralPath $TestPythonPath -Algorithm SHA256).Hash.ToLowerInvariant() -cne $testPython.executableSha256) { throw 'The verification Python version or original image changed.' }
+}
 Invoke-B122PinnedNpm -Arguments @('ci','--ignore-scripts','--no-audit','--no-fund','--prefer-offline') -FailureMessage 'Pinned dependency installation from package-lock.json failed.'
 $testHelperProjects=@(
   'apps\windows-companion\repository-runner-helper\Sxsy.B122.RepositoryRunner.csproj',
@@ -355,6 +370,7 @@ if (-not $SkipVerification) {
   Write-Utf8NoBom (Join-Path $output 'state-lease-test-helper.json') ([ordered]@{ schema='switchyard-state-lease-test-helper/v1'; sourceCommit=$sourceCommit; sha256=$stateLeaseDigest; bytes=$stateLeaseItem.Length; sourceAssembly='git-archive'; copiedBytesVerified=$true; nativeAcceptance=$false } | ConvertTo-Json)
   Invoke-B122PinnedNpm -Arguments @('run','typecheck') -FailureMessage 'Typecheck failed.'
   Invoke-B122PinnedNpm -Arguments @('test') -FailureMessage 'Test verification failed.'
+  if ((Get-FileHash -LiteralPath $TestPythonPath -Algorithm SHA256).Hash.ToLowerInvariant() -cne $testPython.executableSha256) { throw 'The verification Python image changed during tests.' }
   $firmwareVerificationReceipt = Join-Path $output 'firmware-verification.json'
   Assert-Child $output $firmwareVerificationReceipt
   Invoke-B122IsolatedHost -Executable $node.FullName -Arguments @('firmware\verify.mjs','--require-c-compiler','--dotnet',$dotnetExe,'--receipt',$firmwareVerificationReceipt) -FailureMessage 'Firmware and Raw-HID protocol verification failed.'
@@ -671,7 +687,7 @@ Write-Utf8NoBom (Join-Path $output 'sbom.spdx.json') ([ordered]@{ spdxVersion='S
 Assert-B122ReleaseSourceState -RepositoryRoot $repo -ExpectedCommit $sourceCommit | Out-Null
 $verificationSkipped = [bool]$SkipVerification
 $evidenceEligible = -not $verificationSkipped
-Write-Utf8NoBom (Join-Path $output 'release.json') ([ordered]@{ schema='sxsy-b122.windows-release'; version=1; createdAt=(Get-Date).ToUniversalTime().ToString('o'); architecture='x64'; sourceCommit=$sourceCommit; sourceAssembly='git-archive'; verificationSkipped=$verificationSkipped; evidenceEligible=$evidenceEligible; companion=[string]$companionPackageIdentity.version; providerAdapterHost=[string]$providerPackageIdentity.version; providerHostLifecycle='configured-or-disabled'; vscodeExtension=[string]$vscodePackageIdentity.version; nodeRuntime=[ordered]@{ version=$nodeVersion; source=$NodeRuntimeSourceUri; archiveSha256=$NodeRuntimeSha256.ToLowerInvariant();executableSha256=$nodeExecutableSha256;npmVersion=$npmVersion;npmCliSha256=$npmCliSha256;tscVersion=$tscVersion;tscSha256=$tscSha256 }; dotnetRuntime=[ordered]@{ version=[string]$dotnetToolchain.runtimeVersion; sdkVersion=$dotnetSdkVersion; dotnetExeSha256=$dotnetExeSha256; nugetConfigSha256=$nugetConfigSha256; toolchainManifest='build-provenance/dotnet-toolchain.json'; toolchainManifestSha256=$dotnetToolchainManifestSha256; runtimePackages=@($verifiedRuntimePackages); license='licenses/DOTNET-RUNTIME-LICENSE.txt'; thirdPartyNotices='licenses/DOTNET-RUNTIME-THIRD-PARTY-NOTICES.txt' }; buildEnvironment=[ordered]@{ isolated=$true; ambientInherited=$false; profile='ephemeral-exclusive-output'; environmentNames=@($buildEnvironmentNames|Sort-Object); gitExeSha256=$trustedGitSha256 }; firmwareVerificationReceipt=$(if ($SkipVerification) { $null } else { 'firmware-verification.json' }); sandboxHelperSha256=$helperDigest;sandboxLifecycleHelperSha256=$sandboxLifecycleHelperDigest; repositoryRuntimeHelperSha256=$repositoryRuntimeHelperDigest; companionLifecycleHelperSha256=$companionLifecycleHelperDigest; rawHidHelperSha256=$rawHidHelperDigest; rawHidSimulationSelfTest=$true; councilParticipantPresent=$true; providerDesktopHelperSha256=$providerDesktopHelperDigest; voiceHelperSha256=$voiceHelperDigest; payloadCount=$payload.Count; hardwareAcceptance=$false; highConsequenceAcceptance=$false } | ConvertTo-Json -Depth 8)
+Write-Utf8NoBom (Join-Path $output 'release.json') ([ordered]@{ schema='sxsy-b122.windows-release'; version=1; createdAt=(Get-Date).ToUniversalTime().ToString('o'); architecture='x64'; sourceCommit=$sourceCommit; sourceAssembly='git-archive'; verificationSkipped=$verificationSkipped; evidenceEligible=$evidenceEligible; companion=[string]$companionPackageIdentity.version; providerAdapterHost=[string]$providerPackageIdentity.version; providerHostLifecycle='configured-or-disabled'; vscodeExtension=[string]$vscodePackageIdentity.version; nodeRuntime=[ordered]@{ version=$nodeVersion; source=$NodeRuntimeSourceUri; archiveSha256=$NodeRuntimeSha256.ToLowerInvariant();executableSha256=$nodeExecutableSha256;npmVersion=$npmVersion;npmCliSha256=$npmCliSha256;tscVersion=$tscVersion;tscSha256=$tscSha256 }; dotnetRuntime=[ordered]@{ version=[string]$dotnetToolchain.runtimeVersion; sdkVersion=$dotnetSdkVersion; dotnetExeSha256=$dotnetExeSha256; nugetConfigSha256=$nugetConfigSha256; toolchainManifest='build-provenance/dotnet-toolchain.json'; toolchainManifestSha256=$dotnetToolchainManifestSha256; runtimePackages=@($verifiedRuntimePackages); license='licenses/DOTNET-RUNTIME-LICENSE.txt'; thirdPartyNotices='licenses/DOTNET-RUNTIME-THIRD-PARTY-NOTICES.txt' }; buildEnvironment=[ordered]@{ isolated=$true; ambientInherited=$false; profile='ephemeral-exclusive-output'; environmentNames=@($buildEnvironmentNames|Sort-Object); gitExeSha256=$trustedGitSha256; testPython=$testPython }; firmwareVerificationReceipt=$(if ($SkipVerification) { $null } else { 'firmware-verification.json' }); sandboxHelperSha256=$helperDigest;sandboxLifecycleHelperSha256=$sandboxLifecycleHelperDigest; repositoryRuntimeHelperSha256=$repositoryRuntimeHelperDigest; companionLifecycleHelperSha256=$companionLifecycleHelperDigest; rawHidHelperSha256=$rawHidHelperDigest; rawHidSimulationSelfTest=$true; councilParticipantPresent=$true; providerDesktopHelperSha256=$providerDesktopHelperDigest; voiceHelperSha256=$voiceHelperDigest; payloadCount=$payload.Count; hardwareAcceptance=$false; highConsequenceAcceptance=$false } | ConvertTo-Json -Depth 8)
 $releaseValidation = & (Join-Path $scripts 'Test-B122ReleaseArtifact.ps1') -BundleRoot $output -AllowDevelopmentArtifact:$SkipVerification
 if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($releaseValidation)) { throw 'Release artifact validation failed.' }
 $bootstrapTrustRecords=[Collections.Generic.List[string]]::new()

@@ -1,5 +1,23 @@
 # What has actually been verified
 
+Windows `fb265e7b` proves `CreateJobObjectW` fails with Win32 error 5 before
+setup-identity readiness. The original restricted owner remains 0/8. Do not
+infer whether its object DACL or namespace caused denial and do not add broader
+token/process/default-DACL/SID/privilege/account permissions or a runtime fallback.
+[Native evidence](evidence/windows-guardian-job-native-summary.json).
+
+The complete older Windows release `1fc9d7f` fails four groups (eight tests).
+Two Python-dependent checks lack Python on the isolated PATH; native application
+and recovery fixtures still bundle inert helper text. The source now admits one
+explicit existing, version/hash-checked Python 3.13.3 test executable and bundles
+the exact-source helper for actual Windows lifecycle tests. Eight groups / 113
+tests plus 29 lane/package follow-up checks, typecheck and exact test cleanup
+pass on Linux. Native follow-up remains pending; new independent application
+and installation lanes preserve all original checks and deadlines.
+[Original failure](evidence/windows-release-1fc-failure-summary.json),
+[corrections](evidence/windows-release-prerequisite-summary.json).
+
+
 The Windows guardian now reports only fixed pre-readiness startup phases, with
 API-specific numeric codes for Job create/configure failures. The host preserves
 refusal and all ownership checks; it does not turn diagnostic output into exit
