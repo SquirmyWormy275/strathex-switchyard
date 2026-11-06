@@ -82,10 +82,33 @@ test("mixed public OSV transport binds each exact ecosystem and source hash with
 
 const highVector = "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H", lowVector = "CVSS:3.0/AV:N/AC:H/PR:N/UI:R/S:U/C:L/I:N/A:N";
 const severity = score => [{ type: "CVSS_V3", score }];
+test("V2 source scores retain their own rating bands and cannot downgrade a mixed V3 critical finding", async () => {
+  const source = record(), vector = "AV:N/AC:L/Au:N/C:C/I:C/A:C";
+  source.severity = [{ type: "CVSS_V2", score: vector + "/E:F/RL:OF/RC:C/TD:N", source: "https://NEVER_FETCH.invalid" }];
+  let result = normalizeOsvRecord(source, query, now());
+  assert.equal(result.advisory.severity, "high"); assert.equal(result.evidence.cvssV2Base.maximumScore, 10); assert.equal(result.evidence.cvssV3Base, undefined);
+  assert.equal(result.evidence.severityAssessment, "cvss-v2-base-calculated"); assert.equal(result.evidence.cvssV2Context.localEnvironmentVerified, false); assert.equal(result.evidence.cvssV2Context.baseSeverityReduced, false);
+  assert.deepEqual(result.evidence.cvssV2Context.vectors.map(row => [row.temporalScore, row.environmentalScore]), [[8.3, 0]]);
+  source.severity.push(...severity(highVector));
+  result = normalizeOsvRecord(source, query, now()); assert.equal(result.advisory.severity, "critical"); assert.equal(result.evidence.cvssV3Base.maximumScore, 9.8); assert.equal(result.evidence.cvssV2Base.maximumScore, 10); assert.equal(result.evidence.severityAssessment, "cvss-mixed-base-calculated");
+  const collected = await collectOsvAdvisories([query], { now, fetchImpl: async () => response({ vulns: [source] }) });
+  const f = scannerFixture({ action: "shield_supply_chain", files: { "package-lock.json": JSON.stringify({ lockfileVersion: 3, packages: { "node_modules/example": { version: "1.2.3", license: "MIT" } } }) }, advisory: collected.feed.packages }), report = await f.scan();
+  assert.equal(report.findings[0].severity, "critical"); assert.equal(report.outcome, "failed"); assert.equal(report.completeness, "incomplete"); assert.equal(JSON.stringify(result).includes("NEVER_FETCH"), false); assert.equal(JSON.stringify(result).includes(vector), false);
+  source.severity.reverse(); assert.deepEqual(normalizeOsvRecord(source, query, now()).advisory, result.advisory);
+});
+test("V2 package scope, source-method mismatch, zero impact and mixed unsupported methods stay explicit", () => {
+  const source = record(), row = { type: "CVSS_V2", score: "AV:N/AC:L/Au:N/C:P/I:N/A:N" };
+  source.affected[0].severity = [row];
+  source.affected.push({ package: { ecosystem: "PyPI", name: query.name }, versions: [query.version], severity: severity(highVector) });
+  const r = normalizeOsvRecord(source, query, now()); assert.equal(r.advisory.severity, "medium"); assert.equal(r.evidence.cvssV2Base.scope, "affected-package");
+  for (const entries of [[{ ...row, score: highVector }], [{ type: "CVSS_V3", score: row.score }], [row, { type: "CVSS_V4", score: highVector }], [{ ...row, score: row.score.replace("C:P", "C:N") }]]) {
+    source.affected[0].severity = entries; const result = normalizeOsvRecord(source, query, now()); assert.equal(result.advisory.severity, "unknown"); assert.equal(result.evidence.cvssV2Base, undefined);
+  }
+});
 test("OSV calculates quantitative base severity only from complete supported vectors and preserves every source/algorithm hash", async () => {
   const source = record(); source.severity = [...severity(lowVector), ...severity(highVector)];
   const result = normalizeOsvRecord(source, query, now()); assert.equal(result.advisory.severity, "critical"); assert.equal(result.evidence.severityAssessment, "cvss-v3-base-calculated"); assert.equal(result.evidence.cvssV3Base.maximumScore, 9.8); assert.equal(result.evidence.cvssV3Base.scope, "record"); assert.equal(result.evidence.cvssV3Base.vectors.length, 2); assert.ok(result.evidence.cvssV3Base.vectors.every(row => /^[a-f0-9]{64}$/.test(row.vectorSha256))); assert.equal(JSON.stringify(result).includes("CVSS:3."), false);
-  const collected = await collectOsvAdvisories([query], { now, fetchImpl: async () => response({ vulns: [source] }) }); assert.equal(collected.provenance.collector, "switchyard-osv-collector/3");
+  const collected = await collectOsvAdvisories([query], { now, fetchImpl: async () => response({ vulns: [source] }) }); assert.equal(collected.provenance.collector, "switchyard-osv-collector/4");
   const f = scannerFixture({ action: "shield_supply_chain", files: { "package-lock.json": JSON.stringify({ lockfileVersion: 3, packages: { "node_modules/example": { version: "1.2.3", license: "MIT" } } }) }, advisory: collected.feed.packages }), report = await f.scan();
   assert.equal(report.outcome, "failed"); assert.equal(report.completeness, "incomplete"); assert.equal(report.findings[0].severity, "critical"); assert.equal(report.gaps.includes("advisory_severity_unassessed"), false); assert.deepEqual(parseShieldScannerReport(JSON.stringify(report), { engine: report.engine, requestSha256: report.requestSha256, request: f.request }, f.request.action), report);
 });

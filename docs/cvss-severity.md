@@ -1,15 +1,23 @@
 # Calculate severity from supported source metrics
 
 The [OSV collector](osv-advisory-source.md) can calculate a base severity from
-complete CVSS 3.0/3.1 vectors, including their optional temporal and environmental metric groups. It uses FIRST's published
+complete CVSS 2.0 and 3.0/3.1 vectors, including their optional temporal and environmental metric groups. It uses FIRST's published
 [equations, rounding and rating thresholds](https://www.first.org/cvss/v3.1/specification-document).
 It does not infer metrics from advisory prose or database-specific labels.
-Supported source data produces a numeric maximum and its low/medium/high/critical
+Supported source data produces numeric scores and the highest applicable version-specific
 rating; matched advisories still fail Shield and retain incomplete coverage.
 
-The collector requires all eight base metrics and accepts the fourteen optional metrics in any order, within 128 characters. Omitted or explicit `X` metrics use the standard defaults without claiming a supplied environment. Missing, duplicate, unknown or invalid metrics refuse calculation. CVSS 2/4 and other unsupported methods remain unknown. The original base-only helper still accepts only its eight base metrics.
+For CVSS 3, the collector requires all eight base metrics and accepts the fourteen optional metrics in any order, within 128 characters. Omitted or explicit `X` metrics use the standard defaults without claiming a supplied environment. Missing, duplicate, unknown or invalid metrics refuse calculation. CVSS 4 and other unsupported methods remain unknown. The original base-only helper still accepts only its eight base metrics.
 
-The signed finding severity continues to use the maximum applicable **base** score. Supported supplied context is retained separately as numeric temporal/environmental scores and vector hashes, with `advisory-supplied-metrics` provenance, `localEnvironmentVerified: false` and `baseSeverityReduced: false`. For example, a critical base score of 9.8 can retain supplied scores of 8.5 and 8.2 without lowering the signed critical finding. These calculations do not verify the source metrics against the user's environment or clear a vulnerability.
+The signed finding severity uses the highest applicable version-specific **base** rating; scores remain separated by version. Supported supplied context is retained separately as numeric temporal/environmental scores and vector hashes, with `advisory-supplied-metrics` provenance, `localEnvironmentVerified: false` and `baseSeverityReduced: false`. For example, a critical base score of 9.8 can retain supplied scores of 8.5 and 8.2 without lowering the signed critical finding. These calculations do not verify the source metrics against the user's environment or clear a vulnerability.
+
+## CVSS 2 support
+
+CVSS 2 accepts six required base metrics and eight optional temporal/environmental metrics, within 128 characters. It follows [FIRST’s V2 equations and metric grammar](https://www.first.org/cvss/v2/guide) and the unprefixed vector form in the [OSV schema](https://ossf.github.io/osv-schema/#severity-field). `Au` is case sensitive; duplicate, incomplete, unknown or mis-versioned metrics refuse calculation. `ND` defaults do not claim supplied context. Integer fractions preserve decimal half-up rounding without binary floating-point ties.
+
+All 729 base vectors, 72,900 base/temporal combinations, 46,656 base/security-requirement combinations and 297,000 adjusted temporal/distribution combinations match the separately hash-pinned [Red Hat Product Security calculator](https://github.com/RedHatProductSecurity/cvss/tree/2f149099257ae06b98cef252efc440bddafe61e5). The last cohort uses all 99 distinct adjusted rounded base results. The 417,285-case result digest and reference source hashes remain in an offline fixture; temporary reference code is removed and is not packaged.
+
+Seven isolated groups pass 53 checks; after adding actual Linux V2 Supply Chain and mixed-version Release journeys, two changed groups pass 25 checks. The Windows journey uses a guest double. Child/tree cleanup and typecheck pass. Zero supplied environmental severity does not clear a high base finding; mixed V2/V3 retains critical. These are source acceptance checks; the installed application still uses its separately recorded `4b5e3cc` source. [Evidence](evidence/cvss-v2-summary.json).
 
 ## Bind the right package and version
 
@@ -21,8 +29,8 @@ ratings cannot coexist with package-specific ratings; that ambiguity stays
 unknown. Missing package-specific ratings also stay unknown.
 
 Each applicable severity array is limited to eight entries and the combined
-selection to 32. Every applicable entry must use a supported complete supported CVSS 3 vector;
-the maximum calculated score determines the rating. Mixed supported/unsupported
+selection to 32. Every applicable entry must use a supported complete CVSS 2 or 3 vector.
+V2 uses low/medium/high bands and never invents a critical band. In a mixed record, V2 high at 10.0 cannot replace V3 critical at 9.8. Mixed supported/unsupported
 methods stay unknown. Source labels and optional source strings do not authorize
 a request, fetch, executable, publisher claim or metric. The signed finding
 contract has no `none` severity: a matched advisory containing only zero-score
@@ -30,7 +38,7 @@ vectors remains unknown and failed, with `zero-base-score-not-a-clearance`.
 
 ## Retain the calculation evidence
 
-Collector version `switchyard-osv-collector/3` retains the exact public record
+Collector version `switchyard-osv-collector/4` retains the exact public record
 hash, package/version proof, calculation algorithm identity, normalized vector
 hashes, individual numeric base scores, applicable scope and maximum score.
 Unsupported cases retain fixed reasons without copying arbitrary source fields.
