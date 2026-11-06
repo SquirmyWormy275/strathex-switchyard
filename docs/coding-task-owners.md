@@ -229,3 +229,12 @@ CommonJS method checks also pass. Child/tree cleanup and removal of the exact
 generated extension output verify. Actual terminal creation, command wiring and
 native attachment acknowledgement remain unfinished.
 [Source-specific evidence](evidence/editor-authorization-client-summary.json).
+
+Normal installed source `2c87c03` passes six update, ten owner/editor/severity and
+seven journal checks. The new signed routes reject unknown owners without
+creating a review, permit or terminal. All 54 identities remain, and 52 sealed
+files stay byte-identical across restart. Existing recovery rewrites the two
+opened verification workspaces; definitions/package/modes and the historical
+pending conversation remain verified separately. Selected bytes stay unchanged
+during the metadata checks. Dated launcher backups and exact bundle cleanup
+verify. [Installed evidence](evidence/installed-editor-authorization-summary.json).
