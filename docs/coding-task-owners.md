@@ -86,3 +86,14 @@ task and refuses replay, unauthenticated requests and unexpected prompt fields.
 Six files pass 91 tests; the final privacy/route cohort passes forty with cleanup
 and typecheck. This establishes backend composition, not live account or IDE
 acceptance. [Evidence](evidence/routed-task-load-summary.json).
+
+After a normal versioned update, the pilot can verify only installed metadata and
+refusals with `node scripts/verify-task-owner-host.mjs --read-only-metadata`.
+The verifier authenticates the saved app instance before disclosing its bearer,
+checks exact installed source, safe owner/load projections and rejected effect
+fields, then verifies selected sealed bytes, workspace inventory and frozen Home.
+It starts no provider, resumes no task and requests no model turn. Extra native,
+account or approval flags are rejected before installed-state access; the shared
+metadata verifier cohort passes two tests with child/tree cleanup (receipt
+`isolated-test-2ce51fcb-268e-40fb-82e1-1924cc8ea2ec.json`). Installed execution of
+this later verifier still requires its separate receipt.

@@ -12,7 +12,7 @@ Start with the [requirement ledger](switchyard-requirements.md) for complete sco
 
 | Checkpoint | Result | What it establishes |
 | --- | --- | --- |
-| Complete Linux source `370c21e` | **241/241 groups; 1,509 passed tests; eleven declared skips.** | Every child/process-tree exit and exact owned fixture, dependency, build and checkout cleanup verifies. [Receipt](evidence/linux-370-complete-summary.json). Later source changes have separate focused evidence. |
+| Complete Linux source `74d0d04` | **242/242 groups; 1,529 passed tests; eleven declared skips.** | Every child/process-tree exit and exact owned fixture, dependency, build and checkout cleanup verifies. [Receipt](evidence/linux-74d-complete-summary.json). Later source changes have separate focused evidence. |
 | Windows state leases `ce5be6a` | Eighteen native tests pass; one declared Linux-only skip. Supply Chain scenario and all 23 policy-output tests also pass. | The shipped native helper exercises real kernel sharing, replacement/hard-link refusal, malformed release, detached owners and parent loss. Three archive digests and child/tree cleanup verify. [Receipts](evidence/native-state-lease-ce5-summary.json). |
 | Windows packaging and scanner directories | Client/package cohort: 73 native tests pass at `5fe6e95`; scanner registry: twenty pass at `ec3afe7`. | Package size and filesystem identity corrections pass their complete focused cohorts. [Package](evidence/windows-fixture-alias-followup-summary.json), [registry](evidence/linux-startup-windows-user-object-summary.json). |
 | Installed Linux application `c5d2d28` | Six update/seven metadata checks and fifteen checks each for Supply Chain and Release. | Four actual offline scanner exits, original 54 workspace identities, selection, private endpoint and frozen frontend are restored; owned staging is removed. [Installed receipt](evidence/installed-cvss-context-summary.json). |
@@ -42,6 +42,13 @@ guard and shutdown joins for active polls, deadlines and managed input release.
 All exact owned checkout/dependency/build cleanup verifies; its marker is removed.
 The preceding failed `efbaa52` run remains failed. [Correction](evidence/execution-shutdown-summary.json).
 
+The subsequent complete **`74d0d04` run passes 242/242 groups**, 1,529 tests
+and eleven declared skips. Its private temporary parent uses available storage
+without changing mount rules, quota settings, deadlines or assertions. Every
+child/tree and exact temporary parent, checkout, alias, build and marker cleanup
+verifies. [Complete acceptance](evidence/linux-74d-complete-summary.json). Later
+Studio owner-route composition has separate 91-test and forty-case evidence.
+
 The complete `a9cefaf` run is **failed: 236/242 groups**, 1,508 passed tests,
 thirteen failed tests and eleven declared skips. All six failing groups report
 Linux `EDQUOT` during fixture writes/copies; `/tmp` has per-user quotas. Every
@@ -70,7 +77,7 @@ The explicit protected task-owner service now persists original task/account/
 repository/listener identities and refuses duplicate or foreign-host adoption.
 Five related files pass 76 tests; final eight registry/five package checks pass
 with exact cleanup and typecheck. An actual Unix listener/bridge composes with a
-controlled provider double. The newer 242-group run failed as recorded above. The owner/load routes have separate composition evidence above; frontend and IDE attachment remain unfinished.
+controlled provider double. The 242-group `74d0d04` run passes as recorded above. The owner/load routes have separate composition evidence above; frontend and IDE attachment remain unfinished.
 [Owner contract](coding-task-owners.md), [evidence](evidence/coding-task-owner-summary.json).
 
 The task creator now verifies its own native account, original repository and
