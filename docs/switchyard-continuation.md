@@ -36,22 +36,23 @@ checks, native Windows results, focused source checks and installed acceptance.
 The [verification record](verification.md) retains historical receipts and failed
 attempts; do not infer current status from an older passing checkpoint.
 
-The installed baseline is `5a8d15987f54a5c0f72d44a9b5848ddf4e5df442`,
-release `44d51187f8030c333a28a3c396f334e061e125ecbdf0818328ef887272e08af7`.
+The installed baseline is `4b2daede4ead6293b5344b3e9c2b4d7b68601ad4`,
+release `884a1433e7463bd3498a185229a5df11a2933a3d2e80b92448368fe7521067a8`.
 Preserve all 54 original workspace identities, the pending keyboard-only Codex
-workspace, private connection information and the frozen Home bytes. The
-normal versioned update passed 31 metadata checks, including six pure installed
-archive checks and five extras checks covering all 39 pip/PyPA reference cases.
-All 54 semantic snapshots match; 53 sealed files
-are byte-identical and one changed only audit
-metadata. Keep the current release and its one rollback. The prepared bundle
-was removed after manifest verification. [Receipt](evidence/installed-pypi-extras-summary.json).
+workspace, private connection information and the frozen Home bytes. The normal
+versioned update passes 20 owner/journal metadata checks and verifies the exact
+suite module hash from the 72-check source demonstration. It starts no bundled
+example or provider. All 54 semantic snapshots match; 53 sealed files are
+byte-identical and one changed only audit metadata. Keep the current release and
+its one rollback. The 534-file prepared bundle was verified and removed.
+[Receipt](evidence/installed-bundled-examples-summary.json).
+The previous installed `5a8d159` has separate 31-check archive/extras evidence.
 
 Latest source work closes the bundled-example uncertain-stop/replacement/shutdown
 gap. Seven focused groups/72 checks pass, including real authenticated Node
 readiness, restart identity and keyboard-only exits; typecheck and package bounds
-pass. The exact focused temporary root is removed. Native Windows and normal
-installed acceptance of that correction remain separate. [Contract](bundled-agent-lifecycle.md).
+pass. The exact focused temporary root is removed. Normal installed metadata/module verification now passes; native Windows and
+live installed bundled-example execution remain separate. [Contract](bundled-agent-lifecycle.md).
 The four Windows backend batches at `9f35961` are now digest-verified: 198 groups,
 1,022 passes, 142 declared skips, no failures and all cleanup verified. Its combined
 release run 42281533502 is still active. [Receipt](evidence/windows-backend-9f35961-native-summary.json).
@@ -136,7 +137,7 @@ release run 42281533502 is still active. [Receipt](evidence/windows-backend-9f35
    and cancelled retry remain historical; their cause is not established.
    [Native receipt](evidence/shortcut-writer-native-summary.json).
    [Source evidence](evidence/shortcut-writer-retirement-source-summary.json).
-   Installed source is now 5a8d159, with 31 permitted metadata checks.
+   Historical installed source 5a8d159 passes 31 permitted metadata checks.
    Native NTFS index/history staging now each pass six original checks and
    three independent guardian exits at 6b4089c. Their Windows scanner files
    separately pass two cases each with guest doubles; leases pass 24 cases and
@@ -152,8 +153,11 @@ release run 42281533502 is still active. [Receipt](evidence/windows-backend-9f35
    Linux scans and two Windows guest-double journeys retain original state,
    receipt/replay and cleanup guarantees. Typecheck/package bounds pass. Five
    installed extras metadata checks now pass inside the 31-check update; native
-   Windows extras acceptance remains pending. A complete immutable Linux run at
-   5a8d159 is active; reconcile its marker and exact owned cleanup when it exits.
+   Windows extras acceptance remains pending. The complete immutable Linux run at
+   `5a8d159` now passes all 308 groups: 1,823 tests, sixteen declared skips and
+   zero failures. Exact cleanup removed its checkout, nine aliases, 782 generated
+   files, temporary parent and marker; all three other worktrees remain.
+   [Complete receipt](evidence/linux-5a8d159-complete-summary.json).
    [Evidence](evidence/pypi-extras-source-summary.json).
 5. Keep frontend and editor command activation frozen. The protected editor
    journal, signed routes, restricted upstream and retained Terminal compose

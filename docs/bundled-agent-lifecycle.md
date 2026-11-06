@@ -31,5 +31,12 @@ original package budget pass; owned temporary staging was removed.
 [Source receipts and limitations](evidence/bundled-example-lifecycle-source-summary.json)
 distinguish this Linux demonstration from provider doubles. These checks do not
 accept a new LangChain runtime execution, arbitrary descendant containment,
-installed application update or native Windows execution. Frontend and extension
+live installed bundled-example execution or native Windows execution. Frontend and extension
 activation remain frozen; no real account, model task or hardware operation ran.
+
+The normal installed update at `4b2daed` now passes 20 owner/journal metadata
+checks and verifies the exact tested suite module hash. All 54 workspace semantic
+snapshots remain unchanged, 53 sealed files remain byte-identical, and the
+frozen frontend is unchanged. The prepared bundle is removed and only current
+plus one rollback remain. No bundled example or provider is launched by these
+installed checks. [Installed evidence](evidence/installed-bundled-examples-summary.json).

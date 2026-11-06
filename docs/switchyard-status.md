@@ -7,9 +7,9 @@ a partial implementation.** The F77 is the pilot device; it does not limit scope
 The Linux backend has a passing complete test checkpoint, and a versioned
 application has separately verified installed metadata checks. Later archive
 identity work has focused source acceptance.
-The corrected complete Linux `55515d1` run passes all 307 groups, 1,805 tests
-and sixteen declared skips. Both separately scheduled npm files also pass on
-native Windows; later shortcut work has separate focused acceptance.
+The corrected complete Linux `5a8d159` run passes all 308 groups, 1,823 tests
+and sixteen declared skips, covering combined archive, shortcut and Python changes.
+The newer bundled-agent retirement correction has separate 72-check acceptance.
 The restricted Windows storage owner now passes all eight original checks with
 verified retirement. Complete Windows release acceptance remains pending. Hardware,
 account and visual acceptance remain separate from those implementation results.
@@ -25,13 +25,13 @@ there is no merge or public release acceptance.
 
 | Boundary | Verified result | Still open |
 | --- | --- | --- |
-| Complete Linux source | `55515d1`: **307 groups, 1,805 passing tests, sixteen declared skips, zero failures.** All owned children, checkout, dependency aliases and generated files were removed. [Receipt](evidence/linux-55515d1-complete-summary.json). | Provider/guest doubles remain explicit. Later shortcut and Python changes have separate focused checks. |
-| Windows backend batches | `dbbcce8`: 170 of 171 groups accepted, 971 passing tests and 135 declared skips. The native lease group passes. [Receipts](evidence/windows-backend-dbbc-native-summary.json). | The older complete release also finishes 385/386 groups with 2,336 accepted tests and 195 declared skips; its sole failure is that same task-owner file timeout, excluded from accepted totals. [Complete failed receipt](evidence/windows-complete-dbbc-failed-summary.json). All 26 original cases now run independently under the same 45-second child bound; all pass locally. Native `9fde0a3` now completes all 26 independent cases: 24 pass, two declared Linux-only skips, original 45-second bounds and verified cleanup. [Native receipt](evidence/task-owner-native-summary.json). [Correction](evidence/task-owner-scenarios-source-summary.json), [independent job](evidence/pipe-buffer-and-task-source-summary.json). |
+| Complete Linux source | `5a8d159`: **308 groups, 1,823 passing tests, sixteen declared skips, zero failures.** Exact child/tree exit and owned checkout, nine aliases, 782 generated files, temporary parent and marker cleanup verify; all three other worktrees remain. [Receipt](evidence/linux-5a8d159-complete-summary.json). | Provider/guest doubles remain explicit. The newer bundled-agent correction has a separate 72-check pass. |
+| Windows backend batches | `9f35961`: **198 groups, 1,022 passing tests, 142 declared skips, zero failures.** Four digests, source/merge tree equality and all child/tree cleanup verify. [Receipts](evidence/windows-backend-9f35961-native-summary.json). | The combined release remains active. Older `dbbcce8` backend and complete-release failures remain recorded; later passing batches do not relabel them. [Historical backend](evidence/windows-backend-dbbc-native-summary.json), [complete failure](evidence/windows-complete-dbbc-failed-summary.json). |
 | Restricted Windows owner | `6e967a3`: **8/8 original owner checks pass**, with 68 exact QUERY-mask-8 registrations, native tree exit, token recheck, private-desktop closure and fixture/service/file retirement. All six GUI setup checks pass. [Owner receipt](evidence/windows-restricted-owner-accepted-summary.json), [setup](evidence/setup-final-native-summary.json). | This controlled native CI proof does not accept an ordinary user account, interactive UAC or actual guest journey. |
 | Installation and runtime | All sixteen original Windows installation/recovery cases pass at `b600a6d`; its independent fresh runtime installs 49 packages and loads/rechecks the offline CPU model, then removes its temporary runtime. [Installation](evidence/installation-scenarios-native-summary.json), [runtime](evidence/windows-runtime-b600-native-summary.json). | These independent passes do not accept the failed complete Windows release or ordinary-user/guest journeys. |
 | Latest diagnostic source | Seven focused groups pass 69 tests with five Windows-only skips. Two managed builds, 2,101 portable checks, typecheck and exact owned cleanup pass. [Receipt](evidence/worker-start-observation-source-summary.json). | Actual Windows `d15285b` passes all eight acknowledgement/refusal tests without skips. [Native receipt](evidence/worker-start-refusal-native-summary.json). The full restricted-owner journey is now separately accepted above. |
 | Windows index/history/leases | Native NTFS index and history packets each pass six checks and three independent guardian exits. Both Windows scanner files pass two cases with guest execution doubled; lease groups pass 24 tests and one Linux-only skip. [Evidence](evidence/native-history-index-leases-summary.json). | Packet Git witnesses are synthetic. Actual guest, installed Windows and ordinary-user acceptance remain separate. |
-| Installed app | Linux source `5a8d159` passes 31 installed owner/editor/journal/offline-severity/SPDX/OSV/archive/Python-extras metadata checks, including all 39 independent pip/PyPA cases. All 54 workspace semantic snapshots and frozen frontend bytes are preserved. [Receipt](evidence/installed-pypi-extras-summary.json). | This metadata update starts no scanner, task, provider or public query. Frontend and extension activation remain frozen. |
+| Installed app | Linux source `4b2daed` passes 20 owner/journal metadata checks and verifies the exact suite module from the 72-check source demonstration. All 54 workspace semantic snapshots, 53 sealed files and frozen frontend bytes are preserved. Only current plus one rollback remain; prepared staging is removed. [Receipt](evidence/installed-bundled-examples-summary.json). Earlier `5a8d159` has separate [31-check archive/extras evidence](evidence/installed-pypi-extras-summary.json). | No bundled example, scanner, task, provider or public query is started by this update. Frontend and extension activation remain frozen. |
 | Windows npm archive identity | Corrected `55515d1` completes ten archive tests plus eight original byte-comparison tests, each file with two original Linux-only skips inside its original 300-second bound; guest execution is doubled. [Archive](evidence/npm-archive-native-summary.json), [bytes](evidence/npm-artifact-split-native-summary.json). | Complete Windows release remains separate. |
 | Windows shortcut retirement | `9f35961` passes all sixteen original installation/recovery scenarios and nine writer checks, with no skips and verified cleanup. The execution deadline remains ten seconds. [Receipt](evidence/shortcut-writer-native-summary.json). | The historical timeout and cancelled unchanged-source retry remain recorded; their cause is not established. Interactive user/installed Windows acceptance is separate. [Failure](evidence/windows-shortcut-timeout-summary.json). |
 
@@ -48,8 +48,8 @@ combined Windows release still running. [Backend receipts](evidence/windows-back
 
 Bundled-agent retirement now preserves uncertain exact children, refuses replacement
 across mode changes and reports unconfirmed shutdown. Seven groups/72 checks pass,
-including two real authenticated Node sessions and confirmed exits. Native Windows
-and installed acceptance of this new correction remain pending.
+including two real authenticated Node sessions and confirmed exits. Installed metadata/module verification passes without starting an example. Native
+Windows and live installed example acceptance remain pending.
 [Contract](bundled-agent-lifecycle.md), [source evidence](evidence/bundled-example-lifecycle-source-summary.json).
 
 ## What the backend does

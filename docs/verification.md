@@ -1122,3 +1122,28 @@ backend artifacts verify their declared byte lengths and SHA-256 digests. Their
 deadlines and complete child/tree cleanup. No ZIP or native runtime is retained
 locally. The combined release remains active and is not accepted by these passes.
 [Native receipts](evidence/windows-backend-9f35961-native-summary.json).
+
+Normal installed source `4b2daed` now passes 13 task-owner and seven journal
+metadata checks. The deployed suite module matches the exact hash exercised
+by the source demonstration. All 54 semantic workspace snapshots and selection
+are preserved; 53 sealed files are byte-identical and one changes only audit
+metadata. The dated backup and launcher readback verify. Frozen frontend bytes
+remain unchanged, only current plus one rollback remain, and the 534-file
+5,234,856-byte prepared bundle is removed after verification. No bundled example,
+provider, task, model, public query or HID operation runs during this update.
+[Installed receipt](evidence/installed-bundled-examples-summary.json).
+
+## Complete Linux 5a8d159 — 2026-11-06
+
+Immutable source `5a8d15987f54a5c0f72d44a9b5848ddf4e5df442`, tree
+`37bdd5785537167049a71191f596e57ddde07056`, passes all 308 groups: 1,823 passing
+tests, sixteen declared skips, no failures. Receipt
+`isolated-test-3b407eac-a7a5-4a36-80e5-64b4acc53d7e.json` has SHA-256
+`2e371d5251a88b524c236a22294445b69cf10b83e6048fc66191e3c587b0a729`.
+Every child and process tree exit/cleanup verifies. Exact owned cleanup removes
+the checkout, nine dependency aliases, 782 generated files (11,766,655 bytes),
+temporary parent and run marker; all three other worktrees remain unchanged.
+Provider and Windows guest doubles remain declared. This complete result covers
+the combined shortcut and Python changes; the newer bundled-agent correction
+has its separate focused/installed evidence. No new complete run is needed for
+documentation changes. [Receipt](evidence/linux-5a8d159-complete-summary.json).
