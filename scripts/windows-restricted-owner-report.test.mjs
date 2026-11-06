@@ -1,10 +1,28 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { verifyRestrictedOwnerReport, storageBrokerFailureEvidence } from "./windows-restricted-owner-report.mjs";
+function stdio() { return { schema: "switchyard-restricted-child-stdio/v1", standardHandles: 3, inheritanceRestricted: true, stdinEof: true, stdoutBytes: 0, stderrBytes: 0, outputBounded: true, handlesClosedVerified: true, drainsCompleted: true, stderr: { category: "empty", function: null, code: null } }; }
 function sample() { return { success: true, nativeRestrictedHostProof: {
+  standardIo: stdio(),
   schema: "switchyard-restricted-host-process-proof/v1", success: true, processCreationApi: "CreateProcessAsUserW", consoleCreationMode: "detached-process", startupDesktop: "owned-noninteractive", interactiveDesktopInherited: false, privateDesktopClosedVerified: true, creatorPrivileges: { quotaAssigned: true, quotaEnabled: false, assignPrimaryAssigned: false, assignPrimaryEnabled: false, impersonateAssigned: true, impersonateEnabled: true }, creatorQuotaRestoredVerified: true, restrictingSidListVerified: true, restrictingSidCount: 4, primaryTokenVerified: true, sameUserVerified: true, mediumIntegrityVerified: true, administratorsDenyOnlyVerified: true, volumePrivilegeAbsentVerified: true, onlyTraversePrivilegeAssignedVerified: true, historicalFilteredFlags: [false, false, false], historicalFilterBytes: [1, 1, 1], tokenRecheckedAfterExit: true, treeExitVerified: true, hostOwnerChecks: 8,
   hostOwner: { schema: "switchyard-native-broker-owner-proof/v1", success: true, checks: Array.from({ length: 8 }, (_, i) => "synthetic independently verified boundary " + i), nativeExitVerified: true, fixtureRemoved: true, ordinaryUserToken: false, guestLaunched: false, setupRequested: false, accountCreated: false }, ordinaryUserAccountAccepted: false, guestLaunched: false, accountCreated: false
 } }; }
+test("child standard output evidence accepts only closed fixed diagnostics, with no path or account disclosure", () => {
+  const pipes = { ...stdio(), stderrBytes: 120, stderr: { category: "assertion", function: "uv_pipe_open", code: "EINVAL" } };
+  const input = { schema: "switchyard-storage-broker-protocol-proof/v1", success: false, restrictedHostStdio: pipes, restrictedHostChildExit: { waitResult: 0, exitCode: 134, resultAvailable: false } };
+  const projected = storageBrokerFailureEvidence(input); assert.deepEqual(projected.restrictedHostStdio, pipes); assert.equal(projected.success, false); assert.equal(projected.restrictedHostChildExit.exitCode, 134);
+  projected.restrictedHostStdio.stderr.code = null; assert.equal(pipes.stderr.code, "EINVAL");
+  for (const mutate of [s => { s.raw = "NEVER_RETAIN"; }, s => { s.stderr.path = "NEVER_RETAIN"; }, s => { s.stderr.category = "NEVER_RETAIN"; }, s => { s.stderr.function = "NEVER_RETAIN"; }, s => { s.stderr.code = "NEVER_RETAIN"; }, s => { s.standardHandles = 4; }, s => { s.stdoutBytes = -1; }, s => { s.stderrBytes = 1.5; }, s => { s.stderrBytes = Number.MAX_SAFE_INTEGER + 1; }, s => { s.stderrBytes = 0; }, s => { s.outputBounded = false; }, s => { s.schema = "untrusted"; }, ...["inheritanceRestricted", "stdinEof", "handlesClosedVerified", "drainsCompleted"].map(key => s => { s[key] = false; })]) {
+    const invalid = structuredClone(pipes); mutate(invalid); const result = storageBrokerFailureEvidence({ ...input, restrictedHostStdio: invalid }); assert.equal(result.restrictedHostStdio, undefined); assert.equal(JSON.stringify(result).includes("NEVER_RETAIN"), false); assert.equal(result.restrictedHostChildExit.exitCode, 134);
+  }
+  const exceeded = { ...pipes, stderrBytes: 8193, outputBounded: false }; assert.deepEqual(storageBrokerFailureEvidence({ ...input, restrictedHostStdio: exceeded }).restrictedHostStdio, exceeded);
+});
+test("restricted owner success requires exact standard handle isolation, bounded output and independently closed pipes", () => {
+  assert.equal(verifyRestrictedOwnerReport(sample()).standardIo.handlesClosedVerified, true);
+  for (const mutate of [p => { delete p.standardIo; }, p => { p.standardIo.stderrBytes = 1; }, p => { p.standardIo.stdoutBytes = 65537; p.standardIo.outputBounded = false; }, p => { p.standardIo.stderr.function = "uv_thread_create"; }, ...["inheritanceRestricted", "stdinEof", "handlesClosedVerified", "drainsCompleted"].map(key => p => { p.standardIo[key] = false; })]) {
+    const result = sample(); mutate(result.nativeRestrictedHostProof); assert.throws(() => verifyRestrictedOwnerReport(result));
+  }
+});
 test("the actual coordinator projection retains bounded failed-child evidence and excludes private paths or arbitrary fields", () => {
   const child = { waitResult: 0, exitCode: 2, resultAvailable: true, childReportedSuccess: false, ownerReportedSuccess: false, completedChecks: 0, failedPhase: "private-state-initialize", failureCategory: "Error" };
   const input = { schema: "switchyard-storage-broker-protocol-proof/v1", success: false, restrictedHostPhase: "bounded-owner-journey", restrictedHostChildExit: child, privatePath: "NEVER_RETAIN" };

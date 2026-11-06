@@ -49,14 +49,18 @@ pinned toolchain and verifies source/size/digest before staging at the fixed
 runtime path. There is no PowerShell fallback. Keep the original acquisition,
 release and child/test deadlines. [Contract](private-state-locking.md).
 
-Both managed targets compile with zero warnings/errors; 1,816 portable checks
-pass. Native namespace access at `b83b1a0` completes with closed handles and
-matching original/restricted outcomes. At `7a16bfe`, detached startup changes the
-child's exit to 134 without an owner result; 58/59 workflow jobs pass, so the
-whole workflow remains failed. Its exact fixture is preserved. Investigate the
-file/pipe-only child's standard handles next; do not relax token, desktop, Job,
-process identity, deadline or exit requirements.
-[Latest native failure](evidence/windows-detached-native-summary.json).
+Both managed targets compile with zero warnings/errors; 1,847 portable checks
+pass, including 31 stderr privacy/bounds cases. The detached child's three explicit
+standard pipe handles now have an exact inheritance list, EOF input, bounded
+capture and required closed-handle evidence. Seventeen focused JS tests pass with
+one declared Windows-only skip, exact cleanup and typecheck. Native CI is pending.
+The last native child still exits 134 without an owner result; no repair is claimed.
+[Source evidence](evidence/windows-restricted-stdio-source-summary.json).
+
+The separate GitHub Linux release job `127706968318` at `efbaa52` fails with
+`ENOTEMPTY` during authority-fixture teardown. Investigate exact lifecycle
+settlement before removal; do not add blind cleanup retries. The full local
+`efbaa52` run remains active: inspect its marker before starting another run.
 
 The subsequent Codex creator boundary verifies its own account and the original
 repository/reservation before thread creation and marker injection, including
@@ -74,7 +78,7 @@ workspace/focus and retires owned processes/socket/cache.
 
 ## Next executable tasks
 
-1. Implement and verify explicit standard handles for the detached native child. Verify
+1. Collect native execution of the explicit standard handles for the detached child. Verify
    artifact digest and source/merge identity, distinguish access observations from
    child acceptance, and repair the actual initialization failure without broadening
    token/desktop/service authority. Continue other work while CI runs.

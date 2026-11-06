@@ -1,0 +1,43 @@
+{
+  "schema": "switchyard-restricted-child-stdio-source/v1",
+  "basis": "efbaa52216d4336d0eab53f19c29a2742cc4d6b7",
+  "sourceSha256": {
+    "deployment/windows/test-support/storage-broker-protocol/NativeRestrictedHostProof.cs": "6e2476dcad546701e9e4459aa321925ec1244d4c56aea34028b65704d5e9f543",
+    "deployment/windows/test-support/storage-broker-protocol/RestrictedChildPipes.cs": "5e7a502ace0f1e6f832a5bacdacea50907ce183de69b53af63614a8da6d03a7b",
+    "deployment/windows/test-support/storage-broker-protocol/RestrictedChildStderrProof.cs": "7114c317d1dc88da5bb5f04502dfa23fdd18d505d273111cf322143a18ae8de8",
+    "deployment/windows/test-support/storage-broker-protocol/Program.cs": "965aec064d6c230724bbc31a23d9b28d080bf1fd296ad582c6607770f3a668bc",
+    "scripts/windows-restricted-owner-report.mjs": "a64997436c5e0579ad88a477cb36cfa64af191c9b775139820b4a595b7842fc2",
+    "scripts/windows-restricted-owner-report.test.mjs": "4d25f8df928dd8db6a5baaab0651bb8feea657d4a75079129353beb430ef020c",
+    "scripts/verify-windows-storage-broker.mjs": "e72ed88a9c1d5d79a5367c7ba4befca9ee44f88921dff2d43e31be99b6f2a92d"
+  },
+  "change": "Give the fixed detached restricted child three explicit inherited standard pipe handles, isolate inheritance with PROC_THREAD_ATTRIBUTE_HANDLE_LIST, close parent client copies, deliver stdin EOF, and drain bounded diagnostic prefixes until verified Job exit. Token, private desktop, Job and deadlines are unchanged.",
+  "privacy": "Only fixed diagnostic category/function/code labels and byte counts are retained; no raw stderr, path or account data. Exact closed pipe evidence is mandatory for owner acceptance.",
+  "managedBuild": {
+    "receipt": "managed-source-build-1793938899307.json",
+    "targets": 2,
+    "portableChecksPassed": 1847,
+    "stderrParserChecks": 31,
+    "warnings": 0,
+    "errors": 0,
+    "existingSdkReused": true,
+    "ownedScratchRemoved": true
+  },
+  "software": {
+    "receipt": "isolated-test-fe11ecc1-ef23-4d66-8de2-7c28715ae151.json",
+    "groups": 2,
+    "testsPassed": 17,
+    "declaredWindowsOnlySkips": 1,
+    "allChildAndTreeCleanupVerified": true,
+    "typecheck": true
+  },
+  "nativeAcceptance": "pending",
+  "limits": [
+    "No native Windows execution is possible on this Linux workstation; CI must establish whether startup changes.",
+    "The prior exit 134/no-result child remains failed. Diagnostic capture does not establish a repair.",
+    "The complete efbaa52 Linux run is still in progress. Its separate GitHub Linux release job failed with ENOTEMPTY while removing a test authority directory; cause and cleanup remain under investigation."
+  ],
+  "references": [
+    "https://learn.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-updateprocthreadattribute",
+    "https://learn.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-createprocessasuserw"
+  ]
+}

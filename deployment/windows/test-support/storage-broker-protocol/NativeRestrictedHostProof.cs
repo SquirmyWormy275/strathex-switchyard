@@ -21,6 +21,7 @@ internal static class NativeRestrictedHostProof
     internal static object? ApplicationEventDiagnostic;
     internal static object? UserObjectAccessDiagnostic;
     internal static object? NamespaceAccessDiagnostic;
+    internal static object? StdioDiagnostic;
     private static readonly List<bool> HistoricalFilteredFlags = new();
     private static readonly List<uint> HistoricalFilterBytes = new();
     internal static bool[] HistoricalFilterObservations => HistoricalFilteredFlags.ToArray();
@@ -211,6 +212,8 @@ internal static class NativeRestrictedHostProof
                         UserObjectAccessDiagnostic = desktopSpace.ProbeRestrictedAccess(restricted);
                         Phase = "restricted-existing-namespace-access";
                         NamespaceAccessDiagnostic = RestrictedNamespaceAccess.Capture(source, restricted);
+                        Phase = "owned-standard-pipes";
+                        using var pipes = new RestrictedChildPipes();
                         Phase = "owned-job-before-process";
                         using var job = CreateJobObjectW(IntPtr.Zero, null); Native(!job.IsInvalid);
                         var limits = new ExtendedLimits { Basic = new BasicLimits { Flags = 0x2000 } };
@@ -218,11 +221,12 @@ internal static class NativeRestrictedHostProof
                         IntPtr attributes = IntPtr.Zero, jobs = IntPtr.Zero, environment = IntPtr.Zero; bool initialized = false;
                         try
                         {
-                            IntPtr size = IntPtr.Zero; _ = InitializeProcThreadAttributeList(IntPtr.Zero, 1, 0, ref size); Require(size.ToInt64() is > 0 and <= 65536);
-                            attributes = Marshal.AllocHGlobal(size); Native(InitializeProcThreadAttributeList(attributes, 1, 0, ref size)); initialized = true;
+                            IntPtr size = IntPtr.Zero; _ = InitializeProcThreadAttributeList(IntPtr.Zero, 2, 0, ref size); Require(size.ToInt64() is > 0 and <= 65536);
+                            attributes = Marshal.AllocHGlobal(size); Native(InitializeProcThreadAttributeList(attributes, 2, 0, ref size)); initialized = true;
                             jobs = Marshal.AllocHGlobal(IntPtr.Size); Marshal.WriteIntPtr(jobs, job.DangerousGetHandle());
                             Native(UpdateProcThreadAttribute(attributes, 0, new IntPtr(0x2000d), jobs, new IntPtr(IntPtr.Size), IntPtr.Zero, IntPtr.Zero));
-                            var startup = new StartupInfoEx { Info = new StartupInfo { Size = Marshal.SizeOf<StartupInfoEx>(), Desktop = desktopSpace.Name }, Attributes = attributes };
+                            pipes.Bind(attributes);
+                            var startup = new StartupInfoEx { Info = new StartupInfo { Size = Marshal.SizeOf<StartupInfoEx>(), Desktop = desktopSpace.Name, Flags = 0x100, Input = pipes.Input, Output = pipes.Output, Error = pipes.Error }, Attributes = attributes };
                             var variables = new SortedDictionary<string,string>(StringComparer.OrdinalIgnoreCase);
                             // The outer guardian supplies this bounded allowlisted
                             // environment; creation receives it explicitly.
@@ -248,7 +252,7 @@ internal static class NativeRestrictedHostProof
                                 // explicitly avoids inheriting one; CREATE_NO_WINDOW was the
                                 // previous failed mode. Keep the private desktop, suspended
                                 // token inspection and creation-time Job assignment unchanged.
-                                Native(CreateProcessAsUserW(restricted, node, new StringBuilder(command), IntPtr.Zero, IntPtr.Zero, false, 0x4 | 0x8 | 0x80000 | 0x400, environment, repository, ref startup, out process));
+                                Native(CreateProcessAsUserW(restricted, node, new StringBuilder(command), IntPtr.Zero, IntPtr.Zero, true, 0x4 | 0x8 | 0x80000 | 0x400, environment, repository, ref startup, out process));
                             }
                             finally
                             {
@@ -262,6 +266,7 @@ internal static class NativeRestrictedHostProof
                             using var child = new SafeFileHandle(process.Process, true); using var thread = new SafeFileHandle(process.Thread, true);
                             try
                             {
+                                pipes.ChildStarted();
                                 Phase = "actual-child-token-before-start";
                                 Native(IsProcessInJob(child, job, out bool member)); Require(member);
                                 Native(OpenProcessToken(child.DangerousGetHandle(), 8, out var childToken));
@@ -291,11 +296,12 @@ internal static class NativeRestrictedHostProof
                                 }
                                 Phase = "independent-owned-tree-exit";
                                 Require(ActiveProcesses(job) == 0);
+                                var stdio = pipes.Complete(); StdioDiagnostic = stdio; Require(stdio.outputBounded);
                                 using var result = JsonDocument.Parse(ReadBounded(resultPath)); var report = result.RootElement;
                                 Require(report.GetProperty("schema").GetString() == "switchyard-restricted-host-result/v1" && report.GetProperty("nonce").GetString() == nonce && report.GetProperty("success").GetBoolean());
                                 var owner = report.GetProperty("owner"); Require(owner.GetProperty("success").GetBoolean() && owner.GetProperty("checks").GetArrayLength() == 8 && owner.GetProperty("nativeExitVerified").GetBoolean() && owner.GetProperty("fixtureRemoved").GetBoolean() && !owner.GetProperty("ordinaryUserToken").GetBoolean());
                                 Phase = "complete";
-                                return new { schema = "switchyard-restricted-host-process-proof/v1", success = true, processCreationApi = "CreateProcessAsUserW", consoleCreationMode = "detached-process", startupDesktop = "owned-noninteractive", interactiveDesktopInherited = false, privateDesktopClosedVerified = true, creatorPrivileges = CreatorPrivileges, creatorQuotaRestoredVerified = true, restrictingSidListVerified = true, restrictingSidCount = 4, primaryTokenVerified = true, sameUserVerified = true, mediumIntegrityVerified = true, administratorsDenyOnlyVerified = true, volumePrivilegeAbsentVerified = true, onlyTraversePrivilegeAssignedVerified = true, historicalFilteredFlags = HistoricalFilteredFlags.ToArray(), historicalFilterBytes = HistoricalFilterBytes.ToArray(), tokenRecheckedAfterExit = true, treeExitVerified = true, hostOwnerChecks = 8, hostOwner = owner.Clone(), ordinaryUserAccountAccepted = false, guestLaunched = false, accountCreated = false };
+                                return new { schema = "switchyard-restricted-host-process-proof/v1", success = true, processCreationApi = "CreateProcessAsUserW", consoleCreationMode = "detached-process", standardIo = stdio, startupDesktop = "owned-noninteractive", interactiveDesktopInherited = false, privateDesktopClosedVerified = true, creatorPrivileges = CreatorPrivileges, creatorQuotaRestoredVerified = true, restrictingSidListVerified = true, restrictingSidCount = 4, primaryTokenVerified = true, sameUserVerified = true, mediumIntegrityVerified = true, administratorsDenyOnlyVerified = true, volumePrivilegeAbsentVerified = true, onlyTraversePrivilegeAssignedVerified = true, historicalFilteredFlags = HistoricalFilteredFlags.ToArray(), historicalFilterBytes = HistoricalFilterBytes.ToArray(), tokenRecheckedAfterExit = true, treeExitVerified = true, hostOwnerChecks = 8, hostOwner = owner.Clone(), ordinaryUserAccountAccepted = false, guestLaunched = false, accountCreated = false };
                             }
                             finally
                             {
@@ -305,6 +311,7 @@ internal static class NativeRestrictedHostProof
                                 Require(WaitForSingleObject(child, 3000) == 0);
                                 var watch = Stopwatch.StartNew(); while (ActiveProcesses(job) != 0 && watch.ElapsedMilliseconds < 3000) Thread.Sleep(10);
                                 Require(ActiveProcesses(job) == 0);
+                                StdioDiagnostic = pipes.Complete();
                             }
                         }
                         finally { if (initialized) DeleteProcThreadAttributeList(attributes); if (attributes != IntPtr.Zero) Marshal.FreeHGlobal(attributes); if (jobs != IntPtr.Zero) Marshal.FreeHGlobal(jobs); if (environment != IntPtr.Zero) Marshal.FreeHGlobal(environment); }

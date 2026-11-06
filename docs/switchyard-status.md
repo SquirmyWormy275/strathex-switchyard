@@ -25,6 +25,16 @@ status 3221225794. This change is not an accepted repair. Its private desktop an
 namespace access probes complete, while the failed fixture is preserved.
 [Exact latest failure](evidence/windows-detached-native-summary.json).
 
+The next Windows candidate supplies exactly three inherited standard pipe
+handles, closes them after independently verified Job exit, and emits only fixed
+diagnostic labels. Both managed targets compile without warnings/errors; 1,847
+portable checks and seventeen focused JS tests pass, with one declared Windows
+skip. Native acceptance is pending. [Source evidence](evidence/windows-restricted-stdio-source-summary.json).
+
+The GitHub Linux release job at `efbaa52` separately failed while removing a
+test-owned authority directory (`ENOTEMPTY`). Its cleanup and cause need
+investigation; the newer complete local run is still in progress.
+
 The task creator now verifies its own native account, original repository and
 exact durable reservation before thread effects, including after asynchronous
 setup. Late refusal preserves acknowledged identity and prevents replay. Six
