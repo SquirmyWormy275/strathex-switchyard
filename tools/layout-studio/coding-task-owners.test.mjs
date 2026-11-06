@@ -253,6 +253,25 @@ async function editorFixture(t) {
   await f.api("load", load);
   return { ...f, owner, load, input: { ownerRequestId: owner.requestId, loadRequestId: load.requestId }, endpoint };
 }
+test("authenticated editor routes consume one reviewed launch permission without launching a terminal or exposing its protected record", async t => {
+  const f = await editorFixture(t), token = "e".repeat(43), server = createStudioServer({ suite: f.suite, token, bridge: { close() {} } });
+  server.listen(0, "127.0.0.1"); await once(server, "listening");
+  f.beforeCleanup(async () => { await new Promise((resolve, reject) => server.close(error => error ? reject(error) : resolve())); await server.cleanup(); });
+  const origin = `http://127.0.0.1:${server.address().port}`, input = { ...f.input, requestId: randomUUID(), editorId: randomUUID() };
+  const api = async (action, body = {}, auth = true) => {
+    const response = await fetch(origin + "/api/suite/coding/codex/editor/" + action, { method: "POST", headers: { "Content-Type": "application/json", Origin: origin, ...(auth ? { Authorization: `Bearer ${token}` } : {}) }, body: JSON.stringify({ compartment: "personal", ...body }) });
+    return { status: response.status, body: await response.json() };
+  };
+  assert.equal((await api("review", input, false)).status, 401);
+  for (const action of ["review", "issue", "consume"]) assert.equal((await api(action, { ...input, command: "never" })).status, 409);
+  const review = await api("review", input); assert.equal(review.status, 200);
+  const issued = await api("issue", { ...input, token: review.body.confirmation.token }); assert.equal(issued.status, 200); assert.equal(issued.body.terminalLaunchAuthorized, false);
+  const consumed = await api("consume", { ...input, permit: issued.body.permit }); assert.equal(consumed.status, 200); assert.equal(consumed.body.terminalLaunchAuthorized, true); assert.equal(consumed.body.terminalLaunched, false); assert.equal(consumed.body.ideAttached, false);
+  const duplicate = await api("consume", { ...input, permit: issued.body.permit }); assert.equal(duplicate.body.terminalLaunchAuthorized, false); assert.equal(duplicate.body.duplicatePrevented, true);
+  const snapshot = await f.suite.handle("/api/suite/snapshot", { compartment: "personal" }); assert.equal(snapshot.codingEditorAuthorizations, undefined); assert.equal(JSON.stringify(snapshot).includes(issued.body.permit), false);
+  assert.equal((await f.store.snapshot("personal")).codingEditorAuthorizations[0].status, "consumed"); assert.equal(f.calls.filter(c => c === "resume").length, 1);
+  f.controls.login = "f".repeat(64); assert.equal((await api("review", { ...input, requestId: randomUUID() })).status, 409);
+});
 test("editor target preparation binds the acknowledged load and original endpoint without another resume, launch or authority claim", async t => {
   const f = await editorFixture(t), before = await f.store.snapshot("personal"), calls = f.calls.filter(c => c === "resume").length;
   const result = await f.api("editor-target", f.input);

@@ -176,3 +176,33 @@ the exact-source repository consumer against the installed server and requires
 unknown-owner refusal; it does not attach a task or editor. All 54 workspace
 identities, selected state and frozen Home are preserved. Dated launcher backups
 verify and temporary packaging is removed. [Installed evidence](evidence/installed-editor-metadata-summary.json).
+
+## Review a terminal launch for one editor instance
+
+Authenticated `/api/suite/coding/codex/editor/review`, `issue` and `consume`
+operations bind the original owner/load to an exact request UUID and editor
+instance UUID. Review describes the acknowledged task, account and repository.
+Issuing consumes that exact confirmation and stores only a hash of a new
+30-second permit in encrypted state. The clear permit is delivered once.
+
+Consumption repeats the original account, idle task, socket, repository and
+policy checks under the per-task kernel lease, then permanently spends the
+permit before returning `terminalLaunchAuthorized: true`. Concurrent or later
+retries return metadata with that flag false. Lost replies and drift after
+consumption remain spent; expiry and clock reversal refuse. Sixty-four retained
+requests bound the history without recycling replay protection. The protected
+records are omitted from generic Studio snapshots, and shutdown joins pending
+operations.
+
+This is permission for a specific local editor launch, not proof that one
+occurred. `terminalLaunched`, `ideAttached`, `modelPromptSubmitted` and
+`completionVerified` remain false. The extension must still obtain this grant
+through authenticated transport, recheck its original focused window and exact
+executable, create the terminal once, and observe the native task/account
+acknowledgement. Those connections remain unfinished.
+
+Five isolated groups pass 59 tests, including an actual authenticated HTTP
+review/issue/consume journey through the protected owner service with a
+controlled provider. Typecheck and all child/tree cleanup pass. No live provider
+task, model request, terminal or hardware operation is performed.
+[Evidence](evidence/editor-authorization-summary.json).

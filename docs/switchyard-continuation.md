@@ -31,6 +31,8 @@ Keep commits on GitHub regularly. Do not merge or release.
 
 The `2eeb2f9` full Linux run now passes 243 groups / 1,548 tests with eleven declared skips and exact staging cleanup. At `d798f4f`, native Windows environment observation rejects the missing-SystemRoot hypothesis; cold restricted Node still fails at `ncrypto::CSPRNG`. [Receipt](evidence/windows-environment-native-summary.json).
 
+The complete `83d4139` Linux run passes **244/244 groups, 1,556 tests and eleven declared skips**, with every child/tree and exact owned checkout, dependency, build, temporary parent and marker cleanup verified. Later editor authorization has separate five-group/59-test evidence. [Full run](evidence/linux-83d-complete-summary.json), [authorization](evidence/editor-authorization-summary.json).
+
 The backend now prepares an exact editor target only from an acknowledged load on its original live owner. Fresh socket/alias/process checks refuse a replaced endpoint even when the old metadata bridge survives. Four groups / 75 checks pass with cleanup and typecheck. This grants no terminal authority or IDE attachment; the read-only signed editor metadata consumer now passes six groups / 63 checks. Command wiring, terminal creation and native attachment acknowledgement remain unfinished. [Contract](coding-task-owners.md#prepare-an-exact-editor-target).
 
 Installed source is now `e768d18`, release `a3c9295…`: six update, nine owner/editor/severity and seven journal checks pass. No provider, task, terminal, scanner or public query starts. An old unselected keyboard-only conversation retains its pending marker; its sealed file timestamps remain October 30. [Installed evidence](evidence/installed-editor-metadata-summary.json).
@@ -49,7 +51,7 @@ Keep small receipts and source; retire exact owned staging after exit verifies.
 | Installed Linux `4b5e3cc` | Six update/seven owner metadata/seven existing metadata checks, original 54 workspace identities, selected sealed bytes and frozen Home preserved. Dated launcher backup hashes verify; owned bundle removed. [Receipt](evidence/installed-task-owner-summary.json). | Metadata/refusal acceptance only. No native provider starts, task loads or model turns; IDE handoff remains unfinished. Prior c5d2d28 scanner journeys remain source-specific. |
 | Owned Codex Unix task adapter | Actual installed CLI: two read-only account operations, verifier permission revocation and exact listener/bridge/socket retirement. [Evidence](evidence/codex-unix-task-adapter-summary.json). | Separate owned task routes now compose this adapter; existing creation/text APIs remain stdio. IDE attachment remains unfinished. No native thread, prompt or account change is authorized in the current backend work. |
 
-A cold native CNG probe is prepared for Windows CI: it uses the same restricted primary token, private desktop and environment, with independent Job/pipe/process retirement. Both managed targets and 1,868 portable checks pass; two isolated groups pass 31 checks with cleanup and typecheck. The C++ build/native run remain pending. This is diagnostic work, not a repair or Node startup acceptance. [Source evidence](evidence/windows-cold-random-source-summary.json).
+The cold native CNG probe at `83d4139` passes both API forms under the exact restricted primary token. Its token recheck, process/tree/pipe retirement, provider closure and buffer clearing verify. Node still aborts at `ncrypto::CSPRNG` before JavaScript, exit 134; the failed fixture is preserved. This narrows the investigation beyond a universal cold BCrypt access failure, without identifying the OpenSSL cause or claiming a repair. [Native evidence](evidence/windows-cold-random-native-summary.json).
 
 The Windows lock path now invokes only the shipped helper's
 `--state-lease-worker` mode. Source CI builds it once per run using the existing
@@ -108,7 +110,7 @@ The explicit `createCodingTaskOwners` service now persists original owner stages
 and task/account/repository binding under real private leases. Five files pass 76
 tests; final eight registry and five packaging checks pass with exact cleanup and
 typecheck. Actual Unix listener/bridge composition uses a controlled provider double.
-The manifest now has 244 Linux groups after CVSS 2 support; the latest `2eeb2f9` complete run passes its original 243 groups. The later signed editor metadata consumer has six-group/63-check evidence.
+The manifest now has 245 Linux groups after editor authorization. The latest `83d4139` complete run passes its original 244 groups; later authorization has five-group/59-check evidence.
 Existing creation/text APIs still use stdio; the separate owner/load routes have
 composition evidence above and grant no IDE attachment. [Contract](coding-task-owners.md).
 
