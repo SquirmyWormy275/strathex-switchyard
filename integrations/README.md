@@ -119,6 +119,13 @@ key event or visual/account acceptance.
 
 ## Version 2 wire contract
 
+Custom-agent authorization can now be reviewed and revoked through the protected
+Suite API, then replaced by deliberate enrollment with a fresh credential.
+Old roles and command claims cannot pass to the replacement, even when an agent
+or session ID is reused. The v2 SDK wire format is unchanged. See
+[revocation and replacement](../docs/custom-agent-revocation.md) for endpoints,
+durable failure handling, owned-process evidence and validation limits.
+
 Only `POST /agent/v2/event`, `/agent/v2/poll` and `/agent/v2/ack` accept this
 contract. Version 1 receives HTTP 426; update the SDK and deliberately publish a
 new ready session. Enrollment credentials and portable role identities survive

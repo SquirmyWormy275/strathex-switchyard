@@ -278,6 +278,23 @@ test("an unconfirmed bundled-example stop refuses replacement until the exact ch
   assert.equal(children.length, 2);
 }));
 
+test("durable agent revocation survives uncertain owned exit and an unavailable stop journal", async () => {
+  for (const failJournal of [false, true]) await exampleLifecycleFixture(async ({ suite, store, request, children }) => {
+    const update = store.update.bind(store);
+    if (failJournal) store.update = (id, op, fn, scope) => { if (op === "example-stopped") throw Error("PRIVATE_SYNTHETIC_JOURNAL_FAILURE"); return update(id, op, fn, scope); };
+    try {
+      const review = await suite.handle("/api/suite/agents/revoke/review", { agentId: "custom-example" });
+      const result = await suite.handle("/api/suite/agents/revoke", { agentId: "custom-example", token: review.confirmation.token });
+      assert.equal(result.status, "revoked"); assert.equal(result.ownedExample.status, "stop-unconfirmed");
+      assert.equal(JSON.stringify(result).includes("PRIVATE_SYNTHETIC"), false);
+      assert.equal((await store.snapshot("personal")).agents[0].enrollmentStatus, "revoked");
+      await suite.handle("/api/suite/agents/enroll", { id: "custom-example", name: "Replacement", capabilities: ["status"] });
+      await assert.rejects(suite.handle("/api/suite/agents/example", request), /not verified exit/);
+      assert.equal(children.length, 1);
+    } finally { store.update = update; }
+  });
+});
+
 test("concurrent bundled-example stops share retirement and refuse new starts while it is pending", () => exampleLifecycleFixture(async ({ suite, request, children, stops, setStop, retire }) => {
   let release; const gate = new Promise(resolve => { release = resolve; });
   setStop(async child => { await gate; return retire(child); });
@@ -312,6 +329,48 @@ test("a throwing bundled-example stop preserves its exact child without exposing
   assert.equal(result.status, "stop-unconfirmed"); assert.equal(JSON.stringify(result).includes("SYNTHETIC_PRIVATE_STOP_DETAIL"), false);
   await assert.rejects(suite.handle("/api/suite/agents/example", request), /not verified exit/);
   assert.equal(children.length, 1);
+}));
+
+test("authenticated revocation API stops its owned example and replacement requires new enrollment and role binding", { timeout: 15000 }, () => fixture(async ({ store, keys }) => {
+  const children = [], suite = createSuite({ store, agents: { discovery: async () => [], close() {} }, voice: { discovery: async () => ({ available: false }) }, spawnExample: (...args) => { const c = spawn(...args); children.push(c); return c; } });
+  const server = createStudioServer({ suite, bridge: { close() {} } });
+  const ready = async child => {
+    const deadline = Date.now() + 5000;
+    while (Date.now() < deadline && child.exitCode === null && child.signalCode === null) {
+      const a = (await store.snapshot("personal")).agents.find(a => a.id === "custom-example");
+      if (a?.reportedStatus === "ready" && a.lastSeen && a.sessionId) return a;
+      await new Promise(resolve => setTimeout(resolve, 20));
+    }
+    throw Error("The exact replacement example did not authenticate readiness.");
+  };
+  try {
+    await suite.handle("/api/suite/bootstrap"); await suite.handle("/api/suite/mode", { mode: "personal-companion" });
+    await store.saveWorkflow("personal", { name: "Synthetic", roles: [{ id: "operator", label: "Operator" }], steps: [] });
+    server.listen(0, "127.0.0.1"); await once(server, "listening"); const origin = `http://127.0.0.1:${server.address().port}`;
+    const api = async (path, body, authorized = true) => { const response = await fetch(origin + "/api/suite/" + path, { method: "POST", headers: { "Content-Type": "application/json", Origin: origin, ...(authorized ? { Authorization: `Bearer ${server.accessToken}` } : {}) }, body: JSON.stringify(body) }); return { status: response.status, body: await response.json() }; };
+    assert.equal((await api("agents/example", { example: "custom" })).status, 200); const original = await ready(children[0]), originalToken = keys.get("personal:agent-custom-example");
+    const role = { roleId: "operator", provider: "custom-agent", targetKind: "custom-agent", targetId: "custom-example", intent: "status" };
+    const bound = await api("roles/bind", role); assert.equal(bound.status, 200); assert.equal(bound.body.credentialEpoch, original.credentialEpoch);
+    assert.equal((await api("agents/revoke/review", { agentId: "custom-example" }, false)).status, 401);
+    assert.equal((await api("agents/revoke/review", { agentId: "custom-example", command: "never" })).status, 409);
+    const review = await api("agents/revoke/review", { agentId: "custom-example" }); assert.equal(review.status, 200);
+    const revoked = await api("agents/revoke", { agentId: "custom-example", token: review.body.confirmation.token });
+    assert.equal(revoked.status, 200); assert.equal(revoked.body.status, "revoked"); assert.equal(revoked.body.ownedExample.status, "stopped"); assert.equal(revoked.body.externalProcessStopped, false);
+    assert.ok(children[0].exitCode !== null || children[0].signalCode !== null);
+    assert.equal((await api("agents/example", { example: "custom" })).status, 409); assert.equal(children.length, 1);
+    assert.equal((await api("roles/dispatch", { roleId: "operator", intent: "status" })).status, 409);
+    const replacement = await api("agents/enroll", { id: "custom-example", name: "Replacement", capabilities: ["status"] }); assert.equal(replacement.status, 200); assert.notEqual(replacement.body.token, originalToken);
+    assert.equal((await api("agents/example", { example: "custom" })).status, 200); const current = await ready(children[1]);
+    await store.update("personal", "synthetic-stale-role", s => { s.roleBindings = [{ ...bound.body, sessionId: current.sessionId }]; });
+    assert.equal((await api("roles/dispatch", { roleId: "operator", intent: "status" })).status, 409, "Even a matching replacement session cannot inherit the old credential generation's role.");
+    const rebound = await api("roles/bind", role); assert.equal(rebound.status, 200); assert.equal(rebound.body.credentialEpoch, current.credentialEpoch);
+    assert.equal((await api("roles/dispatch", { roleId: "operator", intent: "status" })).status, 200);
+    assert.equal((await api("agents/example/stop", { example: "custom" })).body.status, "stopped");
+    assert.ok(children[1].exitCode !== null || children[1].signalCode !== null);
+  } finally {
+    await suite.close(); await Promise.all(children.map(child => stopOwnedChild(child)));
+    server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); await server.cleanup();
+  }
 }));
 
 test("real bundled example joins authenticated readiness, duplicate refusal, stop and keyboard-only retirement", { timeout: 15000 }, () => fixture(async ({ store, root }) => {

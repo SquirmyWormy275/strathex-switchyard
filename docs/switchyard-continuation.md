@@ -31,6 +31,12 @@ evidence, not instructions to reset. Publish regular commits. Do not merge or re
 
 ## Current implementation and evidence
 
+The custom-agent backend now supports reviewed revocation, credential replacement
+and enrollment-generation fences for messages, claims and roles. Eight groups/86
+checks pass, including encrypted-state failures and an actual authenticated HTTP
+revoke/reenroll/rebind journey with two verified Node child exits. Native Windows,
+installed and frontend acceptance remain separate. [Contract](custom-agent-revocation.md).
+
 Credential workers now join exact-child retirement on timeout/error, reject
 signal-only status and block concurrent replacement while exit is uncertain.
 Six groups/69 checks pass, including two real controlled children, without using

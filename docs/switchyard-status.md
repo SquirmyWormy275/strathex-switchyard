@@ -63,6 +63,15 @@ the 26-check update; native Windows and live installed command execution remain 
 
 ## What the backend does
 
+Custom-agent authorization now has a reviewed revoke-and-reenroll path. Exact
+roles are retired, unclaimed commands cancel locally and claimed outcomes remain
+uncertain. New credentials cannot inherit old claims or role authority. Eight
+groups/86 checks pass, including actual authenticated HTTP and two new bundled
+Node processes with confirmed exits. Failed credential/state commits and stop
+journals remain explicit. Native Windows, installed and frontend acceptance are
+separate. [Contract](custom-agent-revocation.md),
+[evidence](evidence/custom-agent-revocation-source-summary.json).
+
 | Capability | Implemented behavior and reference |
 | --- | --- |
 | Protected workspaces | Compartment-scoped encrypted state, fresh policy checks, bounded OS locks, exact approvals and durable replay refusal. [State locks](private-state-locking.md), [receipt authority](receipt-authority-commit.md). |

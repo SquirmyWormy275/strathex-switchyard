@@ -159,6 +159,7 @@ export const requiredGroups = [
   { file: "deployment/suite/application.test.mjs" },
   { file: "deployment/suite/shortcut-process.test.mjs" },
   { file: "tools/layout-studio/credential-process.test.mjs" },
+  { file: "tools/layout-studio/agent-revocation.test.mjs" },
   { file: "deployment/suite/runtime-maintenance.test.mjs" },
   { file: "deployment/suite/connection-restoration.test.mjs" },
   ...windowsScenarioGroups("deployment/suite/installation.test.mjs").map(group => ({ ...group, timeoutMs: 120_000 })),

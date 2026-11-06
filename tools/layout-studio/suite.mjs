@@ -149,7 +149,7 @@ export function createSuite({ store = createSuiteStore(), platform = process.pla
       if (!task || !(intent === "status" && ["codex", "claude-code"].includes(binding.provider) || binding.provider === "claude-code" && intent === "summon" && task.backgroundId === null && task.status === "registered" || binding.provider === "codex" && intent === "resume" && task.launchPolicy === "read-only/on-request" && task.nativeTransport !== "owned-stdio" && task.status === "registered")) throw new Error("This exact coding-task binding supports runtime status only, plus verified live Claude focus or legacy owned read-only Codex daemon resume. Dedicated tasks continue through explicit text review. No alternate session action was selected.");
     } else if (binding.provider === "custom-agent") {
       const a = state.agents.find((a) => a.id === binding.targetId && a.sessionId === binding.sessionId);
-      if (!a || !a.capabilities.includes(intent) || !a.lastSeen || Date.now() - a.lastSeen > 30000 || a.reportedStatus === "stopped") throw new Error("This exact custom-agent target is missing, stale or does not support that intent.");
+      if (!a || a.enrollmentStatus === "revoked" || (a.credentialEpoch ?? "legacy") !== (binding.credentialEpoch ?? "legacy") || !a.capabilities.includes(intent) || !a.lastSeen || Date.now() - a.lastSeen > 30000 || a.reportedStatus === "stopped") throw new Error("This exact custom-agent target is missing, stale or does not support that intent.");
     } else if (!state.conversations.some((c) => c.id === binding.targetId && c.provider === binding.provider && c.sessionId === binding.sessionId)) throw new Error("This exact role target changed or disappeared. Rebind it deliberately.");
     return binding;
   }
@@ -385,6 +385,15 @@ export function createSuite({ store = createSuiteStore(), platform = process.pla
       if (path === "/api/suite/coding/claude/turns/outcome/resolve") return claudeSubmissions.resolveOutcome(compartment, body);
       if (path === "/api/suite/coding/claude/turns/delete") return claudeSubmissions.remove(compartment, body.id);
       if (path === "/api/suite/agents/enroll") return custom.enroll(compartment, body);
+      if (path === "/api/suite/agents/revoke/review" || path === "/api/suite/agents/revoke") {
+        if (Object.keys(body).some(k => !["compartment", "agentId", "token", "workspaceBaseUrl"].includes(k))) throw Error("Agent revocation accepts only its exact identity and review token.");
+        if (path.endsWith("/review")) return custom.reviewRevoke(compartment, body.agentId);
+        const result = await custom.revoke(compartment, body);
+        const example = ["custom", "langchain"].find(name => `${name}-example` === body.agentId);
+        if (!example) return result;
+        try { return { ...result, ownedExample: await stopExample(compartment, example) }; }
+        catch { return { ...result, ownedExample: { status: "stop-unconfirmed", evidence: "Authorization is revoked; owned process retirement could not be recorded.", taskCompletionVerified: false } }; }
+      }
       if (path === "/api/suite/agents/dispatch") return custom.dispatch(compartment, body);
       if (path === "/api/suite/agents/example/stop") {
         if (!["custom", "langchain"].includes(body.example)) throw new Error("Choose a bundled owned example.");
@@ -405,6 +414,7 @@ export function createSuite({ store = createSuiteStore(), platform = process.pla
         const id = `${body.example}-example`, state = await store.snapshot(compartment);
         if (closed || generation !== (exampleGenerations.get(key) ?? 0)) throw new Error("This example launch was stopped before startup.");
         let enrollment;
+        if (state.agents.find(a => a.id === id)?.enrollmentStatus === "revoked") throw Error("This example authorization was revoked. Enroll it deliberately with a new credential before starting it.");
         if (state.agents.some((a) => a.id === id)) enrollment = { compartment, agentId: id, token: await store.credential(compartment, `agent-${id}`, undefined, { provider: "custom-agent" }), initialSequence: state.agents.find((a) => a.id === id).sequence };
         else enrollment = await custom.enroll(compartment, { id, name: body.example === "custom" ? "Synthetic custom agent" : "Synthetic LangChain Runnable", capabilities: agentIntents });
         const base = new URL(body.workspaceBaseUrl);
@@ -444,6 +454,7 @@ export function createSuite({ store = createSuiteStore(), platform = process.pla
           const target = targetKind === "coding-task" ? s.codingSessions?.find((t) => t.id === body.targetId && t.provider === provider) : provider === "custom-agent" ? s.agents.find((a) => a.id === body.targetId) : s.conversations.find((c) => c.id === body.targetId && c.provider === provider);
           if (!target?.sessionId) throw new Error("The role needs an exact connected session, not a window title or missing tool.");
           s.roleBindings ??= []; const binding = { roleId: role.id, provider, targetKind, targetId: body.targetId, sessionId: target.sessionId, intent: body.intent };
+          if (provider === "custom-agent") binding.credentialEpoch = target.credentialEpoch ?? "legacy";
           s.roleBindings = [...s.roleBindings.filter((b) => b.roleId !== role.id || b.intent !== body.intent), binding]; roleTarget(s, role.id, body.intent); return binding;
         }, { provider: body.provider });
       }
@@ -559,7 +570,7 @@ export function createSuite({ store = createSuiteStore(), platform = process.pla
         result = await clientLaunch.launch(compartment, { compartment, id: b.targetId, requestId }, { digest, assertCurrent: async () => { const current = await store.snapshot(compartment), binding = roleTarget(current, roleId, intent); if (clientRoleDigest(current, binding) !== digest) throw new Error("The exact client role binding changed before dispatch settled. No alternate target was selected."); } });
       }
       else if (b.targetKind === "coding-task") result = b.provider === "claude-code" ? await (intent === "summon" ? claudeCoding.focus(compartment, b.targetId) : claudeCoding.status(compartment, b.targetId)) : await (intent === "resume" ? coding.resume(compartment, b.targetId) : coding.status(compartment, b.targetId));
-      else if (b.provider === "custom-agent") result = await custom.dispatch(compartment, { agentId: b.targetId, intent, sessionId: b.sessionId, content });
+      else if (b.provider === "custom-agent") result = await custom.dispatch(compartment, { agentId: b.targetId, intent, sessionId: b.sessionId, content, credentialEpoch: b.credentialEpoch ?? "legacy" });
       else {
         const c = s.conversations.find((c) => c.id === b.targetId && c.provider === b.provider && c.sessionId === b.sessionId);
         if (!c) throw new Error("This exact role target changed or disappeared. Rebind it deliberately.");

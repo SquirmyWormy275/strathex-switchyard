@@ -1227,3 +1227,25 @@ execution and child deadlines, artifact size/digest, source/merge tree equality
 and child/tree cleanup verify. The timeout does not reproduce, so the two prior
 failures remain unresolved evidence; instrumentation is not a root-cause repair.
 [Native receipt](evidence/shortcut-stage-diagnostics-native-summary.json).
+
+## Custom-agent revocation and replacement — 2026-11-06
+
+One-use reviewed authorization now revokes an exact custom-agent enrollment,
+retires only its roles and unclaimed commands, and preserves uncertain claims.
+Deliberate reenrollment rotates one bounded credential-store slot and assigns a
+new enrollment generation. Message authentication now runs inside the existing
+state transaction; command acknowledgements and role dispatch cannot inherit
+the old generation's authority. The v2 SDK wire contract is unchanged.
+
+Eight isolated groups pass 86 tests without skips, with original deadlines and
+complete child/tree cleanup. Seven encrypted-state cases cover scoped review,
+expiry, replay, delayed authentication, failed persistence, legacy migration and
+policy. Two new Suite cases cover uncertain owned exit/failed stop journaling
+and an authenticated HTTP journey with two actual bundled Node children. That
+journey verifies revoke, exact exit, automatic-restart refusal, deliberate new
+credential, stale-role refusal and explicit rebind before dispatch. Both children
+exit; existing two-child lifecycle tests also pass. Typecheck and original package
+bounds pass, and the owned temporary root is removed. No live user credential,
+installed workspace, model, hardware or account operation is performed.
+[Contract](custom-agent-revocation.md),
+[receipt](evidence/custom-agent-revocation-source-summary.json).

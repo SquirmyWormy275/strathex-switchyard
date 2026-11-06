@@ -5,7 +5,7 @@ import { redactText } from "./redaction.ts";
 import { sha256, type JournalEntry, type JsonStoreTransaction, ProtectedJsonStore } from "./store.ts";
 
 /** Local review domains do not add physical commands or grant execution authority. */
-export type ConfirmationAction = CommandAction | "bind_legacy_conversation" | "load_codex_task" | "launch_codex_editor" | "submit_codex_text" | "resolve_codex_text" | "submit_claude_text" | "resolve_claude_text" | "resolve_copilot_request" | "issue_task_authority" | "reconcile_repository_effect" | "configure_windows_storage" | "configure_scanner_fixtures" | "configure_shield_exceptions";
+export type ConfirmationAction = CommandAction | "bind_legacy_conversation" | "load_codex_task" | "launch_codex_editor" | "submit_codex_text" | "resolve_codex_text" | "submit_claude_text" | "resolve_claude_text" | "resolve_copilot_request" | "issue_task_authority" | "reconcile_repository_effect" | "configure_windows_storage" | "configure_scanner_fixtures" | "configure_shield_exceptions" | "revoke_custom_agent";
 
 export interface DurableConfirmationRequest {
   readonly action: ConfirmationAction;
