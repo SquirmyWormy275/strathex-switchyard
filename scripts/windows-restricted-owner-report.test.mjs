@@ -112,6 +112,25 @@ test("cold-child environment observations retain only exact OS-match flags and c
   const absent={...environment,systemRootPresent:false,systemRootMatchesWindows:false,windirPresent:false,windirMatchesWindows:false};assert.deepEqual(storageBrokerFailureEvidence({...input,restrictedHostEnvironment:absent}).restrictedHostEnvironment,absent);
 });
 
+test("suspended child token security preserves only ordered classified ACEs and read/cleanup statuses, never raw identities or access grants", () => {
+  const row = { schema: "switchyard-child-token-security/v1", scope: "cold-probe", stage: "complete", error: 0, ownerClass: "administrators", daclPresent: true, nullDacl: false, daclProtected: false, entries: [{ kind: "allow", flags: 0, mask: 0x1fffff, principal: "logon" }, { kind: "deny", flags: 16, mask: 8, principal: "administrators" }], handlesClosedVerified: true, buffersClearedVerified: true };
+  const input = { schema: "switchyard-storage-broker-protocol-proof/v1", success: false, restrictedHostTokenObjectSecurity: [row, { ...structuredClone(row), scope: "node-owner" }], restrictedHostChildExit: { waitResult: 0, exitCode: 134, resultAvailable: false } };
+  assert.deepEqual(storageBrokerFailureEvidence(input).restrictedHostTokenObjectSecurity, input.restrictedHostTokenObjectSecurity); assert.throws(() => verifyRestrictedOwnerReport(input));
+  const copy = storageBrokerFailureEvidence(input); copy.restrictedHostTokenObjectSecurity[0].entries[0].mask = 0; assert.equal(row.entries[0].mask, 0x1fffff);
+  for (const stage of ["open", "read", "parse"]) {
+    const entry = { ...row, stage, error: stage === "parse" ? 0 : 5, ownerClass: null, daclPresent: null, nullDacl: null, daclProtected: null, entries: [] };
+    assert.deepEqual(storageBrokerFailureEvidence({ ...input, restrictedHostTokenObjectSecurity: [entry] }).restrictedHostTokenObjectSecurity, [entry]);
+  }
+  for (const present of [true, false]) { const entry = { ...row, daclPresent: present, nullDacl: true, entries: [] }; assert.deepEqual(storageBrokerFailureEvidence({ ...input, restrictedHostTokenObjectSecurity: [entry] }).restrictedHostTokenObjectSecurity, [entry]); }
+  for (const mutate of [
+    r => { r.sid = "NEVER_RETAIN"; }, r => { r.schema = "unknown"; }, r => { r.scope = "node-owner"; }, r => { r.stage = "granted"; }, r => { r.error = 5; }, r => { r.error = 0x100000000; }, r => { r.ownerClass = "NEVER_RETAIN"; }, r => { r.daclPresent = false; }, r => { r.nullDacl = true; }, r => { r.daclProtected = 1; }, r => { r.handlesClosedVerified = false; }, r => { r.buffersClearedVerified = false; }, r => { r.entries = new Array(65).fill(r.entries[0]); }, r => { r.entries[0].sid = "NEVER_RETAIN"; }, r => { r.entries[0].principal = "absent"; }, r => { r.entries[0].kind = "grant"; }, r => { r.entries[0].mask = -1; }, r => { r.entries[0].mask = 0x100000000; }, r => { r.entries[0].flags = 256; }, r => { r.entries[0].flags = 1.5; }, r => { r.stage = "read"; }
+  ]) {
+    const value = structuredClone(row); mutate(value); const result = storageBrokerFailureEvidence({ ...input, restrictedHostTokenObjectSecurity: [value] });
+    assert.equal(result.restrictedHostTokenObjectSecurity, undefined); assert.equal(JSON.stringify(result).includes("NEVER_RETAIN"), false); assert.equal(result.restrictedHostChildExit.exitCode, 134);
+  }
+  for (const entries of [{}, [row, row], [row, { ...row, scope: "node-owner" }, row]]) assert.equal(storageBrokerFailureEvidence({ ...input, restrictedHostTokenObjectSecurity: entries }).restrictedHostTokenObjectSecurity, undefined);
+});
+
 test("a cold restricted RNG report requires exact primary-token, process, pipe and buffer witnesses without accepting Node startup", () => {
   const cold = { schema: "switchyard-cold-restricted-random/v4", executableSha256: "d".repeat(64), waitResult: 0, exitCode: 0, reportValid: true,
     report: { systemStatus: 0xc0000022, providerOpenStatus: 0xc0000022, providerStatus: null, providerCloseStatus: null, handlesClosedVerified: true, buffersClearedVerified: true, firstApi: "legacy-cryptoapi", legacy: { providerOpened: false, providerOpenError: 5, generated: null, generateError: null, providerCloseError: null, handlesClosedVerified: true, buffersClearedVerified: true } },

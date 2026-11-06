@@ -45,6 +45,7 @@ internal static partial class NativeRestrictedHostProof
             }
             pipes.ChildStarted(); Native(IsProcessInJob(child, job, out bool member)); Require(member);
             Native(OpenProcessToken(child.DangerousGetHandle(), 8, out token)); VerifyToken(token, user, recordHistory: false);
+            CaptureTokenObjectSecurity(child, user, "cold-probe");
             Native(ResumeThread(thread) != uint.MaxValue);
             wait = WaitForSingleObject(child, 10000); Require(wait is 0 or 258);
             if (wait == 0)

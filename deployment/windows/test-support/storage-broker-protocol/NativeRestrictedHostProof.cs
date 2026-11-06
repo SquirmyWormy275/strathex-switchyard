@@ -290,6 +290,7 @@ internal static partial class NativeRestrictedHostProof
                                 using (childToken)
                                 {
                                     VerifyToken(childToken, user);
+                                    CaptureTokenObjectSecurity(child, user, "node-owner");
                                     Native(GetProcessTimes(child, out long created, out _, out _, out _));
                                     Native(ResumeThread(thread) != uint.MaxValue);
                                     Phase = "bounded-owner-journey";

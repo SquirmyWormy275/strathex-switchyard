@@ -1,0 +1,44 @@
+{
+  "schema": "switchyard-child-token-security-source-summary/v1",
+  "basis": "2763f632ee926fd5365ad0e14458628656d359cf",
+  "sourceSha256": {
+    "deployment/windows/test-support/storage-broker-protocol/TokenObjectSecurity.cs": "fe29bff9a20fa4c35236036fb9a801f4ada1d28e527a119199bfc844cd461a56",
+    "deployment/windows/test-support/storage-broker-protocol/ColdRandomProcess.cs": "3562b4c77af2f991f56f34ac3a673fc4066ea0f9ea4cd7bde0611a263bf28695",
+    "deployment/windows/test-support/storage-broker-protocol/NativeRestrictedHostProof.cs": "285e3f3178309f3afcb76199714d408c45c3eec81de3d860b79eeaf6f1e5c6d7",
+    "deployment/windows/test-support/storage-broker-protocol/Program.cs": "c8785d08a33f4bd7d6e7e71ce81a0e51fb3d5af5c4acf849ea2bd1424a20976b",
+    "scripts/windows-restricted-owner-report.mjs": "b2da0cb909a405f5724c8cbfd595aac4f18cee51a9505379b7120569d6e27bee",
+    "scripts/windows-restricted-owner-report.test.mjs": "e7d7879d76504beda813c909ac288c59bb3b5b6a5a5b8df2db3d06acb9e43eab"
+  },
+  "behavior": "Read owner/DACL metadata of the actual suspended cold-probe and original Node child tokens from the parent using READ_CONTROL | TOKEN_QUERY. Preserve ordered ACE kind, flags, access mask and fixed principal classifications; never retain raw SIDs or descriptor bytes.",
+  "bounds": {
+    "descriptorBytes": 16384,
+    "aceCount": 64,
+    "childScopes": 2,
+    "securityInformation": "OWNER_SECURITY_INFORMATION | DACL_SECURITY_INFORMATION"
+  },
+  "managed": {
+    "receipt": "managed-source-build-1793955060817.json",
+    "builds": 2,
+    "warnings": 0,
+    "errors": 0,
+    "portableChecks": 1936,
+    "existingSdk": "8.0.424",
+    "ownedScratchRemoved": true
+  },
+  "projection": {
+    "receipt": "isolated-test-3612b46a-0a91-429e-86d3-51eefde79f51.json",
+    "tests": 15,
+    "childAndTreeCleanupVerified": true
+  },
+  "references": [
+    "https://learn.microsoft.com/en-us/windows/win32/api/securitybaseapi/nf-securitybaseapi-getkernelobjectsecurity",
+    "https://learn.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-openprocesstoken",
+    "https://learn.microsoft.com/en-us/windows/win32/api/securitybaseapi/nf-securitybaseapi-createrestrictedtoken"
+  ],
+  "limits": [
+    "Native descriptor capture and classification remain pending Windows CI. Portable builds/projection tests do not execute Windows ACL APIs.",
+    "No WRITE_DAC, token/DACL mutation, SACL request, privilege enablement, SID expansion, account/runtime fallback or original Node deadline/assertion change.",
+    "A read failure is retained as a fixed unavailable stage/status. Observed ACEs do not themselves prove effective access or the exact operation CryptoAPI attempted.",
+    "The original Node journey remains failed at exit 134; all previous failures and failed fixture ownership remain preserved."
+  ]
+}

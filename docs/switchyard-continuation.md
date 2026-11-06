@@ -88,6 +88,10 @@ the installed update or old live provider verifiers without a relevant new chang
    This does not establish that CryptoAPI attempted that operation. Original
    Node remains exit 134; source/merge/archive and native cleanup verify.
    [Native evidence](evidence/windows-self-token-native-summary.json).
+   The next read-only parent diagnostic captures bounded, classified owner/DACL
+   entries from both suspended child tokens. Two managed builds, 1,936 portable
+   checks and fifteen projection tests pass; native capture is pending. No ACL
+   changes are made. [Source](evidence/windows-token-security-source-summary.json).
 
 3. Implement native acknowledgement for the exact reviewed editor terminal and
    original owner/account/task. A separate observed connection or ordinary focus
