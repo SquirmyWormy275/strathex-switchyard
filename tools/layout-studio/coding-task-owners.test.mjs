@@ -13,6 +13,7 @@ import { codexDesignConfig } from "./agents.mjs";
 import { createCodingTaskOwners } from "./coding-task-owners.mjs";
 import { createSuite } from "./suite.mjs";
 import { createStudioServer } from "./serve.mjs";
+import { StudioTaskClient } from "../../apps/vscode-extension/src/studio-task-client.ts";
 async function fixture(t) {
   const root = await mkdtemp(join(tmpdir(), "sy-owner-")), repositoryRoot = join(root, "repo"), keys = new Map(); await mkdir(repositoryRoot);
   const store = createSuiteStore({ root: join(root, "state"), secrets: { get: async (c,p) => keys.get(c+":"+p), set: async (c,p,v) => keys.set(c+":"+p,v) } });
@@ -288,4 +289,17 @@ test("asynchronous editor inspection cannot conceal load replacement, endpoint d
     };
     await assert.rejects(f.api("editor-target", f.input)); assert.equal(f.calls.filter(c => c === "resume").length, 1);
   }
+});
+test("the editor client authenticates the real Studio route and reads original protected target metadata without another native effect", { skip: process.platform !== "linux" }, async t => {
+  const f = await editorFixture(t), token = "p".repeat(43), instance = { id: randomUUID(), build: "e".repeat(64) };
+  const server = createStudioServer({ suite: f.suite, token, instance, onApplicationStop() { throw Error("No stop request is authorized by this read-only proof"); }, bridge: { close() {} } });
+  server.listen(0, "127.0.0.1"); await once(server, "listening");
+  const endpointPath = join(f.root, "editor-endpoint.json"), origin = `http://127.0.0.1:${server.address().port}`;
+  await writeFile(endpointPath, JSON.stringify({ schema: "switchyard-active-endpoint/v1", instance, pid: process.pid, url: origin + "/#access=" + token }), { mode: 0o600 });
+  const client = new StudioTaskClient({ endpointPath });
+  f.beforeCleanup(async () => { client.close(); await new Promise((resolve, reject) => server.close(error => error ? reject(error) : resolve())); await server.cleanup(); });
+  const before = await f.store.snapshot("personal"), result = await client.editorTarget({ compartment: "personal", ...f.input });
+  assert.equal(result.target.sessionId, f.task.sessionId); assert.equal(result.target.repositoryRoot, f.task.repositoryRoot); assert.deepEqual(result.target.endpoint, f.endpoint); assert.equal(result.authorityGranted, false); assert.equal(result.ideAttached, false);
+  assert.equal(f.calls.filter(c => c === "resume").length, 1); assert.deepEqual(await f.store.snapshot("personal"), before);
+  f.controls.login = "f".repeat(64); await assert.rejects(client.editorTarget({ compartment: "personal", ...f.input })); assert.equal(f.calls.filter(c => c === "resume").length, 1);
 });

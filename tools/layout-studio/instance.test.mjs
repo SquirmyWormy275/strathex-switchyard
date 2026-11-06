@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { randomBytes, createHmac } from "node:crypto";
+import { randomBytes, createHmac, randomUUID } from "node:crypto";
 import { createServer } from "node:http";
 import { once } from "node:events";
 import { createStudioServer } from "./serve.mjs";
@@ -42,3 +42,23 @@ test("instance requests reject wrong build, token, PID, route, stale time and br
 test("legacy, redirected and malformed saved endpoints cannot enter managed application control", () => serverFixture(async ({ endpoint }) => {
   for (const changed of [{ instance: undefined }, { schema: "future" }, { url: endpoint.url.replace("127.0.0.1", "localhost") }, { url: endpoint.url.replace("/#", "/redirect#") }]) await assert.rejects(requestInstance({ ...endpoint, ...changed }), /supported authenticated/);
 }));
+test("signed editor metadata reaches only its closed read-only route and cannot carry effect fields or browser requests", async () => {
+  let calls = 0; const selection = { compartment: "personal", ownerRequestId: randomUUID(), loadRequestId: randomUUID() };
+  const suite = { async handle(path, body) { calls++; assert.equal(path, "/api/suite/coding/codex/owners/editor-target"); assert.deepEqual(body, selection); assert.equal(Object.isFrozen(body), true); return { metadataObserved: true, authorityGranted: false }; } };
+  await serverFixture(async ({ endpoint, stops }) => {
+    const origin = new URL(endpoint.url).origin, route = "/instance/v1/editor-target";
+    const send = async (change = {}, headers = {}, destination = route) => {
+      const raw = JSON.stringify({ schema: "switchyard-instance/v1", operation: "editorTarget", nonce: randomBytes(32).toString("base64url"), at: Date.now(), instanceId: endpoint.instance.id, build, selection, ...change });
+      const signature = createHmac("sha256", token).update(`SWITCHYARD-INSTANCE-V1\nREQUEST\nPOST\n${route}\n`).update(raw).digest("hex");
+      return fetch(origin + destination, { method: "POST", headers: { "Content-Type": "application/json", "X-Switchyard-Instance-Request": signature, ...headers }, body: raw });
+    };
+    const accepted = await send(); assert.equal(accepted.status, 200); const raw = await accepted.text();
+    assert.equal(accepted.headers.get("x-switchyard-instance-response"), createHmac("sha256", token).update(`SWITCHYARD-INSTANCE-V1\nRESPONSE-200\nPOST\n${route}\n`).update(raw).digest("hex"));
+    assert.equal(JSON.parse(raw).targetObservation.authorityGranted, false); assert.equal(calls, 1);
+    for (const change of [{ selection: null }, { selection: [] }, { selection: { ...selection, prompt: "never" } }, { selection: { ...selection, ownerRequestId: "latest" } }, { selection: { ...selection, compartment: "../foreign" } }, { action: "load" }, { operation: "stop" }, { at: Date.now() - 11000 }, { build: "b".repeat(64) }]) assert.equal((await send(change)).status, 403);
+    assert.equal((await send({}, { Origin: origin })).status, 403); assert.equal((await send({}, {}, "/instance/v1/stop")).status, 403);
+    await assert.rejects(requestInstance(endpoint, { operation: "editorTarget" }), /Unsupported/);
+    assert.equal(calls, 1); assert.equal(stops(), 0);
+    await requestInstance(endpoint, { operation: "stop" }); assert.equal((await send()).status, 403); assert.equal(calls, 1);
+  }, { suite, bridge: { close() {} } });
+});

@@ -138,3 +138,26 @@ original bridge keeps answering after its alias is replaced, while new-editor
 target inspection refuses the replacement. Tests restore only their original
 alias before verified owned retirement. Provider behavior is controlled; no live
 account or actual editor attachment is exercised. [Evidence](evidence/editor-target-preparation-summary.json).
+
+## Authenticated editor metadata consumer
+
+The Linux extension's `StudioTaskClient` reads the private, same-user endpoint file with
+no-follow and file/directory identity checks. Its fixed
+`/instance/v1/editor-target` request binds the selected workspace, owner and load
+to the exact application instance/build, a fresh nonce and timestamp. The server
+signs the response containing those same identities and the target observation.
+The API bearer is never transmitted, including to a replacement listener.
+
+The instance gateway dispatches only to the existing read-only target route.
+Browser-origin requests, effect fields, wrong identities and stale requests are
+refused before target inspection. Application stop fences pending and later
+metadata replies. The client preserves a copy of the original selection across
+asynchronous work, checks the saved endpoint again, strictly validates and
+freezes the target, and cancels pending requests on close.
+
+Six isolated groups pass 63 checks, including the actual instance gateway,
+authenticated Studio route, protected registry and app lifecycle, with controlled
+provider behavior. Typecheck passes. This consumer has no automatic command
+registration or terminal effect: editor command wiring, separately authorized
+terminal creation and native attachment acknowledgement remain unfinished.
+[Consumer evidence](evidence/editor-metadata-client-summary.json).

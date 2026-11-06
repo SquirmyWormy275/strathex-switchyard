@@ -10,7 +10,7 @@ Start with the [requirement ledger](switchyard-requirements.md) for complete sco
 
 The latest Windows environment observation confirms both Windows directory variables are present and correct, with no OpenSSL override or Node options. The cold restricted child still aborts in cryptographic initialization; this is an unresolved native software failure, not unavailable hardware. [Observed failure](evidence/windows-environment-native-summary.json).
 
-The backend now prepares an exact editor target only from an acknowledged load on its original live owner. Fresh socket/alias/process checks refuse a replaced endpoint even when the old metadata bridge survives. Four groups / 75 checks pass with cleanup and typecheck. This grants no terminal authority or IDE attachment; editor consumer composition remains unfinished. [Contract](coding-task-owners.md#prepare-an-exact-editor-target).
+The backend now prepares an exact editor target only from an acknowledged load on its original live owner. Fresh socket/alias/process checks refuse a replaced endpoint even when the old metadata bridge survives. Four groups / 75 checks pass with cleanup and typecheck. This grants no terminal authority or IDE attachment; the read-only signed editor metadata consumer now passes six groups / 63 checks. Command wiring, terminal creation and native attachment acknowledgement remain unfinished. [Contract](coding-task-owners.md#prepare-an-exact-editor-target).
 
 ## Latest verified checkpoints
 

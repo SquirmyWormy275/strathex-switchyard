@@ -1,7 +1,7 @@
 /** Mutual local-instance authentication without disclosing the browser access token. */
 import { createHmac, randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
 import { request as httpRequest } from "node:http";
-const routes = { probe: "/instance/v1/probe", stop: "/instance/v1/stop" };
+const routes = { probe: "/instance/v1/probe", stop: "/instance/v1/stop", editorTarget: "/instance/v1/editor-target" };
 const schema = "switchyard-instance/v1";
 const mac = (token, direction, route, raw) => createHmac("sha256", token).update(`SWITCHYARD-INSTANCE-V1\n${direction}\nPOST\n${route}\n`).update(raw).digest("hex");
 const same = (a, b) => typeof a === "string" && typeof b === "string" && /^[a-f0-9]{64}$/.test(a) && /^[a-f0-9]{64}$/.test(b) && timingSafeEqual(Buffer.from(a, "hex"), Buffer.from(b, "hex"));
@@ -12,7 +12,7 @@ export function endpointIdentity(endpoint) {
   if (endpoint.schema !== "switchyard-active-endpoint/v1" || !validIdentity(endpoint.instance) || !Number.isSafeInteger(endpoint.pid) || endpoint.pid < 1 || url.protocol !== "http:" || url.hostname !== "127.0.0.1" || url.pathname !== "/" || url.search || url.username || url.password || !token || +url.port < 1024 || +url.port > 65535) throw new Error("This endpoint has no supported authenticated application identity. Preserve the existing instance for inspection.");
   return { url, token, identity: endpoint.instance };
 }
-export function createInstanceGateway({ token, identity, onStop, now = () => Date.now() }) {
+export function createInstanceGateway({ token, identity, onStop, onEditorTarget, now = () => Date.now() }) {
   if (!validIdentity(identity) || !/^[A-Za-z0-9_-]{43}$/.test(token) || typeof onStop !== "function") throw new Error("A private application identity and owned stop handler are required.");
   let stopping = false;
   return async (req, res, origin) => {
@@ -25,8 +25,17 @@ export function createInstanceGateway({ token, identity, onStop, now = () => Dat
       const raw = Buffer.concat(chunks), supplied = req.headers["x-switchyard-instance-request"];
       if (!same(supplied, mac(token, "REQUEST", req.url, raw))) throw new Error();
       const v = JSON.parse(raw.toString("utf8"));
-      if (JSON.stringify(Object.keys(v).sort()) !== JSON.stringify(["at", "build", "instanceId", "nonce", "operation", "schema"]) || v.schema !== schema || v.operation !== operation || v.instanceId !== identity.id || v.build !== identity.build || !/^[A-Za-z0-9_-]{43}$/.test(v.nonce) || !Number.isSafeInteger(v.at) || Math.abs(now() - v.at) > 10000) throw new Error();
-      const response = JSON.stringify({ schema, operation, nonce: v.nonce, instanceId: identity.id, build: identity.build, pid: process.pid, origin, status: operation === "stop" || stopping ? "stopping" : "ready" });
+      const expected = ["at", "build", "instanceId", "nonce", "operation", "schema", ...(operation === "editorTarget" ? ["selection"] : [])].sort();
+      if (JSON.stringify(Object.keys(v).sort()) !== JSON.stringify(expected) || v.schema !== schema || v.operation !== operation || v.instanceId !== identity.id || v.build !== identity.build || !/^[A-Za-z0-9_-]{43}$/.test(v.nonce) || !Number.isSafeInteger(v.at) || Math.abs(now() - v.at) > 10000) throw new Error();
+      let targetObservation;
+      if (operation === "editorTarget") {
+        const s = v.selection;
+        if (stopping || typeof onEditorTarget !== "function" || !s || typeof s !== "object" || Array.isArray(s) || Object.keys(s).sort().join() !== "compartment,loadRequestId,ownerRequestId" || typeof s.compartment !== "string" || !/^[a-z][a-z0-9-]{0,63}$/.test(s.compartment) || ![s.ownerRequestId, s.loadRequestId].every(id => typeof id === "string" && /^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/.test(id))) throw new Error();
+        targetObservation = await onEditorTarget(Object.freeze({ ...s }));
+        if (stopping) throw new Error();
+      }
+      const response = JSON.stringify({ schema, operation, nonce: v.nonce, instanceId: identity.id, build: identity.build, pid: process.pid, origin, status: operation === "stop" || stopping ? "stopping" : "ready", ...(operation === "editorTarget" ? { targetObservation } : {}) });
+      if (Buffer.byteLength(response) > 32768) throw new Error();
       res.writeHead(200, { "Content-Type": "application/json", "X-Switchyard-Instance-Response": mac(token, "RESPONSE-200", req.url, response) });
       if (operation === "stop" && !stopping) { stopping = true; res.once("finish", () => { void Promise.resolve().then(onStop).catch(() => {}); }); }
       res.end(response);
@@ -35,7 +44,7 @@ export function createInstanceGateway({ token, identity, onStop, now = () => Dat
 }
 export async function requestInstance(endpoint, { operation = "probe", now = () => Date.now(), timeoutMs = 1500 } = {}) {
   const { url, token, identity } = endpointIdentity(endpoint), route = routes[operation];
-  if (!route || !Number.isSafeInteger(timeoutMs) || timeoutMs < 1 || timeoutMs > 10000) throw new Error("Unsupported instance request.");
+  if (!["probe", "stop"].includes(operation) || !route || !Number.isSafeInteger(timeoutMs) || timeoutMs < 1 || timeoutMs > 10000) throw new Error("Unsupported instance request.");
   const nonce = randomBytes(32).toString("base64url"), raw = JSON.stringify({ schema, operation, nonce, at: now(), instanceId: identity.id, build: identity.build });
   const response = await new Promise((resolve, reject) => {
     const req = httpRequest(new URL(route, url.origin), { method: "POST", agent: false, headers: { "Content-Type": "application/json", "Content-Length": Buffer.byteLength(raw), "X-Switchyard-Instance-Request": mac(token, "REQUEST", route, raw) } }, (res) => {

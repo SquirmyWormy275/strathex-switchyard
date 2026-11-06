@@ -31,7 +31,7 @@ Keep commits on GitHub regularly. Do not merge or release.
 
 The `359a825` full Linux run now passes 242 groups / 1,534 tests with eleven declared skips and exact staging cleanup. At `d798f4f`, native Windows environment observation rejects the missing-SystemRoot hypothesis; cold restricted Node still fails at `ncrypto::CSPRNG`. [Receipt](evidence/windows-environment-native-summary.json).
 
-The backend now prepares an exact editor target only from an acknowledged load on its original live owner. Fresh socket/alias/process checks refuse a replaced endpoint even when the old metadata bridge survives. Four groups / 75 checks pass with cleanup and typecheck. This grants no terminal authority or IDE attachment; editor consumer composition remains unfinished. [Contract](coding-task-owners.md#prepare-an-exact-editor-target).
+The backend now prepares an exact editor target only from an acknowledged load on its original live owner. Fresh socket/alias/process checks refuse a replaced endpoint even when the old metadata bridge survives. Four groups / 75 checks pass with cleanup and typecheck. This grants no terminal authority or IDE attachment; the read-only signed editor metadata consumer now passes six groups / 63 checks. Command wiring, terminal creation and native attachment acknowledgement remain unfinished. [Contract](coding-task-owners.md#prepare-an-exact-editor-target).
 
 ## Current executable state
 
@@ -112,7 +112,7 @@ The explicit `createCodingTaskOwners` service now persists original owner stages
 and task/account/repository binding under real private leases. Five files pass 76
 tests; final eight registry and five packaging checks pass with exact cleanup and
 typecheck. Actual Unix listener/bridge composition uses a controlled provider double.
-The manifest now has 243 Linux groups after CVSS 2 support; the latest `359a825` complete run passes its original 242 groups. CVSS 2 has separate focused evidence in [severity](cvss-severity.md).
+The manifest now has 244 Linux groups after CVSS 2 support; the latest `359a825` complete run passes its original 242 groups. CVSS 2 has separate focused evidence in [severity](cvss-severity.md).
 Existing creation/text APIs still use stdio; the separate owner/load routes have
 composition evidence above and grant no IDE attachment. [Contract](coding-task-owners.md).
 
