@@ -1,4 +1,5 @@
 using System.Runtime.InteropServices;
+using System.ComponentModel;
 using System.Security.AccessControl;
 using System.Security.Cryptography;
 using System.Security.Principal;
@@ -50,7 +51,7 @@ internal sealed class RuntimePrivatePipeSecurity : IDisposable
         catch { Dispose(); throw; }
     }
 
-    internal void Verify(IntPtr pipe)
+    internal void Verify(IntPtr pipe, Action<object>? observe = null)
     {
         if (!OperatingSystem.IsWindows() || Descriptor == IntPtr.Zero || pipe == IntPtr.Zero || pipe == new IntPtr(-1)) throw Invalid();
         byte[] bytes = new byte[4096];
@@ -58,18 +59,26 @@ internal sealed class RuntimePrivatePipeSecurity : IDisposable
         {
             // OWNER_SECURITY_INFORMATION | DACL_SECURITY_INFORMATION. The
             // returned pipe handles already include READ_CONTROL.
-            if (!GetKernelObjectSecurity(pipe, 5, bytes, checked((uint)bytes.Length), out uint length) || length is < 20 or > 4096) throw Invalid();
+            if (!GetKernelObjectSecurity(pipe, 5, bytes, checked((uint)bytes.Length), out uint length)) throw new Win32Exception(Marshal.GetLastWin32Error());
+            if (length is < 20 or > 4096) throw Invalid();
             byte[] exact = bytes.AsSpan(0, checked((int)length)).ToArray();
-            try { VerifyDescriptor(exact, user); }
+            try { VerifyDescriptor(exact, user, observe); }
             finally { CryptographicOperations.ZeroMemory(exact); }
         }
         finally { CryptographicOperations.ZeroMemory(bytes); }
     }
 
-    internal static void VerifyDescriptor(byte[] bytes, string user)
+    internal static void VerifyDescriptor(byte[] bytes, string user, Action<object>? observe = null)
     {
         if (!OperatingSystem.IsWindows() || bytes.Length is < 20 or > 4096) throw Invalid();
         var security = new RawSecurityDescriptor(bytes, 0);
+        if (observe is not null)
+        {
+            var one = security.DiscretionaryAcl?.Count == 1 ? security.DiscretionaryAcl[0] as CommonAce : null;
+            observe(new { ownerMatches = security.Owner?.Value == user, controlFlags = (int)security.ControlFlags,
+                aceCount = security.DiscretionaryAcl?.Count, singleMask = one?.AccessMask, singleFlags = one is null ? (int?)null : (int)one.AceFlags,
+                singleAllowed = one?.AceQualifier == AceQualifier.AccessAllowed, singleCallback = one?.IsCallback, singleUserMatches = one?.SecurityIdentifier.Value == user });
+        }
         if (security.Owner?.Value != user || security.DiscretionaryAcl?.Count != 1
             || (security.ControlFlags & (ControlFlags.DiscretionaryAclPresent | ControlFlags.DiscretionaryAclProtected)) != (ControlFlags.DiscretionaryAclPresent | ControlFlags.DiscretionaryAclProtected)
             || security.DiscretionaryAcl[0] is not CommonAce ace || ace.AceQualifier != AceQualifier.AccessAllowed

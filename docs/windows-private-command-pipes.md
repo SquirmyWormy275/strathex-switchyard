@@ -49,3 +49,20 @@ The native proof adds **36 checks**: descriptor refusals, three actual pipe
 transfers, six handle descriptor checks, exact default-DACL preservation and
 handle closure. Those Windows checks have not run locally. Native acceptance
 and the original owner journey remain pending; the owner is still **0/8**.
+
+## Retained candidate failure
+
+Native `25f07e9` passes the PE-image check, then fails ordinary setup preflight
+before the new pipe proof or original restricted-owner journey runs. The retained
+receipt has the generic worker-start refusal; its exact substage was not retained.
+The candidate is **unaccepted**. [Failure receipt](evidence/private-command-pipes-preflight-failed-summary.json).
+
+The follow-up retains the existing closed worker-start phase/code in preflight,
+and lets the independent native pipe proof run after a failed preflight while
+keeping the job failed. Failed pipe proof JSON is retained before throwing.
+Readback observations contain fixed phases, counts, masks, flags and owner-match
+booleans; they contain no SID strings, paths or pipe names. All 36 native checks
+and the original setup assertions remain required. Three focused groups pass
+35 tests with five Windows-only skips; two managed builds, 2,101 portable checks,
+typecheck and cleanup pass. Native readback acceptance remains pending.
+[Source receipt](evidence/private-pipe-readback-source-summary.json).

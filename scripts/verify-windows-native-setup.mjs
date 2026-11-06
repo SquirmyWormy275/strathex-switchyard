@@ -5,7 +5,7 @@ import {createHash,randomUUID} from "node:crypto";
 import {readFile} from "node:fs/promises";
 import {join,isAbsolute} from "node:path";
 import {tmpdir} from "node:os";
-import {runRuntimeCommand,runtimeGuardianStopped} from "../tools/layout-studio/runtime-command.mjs";
+import {runRuntimeCommand,runtimeGuardianStopped,runtimeWorkerStartFailureEvidence} from "../tools/layout-studio/runtime-command.mjs";
 import {desktopEnvironment} from "../tools/layout-studio/process-environment.mjs";
 import {privateWrite} from "../tools/layout-studio/private-fs.mjs";
 const flags=process.argv.slice(2);
@@ -22,5 +22,5 @@ try{
  const changed=await execute(["--install-bootstrap",metadata.clientSid,randomUUID(),"0".repeat(64)],2);assert.equal(changed.status,"unavailable");assert.equal(changed.effectStarted,false);checks.push("changed adjacent helper bytes are refused before any elevation or installation");
  evidence.nativeExitVerified=(await Promise.all(owners.map(frame=>runtimeGuardianStopped(frame,{windowsHelper:helper})))).every(Boolean);assert.equal(evidence.nativeExitVerified,true);checks.push("all exact native guardians exited independently");
  assert.equal(await runtimeGuardianStopped({...owners[0],guardianPid:process.pid},{windowsHelper:helper}),true);process.kill(process.pid,0);checks.push("an unrelated live PID with a different creation time cannot replace an exited guardian or its original empty Job Object");
-}catch(error){failure=error;evidence.diagnostic=String(error.message).slice(0,512);}
-evidence.success=!failure;await privateWrite(receipt,JSON.stringify({...evidence,nativeOwners:owners},null,2)+"\n");console.log(JSON.stringify({success:evidence.success,checks:checks.length,diagnostic:evidence.diagnostic??null,receipt}));if(failure)throw Error("The native setup no-effect proof failed; no UAC or service acceptance is claimed.");
+}catch(error){failure=error;evidence.diagnostic=String(error.message).slice(0,512);evidence.workerStartFailure=runtimeWorkerStartFailureEvidence(error.runtimeWorkerStartFailure)??null;}
+evidence.success=!failure;await privateWrite(receipt,JSON.stringify({...evidence,nativeOwners:owners},null,2)+"\n");console.log(JSON.stringify({success:evidence.success,checks:checks.length,diagnostic:evidence.diagnostic??null,workerStartFailure:evidence.workerStartFailure??null,receipt}));if(failure)throw Error("The native setup no-effect proof failed; no UAC or service acceptance is claimed.");

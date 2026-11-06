@@ -122,6 +122,7 @@ jobs:
           retention-days: 7
 
       - name: Verify broker metadata and protected files with a restricted token
+        if: ${{ !cancelled() }}
         shell: pwsh
         timeout-minutes: 3
         run: |
@@ -133,8 +134,14 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Broker protocol proof build failed.' }
           $assembly = '.\deployment\windows\test-support\storage-broker-protocol\bin\Release\net8.0\StorageBrokerProtocol.Proof.dll'
           $result = & .\.tools\dotnet\dotnet.exe $assembly --native-files
-          if ($LASTEXITCODE -ne 0) { throw 'An authenticated broker metadata boundary failed.' }
+          $code = $LASTEXITCODE
+          $result | Write-Output
           $proof = $result | ConvertFrom-Json
+          if ($code -ne 0) {
+            $proof | Add-Member -NotePropertyName sourceCommit -NotePropertyValue (& git rev-parse HEAD)
+            $proof | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $env:RUNNER_TEMP 'switchyard-storage-broker-protocol-verification.json') -Encoding utf8
+            throw 'An authenticated broker metadata boundary failed.'
+          }
           if ($proof.success -ne $true -or $proof.checks -ne 16 -or $proof.pipeTextProtocolChecks -ne 10 -or $proof.serviceHeaderChecks -ne 1541 -or $proof.restrictedChildEventChecks -ne 12 -or $proof.exchangeProtocolChecks -ne 30 -or $proof.exchangeJournalChecks -ne 43 -or $proof.exchangeFactsChecks -ne 23 -or $proof.indexInputChecks -ne 49 -or $proof.historyInputChecks -ne 62 -or $proof.protectedFilesChecks -ne 16 -or $proof.privatePipeChecks -ne 36 -or $proof.serviceInstalled -ne $false -or $proof.volumeOpened -ne $false -or $proof.guestLaunched -ne $false) { throw 'The exact broker proof result did not verify.' }
           $proof | Add-Member -NotePropertyName sourceCommit -NotePropertyValue (& git rev-parse HEAD)
           $proof | Add-Member -NotePropertyName protocolSourceSha256 -NotePropertyValue ((Get-FileHash '.\apps\desktop-hotkeys\WindowsStorageBrokerProtocol.cs' -Algorithm SHA256).Hash.ToLowerInvariant())

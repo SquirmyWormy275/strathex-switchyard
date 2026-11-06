@@ -1,5 +1,13 @@
 # What has actually been verified
 
+The `25f07e9` pipe candidate is **failed**, not accepted: ordinary native setup
+preflight stops after the PE check, before pipe-proof or restricted-owner checks.
+Its exact worker-start substage was not retained. Readback observation now runs
+independently after failed preflight, with all original assertions preserved;
+35 focused tests, five Windows-only skips, two managed builds and 2,101 portable
+checks pass. [Failure](evidence/private-command-pipes-preflight-failed-summary.json),
+[source correction](evidence/private-pipe-readback-source-summary.json).
+
 The private-command-pipe candidate passes 69 focused tests with five Windows-only
 skips, two clean managed builds and 2,101 portable checks. It opens only the
 primary token with QUERY mask 8, creates three pipes with one exact owner entry,

@@ -138,3 +138,14 @@ test("every task-owner case runs once with the original bound and only its own n
   }
   for (const broken of [groups.slice(1), [...groups, groups[0]], groups.map((group, index) => index ? group : { ...group, pattern: ".*" })]) assert.throws(() => selectWindowsContractGroups([file], broken));
 });
+
+test("private pipe readback remains observable after failed setup without accepting that failure", async () => {
+  const workflow = await readFile(new URL("../.github/workflows/switchyard-windows-filesystem.yml", import.meta.url), "utf8");
+  const block = workflow.slice(workflow.indexOf("      - name: Verify broker metadata and protected files with a restricted token"), workflow.indexOf("      - name: Verify actual NTFS private index bytes and parser refusals"));
+  assert.match(block, /if: \$\{\{ !cancelled\(\) \}\}/); assert.doesNotMatch(block, /continue-on-error/);
+  assert.match(block, /\$proof\.privatePipeChecks -ne 36/); assert.match(block, /\$proof\.protectedFilesChecks -ne 16/);
+  const failure = block.slice(block.indexOf("if ($code -ne 0) {"), block.indexOf("if ($proof.success"));
+  assert.match(failure, /switchyard-storage-broker-protocol-verification\.json/); assert.match(failure, /throw 'An authenticated broker metadata boundary failed.'/);
+  assert.ok(failure.indexOf("Set-Content") < failure.indexOf("throw"));
+  assert.match(workflow, /if \(\$LASTEXITCODE -ne 0\) \{ throw 'Native setup preflight failed; no elevation was attempted.'/);
+});
