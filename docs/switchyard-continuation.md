@@ -36,17 +36,17 @@ checks, native Windows results, focused source checks and installed acceptance.
 The [verification record](verification.md) retains historical receipts and failed
 attempts; do not infer current status from an older passing checkpoint.
 
-The installed baseline is `4b2daede4ead6293b5344b3e9c2b4d7b68601ad4`,
-release `884a1433e7463bd3498a185229a5df11a2933a3d2e80b92448368fe7521067a8`.
+The installed baseline is `e7cec91d1b28c87e8ed2a92a15f3b021cd9767fe`,
+release `33eed82b8249d733d3f86ec1affb6bc304ccd2c88c9caa4736d290626c455870`.
 Preserve all 54 original workspace identities, the pending keyboard-only Codex
 workspace, private connection information and the frozen Home bytes. The normal
-versioned update passes 20 owner/journal metadata checks and verifies the exact
-suite module hash from the 72-check source demonstration. It starts no bundled
-example or provider. All 54 semantic snapshots match; 53 sealed files are
-byte-identical and one changed only audit metadata. Keep the current release and
-its one rollback. The 534-file prepared bundle was verified and removed.
-[Receipt](evidence/installed-bundled-examples-summary.json).
-The previous installed `5a8d159` has separate 31-check archive/extras evidence.
+versioned update passes 20 owner/journal metadata checks plus six pure in-memory
+command-history checks. Exact tested module hashes verify. It starts no bundled
+example, recording or provider. All 54 semantic snapshots match; 53 sealed files
+are byte-identical and one changed only audit metadata. Keep the current release
+and its one rollback. The 534-file prepared bundle was verified and removed.
+[Receipt](evidence/installed-command-observation-summary.json).
+Earlier installed `4b2daed` and `5a8d159` retain separate lifecycle/archive/extras evidence.
 
 Latest source work closes the bundled-example uncertain-stop/replacement/shutdown
 gap. Seven focused groups/72 checks pass, including real authenticated Node
@@ -57,12 +57,13 @@ The four Windows backend batches at `9f35961` are now digest-verified: 198 group
 1,022 passes, 142 declared skips, no failures and all cleanup verified. Its combined
 release run 42281533502 is still active. [Receipt](evidence/windows-backend-9f35961-native-summary.json).
 
-Latest uninstalled addition: custom-agent command history now retains only opted-in
+Latest addition: custom-agent command history now retains only opted-in
 queue/claim/retirement/acknowledgement metadata. Seven groups/92 checks pass with
 real encrypted HTTP/bundled-agent execution, explicit provider doubles, source/
 interval/exclusion/pause fences, rollback and exact cleanup. Typecheck/package
-bounds pass. Keep actual completion and measured savings false. Native Windows
-and installed acceptance of this addition remain separate.
+bounds pass. Keep actual completion and measured savings false. Installed pure
+metadata acceptance now passes six checks within the 26-check update. Native
+Windows and live installed command execution remain separate.
 [Contract](agent-lifecycle-observation.md#custom-agent-command-history),
 [evidence](evidence/custom-agent-command-observation-summary.json).
 

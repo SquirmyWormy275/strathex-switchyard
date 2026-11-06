@@ -1163,3 +1163,13 @@ the original package budget pass, and exact owned temporary staging is removed.
 No real provider account, model task, hardware, frontend or extension activation
 changes occur. Native Windows and installed acceptance remain separate.
 [Receipt](evidence/custom-agent-command-observation-summary.json).
+
+Normal installed source `e7cec91` passes 13 owner metadata, seven journal metadata
+and six pure in-memory command-history checks. The installed modules match the
+source-tested hashes. All 54 workspace semantic snapshots and selection remain
+unchanged, 53 sealed files remain byte-identical and one changes only audit
+metadata. Dated backup/launcher readback, frozen frontend and current-plus-one-
+rollback inventory verify. The 534-file, 5,236,896-byte prepared bundle is removed
+after exact manifest verification. No live recording, bundled example, scanner,
+task, provider, public query or HID operation is started.
+[Installed evidence](evidence/installed-command-observation-summary.json).

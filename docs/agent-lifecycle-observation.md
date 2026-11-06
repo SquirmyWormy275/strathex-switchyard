@@ -65,7 +65,7 @@ encrypted store. The command is claimed and acknowledged, sensitive text stays
 out of observations and plaintext state, and both owned example processes exit.
 Failed-save injection uses a memory store; provider checks elsewhere use doubles.
 Typecheck, the original package budget and exact owned cleanup pass. Native
-Windows and installed acceptance of this addition remain separate.
+Windows and live installed command execution remain separate.
 [Evidence](evidence/custom-agent-command-observation-summary.json).
 
 Configuration conversations now append local request reservation, validated
@@ -181,3 +181,10 @@ source-specific boundary cases and the existing rollback/lifecycle tests.
 The host journal fixture now uses its real synthetic recording start rather than
 a timestamp predating consent. Typecheck and exact owned child/tree/temporary
 parent cleanup pass. [Evidence](evidence/observation-window-summary.json).
+
+Installed source `e7cec91` now passes six pure in-memory command-history checks
+within a 26-check metadata update. The exact tested module hashes verify. All
+54 semantic workspace snapshots and frozen frontend bytes remain unchanged,
+53 sealed files remain byte-identical, and the prepared bundle is removed.
+No live recording, command, provider or model request is started by these checks.
+[Installed evidence](evidence/installed-command-observation-summary.json).
