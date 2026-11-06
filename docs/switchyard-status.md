@@ -26,6 +26,17 @@ there is no merge or public release acceptance.
 
 ## Current evidence
 
+Normal installed 39db1fe passes **44 metadata/synthetic checks**: thirteen
+task-owner, seven Copilot-journal, fourteen agent/helper/SDK and ten Python
+inventory checks. Fourteen exact installed module hashes verify. The Python
+checks include fifteen independent ZIP fixtures, six in-memory wheel reports
+and forged-report refusals; no scanner process, extraction or package execution
+starts. All 54 semantic workspace snapshots, selection, pending keyboard-only
+conversation and frozen frontend bytes remain intact. Fifty-three sealed files
+are byte-identical; one changes only audit metadata. Dated backup/readback and
+current plus one rollback verify. The exact 533-file, 5,231,889-byte prepared
+bundle is removed. [Installed evidence](evidence/installed-python-wheels-summary.json).
+
 The deliberately public VS Code endpoint fixture now applies and reads back its
 intended mode explicitly, so a private test-runner umask cannot turn the fixture
 into a private file. Production transport permissions are unchanged. With umask
@@ -33,7 +44,7 @@ into a private file. Production transport permissions are unchanged. With umask
 installed-verifier guard tests also pass. A separate initial follow-up hit the
 Unix socket path limit and remains recorded; the corrected short test parent
 passes and both owned roots are removed. Typecheck passes. The expanded installed
-Python verifier has ten in-memory checks; installed wheel acceptance is pending.
+Python verifier now passes all ten installed in-memory checks.
 [Verification repair](evidence/private-runner-verification-source-summary.json).
 
 Selected Python wheels now receive bounded ZIP/metadata identity checks alongside
@@ -44,8 +55,7 @@ scanner journeys and six Windows guest doubles. Fifteen independent Python ZIP
 fixtures, malformed inputs, expansion limits, protected receipts and exact cleanup
 verify; typecheck and the original package budget pass. No extraction or execution
 occurs. RECORD hashes, compatibility tags, license/code contents and publisher
-provenance remain unverified. The installed aa98c91 baseline predates this change;
-installed and native Windows wheel acceptance are pending.
+provenance remain unverified. Installed metadata acceptance now passes; native Windows wheel acceptance remains pending.
 [Wheel contract](python-wheel-identity.md),
 [source evidence](evidence/pypi-wheel-identity-source-summary.json).
 
@@ -101,7 +111,7 @@ Installed metadata checks now pass separately; native Windows marker acceptance 
 | Installation and runtime | All sixteen original Windows installation/recovery cases pass at `b600a6d`; its independent fresh runtime installs 49 packages and loads/rechecks the offline CPU model, then removes its temporary runtime. [Installation](evidence/installation-scenarios-native-summary.json), [runtime](evidence/windows-runtime-b600-native-summary.json). | Complete Windows `9f35961` now passes separately; ordinary-user/guest journeys remain open. |
 | Latest diagnostic source | Seven focused groups pass 69 tests with five Windows-only skips. Two managed builds, 2,101 portable checks, typecheck and exact owned cleanup pass. [Receipt](evidence/worker-start-observation-source-summary.json). | Actual Windows `d15285b` passes all eight acknowledgement/refusal tests without skips. [Native receipt](evidence/worker-start-refusal-native-summary.json). The full restricted-owner journey is now separately accepted above. |
 | Windows index/history/leases | Native NTFS index and history packets each pass six checks and three independent guardian exits. Both Windows scanner files pass two cases with guest execution doubled; lease groups pass 24 tests and one Linux-only skip. [Evidence](evidence/native-history-index-leases-summary.json). | Packet Git witnesses are synthetic. Actual guest, installed Windows and ordinary-user acceptance remain separate. |
-| Installed app | Linux source `aa98c91` passes **41 metadata/synthetic checks** and fourteen tested module hashes. All 54 semantic workspace snapshots, 53 sealed files and frozen frontend bytes verify. Only current plus one rollback remain; the complete 5,221,413-byte prepared bundle is removed. [Installed evidence](evidence/installed-python-markers-summary.json). | The Python scanner examples run in memory; no live task, scanner process, agent, account, model request or hardware operation starts. Frontend and extension activation remain frozen. |
+| Installed app | Linux source `39db1fe` passes **44 metadata/synthetic checks** and fourteen tested module hashes. All 54 semantic snapshots and frozen frontend bytes verify. Only current plus one rollback remain; the 5,231,889-byte prepared bundle is removed. [Evidence](evidence/installed-python-wheels-summary.json). | Pure in-memory examples start no scanner process, live task, agent or account action. Frontend/editor activation remains frozen. |
 | Windows npm archive identity | Corrected `55515d1` completes ten archive tests plus eight original byte-comparison tests, each file with two original Linux-only skips inside its original 300-second bound; guest execution is doubled. [Archive](evidence/npm-archive-native-summary.json), [bytes](evidence/npm-artifact-split-native-summary.json). | Complete Windows release remains separate. |
 | Windows shortcut retirement | `80601e9` passes all sixteen original installation/recovery scenarios and twelve writer checks, no skips and verified cleanup. The fixed stage diagnostics execute with the original bounds. [Native pass](evidence/shortcut-stage-diagnostics-native-summary.json). | `9193471` and `4b2daed` each fail the first installation scenario at the original ten-second shortcut deadline: 24/25 tests pass, all cleanup verifies. The latest pass does not reproduce or establish the cause of the intermittent timeout. [Recurring failures](evidence/windows-shortcut-recurring-timeout-summary.json), [diagnostic source](evidence/shortcut-stage-diagnostics-source-summary.json). |
 | Credential worker retirement | Six groups/69 checks pass, including ten worker tests and two controlled real children. Errors join exact-child retirement; unconfirmed exit blocks replacement. Installed pure synthetic checks also pass within the 27-check update. [Contract](credential-worker-lifecycle.md), [source](evidence/credential-process-source-summary.json), [installed](evidence/installed-agent-security-summary.json). | Live credential failure injection and native Windows acceptance remain separate. No user key is replaced. |

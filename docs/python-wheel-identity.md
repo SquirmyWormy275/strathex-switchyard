@@ -61,14 +61,16 @@ case: **101 distinct passes**. Six actual Linux scanner journeys and six Windows
 guest doubles cover both actions, matched/mismatched identity and unsupported
 format. Original files, index/HEAD, protected incomplete receipts, replay and exact
 process/staging cleanup verify. Typecheck and the original package-size test pass.
-Installed and native Windows wheel acceptance remain separate.
+Installed metadata acceptance now passes; native Windows wheel acceptance remains separate.
 [Source evidence](evidence/pypi-wheel-identity-source-summary.json).
 
 The existing `scripts/verify-python-inventory-host.mjs --read-only-metadata`
 verifier now pins the wheel implementation and adds the fifteen ZIP facts,
 six in-memory wheel reports and host-forgery refusals. Its ten checks start no
-scanner process or account action. Four flag-guard tests pass; installed wheel
-acceptance still requires running it against the updated installed release.
+scanner process or account action. Four flag-guard tests and all ten installed checks pass at source 39db1fe,
+within its 44-check update. All 54 workspace snapshots and frozen frontend verify;
+only current plus one rollback remain and the prepared bundle is removed.
+[Installed receipt](evidence/installed-python-wheels-summary.json).
 [Verifier source checks](evidence/private-runner-verification-source-summary.json).
 
 The [15-case reference fixture](../scripts/fixtures/pypi-wheel-oracle.json) was

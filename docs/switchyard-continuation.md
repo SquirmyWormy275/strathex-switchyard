@@ -38,7 +38,7 @@ into a private file. Production transport permissions are unchanged. With umask
 installed-verifier guard tests also pass. A separate initial follow-up hit the
 Unix socket path limit and remains recorded; the corrected short test parent
 passes and both owned roots are removed. Typecheck passes. The expanded installed
-Python verifier has ten in-memory checks; installed wheel acceptance is pending.
+Python verifier now passes all ten installed in-memory checks.
 [Verification repair](evidence/private-runner-verification-source-summary.json).
 
 Selected Python wheels now receive bounded ZIP/metadata identity checks alongside
@@ -49,8 +49,7 @@ scanner journeys and six Windows guest doubles. Fifteen independent Python ZIP
 fixtures, malformed inputs, expansion limits, protected receipts and exact cleanup
 verify; typecheck and the original package budget pass. No extraction or execution
 occurs. RECORD hashes, compatibility tags, license/code contents and publisher
-provenance remain unverified. The installed aa98c91 baseline predates this change;
-installed and native Windows wheel acceptance are pending.
+provenance remain unverified. Installed metadata acceptance now passes; native Windows wheel acceptance remains pending.
 [Wheel contract](python-wheel-identity.md),
 [source evidence](evidence/pypi-wheel-identity-source-summary.json).
 
@@ -179,18 +178,18 @@ shortcut-helper source `f06674d` has its separate 89-check focused and 33-check
 installed acceptance.
 [Receipt](evidence/linux-68bcc76-complete-summary.json).
 
-The installed baseline is `aa98c91f11be1d41e67a7d5e043359c7114423d1`,
-release `e1355f25ecea493fc47fae4aa544021ed285629f6305e39555d09cbc322df851`.
-Normal installed aa98c91 passes **41 metadata/synthetic checks**: 13 task-owner,
-seven Copilot-journal, fourteen agent/helper/SDK and seven Python-inventory checks.
-Fourteen tested module hashes and both verifier hashes bind the running build.
-The Python checks use 87 marker and 39 original reference cases plus fixed
-in-memory reports/artifact comparisons; they evaluate no condition and start
-no scanner process. All 54 semantic workspaces, selected state, pending
-keyboard-only conversation and frozen frontend remain preserved; 53 sealed files
-are byte-identical and one changes only audit metadata. Dated backup/readback
-and current plus one rollback verify. The exact 533-file, 5,221,413-byte prepared
-bundle is removed. [Installed evidence](evidence/installed-python-markers-summary.json).
+The installed baseline is `39db1fe6ca5f7dce4737d4847e794354b8bc63c9`,
+release `d50cf10e191b61bcd45620b542f09808cdddaff3c3e3ce750febfaf15542bcc5`.
+Normal installed 39db1fe passes **44 metadata/synthetic checks**: thirteen
+task-owner, seven Copilot-journal, fourteen agent/helper/SDK and ten Python
+inventory checks. Fourteen exact installed module hashes verify. The Python
+checks include fifteen independent ZIP fixtures, six in-memory wheel reports
+and forged-report refusals; no scanner process, extraction or package execution
+starts. All 54 semantic workspace snapshots, selection, pending keyboard-only
+conversation and frozen frontend bytes remain intact. Fifty-three sealed files
+are byte-identical; one changes only audit metadata. Dated backup/readback and
+current plus one rollback verify. The exact 533-file, 5,231,889-byte prepared
+bundle is removed. [Installed evidence](evidence/installed-python-wheels-summary.json).
 
 The repeatable `scripts/verify-agent-security-host.mjs --read-only-metadata`
 proof verifies exact installed hashes and uses only synthetic in-memory state;
