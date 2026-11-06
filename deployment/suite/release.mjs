@@ -77,7 +77,7 @@ export async function buildSuiteRelease({ sourceRoot, sourceFiles, outputRoot, f
   const tracked = new Set(sourceFiles), inputs = new Map(), add = async (from, to = from) => { portableName(to); if (!tracked.has(from)) return; if (inputs.has(to)) throw new Error("A release input was duplicated."); inputs.set(to, await bytes(join(sourceRoot, from))); };
   // These browser entry points and static assets ship once in the verified frozen
   // frontend. Shared modules (for example catalog.mjs) remain in the backend.
-  const frontendOnly = new Set(["index.html", "style.css", "app.mjs", "home.mjs", "shell.mjs", "keyboard-view.mjs", "suite-ui.mjs", "device-ui.mjs"]);
+  const frontendOnly = new Set(["index.html", "style.css", "app.mjs", "home.mjs", "shell.mjs", "keyboard-view.mjs", "suite-ui.mjs", "device-ui.mjs", "model-f-catalog.json"]);
   if ([...frontendOnly].some(name => !front.files.some(file => file.file === name))) throw new Error("The frozen frontend is missing its browser module closure.");
   for (const name of await walk(join(sourceRoot, "tools/layout-studio"))) if (!frontendOnly.has(name) && !name.endsWith(".test.mjs") && !name.endsWith(".pyc") && !name.startsWith("test-support/")) await add(`tools/layout-studio/${name}`);
   for (const prefix of ["integrations", "examples/custom-agent", "examples/langchain-agent", "deployment/suite", "third_party/model-f-catalog"]) for (const name of await walk(join(sourceRoot, prefix))) if (!name.endsWith(".test.mjs") && !name.endsWith(".pyc") && !name.startsWith("test-support/")) await add(`${prefix}/${name}`);

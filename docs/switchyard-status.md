@@ -46,6 +46,15 @@ Four local files pass all 56 tests and typecheck. Focused complete Windows
 device/storage jobs await native results; other full-run failures remain open.
 [Exact failed receipt and followup](evidence/windows-full-followup-summary.json).
 
+Native `2d0cd09` focused cohorts now pass all eighteen device tests and eleven
+storage transport tests, with both artifact digests and cleanup verified.
+Fifty-seven of 58 filesystem workflow jobs pass; restricted primary-child startup
+still fails. The original full Windows failure remains failed. A separate client
+platform job exposed the bundle size budget; sharing the exact frozen catalog
+removes its duplicate without changing UI bytes. Five local files/52 tests pass,
+with native package followup still pending.
+[Exact focused evidence](evidence/windows-2d0-focused-native-summary.json).
+
 Windows keyless workers pass both complete native lease files at `0740791`:
 sixteen tests plus one declared platform skip. Fresh encrypted state and keys
 remain independently read for every transaction; each kernel handle is acquired
@@ -82,6 +91,15 @@ No thread, model turn or account change is requested; all owned stages retire.
 stdio; complete Studio/task/IDE wiring remains unfinished software.
 [Pinned stream evidence](evidence/codex-pinned-unix-summary.json). The unproven
 native CLI proxy is not exposed. [Guardian contract and evidence](codex-owned-transport.md).
+
+The explicit Unix task adapter now connects the shared task metadata operations
+to the owned listener. Asynchronous constructors register ownership before startup;
+revocation prevents late initialization, and complete listener retirement gates
+replacement. Seven related files pass 78 tests; the actual installed CLI passes
+three task-adapter checks with two account operations, fresh verifier revocation
+and exact shutdown. No native thread/model turn is created. Main Studio composition
+and full task/IDE attachment remain unfinished; production stays stdio.
+[Adapter and package followup evidence](evidence/codex-unix-task-adapter-summary.json).
 
 The later immutable `82eb764` full run remains failed at interrupted-install
 recovery: 213/214 groups pass, 1,266 tests pass, one fails and ten skips. Recovery

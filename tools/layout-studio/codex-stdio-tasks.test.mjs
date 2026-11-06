@@ -203,6 +203,26 @@ test("an unconfirmed owned-process exit blocks replacement without closing an un
   } finally { owned.forEach((c) => stopped.add(c)); await driver.close(); }
 }));
 
+test("a registered asynchronous task factory is stopped before it can initialize", () => fixture(async ({ options }) => {
+  let entered, release, initializations = 0, stops = 0;
+  const ready = new Promise(resolve => { entered = resolve; }), gate = new Promise(resolve => { release = resolve; });
+  const client = { closed: false, close() { this.closed = true; release(); }, async stop() { stops++; return { stopped: true }; }, async initialize() { initializations++; } };
+  const driver = createCodexStdioTasks({ ...options, clientFactory: async (_exe, _cwd, _names, context) => { context.onClient(client); entered(); await gate; return client; }, stopChild: async () => { throw Error("A managed listener cannot use child-only retirement"); } });
+  try { const pending = driver.list("personal").catch(error => error); await ready; assert.equal((await driver.stopCompartment("personal")).stopped, true); assert.match((await pending).message, /stopped/); assert.equal(initializations, 0); assert.ok(stops >= 1); }
+  finally { release(); await driver.close(); }
+}));
+
+test("authorization revoked while an async factory returns prevents initialization and retains unconfirmed ownership", () => fixture(async ({ options, store }) => {
+  let initializations = 0, launches = 0, verified = false;
+  const client = { closed: false, close() { this.closed = true; }, async stop() { return { stopped: verified }; }, async initialize() { initializations++; } };
+  const driver = createCodexStdioTasks({ ...options, clientFactory: async (_exe, _cwd, _names, context) => { launches++; context.onClient(client); await store.update("personal", "synthetic-revoke", state => { state.mode = "keyboard-only"; }); return client; } });
+  try {
+    await assert.rejects(driver.list("personal"), /Keyboard-only/); assert.equal(initializations, 0); assert.equal((await driver.stopCompartment("personal")).stopped, false);
+    await store.update("personal", "synthetic-restore", state => { state.mode = "personal-companion"; }); await assert.rejects(driver.list("personal"), /No replacement/); assert.equal(launches, 1);
+    verified = true; assert.equal((await driver.stopCompartment("personal")).stopped, true);
+  } finally { verified = true; await driver.close(); }
+}));
+
 test("restricted private transports retain every native restriction and refuse network, alias or absent socket identities before spawn", () => {
   const executable = "/fixed/codex", socketPath = "/run/user/1000/sy-codex/s";
   const stdio = codexRestrictedProcessArguments(executable, ["fixture"]), listener = codexRestrictedProcessArguments(executable, ["fixture"], { mode: "unix-listener", socketPath });

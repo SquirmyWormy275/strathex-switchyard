@@ -24,7 +24,7 @@ import { createVoiceQueue, reviewTranscript } from "./voice-queue.mjs";
 import { exportAssignmentLegends } from "./legend-export.mjs";
 import { identifyCatalogSnapshot } from "./catalog-identity.mjs";
 import { inspectSourceHaptics } from "./haptic-capabilities.mjs";
-import sourceCatalog from "./model-f-catalog.json" with { type: "json" };
+import sourceCatalog from "./model-f-source.mjs";
 import { createReadoutProfiles } from "./readout-profiles.mjs";
 import { createKeyboardIndicators } from "./keyboard-indicators.mjs";
 import { createMatrixDiagnostics } from "./matrix-diagnostics.mjs";

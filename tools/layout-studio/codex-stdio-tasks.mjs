@@ -1,4 +1,4 @@
-/** Owned app-server transport for Windows tasks; no model turns or shell requests. */
+/** Owned app-server task metadata; no model turns or shell requests. */
 import { homedir } from "node:os";
 import { isAbsolute, join } from "node:path";
 import { realpath } from "node:fs/promises";
@@ -18,10 +18,11 @@ async function exactRoot(value, expected) {
   if (canonical !== expected) throw new Error("Codex returned another working directory. No task was redirected.");
 }
 export function createCodexStdioTasks({ store, root = join(process.env.XDG_STATE_HOME || process.env.LOCALAPPDATA || join(homedir(), ".local/state"), "strathex-switchyard/codex-tasks"), resolveCli = trustedCli, resolveMcp = readCodexMcpNames, clientFactory = (exe, cwd, names) => new CodexClient(exe, cwd, names, { clientInfo: { name: "switchyard_tasks", title: "Switchyard exact tasks", version: "0.1.0" } }), stopChild = stopOwnedChild } = {}) {
-  const clients = new Map(), connecting = new Map(), generations = new Map(), unconfirmed = new Map(), probes = new Map(); let closed = false;
+  const clients = new Map(), connecting = new Map(), constructing = new Map(), generations = new Map(), unconfirmed = new Map(), probes = new Map(); let closed = false;
   const generation = (c) => generations.get(c) ?? 0;
   async function dispose(c, client) {
-    client.close(); const result = await stopChild(client.child);
+    unconfirmed.set(c, client); client.close();
+    const result = typeof client.stop === "function" ? await client.stop() : await stopChild(client.child);
     if (!result.stopped) unconfirmed.set(c, client); else if (unconfirmed.get(c) === client) unconfirmed.delete(c);
     if (clients.get(c) === client) clients.delete(c);
     return result;
@@ -44,9 +45,18 @@ export function createCodexStdioTasks({ store, root = join(process.env.XDG_STATE
           try { names = await resolveMcp(executable, cwd, { onProbe: (probe) => { probes.set(c, probe); } }); }
           finally { const probe = probes.get(c); if (probe) { const result = await dispose(c, probe); if (result.stopped && probes.get(c) === probe) probes.delete(c); if (!result.stopped) throw new Error("The owned Codex configuration probe has not verified exit. No replacement was launched."); } }
           await authorize();
-          const owned = clientFactory(executable, cwd, names);
-          try { await owned.initialize(); await authorize(); clients.set(c, owned); return owned; }
-          catch (e) { await dispose(c, owned); throw e; }
+          let owned;
+          const onClient = value => {
+            if (owned && owned !== value) throw new Error("An owned task factory cannot replace its registered client.");
+            owned = value; constructing.set(c, owned);
+            try { current(); } catch (error) { owned.close(); throw error; }
+          };
+          try {
+            const created = await clientFactory(executable, cwd, names, { compartment: c, authorize, onClient });
+            onClient(created); await authorize(); await owned.initialize(); await authorize(); clients.set(c, owned); return owned;
+          }
+          catch (e) { if (owned) await dispose(c, owned); throw e; }
+          finally { if (constructing.get(c) === owned) constructing.delete(c); }
         })(); connecting.set(c, pending);
         void pending.finally(() => { if (connecting.get(c) === pending) connecting.delete(c); }).catch(() => {});
       }
@@ -73,6 +83,7 @@ export function createCodexStdioTasks({ store, root = join(process.env.XDG_STATE
   async function stopCompartment(c) {
     generations.set(c, generation(c) + 1);
     const probe = probes.get(c); if (probe) { if ((await dispose(c, probe)).stopped && probes.get(c) === probe) probes.delete(c); }
+    const starting = constructing.get(c); if (starting) await dispose(c, starting);
     const client = clients.get(c); if (client) await dispose(c, client);
     await connecting.get(c)?.catch(() => {});
     const pending = clients.get(c) ?? unconfirmed.get(c);
@@ -120,6 +131,6 @@ export function createCodexStdioTasks({ store, root = join(process.env.XDG_STATE
       });
     },
     stopCompartment,
-    async close() { closed = true; return Promise.all([...new Set([...clients.keys(), ...connecting.keys(), ...unconfirmed.keys(), ...probes.keys()])].map(stopCompartment)); }
+    async close() { closed = true; return Promise.all([...new Set([...clients.keys(), ...connecting.keys(), ...constructing.keys(), ...unconfirmed.keys(), ...probes.keys()])].map(stopCompartment)); }
   };
 }

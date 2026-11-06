@@ -122,3 +122,23 @@ software-tested. Live controlled account switching remains unaccepted.
 Production task/design routes still use stdio; complete Studio/task/IDE wiring
 remains unfinished software. No saved task authority is inferred from socket
 ownership, native version or matching account snapshots.
+
+## Explicit task adapter
+
+`createCodexUnixTasks` reuses the existing exact-root, restricted-configuration,
+account-epoch and metadata-only task operations with an owned Unix listener.
+The shared task layer accepts asynchronous factories with early ownership
+registration, rechecks permission before initialization, and stops a complete
+listener owner before accepting replacement. An unconfirmed exit or unknown
+private file preserves the original owner and blocks replacement.
+
+The actual installed CLI task-adapter demonstration is reproducible with
+`node scripts/verify-codex-unix-tasks.mjs --read-only-account`. It reads the same
+account twice, revokes only its verifier permission, and verifies exact shutdown
+and staging removal. It creates no thread and submits no model turn. The verifier
+permission boundary is separate from production protected-store composition.
+[Exact evidence and remaining integration](evidence/codex-unix-task-adapter-summary.json).
+
+The normal Studio still uses stdio. This adapter does not yet supply the durable
+per-task owner registry, authenticated IDE attachment, or installed end-to-end
+handoff needed to change that default.

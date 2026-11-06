@@ -28,6 +28,13 @@ server.on("upgrade", (request, socket) => {
       if (message.method === "config/read") result = { config: settings.config };
       if (message.method === "account/read") result = { account: { type: "chatgpt", email: fs.readFileSync("account", "utf8") } };
       if (message.method === "fixture/echo") result = message.params;
+      if (settings.repositoryRoot) {
+        const thread = { id: message.params?.threadId || "synthetic-owned-task", cwd: settings.repositoryRoot, status: { type: "idle" }, turns: [] };
+        if (message.method === "thread/list") result = { data: [thread] };
+        if (message.method === "thread/read") result = { thread };
+        if (["thread/start", "thread/resume"].includes(message.method)) result = { thread, cwd: settings.repositoryRoot, sandbox: { type: "readOnly" }, approvalPolicy: "on-request" };
+        if (message.method === "thread/inject_items") result = {};
+      }
       if (result) socket.write(frame({ id: message.id, result }));
     }
   });

@@ -1,0 +1,40 @@
+{
+  "schema": "switchyard-windows-focused-native-summary/v1",
+  "source": "2d0cd0928b751f7836e3c44f637379f6a856a205",
+  "executionMerge": "993dd5f3bfaeae51247435f4b1246fdca4f30c45",
+  "runId": 42152647868,
+  "jobs": 58,
+  "passedJobs": 57,
+  "failedJobs": 1,
+  "artifacts": [
+    {
+      "id": 13473366368,
+      "sha256": "c6d592052997e42336026299cf0531c0a8ca713341be36c7e5352cd6e2c2c974",
+      "receipt": "windows-devices-2d0-native.json",
+      "testsPassed": 18
+    },
+    {
+      "id": 13473021842,
+      "sha256": "94e9c344d7811899571e5ab32b171049b043552cb2e4da9435f522bd13323c4f",
+      "receipt": "windows-storage-native-2d0-native.json",
+      "testsPassed": 11
+    }
+  ],
+  "artifactDigestsVerified": true,
+  "declaredSkips": 0,
+  "childCleanupVerified": true,
+  "limits": [
+    "The original full Windows isolated run remains failed and its first device failure cause is unestablished.",
+    "Restricted primary-child startup remains failed; full Windows acceptance is not established.",
+    "These native-host contract files use explicit keyboard/setup doubles: zero physical keyboard or setup actions."
+  ],
+  "newFailure": {
+    "runId": 42152647792,
+    "jobId": 127679276105,
+    "file": "deployment/suite/release.test.mjs",
+    "status": "failed",
+    "reason": "Bundle exceeded unchanged 5 MiB fixture budget.",
+    "sourceCorrection": "Remove duplicate backend catalog by sharing the exact frozen frontend catalog; five local files/52 checks pass.",
+    "nativeCorrectionAcceptance": "pending"
+  }
+}

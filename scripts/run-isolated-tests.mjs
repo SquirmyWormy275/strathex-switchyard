@@ -267,6 +267,7 @@ export const requiredGroups = [
   { file: "tools/layout-studio/private-fs.test.mjs" },
   { file: "tools/layout-studio/coding-sessions.test.mjs" },
   { file: "tools/layout-studio/codex-stdio-tasks.test.mjs" },
+  { file: "tools/layout-studio/codex-unix-tasks.test.mjs", ...(process.platform !== "linux" ? { expectedSkipped: 4 } : {}) },
   { file: "tools/layout-studio/codex-unix-transport.test.mjs", ...(process.platform !== "linux" ? { expectedSkipped: 6 } : {}) },
   { file: "tools/layout-studio/codex-owned-listener.test.mjs", ...(process.platform !== "linux" ? { expectedSkipped: 8 } : {}) },
   { file: "tools/layout-studio/codex-turn.test.mjs" },
