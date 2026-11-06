@@ -57,8 +57,10 @@ source-only changes have not updated or restarted this installed application.
    a pipe-descriptor cause is still an inference requiring a native check.
    The explicit new-pipe descriptor candidate adds 36 native checks and preserves
    the token default DACL, but `25f07e9` failed ordinary setup preflight before
-   those checks ran. The follow-up makes bounded descriptor readback independent
-   of failed preflight while retaining the failure; [contract](windows-private-command-pipes.md).
+   those checks ran. Independent `f7fda6b` readback then reported 15 parser checks
+   and successful pipe creation, failing before descriptor fields were observed.
+   Inspect the bounded handle/buffer observation next; keep all descriptor guards.
+   [Contract](windows-private-command-pipes.md).
    Preserve all eight original owner checks, the ninety-second deadline and
    exact TOKEN_QUERY mask 8. No broader token/process/default-DACL/SID/privilege/
    account rights or runtime fallback. [Observation contract](windows-helper-startup.md),
@@ -66,8 +68,9 @@ source-only changes have not updated or restarted this installed application.
 3. Verify the corrected Windows backend scheduling and full release separately.
    All 26 task-owner cases now have independent children with the original
    45-second bound; the original test assertions and two Linux-only skips remain.
-   The earlier native four-job run finished within its job limits but one file
-   timed out. The previously reported lease case now passes.
+   A dedicated task-owner Windows job now avoids waiting for the long release
+   lane. The earlier native four-job run finished within its job limits but one
+   file timed out. The previously reported lease case now passes.
    [Native batches](evidence/windows-backend-dbbc-native-summary.json),
    [case scheduling](evidence/task-owner-scenarios-source-summary.json).
 4. Continue other independently executable ledger requirements, including Shield

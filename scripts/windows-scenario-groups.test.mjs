@@ -129,6 +129,12 @@ test("every task-owner case runs once with the original bound and only its own n
   const names = [...source.matchAll(/^test\("([^"\n]+)"/gm)].map(match => match[1]);
   const native = [...source.matchAll(/^test\("([^"\n]+)",\s*\{\s*skip:\s*process.platform\s*!==\s*"linux"\s*\}/gm)].map(match => match[1]);
   assert.equal(names.length, 26); assert.equal(new Set(names).size, 26);
+  const workflow = await readFile(new URL("../.github/workflows/switchyard-windows-filesystem.yml", import.meta.url), "utf8");
+  const matrix = workflow.match(/^        suite: \[([^\]\n]+)\]$/m)?.[1].split(",").map(value => value.trim());
+  assert.equal(matrix.filter(suite => suite === "task-owners").length, 1);
+  const entry = await readFile(new URL("./verify-windows-storage-contracts.mjs", import.meta.url), "utf8");
+  assert.ok(entry.includes('"task-owners": "tools/layout-studio/coding-task-owners.test.mjs"'));
+
   assert.deepEqual(windowsTaskOwnerScenarios, names); assert.deepEqual(windowsTaskOwnerLinuxScenarios, native); assert.equal(native.length, 2);
   const groups = selectWindowsContractGroups([file], requiredGroups);
   assert.deepEqual(groups.map(group => group.pattern), names);

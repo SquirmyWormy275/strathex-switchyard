@@ -66,3 +66,13 @@ and the original setup assertions remain required. Three focused groups pass
 35 tests with five Windows-only skips; two managed builds, 2,101 portable checks,
 typecheck and cleanup pass. Native readback acceptance remains pending.
 [Source receipt](evidence/private-pipe-readback-source-summary.json).
+
+Native `f7fda6b` now reports the narrower failure: setup stops at
+`pipe-security-verify`; the independent proof completes 15 parser checks and
+creates its first pipe, then stops at descriptor readback before any descriptor
+fields are observed. The complete 36-check proof remains failed. No restricted
+owner journey runs. [Retained observations](evidence/private-pipe-readback-failed-summary.json).
+The next bounded observation includes handle-presence booleans and the returned
+buffer length before descriptor parsing, while retaining every descriptor guard.
+Its two managed builds and 2,101 portable checks pass. No descriptor cause is yet
+established. [Source receipt](evidence/pipe-buffer-and-task-source-summary.json).

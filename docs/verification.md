@@ -1,5 +1,14 @@
 # What has actually been verified
 
+Independent native `f7fda6b` reaches pipe creation, reports 15 parser checks,
+and fails descriptor readback before fields are observed. The 36-check proof
+remains failed and the original restricted owner never starts. Bounded buffer-
+length observation retains the existing guards. A separate Windows task-owner
+job now selects all 26 original scenarios under their original bounds. Thirty
+focused groups pass 67 tests with one Windows-only skip; two managed builds and
+2,101 portable checks pass. [Native failure](evidence/private-pipe-readback-failed-summary.json),
+[source receipt](evidence/pipe-buffer-and-task-source-summary.json).
+
 The `25f07e9` pipe candidate is **failed**, not accepted: ordinary native setup
 preflight stops after the PE check, before pipe-proof or restricted-owner checks.
 Its exact worker-start substage was not retained. Readback observation now runs

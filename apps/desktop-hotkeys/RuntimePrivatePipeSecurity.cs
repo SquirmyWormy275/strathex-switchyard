@@ -53,6 +53,7 @@ internal sealed class RuntimePrivatePipeSecurity : IDisposable
 
     internal void Verify(IntPtr pipe, Action<object>? observe = null)
     {
+        observe?.Invoke(new { stage = "handle-preflight", windows = OperatingSystem.IsWindows(), descriptorAllocated = Descriptor != IntPtr.Zero, pipePresent = pipe != IntPtr.Zero && pipe != new IntPtr(-1) });
         if (!OperatingSystem.IsWindows() || Descriptor == IntPtr.Zero || pipe == IntPtr.Zero || pipe == new IntPtr(-1)) throw Invalid();
         byte[] bytes = new byte[4096];
         try
@@ -60,6 +61,7 @@ internal sealed class RuntimePrivatePipeSecurity : IDisposable
             // OWNER_SECURITY_INFORMATION | DACL_SECURITY_INFORMATION. The
             // returned pipe handles already include READ_CONTROL.
             if (!GetKernelObjectSecurity(pipe, 5, bytes, checked((uint)bytes.Length), out uint length)) throw new Win32Exception(Marshal.GetLastWin32Error());
+            observe?.Invoke(new { stage = "descriptor-buffer", reportedBytes = length, capacity = bytes.Length });
             if (length is < 20 or > 4096) throw Invalid();
             byte[] exact = bytes.AsSpan(0, checked((int)length)).ToArray();
             try { VerifyDescriptor(exact, user, observe); }
@@ -75,7 +77,7 @@ internal sealed class RuntimePrivatePipeSecurity : IDisposable
         if (observe is not null)
         {
             var one = security.DiscretionaryAcl?.Count == 1 ? security.DiscretionaryAcl[0] as CommonAce : null;
-            observe(new { ownerMatches = security.Owner?.Value == user, controlFlags = (int)security.ControlFlags,
+            observe(new { stage = "descriptor-fields", ownerMatches = security.Owner?.Value == user, controlFlags = (int)security.ControlFlags,
                 aceCount = security.DiscretionaryAcl?.Count, singleMask = one?.AccessMask, singleFlags = one is null ? (int?)null : (int)one.AceFlags,
                 singleAllowed = one?.AceQualifier == AceQualifier.AccessAllowed, singleCallback = one?.IsCallback, singleUserMatches = one?.SecurityIdentifier.Value == user });
         }

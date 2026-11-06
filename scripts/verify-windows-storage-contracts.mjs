@@ -9,6 +9,7 @@ const suites = {
   "inspect-cli": "deployment/suite/inspect.test.mjs",
   "suite-application": "deployment/suite/application.test.mjs",
   "suite-installation": "deployment/suite/installation.test.mjs",
+  "task-owners": "tools/layout-studio/coding-task-owners.test.mjs",
   "history-windows-scanner": "tools/layout-studio/repository-windows-shield-history.test.mjs",
   "history-bytes": "tools/layout-studio/windows-history-inputs.test.mjs",
   "history-staging": "tools/layout-studio/windows-history-staging.test.mjs",
