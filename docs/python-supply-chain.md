@@ -75,8 +75,12 @@ continued comments. No package, runtime or dependency is downloaded. Use
 `python3 -I -B scripts/generate-pypi-requirements-oracle.py` only with an already
 installed pip to regenerate it. Additional refusal checks retain the original
 row/hash limits and reject malformed extras, substituted BOM metadata and omitted
-unresolved-coverage gaps. Native Windows and installed extras acceptance remain
-separate. [Exact evidence](evidence/pypi-extras-source-summary.json).
+unresolved-coverage gaps. Normal installed 5a8d159 now passes five pure extras
+metadata checks, including all 39 reference cases, inside its 31-check update.
+All 54 original workspaces and frozen frontend bytes remain preserved. No scanner,
+task, model request or public query runs. Native Windows extras acceptance remains
+separate. [Installed evidence](evidence/installed-pypi-extras-summary.json),
+[source evidence](evidence/pypi-extras-source-summary.json).
 
 ## Advisories and portable inventory
 

@@ -36,15 +36,16 @@ checks, native Windows results, focused source checks and installed acceptance.
 The [verification record](verification.md) retains historical receipts and failed
 attempts; do not infer current status from an older passing checkpoint.
 
-The installed baseline is `0cb823bba89e788be7a7d0adfd41769c185de4cd`,
-release `5b9215b2466687a90f15d935af2839927abd479ddfd34640c108dacda10b9f5a`.
+The installed baseline is `5a8d15987f54a5c0f72d44a9b5848ddf4e5df442`,
+release `44d51187f8030c333a28a3c396f334e061e125ecbdf0818328ef887272e08af7`.
 Preserve all 54 original workspace identities, the pending keyboard-only Codex
 workspace, private connection information and the frozen Home bytes. The
-normal versioned update passed 26 metadata checks, including six pure installed
-archive identity/refusal checks. All 54 semantic snapshots match; 53 sealed files
+normal versioned update passed 31 metadata checks, including six pure installed
+archive checks and five extras checks covering all 39 pip/PyPA reference cases.
+All 54 semantic snapshots match; 53 sealed files
 are byte-identical and one changed only audit
 metadata. Keep the current release and its one rollback. The prepared bundle
-was removed after manifest verification. [Receipt](evidence/installed-npm-archive-summary.json).
+was removed after manifest verification. [Receipt](evidence/installed-pypi-extras-summary.json).
 
 ## Continue independently
 
@@ -120,9 +121,13 @@ was removed after manifest verification. [Receipt](evidence/installed-npm-archiv
    ten-second execution bound: failure joins direct-child retirement and only
    then removes temporary output; unconfirmed exit preserves owned staging.
    Twenty-three focused groups/69 distinct checks pass, including two actual
-   controlled Node writers. Windows COM/shortcut acceptance is still pending.
+   controlled Node writers. Native Windows 9f35961 now passes all sixteen original
+   installation/recovery scenarios plus nine writer tests: 25 passes, no skips,
+   original execution deadline and verified child/tree cleanup. The older failure
+   and cancelled retry remain historical; their cause is not established.
+   [Native receipt](evidence/shortcut-writer-native-summary.json).
    [Source evidence](evidence/shortcut-writer-retirement-source-summary.json).
-   Installed source is now 0cb823b, with 26 permitted metadata checks.
+   Installed source is now 5a8d159, with 31 permitted metadata checks.
    Native NTFS index/history staging now each pass six original checks and
    three independent guardian exits at 6b4089c. Their Windows scanner files
    separately pass two cases each with guest doubles; leases pass 24 cases and
@@ -136,8 +141,10 @@ was removed after manifest verification. [Receipt](evidence/installed-npm-archiv
    Exact Python extras and corrected continuation/comment processing now pass
    ten focused groups/106 checks and a 39-case pip/PyPA oracle. Two new actual
    Linux scans and two Windows guest-double journeys retain original state,
-   receipt/replay and cleanup guarantees. Typecheck/package bounds pass; no
-   installed update or native Windows extras acceptance is claimed.
+   receipt/replay and cleanup guarantees. Typecheck/package bounds pass. Five
+   installed extras metadata checks now pass inside the 31-check update; native
+   Windows extras acceptance remains pending. A complete immutable Linux run at
+   5a8d159 is active; reconcile its marker and exact owned cleanup when it exits.
    [Evidence](evidence/pypi-extras-source-summary.json).
 5. Keep frontend and editor command activation frozen. The protected editor
    journal, signed routes, restricted upstream and retained Terminal compose

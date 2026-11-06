@@ -108,8 +108,11 @@ file. A verified response is accepted only after successful process closure.
 Twenty-three focused groups accept 69 distinct checks, including actual controlled
 Node writers, late output after termination, unconfirmed exit and the original
 installation/rollback/package tests. These controlled writers do not exercise
-Windows COM. The native ten-second creation failure remains recorded separately;
-this cleanup correction does not establish its cause or native resolution.
+Windows COM. Native Windows 9f35961 now also passes all sixteen original install/
+recovery scenarios plus nine writer checks, with exact cleanup and no extended
+deadlines. The historical ten-second failure remains recorded separately; its
+cause is not established by this later pass. Interactive user acceptance remains
+separate. [Native acceptance](evidence/shortcut-writer-native-summary.json).
 [Source evidence](evidence/shortcut-writer-retirement-source-summary.json),
 [native failure](evidence/windows-shortcut-timeout-summary.json).
 

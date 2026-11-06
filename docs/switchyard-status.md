@@ -31,8 +31,9 @@ there is no merge or public release acceptance.
 | Installation and runtime | All sixteen original Windows installation/recovery cases pass at `b600a6d`; its independent fresh runtime installs 49 packages and loads/rechecks the offline CPU model, then removes its temporary runtime. [Installation](evidence/installation-scenarios-native-summary.json), [runtime](evidence/windows-runtime-b600-native-summary.json). | These independent passes do not accept the failed complete Windows release or ordinary-user/guest journeys. |
 | Latest diagnostic source | Seven focused groups pass 69 tests with five Windows-only skips. Two managed builds, 2,101 portable checks, typecheck and exact owned cleanup pass. [Receipt](evidence/worker-start-observation-source-summary.json). | Actual Windows `d15285b` passes all eight acknowledgement/refusal tests without skips. [Native receipt](evidence/worker-start-refusal-native-summary.json). The full restricted-owner journey is now separately accepted above. |
 | Windows index/history/leases | Native NTFS index and history packets each pass six checks and three independent guardian exits. Both Windows scanner files pass two cases with guest execution doubled; lease groups pass 24 tests and one Linux-only skip. [Evidence](evidence/native-history-index-leases-summary.json). | Packet Git witnesses are synthetic. Actual guest, installed Windows and ordinary-user acceptance remain separate. |
-| Installed app | Linux source `0cb823b` passes 26 installed owner/editor/journal/offline-severity/SPDX/OSV/archive metadata checks. All 54 workspace semantic snapshots and frozen frontend bytes are preserved. The new archive parser reads the retained offline npm fixture without extraction or execution. [Receipt](evidence/installed-npm-archive-summary.json). | This metadata update starts no scanner, task, provider or public query. Frontend and extension activation remain frozen. |
-| Windows npm archive identity | Corrected `55515d1` completes ten archive tests plus eight original byte-comparison tests, each file with two original Linux-only skips inside its original 300-second bound; guest execution is doubled. [Archive](evidence/npm-archive-native-summary.json), [bytes](evidence/npm-artifact-split-native-summary.json). | Complete Windows release remains separate. Its installation lane has a new native shortcut timeout: 15/16 scenarios pass, and the failed scenario is retained. [Failure](evidence/windows-shortcut-timeout-summary.json). |
+| Installed app | Linux source `5a8d159` passes 31 installed owner/editor/journal/offline-severity/SPDX/OSV/archive/Python-extras metadata checks, including all 39 independent pip/PyPA cases. All 54 workspace semantic snapshots and frozen frontend bytes are preserved. [Receipt](evidence/installed-pypi-extras-summary.json). | This metadata update starts no scanner, task, provider or public query. Frontend and extension activation remain frozen. |
+| Windows npm archive identity | Corrected `55515d1` completes ten archive tests plus eight original byte-comparison tests, each file with two original Linux-only skips inside its original 300-second bound; guest execution is doubled. [Archive](evidence/npm-archive-native-summary.json), [bytes](evidence/npm-artifact-split-native-summary.json). | Complete Windows release remains separate. |
+| Windows shortcut retirement | `9f35961` passes all sixteen original installation/recovery scenarios and nine writer checks, with no skips and verified cleanup. The execution deadline remains ten seconds. [Receipt](evidence/shortcut-writer-native-summary.json). | The historical timeout and cancelled unchanged-source retry remain recorded; their cause is not established. Interactive user/installed Windows acceptance is separate. [Failure](evidence/windows-shortcut-timeout-summary.json). |
 
 Failed runs remain failed evidence. Partial test output is excluded when the
 final plan is missing. Provider and guest doubles are explicitly identified in
@@ -56,10 +57,9 @@ Rev2 scope independently of these checkpoints.
 
 - Corrected complete Windows release verification; the separate restricted
   storage-owner journey is now accepted in controlled native CI.
-  Native shortcut timeout remains under investigation. A separately identified
-  cleanup race is corrected: failures join the writer's exit before removing its
-  owned output, and unconfirmed exits preserve staging. Twenty-three focused
-  groups/69 distinct checks pass; native acceptance is pending.
+  The shortcut cleanup race is corrected: failures join the writer's exit before
+  removing its owned output, and unconfirmed exits preserve staging. Twenty-three
+  focused groups/69 distinct checks and all 25 native Windows checks pass.
   [Cleanup evidence](evidence/shortcut-writer-retirement-source-summary.json).
 - Production editor command activation and remaining guided role/device wiring.
   Frontend and command activation are deliberately frozen for owner review.
@@ -68,7 +68,8 @@ Rev2 scope independently of these checkpoints.
   Exact Python pins now retain bounded normalized extras and process continuations
   before comments. Ten groups/106 checks and 39 independent pip/PyPA cases pass,
   including actual Linux scans and Windows guest doubles. Optional dependencies
-  remain explicitly unresolved; installed/native acceptance is pending.
+  remain explicitly unresolved. Five installed extras metadata checks now pass;
+  native Windows extras acceptance is pending.
   [Python evidence](evidence/pypi-extras-source-summary.json).
   Selected npm archive identity comparison is implemented with bounded, non-extracting
   gzip/USTAR parsing: six groups/78 checks plus one exact alias/version check pass.

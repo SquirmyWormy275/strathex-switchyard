@@ -1,5 +1,20 @@
 # What has actually been verified
 
+Native Windows `9f35961` passes **all sixteen original installation/recovery
+scenarios plus nine writer checks**, with no skips, original execution bounds
+and verified child/tree cleanup. Source/merge tree and artifact digest agree.
+The prior shortcut timeout and cancelled unchanged-source retry remain recorded;
+this passing checkpoint does not establish the initial timeout's cause or
+interactive user acceptance. [Native evidence](evidence/shortcut-writer-native-summary.json).
+
+Normal installed `5a8d159` passes **31 metadata checks**, including five extras
+checks and all 39 pip/PyPA facts. All 54 semantic workspace snapshots and frozen
+frontend bytes are preserved; 53 sealed files are byte-identical and one changes
+only audit metadata. Dated launcher backup/readback, current/one rollback and
+exact prepared-bundle removal pass. No scanner, task, prompt, public query,
+Microsoft request or HID operation runs.
+[Installed evidence](evidence/installed-pypi-extras-summary.json).
+
 Pinned Python requirements now retain normalized, bounded extra declarations
 without claiming optional dependency resolution. Physical continuations precede
 comment removal, preventing commented text from becoming false inventory.
