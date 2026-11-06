@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { randomUUID } from "node:crypto";
 import { EventEmitter, once } from "node:events";
+import { spawn } from "node:child_process";
 import { mkdtemp, readFile, writeFile, mkdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -12,6 +13,7 @@ import { createAgentService, codexDesignConfig, assertCodexDesignConfig } from "
 import { newPlan, parseBoardProfile } from "./model.mjs";
 import { portableProfile } from "./workspace.mjs";
 import { parseWorkflow, reconcileWorkflow } from "./workflow.mjs";
+import { stopOwnedChild } from "./owned-process.mjs";
 
 function samplePlan() { return newPlan(parseBoardProfile({ schema: "sxsy-board-profile/v1", name: "Synthetic", layout: "one", keys: [{ id: "one", label: "A", matrix: [0, 0], x: 0, y: 0, baseKeycode: "KC_A" }] })); }
 async function fixture(fn) {
@@ -240,6 +242,112 @@ test("concurrent bundled-example starts share one launch and mode changes invali
     releaseAuthorityStop(); await mode;
     assert.equal(launches, 1);
   } finally { release?.(); releaseAuthorityStop?.(); await suite.close(); }
+}));
+
+async function exampleLifecycleFixture(fn) {
+  return fixture(async ({ store }) => {
+    const children = [], stops = []; let stop = async () => ({ stopped: false, evidence: "synthetic exit unconfirmed" });
+    const suite = createSuite({ store, agents: { discovery: async () => [], close() {} }, voice: { discovery: async () => ({ available: false }) },
+      stopExampleChild: async child => { if (!child) return { stopped: true }; stops.push(child); return stop(child); },
+      spawnExample: () => {
+        const child = new EventEmitter(); child.exitCode = null; child.signalCode = null;
+        child.stdin = new EventEmitter(); child.stdin.write = () => {}; child.stdin.end = () => {};
+        child.kill = () => false; children.push(child); queueMicrotask(() => child.emit("spawn")); return child;
+      }
+    });
+    const request = { example: "custom", workspaceBaseUrl: "http://127.0.0.1:43177/" };
+    const retire = child => { child.exitCode = 0; child.emit("close", 0); return { stopped: true, evidence: "synthetic exact child exit" }; };
+    try {
+      await suite.handle("/api/suite/bootstrap"); await suite.handle("/api/suite/mode", { mode: "personal-companion" });
+      await suite.handle("/api/suite/agents/example", request);
+      await fn({ suite, store, request, children, stops, retire, setStop: fn => { stop = fn; } });
+    } finally { children.forEach(retire); await suite.close(); }
+  });
+}
+
+test("an unconfirmed bundled-example stop refuses replacement until the exact child exits", () => exampleLifecycleFixture(async ({ suite, store, request, children, stops, setStop, retire }) => {
+  assert.equal((await suite.handle("/api/suite/agents/example/stop", request)).status, "stop-unconfirmed");
+  const saved = (await store.snapshot("personal")).agents.find(a => a.id === "custom-example");
+  assert.equal(saved.lastSeen, null); assert.equal(saved.reportedStatus, "unknown");
+  await assert.rejects(suite.handle("/api/suite/agents/example", request), /exit.*unconfirmed|not verified exit/);
+  assert.equal(children.length, 1); assert.equal(stops.length, 1);
+  setStop(async child => retire(child));
+  assert.equal((await suite.handle("/api/suite/agents/example/stop", request)).status, "stopped");
+  assert.equal(stops[1], children[0]);
+  assert.equal((await suite.handle("/api/suite/agents/example", request)).status, "starting");
+  assert.equal(children.length, 2);
+}));
+
+test("concurrent bundled-example stops share retirement and refuse new starts while it is pending", () => exampleLifecycleFixture(async ({ suite, request, children, stops, setStop, retire }) => {
+  let release; const gate = new Promise(resolve => { release = resolve; });
+  setStop(async child => { await gate; return retire(child); });
+  const first = suite.handle("/api/suite/agents/example/stop", request), second = suite.handle("/api/suite/agents/example/stop", request);
+  try {
+    await new Promise(resolve => setImmediate(resolve));
+    await assert.rejects(suite.handle("/api/suite/agents/example", request), /retirement|stopping/);
+    assert.equal(stops.length, 1); assert.equal(children.length, 1);
+  } finally { release(); await Promise.all([first, second]); }
+}));
+
+test("keyboard-only refusal retains bundled-example uncertainty across a companion-mode restart", () => exampleLifecycleFixture(async ({ suite, store, request, children, setStop, retire }) => {
+  await assert.rejects(suite.handle("/api/suite/mode", { mode: "keyboard-only" }), /stop is unconfirmed/);
+  assert.equal((await store.snapshot("personal")).mode, "keyboard-only");
+  await suite.handle("/api/suite/mode", { mode: "personal-companion" });
+  await assert.rejects(suite.handle("/api/suite/agents/example", request), /exit.*unconfirmed|not verified exit/);
+  assert.equal(children.length, 1);
+  setStop(async child => retire(child));
+  await suite.handle("/api/suite/agents/example/stop", request);
+}));
+
+test("suite shutdown reports an unconfirmed bundled-example exit and retries only its retained child", () => exampleLifecycleFixture(async ({ suite, children, stops, setStop, retire }) => {
+  await assert.rejects(suite.close(), /bundled example.*exit.*unconfirmed/);
+  assert.deepEqual(stops, [children[0]]);
+  setStop(async child => retire(child)); await suite.close();
+  assert.deepEqual(stops, [children[0], children[0]]);
+}));
+
+test("a throwing bundled-example stop preserves its exact child without exposing diagnostics", () => exampleLifecycleFixture(async ({ suite, request, children, setStop }) => {
+  setStop(async () => { throw Error("SYNTHETIC_PRIVATE_STOP_DETAIL"); });
+  const result = await suite.handle("/api/suite/agents/example/stop", request);
+  assert.equal(result.status, "stop-unconfirmed"); assert.equal(JSON.stringify(result).includes("SYNTHETIC_PRIVATE_STOP_DETAIL"), false);
+  await assert.rejects(suite.handle("/api/suite/agents/example", request), /not verified exit/);
+  assert.equal(children.length, 1);
+}));
+
+test("real bundled example joins authenticated readiness, duplicate refusal, stop and keyboard-only retirement", { timeout: 15000 }, () => fixture(async ({ store }) => {
+  const children = [];
+  const suite = createSuite({ store, agents: { discovery: async () => [], close() {} }, voice: { discovery: async () => ({ available: false }) },
+    spawnExample: (...args) => { const child = spawn(...args); children.push(child); return child; }
+  });
+  const server = createStudioServer({ suite, bridge: { close() {} } });
+  const ready = async child => {
+    const deadline = Date.now() + 5000;
+    while (Date.now() < deadline && child.exitCode === null && child.signalCode === null) {
+      const a = (await store.snapshot("personal")).agents.find(a => a.id === "custom-example");
+      if (a?.reportedStatus === "ready" && a.lastSeen && a.sessionId) return a.sessionId;
+      await new Promise(resolve => setTimeout(resolve, 20));
+    }
+    throw Error("The exact synthetic example did not authenticate readiness.");
+  };
+  try {
+    await suite.handle("/api/suite/bootstrap"); await suite.handle("/api/suite/mode", { mode: "personal-companion" });
+    server.listen(0, "127.0.0.1"); await once(server, "listening");
+    const request = { example: "custom", workspaceBaseUrl: `http://127.0.0.1:${server.address().port}/` };
+    await suite.handle("/api/suite/agents/example", request); const firstSession = await ready(children[0]);
+    assert.equal((await suite.handle("/api/suite/agents/example", request)).duplicatePrevented, true); assert.equal(children.length, 1);
+    const results = await Promise.all([suite.handle("/api/suite/agents/example/stop", request), suite.handle("/api/suite/agents/example/stop", request)]);
+    assert.equal(results.every(r => r.status === "stopped" && r.taskCompletionVerified === false), true);
+    assert.ok(children[0].exitCode !== null || children[0].signalCode !== null);
+    const stopped = (await store.snapshot("personal")).agents.find(a => a.id === "custom-example");
+    assert.equal(stopped.reportedStatus, "stopped"); assert.equal(stopped.lastSeen, null);
+    await suite.handle("/api/suite/agents/example", request); assert.notEqual(await ready(children[1]), firstSession);
+    assert.equal((await suite.handle("/api/suite/mode", { mode: "keyboard-only" })).ownedProcessesStopped, true);
+    assert.ok(children[1].exitCode !== null || children[1].signalCode !== null);
+    await assert.rejects(suite.handle("/api/suite/agents/example", request), /Keyboard-only/);
+  } finally {
+    await suite.close(); await Promise.all(children.map(child => stopOwnedChild(child)));
+    server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); await server.cleanup();
+  }
 }));
 
 test("missing keys never replace existing data; saved profiles survive restart and omit local environment data", () => fixture(async ({ root, store, keys, secrets }) => {

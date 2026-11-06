@@ -1102,3 +1102,23 @@ Linux and twelve Windows guest-double scenarios. The initial harness failure
 was its explicit timeout inventory missing the new file; the original receipt
 remains failed. No timeout was extended. Four earlier report-bound checks also
 pass with exact cleanup. [Correction evidence](evidence/npm-archive-scheduling-summary.json).
+
+
+## Bundled-example retirement and corrected native backend — 2026-11-06
+
+Four isolated regressions reproduce false acceptance after an uncertain stop,
+overlapping retirement, a mode restart and shutdown. All four pass after the
+correction. Seven complete focused groups then pass 72 tests, with no skips or
+failures, including six new regressions and two real bundled Node sessions through
+the authenticated loopback server. Exact exits, duplicate refusal, new session
+identity and keyboard-only retirement verify. Typecheck and the original package
+budget pass. The failed exact-name selector attempt selected zero tests and is
+excluded. The owned focused root is empty and removed.
+[Full source evidence](evidence/bundled-example-lifecycle-source-summary.json).
+
+Separately, Windows source `9f35961` and merge `c87caa4` have equal trees. All four
+backend artifacts verify their declared byte lengths and SHA-256 digests. Their
+198 distinct groups pass 1,022 tests with 142 declared skips, no failures, original
+deadlines and complete child/tree cleanup. No ZIP or native runtime is retained
+locally. The combined release remains active and is not accepted by these passes.
+[Native receipts](evidence/windows-backend-9f35961-native-summary.json).

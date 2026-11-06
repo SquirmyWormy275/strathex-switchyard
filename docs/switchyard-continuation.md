@@ -47,6 +47,15 @@ are byte-identical and one changed only audit
 metadata. Keep the current release and its one rollback. The prepared bundle
 was removed after manifest verification. [Receipt](evidence/installed-pypi-extras-summary.json).
 
+Latest source work closes the bundled-example uncertain-stop/replacement/shutdown
+gap. Seven focused groups/72 checks pass, including real authenticated Node
+readiness, restart identity and keyboard-only exits; typecheck and package bounds
+pass. The exact focused temporary root is removed. Native Windows and normal
+installed acceptance of that correction remain separate. [Contract](bundled-agent-lifecycle.md).
+The four Windows backend batches at `9f35961` are now digest-verified: 198 groups,
+1,022 passes, 142 declared skips, no failures and all cleanup verified. Its combined
+release run 42281533502 is still active. [Receipt](evidence/windows-backend-9f35961-native-summary.json).
+
 ## Continue independently
 
 1. Complete Linux `6e967a3` passes all 306 groups: 1,793 passing tests, sixteen

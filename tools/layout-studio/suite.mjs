@@ -45,7 +45,7 @@ import { clientRecipe } from "../../integrations/client-recipes.mjs";
 import { linuxProcess } from "./native-process.mjs";
 
 const kinds = ["interruption", "resume", "switch", "handoff", "status", "review", "approval", "failure", "recovery", "other"];
-export function createSuite({ store = createSuiteStore(), platform = process.platform, agents, voice = localVoice(), hypr = runHypr, nativeProcess = linuxProcess, devices, copilot, copilotFactory = createCopilot, coding, codingTaskOwners, codingTaskOwnersFactory = createCodingTaskOwners, codingEditorConnections, codingEditorConnectionsFactory = createCodingEditorConnections, editorRuntimeRoot = process.env.XDG_RUNTIME_DIR, codexSubmissions, claudeCoding, claudeSubmissions, keyboardIndicators = createKeyboardIndicators(), taskAuthority, taskAuthorityFactory = createTaskAuthority, repositoryRecovery, repositoryCommits, repositoryExecution, storageSetup, fixtureAdministration, shieldExceptions, clientLaunch, spawnExample = spawn, foreground, scheduleForeground = setInterval, clearForeground = clearInterval } = {}) {
+export function createSuite({ store = createSuiteStore(), platform = process.platform, agents, voice = localVoice(), hypr = runHypr, nativeProcess = linuxProcess, devices, copilot, copilotFactory = createCopilot, coding, codingTaskOwners, codingTaskOwnersFactory = createCodingTaskOwners, codingEditorConnections, codingEditorConnectionsFactory = createCodingEditorConnections, editorRuntimeRoot = process.env.XDG_RUNTIME_DIR, codexSubmissions, claudeCoding, claudeSubmissions, keyboardIndicators = createKeyboardIndicators(), taskAuthority, taskAuthorityFactory = createTaskAuthority, repositoryRecovery, repositoryCommits, repositoryExecution, storageSetup, fixtureAdministration, shieldExceptions, clientLaunch, spawnExample = spawn, stopExampleChild = stopOwnedChild, foreground, scheduleForeground = setInterval, clearForeground = clearInterval } = {}) {
   agents ??= createAgentService({ store, runtimeRoot: join(process.env.XDG_RUNTIME_DIR || process.env.LOCALAPPDATA || join(homedir(), ".local/state"), "switchyard-design") });
   devices ??= createDeviceService({ store });
   coding ??= createCodingSessions({ store });
@@ -57,7 +57,8 @@ export function createSuite({ store = createSuiteStore(), platform = process.pla
   const voiceQueue = createVoiceQueue({ store, voice });
   const readoutProfiles = createReadoutProfiles({ store, catalog: sourceCatalog });
   foreground ??= process.platform === "linux" ? { implemented: true, read: async (c, beforeStart) => { await beforeStart(); return { available: true, category: surfaceForClass(JSON.parse(await hypr("activewindow", "-j")).class), provenance: "Hyprland application class; no task identity" }; }, stopCompartment: async () => ({ stopped: true }), close: async () => {} } : { implemented: false };
-  const examples = new Map(), exampleGenerations = new Map(), exampleStarts = new Map();
+  const examples = new Map(), exampleGenerations = new Map(), exampleStarts = new Map(), exampleStops = new Map();
+  const uncertainExamples = new Set(), exampleRetirements = new WeakMap();
   const started = new Set(), initializing = new Map(), monitors = new Map();
   let activeCompartment = "personal";
   let selectionLoaded = false;
@@ -86,17 +87,34 @@ export function createSuite({ store = createSuiteStore(), platform = process.pla
   repositoryRecovery ??= createRepositoryEffectRecovery({ store, stateDirectory: repositoryDirectory, isActive: async c => { await loadSelection(); return c === activeCompartment; } });
   storageSetup ??= createWindowsStorageSetup({store,platform,isActive:async c=>{await loadSelection();return c===activeCompartment;}});
   clientLaunch ??= createClientLaunch({ store, stateDirectory: join(repositoryDirectory, "client-launches"), isActive: async c => { await loadSelection(); return c === activeCompartment; } });
+  async function retireExample(key, child) {
+    if (!child) return { stopped: true, evidence: "no owned example process observed in this runtime" };
+    if (exampleRetirements.has(child)) return exampleRetirements.get(child);
+    uncertainExamples.add(key);
+    const retiring = (async () => {
+      let stopped = false;
+      try { stopped = (await stopExampleChild(child))?.stopped === true; } catch { /* Retain the exact child; no replacement or successful-stop claim. */ }
+      if (stopped && examples.get(key) === child) { examples.delete(key); uncertainExamples.delete(key); }
+      return { stopped, evidence: stopped ? "owned direct child exited" : "owned child stop was not confirmed" };
+    })();
+    exampleRetirements.set(child, retiring);
+    try { return await retiring; } finally { if (exampleRetirements.get(child) === retiring) exampleRetirements.delete(child); }
+  }
   async function stopExample(compartment, example) {
-    const key = `${compartment}:${example}`, child = examples.get(key);
+    const key = `${compartment}:${example}`;
+    if (exampleStops.has(key)) return exampleStops.get(key);
     exampleGenerations.set(key, (exampleGenerations.get(key) ?? 0) + 1);
-    await exampleStarts.get(key)?.catch(() => {});
-    const result = await stopOwnedChild(child);
-    if (child && result.stopped && examples.get(key) === child) examples.delete(key);
-    await store.update(compartment, "example-stopped", (s) => {
-      const a = s.agents.find((a) => a.id === `${example}-example`);
-      if (a) { a.reportedStatus = child && result.stopped ? "stopped" : "unknown"; a.lastSeen = null; a.provenance = child && result.stopped ? "owned bundled example process exited; external task outcome unverified" : "no owned example process observed in this runtime"; }
-    });
-    return { status: result.stopped ? (child ? "stopped" : "not-observed") : "stop-unconfirmed", evidence: result.evidence, taskCompletionVerified: false };
+    const stopping = (async () => {
+      await exampleStarts.get(key)?.catch(() => {});
+      const child = examples.get(key), result = await retireExample(key, child);
+      await store.update(compartment, "example-stopped", (s) => {
+        const a = s.agents.find((a) => a.id === `${example}-example`);
+        if (a) { a.reportedStatus = child && result.stopped ? "stopped" : "unknown"; a.lastSeen = null; a.provenance = child ? result.stopped ? "owned bundled example process exited; external task outcome unverified" : "owned bundled example exit unconfirmed; external task outcome unverified" : "no owned example process observed in this runtime"; }
+      });
+      return { status: result.stopped ? (child ? "stopped" : "not-observed") : "stop-unconfirmed", evidence: result.evidence, taskCompletionVerified: false };
+    })();
+    exampleStops.set(key, stopping);
+    try { return await stopping; } finally { if (exampleStops.get(key) === stopping) exampleStops.delete(key); }
   }
   async function initialize(id, policy) {
     if (started.has(id)) { if (policy !== undefined) await store.initialize(id, policy); return; }
@@ -377,6 +395,8 @@ export function createSuite({ store = createSuiteStore(), platform = process.pla
         const key = `${compartment}:${body.example}`, fence = exampleGenerations.get(key) ?? 0;
         await store.authorize(compartment, { provider: "custom-agent" });
         if (closed || fence !== (exampleGenerations.get(key) ?? 0)) throw new Error("This example request was invalidated before startup.");
+        if (exampleStops.has(key)) throw new Error("The exact bundled example is stopping. Wait for its retirement before starting again.");
+        if (uncertainExamples.has(key)) throw new Error("The previous bundled example has not verified exit. No replacement was launched.");
         if (exampleStarts.has(key)) { await exampleStarts.get(key); return { status: "already-starting", duplicatePrevented: true }; }
         const existing = examples.get(key);
         if (existing && existing.exitCode === null && existing.signalCode == null) return { status: "already-running", duplicatePrevented: true };
@@ -395,10 +415,12 @@ export function createSuite({ store = createSuiteStore(), platform = process.pla
         if (closed || generation !== (exampleGenerations.get(key) ?? 0)) throw new Error("This example launch was stopped before startup.");
         const child = spawnExample(executable, [...(body.example === "langchain" ? ["-I", "-B"] : []), file], { shell: false, windowsHide: true, stdio: ["pipe", "ignore", "ignore"], env: runtimeEnvironment() });
         examples.set(key, child); child.stdin.on("error", () => {});
-        child.on("close", () => { if (examples.get(key) === child) examples.delete(key); });
-        await new Promise((resolve, reject) => { child.once("spawn", resolve); child.once("error", reject); });
-        if (closed || generation !== (exampleGenerations.get(key) ?? 0)) { await stopOwnedChild(child); throw new Error("This example launch was stopped during startup."); }
-        child.stdin.write(JSON.stringify({ ...enrollment, baseUrl: base.href, supervised: true }) + "\n");
+        child.on("close", () => { if (examples.get(key) === child) { examples.delete(key); uncertainExamples.delete(key); } });
+        try {
+          await new Promise((resolve, reject) => { child.once("spawn", resolve); child.once("error", reject); });
+          if (closed || generation !== (exampleGenerations.get(key) ?? 0)) throw new Error("This example launch was stopped during startup.");
+          child.stdin.write(JSON.stringify({ ...enrollment, baseUrl: base.href, supervised: true }) + "\n");
+        } catch (error) { await retireExample(key, child); throw error; }
         return { status: "starting", agentId: id, provenance: "Wait for authenticated ready event before claiming availability" };
         })();
         exampleStarts.set(key, starting);
@@ -570,6 +592,6 @@ export function createSuite({ store = createSuiteStore(), platform = process.pla
         const results = await codingTaskOwners.close();
         if (!Array.isArray(results) || results.some(r => r?.stopped !== true)) throw new Error("Original coding task owner exit is unconfirmed.");
         if (editorError) throw editorError;
-      })(), copilot.close?.(), matrixDiagnostics.close(), repositoryExecution.close(), repositoryCommits.close(), repositoryRecovery.close(), clientLaunch.close(), taskAuthority.close(), storageSetup.close(), fixtureAdministration.close(), shieldExceptions.close()]); readoutProfiles.close(); for (const timer of monitors.values()) clearForeground(timer); monitors.clear(); for (const key of new Set([...examples.keys(), ...exampleStarts.keys()])) exampleGenerations.set(key, (exampleGenerations.get(key) ?? 0) + 1); await Promise.allSettled(exampleStarts.values()); let claudeStopError; try { await claudeSubmissions.close(); } catch (error) { claudeStopError = error; } await Promise.all([foreground.close?.(), agents.close(), coding.close?.(), codexSubmissions.close(), voiceQueue.close(), claudeCoding.close?.(), keyboardIndicators.close().then(result => { if (result.stopped !== true) throw new Error("Owned indicator probe exit is unconfirmed."); }), ...[...examples.values()].map((child) => stopOwnedChild(child))]); if (claudeStopError) throw claudeStopError; const failedBoundary = boundaryStops.find(r => r.status === "rejected"); if (failedBoundary) throw failedBoundary.reason; }
+      })(), copilot.close?.(), matrixDiagnostics.close(), repositoryExecution.close(), repositoryCommits.close(), repositoryRecovery.close(), clientLaunch.close(), taskAuthority.close(), storageSetup.close(), fixtureAdministration.close(), shieldExceptions.close()]); readoutProfiles.close(); for (const timer of monitors.values()) clearForeground(timer); monitors.clear(); for (const key of new Set([...examples.keys(), ...exampleStarts.keys()])) exampleGenerations.set(key, (exampleGenerations.get(key) ?? 0) + 1); await Promise.allSettled(exampleStarts.values()); let claudeStopError; try { await claudeSubmissions.close(); } catch (error) { claudeStopError = error; } const providerStops = await Promise.allSettled([foreground.close?.(), agents.close(), coding.close?.(), codexSubmissions.close(), voiceQueue.close(), claudeCoding.close?.(), keyboardIndicators.close().then(result => { if (result.stopped !== true) throw new Error("Owned indicator probe exit is unconfirmed."); }), ...exampleStops.values(), ...[...examples].map(async ([key, child]) => { if (!(await retireExample(key, child)).stopped) throw new Error("Owned bundled example exit is unconfirmed."); })]); if (claudeStopError) throw claudeStopError; const failedProvider = providerStops.find(r => r.status === "rejected"); if (failedProvider) throw failedProvider.reason; const failedBoundary = boundaryStops.find(r => r.status === "rejected"); if (failedBoundary) throw failedBoundary.reason; }
   };
 }

@@ -1,0 +1,89 @@
+{
+  "schema": "switchyard-bundled-example-lifecycle-source/v1",
+  "baseCommit": "9193471ac9a1de6154badfebd79c311b9a3ed78a",
+  "sourceFiles": {
+    "tools/layout-studio/suite.mjs": "9f6fe1edc5042158ebc2d38177a7264881f1253430b334901567951092a22ecb",
+    "tools/layout-studio/suite.test.mjs": "4ccfd0111337ff62fcf381454234361f6fce2aa1c237db3edb68b4e0f645a066"
+  },
+  "receipts": [
+    {
+      "label": "baseline-failure",
+      "receipt": "isolated-test-d10a0efd-3d69-4e7e-9884-f05be7c29a68.json",
+      "sha256": "d9b49e943eb30431b5715ab7732ecef34b870a11767150ec605dcc9be89f6cb5",
+      "totals": {
+        "required": 4,
+        "passed": 0,
+        "failed": 4,
+        "tests": 4,
+        "passedTests": 0,
+        "failedTests": 4,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "success": false,
+      "allChildAndTreeCleanupVerified": true
+    },
+    {
+      "label": "corrected-regressions",
+      "receipt": "isolated-test-946761eb-afee-4641-9dc7-30808cb2405e.json",
+      "sha256": "57ec8c6fc818b49f5a4aa469c410fec45ba5def472bdf7a25813f9f9ff378ac2",
+      "totals": {
+        "required": 4,
+        "passed": 4,
+        "failed": 0,
+        "tests": 4,
+        "passedTests": 4,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "success": true,
+      "allChildAndTreeCleanupVerified": true
+    },
+    {
+      "label": "focused-source",
+      "receipt": "isolated-test-a4216b1b-968d-42f0-8a89-d7b977673fc6.json",
+      "sha256": "c0ccd5c6fca37fc5c3583b8632844c6975ed7e24be446a8b3e2088ebe3e0c200",
+      "totals": {
+        "required": 7,
+        "passed": 7,
+        "failed": 0,
+        "tests": 72,
+        "passedTests": 72,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "success": true,
+      "allChildAndTreeCleanupVerified": true
+    }
+  ],
+  "acceptedFocusedGroups": 7,
+  "acceptedDistinctTests": 72,
+  "newRegressionTests": 6,
+  "actualBundledNodeProcesses": 2,
+  "authenticatedLoopbackReadinessVerified": true,
+  "exactNewSessionAfterRetirementVerified": true,
+  "keyboardOnlyExitVerified": true,
+  "providerDoublesUsedElsewhere": true,
+  "typecheckPassed": true,
+  "originalPackageBudgetPreserved": true,
+  "ownedTemporaryRootRemoved": true,
+  "liveAccountTaskOrModelRequests": 0,
+  "hardwareOperations": 0,
+  "frontendChanged": false,
+  "installedChanged": false,
+  "nativeWindowsAcceptance": "pending",
+  "limitations": [
+    "Direct bundled-child ownership does not attest arbitrary external descendants.",
+    "LangChain process execution is not newly accepted by the Node demonstration.",
+    "Broader provider isolation, physical-action UI and installed acceptance remain separate."
+  ],
+  "excludedAttempt": {
+    "receipt": "isolated-test-bf4a25e9-d0c5-4bdd-8219-48ec2cf0a919.json",
+    "reason": "The exact-name runner escaped an attempted regular expression; zero selected tests, excluded from acceptance."
+  }
+}

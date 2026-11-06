@@ -41,6 +41,17 @@ their receipts. The [verification record](verification.md) retains the detailed
 chronology; the [requirement ledger](switchyard-requirements.md) tracks the full
 Rev2 scope independently of these checkpoints.
 
+The corrected native Windows preliminary backend now passes all 198 groups: 1,022
+passing tests and 142 declared skips. Four archive digests, source/merge tree
+equality and every child/tree cleanup are verified. This is separate from the
+combined Windows release still running. [Backend receipts](evidence/windows-backend-9f35961-native-summary.json).
+
+Bundled-agent retirement now preserves uncertain exact children, refuses replacement
+across mode changes and reports unconfirmed shutdown. Seven groups/72 checks pass,
+including two real authenticated Node sessions and confirmed exits. Native Windows
+and installed acceptance of this new correction remain pending.
+[Contract](bundled-agent-lifecycle.md), [source evidence](evidence/bundled-example-lifecycle-source-summary.json).
+
 ## What the backend does
 
 | Capability | Implemented behavior and reference |
