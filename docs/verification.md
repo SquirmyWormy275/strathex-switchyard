@@ -1,5 +1,15 @@
 # What has actually been verified
 
+The deliberately public VS Code endpoint fixture now applies and reads back its
+intended mode explicitly, so a private test-runner umask cannot turn the fixture
+into a private file. Production transport permissions are unchanged. With umask
+0077, its file passes five tests and seven declared Windows-only skips; four
+installed-verifier guard tests also pass. A separate initial follow-up hit the
+Unix socket path limit and remains recorded; the corrected short test parent
+passes and both owned roots are removed. Typecheck passes. The expanded installed
+Python verifier has ten in-memory checks; installed wheel acceptance is pending.
+[Verification repair](evidence/private-runner-verification-source-summary.json).
+
 Selected Python wheels now receive bounded ZIP/metadata identity checks alongside
 their declared byte hash. A different embedded package name/version produces a
 failed provenance finding even when the byte hash matches. Eight focused groups

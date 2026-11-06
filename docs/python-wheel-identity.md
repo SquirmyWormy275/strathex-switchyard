@@ -64,6 +64,13 @@ process/staging cleanup verify. Typecheck and the original package-size test pas
 Installed and native Windows wheel acceptance remain separate.
 [Source evidence](evidence/pypi-wheel-identity-source-summary.json).
 
+The existing `scripts/verify-python-inventory-host.mjs --read-only-metadata`
+verifier now pins the wheel implementation and adds the fifteen ZIP facts,
+six in-memory wheel reports and host-forgery refusals. Its ten checks start no
+scanner process or account action. Four flag-guard tests pass; installed wheel
+acceptance still requires running it against the updated installed release.
+[Verifier source checks](evidence/private-runner-verification-source-summary.json).
+
 The [15-case reference fixture](../scripts/fixtures/pypi-wheel-oracle.json) was
 created and reread in memory with existing Python 3.15.2 `zipfile`, email parsing
 and PyPA utilities. Seven supported identity cases and intentionally unsupported

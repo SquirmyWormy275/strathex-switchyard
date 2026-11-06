@@ -124,8 +124,9 @@ mise exec node@24.14.0 -- node --experimental-transform-types \
 It verifies full release integrity and the two tested installed module hashes,
 then runs the 87 marker and 39 original reference cases plus fixed synthetic
 report/artifact examples in memory. It writes a private receipt, starts no scanner
-process and changes no task, account or package. Its seven checks are separate
-from actual scanner execution. Evaluation, installation, network and execution
+process and changes no task, account or package. Its current ten checks also
+include the bounded wheel metadata comparisons and are separate from actual
+scanner execution. Evaluation, installation, network and execution
 flags refuse before installed-state access; all four verifier guard tests pass.
 [Verifier evidence](evidence/python-inventory-verifier-source-summary.json).
 
