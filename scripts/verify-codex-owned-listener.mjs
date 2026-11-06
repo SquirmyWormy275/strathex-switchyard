@@ -7,20 +7,21 @@ import { lstat, mkdtemp, open, readFile, readdir, readlink, realpath, rm, rmdir 
 import { homedir, userInfo } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { assertCodexDesignConfig, codexRestrictedProcessArguments, readCodexMcpNames, trustedCli } from "../tools/layout-studio/agents.mjs";
+import { codexRestrictedProcessArguments, readCodexMcpNames, trustedCli } from "../tools/layout-studio/agents.mjs";
 import { desktopEnvironment } from "../tools/layout-studio/process-environment.mjs";
 import { directoryIdentity, privateDirectory, privateWrite } from "../tools/layout-studio/private-fs.mjs";
 import { runtimeGuardianStopped } from "../tools/layout-studio/runtime-command.mjs";
-import daemon from "../apps/vscode-extension/src/codex-daemon-status.cjs";
+import { createPinnedCodexUnixClient } from "../tools/layout-studio/codex-unix-transport.mjs";
+import { stopOwnedChild } from "../tools/layout-studio/owned-process.mjs";
 
 if (process.platform !== "linux" || process.argv.slice(2).join() !== "--read-only-parent-loss") throw Error("Use --read-only-parent-loss on the Linux pilot. Reads existing account/config metadata, then kills only its own listener owner. No thread, model turn or account change.");
 const repo = resolve(dirname(fileURLToPath(import.meta.url)), ".."), uid = userInfo().uid;
 const hash = bytes => createHash("sha256").update(bytes).digest("hex");
 const marker = "/tmp/switchyard-codex-guardian-probe-path.json", markerFile = await open(marker, "wx", 0o600);
 const evidence = { schema: "switchyard-owned-codex-guardian-proof/v1", success: false, threadCreated: false, modelPromptsSubmitted: 0, accountLoginLogoutOrSwitch: false, globalDaemonCommandUsed: false, frontendChanged: false, hardwareOpened: false, checks: [] };
-let root, rootIdentity, owner, ownerClosed, guardian, socketPath, socketIdentity, socketParentIdentity, aliasIdentity, failure;
+let root, rootIdentity, owner, ownerClosed, guardian, socketPath, socketIdentity, socketParentIdentity, aliasIdentity, client, failure;
 const delay = () => new Promise(resolve => setTimeout(resolve, 20));
-async function checkpoint() { await markerFile.truncate(0); await markerFile.write(JSON.stringify({ root, rootIdentity, owner: evidence.owner, guardian, socketPath, socketIdentity, socketParentIdentity, aliasIdentity }), 0, "utf8"); await markerFile.sync(); }
+async function checkpoint() { await markerFile.truncate(0); await markerFile.write(JSON.stringify({ root, rootIdentity, owner: evidence.owner, guardian, socketPath, socketIdentity, socketParentIdentity, aliasIdentity, bridge: evidence.bridge }), 0, "utf8"); await markerFile.sync(); }
 async function identity(path) { const s = await lstat(path); return { device: String(s.dev), inode: String(s.ino), uid: s.uid, mode: s.mode }; }
 async function processInfo(pid) {
   try { const s = await lstat(`/proc/${pid}`), text = await readFile(`/proc/${pid}/stat`, "utf8"), f = text.slice(text.lastIndexOf(")") + 2).split(" "); return { pid, uid: s.uid, birth: f[19], group: Number(f[2]), session: Number(f[3]), state: f[0] }; }
@@ -73,15 +74,20 @@ try {
   }
   assert.equal(holders.length, 1); assert.equal(await realpath(`/proc/${holders[0].pid}/exe`), executable); assert.equal(hash(await readFile(executable)), executableSha256);
   evidence.nativeServer = holders[0]; await checkpoint(); evidence.checks.push("exact private socket belongs to the pinned native executable in the owned guardian session");
-  const config = await daemon.readCodexDaemonConfiguration(socketPath); assertCodexDesignConfig(config); evidence.effectiveConfigurationRestricted = true; evidence.checks.push("effective native Unix configuration retains all disabled tools, hooks, MCP entries and first-party route");
-  const first = await daemon.readCodexDaemonAccount(socketPath), second = await daemon.readCodexDaemonAccount(socketPath);
-  assert.equal(first.type, "chatgpt"); assert.match(first.fingerprint, /^[a-f0-9]{64}$/); assert.equal(first.fingerprint, second.fingerprint); evidence.matchingAccountReads = 2; evidence.checks.push("two read-only account snapshots match without a login, refresh, thread or model request");
+  client = createPinnedCodexUnixClient(executable, root, names, { socketPath, socketDevice: socketIdentity.device, socketInode: socketIdentity.inode, peerPid: holders[0].pid, peerBirth: holders[0].birth, peerExecutableSha256: executableSha256 });
+  evidence.bridge = await processInfo(client.child.pid); assert.equal(evidence.bridge.uid, uid); await checkpoint();
+  await client.initialize(); assert.equal(client.nativeVersion, "0.166.0"); assert.equal(client.restrictionsVerified, true); evidence.effectiveConfigurationRestricted = true; evidence.kernelPeerCredentialsAndNativeBytesVerified = true; evidence.singlePersistentConnection = true; evidence.checks.push("effective native Unix configuration retains all disabled tools, hooks, MCP entries and first-party route");
+  const fingerprint = await client.recheckAccount(); assert.equal(fingerprint, client.accountFingerprint); evidence.matchingAccountReads = 2; evidence.accountReadRequests = client.sequence - 2; assert.ok(evidence.accountReadRequests >= 2 && evidence.accountReadRequests <= 3); evidence.checks.push("pinned account revalidation succeeds on one persistent read-only connection without a login, refresh, thread or model request");
   const original = await processInfo(owner.pid); assert.equal(original.birth, evidence.owner.birth); assert.equal(original.uid, uid); assert.equal(owner.exitCode, null); assert.equal(owner.signalCode, null);
   owner.kill("SIGKILL"); await ownerClosed; evidence.ownerKilledForParentLoss = true;
   await waitFor(() => runtimeGuardianStopped(guardian), "Owned guardian and native process exit is unconfirmed.", 5000); assert.deepEqual(await groupMembers(), []);
+  await waitFor(() => client.closed, "The private bridge did not observe native peer exit.", 5000); evidence.peerExitDisconnectObserved = true;
   evidence.parentLossTreeExitVerified = true; evidence.checks.push("abrupt owned parent loss independently retires guardian, native process and every owned session member");
 } catch (error) { failure = error; evidence.failure = error.code === "ENOENT" ? "A required owned native identity was unavailable." : String(error.message).replaceAll(root ?? "[none]", "[owned root]").slice(0, 1000); }
 finally {
+  let bridgeStopped = true;
+  try { if (client) { client.close(); const stopped = await stopOwnedChild(client.child); bridgeStopped = stopped.stopped; assert.ok(bridgeStopped); evidence.bridgeExitVerified = true; } }
+  catch { bridgeStopped = false; failure ??= Error("The owned private bridge exit is unconfirmed."); evidence.cleanupUnconfirmed = true; }
   try {
     if (owner && owner.exitCode === null && owner.signalCode === null) { const current = await processInfo(owner.pid); assert.equal(current?.birth, evidence.owner?.birth); owner.kill("SIGKILL"); await ownerClosed; }
     if (guardian) { await waitFor(() => runtimeGuardianStopped(guardian), "Owned guardian cleanup is unconfirmed.", 5000); assert.deepEqual(await groupMembers(), []); evidence.guardianExitVerified = true; }
@@ -91,7 +97,7 @@ finally {
       evidence.ownedSocketRetired = true;
     }
     if (aliasIdentity) { const endpoint = join(root, "s"); try { assert.deepEqual(await identity(endpoint), aliasIdentity); assert.equal(await readlink(endpoint), socketPath); await rm(endpoint); } catch (error) { if (error.code !== "ENOENT") throw error; } evidence.ownedAliasRetired = true; }
-    if (root && (!owner || evidence.guardianExitVerified)) { assert.deepEqual(await identity(root), rootIdentity); assert.deepEqual(await readdir(root), []); await rmdir(root); evidence.ownedRootRemoved = true; }
+    if (root && bridgeStopped && (!owner || evidence.guardianExitVerified)) { assert.deepEqual(await identity(root), rootIdentity); assert.deepEqual(await readdir(root), []); await rmdir(root); evidence.ownedRootRemoved = true; }
     if (evidence.ownedRootRemoved || !root) { await rm(marker); evidence.markerRemoved = true; }
   } catch (error) { failure ??= Error("Exact owned native cleanup is unconfirmed; preserve its marker and stage."); evidence.cleanupUnconfirmed = true; evidence.cleanupFailureCode = typeof error.code === "string" && /^[A-Z_]{1,40}$/.test(error.code) ? error.code : "IDENTITY_OR_INVENTORY_MISMATCH"; }
   await markerFile.close();

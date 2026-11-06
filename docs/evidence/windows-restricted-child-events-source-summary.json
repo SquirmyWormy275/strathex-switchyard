@@ -14,7 +14,7 @@
   "allChildAndTreeCleanupVerified": true,
   "ownedBuildScratchRemoved": true,
   "reusedSdk": "8.0.424",
-  "nativeEventQueryAccepted": false,
+  "nativeEventQueryAccepted": true,
   "originalChildFailureRemainsFailed": true,
   "eventDiagnosticOnly": true,
   "maxExistingApplicationErrorEvents": 32,
@@ -36,5 +36,15 @@
     "scripts/windows-restricted-owner-report.test.mjs": "60893d243b74cdf7de33e0f1405201b8671ea850befc9aa6b498c2007176a15e",
     ".github/workflows/switchyard-windows-filesystem.yml": "7148b9d7a4035bf398d5f0600b3ffa98d4150bdfe9a24baa8eff547cdaeb6655",
     "scripts/verify-windows-storage-broker.mjs": "0988c5587421b365ecb8ff30d235fbbc63f3ad851d9fa9cf744b0ac18f54e0f3"
+  },
+  "nativeMatchingEventWitnessAvailable": false,
+  "nativeFollowup": {
+    "head": "6f7e5952315cc617f63763cf20677daabe461a7f",
+    "runId": 42142720013,
+    "queryStatus": "completed",
+    "handlesClosedVerified": true,
+    "retainedMatchingEvents": 0,
+    "wholeWorkflowAccepted": false,
+    "summary": "windows-restricted-child-events-native-summary.json"
   }
 }

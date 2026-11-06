@@ -56,7 +56,10 @@ original child exit and owner checks remain unchanged, with no process retry.
 Both managed targets compile and all 1,776 portable checks plus five backend
 files/fifty-one tests pass. The twelve parser cases include wrong/reused PID,
 wrong creation time, duplicate fields, oversized/DTD XML and private-text
-rejection. Native event-query acceptance remains pending. This uses the documented
+rejection. Native `6f7e595` executes the query and closes its handles but retains
+no exact PID/creation-time match; the actual initialization failure remains
+unresolved. [Native evidence](evidence/windows-restricted-child-events-native-summary.json).
+This uses the documented
 [EvtQuery](https://learn.microsoft.com/en-us/windows/win32/api/winevt/nf-winevt-evtquery),
 [EvtNext](https://learn.microsoft.com/en-us/windows/win32/api/winevt/nf-winevt-evtnext)
 and [EvtRender](https://learn.microsoft.com/en-us/windows/win32/api/winevt/nf-winevt-evtrender)

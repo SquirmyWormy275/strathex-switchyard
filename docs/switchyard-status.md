@@ -31,7 +31,9 @@ The next restricted-child diagnostic reads only bounded existing Application
 Error events matching both the exact PID and native creation time. Fixed module/
 exception fields omit raw XML, paths, account data and IDs. Both managed targets
 compile; 1,776 portable checks and five backend files/fifty-one tests pass. Native
-query acceptance and the actual DLL-initialization repair remain unfinished.
+query now completes at `6f7e595` with closed handles but no retained exact match;
+the actual DLL-initialization repair remains unfinished.
+[Native query evidence](evidence/windows-restricted-child-events-native-summary.json).
 [Source evidence](evidence/windows-restricted-child-events-source-summary.json).
 
 Windows keyless workers pass both complete native lease files at `0740791`:
@@ -53,9 +55,17 @@ socket/process identity, effective restricted configuration, two matching
 read-only account snapshots and containment after abrupt parent loss. Exact
 socket/alias/directory/marker retirement passes; two software files pass eighteen
 tests. The first alias-cleanup failure remains failed with its separate recovery
-receipt. Full Studio task/IDE attachment and continuous Unix account fencing
-remain unfinished software. Production connections stay restricted stdio; the
-unproven proxy is not exposed. [Guardian contract and evidence](codex-owned-transport.md).
+receipt. The new pinned streaming bridge additionally verifies kernel peer credentials,
+exact birth/executable bytes and socket device/inode before provider traffic.
+Seven related software files pass 95 tests, the final bridge file passes seven
+tests, and the installed CLI passes four checks on one persistent connection
+with effective configuration, bounded startup account settling, pinned account
+revalidation, peer exit and exact owned cleanup. Account-event fencing is
+implemented and tested with provider doubles; live account switching remains
+unaccepted. Production stays stdio; owned listener/task/IDE lifecycle wiring
+remains unfinished software.
+[Pinned stream evidence](evidence/codex-pinned-unix-summary.json). The unproven
+native CLI proxy is not exposed. [Guardian contract and evidence](codex-owned-transport.md).
 
 The later immutable `82eb764` full run remains failed at interrupted-install
 recovery: 213/214 groups pass, 1,266 tests pass, one fails and ten skips. Recovery
