@@ -64,7 +64,7 @@
   },
   "allChildAndTreeCleanupVerified": true,
   "typecheckPassed": true,
-  "nativeWindowsAcceptance": "Pending exact-source CI; four native cases are explicitly skipped on Linux.",
+  "nativeWindowsAcceptance": "7dd2c36: all six tests pass without skips on actual Windows. See windows-suspended-worker-native-summary.json.",
   "restrictedOwnerAccepted": false,
   "originalOwnerPassedChecks": 0,
   "originalOwnerRequiredChecks": 8,

@@ -63,7 +63,14 @@ while its owner registers PID, birth and executable hash. Callback refusal,
 cancellation and malformed or overdue acknowledgement cannot authorize execution.
 Seven focused groups pass **82 tests / four declared Windows-only skips**;
 27 harness follow-up tests, two managed builds, 2,071 portable proof checks,
-typecheck and owned cleanup pass. Exact-source native Windows acceptance is
-pending. This step grants no permissions and does not repair the original
+typecheck and owned cleanup pass. Native Windows `7dd2c36` passes all six
+acknowledgement checks without skips; [receipt](evidence/windows-suspended-worker-native-summary.json).
+This step grants no permissions and does not repair the original
 restricted owner, which remains **0/8**.
 [Contract](windows-worker-acknowledgement.md), [source evidence](evidence/windows-suspended-worker-source-summary.json).
+
+Complete Linux `d551ccf` and Windows `b600a6d` follow-ups remain failed. The
+Linux crash-fixture correction passes 42 tests; four-way Windows backend
+scheduling and explicit Python selection pass 39 tests with one Windows-only
+skip. Corrected complete/native scheduling acceptance remains pending.
+[Correction evidence](evidence/release-scheduling-recovery-summary.json).

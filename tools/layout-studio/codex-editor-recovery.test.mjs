@@ -27,11 +27,20 @@ async function fixture(t){
  const store=createSuiteStore({root:join(root,'state'),secrets:{get:async()=>Buffer.alloc(32,23).toString('base64'),set:async()=>{throw Error('The fixed synthetic key must exist.');}}});let providerCalls=0;
  api=createCodingEditorConnections({store,root:socketRoot,owners:{openEditorClient(){providerCalls++;throw Error('Recovery must not open a provider.');}},authorizations:{returnTarget(){providerCalls++;throw Error('Recovery must not open account metadata.');}}});
  const row=(await store.snapshot('personal')).codingEditorConnections[0];assert.equal(row.host.pid,child.pid);assert.equal(row.status,'ready');
- async function crash(){const exited=once(child,'close');child.kill('SIGKILL');await exited;for(const pid of [row.upstream.pid,row.ingress.pid])await until(()=>gone(pid));}
+ async function crash(){
+  // EOF can let Python remove its socket before the parent-death SIGKILL.
+  // Hold this exact fixture carrier first so the stale-socket crash scenario
+  // is deterministic; the kernel still kills a stopped child on parent loss.
+  const carrier=()=>readFile(`/proc/${row.ingress.pid}/stat`,'utf8').then(s=>s.slice(s.lastIndexOf(') ')+2).split(' '));
+  assert.equal((await carrier())[19],row.ingress.birth);process.kill(row.ingress.pid,'SIGSTOP');
+  await until(async()=>{const fields=await carrier();assert.equal(fields[19],row.ingress.birth);return fields[0]==='T';});
+  assert.equal((await lstat(proof.opened.endpoint.socketPath)).isSocket(),true);
+  const exited=once(child,'close');child.kill('SIGKILL');await exited;for(const pid of [row.upstream.pid,row.ingress.pid])await until(()=>gone(pid));
+ }
  return{root,socketRoot,store,api,proof,row,crash,get providerCalls(){return providerCalls;}};
 }
 
-test('a live original host is not adopted; abrupt host loss permits exact stale-socket recovery without a provider call',native,async t=>{
+test('a live original host is not adopted; abrupt host and carrier loss permits exact stale-socket recovery without a provider call',native,async t=>{
  const f=await fixture(t),before=JSON.stringify((await f.store.snapshot('personal')).codingEditorConnections);
  const blocked=await f.api.recover('personal',f.proof.selected);assert.equal(blocked.recoveryBlocked,true);assert.equal(blocked.stoppedVerified,false);assert.equal(JSON.stringify((await f.store.snapshot('personal')).codingEditorConnections),before);
  await f.crash();assert.equal((await lstat(f.proof.opened.endpoint.socketPath)).isSocket(),true);

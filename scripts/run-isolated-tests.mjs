@@ -143,6 +143,7 @@ export function nativeTestOverrides(file, platform = process.platform) {
   return platform === "win32" && protectedNativeGroups.includes(file) ? { timeoutMs: 120_000 } : {};
 }
 export const requiredGroups = [
+  { file: "scripts/windows-backend-shards.test.mjs" },
   { file: "scripts/run-isolated-tests.test.mjs" },
   { file: "scripts/windows-scenario-groups.test.mjs" },
   { file: "scripts/windows-restricted-owner-report.test.mjs" },

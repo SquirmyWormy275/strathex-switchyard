@@ -18,13 +18,39 @@ there is no merge or public release acceptance.
 
 ## Current evidence
 
+The complete Linux run at `d551ccf` is **failed**: 278 groups, 1,767
+passed tests, eleven declared skips and one crash-fixture failure. EOF cleanup
+could remove the socket before the fixture substituted it. The corrected fixture
+holds the exact carrier before abrupt host loss; 42 recovery/ingress tests pass.
+All children, the temporary checkout, nine dependency aliases and 782 generated
+files were removed. A corrected complete run remains pending.
+[Failed run](evidence/linux-d551-failed-summary.json).
+
+Windows `b600a6d` also remains a **failed complete release**. Its preliminary
+backend exceeded twenty minutes and reported one lease-case failure without a
+complete plan; later steps continued by design. The release build then refused
+the non-scalar `TestPythonPath` argument before starting. Source now assigns all
+171 preliminary backend groups exactly once across four isolated jobs, retaining
+every declared child bound and a twenty-minute limit per job. Python is selected
+directly from the pinned setup action, preserving version/hash/reparse checks.
+The scheduling/harness/lease follow-up passes 39 tests with one Windows-only
+skip; native scheduling and the reported lease failure remain unaccepted.
+[Retained failure](evidence/windows-b600-release-failed-summary.json),
+[correction](evidence/release-scheduling-recovery-summary.json).
+
+Independent Windows `b600a6d` runtime installation, 49-package imports and offline
+CPU model load/recheck pass, with its temporary runtime removed.
+[Runtime receipt](evidence/windows-runtime-b600-native-summary.json).
+This does not accept the failed backend batch or complete release.
+
 An optional Windows worker acknowledgement now holds the exact process suspended
 while its owner registers PID, birth and executable hash. Callback refusal,
 cancellation and malformed or overdue acknowledgement cannot authorize execution.
 Seven focused groups pass **82 tests / four declared Windows-only skips**;
 27 harness follow-up tests, two managed builds, 2,071 portable proof checks,
-typecheck and owned cleanup pass. Exact-source native Windows acceptance is
-pending. This step grants no permissions and does not repair the original
+typecheck and owned cleanup pass. Actual Windows `7dd2c36` now passes all six
+native acknowledgement tests without skips. [Native receipt](evidence/windows-suspended-worker-native-summary.json).
+This step grants no permissions and does not repair the original
 restricted owner, which remains **0/8**.
 [Contract](windows-worker-acknowledgement.md), [source evidence](evidence/windows-suspended-worker-source-summary.json).
 
@@ -44,7 +70,7 @@ the guest remains doubled. [Native receipt](evidence/python-artifact-windows-nat
 Native Windows `b600a6d` now passes all sixteen original installation/recovery
 cases exactly once, with unchanged assertions, original 120-second child bounds
 and verified child/tree cleanup. The earlier timeout and local zero-plan attempt
-remain failed evidence. The complete Windows release is still running; restricted
+remain failed evidence. The complete Windows release subsequently failed as recorded above; restricted
 owner acceptance remains separate and failed.
 [Native installation receipt](evidence/installation-scenarios-native-summary.json).
 

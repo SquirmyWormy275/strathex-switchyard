@@ -42,8 +42,9 @@ trees and 124 temporary managed build files are removed, and typecheck passes.
 The native CI cases cover delayed acknowledgement, callback refusal,
 cancellation, changed identities, duplicate/missing fields, EOF and timeout.
 They independently check Job exit and verify the command marker never appears on
-refusal. Native execution of this new contract is pending. Existing Linux/default
-behavior tests do not substitute for that acceptance.
+refusal. Actual Windows source `7dd2c36` now passes all six tests without skips.
+[Native receipt](evidence/windows-suspended-worker-native-summary.json).
+Existing Linux/default behavior tests remain separate from that acceptance.
 
 The original restricted owner remains zero of eight checks at named Job creation.
 Applying the already bounded QUERY-only allowance to additional exact descendants
