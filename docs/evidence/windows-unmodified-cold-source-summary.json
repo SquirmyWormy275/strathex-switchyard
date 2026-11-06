@@ -55,7 +55,7 @@
     "The original cold child and original Node child then retain exactly their existing QUERY-only allowance, original two ACL observations, token rechecks and all eight owner assertions. The additional diagnostic cannot update or satisfy original SelfTokenQueryAccessVerified.",
     "A separate closed failure-report property retains the unmodified-token observation. Invalid or missing comparison data cannot replace the original report or accept a failed owner. No new rights, fallback, account or runtime change."
   ],
-  "nativeAcceptance": "Pending paired native observation. No causal claim is made from the prior distinct guardian and cold child alone.",
+  "nativeAcceptance": "Paired 7e5c495 observation is retained in windows-unmodified-cold-native-summary.json; the original owner remains 0/8 and the actual guardian remains denied.",
   "newRightsGranted": false,
   "installedChanged": false
 }

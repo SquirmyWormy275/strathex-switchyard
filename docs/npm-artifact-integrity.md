@@ -24,7 +24,8 @@ The existing request still includes its schema/version, action, scope, full
 `files` list and exact signed feed references. Every referenced lock and artifact
 must be an exact reviewed input. The host binds that request, engine, feeds and
 bytes to the same task snapshot and one-use execution approval. At most 128
-distinct lock/location references are accepted within the original 512-file,
+distinct references, shared with [Cargo selections](cargo-artifact-integrity.md),
+are accepted within the original 512-file,
 2 MiB per file and 16 MiB total bounds. Empty artifacts, duplicate locations,
 unreviewed paths, manifest-as-artifact aliases and unsupported actions are refused.
 Workspace links and unresolved package references cannot claim artifact results.

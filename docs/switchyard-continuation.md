@@ -31,6 +31,30 @@ evidence, not instructions to reset. Publish regular commits. Do not merge or re
 
 ## Current implementation and evidence
 
+Windows `7e5c495` also retains a separate installation-group timeout: fifteen
+case reports succeeded before the original 120-second deadline, but there was no
+complete TAP plan, so the group is failed with zero accepted cases. The earlier
+`3363e8b` sixteen-case acceptance remains source-specific. Scheduling the original
+cases independently is pending; this is a CI failure, not unavailable hardware.
+[Timeout evidence](evidence/windows-installation-timeout-summary.json).
+
+Selected Cargo artifact-byte comparison is implemented through reviewed Supply
+Chain and Release execution. Exact package/version/source binding, mismatch
+findings, receipt replay and cleanup pass fifteen groups / 105 tests and a
+21-test manifest-alias follow-up; typecheck passes. Four actual Linux scans and
+four Windows guest-double runs preserve original bytes/index/HEAD. Native Windows
+host acceptance is pending; publisher/archive-content verification remains open.
+[Contract](cargo-artifact-integrity.md), [evidence](evidence/cargo-artifact-integrity-summary.json).
+
+Native `7e5c495` now compares the same pinned cold image with and without
+the existing self-query allowance. Without it, self-query, legacy CryptoAPI and
+Local/Global named Job creation receive error 5; anonymous Job creation and CNG
+still succeed. The original child with its existing allowance succeeds in all
+three Job namespaces. Both cold children verify token restrictions, exit and
+handle cleanup. The actual guardian remains denied and the original owner stays
+**0/8**. No new rights were granted; broader failed-fixture cleanup is not claimed.
+[Paired native receipt](evidence/windows-unmodified-cold-native-summary.json).
+
 Source `0a0dd11` passes the complete Linux manifest: **261 groups, 1,745
 passed tests, eleven declared skips, zero failures**. Every owned child/tree,
 temporary checkout, nine dependency aliases and 782 generated files (11,766,655
@@ -48,7 +72,7 @@ The next CI-only comparison runs the same cold image once without its existing
 self-query allowance, then preserves the original cold and Node checks unchanged.
 It grants no additional rights and cannot satisfy the original self-query/owner
 assertions. Six groups / 79 tests, two managed builds / 2,071 portable checks,
-typecheck and owned cleanup pass. Paired native execution remains pending.
+typecheck and owned cleanup pass. Paired native execution is recorded above; the owner remains failed.
 [Source evidence](evidence/windows-unmodified-cold-source-summary.json).
 
 The artifact-scanner lane at `f0aacab` now passes **eight tests / two declared

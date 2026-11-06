@@ -5,7 +5,7 @@ import { NodeFileDigestReader } from "../../packages/control-plane/src/git-inspe
 import { createDurableAbortControl } from "../../packages/control-plane/src/execution-cancellation.ts";
 import { createRepositoryRecipeEvidence } from "../../apps/windows-companion/src/repository-runtime-broker.ts";
 import { pipelineDependencies } from "./repository-pipeline.mjs";
-import { shieldActions, shieldEngineVersion, shieldIndexPrefix, validateShieldRequest, scannerPath, shieldReservedPath, pypiIdentity, validateCargoComponent, shieldCycloneDxComponent, isPinnedRequirementsPath, npmLicenseDeclaration, npmVersion } from "./shield-scanner-engine.mjs";
+import { shieldActions, shieldEngineVersion, shieldIndexPrefix, validateShieldRequest, scannerPath, shieldReservedPath, pypiIdentity, validateCargoComponent, shieldCycloneDxComponent, shieldArtifactReferenceKey, isPinnedRequirementsPath, npmLicenseDeclaration, npmVersion } from "./shield-scanner-engine.mjs";
 import { evaluateShieldExceptions } from "./shield-exception-ledger.mjs";
 import { resolveShieldIndexWitness } from "./shield-index-inputs.mjs";
 import { resolveShieldHistoryWitness } from "./shield-history-inputs.mjs";
@@ -82,7 +82,7 @@ export function parseShieldScannerReport(output,shield,action) {
   if(!Array.isArray(report.findings)||report.findings.length>512||new Set(report.findings.map(f=>f.fingerprint)).size!==report.findings.length||report.findings.some(f=>!exact(f,["ruleId","dimension","severity","path","line","fingerprint"])||!id(f.ruleId)||!required.includes(f.dimension)||(!["low","medium","high","critical"].includes(f.severity)&&!(f.severity==="unknown"&&f.dimension==="vulnerabilities"))||!files.has(f.path)||!digest(f.fingerprint)||(f.line===null?!["vulnerabilities","licenses"].includes(f.dimension)&&!(f.dimension==="provenance"&&f.ruleId==="artifact.integrity-mismatch"):!Number.isSafeInteger(f.line)||f.line<1||f.line>files.get(f.path).size+1))||report.outcome!==(report.findings.length?"failed":"incomplete"))throw Error("Invalid exact Shield findings.");
   if(!Array.isArray(report.coverage)||report.coverage.length!==required.length||new Set(report.coverage.map(c=>c.dimension)).size!==required.length||report.coverage.some(c=>!exact(c,["dimension","status","rules","findings"])||!required.includes(c.dimension)||c.status!=="incomplete"||!Array.isArray(c.rules)||c.rules.length>32||new Set(c.rules).size!==c.rules.length||c.rules.some(r=>!id(r))||c.findings!==report.findings.filter(f=>f.dimension===c.dimension).length))throw Error("Invalid Shield coverage matrix.");
   if(!exact(report.sbom,["schema","components"])||report.sbom.schema!=="switchyard-lock-inventory/v2"||!Array.isArray(report.sbom.components)||report.sbom.components.length>4096)throw Error("Invalid Shield dependency inventory.");
-  const componentKeys = new Set(), artifactReferences = new Map((shield.request.packageArtifacts ?? []).map(row => [JSON.stringify([row.lockPath, row.location]), row])), observedArtifacts = new Set();
+  const componentKeys = new Set(), artifactReferences = new Map((shield.request.packageArtifacts ?? []).map(row => [shieldArtifactReferenceKey(row), row])), observedArtifacts = new Set();
   if (artifactReferences.size && !report.gaps.includes("artifact_contents_not_inspected")) throw Error("Artifact byte comparisons cannot attest archive contents.");
   for(const component of report.sbom.components){
     if(!component||!files.has(component.lockPath??component.requirementsPath))throw Error("Dependency inventory is outside its witnessed manifest.");
@@ -92,6 +92,17 @@ export function parseShieldScannerReport(output,shield,action) {
       key="PyPI\0"+component.requirementsPath+"\0"+component.name;
     }else if(component.ecosystem==="Cargo"){
       validateCargoComponent(component);key=JSON.stringify(["Cargo",component.lockPath,component.name,component.version,component.sourceSha256]);
+      const reference = artifactReferences.get(key);
+      if (reference) {
+        const a = component.artifact, file = files.get(reference.path);
+        if (!a || a.path !== reference.path || a.sha256 !== file?.sha256 || a.size !== file?.size) throw Error("Cargo artifact observation differs from its exact reviewed bytes.");
+        if (a.status === "mismatched") {
+          if (!report.gaps.includes("package_artifact_not_verified")) throw Error("Unmatched Cargo artifacts must retain their coverage gap.");
+          const fingerprint = sha(`artifact.integrity-mismatch\0Cargo\0${component.lockPath}\0${files.get(component.lockPath).sha256}\0${component.name}\0${component.version}\0${component.sourceSha256}\0${a.path}\0${a.sha256}`);
+          if (!report.findings.some(f => f.ruleId === "artifact.integrity-mismatch" && f.dimension === "provenance" && f.severity === "high" && f.path === component.lockPath && f.line === null && f.fingerprint === fingerprint) && !(report.findings.length === 512 && report.gaps.includes("finding_limit"))) throw Error("A mismatched Cargo artifact cannot lose its failed integrity finding.");
+        }
+        observedArtifacts.add(key);
+      } else if (Object.hasOwn(component, "artifact") || !report.gaps.includes("package_artifact_not_verified")) throw Error("Unreviewed Cargo artifacts cannot claim verified bytes.");
     }else if(component.ecosystem==="npm"){
       const name=value=>typeof value==="string"&&![".",".."].includes(value)&&/^(?:@[a-z0-9._-]+\/)?[a-z0-9._-]{1,128}$/.test(value);
       if(!exact(component,["ecosystem","name","installedAs","version","location","lockPath","license","integritySha256",...(Object.hasOwn(component,"workspace")?["workspace"]:[]),...(Object.hasOwn(component,"artifact")?["artifact"]:[])])||!name(component.name)||!name(component.installedAs)||!npmVersion(component.version)||component.license!==null&&npmLicenseDeclaration(component.license)?.expression!==component.license||component.integritySha256!==null&&!digest(component.integritySha256))throw Error("Invalid exact npm inventory.");

@@ -18,6 +18,13 @@ there is no merge or public release acceptance.
 
 ## Current evidence
 
+Windows `7e5c495` also retains a separate installation-group timeout: fifteen
+case reports succeeded before the original 120-second deadline, but there was no
+complete TAP plan, so the group is failed with zero accepted cases. The earlier
+`3363e8b` sixteen-case acceptance remains source-specific. Scheduling the original
+cases independently is pending; this is a CI failure, not unavailable hardware.
+[Timeout evidence](evidence/windows-installation-timeout-summary.json).
+
 | Area | Verified result | What it establishes |
 | --- | --- | --- |
 | Complete Linux source `0a0dd11` | **261 groups, 1,745 passed tests, eleven declared skips, zero failures.** All owned children, temporary checkout, dependency aliases and generated builds were retired. [Receipt](evidence/linux-0a-complete-summary.json). | Backend integration, including editor lifecycle, Terminal composition, artifact-byte comparison and guardian failure reporting. Provider/editor doubles and Windows-only skips remain explicit; this is not native account or hardware acceptance. |
@@ -65,8 +72,17 @@ confirms self-query denial in the same guardian; permissions and refusal remain 
 
 A CI-only comparison now runs one additional cold child without the existing
 QUERY allowance, then leaves the original cold/Node checks intact. It grants no
-additional access. Six groups / 79 tests and managed/type checks pass; native
-comparison is pending. [Source](evidence/windows-unmodified-cold-source-summary.json).
+additional access. Six groups / 79 tests and managed/type checks pass. Native
+comparison ties the named-Job denial to withholding that allowance in the cold
+image; the actual guardian remains failed. [Native comparison](evidence/windows-unmodified-cold-native-summary.json). [Source](evidence/windows-unmodified-cold-source-summary.json).
+
+Selected Cargo artifact-byte comparison is implemented through reviewed Supply
+Chain and Release execution. Exact package/version/source binding, mismatch
+findings, receipt replay and cleanup pass fifteen groups / 105 tests and a
+21-test manifest-alias follow-up; typecheck passes. Four actual Linux scans and
+four Windows guest-double runs preserve original bytes/index/HEAD. Native Windows
+host acceptance is pending; publisher/archive-content verification remains open.
+[Contract](cargo-artifact-integrity.md), [evidence](evidence/cargo-artifact-integrity-summary.json).
 
 ## What the backend does
 

@@ -20,6 +20,15 @@ export function pinnedRequirementsFixture({ action, clean = false, requirementsV
     { ecosystem: "PyPI", name: "mixed-name", version: advisoryVersion, advisories: clean ? [] : [{ id: "PYSEC-synthetic-only", severity: "unknown" }] }
   ] });
 }
+export function cargoArtifactFixture({ action = "shield_supply_chain", artifactStatus = "matched", source = "registry+https://github.com/rust-lang/crates.io-index", cargoVersion = "1.2.3-rc.1+build.7" } = {}) {
+  // Deliberately synthetic raw bytes, not a valid archive or publisher assertion.
+  const original = Buffer.from([0x1f, 0x8b, 0, 0, 0x43, 0x41, 0x52, 0x47]), selected = Buffer.from(original);
+  if (artifactStatus === "mismatched") selected[7] ^= 1;
+  const lock = 'version = 4\n[[package]]\nname = "example"\nversion = ' + JSON.stringify(cargoVersion) + '\nsource = ' + JSON.stringify(source) + '\n' + (source.startsWith("registry+") ? 'checksum = "' + sha(original) + '"\n' : "");
+  const f = scannerFixture({ action, files: { "app.js": "const ordinary = 1;", "Cargo.lock": lock, "reviewed-package.crate": selected }, advisory: [{ ecosystem: "crates.io", name: "example", version: cargoVersion, advisories: [] }] });
+  f.request.packageArtifacts = [{ ecosystem: "Cargo", lockPath: "Cargo.lock", name: "example", version: cargoVersion, sourceSha256: sha(source), path: "reviewed-package.crate" }];
+  return f;
+}
 export function npmArtifactFixture({ action = "shield_supply_chain", artifactStatus = "matched" } = {}) {
   const original = Buffer.from([0x1f, 0x8b, 0, 0, 0x53, 0x58, 0x53, 0x59]);
   const selected = Buffer.from(original); if (artifactStatus === "mismatched") selected[7] ^= 1;

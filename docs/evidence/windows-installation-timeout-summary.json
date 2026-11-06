@@ -1,0 +1,32 @@
+{
+  "schema": "switchyard-windows-installation-timeout/v1",
+  "sourceCommit": "7e5c4952f78a899b624fb486d8f43912c8b19bc3",
+  "executionCommit": "0cad9b42c88ce5074a21501fe43a33e5b5202024",
+  "sourceAndExecutionTree": "1b366f9481f2330936f80a851de8337dd9209b38",
+  "runId": 42243443001,
+  "jobId": 127979856182,
+  "artifactId": 13516988573,
+  "archiveBytes": 1918,
+  "archiveSha256": "d7ebbc3a7f21bc2f6465762d45b33ef63e9c3e6fb8bed86f615f1850b8863447",
+  "zipSavedLocally": false,
+  "privateReceipt": "windows-installation-7e-timeout.json",
+  "group": "deployment/suite/installation.test.mjs",
+  "timeoutMs": 120000,
+  "durationMs": 120148,
+  "timeout": true,
+  "totals": {
+    "required": 1,
+    "passed": 0,
+    "failed": 1,
+    "tests": 0,
+    "passedTests": 0,
+    "failedTests": 0,
+    "skippedTests": 0,
+    "cancelledTests": 0,
+    "todoTests": 0
+  },
+  "childAndTreeCleanupVerified": true,
+  "partialTapCasesPassed": 15,
+  "suiteAccepted": false,
+  "finding": "The original 120-second group deadline expired after fifteen successful case reports. No complete TAP plan was available; totals retain zero accepted cases. The earlier 3363e8b source passed all sixteen installation cases. Keep every original assertion and bound while scheduling independently executable cohorts."
+}

@@ -101,3 +101,7 @@ At `701f915` the independent Windows-host Cargo lane passes all four cases and
 verifies child/tree cleanup. Its 985-byte receipt archive digest and source tree
 verify. Guest execution is still doubled, so this is host contract acceptance
 without claiming a native guest scan. [Windows receipt](evidence/windows-cargo-contract-summary.json).
+
+Selected Cargo artifact-byte comparison is now implemented with exact registry,
+version and source binding. Matched bytes retain incomplete scope; mismatches
+produce failed provenance findings. [Artifact contract and evidence](cargo-artifact-integrity.md).

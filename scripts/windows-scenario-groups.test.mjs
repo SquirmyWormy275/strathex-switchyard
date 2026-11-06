@@ -59,7 +59,7 @@ test("native filesystem, setup and restricted exchange CI lanes preserve every o
   assert.equal(uploads.length, 10); assert.equal(new Set(uploads.map(row => row[1])).size, 10);
   assert.ok(uploads.some(row => row[1] === "Retain fixed imports of the exact Node image" && row[2] === "restricted-exchange"));
   assert.match(native, /timeout-minutes: 20/); assert.match(native, /--exchange/);
-  assert.match(workflow, /osv-scanner, pypi-scanner, cargo-scanner, artifact-scanner, license-scanner, copilot-account, copilot-lifecycle, copilot-requests,/);
+  assert.match(workflow, /osv-scanner, pypi-scanner, cargo-scanner, cargo-artifact-scanner, artifact-scanner, license-scanner, copilot-account, copilot-lifecycle, copilot-requests,/);
   const source = await readFile(new URL("./verify-windows-storage-contracts.mjs", import.meta.url), "utf8");
   assert.match(source, /"pypi-scanner": "tools\/layout-studio\/repository-windows-shield-pypi\.test\.mjs"/);
   assert.equal(selectWindowsContractGroups(["tools/layout-studio/repository-windows-shield-pypi.test.mjs"], requiredGroups).length, 1);
@@ -67,6 +67,7 @@ test("native filesystem, setup and restricted exchange CI lanes preserve every o
   assert.equal(selectWindowsContractGroups(["tools/layout-studio/repository-windows-shield-cargo.test.mjs"], requiredGroups).length, 1);
   assert.match(source, /"artifact-scanner": "tools\/layout-studio\/repository-shield-artifacts\.test\.mjs"/);
   assert.equal(selectWindowsContractGroups(["tools/layout-studio/repository-shield-artifacts.test.mjs"], requiredGroups).length, 1);
+  assert.equal(selectWindowsContractGroups(["tools/layout-studio/repository-shield-cargo-artifacts.test.mjs"], requiredGroups).length, 1);
   assert.match(source, /"license-scanner": "tools\/layout-studio\/repository-windows-shield-licenses\.test\.mjs"/);
   assert.equal(selectWindowsContractGroups(["tools/layout-studio/repository-windows-shield-licenses.test.mjs"], requiredGroups).length, 1);
   for (const name of ["copilot-account-binding", "copilot-lifecycle", "copilot-requests"]) assert.equal(selectWindowsContractGroups(["tools/layout-studio/" + name + ".test.mjs"], requiredGroups).length, 1);

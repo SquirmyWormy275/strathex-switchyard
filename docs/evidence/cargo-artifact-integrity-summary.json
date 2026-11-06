@@ -1,0 +1,317 @@
+{
+  "schema": "switchyard-cargo-artifact-integrity/v1",
+  "basis": "7e5c4952f78a899b624fb486d8f43912c8b19bc3",
+  "sourceSha256": {
+    ".github/workflows/switchyard-windows-filesystem.yml": "6880d82941e870902c1ad907bc945a9fb4b9ce433dc0ba577401a1ff5f05cc55",
+    "scripts/run-isolated-tests.mjs": "f75a05a5e5f95fd3d9addd58a770abd2698ce08b7745d4bd812eca0dc4211d01",
+    "scripts/run-isolated-tests.test.mjs": "1231fe2a431986347ffc2f64997628b76cc7313c866213a7f77107af4e855fd3",
+    "scripts/verify-windows-storage-contracts.mjs": "6ecdf3319f7f6c6d7deb41c01b6a9327b431b6b196c23dceeaa8776d4458d58b",
+    "scripts/windows-scenario-groups.test.mjs": "0bdc90f141ec244dbfe10d803ec06bce46dc572e0e3f3da7fa59a2251790329b",
+    "tools/layout-studio/shield-scanner-engine.mjs": "84fd2727a0e559dc7ea9e8effd8457aab43a64bea440765f3a7a4094eb2b256d",
+    "tools/layout-studio/repository-shield.mjs": "cf46f1258ecd299480dac30a196059ebb2e0bead29b4bd0bd569dc8b99af35c1",
+    "tools/layout-studio/repository-shield-cargo-artifacts.test.mjs": "15f884506986dfd94508efe64153b9c329d21f05d813cf37c238cac72fc23e5a",
+    "tools/layout-studio/test-support/shield-scanner-fixture.mjs": "e90dfda0b2cd1853fc9c47abcd49ba07f3d1510d208f5cb9fcad377b669171a0",
+    "tools/layout-studio/test-support/repository-shield-fixture.mjs": "4aaf13433d4dc6a83ea21ffbd69c965361b58be55df8f4e55bf3c3062479e9c3",
+    "tools/layout-studio/test-support/windows-execution-fixture.mjs": "4efde87decfe04a47a9420c93a1276eb705d2b1550f06d1ee105c4f1358078ed"
+  },
+  "isolated": [
+    {
+      "receipt": "isolated-test-6814b00b-3bb9-437f-be9d-13b12e7a2ac9.json",
+      "totals": {
+        "required": 15,
+        "passed": 15,
+        "failed": 0,
+        "tests": 105,
+        "passedTests": 105,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "allChildAndTreeCleanupVerified": true,
+      "groups": [
+        {
+          "file": "scripts/run-isolated-tests.test.mjs",
+          "pattern": null,
+          "durationMs": 3797,
+          "timeoutMs": 45000,
+          "tests": {
+            "total": 20,
+            "passed": 20,
+            "failed": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          }
+        },
+        {
+          "file": "scripts/windows-scenario-groups.test.mjs",
+          "pattern": null,
+          "durationMs": 84,
+          "timeoutMs": 45000,
+          "tests": {
+            "total": 6,
+            "passed": 6,
+            "failed": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          }
+        },
+        {
+          "file": "deployment/suite/release.test.mjs",
+          "pattern": null,
+          "durationMs": 2171,
+          "timeoutMs": 45000,
+          "tests": {
+            "total": 5,
+            "passed": 5,
+            "failed": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          }
+        },
+        {
+          "file": "tools/layout-studio/repository-windows-shield.test.mjs",
+          "pattern": "Windows shield_change_scan retains pinned scanner observations and incomplete failed receipts",
+          "durationMs": 4011,
+          "timeoutMs": 120000,
+          "tests": {
+            "total": 1,
+            "passed": 1,
+            "failed": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          }
+        },
+        {
+          "file": "tools/layout-studio/repository-windows-shield.test.mjs",
+          "pattern": "Windows shield_codebase_audit retains pinned scanner observations and incomplete failed receipts",
+          "durationMs": 4090,
+          "timeoutMs": 120000,
+          "tests": {
+            "total": 1,
+            "passed": 1,
+            "failed": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          }
+        },
+        {
+          "file": "tools/layout-studio/repository-windows-shield.test.mjs",
+          "pattern": "Windows shield_supply_chain retains pinned scanner observations and incomplete failed receipts",
+          "durationMs": 4158,
+          "timeoutMs": 120000,
+          "tests": {
+            "total": 1,
+            "passed": 1,
+            "failed": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          }
+        },
+        {
+          "file": "tools/layout-studio/repository-windows-shield.test.mjs",
+          "pattern": "Windows release_shield retains pinned scanner observations and incomplete failed receipts",
+          "durationMs": 4072,
+          "timeoutMs": 120000,
+          "tests": {
+            "total": 1,
+            "passed": 1,
+            "failed": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          }
+        },
+        {
+          "file": "tools/layout-studio/repository-windows-shield.test.mjs",
+          "pattern": "Windows clean Shield input cannot establish complete coverage",
+          "durationMs": 4110,
+          "timeoutMs": 120000,
+          "tests": {
+            "total": 1,
+            "passed": 1,
+            "failed": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          }
+        },
+        {
+          "file": "tools/layout-studio/cargo-lock-inventory.test.mjs",
+          "pattern": null,
+          "durationMs": 171,
+          "timeoutMs": 45000,
+          "tests": {
+            "total": 10,
+            "passed": 10,
+            "failed": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          }
+        },
+        {
+          "file": "tools/layout-studio/repository-shield-cargo.test.mjs",
+          "pattern": null,
+          "durationMs": 24559,
+          "timeoutMs": 120000,
+          "tests": {
+            "total": 4,
+            "passed": 4,
+            "failed": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          }
+        },
+        {
+          "file": "tools/layout-studio/repository-windows-shield-cargo.test.mjs",
+          "pattern": null,
+          "durationMs": 16165,
+          "timeoutMs": 120000,
+          "tests": {
+            "total": 4,
+            "passed": 4,
+            "failed": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          }
+        },
+        {
+          "file": "tools/layout-studio/shield-scanner-engine.test.mjs",
+          "pattern": null,
+          "durationMs": 612,
+          "timeoutMs": 45000,
+          "tests": {
+            "total": 27,
+            "passed": 27,
+            "failed": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          }
+        },
+        {
+          "file": "tools/layout-studio/repository-shield-artifacts.test.mjs",
+          "pattern": null,
+          "durationMs": 65225,
+          "timeoutMs": 120000,
+          "tests": {
+            "total": 10,
+            "passed": 10,
+            "failed": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          }
+        },
+        {
+          "file": "tools/layout-studio/repository-shield-cargo-artifacts.test.mjs",
+          "pattern": null,
+          "durationMs": 41624,
+          "timeoutMs": 120000,
+          "tests": {
+            "total": 11,
+            "passed": 11,
+            "failed": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          }
+        },
+        {
+          "file": "tools/layout-studio/repository-shield.test.mjs",
+          "pattern": null,
+          "durationMs": 37158,
+          "timeoutMs": 120000,
+          "tests": {
+            "total": 3,
+            "passed": 3,
+            "failed": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          }
+        }
+      ]
+    },
+    {
+      "receipt": "isolated-test-e89aed07-5d90-420e-ad4b-ea4cfadc9e3b.json",
+      "totals": {
+        "required": 2,
+        "passed": 2,
+        "failed": 0,
+        "tests": 21,
+        "passedTests": 21,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "allChildAndTreeCleanupVerified": true,
+      "groups": [
+        {
+          "file": "tools/layout-studio/repository-shield-artifacts.test.mjs",
+          "pattern": null,
+          "durationMs": 65706,
+          "timeoutMs": 120000,
+          "tests": {
+            "total": 10,
+            "passed": 10,
+            "failed": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          }
+        },
+        {
+          "file": "tools/layout-studio/repository-shield-cargo-artifacts.test.mjs",
+          "pattern": null,
+          "durationMs": 47012,
+          "timeoutMs": 120000,
+          "tests": {
+            "total": 11,
+            "passed": 11,
+            "failed": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          }
+        }
+      ]
+    }
+  ],
+  "typecheckPassed": true,
+  "demonstrations": {
+    "linuxActualScans": 4,
+    "windowsGuestDoubleScans": 4,
+    "actions": [
+      "shield_supply_chain",
+      "release_shield"
+    ],
+    "statuses": [
+      "matched",
+      "mismatched"
+    ],
+    "signedFeeds": true,
+    "protectedOriginalReceipts": true,
+    "replayRefused": true,
+    "originalLockArtifactIndexHeadPreserved": true,
+    "syntheticBytesAreRealArchives": false
+  },
+  "scope": [
+    "Only reviewed bytes and exact registry package/version/source identities are compared with the declared Cargo SHA-256.",
+    "No resolution, archive-content, publisher, license or complete Shield acceptance is inferred.",
+    "Original file/reference/finding bounds remain; npm and Cargo share the reference ceiling."
+  ],
+  "nativeWindowsHostAcceptance": "Pending dedicated cargo-artifact-scanner lane; guest remains doubled.",
+  "installedChanged": false,
+  "downloads": false
+}
