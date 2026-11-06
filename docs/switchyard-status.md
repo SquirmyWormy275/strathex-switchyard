@@ -1,11 +1,16 @@
 # Switchyard implementation and acceptance
 
-Latest complete Linux `7772cb3` **failed**: 249/250 groups, 1,622 passed tests,
-one failure and eleven declared skips. An editor socket remained after child
-exit during teardown. Exact staging and every child/tree cleanup are verified.
-Signal-safe cleanup and parent lifecycle pass 26 focused checks; a new complete
-run is required. `d900499` remains the last accepted full Linux checkpoint.
-[Failure and correction](evidence/linux-777-complete-failure-summary.json).
+Latest complete Linux `d243d81` passes **251/251 groups, 1,633 tests,
+eleven declared skips and zero failures**. Every child/tree and the exact owned
+checkout, dependencies, builds and temporary parent are retired.
+[Complete result](evidence/linux-d243-complete-summary.json).
+The earlier `7772cb3` socket-cleanup failure remains retained; this run includes
+the signal-safe correction and parent ingress lifecycle.
+
+Windows `702897d` stopped before its new console comparison because a verifier
+still expected forty parser checks after the inventory increased to fifty. The
+count is corrected; native rerun is required.
+[Failed receipt and correction](evidence/windows-verifier-inventory-summary.json).
 
 Switchyard gives a Model F keyboard stable controls for returning to tasks,
 reviewing work and handing context between tools. It is a **partial implementation
@@ -89,7 +94,8 @@ authority. [Evidence](evidence/editor-protocol-summary.json).
 
 | Checkpoint | Result | Practical limit |
 | --- | --- | --- |
-| Complete Linux `d900499` | **248/248 groups; 1,600 passed tests; eleven declared skips.** Every child/tree and exact owned checkout, dependency, build and temporary-parent cleanup verifies. [Receipt](evidence/linux-d900-complete-summary.json). | Includes exact terminal process observation and token-security diagnostic source. Later protocol witness and query-only correction have separate focused evidence. |
+| Complete Linux `d243d81` | **251/251 groups; 1,633 passed tests; eleven declared skips.** Every child/tree and exact staging cleanup verifies. [Receipt](evidence/linux-d243-complete-summary.json). | Includes signal-safe ingress and its parent lifecycle. Does not cover later Windows console diagnostics or live IDE/account/task attachment. |
+| Earlier complete Linux `d900499` | **248/248 groups; 1,600 passed tests; eleven declared skips.** Every child/tree and exact owned checkout, dependency, build and temporary-parent cleanup verifies. [Receipt](evidence/linux-d900-complete-summary.json). | Includes exact terminal process observation and token-security diagnostic source. Later protocol witness and query-only correction have separate focused evidence. |
 | Reviewed editor launcher `1508ea9` | Five groups / 54 tests, typecheck, extension build and compiled CommonJS load pass. Generated output is removed. [Evidence](evidence/editor-terminal-launch-summary.json). | Real signed HTTP, encrypted state and Linux leases compose with controlled provider/editor doubles. No actual terminal was launched. |
 | Installed Linux `5a2c324` | Six normal update, eleven owner/editor/severity and seven journal checks pass. All 54 semantic snapshots excluding audit match; 52 sealed files remain byte-identical. Launcher backups and exact bundle cleanup verify. [Evidence](evidence/installed-cvss4-summary.json). | Two verification workspaces receive only the expected recovery/journal audit entries. Offline CVSS 4 keeps critical base severity despite zero supplied environment scores. No live task/provider effects or activated editor. |
 | Earlier installed Linux `2c87c03` | Six update, ten owner/editor/severity and seven journal checks pass. All 54 workspace identities remain; 52 sealed files are byte-identical across update. Launcher backups and exact bundle cleanup verify. [Evidence](evidence/installed-editor-authorization-summary.json). | The two opened verification workspaces are resealed by existing restart recovery. Definitions/package/modes, historical pending bytes and metadata-check state verify separately. No full semantic before-snapshot was retained. Three signed authorization checks are unknown-owner refusals, with no new permit/task/provider effects. |
