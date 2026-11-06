@@ -25,6 +25,14 @@ processes must coordinate that one enrollment's sequence, or use distinct enroll
 identities. Do not retry a claimed command after a timeout: inspect its uncertain
 outcome. Claims are delivered once and are never automatically replayed.
 
+Publishing `stopped` retires that session's pending commands in the same protected
+transaction: unclaimed commands cancel locally; claimed work remains uncertain.
+Readiness cannot resume under that stopped identity. A new process publishes
+`ready` with a fresh session ID, and neither old command is delivered again.
+The stopped adapter may still acknowledge its exact old claim using its original
+credential and a fresh sequence; that acknowledgement does not restore readiness
+or prove the external outcome. [Recovery contract](../docs/custom-agent-revocation.md#review-an-uncertain-claim).
+
 With an explicit Personal `agent-events` recording, the bridge also records
 bounded command queue/claim/retirement/acknowledgement metadata. Handoff text,
 credentials and raw identities stay out of that history. Local claims and agent

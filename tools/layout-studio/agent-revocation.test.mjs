@@ -144,6 +144,66 @@ async function uncertainClaim({ bridge, enroll, message }, intent = "review") {
   return { enrollment, claim, input: { agentId: "test", commandId: claim.commandId } };
 }
 
+test("an authenticated stopped session retires pending work and cannot resume delivery under the same identity", () => fixture(async ({ store, bridge, enroll, message }) => {
+  const e = await enroll(); await message(e.token, 1);
+  const claimed = await bridge.dispatch("personal", { agentId: "test", sessionId: "same-session", intent: "review" });
+  await message(e.token, 2, agentRoutes.poll, {});
+  const queued = await bridge.dispatch("personal", { agentId: "test", sessionId: "same-session", intent: "handoff", content: "PRIVATE_STOPPED_HANDOFF" });
+  await message(e.token, 3, agentRoutes.event, { event: { status: "stopped" } });
+  const stopped = (await store.snapshot("personal")).agents[0];
+  assert.deepEqual(stopped.commands.map(c => c.status), ["uncertain-session-ended", "cancelled-before-claim"]);
+  assert.equal(stopped.sessionId, "same-session"); assert.equal(stopped.reportedStatus, "stopped");
+  for (const status of ["ready", "busy", "idle", "waiting", "failed"]) await assert.rejects(message(e.token, 4, agentRoutes.event, { event: { status } }), /stopped.*session|fresh.*session/i);
+  await assert.rejects(message(e.token, 4, agentRoutes.poll, {}), /no longer owns/);
+  await assert.rejects(bridge.dispatch("personal", { agentId: "test", sessionId: "same-session", intent: "status" }), /absent or stale/);
+  assert.equal((await store.snapshot("personal")).agents[0].sequence, 3);
+  const review = await bridge.reviewOutcome("personal", { agentId: "test", commandId: claimed.commandId });
+  assert.equal(review.externalOutcomeVerified, false);
+  await assert.rejects(bridge.reviewOutcome("personal", { agentId: "test", commandId: queued.commandId }), /uncertain claim/);
+  await message(e.token, 4, agentRoutes.event, { event: { status: "ready" } }, "fresh-session");
+  assert.equal((await message(e.token, 5, agentRoutes.poll, {}, "fresh-session")).payload.result.command, null);
+  const history = (await store.snapshot("personal")).agents[0].commands;
+  assert.deepEqual(history, stopped.commands, "New readiness must not revive either old command.");
+}));
+
+test("a stopped adapter can acknowledge its exact old claim without reviving readiness or accepting stale review", () => fixture(async ({ store, bridge, enroll, message, advance }) => {
+  const e = await enroll(); await message(e.token, 1);
+  const claim = await bridge.dispatch("personal", { agentId: "test", sessionId: "same-session", intent: "review" });
+  await message(e.token, 2, agentRoutes.poll, {});
+  await message(e.token, 3, agentRoutes.event, { event: { status: "stopped" } });
+  const review = await bridge.reviewOutcome("personal", { agentId: "test", commandId: claim.commandId });
+  const stopped = (await store.snapshot("personal")).agents[0]; advance(1000);
+  await message(e.token, 4, agentRoutes.ack, { commandId: claim.commandId, outcome: "completed" });
+  const current = (await store.snapshot("personal")).agents[0];
+  assert.equal(current.commands[0].status, "completed");
+  assert.equal(current.reportedStatus, "stopped"); assert.equal(current.lastSeen, stopped.lastSeen);
+  assert.equal(current.sessionId, stopped.sessionId);
+  await assert.rejects(bridge.resolveOutcome("personal", { agentId: "test", commandId: claim.commandId, token: review.confirmation.token }), /uncertain claim/);
+  await assert.rejects(message(e.token, 5, agentRoutes.poll, {}), /no longer owns/);
+}));
+
+test("stop retirement, sequence and private observations commit together or all remain unchanged", () => fixture(async ({ root, store, bridge, enroll, message }) => {
+  await store.update("personal", "synthetic-recording", s => { s.observations = [{ id: "recording", status: "recording", sources: ["agent-events"], exclusions: [], createdAt: 100000, updatedAt: 100000, events: [] }]; });
+  const e = await enroll(); await message(e.token, 1);
+  const claim = await bridge.dispatch("personal", { agentId: "test", sessionId: "same-session", intent: "handoff", content: "PRIVATE_STOPPED_HANDOFF" });
+  await message(e.token, 2, agentRoutes.poll, {});
+  const before = await store.snapshot("personal"), update = store.update.bind(store);
+  store.update = (id, op, fn, scope) => update(id, op, async s => { await fn(s); throw Error("synthetic stop save failure"); }, scope);
+  try { await assert.rejects(message(e.token, 3, agentRoutes.event, { event: { status: "stopped" } }), /stop save failure/); }
+  finally { store.update = update; }
+  const failed = await store.snapshot("personal");
+  assert.deepEqual(failed.agents, before.agents); assert.deepEqual(failed.observations, before.observations);
+  await message(e.token, 3, agentRoutes.event, { event: { status: "stopped" } });
+  await assert.rejects(message(e.token, 3, agentRoutes.event, { event: { status: "stopped" } }), /replayed/);
+  await message(e.token, 4, agentRoutes.event, { event: { status: "stopped" } });
+  const state = await store.snapshot("personal"), retired = state.observations[0].events.filter(e => e.phase === "adapter-command-retired");
+  assert.equal(retired.length, 1); assert.equal(retired[0].status, "unknown");
+  assert.equal(retired[0].provenance, "switchyard-local-lifecycle"); assert.equal(retired[0].taskCompletionVerified, false);
+  for (const secret of [e.token, claim.commandId, "PRIVATE_STOPPED_HANDOFF", "same-session"]) assert.equal(JSON.stringify(retired).includes(secret), false);
+  const sealed = await readFile(join(root, "personal.sealed.json"), "utf8");
+  assert.equal(sealed.includes("PRIVATE_STOPPED_HANDOFF"), false);
+}));
+
 test("reviewing an uncertain retired claim records only local uncertainty and never retries or verifies external work", () => fixture(async f => {
   await f.store.update("personal", "synthetic-recording", s => { s.observations = [{ id: "recording", status: "recording", sources: ["agent-events"], exclusions: [], createdAt: 100000, updatedAt: 100000, events: [] }]; });
   const { enrollment, input } = await uncertainClaim(f, "handoff");

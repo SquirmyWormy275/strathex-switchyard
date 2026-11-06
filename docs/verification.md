@@ -1347,3 +1347,22 @@ verifier's own hash. No live agent, credential, provider, native task, recording
 model, public query, Microsoft account or HID operation is used. This accepts
 the named installed modules and synthetic behavior, not live agent recovery.
 [Repeatable verifier evidence](evidence/installed-agent-security-verifier-summary.json).
+
+
+## Custom-agent stop retirement — 2026-11-06
+
+An authenticated stopped status previously left commands claimed or queued.
+That prevented uncertain-claim review and allowed queued delivery after readiness
+returned under the same identity. Three new encrypted-state regressions reproduce
+these omissions. The correction retires commands atomically with status, sequence
+and opted-in observations; stopped identities cannot resume active status, while
+fresh readiness cannot revive old work. Exact late acknowledgements remain
+self-reports and invalidate stale outcome review without refreshing readiness.
+
+Eight groups pass 94 tests with no skips, including actual authenticated HTTP and
+bundled Node lifecycle checks. Typecheck, the original full package budget and
+all child/tree/owned-root cleanup pass. Failed persistence and replay preserve the
+original state; repeated stop reports do not duplicate observation metadata.
+The initial three failing regressions remain recorded. Installed and native
+Windows acceptance of this later correction remain separate.
+[Source receipt](evidence/agent-stop-retirement-source-summary.json).

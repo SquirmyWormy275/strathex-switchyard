@@ -64,7 +64,7 @@ deletion of unresolved history.
 
 ## Review an uncertain claim
 
-When a session is replaced or its authorization revoked, a previously claimed
+When a session reports stopped, is replaced or has its authorization revoked, a previously claimed
 command remains `uncertain-session-ended`. It cannot be retried automatically
 or acknowledged by a replacement credential. To record a deliberate review:
 
@@ -115,3 +115,23 @@ provider or native child. Missing, duplicate or broader flags refuse before
 installed-state access. Three focused groups pass 28 checks; the installed proof
 passes all nine. This verifies the named modules, not later unreviewed versions.
 [Reproducible verification](evidence/installed-agent-security-verifier-summary.json).
+
+## An adapter that reports stopped
+
+An authenticated `stopped` event now retires commands in the same encrypted
+transaction as the sequence and optional observations. Queued commands become
+`cancelled-before-claim`; claimed work becomes `uncertain-session-ended` and can
+use the review path above. This does not establish external process exit.
+
+The stopped session cannot publish active status, poll or receive new work. A
+fresh session must publish `ready`; it cannot revive the retired commands. An
+exact late acknowledgement from the original credential can still settle its
+own claim as a self-report without refreshing readiness. It invalidates stale
+operator review. Repeated stopped events do not duplicate retirement history;
+failed persistence preserves commands, sequence and observations together.
+
+Three encrypted-state regressions fail on the previous implementation and pass
+after correction. Eight focused groups pass 94 tests, including the existing
+authenticated HTTP and bundled Node lifecycle demonstrations. Typecheck, original
+package bounds and owned cleanup pass. Installed/native Windows acceptance of
+this correction remains separate. [Evidence](evidence/agent-stop-retirement-source-summary.json).

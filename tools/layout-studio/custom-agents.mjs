@@ -109,10 +109,12 @@ export function createCustomAgents({ store, now = () => Date.now() }) {
         if (path === agentRoutes.event) {
           const event = body.event;
           if (!event || Object.keys(event).join() !== "status" || !["ready", "busy", "waiting", "idle", "failed", "stopped"].includes(event.status)) throw new Error("The agent event is outside the versioned contract.");
+          if (a.sessionId === body.sessionId && a.reportedStatus === "stopped" && event.status !== "stopped") throw Error("This agent session already stopped. Publish ready with a fresh session identity before accepting new work.");
           if (a.sessionId !== body.sessionId) {
             if (event.status !== "ready") throw new Error("A new agent session must publish ready before other events.");
             retireCommands(s, a, "session identity changed; never automatically re-delivered; external outcome unverified");
           }
+          if (event.status === "stopped") retireCommands(s, a, "authenticated adapter reported stopped; external process and task outcomes unverified");
           a.protocolVersion = 2; a.lastSeen = now(); a.sessionId = body.sessionId; a.reportedStatus = event.status; a.provenance = "authenticated adapter self-report; not verified task completion";
           appendAgentObservation(s, { provider: "custom-agent", subjectId: `${a.id}:${body.sessionId}`, phase: "adapter-status-observed", status: event.status, at: now() });
           return accept({ accepted: true, provenance: a.provenance });

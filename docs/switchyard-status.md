@@ -66,6 +66,15 @@ the 26-check update; native Windows and live installed command execution remain 
 
 ## What the backend does
 
+Authenticated custom-agent stop events now retire pending commands atomically:
+unclaimed work cancels locally, claimed outcomes remain uncertain, and a fresh
+session identity is required before accepting new work. Exact late acknowledgements
+remain self-reports and cannot revive readiness. Three regressions fail before
+correction; eight focused groups/94 tests, typecheck, package bounds and cleanup
+pass. Installed and native Windows acceptance remain separate.
+[Contract](custom-agent-revocation.md#an-adapter-that-reports-stopped),
+[evidence](evidence/agent-stop-retirement-source-summary.json).
+
 Custom-agent authorization now has a reviewed revoke-and-reenroll path. Exact
 roles are retired, unclaimed commands cancel locally and claimed outcomes remain
 uncertain. New credentials cannot inherit old claims or role authority. Eight

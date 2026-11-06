@@ -31,6 +31,13 @@ evidence, not instructions to reset. Publish regular commits. Do not merge or re
 
 ## Current implementation and evidence
 
+The latest source correction retires commands when an adapter publishes stopped,
+preserves uncertain claims and rejects active status under the same stopped
+identity. Three regressions fail before the fix and pass within eight groups/94
+checks afterward. Typecheck/package bounds and owned cleanup pass; installed and
+native Windows acceptance of this correction remain separate.
+[Evidence](evidence/agent-stop-retirement-source-summary.json).
+
 Custom-agent uncertain claims now support separately reviewed local recovery.
 Five new cases pass within eight groups/91 checks: original uncertainty is retained,
 no command is retried, late authenticated acknowledgements win and only deliberately
