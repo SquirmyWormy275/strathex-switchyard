@@ -31,7 +31,8 @@ there is no merge or public release acceptance.
 | Installation and runtime | All sixteen original Windows installation/recovery cases pass at `b600a6d`; its independent fresh runtime installs 49 packages and loads/rechecks the offline CPU model, then removes its temporary runtime. [Installation](evidence/installation-scenarios-native-summary.json), [runtime](evidence/windows-runtime-b600-native-summary.json). | These independent passes do not accept the failed complete Windows release or ordinary-user/guest journeys. |
 | Latest diagnostic source | Seven focused groups pass 69 tests with five Windows-only skips. Two managed builds, 2,101 portable checks, typecheck and exact owned cleanup pass. [Receipt](evidence/worker-start-observation-source-summary.json). | Actual Windows `d15285b` passes all eight acknowledgement/refusal tests without skips. [Native receipt](evidence/worker-start-refusal-native-summary.json). The full restricted-owner journey is now separately accepted above. |
 | Windows index/history/leases | Native NTFS index and history packets each pass six checks and three independent guardian exits. Both Windows scanner files pass two cases with guest execution doubled; lease groups pass 24 tests and one Linux-only skip. [Evidence](evidence/native-history-index-leases-summary.json). | Packet Git witnesses are synthetic. Actual guest, installed Windows and ordinary-user acceptance remain separate. |
-| Installed app | Linux source `d8a0a96` passes 20 installed owner/editor/journal/offline-severity/SPDX/OSV metadata checks. All 54 workspace semantic snapshots and frozen frontend bytes are preserved. [Receipt](evidence/installed-spdx-osv-summary.json). | This read-only metadata update starts no scanner, task, provider or public query. Frontend and extension activation remain frozen. |
+| Installed app | Linux source `0cb823b` passes 26 installed owner/editor/journal/offline-severity/SPDX/OSV/archive metadata checks. All 54 workspace semantic snapshots and frozen frontend bytes are preserved. The new archive parser reads the retained offline npm fixture without extraction or execution. [Receipt](evidence/installed-npm-archive-summary.json). | This metadata update starts no scanner, task, provider or public query. Frontend and extension activation remain frozen. |
+| Windows npm archive identity | Corrected `55515d1` completes ten tests with two original Linux-only skips inside the original 300-second file bound; guest execution is doubled. [Native receipt](evidence/npm-archive-native-summary.json). | Complete Windows release remains separate. Its installation lane has a new native shortcut timeout: 15/16 scenarios pass, and the failed scenario is retained. [Failure](evidence/windows-shortcut-timeout-summary.json). |
 
 Failed runs remain failed evidence. Partial test output is excluded when the
 final plan is missing. Provider and guest doubles are explicitly identified in
@@ -62,7 +63,8 @@ Rev2 scope independently of these checkpoints.
   Selected npm archive identity comparison is implemented with bounded, non-extracting
   gzip/USTAR parsing: six groups/78 checks plus one exact alias/version check pass.
   Native Windows hit the original combined-file deadline; the corrected split
-  passes 53 distinct source checks and awaits native acceptance.
+  passes 53 distinct source checks and ten native Windows tests with two declared
+  Linux-only skips. The original byte-comparison lane is verified separately.
   Complete Linux `7e45654` also hits that combined-file deadline: 305/306 groups,
   1,783 accepted tests and sixteen declared skips. Owned staging was removed
   after exit verification. [Failed receipt](evidence/linux-7e45654-timeout-summary.json).

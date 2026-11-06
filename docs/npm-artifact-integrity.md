@@ -156,3 +156,11 @@ Native acceptance of the corrected schedule remains pending.
 The corrected schedule passes five distinct groups / 53 tests across the
 initial scanner/scheduling results and the corrected harness inventory check.
 Every child and process tree exits. [Scheduling evidence](evidence/npm-archive-scheduling-summary.json).
+
+Native Windows 55515d1 now accepts the archive file with ten passing tests and
+two declared Linux-only skips in its original 300-second bound; the guest is a
+double. Normal installed 0cb823b passes six pure archive checks alongside the
+twenty existing metadata checks, preserving all 54 workspaces. This installed
+proof executes neither a scanner nor archive contents.
+[Windows evidence](evidence/npm-archive-native-summary.json),
+[installed evidence](evidence/installed-npm-archive-summary.json).

@@ -1,5 +1,22 @@
 # What has actually been verified
 
+The normal installed `0cb823b` update passes **26 metadata checks**, including
+the exact offline npm archive fixture, mismatched identity, truncated input,
+decompression budget and impossible report refusal. All 54 original workspace
+semantic snapshots and frozen frontend bytes are preserved; 53 sealed files are
+byte-identical, with one audit-only change. Dated launcher backup/readback passes,
+only current/one rollback remain, and the exact prepared bundle is removed.
+No scanner, task, provider, public query, archive extraction or package script
+runs. [Installed receipt](evidence/installed-npm-archive-summary.json).
+
+Native Windows `55515d1` accepts the separately scheduled archive file:
+**ten passes, two original Linux-only skips**, original 300-second bound and
+verified child/tree cleanup. Its guest is doubled. A distinct installation lane
+fails native shortcut creation at its ten-second deadline: **15/16 scenarios
+pass**. That failure is retained; the root cause is not yet established.
+[Archive acceptance](evidence/npm-archive-native-summary.json),
+[shortcut failure](evidence/windows-shortcut-timeout-summary.json).
+
 Complete Linux `7e45654` finishes **305/306 groups**, with 1,783 accepted tests
 and sixteen declared skips. The combined artifact file exceeds its original
 120-second deadline; no partial plan from that group is accepted. Every child

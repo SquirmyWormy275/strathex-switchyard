@@ -36,14 +36,15 @@ checks, native Windows results, focused source checks and installed acceptance.
 The [verification record](verification.md) retains historical receipts and failed
 attempts; do not infer current status from an older passing checkpoint.
 
-The installed baseline is `d8a0a9657afc4df189aa6b6e75252b7682adc054`,
-release `ea1e1770c05bca00c932ad2e77fd28dc9fa4ac6e378992be4f7b437cf902cba1`.
+The installed baseline is `0cb823bba89e788be7a7d0adfd41769c185de4cd`,
+release `5b9215b2466687a90f15d935af2839927abd479ddfd34640c108dacda10b9f5a`.
 Preserve all 54 original workspace identities, the pending keyboard-only Codex
 workspace, private connection information and the frozen Home bytes. The
-normal versioned update passed 20 read-only metadata checks. All 54 semantic
-snapshots match; 52 sealed files are byte-identical and two changed only audit
+normal versioned update passed 26 metadata checks, including six pure installed
+archive identity/refusal checks. All 54 semantic snapshots match; 53 sealed files
+are byte-identical and one changed only audit
 metadata. Keep the current release and its one rollback. The prepared bundle
-was removed after manifest verification. [Receipt](evidence/installed-spdx-osv-summary.json).
+was removed after manifest verification. [Receipt](evidence/installed-npm-archive-summary.json).
 
 ## Continue independently
 
@@ -103,8 +104,13 @@ was removed after manifest verification. [Receipt](evidence/installed-spdx-osv-s
    and deadlines. Five distinct groups/53 checks pass across the initial scanner
    groups and corrected harness inventory; four report-bound cases also pass.
    [Scheduling evidence](evidence/npm-archive-scheduling-summary.json). Reconcile
-   its native follow-up evidence.
-   Installed source remains d8a0a96.
+   its native follow-up evidence. Corrected `55515d1` archive-scanner now passes
+   ten native Windows tests and two declared Linux-only skips, with guest
+   execution doubled and exact cleanup. [Receipt](evidence/npm-archive-native-summary.json).
+   The separate installation lane fails one of sixteen scenarios during native
+   shortcut creation. The original ten-second shortcut deadline remains; its
+   underlying cause is not established. [Failure](evidence/windows-shortcut-timeout-summary.json).
+   Installed source is now 0cb823b, with 26 permitted metadata checks.
    Native NTFS index/history staging now each pass six original checks and
    three independent guardian exits at 6b4089c. Their Windows scanner files
    separately pass two cases each with guest doubles; leases pass 24 cases and
