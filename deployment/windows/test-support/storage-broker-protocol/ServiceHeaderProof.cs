@@ -18,7 +18,23 @@ internal static class ServiceHeaderProof
                 checks++;
             }
         }
-        if (checks != 769) throw new InvalidOperationException("The complete service header guard inventory did not execute.");
+        if (checks != 769) throw new InvalidOperationException("The complete original service header guard inventory did not execute.");
+        WindowsStorageBrokerServiceHeader.Verify(16, 4, 1, deletionAcknowledged: true); checks++;
+        // Exhaust all original fields again in the acknowledged deletion phase.
+        // Only auto/disabled may remain, and neither proves actual SCM absence.
+        foreach (int field in new[] { 0, 1, 2 })
+        {
+            foreach (uint alternative in Enumerable.Range(0, 256).Select(value => (uint)value).Append(uint.MaxValue))
+            {
+                uint type = field == 0 ? alternative : 16, start = field == 1 ? alternative : 4, error = field == 2 ? alternative : 1;
+                bool expected = type == 16 && start is 2 or 4 && error == 1, accepted = true; string? phase = null;
+                try { WindowsStorageBrokerServiceHeader.Verify(type, start, error, value => phase = value, deletionAcknowledged: true); }
+                catch (InvalidOperationException) { accepted = false; }
+                if (accepted != expected || phase is null || phase.Length > 80 || !phase.All(c => char.IsAsciiLetter(c) || c == '-')) throw new InvalidOperationException("The acknowledged deletion header accepted a foreign configuration or leaked a diagnostic.");
+                checks++;
+            }
+        }
+        if (checks != 1541) throw new InvalidOperationException("The complete service lifecycle header guard inventory did not execute.");
         return checks;
     }
 }

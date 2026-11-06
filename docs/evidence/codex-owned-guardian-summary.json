@@ -39,5 +39,20 @@
     "apps/vscode-extension/src/codex-daemon-status.cjs": "9785b5021665fcc366da80ca3aa8678cda098c01a5872238be2e46aae502fbc2",
     "scripts/codex-daemon-status.test.mjs": "c9b58d003e765baef2b040527f3d592b9cc9f241485f269fb6984996757dce25",
     "scripts/verify-codex-owned-listener.mjs": "0e49ef777a3278842a8977013ed56baab9bd8e65bb688a0dc6daa031802712c0"
+  },
+  "readOnlyOptionsFollowup": {
+    "receipt": "codex-owned-guardian-1793927053046.json",
+    "receiptSha256": "646d730e4192ad1980ae165a848e0fde7890dcb56d8652f3bbc250288496daa8",
+    "nativeChecks": 4,
+    "effectiveConfigurationAndParentLossAccepted": true,
+    "ownedCleanupVerified": true,
+    "softwareReceipt": "isolated-test-022ea0bb-c65a-4276-b064-34f9246ace33.json",
+    "completeSoftwareFilePassedTests": 2,
+    "inheritedOrExplicitMutationFollowupForwarded": false,
+    "sourceSha256": {
+      "apps/vscode-extension/src/codex-daemon-status.cjs": "9cd3bb26fa6091834c9ca0d5cb9d2295a7cb5250e6111808d1570820fa9f7544",
+      "scripts/codex-daemon-status.test.mjs": "7576b3a351766f00defb0e97efe46f02c181484d1cddba79f4cc5acea361ea78",
+      "scripts/verify-codex-owned-listener.mjs": "0e49ef777a3278842a8977013ed56baab9bd8e65bb688a0dc6daa031802712c0"
+    }
   }
 }

@@ -12,11 +12,17 @@ have separate focused evidence. [Exact complete checkpoint](evidence/linux-d412-
 
 Native Windows `4911642` passes thirty filesystem checks and both six-check
 service/setup lifecycles, including thirteen restricted metadata checks in each.
-The workflow remains failed: the restricted primary child exits during DLL
-initialization (`STATUS_DLL_INIT_FAILED`), and fixture invalidation times out
-within the unchanged private-lock bound. The private-desktop candidate has not
-resolved the child failure. The later removal pass does not establish the cause
-or resolution of the earlier service-header failure. [Exact artifacts and limits](evidence/windows-491-native-summary.json).
+The later `842416e` run identifies the intermittent removal failure as a disabled
+start type after acknowledged deletion; its restricted primary child still exits
+with `STATUS_DLL_INIT_FAILED`. The source correction keeps every strict pre-delete
+check, allowing disabled only while observing an acknowledged pending deletion.
+Actual SCM absence and original process/ownership guards remain mandatory.
+Both managed targets compile, all 1,764 portable checks and five backend files/
+fifty tests pass; native correction acceptance remains pending. Fixture
+invalidation separately passes all five native tests at `842416e`. Neither
+failure is blocked by absent hardware/accounts.
+[Exact failure and source candidate](evidence/windows-service-deletion-state-summary.json),
+[earlier passing components](evidence/windows-491-native-summary.json).
 
 Windows keyless workers pass both complete native lease files at `0740791`:
 sixteen tests plus one declared platform skip. Fresh encrypted state and keys

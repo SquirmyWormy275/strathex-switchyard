@@ -43,7 +43,7 @@ internal static class WindowsStorageBrokerControl
         if(key==null){if(allowDeleted)return;throw Invalid();}
         if(key.GetValueKind("Environment")!=RegistryValueKind.MultiString||key.GetValue("Environment",null,RegistryValueOptions.DoNotExpandEnvironmentNames) is not string[] values||!values.SequenceEqual(new[]{"DOTNET_BUNDLE_EXTRACT_BASE_DIR="+WindowsStorageBrokerRuntime.Root(settings)}))throw Invalid();
     }
-    private static void VerifyConfiguration(ServiceHandle service,WindowsStorageBrokerInstallation.Settings settings,bool allowDeletedEnvironment=false,Action<string>? phase=null)
+    private static void VerifyConfiguration(ServiceHandle service,WindowsStorageBrokerInstallation.Settings settings,bool deletionAcknowledged=false,Action<string>? phase=null)
     {
         phase?.Invoke("service-absence-query-configuration-size");
         bool initial=QueryServiceConfigW(service,IntPtr.Zero,0,out uint required);int error=Marshal.GetLastWin32Error();
@@ -66,7 +66,7 @@ internal static class WindowsStorageBrokerControl
             }
             // These are fixed phase labels only. Never publish service paths,
             // account strings, environment values or native buffer contents.
-            WindowsStorageBrokerServiceHeader.Verify(config.Type,config.Start,config.Error,phase);
+            WindowsStorageBrokerServiceHeader.Verify(config.Type,config.Start,config.Error,phase,deletionAcknowledged);
             if(Text(config.Binary,"binary")!=settings.ServiceCommand)throw Invalid();
             if(!Text(config.Account,"account").Equals("LocalSystem",StringComparison.OrdinalIgnoreCase))throw Invalid();
             if(Text(config.Display,"display")!="Switchyard scoped storage (metadata bootstrap)")throw Invalid();
@@ -75,7 +75,7 @@ internal static class WindowsStorageBrokerControl
             phase?.Invoke("service-absence-configuration-tag");if(config.Tag!=0)throw Invalid();
         }
         finally{Marshal.FreeHGlobal(memory);}
-        phase?.Invoke("service-absence-environment");VerifyEnvironment(settings,allowDeletedEnvironment);
+        phase?.Invoke("service-absence-environment");VerifyEnvironment(settings,deletionAcknowledged);
     }
     internal static WindowsStorageBrokerInstallation.Settings Install(string sid,string installationId,string selfSha256)
     {
@@ -147,7 +147,8 @@ internal static class WindowsStorageBrokerControl
             // DeleteService marks the entry; SCM removes it asynchronously after
             // every service handle closes. A still-open, stopped original entry
             // is not absence. Close this observation handle before waiting, and
-            // never accept another configuration, a running service or timeout.
+            // never accept another owner/configuration, a running service or
+            // timeout. Only the acknowledged deletion may change start to disabled.
             bool absent;
             phase?.Invoke("service-absence-open");
             using(var observed=OpenServiceW(manager,settings.ServiceName,5))
@@ -160,7 +161,9 @@ internal static class WindowsStorageBrokerControl
                         phase?.Invoke("service-absence-configuration");
                         // The original delete was accepted. SCM and registry
                         // queries can observe a deleted/marked entry through a
-                        // still-valid handle; this is pending, never absence.
+                        // still-valid handle. SCM may mark its start disabled;
+                        // all other exact configuration checks remain required.
+                        // This is pending deletion, never verified absence.
                         VerifyConfiguration(observed,settings,true,phase);
                         phase?.Invoke("service-absence-status");var remaining=ReadStatus(observed);
                         // The original process handle already verified exit.

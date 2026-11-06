@@ -14,6 +14,34 @@ until that complete native journey is accepted.
 
 ## Current verification limits
 
+Native source `842416e` identifies the intermittent removal failure precisely:
+after `DeleteService` succeeded, the still-observable stopped entry reported
+start type disabled. Native setup independently reports the corresponding fixed
+managed exit code 134. Both original failed artifacts remain retained; the
+restricted primary child separately still exits with `STATUS_DLL_INIT_FAILED`.
+Fixture invalidation now passes all five native tests, with verified cleanup;
+that pass does not establish the cause of its earlier lock timeout.
+
+The source fix retains the original 16/2/1 header for installation, metadata and
+every pre-delete check. Only the existing post-delete observation accepts start
+2 or 4, with type/error, exact binary/account/display/dependencies/group/tag,
+remaining environment and stopped-state guards intact. This pending state never
+counts as absence. Original process exit, successful deletion, closed observation
+handles, actual SCM absence and protected inventory checks remain mandatory.
+The original ten-second absence bound and all other deadlines are unchanged.
+
+Microsoft documents [deferred service deletion](https://learn.microsoft.com/en-us/windows/win32/api/winsvc/nf-winsvc-deleteservice)
+until handles close and the service stops. The disabled intermediate start type
+is an observation from the exact native failure, rather than a behavior promised
+by that documentation. Both managed targets compile without warnings/errors,
+all original 769 normal-header cases plus 772 deletion cases pass (1,764 portable
+checks overall), and five complete backend files pass fifty tests. Actual Windows
+acceptance of the correction remains pending. This is independently executable
+software work, separate from guest, ordinary-account and interactive UAC checks.
+[Exact observed failures and source candidate](evidence/windows-service-deletion-state-summary.json).
+
+## Earlier native boundaries
+
 Source `3319f92`, native workflow `42118172704`, is **not accepted** as a complete
 filesystem/restricted-owner journey. Its restricted .NET client passes 13 metadata
 and 31 exchange checks, and the original JavaScript owner passes eight checks.

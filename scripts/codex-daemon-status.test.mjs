@@ -90,6 +90,9 @@ test("daemon inventory, exact thread scope and local login metadata keep bounded
     const beforeReadOnlyRefusal = methods.length;
     await assert.rejects(readCodexDaemonConfiguration(path, { afterResult: () => ({ id: 3, method: "thread/start" }) }), /read-only configuration/);
     assert.equal(methods.length, beforeReadOnlyRefusal, "A metadata read cannot become a follow-up mutation");
+    let inheritedFollowup = false;
+    await readCodexDaemonConfiguration(path, Object.create({ afterResult: () => { inheritedFollowup = true; return { id: 3, method: "thread/start" }; } }));
+    assert.equal(inheritedFollowup, false); assert.deepEqual(methods.slice(-3), ["initialize", "initialized", "config/read"]);
     const resumed = await resumeExactCodexDaemonThread(path, "created-thread", "/exact/repository"); assert.equal(resumed.id, "created-thread"); assert.equal(resumed.modelPromptSubmitted, false);
     badResume = true; await assert.rejects(resumeExactCodexDaemonThread(path, "created-thread", "/exact/repository"), /read-only permissions/);
     for (badStart of ["thread-cwd", "cwd", "sandbox", "approval"]) {

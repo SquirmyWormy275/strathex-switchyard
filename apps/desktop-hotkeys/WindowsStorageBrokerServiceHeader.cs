@@ -1,7 +1,7 @@
 /** Fixed SCM header invariants and bounded diagnostics, with no paths or account data. */
 internal static class WindowsStorageBrokerServiceHeader
 {
-    internal static void Verify(uint type, uint start, uint error, Action<string>? phase = null)
+    internal static void Verify(uint type, uint start, uint error, Action<string>? phase = null, bool deletionAcknowledged = false)
     {
         phase?.Invoke("service-absence-configuration-header-type");
         if (type != 16) throw Invalid();
@@ -14,7 +14,9 @@ internal static class WindowsStorageBrokerServiceHeader
             4 => "service-absence-configuration-header-start-disabled",
             _ => "service-absence-configuration-header-start-unexpected"
         });
-        if (start != 2) throw Invalid();
+        // Only an acknowledged deletion may observe SCM's disabled tombstone.
+        // This is pending deletion, never a usable installation or absence.
+        if (start != 2 && !(deletionAcknowledged && start == 4)) throw Invalid();
         phase?.Invoke(error switch
         {
             0 => "service-absence-configuration-header-error-ignore",

@@ -167,7 +167,7 @@ async function readCodexDaemonConfiguration(socketPath, options = {}) {
   return requestCodexDaemon(socketPath, { id: 2, method: "config/read", params: { includeLayers: false } }, result => {
     if (!result?.config || typeof result.config !== "object" || Array.isArray(result.config)) throw new Error("The Codex runtime configuration is unavailable.");
     return Object.freeze(result.config);
-  }, options);
+  }, { deadlineMs: options.deadlineMs });
 }
 
 async function resumeExactCodexDaemonThread(socketPath, threadId, repositoryRoot, options = {}) {
