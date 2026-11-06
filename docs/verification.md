@@ -1,5 +1,12 @@
 # What has actually been verified
 
+Installed `5a2c324` passes six update, eleven owner/editor/severity and seven
+journal checks. All 54 non-audit semantic snapshots match the fixed-clock
+preflight; 52 sealed files are identical, and two have only expected recovery
+audit additions. Dated launcher backups and exact bundle cleanup verify.
+Offline severity and signed unknown-owner refusals do not establish live task
+or editor attachment. [Installed evidence](evidence/installed-cvss4-summary.json).
+
 CVSS 4 source support matches 463,204 independently generated/reference-compared
 vectors. Six groups / 58 tests, typecheck and exact source/build cleanup pass;
 actual Linux scanner and Windows guest-double evidence remain distinct from

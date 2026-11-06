@@ -1,0 +1,70 @@
+{
+  "schema": "switchyard-installed-cvss4-summary/v1",
+  "sourceCommit": "5a2c3243b223c657d81b190745ad43440b4e013c",
+  "applicationRelease": "9f70e2a819488f8ce04a0f5c978544f3e16a08bd6d9d47dffafa0ca2dd8b8146",
+  "update": {
+    "receipt": "assignment-legends-1793953195889.json",
+    "checks": 6
+  },
+  "ownerEditorSeverity": {
+    "receipt": "installed-task-owner-metadata-1793953579088.json",
+    "checks": 11,
+    "signedUnknownOwnerRefusals": 4,
+    "offlineCvss4BaseThreatEnvironmentCombined": [
+      9.3,
+      8.1,
+      0,
+      0
+    ],
+    "baseSeverity": "critical"
+  },
+  "copilotJournal": {
+    "receipt": "installed-copilot-journal-metadata-1793953578895.json",
+    "checks": 7
+  },
+  "preservation": {
+    "receipt": "installed-cvss4-preservation-1793953683898.json",
+    "beforeReceipt": "cvss4-installed-preflight-1793953144177.json",
+    "workspaceIdentities": 54,
+    "semanticSnapshotsExcludingAuditPreserved": 54,
+    "byteIdenticalWorkspaceFiles": 52,
+    "verificationWorkspacesResealed": 2,
+    "addedAuditOperationsPerVerificationWorkspace": [
+      "repository-effect-journal",
+      "restart-recovery",
+      "claude-creation-recovery",
+      "repository-effect-journal"
+    ],
+    "oldAuditHashesPreservedWithinExistingRetention": true,
+    "historicalPendingConversationSealedHashPreserved": true,
+    "selectionPrivateLinkFrozenHomePreserved": true
+  },
+  "launcherBackup": {
+    "id": "2026-11-06T08-19-54.056Z-e06d7249-42f6-4cac-a0c2-10871cf7b8f5",
+    "beforeAfterHashesAndCurrentModesVerified": 4
+  },
+  "cleanup": {
+    "disposableBundleRemoved": true,
+    "extensionOutputRemoved": true
+  },
+  "readOnlyHarnessFailures": [
+    {
+      "receipt": "installed-cvss4-preservation-1793953614715.json",
+      "cause": "Audit field is operation, not action; undefined fields omitted by serialized preflight made the first deep comparison invalid."
+    },
+    {
+      "receipt": "installed-cvss4-preservation-1793953642463.json",
+      "cause": "Existing recovery also appends repository-effect-journal audit entries; no non-audit semantic change occurred."
+    },
+    {
+      "receipt": "installed-cvss4-preservation-1793953669529.json",
+      "cause": "Backup hash helper serialized byte buffers rather than hashing raw bytes. Corrected raw-byte comparisons verify all four entries."
+    }
+  ],
+  "limits": [
+    "This installs the backend gateway, not an activated editor extension. Installed editor requests exercise unknown-owner refusals only.",
+    "CVSS 4 runs offline with a synthetic pinned advisory; no live scanner, provider, model request, task load, account switch, terminal, microphone or keyboard operation.",
+    "Native editor acknowledgement and command wiring remain unfinished; Windows restricted Node startup remains failed.",
+    "All earlier failed receipts remain failed. These read-only harness corrections do not rewrite saved workspace or installation state."
+  ]
+}
