@@ -108,8 +108,8 @@ jobs:
           $code = $LASTEXITCODE
           $output | Write-Output
           $tap = $output -join "`n"
-          if ($code -ne 0 -or $tap -notmatch '(?m)^1\.\.6\r?\n# tests 6\r?\n# suites 0\r?\n# pass 6\r?\n# fail 0\r?\n# cancelled 0\r?\n# skipped 0\r?\n# todo 0\r?\n# duration_ms [^\r\n]+\s*$') { throw 'The exact native suspended-worker checks did not all pass.' }
-          @{ schema = 'switchyard-windows-suspended-worker-native/v1'; sourceCommit = (& git rev-parse HEAD); passedTests = 6; skippedTests = 0; failedTests = 0; helperSha256 = ((Get-FileHash $env:SWITCHYARD_TEST_RUNTIME_HELPER -Algorithm SHA256).Hash.ToLowerInvariant()); testSourceSha256 = ((Get-FileHash $test -Algorithm SHA256).Hash.ToLowerInvariant()); success = $true } | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $env:RUNNER_TEMP 'switchyard-suspended-worker-verification.json') -Encoding utf8
+          if ($code -ne 0 -or $tap -notmatch '(?m)^1\.\.8\r?\n# tests 8\r?\n# suites 0\r?\n# pass 8\r?\n# fail 0\r?\n# cancelled 0\r?\n# skipped 0\r?\n# todo 0\r?\n# duration_ms [^\r\n]+\s*$') { throw 'The exact native suspended-worker checks did not all pass.' }
+          @{ schema = 'switchyard-windows-suspended-worker-native/v1'; sourceCommit = (& git rev-parse HEAD); passedTests = 8; skippedTests = 0; failedTests = 0; helperSha256 = ((Get-FileHash $env:SWITCHYARD_TEST_RUNTIME_HELPER -Algorithm SHA256).Hash.ToLowerInvariant()); testSourceSha256 = ((Get-FileHash $test -Algorithm SHA256).Hash.ToLowerInvariant()); success = $true } | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $env:RUNNER_TEMP 'switchyard-suspended-worker-verification.json') -Encoding utf8
           Remove-Item Env:SWITCHYARD_TEST_RUNTIME_HELPER
 
       - name: Retain only the suspended-worker native proof

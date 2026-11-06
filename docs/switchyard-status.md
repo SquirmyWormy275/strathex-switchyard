@@ -18,6 +18,20 @@ there is no merge or public release acceptance.
 
 ## Current evidence
 
+Native Windows `dad5400` verifies the guardian self-birth correction: readiness
+and the original start acknowledgement complete. One guardian and two status
+helpers verify exact QUERY-mask-8 registration; no suspended worker is registered.
+The original owner remains **0/8**, failing at
+`probe-identity-committed-worker-exit`. Broader failed-fixture cleanup is not
+claimed. [Native receipt](evidence/guardian-self-birth-native-summary.json).
+A bounded worker-start failure frame now identifies only the fixed pipe,
+attribute, process-create or worker-identity stage and its numeric API error.
+It grants no permissions and cannot establish execution or cleanup. Seven
+focused groups pass **69 tests / five Windows-only skips**, two managed builds
+and **2,101 portable checks** pass, and typecheck/owned cleanup verify.
+Actual Windows acceptance remains pending.
+[Source receipt](evidence/worker-start-observation-source-summary.json).
+
 Native Windows `dbbcce8` finishes all four preliminary backend jobs within
 their twenty-minute limits: **170/171 groups accepted**, with 971 passing tests
 and 135 declared skips from completed plans. The remaining task-owner file

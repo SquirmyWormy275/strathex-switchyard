@@ -72,7 +72,9 @@ The guardian now reads its own creation time through `GetCurrentProcess` and
 or changing its process DACL. The native proof checks liveness using
 `GetExitCodeProcess` before and after the QUERY allowance: Microsoft documents
 that a live process has an undefined exit-time field. Limited-query access stays
-unchanged. This source correction still needs native acceptance.
+unchanged. Native `dad5400` now verifies guardian readiness and its start acknowledgement.
+The original owner still fails before suspended-worker registration, zero of
+eight checks. [Native receipt](evidence/guardian-self-birth-native-summary.json).
 [Source receipt](evidence/guardian-self-birth-source-summary.json).
 
 Primary references: [current-process pseudo handle](https://learn.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-getcurrentprocess)

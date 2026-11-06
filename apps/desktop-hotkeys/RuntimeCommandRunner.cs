@@ -21,7 +21,18 @@ internal static class RuntimeCommandRunner
         public uint? NativeCode;
         public TokenQueryObservation? SelfTokenQuery;
         public bool Ready;
-        public object? Failure => !Ready && Id is not null ? new { schema = Schema, id = Id, @event = "startup-failure", containment = "windows-job", phase = Phase, nativeCode = NativeCode, selfTokenQuery = SelfTokenQuery } : null;
+        public bool WorkerStarting;
+        public void WorkerStage(string phase) { Phase = phase; NativeCode = null; }
+        public object? Failure
+        {
+            get
+            {
+                if (Id is null) return null;
+                if (!Ready) return new { schema = Schema, id = Id, @event = "startup-failure", containment = "windows-job", phase = Phase, nativeCode = NativeCode, selfTokenQuery = SelfTokenQuery };
+                if (WorkerStarting) return new { schema = Schema, id = Id, @event = "worker-start-failure", containment = "windows-job", phase = Phase, nativeCode = NativeCode };
+                return null;
+            }
+        }
     }
     private sealed record TokenQueryObservation(bool opened, uint error, uint? closeError, bool handlesClosedVerified);
     // After a Job-creation denial only: observe the failing process's existing
@@ -36,6 +47,12 @@ internal static class RuntimeCommandRunner
         return new(opened, error, opened ? closeError : null, closed);
     }
     private static Exception NativeError() => new InvalidOperationException("The native runtime boundary is unavailable.");
+    private static void RequireWorkerApi(bool succeeded, StartupObservation observation)
+    {
+        if (succeeded) return;
+        observation.NativeCode = unchecked((uint)Marshal.GetLastWin32Error());
+        throw NativeError();
+    }
     private static async Task<string?> ReadLineBounded(TextReader reader)
     {
         var value = new StringBuilder(); var buffer = new char[1];
@@ -147,15 +164,20 @@ internal static class RuntimeCommandRunner
         lock (Lifecycle)
         {
             if (ParentGone) throw NativeError();
-            child = Start(executable, arguments, cwd, environment, job);
+            startup.WorkerStarting = true;
+            child = Start(executable, arguments, cwd, environment, job, startup);
         }
         using (child)
         {
             if (workerAcknowledgement)
             {
+                startup.WorkerStage("worker-id");
                 uint workerPid = GetProcessId(child.Process);
-                if (workerPid == 0 || !GetProcessTimes(child.Process, out long created, out _, out _, out _)) throw NativeError();
+                RequireWorkerApi(workerPid != 0, startup);
+                startup.WorkerStage("worker-birth");
+                RequireWorkerApi(GetProcessTimes(child.Process, out long created, out _, out _, out _), startup);
                 string workerBirth = DateTime.FromFileTimeUtc(created).Ticks.ToString(System.Globalization.CultureInfo.InvariantCulture);
+                startup.WorkerStarting = false;
                 Write(new { schema = Schema, id, @event = "worker-suspended", containment = "windows-job", guardianPid = Environment.ProcessId, birth, workerPid, workerBirth, executableSha256 = digest });
                 // Console.In can perform its read synchronously even through
                 // ReadAsync; keep that read off the thread enforcing the bound.
@@ -168,6 +190,7 @@ internal static class RuntimeCommandRunner
                     || value.GetProperty("executableSha256").GetString() != digest || !value.GetProperty("startWorker").GetBoolean()) throw NativeError();
                 WatchParent();
             }
+            startup.WorkerStarting = false;
             lock (Lifecycle)
             {
                 if (ParentGone || ResumeThread(child.Thread) != 1) throw NativeError();
@@ -218,7 +241,7 @@ internal static class RuntimeCommandRunner
         foreach (char c in value) { if (c == '\\') { slashes++; continue; } quoted.Append('\\', c == '"' ? slashes * 2 + 1 : slashes); quoted.Append(c); slashes = 0; }
         return quoted.Append('\\', slashes * 2).Append('"').ToString();
     }
-    private static Started Start(string executable, string[] args, string cwd, SortedDictionary<string, string> environment, SafeJobHandle job)
+    private static Started Start(string executable, string[] args, string cwd, SortedDictionary<string, string> environment, SafeJobHandle job, StartupObservation observation)
     {
         IntPtr inputRead = IntPtr.Zero, inputWrite = IntPtr.Zero, outputRead = IntPtr.Zero, outputWrite = IntPtr.Zero, errorRead = IntPtr.Zero, errorWrite = IntPtr.Zero;
         IntPtr attributes = IntPtr.Zero, handles = IntPtr.Zero, jobs = IntPtr.Zero, env = IntPtr.Zero;
@@ -226,17 +249,30 @@ internal static class RuntimeCommandRunner
         try
         {
             var security = new SecurityAttributes { Length = Marshal.SizeOf<SecurityAttributes>(), Inherit = true };
-            if (!CreatePipe(out inputRead, out inputWrite, ref security, 0) || !CreatePipe(out outputRead, out outputWrite, ref security, 0) || !CreatePipe(out errorRead, out errorWrite, ref security, 0) || !SetHandleInformation(inputWrite, 1, 0) || !SetHandleInformation(outputRead, 1, 0) || !SetHandleInformation(errorRead, 1, 0)) throw NativeError();
+            observation.WorkerStage("stdin-pipe"); RequireWorkerApi(CreatePipe(out inputRead, out inputWrite, ref security, 0), observation);
+            observation.WorkerStage("stdout-pipe"); RequireWorkerApi(CreatePipe(out outputRead, out outputWrite, ref security, 0), observation);
+            observation.WorkerStage("stderr-pipe"); RequireWorkerApi(CreatePipe(out errorRead, out errorWrite, ref security, 0), observation);
+            observation.WorkerStage("stdin-inheritance"); RequireWorkerApi(SetHandleInformation(inputWrite, 1, 0), observation);
+            observation.WorkerStage("stdout-inheritance"); RequireWorkerApi(SetHandleInformation(outputRead, 1, 0), observation);
+            observation.WorkerStage("stderr-inheritance"); RequireWorkerApi(SetHandleInformation(errorRead, 1, 0), observation);
+            observation.WorkerStage("attribute-size");
             var size = IntPtr.Zero; _ = InitializeProcThreadAttributeList(IntPtr.Zero, 2, 0, ref size);
+            RequireWorkerApi(size != IntPtr.Zero, observation);
+            observation.WorkerStage("attribute-allocation");
             attributes = Marshal.AllocHGlobal(size);
-            if (!InitializeProcThreadAttributeList(attributes, 2, 0, ref size)) throw NativeError();
+            observation.WorkerStage("attribute-initialize"); RequireWorkerApi(InitializeProcThreadAttributeList(attributes, 2, 0, ref size), observation);
             initialized = true;
+            observation.WorkerStage("handle-storage");
             handles = Marshal.AllocHGlobal(IntPtr.Size * 3); jobs = Marshal.AllocHGlobal(IntPtr.Size);
             Marshal.WriteIntPtr(handles, 0, inputRead); Marshal.WriteIntPtr(handles, IntPtr.Size, outputWrite); Marshal.WriteIntPtr(handles, IntPtr.Size * 2, errorWrite); Marshal.WriteIntPtr(jobs, job.DangerousGetHandle());
-            if (!UpdateProcThreadAttribute(attributes, 0, new IntPtr(0x20002), handles, new IntPtr(IntPtr.Size * 3), IntPtr.Zero, IntPtr.Zero) || !UpdateProcThreadAttribute(attributes, 0, new IntPtr(0x2000D), jobs, new IntPtr(IntPtr.Size), IntPtr.Zero, IntPtr.Zero)) throw NativeError();
+            observation.WorkerStage("handles-attribute"); RequireWorkerApi(UpdateProcThreadAttribute(attributes, 0, new IntPtr(0x20002), handles, new IntPtr(IntPtr.Size * 3), IntPtr.Zero, IntPtr.Zero), observation);
+            observation.WorkerStage("job-attribute"); RequireWorkerApi(UpdateProcThreadAttribute(attributes, 0, new IntPtr(0x2000D), jobs, new IntPtr(IntPtr.Size), IntPtr.Zero, IntPtr.Zero), observation);
             var startup = new StartupInfoEx { Info = new StartupInfo { Size = Marshal.SizeOf<StartupInfoEx>(), Flags = 0x100, Input = inputRead, Output = outputWrite, Error = errorWrite }, Attributes = attributes };
+            observation.WorkerStage("environment-block");
             env = Marshal.StringToHGlobalUni(string.Join('\0', environment.Select(e => e.Key + "=" + e.Value)) + "\0\0");
-            if (!CreateProcessW(executable, new StringBuilder(string.Join(' ', new[] { executable }.Concat(args).Select(Quote))), IntPtr.Zero, IntPtr.Zero, true, 0x4 | 0x8000000 | 0x400 | 0x80000, env, cwd, ref startup, out var process)) throw NativeError();
+            observation.WorkerStage("process-create");
+            RequireWorkerApi(CreateProcessW(executable, new StringBuilder(string.Join(' ', new[] { executable }.Concat(args).Select(Quote))), IntPtr.Zero, IntPtr.Zero, true, 0x4 | 0x8000000 | 0x400 | 0x80000, env, cwd, ref startup, out var process), observation);
+            observation.WorkerStage("worker-streams");
             transferred = true;
             return new Started(new SafeFileHandle(process.Process, true), new SafeFileHandle(process.Thread, true), new FileStream(new SafeFileHandle(inputWrite, true), FileAccess.Write, 4096, false), new FileStream(new SafeFileHandle(outputRead, true), FileAccess.Read, 4096, false), new FileStream(new SafeFileHandle(errorRead, true), FileAccess.Read, 4096, false));
         }

@@ -7,6 +7,14 @@ import { fileURLToPath } from "node:url";
 import { stopOwnedChild } from "./owned-process.mjs";
 import { desktopEnvironment, windowsHelperTemporaryEnvironment } from "./process-environment.mjs";
 const nativeHelper = fileURLToPath(new URL("../../runtime/hotkeys/Switchyard.Hotkeys.exe", import.meta.url));
+export function runtimeWorkerStartFailureEvidence(value) {
+  const api = ["stdin-pipe", "stdout-pipe", "stderr-pipe", "stdin-inheritance", "stdout-inheritance", "stderr-inheritance", "attribute-size", "attribute-initialize", "handles-attribute", "job-attribute", "process-create", "worker-id", "worker-birth"];
+  const managed = ["attribute-allocation", "handle-storage", "environment-block", "worker-streams"];
+  if (!value || typeof value !== "object" || Array.isArray(value) || Object.keys(value).sort().join() !== "nativeCode,phase"
+      || ![...api, ...managed].includes(value.phase)
+      || !(value.nativeCode === null || api.includes(value.phase) && Number.isInteger(value.nativeCode) && value.nativeCode >= 0 && value.nativeCode <= 0xffffffff)) return undefined;
+  return { phase: value.phase, nativeCode: value.nativeCode };
+}
 export function runtimeStartupFailureEvidence(value) {
   if (!value || typeof value !== "object" || Array.isArray(value) || !["nativeCode,phase", "nativeCode,phase,selfTokenQuery"].includes(Object.keys(value).sort().join())
       || !["request-fields", "environment", "executable-attributes", "executable-open", "executable-hash", "job-create", "job-configure", "self-birth", "ready-write"].includes(value.phase)
@@ -111,6 +119,12 @@ export async function runRuntimeCommand(executable, args, { timeout = 120000, en
         fail("The native runtime guardian failed before readiness.");
         failure.code = "RUNTIME_STOP_UNCONFIRMED";
         failure.runtimeStartupFailure = runtimeStartupFailureEvidence(startup);
+        return;
+      } else if (!linux && frame.event === "worker-start-failure" && ready && acknowledged && !workerSeen && !result
+          && Object.keys(frame).sort().join() === "containment,event,id,nativeCode,phase,schema" && runtimeWorkerStartFailureEvidence(startup)) {
+        fail("The native runtime worker failed before its suspended identity was reported.");
+        failure.code = "RUNTIME_STOP_UNCONFIRMED";
+        failure.runtimeWorkerStartFailure = runtimeWorkerStartFailureEvidence(startup);
         return;
       } else if (frame.event === "ready" && !ready) {
         ready = true; clearTimeout(readiness);

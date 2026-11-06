@@ -5,7 +5,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { runRuntimeCommand, runtimeGuardianStopped, runtimeSuspendedWorkerEvidence } from "./runtime-command.mjs";
+import { runRuntimeCommand, runtimeGuardianStopped, runtimeSuspendedWorkerEvidence, runtimeWorkerStartFailureEvidence } from "./runtime-command.mjs";
 import { desktopEnvironment } from "./process-environment.mjs";
 import { runtimeEnvironment } from "./runtime-setup.mjs";
 
@@ -35,6 +35,22 @@ test("invalid or non-Windows worker callbacks refuse before a guardian can start
   assert.equal(started, false);
 });
 
+test("worker-start failure evidence admits only fixed stages and their numeric API errors", () => {
+  for (const phase of ["stdin-pipe", "stdout-pipe", "stderr-pipe", "stdin-inheritance", "stdout-inheritance", "stderr-inheritance", "attribute-size", "attribute-initialize", "handles-attribute", "job-attribute", "process-create", "worker-id", "worker-birth"]) {
+    for (const nativeCode of [null, 0, 5, 267, 0xffffffff]) {
+      const value = { phase, nativeCode }, copy = runtimeWorkerStartFailureEvidence(value); assert.deepEqual(copy, value); copy.phase = "changed"; assert.equal(value.phase, phase);
+    }
+  }
+  for (const phase of ["attribute-allocation", "handle-storage", "environment-block", "worker-streams"]) {
+    assert.deepEqual(runtimeWorkerStartFailureEvidence({ phase, nativeCode: null }), { phase, nativeCode: null });
+    assert.equal(runtimeWorkerStartFailureEvidence({ phase, nativeCode: 5 }), undefined);
+  }
+  for (const value of [null, [], {}, { phase: "process-create" }, { phase: "NEVER_RETAIN", nativeCode: null },
+    ...["5", -1, 1.5, 0x100000000].map(nativeCode => ({ phase: "process-create", nativeCode })),
+    { phase: "process-create", nativeCode: 5, path: "NEVER_RETAIN" }, { phase: "ready-write", nativeCode: null }, { phase: "process-create", nativeCode: null, treeExitVerified: true }
+  ]) assert.equal(runtimeWorkerStartFailureEvidence(value), undefined);
+});
+
 const windowsHelper = process.env.SWITCHYARD_TEST_RUNTIME_HELPER;
 const skip = process.platform !== "win32" ? "Requires actual Windows suspended-process and Job Object APIs" : !windowsHelper ? "Built helper runs in the native Windows guardian workflow step" : false;
 const options = { windowsHelper, env: runtimeEnvironment(), timeout: 10000 };
@@ -51,6 +67,18 @@ async function stopped(scope) {
   assert.fail("The exact suspended-worker guardian did not independently verify exit.");
 }
 const absent = path => assert.rejects(readFile(path), { code: "ENOENT" });
+
+test("Windows worker creation failure reports only its fixed API stage after readiness and cannot authorize execution", { skip }, () => fixture(async root => {
+  const marker = join(root, "must-not-run"); let scope, suspended = false;
+  await assert.rejects(runRuntimeCommand(process.execPath, ["-e", `require('node:fs').writeFileSync(${JSON.stringify(marker)},'unexpected')`], {
+    ...options, cwd: join(root, "missing-working-directory"), onGuardianReady: frame => { scope = frame; }, onWorkerSuspended: () => { suspended = true; }
+  }), error => {
+    assert.ok(scope); assert.equal(error.code, "RUNTIME_STOP_UNCONFIRMED");
+    assert.deepEqual(error.runtimeWorkerStartFailure, { phase: "process-create", nativeCode: 267 });
+    assert.equal(JSON.stringify(error).includes(root), false); return true;
+  });
+  assert.equal(suspended, false); await stopped(scope); await absent(marker);
+}));
 
 test("Windows holds the exact worker suspended until its identity acknowledgement completes", { skip }, () => fixture(async root => {
   const marker = join(root, "ran"), digest = createHash("sha256").update(await readFile(process.execPath)).digest("hex");

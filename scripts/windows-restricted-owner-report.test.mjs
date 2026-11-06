@@ -67,6 +67,26 @@ test("managed startup phases reach bounded owner evidence without conferring rea
   }
 });
 
+test("worker-start observations preserve the original failure and exclude paths, output and unknown stages", async () => {
+  for (const [runtimeWorkerStartFailure, suffix] of [
+    [{ phase: "process-create", nativeCode: 5 }, "worker-process-create-code5"],
+    [{ phase: "worker-birth", nativeCode: 6 }, "worker-worker-birth-code6"],
+    [{ phase: "environment-block", nativeCode: null }, "worker-environment-block"],
+    [{ phase: "environment-block", nativeCode: 5 }, "refused"],
+    [{ phase: "NEVER_RETAIN", nativeCode: null }, "refused"],
+    [{ phase: "process-create", nativeCode: 5, path: "NEVER_RETAIN" }, "refused"]
+  ]) {
+    const observation = createWindowsOwnerProbeObservation(), error = Object.assign(Error("NEVER_RETAIN"), { runtimeWorkerStartFailure });
+    const command = observation.command(async (_exe, _args, options) => { options.onGuardianChild({}); await options.onGuardianReady({}); throw error; });
+    const native = observation.native({ identity: () => command("NEVER_RETAIN", [], {}) });
+    await assert.rejects(native.identity(), actual => actual === error);
+    assert.equal(observation.failurePhase, "probe-identity-committed-" + suffix);
+    const child = { waitResult: 0, resultAvailable: true, failedPhase: observation.failurePhase };
+    assert.deepEqual(storageBrokerFailureEvidence({ schema: "switchyard-storage-broker-protocol-proof/v1", success: false, restrictedHostChildExit: child }).restrictedHostChildExit, child);
+    assert.equal(observation.failurePhase.includes("NEVER_RETAIN"), false);
+  }
+});
+
 test("fixed Node imports retain only known method presence and exact image hash, never a runtime branch claim", () => {
   const text = "Dump of file C:\\NEVER_RETAIN\\node.exe\n\n  bcrypt.dll\n     2A BCryptGenRandom\n  ADVAPI32.dll\n     10 CryptAcquireContextW\n     11 CryptGenRandom\n     12 CryptReleaseContext\n     13 UnrelatedSecretMethod\n  Summary\n";
   const value = parseNodeRngImports(text, "a".repeat(64));

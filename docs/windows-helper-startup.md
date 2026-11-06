@@ -194,3 +194,19 @@ declared Linux-only skip and all child/tree cleanup verified. File replacement,
 hard-link refusal, malformed release and parent-loss checks pass after correcting
 the stale diagnostic expectation. This is distinct from restricted-owner or
 guest acceptance. [Evidence](evidence/windows-parent-projection-summary.json).
+
+## After guardian readiness
+
+A separate `worker-start-failure` frame now reports fixed creation stages only:
+pipe setup/inheritance, attribute initialization/storage, handle/Job attributes,
+environment allocation, `CreateProcessW`, stream construction and worker identity.
+Only the native API stages can carry a numeric error. Paths, arguments, inherited
+environment and child output remain excluded. The frame is accepted only after
+the same guardian's ready/start exchange and before a suspended worker or result.
+It remains an unconfirmed-stop refusal, never execution or cleanup evidence.
+
+Observation ends before the worker acknowledgement and resume. The native test
+adds an absent working-directory case: readiness must occur, the worker callback
+must not occur, the marker must remain absent and original Job exit must verify
+independently. That Windows test is pending; portable validation and managed
+builds pass. [Source evidence](evidence/worker-start-observation-source-summary.json).
