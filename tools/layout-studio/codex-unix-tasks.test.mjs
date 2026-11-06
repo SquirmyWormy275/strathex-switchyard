@@ -17,7 +17,7 @@ async function fixture(t, extra = {}) {
       await copyFile(new URL("./test-support/codex-owned-listener-fixture.cjs", import.meta.url), join(input.cwd, "app-server"));
       await writeFile(join(input.cwd, "account"), "synthetic@example.invalid");
       await writeFile(join(input.cwd, "fixture.json"), JSON.stringify({ repositoryRoot, config: { ...codexDesignConfig(), mcp_servers: {} } }));
-      return openOwnedCodexListener({ ...input, onOwner(value) { owners.push(value); input.onOwner(value); } });
+      return openOwnedCodexListener({ ...input, async onOwner(value) { owners.push(value); await input.onOwner(value); } });
     }, ...extra };
   const driver = createCodexUnixTasks(options);
   t.after(async () => { const result = await driver.close(); assert.equal(result.every(value => value.stopped), true); for (const owner of owners) assert.equal((await owner.stop()).stopped, true); await rm(root, { recursive: true }); });
@@ -26,7 +26,7 @@ async function fixture(t, extra = {}) {
 test("managed task retirement requires the complete listener owner instead of a child-only exit", async t => {
   let stopped = false, launches = 0;
   const owner = { closed: false, close() { this.closed = true; }, async stop() { return { stopped }; }, async connect() { return { closed: false, accountEpoch: 0, async request() { return { data: [] }; } }; } };
-  const f = await fixture(t, { async openListener(input) { launches++; input.onOwner(owner); return owner; }, stopChild: async () => { throw Error("A managed listener cannot use child-only retirement"); } });
+  const f = await fixture(t, { async openListener(input) { launches++; await input.onOwner(owner); return owner; }, stopChild: async () => { throw Error("A managed listener cannot use child-only retirement"); } });
   try { assert.deepEqual(await f.driver.list("personal"), []); assert.equal((await f.driver.stopCompartment("personal")).stopped, false); await assert.rejects(f.driver.list("personal"), /No replacement/); assert.equal(launches, 1); }
   finally { stopped = true; }
 });
@@ -56,4 +56,28 @@ test("unfamiliar owned files preserve the original task lifetime and block a rep
   const f = await fixture(t); await f.driver.account("personal"); const owner = f.owners[0], path = join(owner.privateOwnership.root, "preserve-fixture"); await writeFile(path, "synthetic");
   try { assert.equal((await f.driver.stopCompartment("personal")).stopped, false); await assert.rejects(f.driver.account("personal"), /No replacement/); assert.equal(f.owners.length, 1); assert.equal(await readFile(path, "utf8"), "synthetic"); }
   finally { await rm(path); assert.equal((await f.driver.stopCompartment("personal")).stopped, true); }
+});
+
+test("durable owner hooks precede native startup, task metadata and account acknowledgement in exact order", native, async t => {
+  const events = []; let original;
+  const f = await fixture(t, {
+    async onReserved(c, owner) { assert.equal(c, "personal"); original = owner; assert.equal(owner.scope, null); assert.equal(owner.privateOwnership.socketIdentity, undefined); events.push("reserved"); },
+    async onReady(c, scope, owner) { assert.equal(owner, original); assert.equal(c, "personal"); assert.deepEqual(owner.scope, scope); assert.equal(owner.privateOwnership.socketIdentity, undefined); events.push("guardian"); },
+    async onListening(c, owner) { assert.equal(owner, original); assert.equal(c, "personal"); assert.ok(owner.privateOwnership.socketIdentity); assert.ok(owner.privateOwnership.aliasIdentity); assert.equal(owner.accountFingerprint, null); events.push("listening"); },
+    async onAuthenticated(c, owner) { assert.equal(owner, original); assert.equal(c, "personal"); assert.match(owner.accountFingerprint, /^[a-f0-9]{64}$/); assert.ok(owner.binding); events.push("authenticated"); }
+  });
+  await f.driver.account("personal"); assert.deepEqual(events, ["reserved", "guardian", "listening", "authenticated"]);
+  await f.driver.list("personal"); assert.deepEqual(events, ["reserved", "guardian", "listening", "authenticated"]);
+});
+
+test("failed durable owner persistence stops the exact listener before later task metadata can run", native, async t => {
+  for (const hook of ["onReserved", "onReady", "onListening", "onAuthenticated"]) {
+    const f = await fixture(t, { [hook]: async () => { throw Error("synthetic durable ownership persistence failed"); } });
+    await assert.rejects(f.driver.list("personal"), /persistence|listener|stopped|startup/i);
+    assert.equal(f.owners.length, 1); const owner = f.owners[0]; assert.equal((await owner.stop()).stopped, true);
+    if (owner.scope) assert.equal(await runtimeGuardianStopped(owner.scope), true);
+    await assert.rejects(readFile(owner.privateOwnership.endpoint), { code: "ENOENT" });
+    let calls = ""; try { calls = await readFile(join(f.root, "tasks/personal/calls"), "utf8"); } catch (error) { if (error.code !== "ENOENT") throw error; }
+    assert.equal(calls.includes("thread/list"), false); assert.equal(calls.includes("thread/start"), false); assert.equal(calls.includes("turn/start"), false);
+  }
 });

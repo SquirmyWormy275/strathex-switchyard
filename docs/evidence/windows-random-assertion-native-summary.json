@@ -1,0 +1,41 @@
+{
+  "schema": "switchyard-restricted-assertion-native/v1",
+  "source": "8c6f91a7fc0d4e816c12b79a6dedfea3f93a0e1d",
+  "executionMerge": "c896fec7eec3d26fcb810a7bc11d3297072a5b0c",
+  "runId": 42163334683,
+  "jobId": 127714372972,
+  "artifactId": 13477936831,
+  "archiveSha256": "baaf3c0b89aae33651f0b676ba53f80224307ba87756322643670c577a9f5b0e",
+  "receipt": "windows-restricted-assertion-8c6-native.json",
+  "accepted": false,
+  "childExit": {
+    "waitResult": 0,
+    "exitCode": 134,
+    "resultAvailable": false
+  },
+  "standardIo": {
+    "schema": "switchyard-restricted-child-stdio/v1",
+    "standardHandles": 3,
+    "inheritanceRestricted": true,
+    "stdinEof": true,
+    "stdoutBytes": 0,
+    "stderrBytes": 663,
+    "outputBounded": true,
+    "handlesClosedVerified": true,
+    "drainsCompleted": true,
+    "stderr": {
+      "category": "assertion",
+      "function": "ncrypto::CSPRNG",
+      "code": null,
+      "sourceFile": "node.cc",
+      "sourceLine": 1221
+    }
+  },
+  "failedFixturePreserved": true,
+  "finding": "The child reports an assertion containing ncrypto::CSPRNG at node.cc line 1221. Its Windows random-source failure is not yet identified.",
+  "limits": [
+    "No cryptographic fallback, weaker entropy, token relaxation or permission bypass is introduced.",
+    "Only source basename/line and fixed symbols are retained, not raw stderr or private paths.",
+    "Pipe retirement is verified; complete failed-fixture cleanup and owner journey remain unaccepted."
+  ]
+}

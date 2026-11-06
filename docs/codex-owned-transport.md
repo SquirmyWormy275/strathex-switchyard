@@ -139,6 +139,7 @@ and staging removal. It creates no thread and submits no model turn. The verifie
 permission boundary is separate from production protected-store composition.
 [Exact evidence and remaining integration](evidence/codex-unix-task-adapter-summary.json).
 
-The normal Studio still uses stdio. This adapter does not yet supply the durable
-per-task owner registry, authenticated IDE attachment, or installed end-to-end
-handoff needed to change that default.
+The normal Studio still uses stdio. The explicit [protected task-owner service](coding-task-owners.md)
+now records its directory/guardian/socket/account checkpoints and verifies exact
+metadata ownership across duplicate requests and recovery. Reviewed task loading,
+authenticated IDE attachment and installed handoff remain unfinished.

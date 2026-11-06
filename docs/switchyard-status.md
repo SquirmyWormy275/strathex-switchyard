@@ -12,7 +12,7 @@ Start with the [requirement ledger](switchyard-requirements.md) for complete sco
 
 | Checkpoint | Result | What it establishes |
 | --- | --- | --- |
-| Complete Linux source `7897835` | **241/241 groups; 1,501 passed tests; ten declared skips.** | Every child/process-tree exit and exact owned fixture, dependency, build and checkout cleanup verifies. [Receipt](evidence/linux-789-complete-summary.json). Later source changes have separate focused evidence. |
+| Complete Linux source `370c21e` | **241/241 groups; 1,509 passed tests; eleven declared skips.** | Every child/process-tree exit and exact owned fixture, dependency, build and checkout cleanup verifies. [Receipt](evidence/linux-370-complete-summary.json). Later source changes have separate focused evidence. |
 | Windows state leases `ce5be6a` | Eighteen native tests pass; one declared Linux-only skip. Supply Chain scenario and all 23 policy-output tests also pass. | The shipped native helper exercises real kernel sharing, replacement/hard-link refusal, malformed release, detached owners and parent loss. Three archive digests and child/tree cleanup verify. [Receipts](evidence/native-state-lease-ce5-summary.json). |
 | Windows packaging and scanner directories | Client/package cohort: 73 native tests pass at `5fe6e95`; scanner registry: twenty pass at `ec3afe7`. | Package size and filesystem identity corrections pass their complete focused cohorts. [Package](evidence/windows-fixture-alias-followup-summary.json), [registry](evidence/linux-startup-windows-user-object-summary.json). |
 | Installed Linux application `c5d2d28` | Six update/seven metadata checks and fifteen checks each for Supply Chain and Release. | Four actual offline scanner exits, original 54 workspace identities, selection, private endpoint and frozen frontend are restored; owned staging is removed. [Installed receipt](evidence/installed-cvss-context-summary.json). |
@@ -25,22 +25,23 @@ status 3221225794. This change is not an accepted repair. Its private desktop an
 namespace access probes complete, while the failed fixture is preserved.
 [Exact latest failure](evidence/windows-detached-native-summary.json).
 
-The explicit standard pipes run natively at `7a75189`: only three handles are
-inherited, all are closed, and 663 stderr bytes classify as an assertion. The
-child still exits 134 without a result; its precise assertion remains unidentified.
-[Native evidence](evidence/windows-stdio-native-summary.json). The next diagnostic
-keeps only known upstream source basenames and bounded line numbers: both managed
-targets compile, 1,856 portable and ten JS checks pass, with typecheck and owned
-cleanup. Native location capture is pending. [Diagnostic](evidence/windows-assertion-location-source-summary.json).
+The native child at `8c6f91a` identifies a cryptographic random initialization
+assertion: `ncrypto::CSPRNG`, source `node.cc:1221`. It still exits 134 with no
+owner result. All three standard pipe handles close, but its underlying Windows
+random-source failure remains unconfirmed. [Exact failure](evidence/windows-random-assertion-native-summary.json).
 
-The complete local `efbaa52` run finishes **240/241 groups**, 1,504 passed tests,
-one failure and eleven declared skips. A stale concurrency test rejects the new
-shared helper dependency; the correction now allows only that exact dependency.
-Every child/tree and owned checkout cleanup verifies. The separate GitHub Linux
-release failure is an authority-fixture `ENOTEMPTY` teardown. Shutdown now joins
-in-flight observation/deadline callbacks and managed input release; seven files
-pass 66 checks and typecheck. Full followup remains pending.
-[Failed run and lifecycle correction](evidence/execution-shutdown-summary.json).
+The accepted complete Linux `370c21e` checkpoint includes the corrected CI dependency
+guard and shutdown joins for active polls, deadlines and managed input release.
+All exact owned checkout/dependency/build cleanup verifies; its marker is removed.
+The preceding failed `efbaa52` run remains failed. [Correction](evidence/execution-shutdown-summary.json).
+
+The explicit protected task-owner service now persists original task/account/
+repository/listener identities and refuses duplicate or foreign-host adoption.
+Five related files pass 76 tests; final eight registry/five package checks pass
+with exact cleanup and typecheck. An actual Unix listener/bridge composes with a
+controlled provider double. The new 242-group manifest has no complete acceptance
+yet. Production routing, task loading and IDE attachment remain unfinished.
+[Owner contract](coding-task-owners.md), [evidence](evidence/coding-task-owner-summary.json).
 
 The task creator now verifies its own native account, original repository and
 exact durable reservation before thread effects, including after asynchronous

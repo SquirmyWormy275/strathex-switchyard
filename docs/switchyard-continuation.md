@@ -38,7 +38,7 @@ Keep small receipts and source; retire exact owned staging after exit verifies.
 
 | Source | Accepted evidence | Limit |
 | --- | --- | --- |
-| Linux `7897835` | Complete 241-group run: 1,501 passed tests, ten declared skips; all child/tree and owned checkout/dependency/build cleanup verifies. [Receipt](evidence/linux-789-complete-summary.json). | Later changes have focused evidence. Its full-run marker and checkout are removed. Inspect `/tmp/switchyard-full-linux-path.json` before starting any later full run. |
+| Linux `370c21e` | Complete 241-group run: 1,509 passed tests, eleven declared skips; all child/tree and owned checkout/dependency/build cleanup verifies. [Receipt](evidence/linux-370-complete-summary.json). | Later changes have focused evidence. Its full-run marker and checkout are removed. Inspect `/tmp/switchyard-full-linux-path.json` before starting any later full run. |
 | Native Windows `ce5be6a` | Eighteen lease tests and one declared skip; Supply Chain scenario and 23 policy-output tests pass. Digests and child/tree cleanup verify. [Receipts](evidence/native-state-lease-ce5-summary.json). | The restricted primary-child journey still fails; its latest detached run exits 134. Earlier PowerShell startup failures remain recorded. |
 | Installed Linux `c5d2d28` | Six update/seven metadata checks, fifteen checks each for Supply Chain/Release, four actual scanner exits and original 54 workspace identities restored. [Installed evidence](evidence/installed-cvss-context-summary.json). | Published source is newer than the installed application. Do not confuse source verification with installed acceptance. |
 | Owned Codex Unix task adapter | Actual installed CLI: two read-only account operations, verifier permission revocation and exact listener/bridge/socket retirement. [Evidence](evidence/codex-unix-task-adapter-summary.json). | Explicit adapter; main Studio uses stdio. Complete task/IDE composition remains unfinished. No native thread, prompt or account change is authorized in the current backend work. |
@@ -49,25 +49,25 @@ pinned toolchain and verifies source/size/digest before staging at the fixed
 runtime path. There is no PowerShell fallback. Keep the original acquisition,
 release and child/test deadlines. [Contract](private-state-locking.md).
 
-The explicit pipe candidate `7a75189` executes on Windows: only three standard
-handles are inherited and all close; 663 stderr bytes classify as an assertion.
-The child still exits 134 without a result. Its precise assertion is unidentified.
-A fixed Node source-basename/line parser is now prepared: 1,856 managed checks and
-ten JS report cases pass, both managed builds have zero warnings/errors, and
-typecheck/cleanup verify. Native location capture is pending.
-[Source diagnostic](evidence/windows-assertion-location-source-summary.json).
-[Native evidence](evidence/windows-stdio-native-summary.json).
+The restricted child at `8c6f91a` identifies its assertion as `ncrypto::CSPRNG`,
+`node.cc:1221`. Exact artifact digest, fixed source location and pipe retirement
+verify; the child still exits 134 with no result. Determine the Windows random
+source failure next, using read-only diagnostics without weaker entropy or token
+relaxation. [Native evidence](evidence/windows-random-assertion-native-summary.json).
 
-The full local `efbaa52` run finishes 240/241 groups, 1,504 passed tests, one failure
-and eleven declared skips. Its stale CI dependency assertion is corrected to allow
-only the exact-source helper build. All child/tree and exact checkout/alias/build/
-marker cleanup verifies. A fresh complete `370c21e` run is active; inspect its
-`/tmp/switchyard-full-linux-path.json` marker before starting another run.
-Separately, the GitHub Linux release job `127706968318` failed with `ENOTEMPTY`.
-Observation shutdown now joins active polls and original/recovered deadline callbacks;
-managed input-release observers also retire before staging cleanup. Seven files pass
-66 tests and typecheck. Full followup remains pending. No blind deletion retry was
-added. [Failure and correction](evidence/execution-shutdown-summary.json).
+The complete local `370c21e` run passes 241/241 groups, 1,509 tests and eleven
+declared skips. All child/tree and owned checkout/alias/build/marker cleanup verifies.
+No full run remains active at this checkpoint. The preceding `efbaa52` full run
+remains failed; its concurrency assertion and shutdown lifecycle corrections are
+included in the accepted source.
+
+The explicit `createCodingTaskOwners` service now persists original owner stages
+and task/account/repository binding under real private leases. Five files pass 76
+tests; final eight registry and five packaging checks pass with exact cleanup and
+typecheck. Actual Unix listener/bridge composition uses a controlled provider double.
+The manifest now has 242 Linux groups, without a complete run of this later source.
+Production still uses stdio; the service currently observes metadata only and neither
+loads a task nor grants IDE attachment. [Contract](coding-task-owners.md).
 
 The subsequent Codex creator boundary verifies its own account and the original
 repository/reservation before thread creation and marker injection, including
@@ -85,13 +85,12 @@ workspace/focus and retires owned processes/socket/cache.
 
 ## Next executable tasks
 
-1. Identify the exact assertion in the restricted child using bounded source/function
-   diagnostics. Verify
+1. Diagnose the restricted child's native Windows random-source failure. Verify
    artifact digest and source/merge identity, distinguish access observations from
    child acceptance, and repair the actual initialization failure without broadening
    token/desktop/service authority. Continue other work while CI runs.
-2. Connect the owned Unix listener/task adapter to durable exact task ownership
-   and supported IDE/terminal attachment. Recheck compartment, account, repository
+2. Connect the protected task-owner service to reviewed task loading and supported
+   IDE/terminal attachment, then normal Studio routing. Recheck compartment, account, repository
    and original native owner before every effect. Process ancestry alone cannot
    identify an IDE terminal tab. Use provider doubles for task/model operations
    unless their native execution is separately authorized.
