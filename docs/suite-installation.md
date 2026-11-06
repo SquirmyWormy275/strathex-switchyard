@@ -2,7 +2,7 @@
 
 Switchyard's new suite can now be built as a small, self-contained application
 directory. It starts independently of the checkout and VS Code, using an existing
-Node **24.14.0** installation. Linux program files are approximately 2 MiB.
+Node **24.14.0** installation. The current Linux package is approximately 4.9 MiB (523 files at `4b5e3cc`).
 The optional Python/HID/voice runtime, model, accounts, protected workspaces and
 recovery records remain outside the bundle and are reused.
 

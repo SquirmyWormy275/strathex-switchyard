@@ -97,3 +97,10 @@ account or approval flags are rejected before installed-state access; the shared
 metadata verifier cohort passes two tests with child/tree cleanup (receipt
 `isolated-test-2ce51fcb-268e-40fb-82e1-1924cc8ea2ec.json`). Installed execution of
 this later verifier still requires its separate receipt.
+
+The installed `4b5e3cc` application now passes six normal update checks plus
+seven owner metadata/refusal and seven existing journal metadata checks. All
+54 workspace identities, selected sealed bytes, private endpoint and frozen Home
+are preserved. Dated launcher copies and installed bytes match their journal;
+the temporary bundle is removed. No native provider, task resume, model, keyboard
+or microphone operation occurred. [Installed evidence](evidence/installed-task-owner-summary.json).

@@ -68,8 +68,8 @@ execution, offline repository scans and recoverable installation. The Home and
 Model F catalog provide the starting experience; complete task/IDE attachment,
 role/device controls and full scanner coverage remain unfinished.
 
-The latest accepted complete Linux checkpoint, `370c21e`, passes **241 groups**:
-**1,509 tests passed**, eleven declared skips, and every child/process-tree and owned
+The latest accepted complete Linux checkpoint, `74d0d04`, passes **242 groups**:
+**1,529 tests passed**, eleven declared skips, and every child/process-tree and owned
 checkout cleanup verified. The Windows native lease replacement at `ce5be6a`
 passes eighteen tests plus one declared skip, the Supply Chain scenario, and all
 23 policy-output tests. **Full Windows acceptance remains failed** because the
@@ -78,7 +78,7 @@ restricted primary child still exits before its owner journey verifies.
 
 | Explore | Start here |
 | --- | --- |
-| Return to a coding task | [Codex bindings](docs/coding-task-bindings.md), [Claude bindings](docs/claude-task-bindings.md), [reviewed text](docs/native-coding-tasks.md) |
+| Return to a coding task | [Codex bindings](docs/coding-task-bindings.md), [Claude bindings](docs/claude-task-bindings.md), [reviewed text](docs/native-coding-tasks.md), [owned task loading](docs/coding-task-owners.md) |
 | Inspect a repository without starting work | [Installed `switchyard inspect` commands](docs/inspect-cli.md) |
 | Run reviewed inputs in a disposable workspace | [Task execution](docs/reviewed-task-execution.md), [bounded build workspace](docs/bounded-build-workspace.md) |
 | Understand findings and coverage | [Shield baseline](docs/shield-baseline-scanner.md), [SBOM example](docs/evidence/README.md), [CVSS context](docs/cvss-severity.md) |
