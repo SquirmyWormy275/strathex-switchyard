@@ -185,3 +185,18 @@ all original deadlines and input/output bounds, and expose no arbitrary native
 text. Native diagnostic acceptance is pending.
 [Recurring failures](evidence/windows-shortcut-recurring-timeout-summary.json),
 [source diagnostics](evidence/shortcut-stage-diagnostics-source-summary.json).
+
+Complete Windows `9f35961` now passes all 414 test/build groups, 2,398 tests
+and 202 declared skips. Artifact/receipt digests, equal source/merge trees,
+original bounds and every child/tree cleanup verify. Later agent security work
+is outside this checkpoint; interactive accounts and actual guests remain open.
+[Complete native evidence](evidence/windows-complete-9f35961-summary.json).
+
+Normal installed `cadbccd` additionally accepts nine pure credential/revocation/
+outcome checks within 29 metadata checks. Seven tested module hashes, all 54
+workspace semantic snapshots and frozen frontend bytes verify. The prepared
+bundle is removed. A repository verifier repeats those nine checks using only
+in-memory synthetic state; its guard/harness/package suite passes 28 checks.
+Live agent recovery and native Windows acceptance of these later changes remain
+separate. [Installed update](evidence/installed-agent-outcome-summary.json),
+[repeatable proof](evidence/installed-agent-security-verifier-summary.json).

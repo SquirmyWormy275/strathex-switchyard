@@ -95,5 +95,23 @@ in eight groups/91 checks, including actual owner-authenticated HTTP, both late-
 races, failed persistence and the full history limit. The first test attempt had
 two incomplete synthetic recording timestamps; those fixtures were corrected
 without changing retention rules or deadlines. Typecheck, complete package bounds
-and exact owned cleanup pass. Installed recovery and native Windows acceptance
-remain separate. [Recovery evidence](evidence/custom-agent-outcome-source-summary.json).
+and exact owned cleanup pass. Installed `cadbccd` additionally passes nine pure
+credential/revocation/outcome checks inside its 29-check metadata update. Seven
+tested module hashes and all 54 workspace snapshots verify. No live agent is
+revoked, replaced or dispatched. Native Windows and live installed recovery
+acceptance remain separate. [Recovery evidence](evidence/custom-agent-outcome-source-summary.json),
+[installed update](evidence/installed-agent-outcome-summary.json).
+
+To repeat the bounded installed check from the repository on the Linux pilot:
+
+```sh
+mise exec node@24.14.0 -- node --experimental-transform-types scripts/verify-agent-security-host.mjs --read-only-metadata
+```
+
+The verifier checks installed bundle integrity and the exact source-tested module
+hashes before running in-memory doubles. It writes a private receipt containing
+its own source hash. It neither reads user credentials nor executes an agent,
+provider or native child. Missing, duplicate or broader flags refuse before
+installed-state access. Three focused groups pass 28 checks; the installed proof
+passes all nine. This verifies the named modules, not later unreviewed versions.
+[Reproducible verification](evidence/installed-agent-security-verifier-summary.json).

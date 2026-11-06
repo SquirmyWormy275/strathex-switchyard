@@ -1308,3 +1308,42 @@ fixtures were corrected without relaxing production retention or test bounds.
 No live installed command, credential or account is changed. Native Windows and
 installed recovery acceptance remain separate.
 [Source receipt](evidence/custom-agent-outcome-source-summary.json).
+
+
+## Complete Windows release acceptance — 2026-11-06
+
+Source `9f35961`, execution merge `c87caa4`, passes all **414 test/build
+groups: 2,398 tests, 202 declared skips, zero failures, cancellations or todo**.
+Nine non-TAP build/native groups also exit successfully. All original group
+bounds, final plans, child/tree retirement and fixture cleanup verify. The
+48,330-byte artifact and its 638,073-byte receipt match their retained digests;
+source and merge share the exact tree. The archive was read in memory and only
+the private receipt is retained locally.
+
+This closes this source checkpoint's complete release verification. Earlier
+failed or cancelled runs remain unchanged. Later credential-worker ownership,
+agent revocation and uncertain-outcome recovery are outside this checkpoint.
+Provider and guest doubles remain explicit; interactive Windows/UAC, actual
+guest, hardware and account acceptance remain separate.
+[Complete native receipt](evidence/windows-complete-9f35961-summary.json).
+
+## Installed recovery and repeatable agent proof — 2026-11-06
+
+Normal installed source `cadbccd`, release `cfa9dba`, passes **29 checks**:
+thirteen owner, seven journal and nine pure credential/revocation/outcome checks.
+Seven installed modules match their tested hashes. All 54 semantic workspace
+snapshots and selection remain unchanged; 53 sealed files are byte-identical and
+one changes only audit metadata. Dated backup, launcher readback, frozen frontend
+and current plus one rollback verify. The 535-file prepared bundle totals
+5,230,818 bytes and is removed after exact verification.
+[Installed receipt](evidence/installed-agent-outcome-summary.json).
+
+The repository now contains `verify-agent-security-host.mjs` with one explicit
+`--read-only-metadata` mode. It verifies the full installed release and seven
+source-tested hashes before using only synthetic in-memory state and child
+doubles. Its nine checks pass; three focused groups pass 28 flag-refusal,
+harness and package checks with exact cleanup. A private receipt includes the
+verifier's own hash. No live agent, credential, provider, native task, recording,
+model, public query, Microsoft account or HID operation is used. This accepts
+the named installed modules and synthetic behavior, not live agent recovery.
+[Repeatable verifier evidence](evidence/installed-agent-security-verifier-summary.json).

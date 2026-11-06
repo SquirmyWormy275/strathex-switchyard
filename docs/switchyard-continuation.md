@@ -36,7 +36,7 @@ Five new cases pass within eight groups/91 checks: original uncertainty is retai
 no command is retried, late authenticated acknowledgements win and only deliberately
 reviewed records become eligible for bounded history retention. Source HTTP,
 privacy, rollback, typecheck/package bounds and owned cleanup pass. Installed
-recovery and native Windows remain separate. [Contract](custom-agent-revocation.md#review-an-uncertain-claim).
+pure recovery checks now pass; live recovery and native Windows remain separate. [Contract](custom-agent-revocation.md#review-an-uncertain-claim).
 
 The custom-agent backend now supports reviewed revocation, credential replacement
 and enrollment-generation fences for messages, claims and roles. Eight groups/86
@@ -66,18 +66,22 @@ are removed. All three other worktrees remain. Newer revocation/compact-package
 changes retain separate focused and installed checks; they are not included in
 that complete run. [Receipt](evidence/linux-8786f83-complete-summary.json).
 
-The installed baseline is `b3ce0a9c27a76547bb03956f7ae99fcde28a4e2f`,
-release `8858cf1d017215ebdb01813ceab4c6821bbe3766b469da5e5a2ea550d9d8d6c0`.
+The installed baseline is `cadbccd31277d41405a18f4a8f690a515ef03785`,
+release `cfa9dbad62d3c7d9bceceab9f381fb237c0419eb69504ea56dd2e724f50c308e`.
 Preserve all 54 original workspace identities, the pending keyboard-only Codex
 workspace, private connection information and the frozen Home bytes. The normal
-versioned update passes 20 owner/journal metadata checks plus seven pure in-memory
-credential/revocation checks. Six exact tested module hashes verify. It starts no
+versioned update passes 20 owner/journal metadata checks plus nine pure in-memory
+credential/revocation/outcome checks. Seven exact tested module hashes verify. It starts no
 bundled example, recording or provider and revokes no live agent. All 54 semantic snapshots match; 53 sealed files
 are byte-identical and one changed only audit metadata. Keep the current release
-and its one rollback. The 535-file, 5,227,326-byte prepared bundle was verified and
+and its one rollback. The 535-file, 5,230,818-byte prepared bundle was verified and
 removed. Compact manifest JSON keeps the complete package below the original
 5 MiB limit; all sixteen installation scenarios pass after that change.
-[Receipt](evidence/installed-agent-security-summary.json).
+[Receipt](evidence/installed-agent-outcome-summary.json).
+The repeatable `scripts/verify-agent-security-host.mjs --read-only-metadata`
+proof verifies exact installed hashes and uses only synthetic in-memory state;
+its nine checks and 28 focused guard/package checks pass.
+[Verifier evidence](evidence/installed-agent-security-verifier-summary.json).
 Earlier installed `4b2daed` and `5a8d159` retain separate lifecycle/archive/extras evidence.
 
 Latest source work closes the bundled-example uncertain-stop/replacement/shutdown
@@ -87,7 +91,10 @@ pass. The exact focused temporary root is removed. Normal installed metadata/mod
 live installed bundled-example execution remain separate. [Contract](bundled-agent-lifecycle.md).
 The four Windows backend batches at `9f35961` are now digest-verified: 198 groups,
 1,022 passes, 142 declared skips, no failures and all cleanup verified. Its combined
-release run 42281533502 is still active. [Receipt](evidence/windows-backend-9f35961-native-summary.json).
+release run 42281533502 now passes 414 test/build groups, 2,398 tests and 202
+declared skips. Archive/receipt digests, source/merge tree equality, original
+bounds and all cleanup verify. This accepts `9f35961`, excluding later agent
+security changes. [Complete receipt](evidence/windows-complete-9f35961-summary.json). [Receipt](evidence/windows-backend-9f35961-native-summary.json).
 
 Latest addition: custom-agent command history now retains only opted-in
 queue/claim/retirement/acknowledgement metadata. Seven groups/92 checks pass with

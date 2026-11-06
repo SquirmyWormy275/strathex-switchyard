@@ -1,0 +1,120 @@
+#!/usr/bin/env node
+/** Verify installed agent authorization using isolated in-memory doubles. No user keys, agents, recordings or provider tasks are modified. */
+import assert from "node:assert/strict";
+import { readFile, writeFile } from "node:fs/promises";
+import { join } from "node:path";
+import { homedir } from "node:os";
+import { pathToFileURL } from "node:url";
+import { createHash } from "node:crypto";
+import { EventEmitter } from "node:events";
+import { PassThrough } from "node:stream";
+import { applicationStatus } from "../deployment/suite/application.mjs";
+import { installationRoot } from "../deployment/suite/installation.mjs";
+const flags = process.argv.slice(2);
+if (process.platform !== "linux" || flags.length !== 1 || flags[0] !== "--read-only-metadata")
+    throw Error("Usage on the pilot: node scripts/verify-agent-security-host.mjs --read-only-metadata");
+const app = await applicationStatus();
+assert.equal(app.status, "ready");
+const { verifySuiteRelease } = await import("../deployment/suite/release.mjs");
+const root = join(installationRoot(), "versions", app.build), m = await verifySuiteRelease(root, { expectedId: app.build, platform: "linux", checkRuntime: true }), checks = [], moduleDigests = {};
+assert.equal(m.development, false);
+const built = { source: m.sourceCommit, id: m.id };
+for (const [evidence, names] of [["credential-process-source-summary.json", ["tools/layout-studio/credential-process.mjs", "tools/layout-studio/suite-store.mjs"]], ["custom-agent-outcome-source-summary.json", ["tools/layout-studio/custom-agents.mjs", "tools/layout-studio/agent-observation.mjs", "tools/layout-studio/suite.mjs", "packages/control-plane/src/confirmations.ts"]], ["compact-release-manifest-summary.json", ["deployment/suite/release.mjs"]]]) {
+    const e = JSON.parse(await readFile(new URL("../docs/evidence/" + evidence, import.meta.url), "utf8"));
+    for (const name of names) {
+        const digest = createHash("sha256").update(await readFile(join(root, name))).digest("hex");
+        assert.equal(digest, e.sourceFiles[name]);
+        moduleDigests[name] = digest;
+    }
+}
+checks.push("seven-exact-tested-installed-module-hashes");
+const load = name => import(pathToFileURL(join(root, name)).href), { createCredentialProcessRunner } = await load("tools/layout-studio/credential-process.mjs");
+const children = [], close = (c, code = 0, signal = null) => { c.exitCode = code; c.signalCode = signal; c.emit("close", code, signal); }, spawn = () => { const c = new EventEmitter(); Object.assign(c, { stdin: new PassThrough(), stdout: new PassThrough(), stderr: new PassThrough(), exitCode: null, signalCode: null, kill() { close(c, 1); return true; } }); children.push(c); return c; };
+const run = createCredentialProcessRunner({ spawnProcess: spawn });
+let pending = run("synthetic", [], "SYNTHETIC_INPUT");
+await new Promise(r => setImmediate(r));
+let c = children.at(-1);
+assert.equal(c.stdin.read().toString(), "SYNTHETIC_INPUT");
+c.stdout.write(" SYNTHETIC_RESULT ");
+close(c);
+assert.equal((await pending).text, "SYNTHETIC_RESULT");
+checks.push("synthetic-credential-result-requires-exact-close");
+pending = run("synthetic", [], "");
+const rejected = assert.rejects(pending, /verified status/);
+await new Promise(r => setImmediate(r));
+close(children.at(-1), null, "SIGTERM");
+await rejected;
+checks.push("signal-exit-cannot-return-partial-credential");
+const uncertain = createCredentialProcessRunner({ spawnProcess: spawn, stopChild: async () => ({ stopped: false }) });
+pending = uncertain("synthetic", [], "");
+const refused = assert.rejects(pending, { code: "CREDENTIAL_PROCESS_EXIT_UNCONFIRMED" });
+await new Promise(r => setImmediate(r));
+c = children.at(-1);
+c.stdout.write("x".repeat(32769));
+await refused;
+const count = children.length;
+await assert.rejects(uncertain("synthetic", [], ""), { code: "CREDENTIAL_PROCESS_EXIT_UNCONFIRMED" });
+assert.equal(children.length, count);
+close(c);
+checks.push("uncertain-exact-worker-prevents-replacement");
+const { createCustomAgents } = await load("tools/layout-studio/custom-agents.mjs"), { agentRoutes, agentMessageSchema, requestMac } = await load("integrations/agent-protocol.mjs");
+let state = { id: "synthetic", policy: "personal", mode: "personal-companion", agents: [], roleBindings: [], observations: [], confirmationJournal: [] }, chain = Promise.resolve();
+const keys = new Map(), store = { async authorize(id) { assert.equal(id, "synthetic"); if (state.mode !== "personal-companion")
+        throw Error("Synthetic keyboard-only refusal"); }, async credential(id, p, value) { await this.authorize(id); if (value === undefined)
+        return keys.get(p); keys.set(p, value); }, async snapshot() { return structuredClone(state); }, async update(id, op, fn) { const next = chain.catch(() => { }).then(async () => { await this.authorize(id); const draft = structuredClone(state), r = await fn(draft); state = draft; return r; }); chain = next; return next; } };
+const agents = createCustomAgents({ store, now: () => 100000 }), enroll = () => agents.enroll("synthetic", { id: "example", name: "Synthetic", capabilities: ["status", "review"] }), send = (token, sequence, path = agentRoutes.event, extra = { event: { status: "ready" } }) => { const body = { schema: agentMessageSchema, compartment: "synthetic", agentId: "example", sessionId: "same-session", sequence, at: 100000, ...extra }, raw = JSON.stringify(body); return agents.message(path, body, requestMac(token, path, raw), raw); };
+const old = await enroll();
+await send(old.token, 1);
+const oldEpoch = state.agents[0].credentialEpoch, claim = await agents.dispatch("synthetic", { agentId: "example", sessionId: "same-session", intent: "review" });
+await send(old.token, 2, agentRoutes.poll, {});
+state.roleBindings = [{ provider: "custom-agent", targetId: "example", roleId: "old" }];
+const review = await agents.reviewRevoke("synthetic", "example");
+const revoked = await agents.revoke("synthetic", { agentId: "example", token: review.confirmation.token });
+assert.equal(revoked.externalProcessStopped, false);
+assert.equal(state.agents[0].commands[0].status, "uncertain-session-ended");
+assert.equal(state.roleBindings.length, 0);
+await assert.rejects(send(old.token, 3), /not actively enrolled/);
+checks.push("synthetic-reviewed-revocation-preserves-uncertain-history");
+const next = await enroll();
+assert.notEqual(next.token, old.token);
+await send(next.token, 1);
+await assert.rejects(send(old.token, 99), /authentication/);
+await assert.rejects(send(next.token, 2, agentRoutes.ack, { commandId: claim.commandId, outcome: "completed" }), /active claim/);
+await assert.rejects(agents.dispatch("synthetic", { agentId: "example", sessionId: "same-session", intent: "status", credentialEpoch: oldEpoch }), /replaced/);
+assert.equal(keys.size, 1);
+checks.push("replacement-cannot-inherit-old-claims-or-role-authority");
+state.observations = [{ id: "synthetic-recording", status: "recording", sources: ["agent-events"], exclusions: [], createdAt: 100000, updatedAt: 100000, events: [] }];
+const input = { agentId: "example", commandId: claim.commandId }, outcomeReview = await agents.reviewOutcome("synthetic", input);
+assert.equal(outcomeReview.externalOutcomeVerified, false);
+assert.equal(outcomeReview.commandWillBeRetried, false);
+const outcome = await agents.resolveOutcome("synthetic", { ...input, token: outcomeReview.confirmation.token });
+assert.equal(outcome.status, "reviewed-unconfirmed");
+assert.equal(outcome.externalOutcomeVerified, false);
+assert.equal(outcome.providerCommandSent, false);
+assert.equal(state.agents[0].sequence, 1);
+assert.equal(state.agents[0].commands[0].status, "reviewed-unconfirmed");
+checks.push("synthetic-reviewed-uncertainty-never-resends-or-verifies-work");
+await assert.rejects(agents.resolveOutcome("synthetic", { ...input, token: outcomeReview.confirmation.token }), /uncertain claim/);
+const observations = state.observations[0].events;
+assert.equal(observations.length, 1);
+assert.equal(observations[0].phase, "adapter-command-outcome-reviewed");
+assert.equal(observations[0].status, "unknown");
+assert.equal(observations[0].provenance, "switchyard-local-lifecycle");
+assert.equal(observations[0].taskCompletionVerified, false);
+for (const secret of [claim.commandId, old.token, next.token, outcomeReview.confirmation.token])
+    assert.equal(JSON.stringify(observations).includes(secret), false);
+checks.push("review-replay-and-private-local-observation-boundary");
+await assert.rejects(agents.revoke("synthetic", { agentId: "example", token: review.confirmation.token }), /consum|scope|match|unavailable/i);
+for (const secret of [old.token, next.token, review.confirmation.token])
+    assert.equal(JSON.stringify(state).includes(secret), false);
+state.mode = "keyboard-only";
+await assert.rejects(agents.reviewRevoke("synthetic", "example"), /keyboard-only/);
+checks.push("review-replay-privacy-and-policy-fences");
+const evidence = { schema: "switchyard-installed-agent-security-metadata/v2", at: new Date().toISOString(), moduleDigests, verifierSourceSha256: createHash("sha256").update(await readFile(new URL(import.meta.url))).digest("hex"), sourceCommit: built.source, applicationRelease: built.id, checks, success: true, pureInMemoryOnly: true, liveUserCredentialsUsed: false, liveAgentsRevoked: 0, nativeProcessesStarted: 0, providerOrModelRequests: 0, hardwareOperations: 0 };
+const { privateDirectory } = await import("../tools/layout-studio/private-fs.mjs");
+const outputRoot = join(process.env.XDG_STATE_HOME || join(homedir(), ".local/state"), "strathex-switchyard/runtime-verification");
+await privateDirectory(outputRoot);
+const out = join(outputRoot, "installed-agent-security-metadata-" + Date.now() + ".json");
+await writeFile(out, JSON.stringify(evidence, null, 2) + "\n", { flag: "wx", mode: 0o600 });
+console.log(JSON.stringify({ receipt: out, checks: checks.length, success: true, pureInMemoryOnly: true }));
+

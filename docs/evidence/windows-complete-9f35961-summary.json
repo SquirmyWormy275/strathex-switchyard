@@ -1,0 +1,43 @@
+{
+  "schema": "switchyard-complete-windows-source-summary/v1",
+  "sourceCommit": "9f35961ca18087b2406e7e2ad716b5fe97ebc2bb",
+  "executionCommit": "c87caa487b44ea851f0174101f8fbdc757927227",
+  "sourceAndExecutionTree": "ce90296ad34d0ea3fb7445a3b120cafb579f0dfd",
+  "runId": 42281533502,
+  "jobId": 128122800726,
+  "artifactId": 13540744985,
+  "archiveBytes": 48330,
+  "archiveSha256": "d402c1c43db6b9c2dcef4c50a19658fbbd42bf36091f927319bdbe45085f4e2b",
+  "zipSavedLocally": false,
+  "privateReceipt": "windows-complete-9f35961-13540744985-0.json",
+  "receiptSha256": "ed8bbb6d057a76e05d7365adb7eab9f75d34f22e5ac749e24791c97452a1fdc1",
+  "success": true,
+  "totals": {
+    "required": 414,
+    "passed": 414,
+    "failed": 0,
+    "tests": 2600,
+    "passedTests": 2398,
+    "failedTests": 0,
+    "skippedTests": 202,
+    "cancelledTests": 0,
+    "todoTests": 0
+  },
+  "nonTestGroups": [
+    "build:companion",
+    "build:linux-companion",
+    "build:provider-host",
+    "build:vscode",
+    "deployment/windows/Test-B122ManifestGenerators.ps1",
+    "deployment/windows/Test-B122InstallLifecycle.ps1",
+    "deployment/windows/Test-B122TrustedBootstrap.ps1#powershell5",
+    "deployment/windows/Test-B122TrustedBootstrap.ps1#pwsh",
+    "deployment/windows/Test-B122ProviderDesktopRelease.ps1"
+  ],
+  "originalGroupBoundsVerified": true,
+  "allChildAndTreeCleanupVerified": true,
+  "providersAndWindowsGuestsDoubledWhereDeclared": true,
+  "interactiveWindowsAcceptance": false,
+  "installedChanged": false,
+  "laterCredentialRevocationAndOutcomeChangesIncluded": false
+}

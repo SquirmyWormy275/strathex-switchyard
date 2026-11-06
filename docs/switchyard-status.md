@@ -12,7 +12,9 @@ declared skips, covering bundled-agent retirement, command observation,
 credential-worker ownership and shortcut diagnostics. Newer agent revocation and
 compact packaging have separate focused and installed evidence.
 The restricted Windows storage owner now passes all eight original checks with
-verified retirement. Complete Windows release acceptance remains pending. Hardware,
+verified retirement. Complete Windows source `9f35961` passes 414 test/build groups,
+2,398 tests and 202 declared skips. Later credential and custom-agent changes have
+separate acceptance. Hardware,
 account and visual acceptance remain separate from those implementation results.
 
 Use the [requirement ledger](switchyard-requirements.md) for the complete scope,
@@ -27,12 +29,13 @@ there is no merge or public release acceptance.
 | Boundary | Verified result | Still open |
 | --- | --- | --- |
 | Complete Linux source | `8786f83`: **309 groups, 1,847 passing tests, sixteen declared skips, zero failures.** Exact child/tree exit and owned checkout, nine aliases, 782 generated files, temporary parent and marker cleanup verify; all three other worktrees remain. [Receipt](evidence/linux-8786f83-complete-summary.json). | Provider/guest doubles remain explicit. Newer agent revocation and compact packaging have separate 86-check and 26-check focused passes plus installed metadata acceptance. |
-| Windows backend batches | `9f35961`: **198 groups, 1,022 passing tests, 142 declared skips, zero failures.** Four digests, source/merge tree equality and all child/tree cleanup verify. [Receipts](evidence/windows-backend-9f35961-native-summary.json). | The combined release remains active. Older `dbbcce8` backend and complete-release failures remain recorded; later passing batches do not relabel them. [Historical backend](evidence/windows-backend-dbbc-native-summary.json), [complete failure](evidence/windows-complete-dbbc-failed-summary.json). |
+| Complete Windows release | `9f35961`: **414 groups, 2,398 passing tests, 202 declared skips, zero failures.** Archive/receipt digests, source/merge tree equality, original bounds and all child/tree cleanup verify. [Receipt](evidence/windows-complete-9f35961-summary.json). | Later credential ownership, revocation and outcome changes are outside this checkpoint. Provider/guest doubles and interactive acceptance remain separate. |
+| Windows backend batches | `9f35961`: **198 groups, 1,022 passing tests, 142 declared skips, zero failures.** Four digests, source/merge tree equality and all child/tree cleanup verify. [Receipts](evidence/windows-backend-9f35961-native-summary.json). | The combined release now passes separately above. Older `dbbcce8` backend and complete-release failures remain recorded; later passing batches do not relabel them. [Historical backend](evidence/windows-backend-dbbc-native-summary.json), [complete failure](evidence/windows-complete-dbbc-failed-summary.json). |
 | Restricted Windows owner | `6e967a3`: **8/8 original owner checks pass**, with 68 exact QUERY-mask-8 registrations, native tree exit, token recheck, private-desktop closure and fixture/service/file retirement. All six GUI setup checks pass. [Owner receipt](evidence/windows-restricted-owner-accepted-summary.json), [setup](evidence/setup-final-native-summary.json). | This controlled native CI proof does not accept an ordinary user account, interactive UAC or actual guest journey. |
-| Installation and runtime | All sixteen original Windows installation/recovery cases pass at `b600a6d`; its independent fresh runtime installs 49 packages and loads/rechecks the offline CPU model, then removes its temporary runtime. [Installation](evidence/installation-scenarios-native-summary.json), [runtime](evidence/windows-runtime-b600-native-summary.json). | These independent passes do not accept the failed complete Windows release or ordinary-user/guest journeys. |
+| Installation and runtime | All sixteen original Windows installation/recovery cases pass at `b600a6d`; its independent fresh runtime installs 49 packages and loads/rechecks the offline CPU model, then removes its temporary runtime. [Installation](evidence/installation-scenarios-native-summary.json), [runtime](evidence/windows-runtime-b600-native-summary.json). | Complete Windows `9f35961` now passes separately; ordinary-user/guest journeys remain open. |
 | Latest diagnostic source | Seven focused groups pass 69 tests with five Windows-only skips. Two managed builds, 2,101 portable checks, typecheck and exact owned cleanup pass. [Receipt](evidence/worker-start-observation-source-summary.json). | Actual Windows `d15285b` passes all eight acknowledgement/refusal tests without skips. [Native receipt](evidence/worker-start-refusal-native-summary.json). The full restricted-owner journey is now separately accepted above. |
 | Windows index/history/leases | Native NTFS index and history packets each pass six checks and three independent guardian exits. Both Windows scanner files pass two cases with guest execution doubled; lease groups pass 24 tests and one Linux-only skip. [Evidence](evidence/native-history-index-leases-summary.json). | Packet Git witnesses are synthetic. Actual guest, installed Windows and ordinary-user acceptance remain separate. |
-| Installed app | Linux source `b3ce0a9` passes 20 owner/journal metadata checks and seven pure credential/revocation checks. Six tested module hashes, all 54 workspace semantic snapshots, 53 sealed files and frozen frontend bytes verify. Only current plus one rollback remain; the complete 5,227,326-byte prepared bundle is removed. [Receipt](evidence/installed-agent-security-summary.json). Earlier lifecycle/archive/extras receipts remain source-specific evidence. | No live agent is revoked and no bundled example, recording, scanner, task, provider or public query is started by this update. Frontend and extension activation remain frozen. |
+| Installed app | Linux source `cadbccd` passes 20 owner/journal metadata checks and nine pure credential/revocation/outcome checks. Seven tested module hashes, all 54 workspace semantic snapshots, 53 sealed files and frozen frontend bytes verify. Only current plus one rollback remain; the complete 5,230,818-byte prepared bundle is removed. [Receipt](evidence/installed-agent-outcome-summary.json), [repeatable proof](evidence/installed-agent-security-verifier-summary.json). Earlier lifecycle/archive/extras receipts remain source-specific evidence. | No live agent is revoked and no bundled example, recording, scanner, task, provider or public query is started by this update. Frontend and extension activation remain frozen. |
 | Windows npm archive identity | Corrected `55515d1` completes ten archive tests plus eight original byte-comparison tests, each file with two original Linux-only skips inside its original 300-second bound; guest execution is doubled. [Archive](evidence/npm-archive-native-summary.json), [bytes](evidence/npm-artifact-split-native-summary.json). | Complete Windows release remains separate. |
 | Windows shortcut retirement | `80601e9` passes all sixteen original installation/recovery scenarios and twelve writer checks, no skips and verified cleanup. The fixed stage diagnostics execute with the original bounds. [Native pass](evidence/shortcut-stage-diagnostics-native-summary.json). | `9193471` and `4b2daed` each fail the first installation scenario at the original ten-second shortcut deadline: 24/25 tests pass, all cleanup verifies. The latest pass does not reproduce or establish the cause of the intermittent timeout. [Recurring failures](evidence/windows-shortcut-recurring-timeout-summary.json), [diagnostic source](evidence/shortcut-stage-diagnostics-source-summary.json). |
 | Credential worker retirement | Six groups/69 checks pass, including ten worker tests and two controlled real children. Errors join exact-child retirement; unconfirmed exit blocks replacement. Installed pure synthetic checks also pass within the 27-check update. [Contract](credential-worker-lifecycle.md), [source](evidence/credential-process-source-summary.json), [installed](evidence/installed-agent-security-summary.json). | Live credential failure injection and native Windows acceptance remain separate. No user key is replaced. |
@@ -46,7 +49,7 @@ Rev2 scope independently of these checkpoints.
 The corrected native Windows preliminary backend now passes all 198 groups: 1,022
 passing tests and 142 declared skips. Four archive digests, source/merge tree
 equality and every child/tree cleanup are verified. This is separate from the
-combined Windows release still running. [Backend receipts](evidence/windows-backend-9f35961-native-summary.json).
+combined Windows release, which now passes 414 groups. [Backend receipts](evidence/windows-backend-9f35961-native-summary.json).
 
 Bundled-agent retirement now preserves uncertain exact children, refuses replacement
 across mode changes and reports unconfirmed shutdown. Seven groups/72 checks pass,
@@ -77,8 +80,9 @@ Uncertain claims from retired custom-agent sessions now have a separate one-use
 review path. Reviewed records remain explicitly unverified, become eligible for
 the existing bounded history retention and never resend provider commands. Five
 new recovery cases pass within eight groups/91 checks, including authenticated
-HTTP, late-ack races, rollback and capacity preservation. Installed recovery and
-native Windows acceptance remain separate.
+HTTP, late-ack races, rollback and capacity preservation. Installed pure recovery
+checks also pass inside the 29-check update; live installed recovery and native
+Windows acceptance remain separate.
 [Contract](custom-agent-revocation.md#review-an-uncertain-claim),
 [evidence](evidence/custom-agent-outcome-source-summary.json).
 
@@ -94,8 +98,9 @@ native Windows acceptance remain separate.
 
 ## Unfinished implementation
 
-- Corrected complete Windows release verification; the separate restricted
-  storage-owner journey is now accepted in controlled native CI.
+- Native Windows verification of changes newer than the passing `9f35961`
+  complete release; the restricted storage-owner journey is separately accepted
+  in controlled native CI.
   The shortcut cleanup race is corrected: failures join the writer's exit before
   removing its owned output, and unconfirmed exits preserve staging. Twenty-three
   focused groups/69 distinct checks and all 25 native Windows checks pass.

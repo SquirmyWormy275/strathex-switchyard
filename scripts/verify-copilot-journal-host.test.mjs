@@ -13,3 +13,8 @@ test("installed task-owner metadata proof rejects native loading, account and ap
   const script=fileURLToPath(new URL("./verify-task-owner-host.mjs",import.meta.url));
   for(const flags of [[],["--load"],["--read-only-metadata","--resume"],["--read-only-metadata","--attach"],["--read-only-metadata","--account=NEVER_CONTACT"],["--read-only-metadata","--approved"],["--read-only-metadata","--read-only-metadata"]]) await assert.rejects(execute(process.execPath,[script,...flags],{timeout:5000,maxBuffer:32768}),error=>error.code===1&&error.stdout===""&&/Usage on the pilot:/.test(error.stderr));
 });
+
+test("installed agent-security proof refuses live enrollment, revocation, outcome and broad flags before installed-state access", async () => {
+  const script = fileURLToPath(new URL("./verify-agent-security-host.mjs", import.meta.url));
+  for (const flags of [[], ["--synthetic"], ["--read-only-metadata", "--enroll"], ["--read-only-metadata", "--revoke"], ["--read-only-metadata", "--resolve"], ["--read-only-metadata", "--agent=NEVER_CONTACT"], ["--read-only-metadata", "--approved"], ["--read-only-metadata", "--read-only-metadata"]]) await assert.rejects(execute(process.execPath, [script, ...flags], { timeout: 5000, maxBuffer: 32768 }), error => error.code === 1 && error.stdout === "" && /Usage on the pilot:/.test(error.stderr));
+});
