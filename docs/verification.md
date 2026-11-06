@@ -1,5 +1,18 @@
 # What has actually been verified
 
+## Windows read-only probe observation
+
+The native 4faa8a1 owner clears private state and mode update but fails its
+read-only storage probe. The CI proof now delegates unchanged native operations
+through fixed phase observation: reconcile/identity/capability, command startup,
+child registration, ready callback and completed ownership persistence. Only
+known fixed error categories are retained, with an unknown refusal fallback.
+Original exceptions, assertions and protected failed fixtures are preserved.
+Five isolated groups / 60 tests, typecheck and every child/tree cleanup pass.
+The existing managed and JavaScript bounded phase projection accepts these
+labels; no managed protocol or production runtime change is made. Native
+follow-up is pending. [Evidence](evidence/windows-owner-probe-observation-summary.json).
+
 Windows `4faa8a1` clears restricted private-state initialization and mode update.
 Its version 2 native lease tests pass **24 checks / one declared skip**, including
 EOF, contention, partial input, non-pipe input refusal and parent-loss cleanup.

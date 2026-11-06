@@ -6,7 +6,7 @@ a partial implementation.** The F77 is the pilot device; it does not limit scope
 
 The Linux backend has a passing complete test checkpoint, and a versioned
 application is installed. The source has since gained additional tested changes.
-Windows restricted-owner initialization is an active software failure. Hardware,
+Windows restricted-owner storage probing is an active software failure. Hardware,
 account and visual acceptance remain separate from those implementation results.
 
 Use the [requirement ledger](switchyard-requirements.md) for the complete scope,
@@ -31,7 +31,10 @@ The `fea2ca4` native lease failure was a stale diagnostic-label expectation.
 The `f653827` follow-up passes its file replacement, hard-link, malformed release
 and parent-loss checks, with exact process cleanup. Its client and policy
 workflows also pass; the prior SDK-download failure remains retained.
-Complete release CI is still pending.
+Complete release CI is still pending. CI-only fixed probe-stage observation now
+passes five groups / 60 tests and typecheck. It preserves the original calls and
+eight checks; native follow-up is pending.
+[Observation evidence](evidence/windows-owner-probe-observation-summary.json).
 
 ## What the backend does
 

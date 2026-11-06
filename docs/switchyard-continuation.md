@@ -31,6 +31,13 @@ evidence, not instructions to reset. Publish regular commits. Do not merge or re
 
 ## Current implementation and evidence
 
+CI-only probe observation now labels reconcile, setup identity or broker capability
+and the first failing command lifecycle stage without changing native behavior,
+permissions or the eight owner assertions. Five groups / 60 tests and typecheck
+pass with cleanup. Native follow-up is pending; do not infer a narrower cause
+from the prior read-only-probe failure.
+[Evidence](evidence/windows-owner-probe-observation-summary.json).
+
 Windows `4faa8a1` clears restricted private-state initialization and mode update.
 Its version 2 native lease tests pass **24 checks / one declared skip**, including
 EOF, contention, partial input, non-pipe input refusal and parent-loss cleanup.

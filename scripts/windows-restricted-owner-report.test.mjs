@@ -1,6 +1,49 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { verifyRestrictedOwnerReport, storageBrokerFailureEvidence, parseNodeRngImports, verifyNodeRngImports } from "./windows-restricted-owner-report.mjs";
+import { createWindowsOwnerProbeObservation } from "./windows-owner-probe-observation.mjs";
+
+test("probe observation delegates original arguments, callbacks and result without accepting native work", async () => {
+  const observation = createWindowsOwnerProbeObservation(), calls = [], child = {}, frame = {}, result = {}, argument = {}, options = {
+    env: { PATH: "NEVER_RETAIN" }, inputText: "NEVER_RETAIN", signal: new AbortController().signal,
+    onGuardianChild: value => { assert.equal(value, child); calls.push("child"); },
+    onGuardianReady: async value => { assert.equal(value, frame); await Promise.resolve(); calls.push("persisted"); },
+  };
+  const command = observation.command(async (executable, args, actual) => {
+    assert.equal(executable, "NEVER_RETAIN"); assert.equal(args, argument);
+    for (const key of ["env", "inputText", "signal"]) assert.equal(actual[key], options[key]);
+    actual.onGuardianChild(child); await actual.onGuardianReady(frame); calls.push("original-command"); return result;
+  });
+  const original = { identity: async value => { assert.equal(value, argument); return command("NEVER_RETAIN", argument, options); }, reconcile: async () => ({ stopped: true }), probeExchange: async () => result, close() { return this.reconcile(); } };
+  const native = observation.native(original);
+  assert.equal(await native.identity(argument), result); assert.equal(await native.probeExchange(), result);
+  assert.deepEqual(await native.close(), { stopped: true });
+  assert.deepEqual(calls, ["child", "persisted", "original-command"]); assert.equal(observation.failurePhase, null);
+});
+
+test("probe observation retains original exceptions and projects only fixed operation and lifecycle labels", async () => {
+  for (const stage of ["startup", "created", "ready", "committed"]) {
+    const observation = createWindowsOwnerProbeObservation(), error = Object.assign(new Error("Runtime worker exit could not be fully verified. Preserve its staging/recovery state."), { privatePath: "NEVER_RETAIN" });
+    const command = observation.command(async (_exe, _args, options) => {
+      if (stage !== "startup") options.onGuardianChild({ privatePath: "NEVER_RETAIN" });
+      if (["ready", "committed"].includes(stage)) await options.onGuardianReady({ privatePath: "NEVER_RETAIN" });
+      throw error;
+    });
+    const native = observation.native({ identity: () => command("NEVER_RETAIN", [], { onGuardianReady: async () => { if (stage === "ready") throw error; } }) });
+    await assert.rejects(native.identity(), value => value === error);
+    assert.equal(observation.failurePhase, `probe-identity-${stage}-worker-exit`);
+    const report = { schema: "switchyard-storage-broker-protocol-proof/v1", success: false, restrictedHostChildExit: { waitResult: 0, resultAvailable: true, failedPhase: observation.failurePhase } };
+    assert.equal(storageBrokerFailureEvidence(report).restrictedHostChildExit.failedPhase, observation.failurePhase);
+    assert.equal(JSON.stringify(report).includes("NEVER_RETAIN"), false);
+  }
+  for (const method of ["reconcile", "identity", "probeExchange"]) {
+    const observation = createWindowsOwnerProbeObservation(), error = Object.assign(new Error("NEVER_RETAIN"), { code: "NEVER_RETAIN" });
+    const native = observation.native({ [method]: async () => { throw error; } });
+    await assert.rejects(native[method](), value => value === error);
+    assert.match(observation.failurePhase, /^probe-(?:reconcile|identity|capability)-return-refused$/);
+  }
+});
+
 test("fixed Node imports retain only known method presence and exact image hash, never a runtime branch claim", () => {
   const text = "Dump of file C:\\NEVER_RETAIN\\node.exe\n\n  bcrypt.dll\n     2A BCryptGenRandom\n  ADVAPI32.dll\n     10 CryptAcquireContextW\n     11 CryptGenRandom\n     12 CryptReleaseContext\n     13 UnrelatedSecretMethod\n  Summary\n";
   const value = parseNodeRngImports(text, "a".repeat(64));

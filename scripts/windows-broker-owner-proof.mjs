@@ -8,14 +8,16 @@ import { createSuiteStore } from "../tools/layout-studio/suite-store.mjs";
 import { createWindowsStorageNative } from "../tools/layout-studio/windows-storage-native.mjs";
 import { createWindowsBrokerExchanges } from "../tools/layout-studio/windows-broker-exchanges.mjs";
 import { directoryIdentity } from "../tools/layout-studio/private-fs.mjs";
-import { runtimeGuardianStopped } from "../tools/layout-studio/runtime-command.mjs";
+import { runtimeGuardianStopped, runRuntimeCommand } from "../tools/layout-studio/runtime-command.mjs";
 import { stateLockFailureEvidence } from "../tools/layout-studio/keyless-lease-pool.mjs";
+import { createWindowsOwnerProbeObservation } from "./windows-owner-probe-observation.mjs";
 
 export async function verifyWindowsBrokerOwner({ helper, installationId, serviceImageSha256 }) {
   if (process.platform !== "win32" || process.env.GITHUB_ACTIONS !== "true" || process.env.RUNNER_OS !== "Windows") throw Error("The actual broker-owner proof requires the explicit disposable Windows worker.");
   const root = await mkdtemp(join(process.env.RUNNER_TEMP || tmpdir(), "sxbo-")), original = await directoryIdentity(root), keys = new Map(), checks = [];
   const store = createSuiteStore({ root, secrets: { get: async (c,p) => keys.get(c+p), set: async (c,p,v) => { keys.set(c+p,v); } } });
-  const native = createWindowsStorageNative({ store, helperPath: helper, setupPath: join(dirname(helper), "Switchyard.Setup.exe") });
+  const observation = createWindowsOwnerProbeObservation();
+  const native = observation.native(createWindowsStorageNative({ store, helperPath: helper, setupPath: join(dirname(helper), "Switchyard.Setup.exe"), command: observation.command(runRuntimeCommand) }));
   let consumerExited = true, phase = "private-state-initialize";
   const service = createWindowsBrokerExchanges({ store, native, consumerStopped: async () => consumerExited }), context = { operationId: randomUUID(), scopeDigest: "a".repeat(64), provider: "codex" }, inputs = { inputManifestSha256: "e".repeat(64) }, authorize = async () => {};
   try {
@@ -57,7 +59,7 @@ export async function verifyWindowsBrokerOwner({ helper, installationId, service
   } catch (error) {
     // Keep original native ownership and AEAD facts. The enclosing coordinator
     // preserves the installation and never replays its failed action.
-    error.hostExchangeProof = { schema: "switchyard-native-broker-owner-proof/v1", success: false, checks, failedPhase: phase, failureCategory: ["Error", "AssertionError", "TypeError", "RangeError"].includes(error.name) ? error.name : "Error", stateLockFailure: stateLockFailureEvidence(error.stateLockFailure) ?? null, stateDirectory: root, fixtureRemoved: false, guestLaunched: false, setupRequested: false, accountCreated: false };
+    error.hostExchangeProof = { schema: "switchyard-native-broker-owner-proof/v1", success: false, checks, failedPhase: phase === "read-only-probe" ? observation.failurePhase ?? phase : phase, failureCategory: ["Error", "AssertionError", "TypeError", "RangeError"].includes(error.name) ? error.name : "Error", stateLockFailure: stateLockFailureEvidence(error.stateLockFailure) ?? null, stateDirectory: root, fixtureRemoved: false, guestLaunched: false, setupRequested: false, accountCreated: false };
     throw error;
   }
 }
