@@ -31,6 +31,19 @@ evidence, not instructions to reset. Publish regular commits. Do not merge or re
 
 ## Current implementation and evidence
 
+Selected Python wheels now receive bounded ZIP/metadata identity checks alongside
+their declared byte hash. A different embedded package name/version produces a
+failed provenance finding even when the byte hash matches. Eight focused groups
+plus a final unit follow-up pass 101 distinct checks, including six actual Linux
+scanner journeys and six Windows guest doubles. Fifteen independent Python ZIP
+fixtures, malformed inputs, expansion limits, protected receipts and exact cleanup
+verify; typecheck and the original package budget pass. No extraction or execution
+occurs. RECORD hashes, compatibility tags, license/code contents and publisher
+provenance remain unverified. The installed aa98c91 baseline predates this change;
+installed and native Windows wheel acceptance are pending.
+[Wheel contract](python-wheel-identity.md),
+[source evidence](evidence/pypi-wheel-identity-source-summary.json).
+
 Complete Windows source cadbccd now passes its separate full verification packet:
 **416 test/build groups, 2,443 passing tests, 204 declared skips and no failures**.
 The source/merge trees, artifact/receipt digests, original source group inventory,

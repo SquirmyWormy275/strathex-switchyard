@@ -15,6 +15,9 @@ This is a deliberately vulnerable test example, not a version recommendation.
 Declared hashes remain declarations unless an artifact is explicitly selected
 for [byte comparison](python-artifact-integrity.md). Such comparison does not
 verify an installed distribution, archive contents or publisher signature.
+Selected wheels also receive a [bounded metadata identity comparison](python-wheel-identity.md).
+Different declared package identity produces a separate failed finding, while
+RECORD hashes and publisher provenance remain unverified.
 
 ## Supported input
 

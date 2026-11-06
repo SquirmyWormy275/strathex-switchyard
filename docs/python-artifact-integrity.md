@@ -57,8 +57,10 @@ observations, missing findings and changed alternatives refuse. The original
 
 The report's `acceptedSha256` array records the declared alternatives; its name
 does not imply accepted security coverage. CycloneDX includes namespaced artifact
-metadata and unknown composition. Wheel/archive format, embedded package identity,
-installation, license obligations and publisher provenance remain unverified.
+metadata and unknown composition. A separate [bounded wheel identity check](python-wheel-identity.md)
+now compares embedded package metadata, even when the selected byte hash matches.
+Broader archive variants, RECORD hashes, installation compatibility, license
+obligations and publisher provenance remain unverified.
 Matching an attacker-controlled requirements file is not proof of trustworthy code.
 
 ## Demonstration

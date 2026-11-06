@@ -4,7 +4,7 @@ import { constants } from "node:fs";
 import { lstat, open, realpath } from "node:fs/promises";
 import { dirname, resolve, relative, isAbsolute } from "node:path";
 import { fileURLToPath } from "node:url";
-import { gunzipSync } from "node:zlib";
+import { gunzipSync, inflateRawSync, crc32 } from "node:zlib";
 
 export const shieldEngineVersion = "switchyard-baseline-scanner/1";
 
@@ -373,7 +373,7 @@ export function npmArtifactSha512(value) {
 const artifactKey = (lockPath, location) => JSON.stringify([lockPath, location]);
 const archiveLimit = 4 * 1024 * 1024;
 const archiveReasons = ["compression", "bounds", "format", "headers", "paths", "manifest", "budget"];
-const archiveRefuse = reason => { const error = new Error("Unsupported bounded npm archive."); error.archiveReason = reason; throw error; };
+const archiveRefuse = reason => { const error = new Error("Unsupported bounded package archive."); error.archiveReason = reason; throw error; };
 function archiveString(bytes) {
   const end = bytes.indexOf(0), value = end < 0 ? bytes : bytes.subarray(0, end);
   if (value.some(b => b < 32 || b > 126) || end >= 0 && bytes.subarray(end).some(b => b !== 0)) archiveRefuse("headers");
@@ -482,12 +482,95 @@ export function validateNpmArchiveObservation(value, name, version) {
       || !Number.isSafeInteger(value.expandedBytes) || value.expandedBytes < (value.entries + 3) * 512 || value.expandedBytes > archiveLimit || value.expandedBytes % 512
       || value.status !== (value.name === name && value.version === version ? "matched" : "mismatched")) throw Error("Archive identity observation is inconsistent.");
 }
+const wheelMetadataVersions = ["1.1", "1.2", "2.1", "2.2", "2.3", "2.4", "2.5", "2.6"];
+function wheelHeaders(bytes, selected) {
+  if (!bytes?.length || bytes.length > 65536) archiveRefuse("manifest");
+  let text;
+  try { text = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(bytes); } catch { archiveRefuse("manifest"); }
+  if (/[\0\v\f]|\r(?!\n)/.test(text)) archiveRefuse("manifest");
+  const lines = text.replaceAll("\r\n", "\n").split("\n"), result = new Map(); let previous;
+  if (lines.length > 2048) archiveRefuse("manifest");
+  for (const line of lines) {
+    if (!line) break;
+    if (line.length > 8192) archiveRefuse("manifest");
+    if (/^[ \t]/.test(line)) { if (!previous || selected.includes(previous)) archiveRefuse("manifest"); continue; }
+    const match = /^([A-Za-z][A-Za-z0-9-]{0,63}):[ \t]*(.*)$/.exec(line); if (!match) archiveRefuse("manifest");
+    previous = match[1].toLowerCase();
+    if (selected.includes(previous)) { if (result.has(previous)) archiveRefuse("manifest"); result.set(previous, match[2].trim()); }
+  }
+  if (result.size !== selected.length) archiveRefuse("manifest");
+  return result;
+}
+/** Bounded ZIP/metadata identity only: never extracts, imports or installs a wheel. */
+export function inspectPypiWheel(bytes, budget = { remaining: archiveLimit }) {
+  try {
+    if (!Number.isSafeInteger(budget.remaining) || budget.remaining < 0 || budget.remaining > 32 * 1024 * 1024 || !Buffer.isBuffer(bytes) || bytes.length > 2 * 1024 * 1024) archiveRefuse("bounds");
+    if (bytes.length < 22) archiveRefuse("format");
+    const u16 = p => bytes.readUInt16LE(p), u32 = p => bytes.readUInt32LE(p), end = bytes.length - 22;
+    if (u32(end) !== 0x06054b50 || u16(end + 4) || u16(end + 6) || u16(end + 20)) archiveRefuse("format");
+    const count = u16(end + 10), central = u32(end + 16);
+    if (!count || count > 1024 || count !== u16(end + 8) || central > end || central + u32(end + 12) !== end) archiveRefuse("bounds");
+    const rows = [], paths = new Map(); let cursor = central, total = 0;
+    for (let i = 0; i < count; i++) {
+      if (cursor + 46 > end || u32(cursor) !== 0x02014b50) archiveRefuse("headers");
+      const flags = u16(cursor + 8), method = u16(cursor + 10), needed = u16(cursor + 6), nameLength = u16(cursor + 28), extra = u16(cursor + 30), comment = u16(cursor + 32), attributes = u32(cursor + 38);
+      if (![0, 8].includes(method)) archiveRefuse("compression");
+      if (flags & ~0x800 || needed < 10 || needed > 20 || ![0, 3].includes(u16(cursor + 4) >>> 8) || extra || comment || u16(cursor + 34) || !nameLength || nameLength > 512 || cursor + 46 + nameLength > end) archiveRefuse("headers");
+      const nameBytes = bytes.subarray(cursor + 46, cursor + 46 + nameLength);
+      if (nameBytes.some(b => b < 33 || b > 126)) archiveRefuse("paths");
+      const raw = nameBytes.toString("ascii"), directory = raw.endsWith("/"), path = directory ? raw.slice(0, -1) : raw, parts = path.split("/"), type = (attributes >>> 16) & 0xf000;
+      if (parts.length > 32 || parts.some(p => !p || p === "." || p === ".." || /[\\:<>"|?*]|[. ]$/.test(p) || /^(?:con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\.|$)/i.test(p)) || type && type !== (directory ? 0x4000 : 0x8000) || attributes & 0x10 && !directory || paths.has(path.toLowerCase())) archiveRefuse("paths");
+      const size = u32(cursor + 24), compressed = u32(cursor + 20), offset = u32(cursor + 42);
+      if (size > archiveLimit || compressed > bytes.length || directory && (size || compressed)) archiveRefuse("bounds");
+      total += size; if (total > archiveLimit) archiveRefuse("bounds");
+      paths.set(path.toLowerCase(), directory); rows.push({ path, nameBytes, directory, size, compressed, offset, crc: u32(cursor + 16), flags, method, needed, time: u32(cursor + 12) });
+      cursor += 46 + nameLength;
+    }
+    if (cursor !== end) archiveRefuse("format");
+    for (const path of paths.keys()) { const parts = path.split("/"); for (let i = 1; i < parts.length; i++) if (paths.get(parts.slice(0, i).join("/")) === false) archiveRefuse("paths"); }
+    const allowance = Math.min(archiveLimit, budget.remaining); if (!allowance || total > allowance) archiveRefuse("budget");
+    budget.remaining -= allowance;
+    const metadata = new Map(); let offset = 0, expanded = 0;
+    for (const row of rows.sort((a, b) => a.offset - b.offset)) {
+      const p = row.offset;
+      if (p !== offset || p + 30 > central || u32(p) !== 0x04034b50 || u16(p + 4) !== row.needed || u16(p + 6) !== row.flags || u16(p + 8) !== row.method || u32(p + 10) !== row.time || u32(p + 14) !== row.crc || u32(p + 18) !== row.compressed || u32(p + 22) !== row.size || u16(p + 26) !== row.nameBytes.length || u16(p + 28)) archiveRefuse("headers");
+      const start = p + 30 + row.nameBytes.length, stop = start + row.compressed;
+      if (stop > central || !bytes.subarray(p + 30, start).equals(row.nameBytes)) archiveRefuse("headers");
+      let content = bytes.subarray(start, stop);
+      if (row.method === 8) {
+        let result;
+        try { result = inflateRawSync(content, { maxOutputLength: Math.max(1, row.size), info: true }); } catch (error) { archiveRefuse(error.code === "ERR_BUFFER_TOO_LARGE" ? "bounds" : "compression"); }
+        if (result.engine.bytesWritten !== content.length) archiveRefuse("compression"); content = result.buffer;
+      }
+      if (content.length !== row.size || crc32(content) !== row.crc) archiveRefuse("headers");
+      expanded += content.length; offset = stop;
+      if (/^[^/]+\.dist-info\/(?:METADATA|WHEEL|RECORD)$/.test(row.path)) { if (row.directory) archiveRefuse("manifest"); metadata.set(row.path, content); }
+    }
+    if (offset !== central || expanded !== total) archiveRefuse("format");
+    const roots = [...new Set(rows.map(r => r.path.split("/")[0]).filter(p => p.endsWith(".dist-info")))];
+    if (roots.length !== 1) archiveRefuse("manifest");
+    const prefix = roots[0], match = /^([A-Za-z0-9_.]+)-([A-Za-z0-9.!+_]+)\.dist-info$/.exec(prefix), manifest = metadata.get(prefix + "/METADATA");
+    if (!match || !metadata.get(prefix + "/RECORD")?.length) archiveRefuse("manifest");
+    const fields = wheelHeaders(manifest, ["metadata-version", "name", "version"]), wheel = wheelHeaders(metadata.get(prefix + "/WHEEL"), ["wheel-version"]);
+    const metadataVersion = fields.get("metadata-version"), wheelVersion = wheel.get("wheel-version"); let identity;
+    try { identity = pypiIdentity(fields.get("name"), fields.get("version")); if (pypiIdentity(match[1], match[2]).name !== identity.name || pypiVersionKey(match[2]) !== pypiVersionKey(identity.version)) archiveRefuse("manifest"); } catch { archiveRefuse("manifest"); }
+    if (!wheelMetadataVersions.includes(metadataVersion) || wheelVersion !== "1.0") archiveRefuse("manifest");
+    budget.remaining += allowance - expanded;
+    return { status: "inspected", name: identity.name, version: identity.version, metadataVersion, wheelVersion, manifestSha256: sha(manifest), entries: count, expandedBytes: expanded };
+  } catch (error) { if (!archiveReasons.includes(error.archiveReason)) throw error; return { status: "unsupported", reason: error.archiveReason }; }
+}
+export function validatePypiWheelObservation(value, name, version) {
+  if (value?.status === "unsupported") { exact(value, ["status", "reason"]); if (!archiveReasons.includes(value.reason)) throw Error("Invalid wheel coverage gap."); return; }
+  exact(value, ["status", "name", "version", "metadataVersion", "wheelVersion", "manifestSha256", "entries", "expandedBytes"]);
+  if (pypiIdentity(value.name, value.version).name !== value.name || !wheelMetadataVersions.includes(value.metadataVersion) || value.wheelVersion !== "1.0" || !/^[a-f0-9]{64}$/.test(value.manifestSha256 ?? "") || !Number.isSafeInteger(value.entries) || value.entries < 3 || value.entries > 1024 || !Number.isSafeInteger(value.expandedBytes) || value.expandedBytes < 1 || value.expandedBytes > archiveLimit || value.status !== (value.name === name && pypiVersionKey(value.version) === pypiVersionKey(version) ? "matched" : "mismatched")) throw Error("Wheel identity observation is inconsistent.");
+}
 function archiveProperties(archive) {
   return archive ? [{ name: "switchyard:archive-identity", value: archive.status },
     ...(archive.status === "unsupported" ? [{ name: "switchyard:archive-gap", value: archive.reason }] : [
       { name: "switchyard:archive-manifest-sha256", value: archive.manifestSha256 },
       { name: "switchyard:archive-declared-name", value: archive.name },
-      { name: "switchyard:archive-declared-version", value: archive.version }])] : [];
+      { name: "switchyard:archive-declared-version", value: archive.version },
+      ...(archive.metadataVersion ? [{ name: "switchyard:wheel-metadata-version", value: archive.metadataVersion }, { name: "switchyard:wheel-format-version", value: archive.wheelVersion }, { name: "switchyard:wheel-record-verification", value: "not-verified" }] : [])])] : [];
 }
 export const shieldArtifactReferenceKey = row => row.ecosystem === "Cargo"
   ? JSON.stringify(["Cargo", row.lockPath, row.name, row.version, row.sourceSha256])
@@ -606,13 +689,14 @@ export async function scanShieldInputs(proposed, { readInput }) {
   const policy = parseRules(await readFeed(request.scanner)), advisory = request.advisory ? parseAdvisories(await readFeed(request.advisory)) : [];
   const advisoryByIdentity = new Map(advisory.map(entry => [advisoryIdentityKey(entry), entry]));
   const add = finding => { if (findings.length < 512) findings.push(finding); else gaps.add("finding_limit"); };
-  const artifacts = new Map((request.packageArtifacts ?? []).map(row => [shieldArtifactReferenceKey(row), row])), consumedArtifacts = new Set(), artifactDigests = new Map(), archiveIdentities = new Map();
-  const npmArtifacts = new Set([...artifacts.values()].filter(row => !row.ecosystem).map(row => row.path)), archiveBudget = { remaining: 32 * 1024 * 1024 };
+  const artifacts = new Map((request.packageArtifacts ?? []).map(row => [shieldArtifactReferenceKey(row), row])), consumedArtifacts = new Set(), artifactDigests = new Map(), archiveIdentities = new Map(), wheelIdentities = new Map();
+  const npmArtifacts = new Set([...artifacts.values()].filter(row => !row.ecosystem).map(row => row.path)), pythonArtifacts = new Set([...artifacts.values()].filter(row => row.ecosystem === "PyPI").map(row => row.path)), archiveBudget = { remaining: 32 * 1024 * 1024 };
   for (const row of artifacts.values()) if (!artifactDigests.has(row.path)) {
     const file = request.files.find(file => file.path === row.path), bytes = await readInput(file.path, file.size);
     if (bytes.length !== file.size || sha(bytes) !== file.sha256) throw Error("Reviewed artifact bytes changed.");
     artifactDigests.set(row.path, { path: file.path, sha256: file.sha256, size: file.size, observedSha512: createHash("sha512").update(bytes).digest("hex") });
     if (npmArtifacts.has(row.path)) archiveIdentities.set(row.path, inspectNpmArchive(bytes, archiveBudget));
+    if (pythonArtifacts.has(row.path)) wheelIdentities.set(row.path, inspectPypiWheel(bytes, archiveBudget));
   }
   if (artifacts.size) gaps.add("artifact_contents_not_inspected");
   for (const file of request.files) {
@@ -669,7 +753,10 @@ export async function scanShieldInputs(proposed, { readInput }) {
         if (reference) {
           const observed = artifactDigests.get(reference.path), acceptedSha256 = [...component.declaredSha256];
           const status = !acceptedSha256.length ? "unsupported-integrity" : acceptedSha256.includes(observed.sha256) ? "matched" : "mismatched";
-          component.artifact = { path: observed.path, sha256: observed.sha256, size: observed.size, algorithm: "sha256", acceptedSha256, status };
+          const inspected = wheelIdentities.get(reference.path), archive = inspected.status === "unsupported" ? inspected : { ...inspected, status: inspected.name === component.name && pypiVersionKey(inspected.version) === pypiVersionKey(component.version) ? "matched" : "mismatched" };
+          component.artifact = { path: observed.path, sha256: observed.sha256, size: observed.size, algorithm: "sha256", acceptedSha256, status, archive };
+          if (archive.status !== "matched") gaps.add("python_wheel_identity_not_verified");
+          if (archive.status === "mismatched") add({ ruleId: "artifact.identity-mismatch", dimension: "provenance", severity: "high", path: file.path, line: null, fingerprint: sha(["artifact.identity-mismatch", "PyPI", file.path, file.sha256, component.name, component.version, observed.path, observed.sha256, archive.manifestSha256].join("\0")) });
           consumedArtifacts.add(referenceKey);
           if (status !== "matched") gaps.add("package_artifact_not_verified");
           if (status === "mismatched") add({ ruleId: "artifact.integrity-mismatch", dimension: "provenance", severity: "high", path: file.path, line: null, fingerprint: sha(`artifact.integrity-mismatch\0PyPI\0${file.path}\0${file.sha256}\0${component.name}\0${component.version}\0${observed.path}\0${observed.sha256}`) });
