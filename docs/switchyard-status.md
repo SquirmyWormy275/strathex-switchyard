@@ -56,6 +56,12 @@ across behavior and corrected inventory checks, including six actual Linux and
 six Windows guest-double scans. Checksums do not establish publisher identity or
 archive contents. [Contract and evidence](npm-artifact-integrity.md).
 
+A subsequent guardian failure observation checks only its existing self-token
+QUERY access after Job creation is denied. Six groups / 79 tests, two managed
+builds / 2,071 portable checks and typecheck pass, with cleanup. Native execution
+is pending; permissions and refusal remain unchanged.
+[Source evidence](evidence/windows-guardian-query-source-summary.json).
+
 ## What the backend does
 
 | Capability | Implemented behavior and reference |

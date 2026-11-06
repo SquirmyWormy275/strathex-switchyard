@@ -47,6 +47,12 @@ test("probe observation retains original exceptions and projects only fixed oper
 test("managed startup phases reach bounded owner evidence without conferring readiness or copying unknown details", async () => {
   for (const [runtimeStartupFailure, suffix] of [
     [{ phase: "job-create", nativeCode: 5 }, "native-job-create-code5"],
+    [{ phase: "job-create", nativeCode: 5, selfTokenQuery: null }, "native-job-create-code5"],
+    [{ phase: "job-create", nativeCode: 5, selfTokenQuery: { opened: false, error: 5, closeError: null, handlesClosedVerified: true } }, "native-job-create-code5-qdenied"],
+    [{ phase: "job-create", nativeCode: 5, selfTokenQuery: { opened: false, error: 0xffffffff, closeError: null, handlesClosedVerified: true } }, "native-job-create-code5-qfailed"],
+    [{ phase: "job-create", nativeCode: 5, selfTokenQuery: { opened: true, error: 0, closeError: 0, handlesClosedVerified: true } }, "native-job-create-code5-qopen"],
+    [{ phase: "job-create", nativeCode: 5, selfTokenQuery: { opened: true, error: 0, closeError: 5, handlesClosedVerified: false } }, "native-job-create-code5-qclose"],
+    [{ phase: "job-create", nativeCode: 5, selfTokenQuery: { opened: true, error: 0, closeError: 0, handlesClosedVerified: true, raw: "NEVER_RETAIN" } }, "refused"],
     [{ phase: "job-configure", nativeCode: 0xffffffff }, "native-job-configure-code4294967295"],
     [{ phase: "self-birth", nativeCode: null }, "native-self-birth"],
     [{ phase: "self-birth", nativeCode: null, raw: "NEVER_RETAIN" }, "refused"],

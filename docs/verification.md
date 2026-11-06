@@ -1,5 +1,18 @@
 # What has actually been verified
 
+The failing guardian now performs one read-only self-token access observation
+only after `CreateJobObjectW` returns error 5: `OpenProcessToken` requests
+`TOKEN_QUERY` (mask 8) against its own pseudo-process handle, then closes any
+returned handle. It neither grants access nor reads token/account information.
+The optional closed failure field reports only opened/error/close status; older
+frames remain accepted. CI projects fixed query-result suffixes while retaining
+original refusal, uncertain exit and all eight owner checks.
+
+Six groups / 79 tests, two managed builds / 2,071 portable checks and typecheck
+pass. All 124 owned build files (3,240,871 bytes) and test staging are removed.
+Native execution of this new observation is pending.
+[Evidence](evidence/windows-guardian-query-source-summary.json).
+
 Selected npm artifact comparison now joins the existing reviewed Supply Chain
 and Release paths. It compares raw bytes with one canonical SHA-512 declaration,
 retains high failed mismatch findings, and keeps archive contents/publisher

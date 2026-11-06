@@ -19,7 +19,9 @@ export function createWindowsOwnerProbeObservation() {
   const record = (stage, error) => {
     // No raw exception, code, path, child output or account identifier is projected.
     const native = runtimeStartupFailureEvidence(error?.runtimeStartupFailure);
-    failure ??= native ? `probe-${operation}-${stage}-native-${native.phase}${native.nativeCode === null ? "" : "-code" + native.nativeCode}` : `probe-${operation}-${stage}-${reasons.get(error?.message) ?? "refused"}`;
+    const query = native?.selfTokenQuery;
+    const queryStage = !query ? "" : !query.handlesClosedVerified ? "-qclose" : query.opened ? "-qopen" : query.error === 5 ? "-qdenied" : "-qfailed";
+    failure ??= native ? `probe-${operation}-${stage}-native-${native.phase}${native.nativeCode === null ? "" : "-code" + native.nativeCode}${queryStage}` : `probe-${operation}-${stage}-${reasons.get(error?.message) ?? "refused"}`;
   };
   return {
     get failurePhase() { return failure; },

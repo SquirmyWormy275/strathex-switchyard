@@ -19,8 +19,21 @@ internal static class RuntimeCommandRunner
         public string? Id;
         public string Phase = "request-fields";
         public uint? NativeCode;
+        public TokenQueryObservation? SelfTokenQuery;
         public bool Ready;
-        public object? Failure => !Ready && Id is not null ? new { schema = Schema, id = Id, @event = "startup-failure", containment = "windows-job", phase = Phase, nativeCode = NativeCode } : null;
+        public object? Failure => !Ready && Id is not null ? new { schema = Schema, id = Id, @event = "startup-failure", containment = "windows-job", phase = Phase, nativeCode = NativeCode, selfTokenQuery = SelfTokenQuery } : null;
+    }
+    private sealed record TokenQueryObservation(bool opened, uint error, uint? closeError, bool handlesClosedVerified);
+    // After a Job-creation denial only: observe the failing process's existing
+    // QUERY access. Never duplicate a token, change an ACL, or grant new rights.
+    private static TokenQueryObservation ObserveSelfTokenQuery()
+    {
+        bool opened = OpenProcessToken(new IntPtr(-1), 8, out IntPtr token);
+        uint error = opened ? 0u : unchecked((uint)Marshal.GetLastWin32Error());
+        if (token == IntPtr.Zero) return new(false, error, null, !opened);
+        bool closed = CloseObservedHandle(token);
+        uint closeError = closed ? 0u : unchecked((uint)Marshal.GetLastWin32Error());
+        return new(opened, error, opened ? closeError : null, closed);
     }
     private static Exception NativeError() => new InvalidOperationException("The native runtime boundary is unavailable.");
     private static async Task<string?> ReadLineBounded(TextReader reader)
@@ -212,7 +225,14 @@ internal static class RuntimeCommandRunner
         startup.Phase = "job-create";
         SafeJobHandle job = CreateJobObjectW(IntPtr.Zero, JobName(id));
         int createError = Marshal.GetLastWin32Error();
-        if (job.IsInvalid || createError == 183) { startup.NativeCode = unchecked((uint)createError); job.Dispose(); throw NativeError(); }
+        if (job.IsInvalid || createError == 183)
+        {
+            startup.NativeCode = unchecked((uint)createError);
+            bool denied = job.IsInvalid && createError == 5;
+            job.Dispose();
+            if (denied) startup.SelfTokenQuery = ObserveSelfTokenQuery();
+            throw NativeError();
+        }
         startup.Phase = "job-configure";
         var information = new ExtendedLimits { Basic = new BasicLimits { Flags = 0x2000 } };
         IntPtr pointer = Marshal.AllocHGlobal(Marshal.SizeOf<ExtendedLimits>());
@@ -252,4 +272,6 @@ internal static class RuntimeCommandRunner
     [DllImport("kernel32.dll", SetLastError = true)] private static extern bool CreatePipe(out IntPtr read, out IntPtr write, ref SecurityAttributes attributes, uint size);
     [DllImport("kernel32.dll", SetLastError = true)] private static extern bool SetHandleInformation(IntPtr handle, uint mask, uint flags);
     [DllImport("kernel32.dll")] private static extern bool CloseHandle(IntPtr handle);
+    [DllImport("kernel32.dll", EntryPoint = "CloseHandle", SetLastError = true)] private static extern bool CloseObservedHandle(IntPtr handle);
+    [DllImport("advapi32.dll", SetLastError = true)] private static extern bool OpenProcessToken(IntPtr process, uint access, out IntPtr token);
 }

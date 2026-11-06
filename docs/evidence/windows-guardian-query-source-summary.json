@@ -1,0 +1,61 @@
+{
+  "schema": "switchyard-windows-guardian-query-source/v1",
+  "basis": "f0aacab94f94686edac0e130b98f0dce4d01aafc",
+  "sourceSha256": {
+    "apps/desktop-hotkeys/RuntimeCommandRunner.cs": "ff22bc7865dc75194ec067c6a5e440920fcdcebea930f5deb11aee283e364c0f",
+    "scripts/windows-owner-probe-observation.mjs": "a4f0688a3c3dd845ffcefb2c1bfd74559223522a6f0389662a306d1589230658",
+    "scripts/windows-restricted-owner-report.test.mjs": "ac4f6751f02c9eeb795165167769ae4af37c38702a534bf559124346b8d28a04",
+    "tools/layout-studio/runtime-command.mjs": "31a27598fbc46e2782d24a2b7fc7a5cf918dbd324f271ee0cac63e61dd97e3fb",
+    "tools/layout-studio/runtime-command.test.mjs": "284608a2595cb4b823a44afce2d45a244023a1f62ad36f3f4e85e3dfadea01d1"
+  },
+  "isolated": {
+    "receipt": "isolated-test-398e2f48-2e79-432c-baa3-783a87d3389a.json",
+    "totals": {
+      "required": 6,
+      "passed": 6,
+      "failed": 0,
+      "tests": 79,
+      "passedTests": 79,
+      "failedTests": 0,
+      "skippedTests": 0,
+      "cancelledTests": 0,
+      "todoTests": 0
+    },
+    "allChildAndTreeCleanupVerified": true
+  },
+  "managed": {
+    "receipt": "guardian-self-query-observation-managed-1793977588197.json",
+    "builds": [
+      {
+        "name": "helper",
+        "warnings": 0,
+        "errors": 0,
+        "managedAssemblySha256": "9f39cc92d831f25f4bf70ecc04bc205a2097c24b2f1f05dc7ecefbe2001a39f4",
+        "managedPeSubsystem": 2
+      },
+      {
+        "name": "proof",
+        "warnings": 0,
+        "errors": 0,
+        "managedAssemblySha256": "060887b4e2bce2372bc2bb512f48ea859df0d5a543a5373e74e247d02cfa9b70",
+        "managedPeSubsystem": 3
+      }
+    ],
+    "portableChecks": 2071,
+    "ownedCleanup": {
+      "files": 124,
+      "bytes": 3240871,
+      "removed": true
+    },
+    "noDownloads": true
+  },
+  "typecheckPassed": true,
+  "behavior": [
+    "Only after CreateJobObjectW fails with immediate error 5, the same guardian tries OpenProcessToken on its own pseudo-process handle with TOKEN_QUERY mask 8 and closes any returned token handle. No token information, account/SID, raw handle, path or text is read/exported.",
+    "A fixed optional selfTokenQuery observation retains opened/error/closeError/handlesClosedVerified. Old frames without the field remain supported; malformed or unrelated observations refuse. Null means no observation.",
+    "The CI owner projects only qopen/qdenied/qfailed/qclose suffixes through its existing bounded phase label. It preserves original exceptions, no acknowledgement, RUNTIME_STOP_UNCONFIRMED and every original owner assertion."
+  ],
+  "nativeAcceptance": "Pending. The accepted cold native probe with its existing self-query allowance cannot establish the actual descendant guardian token access or explain the denied Job creation.",
+  "permissionsChanged": false,
+  "installedChanged": false
+}

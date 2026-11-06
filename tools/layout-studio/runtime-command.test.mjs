@@ -19,6 +19,21 @@ test("runtime startup refusal evidence excludes private output and unrelated nat
   for (const value of [null, [], { phase: "self-birth" }, { phase: "NEVER_RETAIN", nativeCode: null }, { phase: "job-create", nativeCode: "5" }, { phase: "job-create", nativeCode: -1 }, { phase: "job-create", nativeCode: 1.5 }, { phase: "job-create", nativeCode: 0x100000000 }, { phase: "self-birth", nativeCode: 5 }, { phase: "job-create", nativeCode: 5, path: "NEVER_RETAIN" }]) assert.equal(runtimeStartupFailureEvidence(value), undefined);
 });
 
+test("a denied Job startup may observe only existing self-token QUERY status with explicit handle cleanup", () => {
+  const basis = { phase: "job-create", nativeCode: 5 }, opened = { opened: true, error: 0, closeError: 0, handlesClosedVerified: true }, denied = { opened: false, error: 5, closeError: null, handlesClosedVerified: true };
+  for (const q of [null, opened, denied, { ...denied, error: 0 }, { ...denied, error: 0xffffffff }, { ...opened, closeError: 5, handlesClosedVerified: false }]) {
+    const value = { ...basis, selfTokenQuery: q }, copy = runtimeStartupFailureEvidence(value); assert.deepEqual(copy, value);
+    if (q) { copy.selfTokenQuery.error = 42; assert.notEqual(q.error, 42); }
+  }
+  assert.deepEqual(runtimeStartupFailureEvidence({ phase: "environment", nativeCode: null, selfTokenQuery: null }), { phase: "environment", nativeCode: null, selfTokenQuery: null });
+  for (const value of [
+    { ...basis, selfTokenQuery: [] }, { ...basis, selfTokenQuery: {} }, { ...basis, selfTokenQuery: undefined },
+    { phase: "job-configure", nativeCode: 5, selfTokenQuery: denied }, { ...basis, nativeCode: 183, selfTokenQuery: denied },
+    ...[{ opened: 1 }, { error: 5 }, { error: -1 }, { error: 0.1 }, { error: 0x100000000 }, { closeError: null }, { closeError: 1 }, { handlesClosedVerified: false }, { mask: 0x1fffff }, { sid: "NEVER_RETAIN" }].map(change => ({ ...basis, selfTokenQuery: { ...opened, ...change } })),
+    ...[{ closeError: 0 }, { handlesClosedVerified: false }].map(change => ({ ...basis, selfTokenQuery: { ...denied, ...change } }))
+  ]) assert.equal(runtimeStartupFailureEvidence(value), undefined);
+});
+
 test("fixed Windows helper temp coordinates exclude secrets and startup overrides and reject ambiguous or redirected syntax",()=>{
   assert.deepEqual(windowsHelperTemporaryEnvironment({TEMP:"C:\\Users\\pilot\\Temp",TMP:"D:\\private-temp",API_KEY:"synthetic",DOTNET_STARTUP_HOOKS:"untrusted"}),{TEMP:"D:\\private-temp",TMP:"D:\\private-temp"});
   assert.deepEqual(windowsHelperTemporaryEnvironment({Temp:"C:\\private-temp"}),{TEMP:"C:\\private-temp",TMP:"C:\\private-temp"});
@@ -58,7 +73,7 @@ test("native guardian environment blocks respect platform identifiers and reject
   assert.deepEqual(JSON.parse(await runRuntimeCommand(process.execPath, ["-e", code], { ...options, env })), [env["ProgramFiles(x86)"], env["CommonProgramFiles(x86)"]]);
   let acknowledged = false;
   await assert.rejects(runRuntimeCommand(process.execPath, ["-e", "process.stdout.write('must-not-start')"], { ...options, env: { ...env, "Invalid(Name)": "rejected" }, onGuardianReady: () => { acknowledged = true; } }), error => {
-    assert.deepEqual(error.runtimeStartupFailure, { phase: "environment", nativeCode: null });
+    assert.deepEqual(error.runtimeStartupFailure, { phase: "environment", nativeCode: null, selfTokenQuery: null });
     assert.equal(error.code, "RUNTIME_STOP_UNCONFIRMED"); return true;
   });
   assert.equal(acknowledged, false);

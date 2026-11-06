@@ -8,9 +8,16 @@ import { stopOwnedChild } from "./owned-process.mjs";
 import { desktopEnvironment, windowsHelperTemporaryEnvironment } from "./process-environment.mjs";
 const nativeHelper = fileURLToPath(new URL("../../runtime/hotkeys/Switchyard.Hotkeys.exe", import.meta.url));
 export function runtimeStartupFailureEvidence(value) {
-  if (!value || typeof value !== "object" || Array.isArray(value) || Object.keys(value).sort().join() !== "nativeCode,phase"
+  if (!value || typeof value !== "object" || Array.isArray(value) || !["nativeCode,phase", "nativeCode,phase,selfTokenQuery"].includes(Object.keys(value).sort().join())
       || !["request-fields", "environment", "executable-attributes", "executable-open", "executable-hash", "job-create", "job-configure", "self-birth", "ready-write"].includes(value.phase)
       || !(value.nativeCode === null || ["job-create", "job-configure"].includes(value.phase) && Number.isInteger(value.nativeCode) && value.nativeCode >= 0 && value.nativeCode <= 0xffffffff)) return undefined;
+  if (Object.hasOwn(value, "selfTokenQuery")) {
+    const q = value.selfTokenQuery, uint = n => Number.isInteger(n) && n >= 0 && n <= 0xffffffff;
+    if (q !== null && (value.phase !== "job-create" || value.nativeCode !== 5 || !q || typeof q !== "object" || Array.isArray(q)
+      || Object.keys(q).sort().join() !== "closeError,error,handlesClosedVerified,opened" || typeof q.opened !== "boolean" || !uint(q.error) || typeof q.handlesClosedVerified !== "boolean"
+      || (q.opened ? q.error !== 0 || !uint(q.closeError) || q.handlesClosedVerified !== (q.closeError === 0) : q.closeError !== null || !q.handlesClosedVerified))) return undefined;
+    return { phase: value.phase, nativeCode: value.nativeCode, selfTokenQuery: q === null ? null : { ...q } };
+  }
   return { phase: value.phase, nativeCode: value.nativeCode };
 }
 export async function runtimeGuardianStopped(frame, { windowsHelper = nativeHelper } = {}) {
@@ -84,10 +91,11 @@ export async function runRuntimeCommand(executable, args, { timeout = 120000, en
       let frame; try { frame = JSON.parse(buffer.slice(0, end)); } catch { fail("Invalid native runtime response."); return; } buffer = buffer.slice(end + 1);
       if (!frame || typeof frame !== "object" || Array.isArray(frame)) { fail("Invalid native runtime response object."); return; }
       if (frame.schema !== request.schema || frame.id !== request.id || frame.containment !== (linux ? "owned-linux-session" : "windows-job")) { fail("Native runtime response scope changed."); return; }
-      if (!linux && frame.event === "startup-failure" && !ready && Object.keys(frame).sort().join() === "containment,event,id,nativeCode,phase,schema" && runtimeStartupFailureEvidence({ phase: frame.phase, nativeCode: frame.nativeCode })) {
+      const startup = { phase: frame.phase, nativeCode: frame.nativeCode, ...(Object.hasOwn(frame, "selfTokenQuery") ? { selfTokenQuery: frame.selfTokenQuery } : {}) };
+      if (!linux && frame.event === "startup-failure" && !ready && ["containment,event,id,nativeCode,phase,schema", "containment,event,id,nativeCode,phase,schema,selfTokenQuery"].includes(Object.keys(frame).sort().join()) && runtimeStartupFailureEvidence(startup)) {
         fail("The native runtime guardian failed before readiness.");
         failure.code = "RUNTIME_STOP_UNCONFIRMED";
-        failure.runtimeStartupFailure = runtimeStartupFailureEvidence({ phase: frame.phase, nativeCode: frame.nativeCode });
+        failure.runtimeStartupFailure = runtimeStartupFailureEvidence(startup);
         return;
       } else if (frame.event === "ready" && !ready) {
         ready = true; clearTimeout(readiness);

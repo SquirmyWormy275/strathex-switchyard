@@ -2,6 +2,31 @@
 
 ## Restricted setup-identity guardian
 
+The current native evidence is specific: `fb265e7b` fails Job creation with error 5.
+At `ad4d5e6`, the separate cold restricted child with its existing QUERY allowance
+creates and closes new anonymous, Local and Global empty Jobs successfully.
+The actual guardian remains failed; the difference in its descendant context is
+not yet explained. [Native comparison](evidence/windows-cold-job-native-summary.json).
+
+The failing guardian now performs one read-only self-token access observation
+only after `CreateJobObjectW` returns error 5: `OpenProcessToken` requests
+`TOKEN_QUERY` (mask 8) against its own pseudo-process handle, then closes any
+returned handle. It neither grants access nor reads token/account information.
+The optional closed failure field reports only opened/error/close status; older
+frames remain accepted. CI projects fixed query-result suffixes while retaining
+original refusal, uncertain exit and all eight owner checks.
+
+Six groups / 79 tests, two managed builds / 2,071 portable checks and typecheck
+pass. All 124 owned build files (3,240,871 bytes) and test staging are removed.
+Native execution of this new observation is pending.
+[Evidence](evidence/windows-guardian-query-source-summary.json).
+
+The read-only access check follows Microsoft's
+[OpenProcessToken contract](https://learn.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-openprocesstoken).
+It does not change the token object ACL, default DACL, restricting SIDs, process
+rights, privileges, account, runtime or namespace. A token-open observation
+cannot accept the guardian or prove which access its failed Job API attempted.
+
 Native `6f2097b` reaches protected initialization and mode update, then fails as
 `probe-identity-created-worker-exit`. The guardian child is created but never
 reports readiness. [Exact native result](evidence/windows-owner-probe-native-summary.json).
@@ -21,7 +46,7 @@ exact environment phase. The original eight restricted-owner checks remain.
 Six groups / 78 tests, two managed builds with no warnings/errors, 2,006 portable
 checks and typecheck pass. All 124 owned build files (3,207,249 bytes) and test
 process/staging cleanup verify. No SDK download or local installation occurred.
-Native follow-up is pending. [Source evidence](evidence/runtime-startup-observation-summary.json).
+Native fb265e7b identifies the Job-creation denial. [Source evidence](evidence/runtime-startup-observation-summary.json).
 
 At `4faa8a1`, version 2 native leases pass 24 checks/one declared skip with
 cleanup. The restricted owner clears protected state initialization and mode
