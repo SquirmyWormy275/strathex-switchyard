@@ -31,6 +31,16 @@ evidence, not instructions to reset. Publish regular commits. Do not merge or re
 
 ## Current implementation and evidence
 
+An optional Windows worker acknowledgement now holds the exact process suspended
+while its owner registers PID, birth and executable hash. Callback refusal,
+cancellation and malformed or overdue acknowledgement cannot authorize execution.
+Seven focused groups pass **82 tests / four declared Windows-only skips**;
+27 harness follow-up tests, two managed builds, 2,071 portable proof checks,
+typecheck and owned cleanup pass. Exact-source native Windows acceptance is
+pending. This step grants no permissions and does not repair the original
+restricted owner, which remains **0/8**.
+[Contract](windows-worker-acknowledgement.md), [source evidence](evidence/windows-suspended-worker-source-summary.json).
+
 Selected Python artifact comparison now supports exact requirements pins and
 multiple declared SHA-256 alternatives through Supply Chain and Release. Fourteen
 behavior/harness groups pass 98 checks; the initial packaging guard correctly
@@ -39,8 +49,9 @@ through erased types from the app bundle restores it to **5,096,071 bytes**;
 their repository source remains unchanged. The corrected packaging, application,
 sixteen installation cases and Python execution follow-up passes **19 groups /
 37 tests**, with typecheck and exact cleanup. Six actual Linux and six Windows
-guest-double scans retain original bytes and receipts. Native Windows host
-acceptance is pending.
+guest-double scans retain original bytes and receipts. Native Windows host `d551ccf` now passes nine tests with two declared
+Linux-only skips and verified cleanup under the original 300-second bound;
+the guest remains doubled. [Native receipt](evidence/python-artifact-windows-native-summary.json).
 [Contract](python-artifact-integrity.md), [evidence](evidence/python-artifact-integrity-summary.json).
 
 Native Windows `b600a6d` now passes all sixteen original installation/recovery

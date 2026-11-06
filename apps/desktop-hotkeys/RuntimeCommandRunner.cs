@@ -105,6 +105,7 @@ internal static class RuntimeCommandRunner
         }
         int stderrLimit = request.TryGetProperty("maxStderrBytes", out var stderrValue) ? stderrValue.GetInt32() : 0;
         if (stderrLimit < 0 || stderrLimit > 16384) throw NativeError();
+        bool workerAcknowledgement = request.TryGetProperty("workerAcknowledgement", out var workerAckValue) && workerAckValue.GetBoolean();
         startup.Phase = "environment";
         var env = request.GetProperty("environment");
         if (env.ValueKind != JsonValueKind.Object || env.EnumerateObject().Count() > 64) throw NativeError();
@@ -126,24 +127,47 @@ internal static class RuntimeCommandRunner
         startup.Phase = "self-birth";
         string birth = Process.GetCurrentProcess().StartTime.ToUniversalTime().Ticks.ToString();
         startup.Phase = "ready-write";
-        Write(new { schema = Schema, id, @event = "ready", guardianPid = Environment.ProcessId, birth, containment = "windows-job", capabilities = new[] { "bounded-stdin", "bounded-stdin-512k", "bounded-stderr" } });
+        Write(new { schema = Schema, id, @event = "ready", guardianPid = Environment.ProcessId, birth, containment = "windows-job", capabilities = new[] { "bounded-stdin", "bounded-stdin-512k", "bounded-stderr", "suspended-worker-ack" } });
         startup.Ready = true;
         using var ack = JsonDocument.Parse(await ReadLineBounded(Console.In) ?? throw NativeError());
         if (ack.RootElement.GetProperty("schema").GetString() != Schema || ack.RootElement.GetProperty("id").GetString() != id || !ack.RootElement.GetProperty("start").GetBoolean()) throw NativeError();
-        _ = Task.Run(async () =>
+        void WatchParent() => _ = Task.Run(async () =>
         {
             try { await Console.In.ReadAsync(new char[1].AsMemory()); }
             finally { lock (Lifecycle) { ParentGone = true; if (!job.IsClosed) _ = TerminateJobObject(job, 130); } }
         });
+        // The optional handshake owns stdin until its one bounded response. A
+        // second reader must never consume any part of that acknowledgement.
+        if (!workerAcknowledgement) WatchParent();
         Started child;
         lock (Lifecycle)
         {
             if (ParentGone) throw NativeError();
             child = Start(executable, arguments, cwd, environment, job);
-            if (ResumeThread(child.Thread) == uint.MaxValue) { child.Dispose(); throw NativeError(); }
         }
         using (child)
         {
+            if (workerAcknowledgement)
+            {
+                uint workerPid = GetProcessId(child.Process);
+                if (workerPid == 0 || !GetProcessTimes(child.Process, out long created, out _, out _, out _)) throw NativeError();
+                string workerBirth = DateTime.FromFileTimeUtc(created).Ticks.ToString(System.Globalization.CultureInfo.InvariantCulture);
+                Write(new { schema = Schema, id, @event = "worker-suspended", containment = "windows-job", guardianPid = Environment.ProcessId, birth, workerPid, workerBirth, executableSha256 = digest });
+                // Console.In can perform its read synchronously even through
+                // ReadAsync; keep that read off the thread enforcing the bound.
+                using var workerAck = JsonDocument.Parse(await Task.Run(() => ReadLineBounded(Console.In)).WaitAsync(TimeSpan.FromSeconds(10)) ?? throw NativeError());
+                var value = workerAck.RootElement;
+                string[] keys = { "schema", "id", "workerPid", "workerBirth", "executableSha256", "startWorker" };
+                if (value.ValueKind != JsonValueKind.Object || value.EnumerateObject().Count() != keys.Length || keys.Any(key => !value.TryGetProperty(key, out _))
+                    || value.GetProperty("schema").GetString() != Schema || value.GetProperty("id").GetString() != id
+                    || value.GetProperty("workerPid").GetUInt32() != workerPid || value.GetProperty("workerBirth").GetString() != workerBirth
+                    || value.GetProperty("executableSha256").GetString() != digest || !value.GetProperty("startWorker").GetBoolean()) throw NativeError();
+                WatchParent();
+            }
+            lock (Lifecycle)
+            {
+                if (ParentGone || ResumeThread(child.Thread) != 1) throw NativeError();
+            }
             string status = "completed";
             void Stop(string reason) { lock (Lifecycle) { if (status == "completed") status = reason; _ = TerminateJobObject(job, 124); } }
             using var timer = new Timer(_ => Stop("timed-out"), null, timeout, Timeout.Infinite);
@@ -266,6 +290,8 @@ internal static class RuntimeCommandRunner
     [DllImport("kernel32.dll", SetLastError = true)] private static extern bool UpdateProcThreadAttribute(IntPtr attributes, uint flags, IntPtr attribute, IntPtr value, IntPtr size, IntPtr previous, IntPtr returnedSize);
     [DllImport("kernel32.dll")] private static extern void DeleteProcThreadAttributeList(IntPtr attributes);
     [DllImport("kernel32.dll", SetLastError = true)] private static extern uint ResumeThread(SafeFileHandle thread);
+    [DllImport("kernel32.dll", SetLastError = true)] private static extern uint GetProcessId(SafeFileHandle process);
+    [DllImport("kernel32.dll", SetLastError = true)] private static extern bool GetProcessTimes(SafeFileHandle process, out long created, out long exited, out long kernel, out long user);
     [DllImport("kernel32.dll", SetLastError = true)] private static extern uint WaitForSingleObject(SafeFileHandle process, uint timeout);
     [DllImport("kernel32.dll", SetLastError = true)] private static extern bool GetExitCodeProcess(SafeFileHandle process, out uint code);
     [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode)] private static extern SafeFileHandle CreateFileW(string path, uint access, uint share, IntPtr attributes, uint disposition, uint flags, IntPtr template);

@@ -1,0 +1,74 @@
+{
+  "schema": "switchyard-suspended-worker-ack-source/v1",
+  "basis": "d551ccffbde77a889ddf45ccd006ab3d756bf70f",
+  "sourceSha256": {
+    "apps/desktop-hotkeys/RuntimeCommandRunner.cs": "ddbbfaf8271756015895e034f2b7de2543606c27d5542be72d189147410ed59c",
+    "tools/layout-studio/runtime-command.mjs": "923995a8419eac62761f62da478327966e4729851a1ef8223b035d49949ffe34",
+    "tools/layout-studio/runtime-command-suspended.test.mjs": "3f97967ca2717adf4c393f4d24391bc65b460d9023c8d41b3851d11284964e73",
+    "scripts/run-isolated-tests.mjs": "b7f1b2f407a6b78b77f346828b6e0bf652249bc420e272ea17c2664b6a7e5db3",
+    ".github/workflows/b122-windows.yml": "711ef059ba2c9ce3cc01c381259e0806debbb537b24c6df2e4840a9e56f301e0",
+    ".github/workflows/switchyard-windows-filesystem.yml": "944e07d5066064f65ac1dbb761db22f6e7fbd091db870cdd9122925cd47847e4"
+  },
+  "focused": {
+    "receipt": "isolated-test-29fce6f5-9908-4195-88f0-7fa1acf322c7.json",
+    "totals": {
+      "required": 7,
+      "passed": 7,
+      "failed": 0,
+      "tests": 86,
+      "passedTests": 82,
+      "failedTests": 0,
+      "skippedTests": 4,
+      "cancelledTests": 0,
+      "todoTests": 0
+    }
+  },
+  "harnessFollowup": {
+    "receipt": "isolated-test-38a81cb0-bfe1-4a4c-a02a-4e7f1f756964.json",
+    "totals": {
+      "required": 2,
+      "passed": 2,
+      "failed": 0,
+      "tests": 27,
+      "passedTests": 27,
+      "failedTests": 0,
+      "skippedTests": 0,
+      "cancelledTests": 0,
+      "todoTests": 0
+    }
+  },
+  "managed": {
+    "receipt": "suspended-worker-ack-managed-1793981799895.json",
+    "builds": [
+      {
+        "name": "helper",
+        "warnings": 0,
+        "errors": 0,
+        "managedAssemblySha256": "3e3affd9d017d80c6c3dfcee85b848d0bae97f3d98c2733da6d083d1cdc7c17d",
+        "managedPeSubsystem": 2
+      },
+      {
+        "name": "proof",
+        "warnings": 0,
+        "errors": 0,
+        "managedAssemblySha256": "01c92aae2e4b9c2e712d2fbfbcea117e4c4421b264bd372ab701e0d0f9bf6d0f",
+        "managedPeSubsystem": 3
+      }
+    ],
+    "portableChecks": 2071,
+    "cleanup": {
+      "files": 124,
+      "bytes": 3254613,
+      "removed": true
+    }
+  },
+  "allChildAndTreeCleanupVerified": true,
+  "typecheckPassed": true,
+  "nativeWindowsAcceptance": "Pending exact-source CI; four native cases are explicitly skipped on Linux.",
+  "restrictedOwnerAccepted": false,
+  "originalOwnerPassedChecks": 0,
+  "originalOwnerRequiredChecks": 8,
+  "newTokenOrProcessPermissions": false,
+  "installedChanged": false,
+  "downloads": false
+}

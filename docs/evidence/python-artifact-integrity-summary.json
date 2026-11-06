@@ -108,7 +108,7 @@
     "A match with any declared SHA-256 alternative stays incomplete; mismatch fails, and absent hashes stay explicitly unsupported/unverified.",
     "No environment resolution, archive inspection, embedded identity, publisher or installed-package acceptance is inferred."
   ],
-  "nativeWindowsHostAcceptance": "Pending dedicated pypi-artifact-scanner lane; guest remains doubled.",
+  "nativeWindowsHostAcceptance": "d551ccf: nine tests pass with two declared Linux-only skips under the original 300-second bound and verified cleanup; guest remains doubled. See python-artifact-windows-native-summary.json.",
   "installedChanged": false,
   "downloads": false
 }

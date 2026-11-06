@@ -72,8 +72,11 @@ Supply Chain and Release each exercise three outcomes through actual Linux
 isolation and Windows guest doubles, signed feeds, authenticated incomplete
 evidence, replay refusal, independently verified exit and staging cleanup. Original
 requirements/artifact/index bytes and HEAD are preserved. The fixture contains
-synthetic binary bytes, not valid wheels. Native Windows host, installed and real
-guest/account/hardware acceptance remain separate.
+synthetic binary bytes, not valid wheels. Native Windows host execution at
+`d551ccf` passes nine tests with two declared Linux-only skips under the original
+300-second bound and verified cleanup. The guest remains doubled.
+[Native receipt](evidence/python-artifact-windows-native-summary.json).
+Installed and real guest/account/hardware acceptance remain separate.
 
 Fourteen behavior/harness groups pass 98 checks. The initial size guard correctly
 refused the oversized package; after removing three unused implementations from

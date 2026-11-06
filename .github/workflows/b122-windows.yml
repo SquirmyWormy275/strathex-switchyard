@@ -159,7 +159,7 @@ jobs:
         shell: pwsh
         run: |
           $env:SWITCHYARD_TEST_RUNTIME_HELPER = Join-Path $env:RUNNER_TEMP 'switchyard-windows-hotkeys\Switchyard.Hotkeys.exe'
-          & node --test .\tools\layout-studio\runtime-command.test.mjs
+          & node --test .\tools\layout-studio\runtime-command.test.mjs .\tools\layout-studio\runtime-command-suspended.test.mjs
           if ($LASTEXITCODE -ne 0) { throw 'The native runtime guardian contract failed.' }
 
       - name: Retain the exact Windows helper checkpoint for seven days

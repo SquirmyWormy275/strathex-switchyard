@@ -20,7 +20,20 @@ export function runtimeStartupFailureEvidence(value) {
   }
   return { phase: value.phase, nativeCode: value.nativeCode };
 }
-export async function runtimeGuardianStopped(frame, { windowsHelper = nativeHelper } = {}) {
+export function runtimeSuspendedWorkerEvidence(value, expected) {
+  const keys = "birth,containment,event,executableSha256,guardianPid,id,schema,workerBirth,workerPid";
+  if (!value || typeof value !== "object" || Array.isArray(value) || Object.keys(value).sort().join() !== keys || !expected
+      || value.schema !== "switchyard-runtime-command/v1" || value.event !== "worker-suspended" || value.containment !== "windows-job"
+      || !["schema", "id", "guardianPid", "birth", "executableSha256"].every(key => value[key] === expected[key])
+      || typeof value.id !== "string" || !/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/.test(value.id)
+      || !Number.isSafeInteger(value.guardianPid) || value.guardianPid < 1 || value.guardianPid > 0xffffffff
+      || typeof value.birth !== "string" || !/^[1-9][0-9]{0,18}$/.test(value.birth)
+      || !Number.isSafeInteger(value.workerPid) || value.workerPid < 1 || value.workerPid > 0xffffffff || value.workerPid === value.guardianPid
+      || typeof value.workerBirth !== "string" || !/^[1-9][0-9]{0,18}$/.test(value.workerBirth)
+      || typeof value.executableSha256 !== "string" || !/^[a-f0-9]{64}$/.test(value.executableSha256)) return undefined;
+  return { ...value };
+}
+export async function runtimeGuardianStopped(frame, { windowsHelper = nativeHelper, onGuardianChild = () => {} } = {}) {
   if (frame?.schema !== "switchyard-runtime-command/v1" || !/^[a-f0-9-]{36}$/.test(frame.id) || !Number.isSafeInteger(frame.guardianPid) || frame.guardianPid < 1 || !/^[0-9]+$/.test(frame.birth ?? "") || frame.containment !== (process.platform === "linux" ? "owned-linux-session" : "windows-job")) throw new Error("The interrupted runtime guardian scope is invalid; preserve its stage.");
   if (process.platform === "linux") {
     try {process.kill(frame.guardianPid,0);const text=await readFile(`/proc/${frame.guardianPid}/stat`,"utf8"),fields=text.slice(text.lastIndexOf(") ")+2).split(" ");if(fields[0]!=="Z")return false;}
@@ -37,14 +50,16 @@ export async function runtimeGuardianStopped(frame, { windowsHelper = nativeHelp
   let output = "", error = false;
   child.stdin.on("error", () => {}); child.stdout.on("data", b => { output += b; if (output.length > 2048) { error = true; child.stdin.end(); } });
   const ended = new Promise(resolve => { child.once("error", () => resolve(null)); child.once("close", resolve); });
-  child.stdin.end(JSON.stringify({ schema: frame.schema, id: frame.id, guardianPid:frame.guardianPid, birth:frame.birth }) + "\n");
+  try { onGuardianChild(child); child.stdin.end(JSON.stringify({ schema: frame.schema, id: frame.id, guardianPid:frame.guardianPid, birth:frame.birth }) + "\n"); }
+  catch { child.stdin.end(); await stopOwnedChild(child); return false; }
   let timer; const code = await Promise.race([ended, new Promise(resolve => { timer = setTimeout(() => resolve(null), 5000); })]); clearTimeout(timer);
   if (code !== 0 || error) { await stopOwnedChild(child); return false; }
   try { const value = JSON.parse(output); return value.schema === frame.schema && value.id === frame.id && value.containment === "windows-job" && value.guardianPid===frame.guardianPid && value.birth===frame.birth && value.guardianExited===true && value.activeProcesses === 0; } catch { return false; }
 }
-export async function runRuntimeCommand(executable, args, { timeout = 120000, env, cwd = process.cwd(), maxOutputBytes = 524288, inputText, inputBytes, captureStderrBytes = 0, detailed = false, expectedExecutableSha256, linuxExecutable, signal, onGuardianChild = () => {}, onGuardianReady = async () => {}, windowsHelper = fileURLToPath(new URL("../../runtime/hotkeys/Switchyard.Hotkeys.exe", import.meta.url)) } = {}) {
+export async function runRuntimeCommand(executable, args, { timeout = 120000, env, cwd = process.cwd(), maxOutputBytes = 524288, inputText, inputBytes, captureStderrBytes = 0, detailed = false, expectedExecutableSha256, linuxExecutable, signal, onGuardianChild = () => {}, onGuardianReady = async () => {}, onWorkerSuspended, windowsHelper = fileURLToPath(new URL("../../runtime/hotkeys/Switchyard.Hotkeys.exe", import.meta.url)) } = {}) {
   if (!["linux", "win32"].includes(process.platform) || !Number.isSafeInteger(timeout) || timeout < 1 || timeout > 600000 || !Number.isSafeInteger(maxOutputBytes) || maxOutputBytes < 1 || maxOutputBytes > 524288 || !Array.isArray(args) || args.length > 256 || args.some(a=>typeof a!=="string" || a.length>8192 || /[\0\r\n]/.test(a))) throw new Error("Choose a supported, bounded runtime operation.");
   if (inputText !== undefined && inputBytes !== undefined || inputBytes !== undefined && (!(inputBytes instanceof Uint8Array) || inputBytes.byteLength > 524288) || inputText !== undefined && (typeof inputText !== "string" || Buffer.byteLength(inputText) > 524288 || inputText.includes("\0")) || !Number.isSafeInteger(captureStderrBytes) || captureStderrBytes < 0 || captureStderrBytes > 16384 || typeof detailed !== "boolean") throw new Error("Choose a bounded private input and diagnostic contract.");
+  if (onWorkerSuspended !== undefined && (process.platform !== "win32" || typeof onWorkerSuspended !== "function")) throw new Error("Suspended-worker acknowledgement requires an explicit Windows callback.");
   if (linuxExecutable !== undefined && (process.platform !== "linux" || executable !== "/usr/bin/bwrap" || !args.includes("/proc/self/fd/3") || !linuxExecutable || Object.keys(linuxExecutable).some(k=>!["fd","sha256"].includes(k)) || !Number.isSafeInteger(linuxExecutable.fd) || linuxExecutable.fd < 3 || !/^[a-f0-9]{64}$/.test(linuxExecutable.sha256 ?? ""))) throw new Error("The pinned Linux executable descriptor contract is invalid.");
   const input = inputText !== undefined ? Buffer.from(inputText) : inputBytes !== undefined ? Buffer.from(inputBytes) : undefined;
   const checkAbort = () => { if (signal?.aborted) throw Object.assign(new Error("The owned native command was cancelled before startup."), { code: "CANCELLED" }); }; checkAbort();
@@ -59,11 +74,11 @@ export async function runRuntimeCommand(executable, args, { timeout = 120000, en
     if(Object.keys(environment).some(name=>/^(DOTNET_|CORECLR_|COMPLUS_)/i.test(name)))throw Error("The fixed native helper cannot receive runtime startup overrides.");
     environment={...Object.fromEntries(Object.entries(environment).filter(([name])=>!["TEMP","TMP"].includes(name.toUpperCase()))),...windowsHelperTemporaryEnvironment()};
   }
-  const request = { schema: "switchyard-runtime-command/v1", id: randomUUID(), executable, executableSha256, args, cwd, environment, timeoutMs: timeout, maxOutputBytes, ...(linuxExecutable ? { linuxExecutableSha256: linuxExecutable.sha256 } : {}), ...(input !== undefined ? { inputBase64: input.toString("base64") } : {}), ...(captureStderrBytes ? { maxStderrBytes: captureStderrBytes } : {}) };
+  const request = { schema: "switchyard-runtime-command/v1", id: randomUUID(), executable, executableSha256, args, cwd, environment, timeoutMs: timeout, maxOutputBytes, ...(linuxExecutable ? { linuxExecutableSha256: linuxExecutable.sha256 } : {}), ...(input !== undefined ? { inputBase64: input.toString("base64") } : {}), ...(captureStderrBytes ? { maxStderrBytes: captureStderrBytes } : {}), ...(onWorkerSuspended ? { workerAcknowledgement: true } : {}) };
   if (Buffer.byteLength(JSON.stringify(request)) > 1048576) throw new Error("The fixed runtime request exceeds its protocol bound.");
   checkAbort();
   const linux = process.platform === "linux", child = spawn(linux ? process.execPath : windowsHelper, linux ? [fileURLToPath(new URL("./runtime-command-worker.mjs", import.meta.url))] : ["--runtime-command"], { shell: false, windowsHide: true, detached: linux, stdio: ["pipe", "pipe", "ignore", ...(linuxExecutable ? [linuxExecutable.fd] : [])], env: desktopEnvironment() });
-  let buffer = "", result, failure, ready = false, pendingReady, readyCommitted = false, guardianBirth, acknowledged = false, aborting, guardianFrame;
+  let buffer = "", result, failure, ready = false, pendingReady, readyCommitted = false, guardianBirth, acknowledged = false, aborting, guardianFrame, workerSeen = false, workerAcknowledged = false;
   let resolveAbort; const aborted = new Promise((r) => { resolveAbort = r; });
   const fail = (message) => {
     failure ??= new Error(message); child.stdin.end();
@@ -102,11 +117,22 @@ export async function runRuntimeCommand(executable, args, { timeout = 120000, en
         if (frame.guardianPid !== child.pid || typeof frame.birth !== "string" || !/^[0-9]+$/.test(frame.birth)) { fail("The native runtime guardian identity changed."); return; }
         const capabilities = Array.isArray(frame.capabilities) ? frame.capabilities : [];
         if (linuxExecutable && !capabilities.includes("pinned-linux-executable")) { fail("The guardian does not support the pinned Linux executable contract."); return; }
+        if (onWorkerSuspended && !capabilities.includes("suspended-worker-ack")) { fail("The native guardian does not support suspended-worker acknowledgement."); return; }
         if ((input !== undefined && !capabilities.includes("bounded-stdin")) || (input !== undefined && input.length > 12000 && !capabilities.includes("bounded-stdin-512k")) || (captureStderrBytes && !capabilities.includes("bounded-stderr"))) { fail("The native guardian has not verified the requested private input/diagnostic contract."); return; }
         guardianFrame = frame;
         guardianBirth = frame.birth;
         pendingReady = Promise.resolve().then(() => onGuardianReady(frame)).then(() => { readyCommitted = true; if (!failure && child.exitCode === null && child.signalCode === null) { acknowledged = true; child.stdin.write(JSON.stringify({ schema: request.schema, id: request.id, start: true }) + "\n"); } }).catch(() => { readyCommitted = true; fail("The runtime start acknowledgement was not committed."); });
-      } else if (frame.event === "result" && acknowledged && !result && ["completed", "failed", "timed-out", "output-limit"].includes(frame.status) && (frame.exitCode === null || Number.isSafeInteger(frame.exitCode) && frame.exitCode >= 0 && frame.exitCode <= 0xffffffff) && typeof frame.stdout === "string") result = frame;
+      } else if (frame.event === "worker-suspended" && !linux && onWorkerSuspended && acknowledged && !workerSeen) {
+        const evidence = runtimeSuspendedWorkerEvidence(frame, { schema: request.schema, id: request.id, guardianPid: child.pid, birth: guardianBirth, executableSha256 });
+        if (!evidence) { fail("The suspended native worker identity changed."); return; }
+        workerSeen = true;
+        Promise.resolve().then(() => onWorkerSuspended(Object.freeze(evidence))).then(() => {
+          if (!failure && child.exitCode === null && child.signalCode === null) {
+            workerAcknowledged = true;
+            child.stdin.write(JSON.stringify({ schema: request.schema, id: request.id, workerPid: evidence.workerPid, workerBirth: evidence.workerBirth, executableSha256, startWorker: true }) + "\n");
+          }
+        }).catch(() => fail("The suspended native worker acknowledgement was not committed."));
+      } else if (frame.event === "result" && acknowledged && (!onWorkerSuspended || workerAcknowledged) && !result && ["completed", "failed", "timed-out", "output-limit"].includes(frame.status) && (frame.exitCode === null || Number.isSafeInteger(frame.exitCode) && frame.exitCode >= 0 && frame.exitCode <= 0xffffffff) && typeof frame.stdout === "string") result = frame;
       else { fail("Unexpected native runtime lifecycle frame."); return; }
     }
   });

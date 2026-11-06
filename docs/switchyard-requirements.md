@@ -57,3 +57,13 @@ Tests use synthetic data unless explicitly labelled host/hardware evidence.
 Preserve Dvorak firmware plus US host layout; exact device/controller identity; no guessed solenoid timing, flash, EEPROM reset or bootloader operation. Maintain separate ordinary typing and intent/authority boundaries. Use exact targets, stale-status handling, cancellation and duplicate-launch prevention. Protect origin/auth/replay/path boundaries and redact logs. No automatic provider/account fallback, sensitive portable state, shared compartment keys, or inferred employer trust. Unknown hosts use keyboard-only mode. Observation must expose consent, sources, pause/stop, exclusions, retention, review and deletion. Voice must preserve incremental reviewed decisions. Stable intents and migrations require deliberate revision. Native ChatGPT must use the repaired main window and preserve overlay guard/artwork.
 
 All named integrations remain distinct: Codex, Claude Code, Claude desktop, Microsoft 365 Copilot, GitHub Copilot, custom/LangChain agents, and explicit extension recipes for other tools. Do not infer universal capability from a generic bridge.
+
+An optional Windows worker acknowledgement now holds the exact process suspended
+while its owner registers PID, birth and executable hash. Callback refusal,
+cancellation and malformed or overdue acknowledgement cannot authorize execution.
+Seven focused groups pass **82 tests / four declared Windows-only skips**;
+27 harness follow-up tests, two managed builds, 2,071 portable proof checks,
+typecheck and owned cleanup pass. Exact-source native Windows acceptance is
+pending. This step grants no permissions and does not repair the original
+restricted owner, which remains **0/8**.
+[Contract](windows-worker-acknowledgement.md), [source evidence](evidence/windows-suspended-worker-source-summary.json).
