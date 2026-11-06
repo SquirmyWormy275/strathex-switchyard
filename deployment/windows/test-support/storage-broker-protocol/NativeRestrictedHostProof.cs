@@ -23,6 +23,7 @@ internal static class NativeRestrictedHostProof
     internal static object? NamespaceAccessDiagnostic;
     internal static object? StdioDiagnostic;
     internal static object? RandomAccessDiagnostic;
+    internal static object? EnvironmentDiagnostic;
     private static readonly List<bool> HistoricalFilteredFlags = new();
     private static readonly List<uint> HistoricalFilterBytes = new();
     internal static bool[] HistoricalFilterObservations => HistoricalFilteredFlags.ToArray();
@@ -240,6 +241,16 @@ internal static class NativeRestrictedHostProof
                                 variables.Add(name, text);
                             }
                             Require(variables.Count is > 0 and <= 64);
+                            // Observe the exact child block before cold startup. A warm
+                            // parent CNG call cannot establish this process environment.
+                            // Export only fixed booleans/counts, never values or paths.
+                            Phase = "restricted-child-environment";
+                            var windowsPath = new StringBuilder(1024);
+                            uint windowsLength = GetSystemWindowsDirectoryW(windowsPath, checked((uint)windowsPath.Capacity));
+                            Native(windowsLength != 0); Require(windowsLength < windowsPath.Capacity);
+                            bool MatchesWindows(string? path) => path != null && string.Equals(path.TrimEnd('\\'), windowsPath.ToString().TrimEnd('\\'), StringComparison.OrdinalIgnoreCase);
+                            bool rootPresent = variables.TryGetValue("SystemRoot", out var systemRoot), windirPresent = variables.TryGetValue("WINDIR", out var windir);
+                            EnvironmentDiagnostic = new { schema = "switchyard-restricted-child-environment/v1", entryCount = variables.Count, systemRootPresent = rootPresent, systemRootMatchesWindows = MatchesWindows(systemRoot), windirPresent, windirMatchesWindows = MatchesWindows(windir), openSslConfigPresent = variables.ContainsKey("OPENSSL_CONF"), openSslModulesPresent = variables.ContainsKey("OPENSSL_MODULES"), nodeOptionsPresent = variables.ContainsKey("NODE_OPTIONS") };
                             environment = Marshal.StringToHGlobalUni(string.Join('\0', variables.Select(entry => entry.Key + "=" + entry.Value)) + "\0\0");
                             string command = string.Join(' ', new[] { node, script, context }.Select(Quote)); Require(command.Length < 1024);
                             Phase = "creator-assigned-quota-privilege"; Require(quota.Assigned);
@@ -332,6 +343,7 @@ internal static class NativeRestrictedHostProof
         int error = Marshal.GetLastWin32Error(); if (error != 0) throw new Win32Exception(error);
         Require(PrivilegeState(token, "SeIncreaseQuotaPrivilege") == (true, enabled));
     }
+    [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)] private static extern uint GetSystemWindowsDirectoryW(StringBuilder buffer, uint size);
     private static uint ActiveProcesses(SafeJobHandle job) { Native(QueryInformationJobObject(job, 1, out var accounting, (uint)Marshal.SizeOf<Accounting>(), IntPtr.Zero)); return accounting.Active; }
     private static string Quote(string value)
     {

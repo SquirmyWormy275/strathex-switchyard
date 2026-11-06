@@ -43,6 +43,14 @@ Keep small receipts and source; retire exact owned staging after exit verifies.
 | Installed Linux `4b5e3cc` | Six update/seven owner metadata/seven existing metadata checks, original 54 workspace identities, selected sealed bytes and frozen Home preserved. Dated launcher backup hashes verify; owned bundle removed. [Receipt](evidence/installed-task-owner-summary.json). | Metadata/refusal acceptance only. No native provider starts, task loads or model turns; IDE handoff remains unfinished. Prior c5d2d28 scanner journeys remain source-specific. |
 | Owned Codex Unix task adapter | Actual installed CLI: two read-only account operations, verifier permission revocation and exact listener/bridge/socket retirement. [Evidence](evidence/codex-unix-task-adapter-summary.json). | Separate owned task routes now compose this adapter; existing creation/text APIs remain stdio. IDE attachment remains unfinished. No native thread, prompt or account change is authorized in the current backend work. |
 
+The next Windows candidate observes only bounded cold-child environment flags:
+SystemRoot/WINDIR presence and comparison with the native system directory, plus
+OpenSSL/Node override presence. Values and paths are never exported; the child
+environment is unchanged. Both managed builds, 1,856 portable checks, twelve
+projection tests and typecheck pass with cleanup. Native execution is pending.
+This tests an upstream missing-SystemRoot lead without claiming this fixture has
+the same cause. [Source evidence](evidence/windows-environment-source-summary.json).
+
 The Windows lock path now invokes only the shipped helper's
 `--state-lease-worker` mode. Source CI builds it once per run using the existing
 pinned toolchain and verifies source/size/digest before staging at the fixed

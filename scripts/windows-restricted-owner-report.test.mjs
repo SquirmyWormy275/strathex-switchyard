@@ -93,3 +93,11 @@ test("random-source diagnostics retain only fixed API statuses and verified hand
     const invalid = structuredClone(random); mutate(invalid); const result = storageBrokerFailureEvidence({ ...input, restrictedHostRandomAccess: invalid }); assert.equal(result.restrictedHostRandomAccess, undefined); assert.equal(JSON.stringify(result).includes("NEVER_RETAIN"), false);
   }
 });
+
+test("cold-child environment observations retain only exact OS-match flags and counts, never values or a startup acceptance",()=>{
+  const environment={schema:"switchyard-restricted-child-environment/v1",entryCount:22,systemRootPresent:true,systemRootMatchesWindows:true,windirPresent:true,windirMatchesWindows:true,openSslConfigPresent:false,openSslModulesPresent:false,nodeOptionsPresent:false};
+  const input={schema:"switchyard-storage-broker-protocol-proof/v1",success:false,restrictedHostEnvironment:environment,restrictedHostChildExit:{waitResult:0,exitCode:134,resultAvailable:false}};
+  const result=storageBrokerFailureEvidence(input);assert.deepEqual(result.restrictedHostEnvironment,environment);result.restrictedHostEnvironment.entryCount=1;assert.equal(environment.entryCount,22);assert.throws(()=>verifyRestrictedOwnerReport(input));
+  for(const changed of [{secret:"NEVER_RETAIN"},{systemRoot:"C:/NEVER_RETAIN"},{entryCount:0},{entryCount:65},{entryCount:1.5},{systemRootPresent:false},{windirPresent:false},{nodeOptionsPresent:"false"},{schema:"foreign"}]){const projected=storageBrokerFailureEvidence({...input,restrictedHostEnvironment:{...environment,...changed}});assert.equal(projected.restrictedHostEnvironment,undefined);assert.equal(JSON.stringify(projected).includes("NEVER_RETAIN"),false);assert.equal(projected.restrictedHostChildExit.exitCode,134);}
+  const absent={...environment,systemRootPresent:false,systemRootMatchesWindows:false,windirPresent:false,windirMatchesWindows:false};assert.deepEqual(storageBrokerFailureEvidence({...input,restrictedHostEnvironment:absent}).restrictedHostEnvironment,absent);
+});
