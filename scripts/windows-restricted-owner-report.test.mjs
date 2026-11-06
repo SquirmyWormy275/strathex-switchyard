@@ -19,6 +19,16 @@ test("restricted-owner acceptance requires the private desktop startup and its c
     const result = sample(); change(result.nativeRestrictedHostProof); assert.throws(() => verifyRestrictedOwnerReport(result));
   }
 });
+test("application-event projection retains only exact fixed diagnostic fields and never upgrades failure or leaks XML, paths, PID or account data", () => {
+  const events = { schema: "switchyard-restricted-child-application-events/v1", queryStatus: "completed", handlesClosedVerified: true, entries: [{ eventId: 1000, exceptionCode: "c0000142", module: "user32.dll" }] };
+  const input = { schema: "switchyard-storage-broker-protocol-proof/v1", success: false, restrictedHostChildExit: { waitResult: 0, exitCode: 3221225794, resultAvailable: false }, restrictedHostApplicationEvents: events };
+  const result = storageBrokerFailureEvidence(input); assert.deepEqual(result.restrictedHostApplicationEvents, events); assert.equal(result.success, false); assert.equal(result.restrictedHostChildExit.exitCode, 3221225794);
+  result.restrictedHostApplicationEvents.entries[0].module = "unrecognized"; assert.equal(events.entries[0].module, "user32.dll");
+  for (const mutate of [e => { e.xml = "NEVER_RETAIN"; }, e => { e.entries[0].module = "C:/NEVER_RETAIN/user32.dll"; }, e => { e.entries[0].module = "NEVER_RETAIN.dll"; }, e => { e.entries[0].pid = 1; }, e => { e.entries[0].exceptionCode = "NEVER_RETAIN"; }, e => { e.entries[0].eventId = 1001; }, e => { e.entries.push(...Array.from({ length: 4 }, () => ({ ...e.entries[0] }))); }, e => { e.handlesClosedVerified = false; }, e => { e.queryStatus = "unavailable"; }, e => { e.schema = "untrusted"; }]) {
+    const invalid = structuredClone(events); mutate(invalid); const projected = storageBrokerFailureEvidence({ ...input, restrictedHostApplicationEvents: invalid }); assert.equal(projected.restrictedHostApplicationEvents, undefined); assert.equal(JSON.stringify(projected).includes("NEVER_RETAIN"), false); assert.equal(projected.restrictedHostChildExit.exitCode, 3221225794);
+  }
+  const unavailable = { ...events, queryStatus: "unavailable", handlesClosedVerified: false, entries: [] }; assert.deepEqual(storageBrokerFailureEvidence({ ...input, restrictedHostApplicationEvents: unavailable }).restrictedHostApplicationEvents, unavailable);
+});
 test("historical filter metadata is observational while every actual token, privilege, exit and owner boundary remains mandatory", () => {
   const result = sample(); assert.equal(verifyRestrictedOwnerReport(result), result.nativeRestrictedHostProof); result.nativeRestrictedHostProof.historicalFilteredFlags = [true, false, true]; result.nativeRestrictedHostProof.historicalFilterBytes = [4, 1, 4]; assert.equal(verifyRestrictedOwnerReport(result), result.nativeRestrictedHostProof);
   for (const key of ["success", "primaryTokenVerified", "sameUserVerified", "mediumIntegrityVerified", "administratorsDenyOnlyVerified", "volumePrivilegeAbsentVerified", "onlyTraversePrivilegeAssignedVerified", "tokenRecheckedAfterExit", "treeExitVerified", "creatorQuotaRestoredVerified", "restrictingSidListVerified"]) { const result = sample(); result.nativeRestrictedHostProof[key] = false; assert.throws(() => verifyRestrictedOwnerReport(result)); }

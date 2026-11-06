@@ -18,11 +18,21 @@ with `STATUS_DLL_INIT_FAILED`. The source correction keeps every strict pre-dele
 check, allowing disabled only while observing an acknowledged pending deletion.
 Actual SCM absence and original process/ownership guards remain mandatory.
 Both managed targets compile, all 1,764 portable checks and five backend files/
-fifty tests pass; native correction acceptance remains pending. Fixture
+fifty tests pass. Native `fdb0559` now passes thirty filesystem checks and both
+six-check service/setup lifecycles, including thirteen restricted metadata checks
+each and the complete 1,541-case service header guard. All 55 other workflow jobs
+succeed; the restricted primary-child failure keeps the workflow unaccepted. Fixture
 invalidation separately passes all five native tests at `842416e`. Neither
 failure is blocked by absent hardware/accounts.
 [Exact failure and source candidate](evidence/windows-service-deletion-state-summary.json),
-[earlier passing components](evidence/windows-491-native-summary.json).
+[corrected native followup](evidence/windows-fdb-native-summary.json).
+
+The next restricted-child diagnostic reads only bounded existing Application
+Error events matching both the exact PID and native creation time. Fixed module/
+exception fields omit raw XML, paths, account data and IDs. Both managed targets
+compile; 1,776 portable checks and five backend files/fifty-one tests pass. Native
+query acceptance and the actual DLL-initialization repair remain unfinished.
+[Source evidence](evidence/windows-restricted-child-events-source-summary.json).
 
 Windows keyless workers pass both complete native lease files at `0740791`:
 sixteen tests plus one declared platform skip. Fresh encrypted state and keys

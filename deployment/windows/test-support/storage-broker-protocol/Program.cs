@@ -21,6 +21,7 @@ internal static class Program
             """);
             byte[] reply = WindowsStorageBrokerProtocol.Reply(binding, request, storage.RootElement, key), publicKey = key.ExportSubjectPublicKeyInfo();
             int serviceHeaderChecks = ServiceHeaderProof.Run();
+            int restrictedChildEventChecks = RestrictedChildApplicationEventsProof.Run();
             int checks = 0;
             void Require(bool value) { if (!value) throw new InvalidOperationException("Storage broker protocol proof failed."); checks++; }
             void Refuses(Action action)
@@ -61,12 +62,12 @@ internal static class Program
                 else if(args[0]=="--native-host-owner")nativeRestrictedHostProof=NativeRestrictedHostProof.Run();
                 else throw new InvalidOperationException("The native proof flag is not recognized.");
             }
-            Console.WriteLine(JsonSerializer.Serialize(new {schema="switchyard-storage-broker-protocol-proof/v1",success=true,checks,serviceHeaderChecks,exchangeProtocolChecks,exchangeJournalChecks,exchangeFactsChecks,indexInputChecks,historyInputChecks,protectedFilesChecks,nativeServiceChecks,nativeExchangeChecks,nativeRestrictedHostProof,serviceInstalled=false,volumeOpened=nativeExchangeChecks>0||nativeRestrictedHostProof!=null,guestLaunched=false}));
+            Console.WriteLine(JsonSerializer.Serialize(new {schema="switchyard-storage-broker-protocol-proof/v1",success=true,checks,serviceHeaderChecks,restrictedChildEventChecks,exchangeProtocolChecks,exchangeJournalChecks,exchangeFactsChecks,indexInputChecks,historyInputChecks,protectedFilesChecks,nativeServiceChecks,nativeExchangeChecks,nativeRestrictedHostProof,serviceInstalled=false,volumeOpened=nativeExchangeChecks>0||nativeRestrictedHostProof!=null,guestLaunched=false}));
             return 0;
         }
         catch(Exception error)
         {
-            Console.WriteLine(JsonSerializer.Serialize(new { schema="switchyard-storage-broker-protocol-proof/v1",success=false,errorCategory=error.GetType().Name,nativeCode=error is System.ComponentModel.Win32Exception native?(int?)native.NativeErrorCode:null,errorHResult=error.HResult,nativeExchangeChecks=OperatingSystem.IsWindows()?NativeExchangeProof.CompletedChecks:0,failedCheckPhase=OperatingSystem.IsWindows()?NativeExchangeProof.Phase:null,restrictedHostPhase=OperatingSystem.IsWindows()?NativeRestrictedHostProof.Phase:null,restrictedHostCreatorPrivileges=OperatingSystem.IsWindows()?NativeRestrictedHostProof.CreatorPrivileges:null,restrictedHostHistoricalFilterFlags=OperatingSystem.IsWindows()?NativeRestrictedHostProof.HistoricalFilterObservations:null,restrictedHostHistoricalFilterBytes=OperatingSystem.IsWindows()?NativeRestrictedHostProof.HistoricalFilterWidths:null,restrictedHostTokenRead=OperatingSystem.IsWindows()?NativeRestrictedHostProof.TokenReadDiagnostic:null,restrictedHostChildExit=OperatingSystem.IsWindows()?NativeRestrictedHostProof.ChildExitDiagnostic:null }));
+            Console.WriteLine(JsonSerializer.Serialize(new { schema="switchyard-storage-broker-protocol-proof/v1",success=false,errorCategory=error.GetType().Name,nativeCode=error is System.ComponentModel.Win32Exception native?(int?)native.NativeErrorCode:null,errorHResult=error.HResult,nativeExchangeChecks=OperatingSystem.IsWindows()?NativeExchangeProof.CompletedChecks:0,failedCheckPhase=OperatingSystem.IsWindows()?NativeExchangeProof.Phase:null,restrictedHostPhase=OperatingSystem.IsWindows()?NativeRestrictedHostProof.Phase:null,restrictedHostCreatorPrivileges=OperatingSystem.IsWindows()?NativeRestrictedHostProof.CreatorPrivileges:null,restrictedHostHistoricalFilterFlags=OperatingSystem.IsWindows()?NativeRestrictedHostProof.HistoricalFilterObservations:null,restrictedHostHistoricalFilterBytes=OperatingSystem.IsWindows()?NativeRestrictedHostProof.HistoricalFilterWidths:null,restrictedHostTokenRead=OperatingSystem.IsWindows()?NativeRestrictedHostProof.TokenReadDiagnostic:null,restrictedHostChildExit=OperatingSystem.IsWindows()?NativeRestrictedHostProof.ChildExitDiagnostic:null,restrictedHostApplicationEvents=OperatingSystem.IsWindows()?NativeRestrictedHostProof.ApplicationEventDiagnostic:null }));
             return 2;
         }
     }

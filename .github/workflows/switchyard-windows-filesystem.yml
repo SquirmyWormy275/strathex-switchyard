@@ -103,7 +103,7 @@ jobs:
           $result = & .\.tools\dotnet\dotnet.exe $assembly --native-files
           if ($LASTEXITCODE -ne 0) { throw 'An authenticated broker metadata boundary failed.' }
           $proof = $result | ConvertFrom-Json
-          if ($proof.success -ne $true -or $proof.checks -ne 16 -or $proof.serviceHeaderChecks -ne 1541 -or $proof.exchangeProtocolChecks -ne 30 -or $proof.exchangeJournalChecks -ne 43 -or $proof.exchangeFactsChecks -ne 23 -or $proof.indexInputChecks -ne 49 -or $proof.historyInputChecks -ne 62 -or $proof.protectedFilesChecks -ne 16 -or $proof.serviceInstalled -ne $false -or $proof.volumeOpened -ne $false -or $proof.guestLaunched -ne $false) { throw 'The exact broker proof result did not verify.' }
+          if ($proof.success -ne $true -or $proof.checks -ne 16 -or $proof.serviceHeaderChecks -ne 1541 -or $proof.restrictedChildEventChecks -ne 12 -or $proof.exchangeProtocolChecks -ne 30 -or $proof.exchangeJournalChecks -ne 43 -or $proof.exchangeFactsChecks -ne 23 -or $proof.indexInputChecks -ne 49 -or $proof.historyInputChecks -ne 62 -or $proof.protectedFilesChecks -ne 16 -or $proof.serviceInstalled -ne $false -or $proof.volumeOpened -ne $false -or $proof.guestLaunched -ne $false) { throw 'The exact broker proof result did not verify.' }
           $proof | Add-Member -NotePropertyName sourceCommit -NotePropertyValue (& git rev-parse HEAD)
           $proof | Add-Member -NotePropertyName protocolSourceSha256 -NotePropertyValue ((Get-FileHash '.\apps\desktop-hotkeys\WindowsStorageBrokerProtocol.cs' -Algorithm SHA256).Hash.ToLowerInvariant())
           $proof | Add-Member -NotePropertyName assemblySha256 -NotePropertyValue ((Get-FileHash $assembly -Algorithm SHA256).Hash.ToLowerInvariant())

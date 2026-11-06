@@ -18,6 +18,7 @@ internal static class NativeRestrictedHostProof
     internal static object? CreatorPrivileges;
     internal static object? TokenReadDiagnostic;
     internal static object? ChildExitDiagnostic;
+    internal static object? ApplicationEventDiagnostic;
     private static readonly List<bool> HistoricalFilteredFlags = new();
     private static readonly List<uint> HistoricalFilterBytes = new();
     internal static bool[] HistoricalFilterObservations => HistoricalFilteredFlags.ToArray();
@@ -257,12 +258,14 @@ internal static class NativeRestrictedHostProof
                                 using (childToken)
                                 {
                                     VerifyToken(childToken, user);
+                                    Native(GetProcessTimes(child, out long created, out _, out _, out _));
                                     Native(ResumeThread(thread) != uint.MaxValue);
                                     Phase = "bounded-owner-journey";
                                     uint wait = WaitForSingleObject(child, 90000);
                                     ChildExitDiagnostic = new { waitResult = wait, resultAvailable = File.Exists(resultPath) };
                                     Require(wait == 0); Native(GetExitCodeProcess(child, out uint code));
                                     ChildExitDiagnostic = new { waitResult = wait, exitCode = code, resultAvailable = File.Exists(resultPath) };
+                                    if (code != 0) ApplicationEventDiagnostic = RestrictedChildApplicationEvents.Capture(process.ProcessId, unchecked((ulong)created));
                                     // A failing owned child can report its bounded phase before
                                     // the strict exit assertion. Never emit its private paths.
                                     if (File.Exists(resultPath))
@@ -322,6 +325,7 @@ internal static class NativeRestrictedHostProof
     [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)] private struct StartupInfo { public int Size; public string? Reserved, Desktop, Title; public uint X, Y, XSize, YSize, XCount, YCount, Fill, Flags; public ushort Show, ReservedSize; public IntPtr ReservedPointer, Input, Output, Error; }
     [StructLayout(LayoutKind.Sequential)] private struct StartupInfoEx { public StartupInfo Info; public IntPtr Attributes; }
     [StructLayout(LayoutKind.Sequential)] private struct ProcessInformation { public IntPtr Process, Thread; public uint ProcessId, ThreadId; }
+    [DllImport("kernel32.dll", SetLastError = true)] [return: MarshalAs(UnmanagedType.Bool)] private static extern bool GetProcessTimes(SafeFileHandle process, out long created, out long exited, out long kernel, out long user);
     [StructLayout(LayoutKind.Sequential)] private struct BasicLimits { public long ProcessTime, JobTime; public uint Flags; public UIntPtr Minimum, Maximum; public uint Count; public UIntPtr Affinity; public uint Priority, Scheduling; }
     [StructLayout(LayoutKind.Sequential)] private struct IoCounters { public ulong ReadCount, WriteCount, OtherCount, ReadBytes, WriteBytes, OtherBytes; }
     [StructLayout(LayoutKind.Sequential)] private struct ExtendedLimits { public BasicLimits Basic; public IoCounters Io; public UIntPtr ProcessMemory, JobMemory, PeakProcessMemory, PeakJobMemory; }

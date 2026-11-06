@@ -21,9 +21,9 @@
     "error": 1,
     "requiresStoppedState": true,
     "stillRequiresActualScmAbsence": true,
-    "sourceCandidateOnly": true
+    "sourceCandidateOnly": false
   },
-  "nativeRemovalCandidateAccepted": false,
+  "nativeRemovalCandidateAccepted": true,
   "allOtherOwnershipConfigurationAndProcessGuardsRetained": true,
   "timeoutsChanged": false,
   "portableBuildReceipt": "windows-index-native-build-1793926949638.json",
@@ -93,6 +93,18 @@
   "limits": [
     "Observed disabled state is exact native evidence; Microsoft documents delayed deletion but does not promise this intermediate start type.",
     "This source fix treats disabled only as pending after acknowledged deletion, never as a usable installation or absence.",
-    "Native candidate acceptance remains pending; restricted child initialization is a separate unfinished software check."
-  ]
+    "Corrected native filesystem/service/setup journeys now pass at the exact source; the restricted primary child still fails and keeps the workflow unaccepted."
+  ],
+  "nativeDisabledPostDeleteBranchForced": false,
+  "nativeFollowup": {
+    "sourceHead": "fdb055946c7cbbfbaa7cc2bd81d955d00de2f08c",
+    "runId": 42141522247,
+    "summary": "windows-fdb-native-summary.json",
+    "filesystemChecks": 30,
+    "serviceLifecycleChecks": 6,
+    "nativeSetupLifecycleChecks": 6,
+    "restrictedMetadataChecksPerLifecycle": 13,
+    "headerCases": 1541,
+    "wholeWorkflowAccepted": false
+  }
 }

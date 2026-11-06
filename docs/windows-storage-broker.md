@@ -35,10 +35,33 @@ until handles close and the service stops. The disabled intermediate start type
 is an observation from the exact native failure, rather than a behavior promised
 by that documentation. Both managed targets compile without warnings/errors,
 all original 769 normal-header cases plus 772 deletion cases pass (1,764 portable
-checks overall), and five complete backend files pass fifty tests. Actual Windows
-acceptance of the correction remains pending. This is independently executable
-software work, separate from guest, ordinary-account and interactive UAC checks.
+checks overall), and five complete backend files pass fifty tests. Native
+`fdb0559` now passes thirty filesystem checks, both six-check service/setup
+lifecycles with thirteen restricted metadata checks each, and all 1,541 header
+cases. All 55 other workflow jobs pass; the restricted primary-child failure
+keeps the whole workflow unaccepted. The disabled branch was not separately
+forced. Guest, ordinary-account and interactive UAC checks remain separate.
 [Exact observed failures and source candidate](evidence/windows-service-deletion-state-summary.json).
+[Digest-verified native followup](evidence/windows-fdb-native-summary.json).
+
+The next test-only diagnostic reads at most 32 existing local Application Error
+events from the prior two minutes, using zero-wait `EvtNext` calls. An event is
+retained only when its PID and native process creation time both match the exact
+failed child. At most four entries retain a fixed event ID, bounded exception
+code and allowlisted module name; raw XML, paths, account data and process IDs
+are omitted. Missing or unsupported logs remain unavailable, never successful
+child execution. Every event/query handle is closed. Token, privilege, Job,
+original child exit and owner checks remain unchanged, with no process retry.
+
+Both managed targets compile and all 1,776 portable checks plus five backend
+files/fifty-one tests pass. The twelve parser cases include wrong/reused PID,
+wrong creation time, duplicate fields, oversized/DTD XML and private-text
+rejection. Native event-query acceptance remains pending. This uses the documented
+[EvtQuery](https://learn.microsoft.com/en-us/windows/win32/api/winevt/nf-winevt-evtquery),
+[EvtNext](https://learn.microsoft.com/en-us/windows/win32/api/winevt/nf-winevt-evtnext)
+and [EvtRender](https://learn.microsoft.com/en-us/windows/win32/api/winevt/nf-winevt-evtrender)
+read APIs; no log setting, subscription, account or privileged setup is changed.
+[Exact diagnostic source evidence](evidence/windows-restricted-child-events-source-summary.json).
 
 ## Earlier native boundaries
 
