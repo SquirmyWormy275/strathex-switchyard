@@ -56,23 +56,39 @@ source failure next. The prepared fixed CNG probe compares system-preferred
 and explicit-provider RNG statuses under restricted and original tokens; it
 retains no entropy and verifies handle/buffer cleanup. Both managed builds and
 1,856 portable checks pass; twenty registry/report cases and typecheck pass.
-Native execution is pending. No weaker entropy or token relaxation is introduced.
+Native execution at `a9cefaf` captures success for both CNG API forms under both tokens, yet the cold restricted Node child still fails. This parent-process observation is not a startup repair. [Native receipt](evidence/windows-random-access-native-summary.json). No weaker entropy or token relaxation is introduced.
 [Probe and final owner-retirement guard](evidence/random-access-owner-retirement-summary.json). [Native evidence](evidence/windows-random-assertion-native-summary.json).
 
 The complete local `370c21e` run passes 241/241 groups, 1,509 tests and eleven
 declared skips. All child/tree and owned checkout/alias/build/marker cleanup verifies.
-A new complete 242-group run is starting at the next published checkpoint; inspect
-`/tmp/switchyard-full-linux-path.json` before starting or cleaning a run. The preceding `efbaa52` full run
+The newer complete 242-group run failed as recorded below; its marker is removed.
+Inspect `/tmp/switchyard-full-linux-path.json` before starting or cleaning a run. The preceding `efbaa52` full run
 remains failed; its concurrency assertion and shutdown lifecycle corrections are
 included in the accepted source.
+
+The complete `a9cefaf` run is **failed: 236/242 groups**, 1,508 passed tests,
+thirteen failed tests and eleven declared skips. All six failing groups report
+Linux `EDQUOT` during fixture writes/copies; `/tmp` has per-user quotas. Every
+child/tree and the exact owned checkout, dependency aliases, builds and marker
+were removed after exit verification. No broad cleanup or quota change occurred.
+Use a fresh explicitly owned temporary root on available storage for the next
+complete run. [Failed receipt](evidence/linux-a9c-quota-failure-summary.json).
+
+Reviewed loading on the original owned task connection is now implemented as an
+explicit backend operation. One-use policy-bound review, durable no-replay
+reservation, idle-state checks, repeated effect boundaries and joined shutdown
+pass 62 tests across five files. An actual Unix listener/bridge loads a synthetic
+task with a controlled provider; no real task or model turn is requested.
+Production routing, installed acceptance and IDE attachment remain unfinished.
+[Load contract](coding-task-owners.md), [evidence](evidence/reviewed-owned-task-load-summary.json).
 
 The explicit `createCodingTaskOwners` service now persists original owner stages
 and task/account/repository binding under real private leases. Five files pass 76
 tests; final eight registry and five packaging checks pass with exact cleanup and
 typecheck. Actual Unix listener/bridge composition uses a controlled provider double.
-The manifest now has 242 Linux groups, without a complete run of this later source.
-Production still uses stdio; the service currently observes metadata only and neither
-loads a task nor grants IDE attachment. [Contract](coding-task-owners.md).
+The manifest has 242 Linux groups; its latest complete run failed as recorded above.
+Production still uses stdio; explicit reviewed loading has separate evidence above
+and grants no IDE attachment. [Contract](coding-task-owners.md).
 
 The subsequent Codex creator boundary verifies its own account and the original
 repository/reservation before thread creation and marker injection, including
@@ -94,8 +110,8 @@ workspace/focus and retires owned processes/socket/cache.
    artifact digest and source/merge identity, distinguish access observations from
    child acceptance, and repair the actual initialization failure without broadening
    token/desktop/service authority. Continue other work while CI runs.
-2. Connect the protected task-owner service to reviewed task loading and supported
-   IDE/terminal attachment, then normal Studio routing. Recheck compartment, account, repository
+2. Connect the reviewed task-loading service to supported
+   IDE/terminal attachment and normal Studio routing. Recheck compartment, account, repository
    and original native owner before every effect. Process ancestry alone cannot
    identify an IDE terminal tab. Use provider doubles for task/model operations
    unless their native execution is separately authorized.

@@ -1,9 +1,11 @@
 # Preserve the original coding-task owner
 
-The explicit Linux `createCodingTaskOwners` service holds an owned metadata
+The explicit Linux `createCodingTaskOwners` service holds an owned native
 connection for one registered Codex task. Its protected record binds the original
 thread, account fingerprint, repository directory and native listener. It does
-not create or resume a thread, submit a prompt, attach an IDE, or grant task authority.
+not create a thread, submit a prompt, attach an IDE, or grant task authority.
+Opening and reading observe metadata only. Loading an existing idle task requires
+a separate exact review and one-use confirmation.
 Production Studio routes still use stdio; connecting this service is unfinished.
 
 A request first reserves its UUID under a per-task kernel lease. The listener
@@ -40,3 +42,25 @@ create no real provider task and do not establish live account or IDE acceptance
 Retirement also compares the protected native identity with the original live
 owner. A substituted saved owner stays uncertain even if the in-memory process
 has exited. [Final guard evidence](evidence/random-access-owner-retirement-summary.json).
+
+## Review and load an existing task
+
+`reviewLoad(compartment, ownerRequestId)` describes the original saved task,
+account, repository and connection. `load(compartment, { ownerRequestId,
+requestId, token })` consumes that exact review under the per-task lease and
+reserves a protected request before the native effect. Only Switchyard-created
+read-only/on-request tasks on the original owned connection qualify.
+
+Every effect boundary checks current policy, original task and repository identity,
+fresh account metadata and the protected native owner. Active, approval-waiting
+or unknown tasks refuse loading. The adapter repeats checks after asynchronous
+project setup and retains an exact returned thread identity if later checks fail.
+An uncertain outcome preserves its request and stops the owned connection; it
+never automatically repeats the resume. Duplicate calls return the retained
+outcome without claiming the connection is still loaded. Shutdown joins loading.
+
+The fifteen registry cases and related adapter/session/confirmation cohort pass
+62 tests with exact child/tree cleanup and typecheck. The actual Unix transport
+loads one synthetic task through a provider double, with zero thread creation,
+injection or model turns. Real provider loading, production Studio routing and
+IDE attachment remain unaccepted or unfinished. [Exact evidence](evidence/reviewed-owned-task-load-summary.json).

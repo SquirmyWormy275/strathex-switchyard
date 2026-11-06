@@ -122,16 +122,23 @@ export function createCodexStdioTasks({ store, root = join(process.env.XDG_STATE
         });
       } catch (e) { if (createdThreadId) e.createdThreadId = createdThreadId; throw e; }
     },
-    async resume(id, expectedRoot, c) {
+    async resume(id, expectedRoot, c, { beforeEffect = async () => {} } = {}) {
+      if (typeof beforeEffect !== "function") throw new Error("An owned task needs a callable effect boundary.");
       if (!validId(id)) throw new Error("Choose an exact thread identity."); await directoryIdentity(expectedRoot);
-      return use(c, async (client, authorize) => {
-        await restrictedRoot(client, expectedRoot, authorize);
-        const value = await client.request("thread/resume", { threadId: id, excludeTurns: true, cwd: expectedRoot, sandbox: "read-only", approvalPolicy: "on-request", config: codexDesignConfig(client.serverNames) });
-        if (value.thread?.id !== id || value.cwd !== expectedRoot || value.sandbox?.type !== "readOnly" || value.approvalPolicy !== "on-request") throw new Error("Codex did not verify the resumed thread and permissions.");
-        await exactRoot(value.thread.cwd, expectedRoot);
-        await restrictedRoot(client, expectedRoot, authorize);
-        return { ...observed(value.thread), repositoryRoot: expectedRoot, permissions: "read-only/on-request", modelPromptSubmitted: false };
-      });
+      let acknowledged = false;
+      try {
+        return await use(c, async (client, authorize) => {
+          await restrictedRoot(client, expectedRoot, authorize);
+          await beforeEffect(); await authorize();
+          const value = await client.request("thread/resume", { threadId: id, excludeTurns: true, cwd: expectedRoot, sandbox: "read-only", approvalPolicy: "on-request", config: codexDesignConfig(client.serverNames) });
+          if (value.thread?.id === id) acknowledged = true;
+          if (value.thread?.id !== id || value.cwd !== expectedRoot || value.sandbox?.type !== "readOnly" || value.approvalPolicy !== "on-request") throw new Error("Codex did not verify the resumed thread and permissions.");
+          await exactRoot(value.thread.cwd, expectedRoot);
+          await restrictedRoot(client, expectedRoot, authorize);
+          await beforeEffect(); await authorize();
+          return { ...observed(value.thread), repositoryRoot: expectedRoot, permissions: "read-only/on-request", modelPromptSubmitted: false };
+        });
+      } catch (error) { if (acknowledged) error.resumedThreadId = id; throw error; }
     },
     stopCompartment,
     async close() { closed = true; return Promise.all([...new Set([...clients.keys(), ...connecting.keys(), ...constructing.keys(), ...unconfirmed.keys(), ...probes.keys()])].map(stopCompartment)); }

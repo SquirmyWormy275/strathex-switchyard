@@ -247,3 +247,17 @@ test("task effect boundaries run after project setup and preserve acknowledged i
     assert.equal((await driver.stopCompartment("personal")).stopped, true);
   });
 });
+
+test("resume repeats the original task boundary after project setup and preserves an exact late acknowledgement", async () => {
+  for (const refusal of [1,2]) await fixture(async ({driver,repositoryRoot,frames}) => {
+    let boundaries=0;
+    await assert.rejects(driver.resume("synthetic-existing",repositoryRoot,"personal",{beforeEffect:async()=>{boundaries++;assert.ok(frames.some(f=>f.method==="config/read"&&f.params.cwd===repositoryRoot));if(boundaries===refusal)throw Error("synthetic owner binding changed");}}),error=>{assert.match(error.message,/owner binding changed/);assert.equal(error.resumedThreadId,refusal===2?"synthetic-existing":undefined);return true;});
+    assert.equal(frames.filter(f=>f.method==="thread/resume").length,refusal===2?1:0);assert.equal(frames.some(f=>f.method==="thread/start"||f.method==="turn/start"||f.method==="thread/inject_items"),false);
+    assert.equal((await driver.stopCompartment("personal")).stopped,true);
+  });
+});
+
+test("a resume permission mismatch retains only its returned exact thread identity, without a successful load claim",()=>fixture(async({driver,repositoryRoot,frames})=>{
+  await assert.rejects(driver.resume("synthetic-existing",repositoryRoot,"personal"),error=>{assert.match(error.message,/permissions/);assert.equal(error.resumedThreadId,"synthetic-existing");return true;});
+  assert.equal(frames.filter(f=>f.method==="thread/resume").length,1);assert.equal(frames.some(f=>f.method==="turn/start"),false);
+},{badPermissions:true}));

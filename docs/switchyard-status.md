@@ -33,7 +33,7 @@ random-source failure remains unconfirmed. [Exact failure](evidence/windows-rand
 A fixed CNG diagnostic now compares native status codes under the original and
 restricted tokens, closing explicit provider handles and clearing buffers. It
 compiles in both managed targets; 1,856 portable checks and twenty focused
-registry/report tests pass with cleanup and typecheck. Native execution is pending.
+registry/report tests pass with cleanup and typecheck. Native execution at `a9cefaf` captures success for both CNG API forms under both tokens, yet the cold restricted Node child still fails. This parent-process observation is not a startup repair. [Native receipt](evidence/windows-random-access-native-summary.json).
 The registry also refuses retirement of a substituted saved owner.
 [Source and evidence](evidence/random-access-owner-retirement-summary.json).
 
@@ -42,12 +42,27 @@ guard and shutdown joins for active polls, deadlines and managed input release.
 All exact owned checkout/dependency/build cleanup verifies; its marker is removed.
 The preceding failed `efbaa52` run remains failed. [Correction](evidence/execution-shutdown-summary.json).
 
+The complete `a9cefaf` run is **failed: 236/242 groups**, 1,508 passed tests,
+thirteen failed tests and eleven declared skips. All six failing groups report
+Linux `EDQUOT` during fixture writes/copies; `/tmp` has per-user quotas. Every
+child/tree and the exact owned checkout, dependency aliases, builds and marker
+were removed after exit verification. No broad cleanup or quota change occurred.
+Use a fresh explicitly owned temporary root on available storage for the next
+complete run. [Failed receipt](evidence/linux-a9c-quota-failure-summary.json).
+
+Reviewed loading on the original owned task connection is now implemented as an
+explicit backend operation. One-use policy-bound review, durable no-replay
+reservation, idle-state checks, repeated effect boundaries and joined shutdown
+pass 62 tests across five files. An actual Unix listener/bridge loads a synthetic
+task with a controlled provider; no real task or model turn is requested.
+Production routing, installed acceptance and IDE attachment remain unfinished.
+[Load contract](coding-task-owners.md), [evidence](evidence/reviewed-owned-task-load-summary.json).
+
 The explicit protected task-owner service now persists original task/account/
 repository/listener identities and refuses duplicate or foreign-host adoption.
 Five related files pass 76 tests; final eight registry/five package checks pass
 with exact cleanup and typecheck. An actual Unix listener/bridge composes with a
-controlled provider double. The new 242-group manifest has no complete acceptance
-yet. Production routing, task loading and IDE attachment remain unfinished.
+controlled provider double. The newer 242-group run failed as recorded above. Production routing and IDE attachment remain unfinished; the explicit reviewed loading operation has separate focused evidence.
 [Owner contract](coding-task-owners.md), [evidence](evidence/coding-task-owner-summary.json).
 
 The task creator now verifies its own native account, original repository and

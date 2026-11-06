@@ -14,9 +14,9 @@ async function fixture(t) {
   const root = await mkdtemp(join(tmpdir(), "sy-owner-")), repositoryRoot = join(root, "repo"), keys = new Map(); await mkdir(repositoryRoot);
   const store = createSuiteStore({ root: join(root, "state"), secrets: { get: async (c,p) => keys.get(c+":"+p), set: async (c,p,v) => keys.set(c+":"+p,v) } });
   await store.initialize("personal"); await store.update("personal", "fixture", s => { s.mode = "personal-companion"; });
-  const task = { id: randomUUID(), provider: "codex", status: "registered", sessionId: "synthetic-private-native-thread", accountFingerprint: "a".repeat(64), repositoryRoot, repositoryIdentity: await repositoryIdentity(repositoryRoot) };
+  const task = { schema: "switchyard-coding-session/v1", launchPolicy: "read-only/on-request", nativeTransport: "owned-stdio", id: randomUUID(), provider: "codex", status: "registered", sessionId: "synthetic-private-native-thread", accountFingerprint: "a".repeat(64), repositoryRoot, repositoryIdentity: await repositoryIdentity(repositoryRoot) };
   await store.update("personal", "fixture-task", s => { s.codingSessions = [task]; });
-  const controls = { login: task.accountFingerprint, stopped: true, fail: null, afterRead: async () => {} }, calls = [], owners = [], services = [];
+  const controls = { login: task.accountFingerprint, stopped: true, fail: null, afterRead: async () => {}, allowResume: false, beforeResume: async () => {}, afterResume: async () => {}, observation: "idle" }, calls = [], owners = [], services = [];
   function driverFactory(options) {
     calls.push("factory"); let started = false, closed = false;
     const owner = { scope: null, binding: null, accountFingerprint: null, privateOwnership: { root: join(root, "synthetic-listener-"+owners.length), rootIdentity: { device:"1",inode:"2",uid:1000,mode:448 } }, async stop() { closed = true; return { stopped: controls.stopped }; } }; owners.push(owner);
@@ -33,9 +33,15 @@ async function fixture(t) {
         }
         return { type:"chatgpt",fingerprint:controls.login };
       },
-      async read(id, path) { calls.push("read"); await controls.afterRead(); return { id,repositoryRoot:path,observation:"idle" }; },
+      async read(id, path) { calls.push("read"); await controls.afterRead(); return { id,repositoryRoot:path,observation:controls.observation }; },
       async close() { calls.push("close"); closed = true; return [{ stopped:controls.stopped }]; },
-      async start() { throw Error("No native thread creation is allowed in this proof"); }, async resume() { throw Error("No native task loading is allowed in this proof"); }
+      async start() { throw Error("No native thread creation is allowed in this proof"); },
+      async resume(id, path, c, {beforeEffect}) {
+        assert.equal(controls.allowResume,true,"Only an explicitly opted-in provider double may load a synthetic task");
+        await controls.beforeResume(); await beforeEffect(); calls.push("resume");
+        try { await controls.afterResume(); await beforeEffect(); } catch(error) { error.resumedThreadId=id; throw error; }
+        return {id,repositoryRoot:path,permissions:"read-only/on-request",modelPromptSubmitted:false,observation:"idle"};
+      }
     };
   }
   function service(extra = {}) { const result = createCodingTaskOwners({ store, platform:"linux", driverFactory, retire:async(scope,ownership) => { calls.push("recover"); assert.ok(owners.some(o => o.scope?.id === scope.id && o.privateOwnership.root === ownership.root)); return { stopped:controls.stopped }; }, ...extra }); services.push(result); return result; }
@@ -100,6 +106,9 @@ test("protected task registry composes the actual owned Unix listener and bridge
   assert.equal((await service.open("personal",request)).status,"bound");assert.equal((await service.read("personal",request.requestId)).observation,"idle");
   const row=(await f.store.snapshot("personal")).codingTaskOwners[0];assert.deepEqual(row.scope,nativeOwner.scope);assert.deepEqual(row.privateOwnership,nativeOwner.privateOwnership);
   const calls=await readFile(join(f.root,"tasks/personal/calls"),"utf8");assert.equal(/thread\/(start|resume)|turn\/start/.test(calls),false);
+  const review=await service.reviewLoad("personal",request.requestId), loaded=await service.load("personal",{ownerRequestId:request.requestId,requestId:randomUUID(),token:review.confirmation.token});
+  assert.equal(loaded.nativeTaskLoaded,true);assert.equal(loaded.ideAttached,false);assert.equal(loaded.modelPromptSubmitted,false);
+  const after=await readFile(join(f.root,"tasks/personal/calls"),"utf8");assert.equal(after.split("thread/resume\n").length-1,1);assert.equal(/thread\/start|turn\/start|thread\/inject_items/.test(after),false);
   assert.equal((await service.stopCompartment("personal")).stopped,true);assert.equal((await service.list("personal"))[0].stoppedVerified,true);
 });
 
@@ -120,4 +129,58 @@ test("verified exit of an in-memory owner cannot retire a substituted protected 
   await f.store.update("personal","fixture-substitute-native-owner",s=>{s.codingTaskOwners[0].privateOwnership.root=join(f.root,"unrelated-owner");});
   try { assert.equal((await service.stopCompartment("personal")).stopped,false);const row=(await f.store.snapshot("personal")).codingTaskOwners[0];assert.equal(row.stoppedVerified,false);assert.equal(row.privateOwnership.root,join(f.root,"unrelated-owner")); }
   finally { await f.store.update("personal","fixture-restore-original-native-owner",s=>{s.codingTaskOwners[0].privateOwnership=original;});assert.equal((await service.stopCompartment("personal")).stopped,true); }
+});
+
+test("reviewed owned loading consumes one exact token and preserves request identity across duplicate and restarted callers",async t=>{
+  const f=await fixture(t),service=f.service(),owner=f.request();f.controls.allowResume=true;await service.open("personal",owner);
+  const review=await service.reviewLoad("personal",owner.requestId),request={ownerRequestId:owner.requestId,requestId:randomUUID(),token:review.confirmation.token};
+  assert.equal(f.calls.includes("resume"),false);const result=await service.load("personal",request);assert.equal(result.nativeTaskLoaded,true);assert.equal(result.nativeLoadAcknowledged,true);assert.equal(result.ideAttached,false);assert.equal(result.modelPromptSubmitted,false);
+  assert.equal((await service.load("personal",request)).duplicatePrevented,true);assert.equal((await f.service().load("personal",request)).nativeTaskLoaded,false);assert.equal(f.calls.filter(c=>c==="resume").length,1);
+  await assert.rejects(service.reviewLoad("personal",owner.requestId),/retained load/);await assert.rejects(service.load("personal",{...request,requestId:randomUUID()}),/already|consumed/);
+  const text=await readFile(join(f.root,"state/personal.sealed.json"),"utf8");assert.equal(text.includes(f.task.sessionId),false);assert.equal(text.includes(review.confirmation.token),false);
+});
+
+test("load refuses substituted token, changed owner contents, policy or task permissions before a native resume",async t=>{
+  for(const change of ["token","owner","policy","permissions","account"]){
+    const f=await fixture(t),service=f.service(),owner=f.request();f.controls.allowResume=true;await service.open("personal",owner);
+    const review=await service.reviewLoad("personal",owner.requestId),request={ownerRequestId:owner.requestId,requestId:randomUUID(),token:review.confirmation.token};
+    if(change==="token")request.token=randomUUID();
+    if(change==="owner")await f.store.update("personal","fixture-owner-substitution",s=>{s.codingTaskOwners[0].privateOwnership.root+="-substituted";});
+    if(change==="policy")await f.store.update("personal","fixture-policy-change",s=>{s.mode="managed-companion";});
+    if(change==="permissions")await f.store.update("personal","fixture-permission-change",s=>{s.codingSessions[0].launchPolicy="unsafe";});
+    if(change==="account")f.controls.login="b".repeat(64);
+    await assert.rejects(service.load("personal",request),undefined,change);assert.equal(f.calls.includes("resume"),false);
+    // Restore only this synthetic protected owner so fixture retirement can verify.
+    if(change==="owner")await f.store.update("personal","fixture-original-owner",s=>{s.codingTaskOwners[0].privateOwnership=structuredClone(f.owners[0].privateOwnership);});
+  }
+});
+
+test("active and unfamiliar task states refuse loading without changing running permissions",async t=>{
+  for(const status of ["active","waiting-on-approval","unknown"]){
+    const f=await fixture(t),service=f.service(),owner=f.request();f.controls.allowResume=true;await service.open("personal",owner);const review=await service.reviewLoad("personal",owner.requestId);f.controls.observation=status;
+    await assert.rejects(service.load("personal",{ownerRequestId:owner.requestId,requestId:randomUUID(),token:review.confirmation.token}),/idle/);assert.equal(f.calls.includes("resume"),false);assert.equal((await f.store.snapshot("personal")).codingTaskLoads[0].status,"refused-before-effect");
+  }
+});
+
+test("load boundaries refuse asynchronous drift and retain exact late acknowledgement without replay",async t=>{
+  for(const phase of ["beforeResume","afterResume"]){
+    const f=await fixture(t),service=f.service(),owner=f.request();f.controls.allowResume=true;await service.open("personal",owner);const review=await service.reviewLoad("personal",owner.requestId),request={ownerRequestId:owner.requestId,requestId:randomUUID(),token:review.confirmation.token};
+    f.controls[phase]=()=>f.store.update("personal","fixture-load-drift",s=>{s.codingSessions[0].sessionId="different-task";});
+    await assert.rejects(service.load("personal",request),/binding changed/);const row=(await f.store.snapshot("personal")).codingTaskLoads[0];assert.equal(row.status,"outcome-unconfirmed");assert.equal(row.acknowledgedThreadId,phase==="afterResume"?f.task.sessionId:null);assert.equal(f.calls.filter(c=>c==="resume").length,phase==="afterResume"?1:0);
+    assert.equal((await service.load("personal",request)).duplicatePrevented,true);assert.equal((await service.list("personal"))[0].stoppedVerified,true);
+  }
+});
+
+test("concurrent reviewed requests cannot load one original owner twice",async t=>{
+  const f=await fixture(t),service=f.service(),owner=f.request();f.controls.allowResume=true;await service.open("personal",owner);
+  const reviews=await Promise.all([service.reviewLoad("personal",owner.requestId),service.reviewLoad("personal",owner.requestId)]);
+  const results=await Promise.allSettled(reviews.map(review=>service.load("personal",{ownerRequestId:owner.requestId,requestId:randomUUID(),token:review.confirmation.token})));
+  assert.equal(results.filter(r=>r.status==="fulfilled").length,1);assert.equal(f.calls.filter(c=>c==="resume").length,1);assert.equal((await f.store.snapshot("personal")).codingTaskLoads.length,1);
+});
+
+test("shutdown joins an in-flight load and prevents its late native effect",async t=>{
+  const f=await fixture(t),service=f.service(),owner=f.request();f.controls.allowResume=true;await service.open("personal",owner);const review=await service.reviewLoad("personal",owner.requestId);
+  let release,entered;const gate=new Promise(r=>release=r),ready=new Promise(r=>entered=r);f.controls.beforeResume=async()=>{entered();await gate;};
+  const loading=service.load("personal",{ownerRequestId:owner.requestId,requestId:randomUUID(),token:review.confirmation.token});const rejection=assert.rejects(loading,/stopped|owner changed/);await ready;
+  let exited=false;const closing=service.stopCompartment("personal").then(result=>{exited=true;return result;});await new Promise(r=>setImmediate(r));assert.equal(exited,false);release();await rejection;assert.equal((await closing).stopped,true);assert.equal(f.calls.includes("resume"),false);assert.equal((await f.store.snapshot("personal")).codingTaskLoads[0].status,"outcome-unconfirmed");
 });
