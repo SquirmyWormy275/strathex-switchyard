@@ -54,6 +54,18 @@
           "value": "npm"
         },
         {
+          "name": "switchyard:spdx-list-version",
+          "value": "3.29.0"
+        },
+        {
+          "name": "switchyard:spdx-identifiers-listed",
+          "value": "false"
+        },
+        {
+          "name": "switchyard:spdx-identifiers-deprecated",
+          "value": "false"
+        },
+        {
           "name": "switchyard:lockfile",
           "value": "package-lock.json"
         },
@@ -99,6 +111,18 @@
         {
           "name": "switchyard:ecosystem",
           "value": "npm"
+        },
+        {
+          "name": "switchyard:spdx-list-version",
+          "value": "3.29.0"
+        },
+        {
+          "name": "switchyard:spdx-identifiers-listed",
+          "value": "false"
+        },
+        {
+          "name": "switchyard:spdx-identifiers-deprecated",
+          "value": "false"
         },
         {
           "name": "switchyard:lockfile",
@@ -148,6 +172,18 @@
           "value": "npm"
         },
         {
+          "name": "switchyard:spdx-list-version",
+          "value": "3.29.0"
+        },
+        {
+          "name": "switchyard:spdx-identifiers-listed",
+          "value": "false"
+        },
+        {
+          "name": "switchyard:spdx-identifiers-deprecated",
+          "value": "false"
+        },
+        {
           "name": "switchyard:lockfile",
           "value": "package-lock.json"
         },
@@ -193,6 +229,18 @@
         {
           "name": "switchyard:ecosystem",
           "value": "npm"
+        },
+        {
+          "name": "switchyard:spdx-list-version",
+          "value": "3.29.0"
+        },
+        {
+          "name": "switchyard:spdx-identifiers-listed",
+          "value": "false"
+        },
+        {
+          "name": "switchyard:spdx-identifiers-deprecated",
+          "value": "false"
         },
         {
           "name": "switchyard:lockfile",
@@ -242,6 +290,18 @@
           "value": "npm"
         },
         {
+          "name": "switchyard:spdx-list-version",
+          "value": "3.29.0"
+        },
+        {
+          "name": "switchyard:spdx-identifiers-listed",
+          "value": "true"
+        },
+        {
+          "name": "switchyard:spdx-identifiers-deprecated",
+          "value": "false"
+        },
+        {
           "name": "switchyard:lockfile",
           "value": "package-lock.json"
         },
@@ -277,6 +337,18 @@
           "value": "npm"
         },
         {
+          "name": "switchyard:spdx-list-version",
+          "value": "3.29.0"
+        },
+        {
+          "name": "switchyard:spdx-identifiers-listed",
+          "value": "true"
+        },
+        {
+          "name": "switchyard:spdx-identifiers-deprecated",
+          "value": "false"
+        },
+        {
           "name": "switchyard:lockfile",
           "value": "package-lock.json"
         },
@@ -310,6 +382,18 @@
         {
           "name": "switchyard:ecosystem",
           "value": "npm"
+        },
+        {
+          "name": "switchyard:spdx-list-version",
+          "value": "3.29.0"
+        },
+        {
+          "name": "switchyard:spdx-identifiers-listed",
+          "value": "true"
+        },
+        {
+          "name": "switchyard:spdx-identifiers-deprecated",
+          "value": "false"
         },
         {
           "name": "switchyard:lockfile",

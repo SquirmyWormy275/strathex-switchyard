@@ -52,7 +52,9 @@ Rev2 scope independently of these checkpoints.
 - Production editor command activation and remaining guided role/device wiring.
   Frontend and command activation are deliberately frozen for owner review.
 - Broader Shield coverage and dependency syntax/resolution, publisher provenance,
-  artifact and license verification, and verified local vulnerability context.
+  archive contents, actual license texts and verified local vulnerability context.
+  Pinned SPDX identifier membership is now source-tested with explicit unknown
+  and deprecated metadata. [Catalog](npm-license-declarations.md).
 - Remaining portability, controller, conversation, observation and platform work
   identified individually in the [requirement ledger](switchyard-requirements.md).
   Passing one adapter or provider does not complete those requirements.

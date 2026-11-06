@@ -3,7 +3,8 @@ import {scanShieldInputs,shieldEngineVersion} from "../shield-scanner-engine.mjs
 const sha=b=>createHash("sha256").update(b).digest("hex");
 export function licenseDeclarationsFixture({ action } = {}) {
   const declarations = { choice: "(MIT OR GPL-3.0-only)", required: "MIT AND GPL-3.0-only", unsupported: "MIT OR LicenseRef-private", precedence: "MIT OR Apache-2.0 AND GPL-3.0-only", excepted: "GPL-2.0-only WITH Classpath-exception-2.0", bare: "GPL-2.0-only", otherexception: "GPL-2.0-only WITH Bison-exception-2.2", exceptionchoice: "MIT OR GPL-2.0-only WITH Bison-exception-2.2" };
-  return scannerFixture({ action, allowedLicenses: ["MIT", "Apache-2.0", "GPL-2.0-only WITH Classpath-exception-2.0"], files: { "app.js": "const ordinary = 1;", "package-lock.json": JSON.stringify({ lockfileVersion: 3, packages: Object.fromEntries(Object.entries(declarations).map(([name, license]) => ["node_modules/" + name, { version: "1.0.0", license }])) }) }, advisory: Object.keys(declarations).map(name => ({ ecosystem: "npm", name, version: "1.0.0", advisories: [] })) });
+  Object.assign(declarations, { unknownchoice: "MIT OR Unknown-2099", unknownexception: "MIT WITH Unknown-2099", swapped: "Classpath-exception-2.0", deprecated: "GPL-2.0+" });
+  return scannerFixture({ action, allowedLicenses: ["MIT", "Apache-2.0", "GPL-2.0-only WITH Classpath-exception-2.0", "MIT WITH Unknown-2099", "Classpath-exception-2.0", "GPL-2.0+"], files: { "app.js": "const ordinary = 1;", "package-lock.json": JSON.stringify({ lockfileVersion: 3, packages: Object.fromEntries(Object.entries(declarations).map(([name, license]) => ["node_modules/" + name, { version: "1.0.0", license }])) }) }, advisory: Object.keys(declarations).map(name => ({ ecosystem: "npm", name, version: "1.0.0", advisories: [] })) });
 }
 export function cargoLockFixture({ action, clean = false, cargoVersion = "1.2.3" } = {}) {
   const source="registry+https://github.com/rust-lang/crates.io-index";

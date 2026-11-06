@@ -10,7 +10,12 @@ export async function assertLicenseShield(f, { windows = false } = {}) {
   assert.equal(result.status, "failed", JSON.stringify(result)); assert.ok(result.receiptId);
   const report = result.data.shieldReport;
   assert.deepEqual(report.findings.map(row => [row.ruleId, row.dimension, row.severity]), Array.from({ length: 3 }, () => ["license.disallowed", "licenses", "high"]));
-  assert.deepEqual(report.sbom.components.map(c => c.license), ["MIT OR GPL-3.0-only", "MIT AND GPL-3.0-only", null, "MIT OR Apache-2.0 AND GPL-3.0-only", "GPL-2.0-only WITH Classpath-exception-2.0", "GPL-2.0-only", "GPL-2.0-only WITH Bison-exception-2.2", "MIT OR GPL-2.0-only WITH Bison-exception-2.2"]);
+  assert.deepEqual(report.sbom.components.map(c => c.license), ["MIT OR GPL-3.0-only", "MIT AND GPL-3.0-only", null, "MIT OR Apache-2.0 AND GPL-3.0-only", "GPL-2.0-only WITH Classpath-exception-2.0", "GPL-2.0-only", "GPL-2.0-only WITH Bison-exception-2.2", "MIT OR GPL-2.0-only WITH Bison-exception-2.2", "MIT OR Unknown-2099", "MIT WITH Unknown-2099", "Classpath-exception-2.0", "GPL-2.0+"]);
+  const catalog = report.cycloneDx.components.map(c => Object.fromEntries(c.properties.map(p => [p.name, p.value])));
+  assert.deepEqual(catalog.slice(8).map(p => p["switchyard:spdx-identifiers-listed"]), ["false", "false", "false", "true"]);
+  assert.equal(catalog[11]["switchyard:spdx-identifiers-deprecated"], "true");
+  assert.equal(catalog[2]["switchyard:spdx-list-version"], undefined);
+  assert.ok(catalog.filter((_, i) => i !== 2).every(p => p["switchyard:spdx-list-version"] === "3.29.0"));
   for (const gap of ["license_choice_not_selected", "license_metadata", "publisher_provenance_not_verified"]) assert.ok(report.gaps.includes(gap), gap);
   assert.equal(report.cycloneDx.components[0].licenses[0].license.name, "MIT OR GPL-3.0-only"); assert.equal(report.cycloneDx.compositions[0].aggregate, "unknown");
   assert.equal(report.completeness, "incomplete"); assert.equal(result.data.receiptEvidenceEnvelope.outcome, "incomplete");

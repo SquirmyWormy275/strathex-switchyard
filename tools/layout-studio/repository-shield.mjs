@@ -6,6 +6,7 @@ import { createDurableAbortControl } from "../../packages/control-plane/src/exec
 import { createRepositoryRecipeEvidence } from "../../apps/windows-companion/src/repository-runtime-broker.ts";
 import { pipelineDependencies } from "./repository-pipeline.mjs";
 import { shieldActions, shieldEngineVersion, shieldIndexPrefix, validateShieldRequest, scannerPath, shieldReservedPath, pypiIdentity, validateCargoComponent, shieldCycloneDxComponent, shieldArtifactReferenceKey, isPinnedRequirementsPath, npmLicenseDeclaration, npmVersion } from "./shield-scanner-engine.mjs";
+import { spdxLicenseMembership } from "./shield-scanner-engine.mjs";
 import { evaluateShieldExceptions } from "./shield-exception-ledger.mjs";
 import { resolveShieldIndexWitness } from "./shield-index-inputs.mjs";
 import { resolveShieldHistoryWitness } from "./shield-history-inputs.mjs";
@@ -120,6 +121,7 @@ export function parseShieldScannerReport(output,shield,action) {
       const name=value=>typeof value==="string"&&![".",".."].includes(value)&&/^(?:@[a-z0-9._-]+\/)?[a-z0-9._-]{1,128}$/.test(value);
       if(!exact(component,["ecosystem","name","installedAs","version","location","lockPath","license","integritySha256",...(Object.hasOwn(component,"workspace")?["workspace"]:[]),...(Object.hasOwn(component,"artifact")?["artifact"]:[])])||!name(component.name)||!name(component.installedAs)||!npmVersion(component.version)||component.license!==null&&npmLicenseDeclaration(component.license)?.expression!==component.license||component.integritySha256!==null&&!digest(component.integritySha256))throw Error("Invalid exact npm inventory.");
       scannerPath(component.location); const parts=component.location.split("/"),index=parts.lastIndexOf("node_modules");
+      if ((!component.license || !spdxLicenseMembership(component.license).listed) && !report.gaps.includes("license_metadata")) throw Error("Missing or unlisted license identifiers must retain their metadata gap.");
       if(component.lockPath.split("/").at(-1)!=="package-lock.json"||parts.includes(".git")||index<0||parts.slice(index+1).join("/")!==component.installedAs)throw Error("Invalid exact npm installation location.");
       if(Object.hasOwn(component,"workspace")){if(!exact(component.workspace,["path","lockMetadataSha256"])||!digest(component.workspace.lockMetadataSha256))throw Error("Invalid exact workspace metadata.");scannerPath(component.workspace.path);if(component.workspace.path.split("/").some(part=>part==="node_modules"||part===".git"))throw Error("Invalid workspace source path.");}
       const referenceKey = JSON.stringify([component.lockPath, component.location]), reference = artifactReferences.get(referenceKey);

@@ -10,6 +10,48 @@ import { scanShieldInputs, shieldActions, shieldEngineVersion, validateShieldReq
 const sha = b => createHash("sha256").update(b).digest("hex");
 import { parseShieldScannerReport } from "./repository-shield.mjs";
 import {scannerFixture} from "./test-support/shield-scanner-fixture.mjs";
+import { spdxLicenseMembership, spdxLicenseListVersion } from "./shield-scanner-engine.mjs";
+
+test("the pinned SPDX catalog recognizes every license and exception in its own namespace without changing policy choices", async () => {
+  const catalog = JSON.parse(await readFile(new URL("../../scripts/data/spdx-license-identifiers.json", import.meta.url), "utf8"));
+  assert.equal(spdxLicenseListVersion, "3.29.0"); assert.equal(catalog.licenses.length, 740); assert.equal(catalog.exceptions.length, 86);
+  execFileSync(process.execPath, [fileURLToPath(new URL("../../scripts/generate-spdx-license-catalog.mjs", import.meta.url)), "--check"], { timeout: 10000 });
+  for (const [id, deprecated] of catalog.licenses) {
+    assert.deepEqual(spdxLicenseMembership(id), { version: "3.29.0", listed: true, deprecated }, id);
+    assert.equal(spdxLicenseMembership(id.toLowerCase()).listed, true, id);
+    assert.equal(spdxLicenseMembership(id.replace(/\+$/, "") + "+").listed, true, id);
+  }
+  for (const [id, deprecated] of catalog.exceptions) {
+    assert.deepEqual(spdxLicenseMembership("MIT WITH " + id), { version: "3.29.0", listed: true, deprecated }, id);
+    assert.equal(spdxLicenseMembership("mit WITH " + id.toLowerCase()).listed, true, id);
+  }
+  for (const value of ["Unknown-2099", "MIT WITH MIT", "Classpath-exception-2.0", "MIT OR (Apache-2.0 AND Unknown-2099)", "MIT OR GPL-2.0-only WITH Unknown-2099"]) assert.equal(spdxLicenseMembership(value).listed, false, value);
+  for (const value of ["MIT or Apache-2.0", "MIT WITH Unknown+", "MIT OR LicenseRef-private", "", null]) assert.equal(spdxLicenseMembership(value), null);
+  assert.equal(npmLicenseDeclaration("MIT+", ["MIT"]).allowed, false);
+  assert.equal(npmLicenseDeclaration("MIT OR Unknown-2099", ["MIT"]).allowed, true);
+  assert.equal(spdxLicenseMembership("MIT OR Unknown-2099").listed, false);
+});
+
+test("listed, deprecated and unknown declarations retain exact catalog evidence without asserting text or publisher verification", async () => {
+  const declarations = ["mit", "GPL-2.0+", "MIT WITH Unknown-2099", "MIT OR Unknown-2099", "Classpath-exception-2.0"];
+  const f = scannerFixture({ action: "shield_supply_chain", allowedLicenses: ["MIT", "GPL-2.0+", "MIT WITH Unknown-2099", "Classpath-exception-2.0"], files: { "package-lock.json": JSON.stringify({ lockfileVersion: 3, packages: Object.fromEntries(declarations.map((license, i) => [`node_modules/example${i}`, { version: "1.0.0", license }])) }) } });
+  const report = await f.scan(), shield = { engine: report.engine, request: f.request, requestSha256: report.requestSha256 };
+  assert.equal(report.outcome, "incomplete"); assert.equal(report.findings.length, 0);
+  assert.ok(report.gaps.includes("license_metadata")); assert.ok(report.gaps.includes("publisher_provenance_not_verified"));
+  assert.ok(report.gaps.includes("license_choice_not_selected"));
+  const properties = report.cycloneDx.components.map(c => Object.fromEntries(c.properties.map(p => [p.name, p.value])));
+  assert.deepEqual(properties.map(p => p["switchyard:spdx-identifiers-listed"]), ["true", "true", "false", "false", "false"]);
+  assert.deepEqual(properties.map(p => p["switchyard:spdx-identifiers-deprecated"]), ["false", "true", "false", "false", "false"]);
+  assert.ok(properties.every(p => p["switchyard:spdx-list-version"] === "3.29.0"));
+  assert.deepEqual(report.cycloneDx.components.map(c => c.licenses), declarations.map(name => [{ license: { name } }]));
+  assert.deepEqual(parseShieldScannerReport(JSON.stringify(report), shield, f.request.action), report);
+  const missingGap = structuredClone(report); missingGap.gaps = missingGap.gaps.filter(g => g !== "license_metadata");
+  assert.throws(() => parseShieldScannerReport(JSON.stringify(missingGap), shield, f.request.action), /metadata gap/);
+  for (const property of ["switchyard:spdx-identifiers-listed", "switchyard:spdx-list-version", "switchyard:spdx-identifiers-deprecated"]) {
+    const changed = structuredClone(report); changed.cycloneDx.components[2].properties.find(p => p.name === property).value = "forged";
+    assert.throws(() => parseShieldScannerReport(JSON.stringify(changed), shield, f.request.action), /BOM components/);
+  }
+});
 
 test("npm SemVer keeps exact build identity and rejects malformed or imprecise inventory and report versions", async () => {
   const order = ["1.0.0-alpha", "1.0.0-alpha.1", "1.0.0-alpha.beta", "1.0.0-beta", "1.0.0-beta.2", "1.0.0-beta.11", "1.0.0-rc.1", "1.0.0"];

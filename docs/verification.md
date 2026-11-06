@@ -774,3 +774,22 @@ finally. Two managed builds pass with zero warnings/errors, 2,101 portable check
 and exact cleanup of 149 files / 3,384,695 bytes. All 36 native pipe checks and the
 eight original owner assertions remain required. Installed state is unchanged.
 [Source receipt](evidence/private-pipe-security-info-source-summary.json).
+
+
+## Offline SPDX identifier catalog (2026-11-06)
+
+The pinned dependency-free scanner now checks membership and deprecation against
+740 license IDs and 86 exception IDs from SPDX 3.29.0, with immutable upstream
+commit, original Git blob and SHA-256 identity checked. Unknown identifiers retain
+metadata gaps even in permitted OR alternatives; policy decisions and catalog
+membership remain separate. Fixed CycloneDX properties bind version/listing/
+deprecation, and host admission recomputes them. No text, publisher or legal
+verification is inferred.
+
+Seven isolated groups pass 47 tests without skips, including every catalog entry,
+real Linux Supply Chain/Release scans, Windows guest doubles, signed feed/receipt
+composition, original index/HEAD/lockfile preservation and exact child/tree
+cleanup. Typecheck and deterministic development SBOM checks pass. Application
+and release checks preserve the original 5 MiB budget. No installed update,
+provider/model request, account change or hardware action occurred.
+[Evidence](evidence/spdx-catalog-source-summary.json), [contract](npm-license-declarations.md).
