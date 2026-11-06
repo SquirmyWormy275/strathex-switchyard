@@ -35,6 +35,14 @@ original full package budget and exact child/tree/temporary cleanup pass.
 
 The tests use encrypted temporary workspaces and synthetic shortcut drivers.
 They register no actual Windows shortcuts and make no hardware/account changes.
-Installed and native Windows interaction remain separate. Exact direct-child
+Installed synthetic ownership and pending-registration hydration checks pass.
+Native Windows interaction remains separate. Exact direct-child
 retirement does not by itself establish arbitrary descendant containment or
 abrupt-parent-loss cleanup.
+
+The normal installed `f06674d` update passes 33 metadata/synthetic checks,
+including nine exact tested module hashes, both helper ownership paths and a
+field-for-field comparison of the compact provenance index. This starts no
+native helper, registration, recording or user task. All 54 workspace semantic
+snapshots and frozen frontend bytes remain intact.
+[Installed evidence](evidence/installed-helper-ownership-summary.json).

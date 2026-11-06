@@ -10,7 +10,7 @@ identity work has focused source acceptance.
 The complete Linux `cadbccd` run passes all 310 groups, 1,861 tests and sixteen
 declared skips, including agent revocation, uncertain-outcome recovery and compact
 packaging. The later stopped-agent correction has separate 94-check focused and
-30-check installed metadata/synthetic evidence.
+33-check installed metadata/synthetic evidence.
 The restricted Windows storage owner now passes all eight original checks with
 verified retirement. Complete Windows source `9f35961` passes 414 test/build groups,
 2,398 tests and 202 declared skips. Later credential and custom-agent changes have
@@ -28,14 +28,14 @@ there is no merge or public release acceptance.
 
 | Boundary | Verified result | Still open |
 | --- | --- | --- |
-| Complete Linux source | `cadbccd`: **310 groups, 1,861 passing tests, sixteen declared skips, zero failures.** Exact child/tree exit and owned checkout, nine aliases, 782 generated files, temporary parent and marker cleanup verify; all three other worktrees remain. [Receipt](evidence/linux-cadbccd-complete-summary.json). | Provider/guest doubles remain explicit. The later stopped-agent correction has separate 94-check focused and 30-check installed metadata/synthetic acceptance. |
+| Complete Linux source | `cadbccd`: **310 groups, 1,861 passing tests, sixteen declared skips, zero failures.** Exact child/tree exit and owned checkout, nine aliases, 782 generated files, temporary parent and marker cleanup verify; all three other worktrees remain. [Receipt](evidence/linux-cadbccd-complete-summary.json). | Provider/guest doubles remain explicit. The later stopped-agent correction has separate 94-check focused and 33-check installed metadata/synthetic acceptance. |
 | Complete Windows release | `9f35961`: **414 groups, 2,398 passing tests, 202 declared skips, zero failures.** Archive/receipt digests, source/merge tree equality, original bounds and all child/tree cleanup verify. [Receipt](evidence/windows-complete-9f35961-summary.json). | Later credential ownership, revocation and outcome changes are outside this checkpoint. Provider/guest doubles and interactive acceptance remain separate. |
 | Windows backend batches | `9f35961`: **198 groups, 1,022 passing tests, 142 declared skips, zero failures.** Four digests, source/merge tree equality and all child/tree cleanup verify. [Receipts](evidence/windows-backend-9f35961-native-summary.json). | The combined release now passes separately above. Older `dbbcce8` backend and complete-release failures remain recorded; later passing batches do not relabel them. [Historical backend](evidence/windows-backend-dbbc-native-summary.json), [complete failure](evidence/windows-complete-dbbc-failed-summary.json). |
 | Restricted Windows owner | `6e967a3`: **8/8 original owner checks pass**, with 68 exact QUERY-mask-8 registrations, native tree exit, token recheck, private-desktop closure and fixture/service/file retirement. All six GUI setup checks pass. [Owner receipt](evidence/windows-restricted-owner-accepted-summary.json), [setup](evidence/setup-final-native-summary.json). | This controlled native CI proof does not accept an ordinary user account, interactive UAC or actual guest journey. |
 | Installation and runtime | All sixteen original Windows installation/recovery cases pass at `b600a6d`; its independent fresh runtime installs 49 packages and loads/rechecks the offline CPU model, then removes its temporary runtime. [Installation](evidence/installation-scenarios-native-summary.json), [runtime](evidence/windows-runtime-b600-native-summary.json). | Complete Windows `9f35961` now passes separately; ordinary-user/guest journeys remain open. |
 | Latest diagnostic source | Seven focused groups pass 69 tests with five Windows-only skips. Two managed builds, 2,101 portable checks, typecheck and exact owned cleanup pass. [Receipt](evidence/worker-start-observation-source-summary.json). | Actual Windows `d15285b` passes all eight acknowledgement/refusal tests without skips. [Native receipt](evidence/worker-start-refusal-native-summary.json). The full restricted-owner journey is now separately accepted above. |
 | Windows index/history/leases | Native NTFS index and history packets each pass six checks and three independent guardian exits. Both Windows scanner files pass two cases with guest execution doubled; lease groups pass 24 tests and one Linux-only skip. [Evidence](evidence/native-history-index-leases-summary.json). | Packet Git witnesses are synthetic. Actual guest, installed Windows and ordinary-user acceptance remain separate. |
-| Installed app | Linux source `7ea2997` passes 20 owner/journal metadata checks and ten pure credential/revocation/outcome/stop checks. Seven tested module hashes, all 54 workspace semantic snapshots, 53 sealed files and frozen frontend bytes verify. Only current plus one rollback remain; the complete 5,231,798-byte prepared bundle is removed. [Receipt and repeatable proof](evidence/installed-agent-stop-summary.json). Earlier lifecycle/archive/extras receipts remain source-specific evidence. | No live agent is revoked and no bundled example, recording, scanner, task, provider or public query is started by this update. Frontend and extension activation remain frozen. |
+| Installed app | Linux source `f06674d` passes 20 owner/journal metadata checks and thirteen pure agent/helper/provenance checks. Nine tested module hashes, all 54 workspace semantic snapshots, 53 sealed files and frozen frontend bytes verify. Only current plus one rollback remain; the complete 5,227,462-byte prepared bundle is removed. [Receipt and repeatable proof](evidence/installed-helper-ownership-summary.json). Earlier lifecycle/archive/extras receipts remain source-specific evidence. | No live agent is revoked and no bundled example, recording, scanner, task, provider or public query is started by this update. Frontend and extension activation remain frozen. |
 | Windows npm archive identity | Corrected `55515d1` completes ten archive tests plus eight original byte-comparison tests, each file with two original Linux-only skips inside its original 300-second bound; guest execution is doubled. [Archive](evidence/npm-archive-native-summary.json), [bytes](evidence/npm-artifact-split-native-summary.json). | Complete Windows release remains separate. |
 | Windows shortcut retirement | `80601e9` passes all sixteen original installation/recovery scenarios and twelve writer checks, no skips and verified cleanup. The fixed stage diagnostics execute with the original bounds. [Native pass](evidence/shortcut-stage-diagnostics-native-summary.json). | `9193471` and `4b2daed` each fail the first installation scenario at the original ten-second shortcut deadline: 24/25 tests pass, all cleanup verifies. The latest pass does not reproduce or establish the cause of the intermittent timeout. [Recurring failures](evidence/windows-shortcut-recurring-timeout-summary.json), [diagnostic source](evidence/shortcut-stage-diagnostics-source-summary.json). |
 | Credential worker retirement | Six groups/69 checks pass, including ten worker tests and two controlled real children. Errors join exact-child retirement; unconfirmed exit blocks replacement. Installed pure synthetic checks also pass within the 27-check update. [Contract](credential-worker-lifecycle.md), [source](evidence/credential-process-source-summary.json), [installed](evidence/installed-agent-security-summary.json). | Live credential failure injection and native Windows acceptance remain separate. No user key is replaced. |
@@ -71,7 +71,7 @@ bind operations to their exact native owner. Failed registration needs verified
 absence or exact exit before rollback; uncertain records stay recovery-pending
 and are never automatically hydrated. Six regressions pass within eight groups/
 89 checks, including two real controlled children. Typecheck/package/cleanup pass;
-installed and native Windows interaction remain separate.
+installed synthetic checks now pass within the 33-check update; actual Windows interaction remains separate.
 [Contract](windows-shortcut-helper-lifecycle.md).
 
 Windows foreground observation now retains an uncertain exact helper, joins
@@ -79,8 +79,9 @@ overlapping stops and refuses replacement until exit. Late replies cannot surviv
 pause/shutdown, and Suite shutdown reports an unconfirmed owner. Ten source groups
 pass 87 checks, with two controlled real Node children; a final eleven-check
 foreground pass verifies recovery after exact close. Catalog provenance ships
-as equivalent compact JSON to preserve the original package budget. Installed and
-native Windows acceptance remain separate.
+as equivalent compact JSON to preserve the original package budget. Installed
+synthetic ownership and complete provenance comparison now pass; actual native
+Windows acceptance remains separate.
 [Contract](foreground-helper-lifecycle.md), [evidence](evidence/foreground-owner-source-summary.json).
 
 Authenticated custom-agent stop events now retire pending commands atomically:

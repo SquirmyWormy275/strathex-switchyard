@@ -1,5 +1,16 @@
 # What has actually been verified
 
+Normal installed `f06674d` passes **33 metadata/synthetic checks**: thirteen
+owner checks, seven Copilot-journal checks and thirteen pure agent/helper/catalog
+checks. Nine installed module hashes match their source-tested evidence. The
+repeatable verifier records its own source hash and starts no native helper or
+shortcut registration. All 54 workspace semantics, the selected workspace and
+frozen frontend are preserved; 53 sealed files are byte-identical and one changes
+only audit metadata. Dated backup/launcher readback, current plus one rollback and
+removal of the exact 535-file, 5,227,462-byte prepared bundle verify. Actual native
+Windows interaction and live agent execution remain separate.
+[Installed receipt](evidence/installed-helper-ownership-summary.json).
+
 Native Windows `9f35961` passes **all sixteen original installation/recovery
 scenarios plus nine writer checks**, with no skips, original execution bounds
 and verified child/tree cleanup. Source/merge tree and artifact digest agree.

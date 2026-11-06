@@ -35,7 +35,8 @@ Latest source work fixes shortcut-helper retirement, shared hydration and stale
 owner readback/rollback. Uncertain registrations are retained for Restore and
 never automatically hydrated; IDs remain reserved. Eight groups/89 checks include
 six regressions and two controlled real child exits. Typecheck/package/cleanup
-pass. Installed and actual Windows acceptance of this correction remain separate.
+pass. Installed synthetic ownership checks now pass within the 33-check update;
+actual Windows interaction remains separate.
 [Contract](windows-shortcut-helper-lifecycle.md).
 
 Windows preliminary batches now use measured scheduling costs from all 198
@@ -50,7 +51,8 @@ blocks replacement and propagates uncertainty through Suite shutdown. Ten groups
 87 checks plus an eleven-check foreground follow-up pass with two real controlled
 Node child exits. Typecheck/catalog verification and exact cleanup pass. Lossless
 provenance JSON compaction keeps the full test bundle below the original 5 MiB
-limit. This later correction is not yet installed or accepted on native Windows.
+limit. Installed synthetic ownership/provenance checks now pass; actual native
+Windows interaction remains separate.
 [Contract](foreground-helper-lifecycle.md).
 
 The latest source correction retires commands when an adapter publishes stopped,
@@ -97,21 +99,21 @@ recovery and compact packaging are included. The later stopped-agent correction
 has separate focused and installed checks.
 [Receipt](evidence/linux-cadbccd-complete-summary.json).
 
-The installed baseline is `7ea2997062af93078ef63bf19f932bb240d17dd1`,
-release `4a9a66f2edba67d1212dd2da3ae8b4cb64adb4619f569034f2577e146610cc17`.
+The installed baseline is `f06674dce1cce5455486b621528bc003d2aad958`,
+release `db4c036d778247073a7be6f861ecdac49117ee1387349bfcd591a741a3108414`.
 Preserve all 54 original workspace identities, the pending keyboard-only Codex
 workspace, private connection information and the frozen Home bytes. The normal
-versioned update passes 20 owner/journal metadata checks plus ten pure in-memory
-credential/revocation/outcome/stop checks. Seven exact tested module hashes verify. It starts no
+versioned update passes 20 owner/journal metadata checks plus thirteen pure
+in-memory agent/helper/provenance checks. Nine exact tested module hashes verify. It starts no
 bundled example, recording or provider and revokes no live agent. All 54 semantic snapshots match; 53 sealed files
 are byte-identical and one changed only audit metadata. Keep the current release
-and its one rollback. The 535-file, 5,231,798-byte prepared bundle was verified and
+and its one rollback. The 535-file, 5,227,462-byte prepared bundle was verified and
 removed. Compact manifest JSON keeps the complete package below the original
 5 MiB limit; all sixteen installation scenarios pass after that change.
-[Receipt](evidence/installed-agent-stop-summary.json).
+[Receipt](evidence/installed-helper-ownership-summary.json).
 The repeatable `scripts/verify-agent-security-host.mjs --read-only-metadata`
 proof verifies exact installed hashes and uses only synthetic in-memory state;
-its ten current installed checks pass. The unchanged flags retain their earlier
+its thirteen current installed checks pass. The unchanged flags retain their earlier
 28-check focused guard/package acceptance.
 [Verifier evidence](evidence/installed-agent-security-verifier-summary.json).
 Earlier installed `4b2daed` and `5a8d159` retain separate lifecycle/archive/extras evidence.

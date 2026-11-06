@@ -36,3 +36,10 @@ field, source revision, hash and notice. Repository formatting, pinned upstream
 files and frozen frontend bytes remain unchanged. The corrected complete test
 bundle is 5,234,949 bytes. Both initial failures and verified cleanup remain in
 the [source evidence](evidence/foreground-owner-source-summary.json).
+
+The normal installed `f06674d` update passes 33 metadata/synthetic checks,
+including nine exact tested module hashes, both helper ownership paths and a
+field-for-field comparison of the compact provenance index. This starts no
+native helper, registration, recording or user task. All 54 workspace semantic
+snapshots and frozen frontend bytes remain intact.
+[Installed evidence](evidence/installed-helper-ownership-summary.json).

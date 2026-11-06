@@ -19,7 +19,7 @@ const { verifySuiteRelease } = await import("../deployment/suite/release.mjs");
 const root = join(installationRoot(), "versions", app.build), m = await verifySuiteRelease(root, { expectedId: app.build, platform: "linux", checkRuntime: true }), checks = [], moduleDigests = {};
 assert.equal(m.development, false);
 const built = { source: m.sourceCommit, id: m.id };
-for (const [evidence, names] of [["credential-process-source-summary.json", ["tools/layout-studio/credential-process.mjs", "tools/layout-studio/suite-store.mjs"]], ["agent-stop-retirement-source-summary.json", ["tools/layout-studio/custom-agents.mjs"]], ["custom-agent-outcome-source-summary.json", ["tools/layout-studio/agent-observation.mjs", "tools/layout-studio/suite.mjs", "packages/control-plane/src/confirmations.ts"]], ["compact-release-manifest-summary.json", ["deployment/suite/release.mjs"]]]) {
+for (const [evidence, names] of [["credential-process-source-summary.json", ["tools/layout-studio/credential-process.mjs", "tools/layout-studio/suite-store.mjs"]], ["agent-stop-retirement-source-summary.json", ["tools/layout-studio/custom-agents.mjs"]], ["custom-agent-outcome-source-summary.json", ["tools/layout-studio/agent-observation.mjs", "tools/layout-studio/suite.mjs", "packages/control-plane/src/confirmations.ts"]], ["foreground-owner-source-summary.json", ["deployment/suite/release.mjs", "tools/layout-studio/foreground.mjs"]], ["hotkey-owner-source-summary.json", ["tools/layout-studio/windows-host.mjs"]]]) {
     const e = JSON.parse(await readFile(new URL("../docs/evidence/" + evidence, import.meta.url), "utf8"));
     for (const name of names) {
         const digest = createHash("sha256").update(await readFile(join(root, name))).digest("hex");
@@ -27,7 +27,7 @@ for (const [evidence, names] of [["credential-process-source-summary.json", ["to
         moduleDigests[name] = digest;
     }
 }
-checks.push("seven-exact-tested-installed-module-hashes");
+checks.push("nine-exact-tested-installed-module-hashes");
 const load = name => import(pathToFileURL(join(root, name)).href), { createCredentialProcessRunner } = await load("tools/layout-studio/credential-process.mjs");
 const children = [], close = (c, code = 0, signal = null) => { c.exitCode = code; c.signalCode = signal; c.emit("close", code, signal); }, spawn = () => { const c = new EventEmitter(); Object.assign(c, { stdin: new PassThrough(), stdout: new PassThrough(), stderr: new PassThrough(), exitCode: null, signalCode: null, kill() { close(c, 1); return true; } }); children.push(c); return c; };
 const run = createCredentialProcessRunner({ spawnProcess: spawn });
@@ -125,7 +125,53 @@ assert.equal(state.agents[0].reportedStatus, "stopped");
 assert.equal(state.agents[0].lastSeen, stoppedSeen);
 assert.equal(state.agents[0].commands.find(command => command.id === stopClaim.commandId).status, "completed");
 checks.push("stopped-session-retires-pending-work-without-restoring-readiness");
-const evidence = { schema: "switchyard-installed-agent-security-metadata/v2", at: new Date().toISOString(), moduleDigests, verifierSourceSha256: createHash("sha256").update(await readFile(new URL(import.meta.url))).digest("hex"), sourceCommit: built.source, applicationRelease: built.id, checks, success: true, pureInMemoryOnly: true, liveUserCredentialsUsed: false, liveAgentsRevoked: 0, nativeProcessesStarted: 0, providerOrModelRequests: 0, hardwareOperations: 0 };
+const frame = { available: true, category: "vscode", provenance: "Windows foreground process filename; no task identity" };
+function syntheticDriver() {
+    const child = new EventEmitter(); Object.assign(child, { exitCode: null, signalCode: null, kill: () => false });
+    return { child, ready: Promise.resolve(), closed: false, registrations: [], request: async () => frame,
+        async register(connection) { this.registrations.push(structuredClone(connection)); return { registered: true }; },
+        close() { this.closed = true; }, exit() { close(child); } };
+}
+const { createWindowsCategoryObserver } = await load("tools/layout-studio/foreground.mjs"), foregroundDrivers = [];
+const foreground = createWindowsCategoryObserver({ driverFactory: options => { assert.equal(options.readOnly, true); const d = syntheticDriver(); foregroundDrivers.push(d); return d; }, stopChild: async () => ({ stopped: false }) });
+try {
+    assert.deepEqual(await foreground.read("synthetic"), frame);
+    assert.equal((await foreground.stopCompartment("synthetic")).stopped, false);
+    await assert.rejects(foreground.read("synthetic"), { code: "FOREGROUND_HELPER_EXIT_UNCONFIRMED" });
+    assert.equal(foregroundDrivers.length, 1);
+    foregroundDrivers[0].exit(); assert.deepEqual(await foreground.read("synthetic"), frame);
+    assert.equal(foregroundDrivers.length, 2);
+    await assert.rejects(foreground.close(), { code: "FOREGROUND_HELPER_EXIT_UNCONFIRMED" });
+    foregroundDrivers[1].exit(); await foreground.close();
+    await assert.rejects(foreground.read("synthetic"), /was stopped/);
+} finally { for (const driver of foregroundDrivers) driver.exit(); await foreground.close(); }
+checks.push("synthetic-foreground-ownership-requires-exact-exit-before-replacement");
+const { createWindowsHostBridge } = await load("tools/layout-studio/windows-host.mjs"), shortcutDrivers = [];
+const shortcutState = { windowsHost: { bindings: [{ nativeId: 1 }, { nativeId: 2 }], transactions: [
+    { id: "synthetic-applied", status: "applied", connection: { nativeId: 1 } },
+    { id: "synthetic-pending", status: "recovery-pending", connection: { nativeId: 2 } }
+] } }, shortcutBefore = structuredClone(shortcutState);
+const shortcut = createWindowsHostBridge({ store: { async snapshot(id) { assert.equal(id, "personal"); return structuredClone(shortcutState); }, async update() { throw Error("This synthetic metadata check must preserve its saved state."); } }, driverFactory: () => { const d = syntheticDriver(); shortcutDrivers.push(d); return d; }, stopChild: async () => ({ stopped: false }) });
+try {
+    assert.equal((await shortcut.transactions()).length, 2);
+    assert.deepEqual(shortcutDrivers[0].registrations, [{ nativeId: 1 }]);
+    shortcutDrivers[0].close();
+    await assert.rejects(shortcut.transactions(), { code: "HOTKEY_HELPER_EXIT_UNCONFIRMED" });
+    assert.equal(shortcutDrivers.length, 1);
+    shortcutDrivers[0].exit(); await shortcut.transactions();
+    assert.equal(shortcutDrivers.length, 2);
+    assert.deepEqual(shortcutDrivers[1].registrations, [{ nativeId: 1 }]);
+    assert.deepEqual(shortcutState, shortcutBefore);
+    await assert.rejects(shortcut.close(), { code: "HOTKEY_HELPER_EXIT_UNCONFIRMED" });
+    shortcutDrivers[1].exit(); await shortcut.close();
+    await assert.rejects(shortcut.transactions(), /closed/);
+} finally { for (const driver of shortcutDrivers) driver.exit(); await shortcut.close(); }
+checks.push("synthetic-shortcut-owner-retains-uncertain-exit-and-never-replays-pending-registration");
+const provenance = "third_party/model-f-catalog/SOURCES.json", installedProvenance = await readFile(join(root, provenance), "utf8"), sourceProvenance = JSON.parse(await readFile(new URL("../" + provenance, import.meta.url), "utf8"));
+assert.deepEqual(JSON.parse(installedProvenance), sourceProvenance);
+assert.equal(installedProvenance, JSON.stringify(sourceProvenance) + "\n");
+checks.push("installed-compact-catalog-provenance-preserves-every-source-field");
+const evidence = { schema: "switchyard-installed-agent-security-metadata/v3", at: new Date().toISOString(), moduleDigests, verifierSourceSha256: createHash("sha256").update(await readFile(new URL(import.meta.url))).digest("hex"), sourceCommit: built.source, applicationRelease: built.id, checks, success: true, pureInMemoryOnly: true, liveUserCredentialsUsed: false, liveAgentsRevoked: 0, nativeProcessesStarted: 0, nativeShortcutRegistrations: 0, providerOrModelRequests: 0, hardwareOperations: 0 };
 const { privateDirectory } = await import("../tools/layout-studio/private-fs.mjs");
 const outputRoot = join(process.env.XDG_STATE_HOME || join(homedir(), ".local/state"), "strathex-switchyard/runtime-verification");
 await privateDirectory(outputRoot);
