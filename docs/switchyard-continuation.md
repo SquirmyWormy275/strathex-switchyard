@@ -91,7 +91,12 @@ was removed after manifest verification. [Receipt](evidence/installed-spdx-osv-s
    offline npm output also passes after its portable omitted-owner fields were
    accounted for. Initial failed source/zero-plan receipts remain recorded.
    [Archive evidence](evidence/npm-archive-identity-summary.json). Reconcile the
-   active complete Linux 7e45654 run marker before exact owned cleanup. Native
+   complete Linux 7e45654 failure separately: 305/306 groups, 1,783 accepted tests,
+   sixteen declared skips and the original combined artifact deadline. Exact owned
+   cleanup removed its checkout, nine aliases, 782 generated files and run marker.
+   [Failed receipt](evidence/linux-7e45654-timeout-summary.json). A new isolated
+   complete run at 55515d1 uses the corrected split; reconcile its active marker
+   before cleanup. Native
    Windows 7e45654 times out the combined artifact file at its original 300-second
    bound; all other 65 boundary jobs pass. The correction separates byte/identity
    cases into independent files and CI lanes, preserving original assertions

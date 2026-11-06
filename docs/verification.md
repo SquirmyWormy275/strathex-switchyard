@@ -1,5 +1,14 @@
 # What has actually been verified
 
+Complete Linux `7e45654` finishes **305/306 groups**, with 1,783 accepted tests
+and sixteen declared skips. The combined artifact file exceeds its original
+120-second deadline; no partial plan from that group is accepted. Every child
+and process tree exits, and the exact owned checkout, nine dependency aliases,
+782 generated files and temporary parent are removed. Three other worktrees
+remain unchanged. The published `55515d1` split retains every assertion and
+deadline, passes focused checks and is undergoing a separate complete rerun.
+[Failed run and cleanup](evidence/linux-7e45654-timeout-summary.json).
+
 Independent native `f7fda6b` reaches pipe creation, reports 15 parser checks,
 and fails descriptor readback before fields are observed. The 36-check proof
 remains failed and the original restricted owner never starts. Bounded buffer-

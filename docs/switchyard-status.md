@@ -7,6 +7,9 @@ a partial implementation.** The F77 is the pilot device; it does not limit scope
 The Linux backend has a passing complete test checkpoint, and a versioned
 application has separately verified installed metadata checks. Later archive
 identity work has focused source acceptance.
+The subsequent complete Linux `7e45654` run passes 305/306 groups and fails the
+combined artifact file's original deadline. Its corrected split passes focused
+checks; complete Linux and native Windows follow-up remain pending.
 The restricted Windows storage owner now passes all eight original checks with
 verified retirement. Complete Windows release acceptance remains pending. Hardware,
 account and visual acceptance remain separate from those implementation results.
@@ -60,6 +63,9 @@ Rev2 scope independently of these checkpoints.
   gzip/USTAR parsing: six groups/78 checks plus one exact alias/version check pass.
   Native Windows hit the original combined-file deadline; the corrected split
   passes 53 distinct source checks and awaits native acceptance.
+  Complete Linux `7e45654` also hits that combined-file deadline: 305/306 groups,
+  1,783 accepted tests and sixteen declared skips. Owned staging was removed
+  after exit verification. [Failed receipt](evidence/linux-7e45654-timeout-summary.json).
   [Artifact contract](npm-artifact-integrity.md).
   Pinned SPDX identifier membership now passes source and native Windows host
   checks (guest execution doubled), with explicit unknown
