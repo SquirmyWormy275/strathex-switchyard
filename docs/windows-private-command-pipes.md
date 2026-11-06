@@ -4,6 +4,12 @@ The original restricted owner reaches guardian readiness but fails when
 `CreatePipe` opens its stdin pipe: Windows error 5, before worker creation.
 [Retained native failure](evidence/worker-start-native-summary.json).
 
+Current native `2202720` passes all 36 pipe checks and six ordinary setup
+preflight checks. The restricted owner now creates its worker, with guardian,
+worker and status QUERY mask 8 verified. Its next failure is the identity probe
+returning no parseable structured result, so its original eight checks remain
+unaccepted. [Current native evidence](evidence/private-pipe-native-summary.json).
+
 The candidate correction supplies an explicit security descriptor when creating
 the guardian's three new anonymous command pipes. The descriptor names the
 current primary-token user as owner and contains one protected allow entry for

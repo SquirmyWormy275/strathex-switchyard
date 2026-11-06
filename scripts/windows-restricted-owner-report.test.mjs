@@ -44,6 +44,31 @@ test("probe observation retains original exceptions and projects only fixed oper
   }
 });
 
+test("structured-result refusal records only bounded worker exit and byte count without upgrading acceptance", async () => {
+  for (const [result, suffix] of [
+    [{ exitCode: 0, stdout: "" }, "-code0-bytes0"],
+    [{ exitCode: 3221225794, stdout: "" }, "-code3221225794-bytes0"],
+    [{ exitCode: 2, stdout: "NEVER_RETAIN", stderr: "NEVER_RETAIN" }, "-code2-bytes12"],
+    [{ exitCode: 4294967296, stdout: "" }, ""], [{ exitCode: -1, stdout: "" }, ""],
+    [{ exitCode: "NEVER_RETAIN", stdout: "" }, ""], [{ exitCode: 0, stdout: "x".repeat(16385) }, ""],
+    [{ exitCode: 0, stdout: "é".repeat(8193) }, ""], [{ exitCode: 0, stdout: {} }, ""]
+  ]) {
+    const observation = createWindowsOwnerProbeObservation(), original = Error("The fixed Windows storage helper returned no bounded structured result.");
+    const command = observation.command(async () => result);
+    const native = observation.native({ identity: async () => { assert.equal(await command("NEVER_RETAIN", [], {}), result); throw original; } });
+    await assert.rejects(native.identity(), error => error === original);
+    assert.equal(observation.failurePhase, "probe-identity-return-structured-result" + suffix);
+    assert.ok(observation.failurePhase.length <= 80); assert.equal(observation.failurePhase.includes("NEVER_RETAIN"), false);
+    const child = { waitResult: 0, resultAvailable: true, failedPhase: observation.failurePhase };
+    assert.deepEqual(storageBrokerFailureEvidence({ schema: "switchyard-storage-broker-protocol-proof/v1", success: false, restrictedHostChildExit: child }).restrictedHostChildExit, child);
+  }
+  const observation = createWindowsOwnerProbeObservation(); let calls = 0;
+  const command = observation.command(async () => ++calls === 1 ? { exitCode: 2, stdout: "stale" } : {});
+  const native = observation.native({ identity: async () => { await command("test", [], {}); await command("test", [], {}); throw Error("The fixed Windows storage helper returned no bounded structured result."); } });
+  await assert.rejects(native.identity());
+  assert.equal(observation.failurePhase, "probe-identity-return-structured-result", "A later result cannot borrow earlier command metadata.");
+});
+
 test("managed startup phases reach bounded owner evidence without conferring readiness or copying unknown details", async () => {
   for (const [runtimeStartupFailure, suffix] of [
     [{ phase: "job-create", nativeCode: 5 }, "native-job-create-code5"],

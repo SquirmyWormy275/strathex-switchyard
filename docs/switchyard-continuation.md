@@ -51,22 +51,17 @@ source-only changes have not updated or restarted this installed application.
    Do not repeat a complete run without relevant changes or unresolved concerns.
    Future runs use an exact owned home-directory temporary root; this machine's
    `/tmp` user quota was exhausted. Do not alter mounts or delete unrelated data.
-2. Continue the now-observed Windows `CreatePipe` stdin error 5 at `d15285b`.
-   Guardian readiness and its start acknowledgement complete; no worker is
-   created. The original owner remains **0/8**. The exact API denial is established;
-   a pipe-descriptor cause is still an inference requiring a native check.
-   The explicit new-pipe descriptor candidate adds 36 native checks and preserves
-   the token default DACL, but `25f07e9` failed ordinary setup preflight before
-   those checks ran. Independent `f7fda6b` readback then reported 15 parser checks
-   and successful pipe creation, failing before descriptor fields were observed.
-   Native `9fde0a3` confirms zero returned length after successful readback.
-   Source now uses exact-handle GetSecurityInfo, checks structure/revision/length
-   and retains every owner/DACL/ACE guard. Verify all 36 native checks next.
-   [Contract](windows-private-command-pipes.md).
-   Preserve all eight original owner checks, the ninety-second deadline and
-   exact TOKEN_QUERY mask 8. No broader token/process/default-DACL/SID/privilege/
-   account rights or runtime fallback. [Observation contract](windows-helper-startup.md),
-   [native evidence](evidence/worker-start-native-summary.json).
+2. Native `2202720` accepts all 36 private-pipe checks and six ordinary setup
+   preflight checks. The restricted owner now creates its worker with exact
+   guardian/worker/status QUERY mask 8 verification, then fails at
+   `probe-identity-return-structured-result`. The original owner remains **0/8**.
+   [Native receipt](evidence/private-pipe-native-summary.json).
+   Next inspect the bounded worker exit code and output byte count. This CI-only
+   observation preserves original results, exceptions, permissions and privacy.
+   [Source receipt](evidence/worker-result-observation-source-summary.json).
+   Preserve all eight owner checks, the ninety-second deadline and exact QUERY
+   mask 8. No broader token/process/default-DACL/SID/privilege/account rights or
+   runtime fallback. [Pipe contract](windows-private-command-pipes.md).
 3. Verify the corrected Windows backend scheduling and full release separately.
    All 26 task-owner cases now have independent children with the original
    45-second bound; the original test assertions and two Linux-only skips remain.

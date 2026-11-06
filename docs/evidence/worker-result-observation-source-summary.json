@@ -1,0 +1,31 @@
+{
+  "schema": "switchyard-worker-result-observation-source/v1",
+  "basis": "a5520be3bf4a38d8ee3c04938cfedabf8ca3fc03",
+  "sourceSha256": {
+    "scripts/windows-owner-probe-observation.mjs": "9604fe33011d6795ab8a2116d58d0b027c9c836e6a2a1b7c446f1a17a4bcec88",
+    "scripts/windows-restricted-owner-report.test.mjs": "8c8375b3269cbb8e867b276f973dc925007abbbe25c5184932f3bc264ad851fe"
+  },
+  "focused": {
+    "receipt": "isolated-test-0365e1dd-f0a5-4c01-a249-d9e106519d1c.json",
+    "totals": {
+      "required": 2,
+      "passed": 2,
+      "failed": 0,
+      "tests": 35,
+      "passedTests": 35,
+      "failedTests": 0,
+      "skippedTests": 0,
+      "cancelledTests": 0,
+      "todoTests": 0
+    },
+    "allChildAndTreeCleanupVerified": true
+  },
+  "behavior": [
+    "CI-only observation delegates the original result and exceptions.",
+    "Structured-result refusal retains only uint32 exit code and original bounded stdout byte count.",
+    "Unknown, out-of-bound or stale result metadata is omitted; no output text is retained."
+  ],
+  "originalOwnerAcceptedChecks": 0,
+  "permissionsChanged": false,
+  "installedChanged": false
+}

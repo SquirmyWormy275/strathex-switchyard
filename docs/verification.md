@@ -793,3 +793,22 @@ cleanup. Typecheck and deterministic development SBOM checks pass. Application
 and release checks preserve the original 5 MiB budget. No installed update,
 provider/model request, account change or hardware action occurred.
 [Evidence](evidence/spdx-catalog-source-summary.json), [contract](npm-license-declarations.md).
+
+
+## Native pipe acceptance and restricted worker return (2026-11-06)
+
+Source `2202720`, execution `cd8d04fd`, equal tree `c9e2fa0b`: all 36 native
+pipe checks pass, alongside the sixteen original protected-file checks; ordinary
+setup preflight passes all six checks with independent exit. This accepts that
+readback correction. The restricted owner now creates its worker and verifies
+QUERY mask 8 for guardian, worker and status. It next fails at
+`probe-identity-return-structured-result`, still **0/8** original owner checks.
+The retained artifact does not establish the worker exit code or output contents.
+[Native evidence](evidence/private-pipe-native-summary.json).
+
+The CI-only follow-up preserves every original call/result/exception and records
+only bounded numeric worker exit and output-byte count when structured parsing
+fails. Oversized, unknown and stale metadata are excluded. Two isolated groups
+pass 35 tests, no skips, all child/tree cleanup verified. Permissions, installed
+state, accounts and hardware are unchanged.
+[Source evidence](evidence/worker-result-observation-source-summary.json).
