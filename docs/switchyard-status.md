@@ -1,11 +1,12 @@
 # Switchyard implementation and acceptance
 
-Latest complete Linux `d243d81` passes **251/251 groups, 1,633 tests,
+Latest complete Linux `072e066` passes **252/252 groups, 1,649 tests,
 eleven declared skips and zero failures**. Every child/tree and the exact owned
 checkout, dependencies, builds and temporary parent are retired.
-[Complete result](evidence/linux-d243-complete-summary.json).
-The earlier `7772cb3` socket-cleanup failure remains retained; this run includes
-the signal-safe correction and parent ingress lifecycle.
+[Complete result](evidence/linux-072-complete-summary.json).
+It includes the restricted editor relay and synthetic carrier demonstration.
+The later protected journal has separate focused evidence; the earlier
+`7772cb3` socket-cleanup failure remains retained.
 
 Windows `700e7f2` reaches the console comparison: the hidden-console helper
 fails before entry; detached startup reaches its fixed entry marker with the same
@@ -115,7 +116,8 @@ or attachment authority. [Earlier evidence](evidence/editor-protocol-summary.jso
 
 | Checkpoint | Result | Practical limit |
 | --- | --- | --- |
-| Complete Linux `d243d81` | **251/251 groups; 1,633 passed tests; eleven declared skips.** Every child/tree and exact staging cleanup verifies. [Receipt](evidence/linux-d243-complete-summary.json). | Includes signal-safe ingress and its parent lifecycle. Does not cover later Windows console diagnostics or live IDE/account/task attachment. |
+| Complete Linux `072e066` | **252/252 groups; 1,649 passed tests; eleven declared skips.** Every child/tree and exact staging cleanup verifies. [Receipt](evidence/linux-072-complete-summary.json). | Includes the restricted relay and synthetic real-carrier demonstration. Later journal implementation and native IDE/account/hardware acceptance remain separate. |
+| Earlier complete Linux `d243d81` | **251/251 groups; 1,633 passed tests; eleven declared skips.** Every child/tree and exact staging cleanup verifies. [Receipt](evidence/linux-d243-complete-summary.json). | Includes signal-safe ingress and its parent lifecycle. Does not cover later Windows console diagnostics or live IDE/account/task attachment. |
 | Earlier complete Linux `d900499` | **248/248 groups; 1,600 passed tests; eleven declared skips.** Every child/tree and exact owned checkout, dependency, build and temporary-parent cleanup verifies. [Receipt](evidence/linux-d900-complete-summary.json). | Includes exact terminal process observation and token-security diagnostic source. Later protocol witness and query-only correction have separate focused evidence. |
 | Reviewed editor launcher `1508ea9` | Five groups / 54 tests, typecheck, extension build and compiled CommonJS load pass. Generated output is removed. [Evidence](evidence/editor-terminal-launch-summary.json). | Real signed HTTP, encrypted state and Linux leases compose with controlled provider/editor doubles. No actual terminal was launched. |
 | Installed Linux `5a2c324` | Six normal update, eleven owner/editor/severity and seven journal checks pass. All 54 semantic snapshots excluding audit match; 52 sealed files remain byte-identical. Launcher backups and exact bundle cleanup verify. [Evidence](evidence/installed-cvss4-summary.json). | Two verification workspaces receive only the expected recovery/journal audit entries. Offline CVSS 4 keeps critical base severity despite zero supplied environment scores. No live task/provider effects or activated editor. |

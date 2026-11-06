@@ -91,13 +91,15 @@ the installed update or old live provider verifiers without a relevant new chang
 
 ## Continue independently
 
-1. Complete Linux `d243d81` passes 251/251 groups, 1,633 tests, eleven declared
-   skips and zero failures. All exact child/tree/staging cleanup verifies.
-   [Receipt](evidence/linux-d243-complete-summary.json). The earlier `7772cb3`
-   failure remains failed. A separate full run for `072e066` was started; inspect
-   `/tmp/switchyard-full-linux-path.json` before any new full run or cleanup.
+1. Complete Linux `072e066` passes 252/252 groups, 1,649 tests, eleven declared
+   skips and zero failures. All exact child/tree/staging cleanup verifies and the
+   marker is removed. [Receipt](evidence/linux-072-complete-summary.json).
+   It includes the relay; the later journal has separate focused evidence.
+   Earlier `d243d81` is accepted and `7772cb3` remains failed. Before another
+   justified complete run, inspect `/tmp/switchyard-full-linux-path.json` first.
    Verify source, phase, process exit, root identities, receipt and every owned
    alias/build/test parent. Never broaden cleanup or relax deadlines.
+
 2. Use the observed `700e7f2` console-mode difference to repair restricted helper
    startup while retaining explicit parent-loss containment. Detached EOF entry
    is a diagnostic, not acceptance of a lease or the original eight-check owner.
