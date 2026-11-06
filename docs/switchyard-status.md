@@ -1,12 +1,23 @@
 # Switchyard implementation and acceptance
 
+The retained Terminal launcher now reaches the restricted connection through the
+signed client and Suite. **Six groups / 46 tests** pass, including one owned
+synthetic terminal process through actual protected state and Linux carriers:
+exact PID/image, one task acknowledgement, duplicate refusal, retained focus and
+verified retirement. Typecheck, compiled extension and twelve CommonJS methods
+pass; exact test/build cleanup verifies. Production command activation and native
+TUI/0.167.0 acceptance remain open. [Demonstration](evidence/editor-terminal-connection-summary.json).
+
+A complete Linux run of routing checkpoint `0ad510e` is in progress. Its result
+will be recorded separately from this later launcher work.
+
 The signed editor connection and typed client now pass **seven groups / 96 tests**.
 The routed demonstration uses real protected state and Linux carriers with a
 synthetic provider/terminal. Workspace, keyboard-only and shutdown cleanup joins
 before original-owner retirement; uncertain exit preserves the relevant refusal.
 Typecheck, compiled extension and CommonJS client checks pass, and generated build
-output is removed. Retained Terminal composition and command activation remain
-unfinished. [Routing evidence](evidence/editor-routing-summary.json).
+output is removed. Retained Terminal composition has later focused evidence;
+command activation remains unfinished. [Routing evidence](evidence/editor-routing-summary.json).
 
 Latest complete Linux `072e066` passes **252/252 groups, 1,649 tests,
 eleven declared skips and zero failures**. Every child/tree and the exact owned
@@ -28,8 +39,8 @@ The composed editor lifecycle and crash recovery pass **six groups / 64 tests**,
 including abrupt loss of an owned synthetic host, exact stale-socket retirement,
 preservation of foreign files and acknowledgement withdrawal on terminal disconnect.
 Real encrypted state and Linux carriers are exercised with provider/editor doubles.
-Signed routes, typed client/Terminal wiring and native TUI compatibility remain
-unfinished. [Recovery evidence](evidence/editor-recovery-summary.json).
+Signed routes and retained Terminal composition have later evidence. Production
+command activation and native TUI compatibility remain unfinished or unaccepted. [Recovery evidence](evidence/editor-recovery-summary.json).
 
 The installed Codex CLI is now **0.167.0**. Offline schema generation succeeds and
 its scratch files are removed; the reviewed adapter still refuses versions other
@@ -49,8 +60,8 @@ VS Code Terminal creation. Signed transport binds the workspace, account, task,
 owner, endpoint and editor instance. A short-lived, durably consumed permit and
 local attempt record prevent automatic retry after lost replies or partial
 creation. Executable hash, repository/socket identity and focused context are
-rechecked. **Command wiring and native task/account acknowledgement remain
-unfinished.** Passing editor/provider doubles does not establish IDE attachment.
+rechecked. **Production command wiring remains unfinished; native TUI/account/task
+acceptance remains open.** Passing editor/provider doubles does not establish IDE attachment.
 [Contract and evidence](coding-task-owners.md#one-reviewed-editor-terminal-creation).
 
 **Windows restricted Node now starts, but the owner journey still fails.**

@@ -506,3 +506,32 @@ waits for the actual acknowledgement without changing production ordering.
 
 Retained Terminal composition, command activation and native TUI/0.167.0 validation
 remain unfinished or unaccepted. No real account, task, model or hardware action ran.
+
+## Compose the retained Terminal with the restricted connection
+
+After durable permission consumption, the launcher opens the dedicated restricted
+endpoint and checks its exact socket identity. It creates one Terminal with the
+original task arguments, observes that object's exact PID, birth and native image,
+then pins the peer and waits for signed protocol acknowledgement within a bound.
+Returning to the retained object rechecks both the original target and connection.
+The observation records that acknowledgement was observed; it grants no current
+IDE, model-turn or completion authority.
+
+Lost replies, changed ingress, failed pinning and partial creation remain spent.
+The launcher attempts exact connection retirement while retaining any returned
+Terminal object. An owned terminal-close event withdraws acknowledgement and joins
+one retirement. Shutdown cancels pending HTTP requests without first disabling
+cleanup, joins work, retires connections and reports uncertain exit. It does not
+dispose unrelated or neighboring Terminal objects.
+
+Six groups / 46 tests pass. The end-to-end demonstration uses a real owned Node
+terminal double, signed client and HTTP gateway, real protected store, kernel
+leases, ingress and dedicated upstream. One exact synthetic resume is acknowledged;
+a second launch is refused, retained focus is rechecked, and shutdown verifies
+retirement while leaving the original provider alive. Typecheck, extension build,
+twelve CommonJS method checks and exact test/build cleanup pass.
+[Source-specific evidence](evidence/editor-terminal-connection-summary.json).
+
+Production command activation and frozen frontend exposure remain unfinished.
+Native Codex TUI behavior and installed 0.167.0 compatibility are unaccepted; no
+real provider account, native task, model or keyboard action ran.

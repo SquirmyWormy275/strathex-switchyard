@@ -226,5 +226,6 @@ export class StudioTaskClient {
   async recoverEditorConnection(input: StudioEditorRequest): Promise<StudioEditorConnectionRecord> {
     const selected = editorSelection(input); return connectionResult(await this.exchange("editorConnectionRecover", selected), selected, "recover") as StudioEditorConnectionRecord;
   }
-  close(): void { this.closed = true; for (const request of this.active) request.destroy(Error("Switchyard editor observation stopped.")); }
+  cancelPending(): void { for (const request of this.active) request.destroy(Error("Switchyard editor observation stopped.")); }
+  close(): void { this.closed = true; this.cancelPending(); }
 }

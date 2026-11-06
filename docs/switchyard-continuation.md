@@ -38,9 +38,10 @@ synthetic host loss permits exact stale-socket retirement without provider/accou
 access. Live hosts, unidentified spawn windows, missing original-host proof and
 foreign entries remain preserved. Terminal disconnect withdraws acknowledgement
 and joins exact dedicated cleanup. Signed routes and typed responses now pass seven groups / 96 tests, including
-actual protected lifecycle routing and joined Suite transitions. Retained Terminal
-composition and command activation remain unfinished; native TUI compatibility
-is unaccepted. [Routing evidence](evidence/editor-routing-summary.json).
+actual protected lifecycle routing and joined Suite transitions. Retained Terminal composition now passes six groups / 46 tests, including an owned
+synthetic terminal process through the signed service and real carriers. Command
+activation remains unfinished; native TUI compatibility is unaccepted.
+[Terminal demonstration](evidence/editor-terminal-connection-summary.json). [Routing evidence](evidence/editor-routing-summary.json).
 [Recovery evidence](evidence/editor-recovery-summary.json),
 [composed lifecycle](evidence/editor-connections-summary.json),
 [relay](evidence/editor-relay-summary.json).
@@ -100,8 +101,8 @@ the installed update or old live provider verifiers without a relevant new chang
    skips and zero failures. All exact child/tree/staging cleanup verifies and the
    marker is removed. [Receipt](evidence/linux-072-complete-summary.json).
    It includes the relay; the later journal has separate focused evidence.
-   Earlier `d243d81` is accepted and `7772cb3` remains failed. Before another
-   justified complete run, inspect `/tmp/switchyard-full-linux-path.json` first.
+   Earlier `d243d81` is accepted and `7772cb3` remains failed. The newer `0ad510e` complete run is active under the existing marker; reconcile
+   it before starting another. Inspect `/tmp/switchyard-full-linux-path.json` first.
    Verify source, phase, process exit, root identities, receipt and every owned
    alias/build/test parent. Never broaden cleanup or relax deadlines.
 
@@ -136,7 +137,8 @@ the installed update or old live provider verifiers without a relevant new chang
    ownership callbacks, which remain doubled in this cohort. The later dedicated original upstream and restricted relay pass their synthetic
    end-to-end check. The protected journal component also passes real-store tests.
    The protected lifecycle and interrupted-host recovery now compose these components.
-   Signed routes and typed responses are now connected; compose the retained Terminal next;
+   Signed routes, typed responses and retained Terminal composition are now connected;
+   production command activation and native TUI compatibility remain next;
    no live task/IDE acknowledgement is granted. [Carrier](evidence/editor-ingress-summary.json),
    [parent lifecycle](evidence/editor-ingress-owner-summary.json).
 4. Continue other ledger requirements, including remaining Shield coverage,
