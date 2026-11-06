@@ -67,7 +67,8 @@ signed feeds, original receipts, replay refusal, process exit and owned cleanup.
 Original lock/artifact/index bytes and HEAD remain unchanged. Tests also cover
 256 canonical final-byte encodings and 256 equivalent noncanonical aliases.
 
-Typecheck passes. Native Windows host execution of the new contract lane is
-pending; the guest remains a double. No installed update or dependency/runtime
+Typecheck passes. Native Windows host execution at f0aacab passes eight tests and two declared
+Linux-only skips in its original 300-second bound, with cleanup; the guest remains
+a double. [Windows receipt](evidence/npm-artifact-windows-native-summary.json). No installed update or dependency/runtime
 download was performed. [Exact evidence](evidence/npm-artifact-integrity-summary.json),
 [baseline scanner](shield-baseline-scanner.md).

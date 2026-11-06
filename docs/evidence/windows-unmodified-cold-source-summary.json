@@ -1,0 +1,61 @@
+{
+  "schema": "switchyard-windows-unmodified-cold-source/v1",
+  "basis": "0a0dd118597b5b936b2f692c0c58309f6ebf4ce5",
+  "sourceSha256": {
+    "deployment/windows/test-support/storage-broker-protocol/ColdRandomProcess.cs": "a3982707feba8ca17420e5a0020e69bad4e40f4e1bda81b5e98d5c260f6deac6",
+    "deployment/windows/test-support/storage-broker-protocol/NativeRestrictedHostProof.cs": "6d1bb02bff54aa9d8bc74c60e6f076507600c580aff06b8510c66af1e09027dd",
+    "deployment/windows/test-support/storage-broker-protocol/Program.cs": "6802136973a0d92ed91acaba73e5ef80851e9cae6d1d5690cca4137095cbbd82",
+    "scripts/windows-restricted-owner-report.mjs": "4fe893fb745c09479593fb0e483e4c2ad4e58f641cbf3cc5f70ae158be605b45",
+    "scripts/windows-restricted-owner-report.test.mjs": "370f2ee15f296919ec8fef3328f2280f87ea48ea9cb901046c43d26eeecc62b7"
+  },
+  "isolated": {
+    "receipt": "isolated-test-73e79052-bff9-4c4d-a55e-bf4b6e7e48c0.json",
+    "totals": {
+      "required": 6,
+      "passed": 6,
+      "failed": 0,
+      "tests": 79,
+      "passedTests": 79,
+      "failedTests": 0,
+      "skippedTests": 0,
+      "cancelledTests": 0,
+      "todoTests": 0
+    },
+    "allChildAndTreeCleanupVerified": true
+  },
+  "managed": {
+    "receipt": "unmodified-cold-comparison-managed-1793978408844.json",
+    "builds": [
+      {
+        "name": "helper",
+        "warnings": 0,
+        "errors": 0,
+        "managedAssemblySha256": "ae8d61537acfaa707a24850a03a76b5da363dc8d9b5b3efd822e43a20a272abd",
+        "managedPeSubsystem": 2
+      },
+      {
+        "name": "proof",
+        "warnings": 0,
+        "errors": 0,
+        "managedAssemblySha256": "49a3edabe104fdd68c1be9368c8ed81c95a62dd54b674c5c3ced6e3f87eeeeea",
+        "managedPeSubsystem": 3
+      }
+    ],
+    "portableChecks": 2071,
+    "ownedCleanup": {
+      "files": 124,
+      "bytes": 3243660,
+      "removed": true
+    },
+    "noDownloads": true
+  },
+  "typecheckPassed": true,
+  "behavior": [
+    "One additional CI-only cold process uses the same pinned native image, explicit restricted primary token, private desktop, environment, creation-time Job, three inherited pipes and original timeout/cleanup checks. It receives no self-query token ACL allowance.",
+    "The original cold child and original Node child then retain exactly their existing QUERY-only allowance, original two ACL observations, token rechecks and all eight owner assertions. The additional diagnostic cannot update or satisfy original SelfTokenQueryAccessVerified.",
+    "A separate closed failure-report property retains the unmodified-token observation. Invalid or missing comparison data cannot replace the original report or accept a failed owner. No new rights, fallback, account or runtime change."
+  ],
+  "nativeAcceptance": "Pending paired native observation. No causal claim is made from the prior distinct guardian and cold child alone.",
+  "newRightsGranted": false,
+  "installedChanged": false
+}

@@ -59,7 +59,7 @@
   "windowsGuestDoubleScans": 6,
   "canonicalPaddingCases": 256,
   "noncanonicalPaddingAliasesRefused": 256,
-  "nativeWindowsHostAcceptance": "Pending the new artifact-scanner CI lane. Guest behavior remains doubled.",
+  "nativeWindowsHostAcceptance": "Source f0aacab passes eight tests with two declared Linux-only skips on actual Windows; guest execution remains doubled. Original 300000 ms bound and all child/tree cleanup verify. See npm-artifact-windows-native-summary.json.",
   "installedChanged": false,
   "newRuntimeOrDependencyDownloads": false,
   "claims": [

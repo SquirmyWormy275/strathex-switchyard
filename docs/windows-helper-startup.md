@@ -18,7 +18,8 @@ original refusal, uncertain exit and all eight owner checks.
 
 Six groups / 79 tests, two managed builds / 2,071 portable checks and typecheck
 pass. All 124 owned build files (3,240,871 bytes) and test staging are removed.
-Native execution of this new observation is pending.
+Native 0a0dd11 now reports self-query error 5 in the actual failed guardian.
+[Native evidence](evidence/windows-guardian-query-native-summary.json).
 [Evidence](evidence/windows-guardian-query-source-summary.json).
 
 The read-only access check follows Microsoft's

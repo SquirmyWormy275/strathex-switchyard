@@ -55,7 +55,7 @@
     "A fixed optional selfTokenQuery observation retains opened/error/closeError/handlesClosedVerified. Old frames without the field remain supported; malformed or unrelated observations refuse. Null means no observation.",
     "The CI owner projects only qopen/qdenied/qfailed/qclose suffixes through its existing bounded phase label. It preserves original exceptions, no acknowledgement, RUNTIME_STOP_UNCONFIRMED and every original owner assertion."
   ],
-  "nativeAcceptance": "Pending. The accepted cold native probe with its existing self-query allowance cannot establish the actual descendant guardian token access or explain the denied Job creation.",
+  "nativeAcceptance": "Source 0a0dd11 confirms the actual guardian self-token QUERY open also returns error 5. The original owner remains 0/8; no narrower DACL cause is claimed. See windows-guardian-query-native-summary.json.",
   "permissionsChanged": false,
   "installedChanged": false
 }

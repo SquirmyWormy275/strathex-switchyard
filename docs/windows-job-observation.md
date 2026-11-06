@@ -40,3 +40,18 @@ API behavior is defined by Microsoft's
 and [kernel object namespaces](https://learn.microsoft.com/en-us/windows/win32/termserv/kernel-object-namespaces).
 The observations do not establish whether an object DACL or namespace caused
 the existing denial.
+
+## Compare the existing self-query allowance
+
+Native `0a0dd11` confirms the actual failed guardian also receives error 5 from
+its own `OpenProcessToken` call with QUERY mask 8. The original restricted owner
+remains 0/8. This does not yet identify the exact process/token DACL or prove which
+internal access caused Job creation to fail.
+[Exact native evidence](evidence/windows-guardian-query-native-summary.json).
+
+The next CI-only comparison runs the same cold image once without its existing
+self-query allowance, then preserves the original cold and Node checks unchanged.
+It grants no additional rights and cannot satisfy the original self-query/owner
+assertions. Six groups / 79 tests, two managed builds / 2,071 portable checks,
+typecheck and owned cleanup pass. Paired native execution remains pending.
+[Source evidence](evidence/windows-unmodified-cold-source-summary.json).

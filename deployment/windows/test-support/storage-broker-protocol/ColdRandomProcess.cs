@@ -9,7 +9,8 @@ using Microsoft.Win32.SafeHandles;
 internal static partial class NativeRestrictedHostProof
 {
     internal static object? ColdRandomDiagnostic;
-    private static object CaptureColdRandom(string executable, string expectedHash, string resultPath, string repository, string desktop, IntPtr environment, SafeAccessTokenHandle source, SafeAccessTokenHandle restricted, string user, (bool Assigned, bool Enabled) quota)
+    internal static object? UnmodifiedColdRandomDiagnostic;
+    private static object CaptureColdRandom(string executable, string expectedHash, string resultPath, string repository, string desktop, IntPtr environment, SafeAccessTokenHandle source, SafeAccessTokenHandle restricted, string user, (bool Assigned, bool Enabled) quota, bool applySelfQueryAllowance = true)
     {
         Require(Path.IsPathFullyQualified(executable) && Path.GetFileName(executable) == "Switchyard.ColdRandom.exe" && expectedHash.Length == 64 && expectedHash.All(c => char.IsAsciiHexDigit(c) && !char.IsUpper(c)) && !File.Exists(resultPath));
         Require((File.GetAttributes(executable) & (FileAttributes.Directory | FileAttributes.ReparsePoint)) == 0);
@@ -45,8 +46,11 @@ internal static partial class NativeRestrictedHostProof
             }
             pipes.ChildStarted(); Native(IsProcessInJob(child, job, out bool member)); Require(member);
             Native(OpenProcessToken(child.DangerousGetHandle(), 8, out token)); VerifyToken(token, user, recordHistory: false);
-            PermitOwnTokenQuery(child, user, "cold-probe");
-            CaptureTokenObjectSecurity(child, user, "cold-probe");
+            if (applySelfQueryAllowance)
+            {
+                PermitOwnTokenQuery(child, user, "cold-probe");
+                CaptureTokenObjectSecurity(child, user, "cold-probe");
+            }
             Native(ResumeThread(thread) != uint.MaxValue);
             wait = WaitForSingleObject(child, 10000); Require(wait is 0 or 258);
             if (wait == 0)
@@ -83,7 +87,7 @@ internal static partial class NativeRestrictedHostProof
             }
         }
         Require(child != null && token != null && child.IsClosed && thread!.IsClosed && token.IsClosed);
-        if (validReport && report != null)
+        if (applySelfQueryAllowance && validReport && report != null)
         {
             var access = report.selfTokenAccess;
             SelfTokenQueryAccessVerified = access.query.opened && access.query.error == 0 && access.query.closeError == 0

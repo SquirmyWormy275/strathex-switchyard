@@ -253,6 +253,11 @@ internal static partial class NativeRestrictedHostProof
                             bool rootPresent = variables.TryGetValue("SystemRoot", out var systemRoot), windirPresent = variables.TryGetValue("WINDIR", out var windir);
                             EnvironmentDiagnostic = new { schema = "switchyard-restricted-child-environment/v1", entryCount = variables.Count, systemRootPresent = rootPresent, systemRootMatchesWindows = MatchesWindows(systemRoot), windirPresent, windirMatchesWindows = MatchesWindows(windir), openSslConfigPresent = variables.ContainsKey("OPENSSL_CONF"), openSslModulesPresent = variables.ContainsKey("OPENSSL_MODULES"), nodeOptionsPresent = variables.ContainsKey("NODE_OPTIONS") };
                             environment = Marshal.StringToHGlobalUni(string.Join('\0', variables.Select(entry => entry.Key + "=" + entry.Value)) + "\0\0");
+                            // CI comparison only: the additional child gets no token ACL
+                            // allowance. The original cold/Node QUERY-only observations
+                            // and all eight original owner assertions remain unchanged.
+                            Phase = "cold-unmodified-token-process";
+                            UnmodifiedColdRandomDiagnostic = CaptureColdRandom(value.GetProperty("coldRandom").GetString() ?? "", value.GetProperty("coldRandomSha256").GetString() ?? "", Path.Combine(Path.GetDirectoryName(context)!, "cold-random-unmodified.bin"), repository, desktopSpace.Name, environment, source, restricted, user, quota, applySelfQueryAllowance: false);
                             Phase = "cold-restricted-random-process";
                             ColdRandomDiagnostic = CaptureColdRandom(value.GetProperty("coldRandom").GetString() ?? "", value.GetProperty("coldRandomSha256").GetString() ?? "", Path.Combine(Path.GetDirectoryName(context)!, "cold-random.bin"), repository, desktopSpace.Name, environment, source, restricted, user, quota);
                             ProbeLeaseConsoles(value.GetProperty("helper").GetString() ?? "", value.GetProperty("serviceImageSha256").GetString() ?? "", repository, desktopSpace.Name, environment, source, restricted, user, quota);

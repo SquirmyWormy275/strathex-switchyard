@@ -31,6 +31,31 @@ evidence, not instructions to reset. Publish regular commits. Do not merge or re
 
 ## Current implementation and evidence
 
+Source `0a0dd11` passes the complete Linux manifest: **261 groups, 1,745
+passed tests, eleven declared skips, zero failures**. Every owned child/tree,
+temporary checkout, nine dependency aliases and 782 generated files (11,766,655
+bytes) were retired. This includes the npm artifact-byte comparison and guardian
+failure reporting. Installed and hardware/account acceptance remain separate.
+[Linux receipt](evidence/linux-0a-complete-summary.json).
+
+Native `0a0dd11` confirms the actual failed guardian also receives error 5 from
+its own `OpenProcessToken` call with QUERY mask 8. The original restricted owner
+remains 0/8. This does not yet identify the exact process/token DACL or prove which
+internal access caused Job creation to fail.
+[Exact native evidence](evidence/windows-guardian-query-native-summary.json).
+
+The next CI-only comparison runs the same cold image once without its existing
+self-query allowance, then preserves the original cold and Node checks unchanged.
+It grants no additional rights and cannot satisfy the original self-query/owner
+assertions. Six groups / 79 tests, two managed builds / 2,071 portable checks,
+typecheck and owned cleanup pass. Paired native execution remains pending.
+[Source evidence](evidence/windows-unmodified-cold-source-summary.json).
+
+The artifact-scanner lane at `f0aacab` now passes **eight tests / two declared
+Linux-only skips on actual Windows**, with its original 300-second bound and
+verified cleanup. The guest remains explicitly doubled.
+[Windows artifact evidence](evidence/npm-artifact-windows-native-summary.json).
+
 The failing guardian now performs one read-only self-token access observation
 only after `CreateJobObjectW` returns error 5: `OpenProcessToken` requests
 `TOKEN_QUERY` (mask 8) against its own pseudo-process handle, then closes any
@@ -41,7 +66,7 @@ original refusal, uncertain exit and all eight owner checks.
 
 Six groups / 79 tests, two managed builds / 2,071 portable checks and typecheck
 pass. All 124 owned build files (3,240,871 bytes) and test staging are removed.
-Native execution of this new observation is pending.
+Native 0a0dd11 now confirms self-query denial; see the later comparison above.
 [Evidence](evidence/windows-guardian-query-source-summary.json).
 
 Selected npm artifact comparison now joins the existing reviewed Supply Chain
@@ -50,7 +75,7 @@ retains high failed mismatch findings, and keeps archive contents/publisher
 identity and the complete Shield gate unverified. Thirteen groups / 89 tests are
 accepted across behavior and corrected inventory checks, including six actual
 Linux and six Windows guest-double scans; typecheck and owned cleanup pass.
-Native Windows host follow-up is pending. [Contract](npm-artifact-integrity.md),
+Native Windows host follow-up passes eight tests / two declared Linux skips; guest execution remains doubled. [Contract](npm-artifact-integrity.md),
 [evidence](evidence/npm-artifact-integrity-summary.json).
 
 Windows `ad4d5e6` builds and executes the cold native probe. Its restricted child

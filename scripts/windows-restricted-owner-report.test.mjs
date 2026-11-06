@@ -296,6 +296,18 @@ test("a cold restricted RNG report requires exact primary-token, process, pipe a
   for (const mutate of [c => { c.schema = "switchyard-cold-restricted-random/v4"; }, c => { delete c.report.emptyJobs; }, c => { c.report.emptyJobs.extra = {}; }, c => { c.report.emptyJobs = []; }]) {
     const value = structuredClone(cold); mutate(value); assert.equal(storageBrokerFailureEvidence({ ...input, restrictedHostColdRandom: value }).restrictedHostColdRandom, undefined);
   }
+  const unmodified = structuredClone(cold);
+  unmodified.report.selfTokenAccess = Object.fromEntries(["query", "queryDuplicate", "queryDuplicateImpersonate"].map(key => [key, { opened: false, error: 5, closeError: null, handlesClosedVerified: true }]));
+  for (const key of ["local", "global"]) unmodified.report.emptyJobs[key] = { opened: false, createError: 5, createdNew: false, querySucceeded: null, queryError: null, activeProcesses: null, closeError: null, handlesClosedVerified: true };
+  const pair = { ...input, restrictedHostUnmodifiedColdRandom: unmodified }, observed = storageBrokerFailureEvidence(pair);
+  assert.deepEqual(observed.restrictedHostColdRandom, cold); assert.deepEqual(observed.restrictedHostUnmodifiedColdRandom, unmodified); assert.equal(observed.success, false); assert.throws(() => verifyRestrictedOwnerReport(observed));
+  observed.restrictedHostUnmodifiedColdRandom.report.selfTokenAccess.query.error = 1; assert.equal(unmodified.report.selfTokenAccess.query.error, 5);
+  for (const mutate of [c => { c.nodeStartupAccepted = true; }, c => { c.raw = "NEVER_RETAIN"; }, c => { c.report.emptyJobs.local.handlesClosedVerified = false; }, c => { c.primaryTokenVerified = false; }, c => { c.report.selfTokenAccess.query.closeError = 0; }, c => { c.treeExitVerified = false; }]) {
+    const bad = structuredClone(unmodified); mutate(bad); const projected = storageBrokerFailureEvidence({ ...pair, restrictedHostUnmodifiedColdRandom: bad });
+    assert.equal(projected.restrictedHostUnmodifiedColdRandom, undefined); assert.deepEqual(projected.restrictedHostColdRandom, cold); assert.equal(JSON.stringify(projected).includes("NEVER_RETAIN"), false);
+  }
+  const partial = storageBrokerFailureEvidence({ ...pair, restrictedHostColdRandom: null }); assert.equal(partial.restrictedHostColdRandom, undefined); assert.deepEqual(partial.restrictedHostUnmodifiedColdRandom, unmodified);
+
 });
 
 test('CI console comparison retains bounded partial evidence and never substitutes for the original Node owner',()=>{
