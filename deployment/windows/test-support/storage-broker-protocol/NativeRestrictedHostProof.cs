@@ -19,6 +19,7 @@ internal static class NativeRestrictedHostProof
     internal static object? TokenReadDiagnostic;
     internal static object? ChildExitDiagnostic;
     internal static object? ApplicationEventDiagnostic;
+    internal static object? UserObjectAccessDiagnostic;
     private static readonly List<bool> HistoricalFilteredFlags = new();
     private static readonly List<uint> HistoricalFilterBytes = new();
     internal static bool[] HistoricalFilterObservations => HistoricalFilteredFlags.ToArray();
@@ -205,6 +206,8 @@ internal static class NativeRestrictedHostProof
                         Native(ConvertStringSidToSidW("S-1-16-8192", out medium)); var label = new SidAttributes { Sid = medium, Attributes = 0x20 };
                         Native(SetTokenInformation(restricted, 25, ref label, checked((uint)Marshal.SizeOf<SidAttributes>() + GetLengthSid(medium))));
                         VerifyToken(restricted, user);
+                        Phase = "restricted-private-user-object-access";
+                        UserObjectAccessDiagnostic = desktopSpace.ProbeRestrictedAccess(restricted);
                         Phase = "owned-job-before-process";
                         using var job = CreateJobObjectW(IntPtr.Zero, null); Native(!job.IsInvalid);
                         var limits = new ExtendedLimits { Basic = new BasicLimits { Flags = 0x2000 } };

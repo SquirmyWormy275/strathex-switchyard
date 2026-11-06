@@ -1,6 +1,8 @@
 using System.ComponentModel;
 using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
+using System.Security.Principal;
+using Microsoft.Win32.SafeHandles;
 
 // Test assembly only. No interactive desktop ACL or persistent configuration is changed.
 [SupportedOSPlatform("windows")]
@@ -38,6 +40,38 @@ internal sealed class PrivateDesktopSpace : IDisposable
         finally { Native(LocalFree(descriptor) == IntPtr.Zero); }
     }
 
+    internal object ProbeRestrictedAccess(SafeAccessTokenHandle token)
+    {
+        // Observe the exact token against only these newly owned USER objects.
+        // The creator's namespace is restored before process creation; no DACL,
+        // privilege, interactive desktop or child-token property is changed.
+        bool stationOpened = false, desktopOpened = false;
+        int stationError = 0, desktopError = 0;
+        IntPtr original = GetProcessWindowStation(); Native(original != IntPtr.Zero);
+        try
+        {
+            Native(SetProcessWindowStation(station));
+            WindowsIdentity.RunImpersonated(token, () =>
+            {
+                IntPtr observedStation = OpenWindowStationW(Name.Split('\\')[0], false, 0x000F037F);
+                stationOpened = observedStation != IntPtr.Zero; stationError = stationOpened ? 0 : Marshal.GetLastWin32Error();
+                try
+                {
+                    IntPtr observedDesktop = OpenDesktopW("default", 0, false, 0x000F01FF);
+                    desktopOpened = observedDesktop != IntPtr.Zero; desktopError = desktopOpened ? 0 : Marshal.GetLastWin32Error();
+                    if (observedDesktop != IntPtr.Zero) Native(CloseDesktop(observedDesktop));
+                }
+                finally { if (observedStation != IntPtr.Zero) Native(CloseWindowStation(observedStation)); }
+            });
+        }
+        finally
+        {
+            Native(SetProcessWindowStation(original));
+            if (GetProcessWindowStation() != original) throw new InvalidOperationException("The original process window station was not restored.");
+        }
+        return new { schema = "switchyard-restricted-user-object-access/v1", stationOpened, stationError, desktopOpened, desktopError, handlesClosedVerified = true, namespaceRestoredVerified = true };
+    }
+
     public void Dispose()
     {
         int error = 0; bool failed = false;
@@ -51,6 +85,8 @@ internal sealed class PrivateDesktopSpace : IDisposable
     [DllImport("kernel32.dll", SetLastError = true)] private static extern IntPtr LocalFree(IntPtr memory);
     [DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = true)] private static extern IntPtr CreateWindowStationW(string name, uint flags, uint access, ref SecurityAttributes security);
     [DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = true)] private static extern IntPtr CreateDesktopW(string name, string? device, IntPtr mode, uint flags, uint access, ref SecurityAttributes security);
+    [DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = true)] private static extern IntPtr OpenWindowStationW(string name, [MarshalAs(UnmanagedType.Bool)] bool inherit, uint access);
+    [DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = true)] private static extern IntPtr OpenDesktopW(string name, uint flags, [MarshalAs(UnmanagedType.Bool)] bool inherit, uint access);
     [DllImport("user32.dll", SetLastError = true)] private static extern IntPtr GetProcessWindowStation();
     [DllImport("user32.dll", SetLastError = true)] [return: MarshalAs(UnmanagedType.Bool)] private static extern bool SetProcessWindowStation(IntPtr station);
     [DllImport("user32.dll", SetLastError = true)] [return: MarshalAs(UnmanagedType.Bool)] private static extern bool CloseWindowStation(IntPtr station);

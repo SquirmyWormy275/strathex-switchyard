@@ -39,7 +39,7 @@ server.on("upgrade", (request, socket) => {
     }
   });
 });
-server.listen(socketPath, () => { fs.chmodSync(socketPath, 0o600); fs.symlinkSync(socketPath, endpoint); fs.writeFileSync("started", String(process.pid)); });
+server.listen(socketPath, () => { fs.chmodSync(socketPath, 0o600); const publish = () => fs.symlinkSync(socketPath, endpoint); if (settings.aliasDelayMs) setTimeout(publish, settings.aliasDelayMs); else publish(); fs.writeFileSync("started", String(process.pid)); });
 fs.watchFile("account", { interval: 20 }, () => send({ method: "account/updated", params: { authMode: "chatgpt" } }));
 if (settings.spawnChild) {
   const code = "import os,time;os.setpgid(0,0);open(" + JSON.stringify(path.join(process.cwd(), "child.pid")) + ",'w').write(str(os.getpid()));time.sleep(600)";

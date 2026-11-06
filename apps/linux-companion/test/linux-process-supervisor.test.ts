@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { mkdtemp, readFile, realpath, rm } from "node:fs/promises";
+import { chmod, copyFile, mkdtemp, readFile, realpath, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -9,14 +9,22 @@ import { ProtectedJsonStore } from "../../../packages/control-plane/src/store.ts
 import { FakeUserSecretProtector, SecretProtectorJournalAuthenticator } from "../../windows-companion/src/windows-secret.ts";
 import { LinuxProcessGroupSupervisor } from "../src/linux-process-supervisor.ts";
 
+async function ownedExecutable(root: string) {
+  // Exercise the user-owned executable pin/cache without three 122 MB Node copies.
+  const selected = join(root, "fixture-sleep"); await copyFile("/usr/bin/sleep", selected); await chmod(selected, 0o700);
+  const executable = await realpath(selected), executableSha256 = createHash("sha256").update(await readFile(executable)).digest("hex");
+  return { executable, executableSha256 };
+}
+
 test("Linux process supervisor binds, observes, and terminates an exact process group", { skip: process.platform !== "linux", timeout: 15_000 }, async (context) => {
   const root = await mkdtemp(join(tmpdir(), "sxsy-linux-process-")); context.after(async () => rm(root, { recursive: true, force: true }));
-  const executable = await realpath(process.execPath); const executableSha256 = createHash("sha256").update(await readFile(executable)).digest("hex");
+  const { executable, executableSha256 } = await ownedExecutable(root);
   const store = new ProtectedJsonStore({ filePath: join(root, "audit.jsonl"), authenticator: new SecretProtectorJournalAuthenticator(new FakeUserSecretProtector()), requireAuthenticatedProtection: true });
   const supervisor = new LinuxProcessGroupSupervisor(store);
-  const request = { action: "run_target" as const, operationId: "linux-process-op", targetSnapshotId: "a".repeat(64), repositoryRoot: root, manifestSha256: "b".repeat(64), executable, executableSha256, args: ["-e", "process.stdout.write('ready');setInterval(()=>{},1000)"], cwd: root, environment: { PATH: "/usr/bin:/bin" }, lifecycle: "managed" as const, timeoutMs: 60_000, maxOutputBytes: 4096 };
+  const request = { action: "run_target" as const, operationId: "linux-process-op", targetSnapshotId: "a".repeat(64), repositoryRoot: root, manifestSha256: "b".repeat(64), executable, executableSha256, args: ["60"], cwd: root, environment: { PATH: "/usr/bin:/bin" }, lifecycle: "managed" as const, timeoutMs: 60_000, maxOutputBytes: 4096 };
   const processHandle = await supervisor.start(request);
   context.after(async () => { if (await processHandle.isAlive()) await processHandle.terminateTree(1_000, 1_000); await processHandle.wait().catch(() => undefined); });
+  assert.equal(createHash("sha256").update(await readFile(join(root, "verified-executables", executableSha256))).digest("hex"), executableSha256);
   assert.equal(await processHandle.isAlive(), true);
   const active = await supervisor.observeOperation({ action: request.action, operationId: request.operationId, targetSnapshotId: request.targetSnapshotId, repositoryRoot: root, manifestSha256: request.manifestSha256 });
   assert.equal(active.state, "active");
@@ -28,12 +36,12 @@ test("Linux process supervisor binds, observes, and terminates an exact process 
 
 test("Linux process supervisor reserves one operation before concurrent launch", { skip: process.platform !== "linux", timeout: 15_000 }, async (context) => {
   const root = await mkdtemp(join(tmpdir(), "sxsy-linux-process-race-")); context.after(async () => rm(root, { recursive: true, force: true }));
-  const executable = await realpath(process.execPath); const executableSha256 = createHash("sha256").update(await readFile(executable)).digest("hex");
+  const { executable, executableSha256 } = await ownedExecutable(root);
   const store = new ProtectedJsonStore({ filePath: join(root, "audit.jsonl"), authenticator: new SecretProtectorJournalAuthenticator(new FakeUserSecretProtector()), requireAuthenticatedProtection: true });
   const supervisor = new LinuxProcessGroupSupervisor(store);
   // This case proves reservation atomicity, not forced termination. Keep the
   // fixture intrinsically bounded so a failed cleanup can never strand CI.
-  const request = { action: "run_target" as const, operationId: "linux-process-race", targetSnapshotId: "c".repeat(64), repositoryRoot: root, manifestSha256: "d".repeat(64), executable, executableSha256, args: ["-e", "setTimeout(()=>process.exit(0),1000)"], cwd: root, environment: { PATH: "/usr/bin:/bin" }, lifecycle: "managed" as const, timeoutMs: 5_000, maxOutputBytes: 4096 };
+  const request = { action: "run_target" as const, operationId: "linux-process-race", targetSnapshotId: "c".repeat(64), repositoryRoot: root, manifestSha256: "d".repeat(64), executable, executableSha256, args: ["1"], cwd: root, environment: { PATH: "/usr/bin:/bin" }, lifecycle: "managed" as const, timeoutMs: 5_000, maxOutputBytes: 4096 };
   const attempts = await Promise.allSettled([supervisor.start(request), supervisor.start(request)]);
   const started = attempts.filter((attempt): attempt is PromiseFulfilledResult<Awaited<ReturnType<typeof supervisor.start>>> => attempt.status === "fulfilled");
   context.after(async () => { for (const attempt of started) { if (await attempt.value.isAlive()) await attempt.value.terminateTree(1_000, 1_000); await attempt.value.wait().catch(() => undefined); } });
@@ -45,10 +53,10 @@ test("Linux process supervisor reserves one operation before concurrent launch",
 
 test("Linux process supervisor persists and enforces the operation deadline", { skip: process.platform !== "linux", timeout: 15_000 }, async (context) => {
   const root = await mkdtemp(join(tmpdir(), "sxsy-linux-process-deadline-")); context.after(async () => rm(root, { recursive: true, force: true }));
-  const executable = await realpath(process.execPath); const executableSha256 = createHash("sha256").update(await readFile(executable)).digest("hex");
+  const { executable, executableSha256 } = await ownedExecutable(root);
   const store = new ProtectedJsonStore({ filePath: join(root, "audit.jsonl"), authenticator: new SecretProtectorJournalAuthenticator(new FakeUserSecretProtector()), requireAuthenticatedProtection: true });
   const supervisor = new LinuxProcessGroupSupervisor(store);
-  const request = { action: "run_target" as const, operationId: "linux-process-deadline", targetSnapshotId: "e".repeat(64), repositoryRoot: root, manifestSha256: "f".repeat(64), executable, executableSha256, args: ["-e", "setInterval(()=>{},1000)"], cwd: root, environment: { PATH: "/usr/bin:/bin" }, lifecycle: "managed" as const, timeoutMs: 250, maxOutputBytes: 4096 };
+  const request = { action: "run_target" as const, operationId: "linux-process-deadline", targetSnapshotId: "e".repeat(64), repositoryRoot: root, manifestSha256: "f".repeat(64), executable, executableSha256, args: ["60"], cwd: root, environment: { PATH: "/usr/bin:/bin" }, lifecycle: "managed" as const, timeoutMs: 250, maxOutputBytes: 4096 };
   const processHandle = await supervisor.start(request);
   context.after(async () => { if (await processHandle.isAlive()) await processHandle.terminateTree(1_000, 1_000); await processHandle.wait().catch(() => undefined); });
   const terminal = await processHandle.wait();

@@ -10,6 +10,25 @@ groups, 1,471 passed tests and ten declared skips. Every child/process-tree exit
 and owned fixture/dependency-alias/worktree removal verifies. Later source changes
 have separate focused evidence. [Exact complete checkpoint](evidence/linux-d412-complete-summary.json).
 
+The newer complete Linux `5fe6e95` run remains failed: 239/241 groups,
+1,495 passed tests, four failures and ten declared skips. Exact child/process-tree
+and owned checkout cleanup verifies. The listener socket/alias readiness race now
+has a bounded correction and deterministic regression; supervisor fixtures keep
+the same real process/cache checks using a small owned executable after Node
+copies hit the local quota. Four related files/25 tests, typecheck and three
+actual native Codex metadata/retirement checks pass. A fresh complete run is still
+required. [Exact failed run and correction](evidence/linux-startup-windows-user-object-summary.json).
+
+Native Windows `ec3afe7` scanner registry passes all twenty tests with a
+digest-verified receipt and cleanup. Its separate Shield job still hits the
+unchanged lock-worker startup deadline before a progress label. The restricted
+child also still fails DLL initialization. A test-only probe now observes the
+same restricted token against only its owned private USER objects and requires
+handle closure and restoration before the original child launch. Both managed
+targets compile with zero warnings/errors; 1,776 portable checks pass. Native
+probe execution and both software repairs remain pending.
+[Source and separate native outcomes](evidence/linux-startup-windows-user-object-summary.json).
+
 Native Windows `4911642` passes thirty filesystem checks and both six-check
 service/setup lifecycles, including thirteen restricted metadata checks in each.
 The later `842416e` run identifies the intermittent removal failure as a disabled
@@ -61,7 +80,8 @@ policy output cohort separately fails one lock-worker startup before any progres
 label; its original 15-second deadline and failed result are retained. Scanner
 fixture directories now also validate DOS aliases by exact filesystem identity,
 including unchanged parent identity and link rejection. Four local files/39 tests
-and the final registry file/20 tests pass; native alias followup is pending.
+and the final registry file/20 tests pass; native registry followup now passes
+all twenty cases at `ec3afe7`, with the available DOS spelling reported.
 [Exact source and separate native outcomes](evidence/windows-fixture-alias-followup-summary.json).
 
 Windows keyless workers pass both complete native lease files at `0740791`:

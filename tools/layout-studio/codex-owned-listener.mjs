@@ -118,7 +118,14 @@ export async function openOwnedCodexListener({ executable, cwd, serverNames = []
     });
     child.stdin.write(JSON.stringify({ schema: "switchyard-runtime-command/v1", id: requestId, executable, executableSha256, cwd, endpoint, serverNames }) + "\n");
     await waitFor(() => { current(); if (workerClosed) throw Error("The owned listener exited during startup."); return native; }, 15000, () => closed);
-    await waitFor(async () => { current(); if (workerClosed) throw Error("The owned listener exited before its private socket."); try { return (await lstat(socketPath)).isSocket(); } catch (error) { if (error.code === "ENOENT") return false; throw error; } }, 15000, () => closed);
+    await waitFor(async () => {
+      current(); if (workerClosed) throw Error("The owned listener exited before its private socket and alias.");
+      try {
+        require((await lstat(socketPath)).isSocket());
+        require((await lstat(endpoint)).isSymbolicLink() && await readlink(endpoint) === socketPath);
+        return true;
+      } catch (error) { if (error.code === "ENOENT") return false; throw error; }
+    }, 15000, () => closed);
     socketIdentity = await identity(socketPath); socketParent = await identity(dirname(socketPath)); require(socketIdentity.uid === uid && !(socketIdentity.mode & 0o077) && socketParent.uid === uid && !(socketParent.mode & 0o077));
     require((await lstat(endpoint)).isSymbolicLink() && await readlink(endpoint) === socketPath); aliasIdentity = await identity(endpoint); require(aliasIdentity.uid === uid);
     const p = await processInfo(native.pid); require(p && p.uid === uid && p.birth === native.birth && p.group === guardian.guardianPid && p.session === guardian.guardianPid && await realpath(`/proc/${p.pid}/exe`) === executable);

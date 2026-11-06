@@ -36,6 +36,12 @@ test("fresh admission and a committed guardian callback precede every native sta
   const owner = await f.open({ authorize: async () => { admissions++; }, onReady: async scope => { assert.equal(scope.containment, "owned-linux-session"); assert.equal(await absent(join(f.root, "started")), true); committed = true; } });
   assert.equal(committed, true); assert.ok(admissions >= 4); assert.equal(await absent(join(f.root, "started")), false); await owner.connect(); assert.ok(admissions >= 6);
 });
+test("a listening socket is not ready until its exact delayed alias has been published", native, async t => {
+  const f = await fixture(t, { aliasDelayMs: 150 }), owner = await f.open();
+  assert.equal((await lstat(owner.privateOwnership.endpoint)).isSymbolicLink(), true);
+  await owner.connect(); assert.ok(owner.binding); assert.equal((await owner.stop()).stopped, true);
+  assert.equal(await runtimeGuardianStopped(owner.scope), true); assert.equal(await absent(owner.privateOwnership.root), true);
+});
 test("stopping while the startup acknowledgement is pending prevents the provider effect and still independently retires its guardian", native, async t => {
   const f = await fixture(t); let entered, release; const ready = new Promise(resolve => { entered = resolve; }), held = new Promise(resolve => { release = resolve; });
   const pending = f.open({ onReady: async () => { entered(); await held; } }).catch(error => error); await ready; const owner = f.owners[0], scope = owner.scope;
