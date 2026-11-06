@@ -73,6 +73,15 @@ the 27-check update; native Windows, live installed revocation and frontend
 acceptance remain separate. [Contract](custom-agent-revocation.md),
 [evidence](evidence/custom-agent-revocation-source-summary.json).
 
+Uncertain claims from retired custom-agent sessions now have a separate one-use
+review path. Reviewed records remain explicitly unverified, become eligible for
+the existing bounded history retention and never resend provider commands. Five
+new recovery cases pass within eight groups/91 checks, including authenticated
+HTTP, late-ack races, rollback and capacity preservation. Installed recovery and
+native Windows acceptance remain separate.
+[Contract](custom-agent-revocation.md#review-an-uncertain-claim),
+[evidence](evidence/custom-agent-outcome-source-summary.json).
+
 | Capability | Implemented behavior and reference |
 | --- | --- |
 | Protected workspaces | Compartment-scoped encrypted state, fresh policy checks, bounded OS locks, exact approvals and durable replay refusal. [State locks](private-state-locking.md), [receipt authority](receipt-authority-commit.md). |

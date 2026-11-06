@@ -61,3 +61,39 @@ inside its 27-check metadata update, with six exact tested module hashes and all
 Live installed revocation, native Windows execution and frontend controls remain
 separate; the frontend is still frozen. This is authorization retirement, not
 deletion of unresolved history.
+
+## Review an uncertain claim
+
+When a session is replaced or its authorization revoked, a previously claimed
+command remains `uncertain-session-ended`. It cannot be retried automatically
+or acknowledged by a replacement credential. To record a deliberate review:
+
+1. `POST /api/suite/agents/outcome/review` with the exact `agentId` and `commandId`.
+   The response contains its original intent, session, timing and retained handoff
+   text, plus a one-use confirmation. Only uncertain claims from retired sessions
+   are eligible; queued, active and acknowledged commands refuse.
+2. `POST /api/suite/agents/outcome/resolve` with those IDs and the returned token.
+   The saved status becomes `reviewed-unconfirmed`, with an explicit review time
+   and `externalOutcomeVerified: false`. No provider command is sent.
+
+This acknowledgement of uncertainty does not declare completion, failure or
+cancellation. A reviewed record becomes eligible for the existing 64-command
+history retention when a later, separately requested command needs capacity.
+Other unresolved records remain intact. The review explicitly describes this
+retention consequence; no replacement action is automatically queued.
+
+The token binds the exact command contents and current enrollment/policy. A late
+authenticated acknowledgement before consumption or before final persistence wins
+over stale review. Reenrollment, expiry, wrong-scope tokens and replay refuse. A
+failed state write preserves the original claim and observation events and requires
+a fresh review. If recording is explicitly enabled for agent events, a fixed
+`adapter-command-outcome-reviewed` event records local provenance and `unknown`
+status without raw command identity or handoff text.
+
+Five new recovery cases and the existing integration/package contracts pass
+in eight groups/91 checks, including actual owner-authenticated HTTP, both late-ack
+races, failed persistence and the full history limit. The first test attempt had
+two incomplete synthetic recording timestamps; those fixtures were corrected
+without changing retention rules or deadlines. Typecheck, complete package bounds
+and exact owned cleanup pass. Installed recovery and native Windows acceptance
+remain separate. [Recovery evidence](evidence/custom-agent-outcome-source-summary.json).

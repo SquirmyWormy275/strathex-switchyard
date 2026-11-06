@@ -22,6 +22,12 @@ export function createCustomAgents({ store, now = () => Date.now() }) {
       appendAgentObservation(state, { provider: "custom-agent", subjectId: command.id, phase: "adapter-command-retired", status: command.status === "cancelled-before-claim" ? "stopped" : "unknown", intent: command.intent, at: now() });
     }
   }
+  function outcomeScope(state, agentId, commandId) {
+    const a = state.agents.find(a => a.id === agentId), command = a?.commands.find(c => c.id === commandId);
+    if (!command || command.status !== "uncertain-session-ended") throw Error("Choose an exact uncertain claim from a retired agent session. Active or acknowledged commands cannot be cleared by this review.");
+    return { command, confirmation: { action: "review_custom_agent_outcome", targetSnapshotId: scopeHash([state.id, agentId, commandId]),
+      scopeDigest: scopeHash([state.policy, state.mode, epoch(a), a.enrollmentStatus ?? "active", a.sessionId, command]) } };
+  }
   async function authenticate(path, body, signature, raw) {
     const fields = { [agentRoutes.event]: ["event"], [agentRoutes.poll]: [], [agentRoutes.ack]: ["commandId", "outcome"] }[path];
     const expectedFields = ["schema", "compartment", "agentId", "sessionId", "sequence", "at", ...(fields ?? [])].sort();
@@ -68,6 +74,27 @@ export function createCustomAgents({ store, now = () => Date.now() }) {
         Object.assign(current.a, { enrollmentStatus: "revoked", revokedAt: now(), sessionId: null, lastSeen: null, reportedStatus: "unknown" });
         s.roleBindings = (s.roleBindings ?? []).filter(b => b.provider !== "custom-agent" || b.targetId !== agentId);
         return { status: "revoked", agentId, externalProcessStopped: false, storedHistoryPreserved: true };
+      }, { provider: "custom-agent" });
+    },
+    async reviewOutcome(compartment, { agentId, commandId }) {
+      await store.authorize(compartment, { provider: "custom-agent" });
+      const scope = outcomeScope(await store.snapshot(compartment), agentId, commandId);
+      const confirmation = await suiteConfirmations(store, compartment, "custom-agent", now).issue({ ...scope.confirmation,
+        reason: "Acknowledge reviewing this exact uncertain claim from a retired session. Its external outcome remains unverified. It will not be retried or cancelled, and its reviewed record becomes eligible for the existing bounded command-history retention.", reauthenticated: false });
+      const { id, intent, sessionId, createdAt, claimedAt, content } = scope.command;
+      return { status: "requires-confirmation", confirmation, agentId, command: { id, intent, sessionId, createdAt, claimedAt, content: content ?? null }, externalOutcomeVerified: false, commandWillBeRetried: false };
+    },
+    async resolveOutcome(compartment, { agentId, commandId, token }) {
+      await store.authorize(compartment, { provider: "custom-agent" });
+      const scope = outcomeScope(await store.snapshot(compartment), agentId, commandId);
+      const decision = await suiteConfirmations(store, compartment, "custom-agent", now).consume({ ...scope.confirmation, token });
+      if (!decision.allowed) throw Error(decision.reason);
+      return store.update(compartment, "agent-outcome-review", s => {
+        const current = outcomeScope(s, agentId, commandId);
+        if (current.confirmation.scopeDigest !== scope.confirmation.scopeDigest) throw Error("The exact claim or agent enrollment changed. Review that outcome again.");
+        Object.assign(current.command, { status: "reviewed-unconfirmed", outcomeReviewedAt: now(), externalOutcomeVerified: false, provenance: "operator reviewed uncertainty; external task outcome unverified; never automatically re-delivered" });
+        appendAgentObservation(s, { provider: "custom-agent", subjectId: commandId, phase: "adapter-command-outcome-reviewed", status: "unknown", intent: current.command.intent, at: now() });
+        return { status: "reviewed-unconfirmed", commandId, externalOutcomeVerified: false, taskCompletionVerified: false, providerCommandSent: false };
       }, { provider: "custom-agent" });
     },
     async message(path, body, signature, raw = JSON.stringify(body)) {

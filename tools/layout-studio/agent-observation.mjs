@@ -8,7 +8,8 @@ const phases = new Set(["request-reserved", "identity-bound", "outcome-unconfirm
 const statuses = new Set(["active", "idle", "waiting-on-approval", "not-observed", "unreachable", "unknown", "waiting-for-input", "running", "stopped", "done", "error", "failed", "ready", "busy", "waiting", "blocked", "reserved-locally", "provider-turn-finished"]);
 const commandPhases = new Map([
   ["adapter-command-queued", ["reserved-locally"]], ["adapter-command-claimed", ["running"]],
-  ["adapter-command-acknowledged", ["done", "failed", "stopped"]], ["adapter-command-retired", ["stopped", "unknown"]]
+  ["adapter-command-acknowledged", ["done", "failed", "stopped"]], ["adapter-command-retired", ["stopped", "unknown"]],
+  ["adapter-command-outcome-reviewed", ["unknown"]]
 ]);
 
 export function appendAgentObservation(state, { provider, subjectId, phase, status, intent, at }) {

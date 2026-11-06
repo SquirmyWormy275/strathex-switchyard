@@ -11,7 +11,7 @@ const event = changes => ({ provider: "codex", subjectId: "private-native-subjec
 const commandEvent = changes => event({ provider: "custom-agent", subjectId: "private-command", phase: "adapter-command-queued", status: "reserved-locally", intent: "handoff", ...changes });
 
 test("custom command history separates local bookkeeping from agent acknowledgements and keeps one private correlation", () => {
-  const s = state(), phases = [["queued", "reserved-locally"], ["claimed", "running"], ["retired", "unknown"], ["acknowledged", "done"]];
+  const s = state(), phases = [["queued", "reserved-locally"], ["claimed", "running"], ["retired", "unknown"], ["acknowledged", "done"], ["outcome-reviewed", "unknown"]];
   for (const [index, [phase, status]] of phases.entries()) {
     const e = commandEvent({ phase: `adapter-command-${phase}`, status, at: 20 + index, content: "NEVER_RETAIN", token: "NEVER_RETAIN", sessionId: "NEVER_RETAIN" });
     assert.equal(appendAgentObservation(s, e), 1); assert.equal(appendAgentObservation(s, { ...e, at: e.at + 1 }), 0);
@@ -19,7 +19,7 @@ test("custom command history separates local bookkeeping from agent acknowledgem
   const rows = s.observations[0].events;
   assert.equal(new Set(rows.map(e => e.subjectDigest)).size, 1);
   assert.equal(rows.every(e => e.intent === "handoff" && e.kind === "status" && e.taskCompletionVerified === false && e.timeSavingMeasured === false), true);
-  assert.deepEqual(rows.map(e => e.provenance), ["switchyard-local-lifecycle", "switchyard-local-lifecycle", "switchyard-local-lifecycle", "authenticated-agent-self-report"]);
+  assert.deepEqual(rows.map(e => e.provenance), ["switchyard-local-lifecycle", "switchyard-local-lifecycle", "switchyard-local-lifecycle", "authenticated-agent-self-report", "switchyard-local-lifecycle"]);
   assert.equal(JSON.stringify(rows).includes("NEVER_RETAIN"), false); assert.equal(JSON.stringify(rows).includes("private-command"), false);
   const other = state({ id: "other" }); appendAgentObservation(other, commandEvent()); assert.notEqual(other.observations[0].events[0].subjectDigest, rows[0].subjectDigest);
   const status = state(); appendAgentObservation(status, commandEvent({ phase: "adapter-status-observed", status: "ready" }));
@@ -31,10 +31,11 @@ test("custom command phases refuse unsupported providers, intents and outcome co
     const s = state(); assert.equal(appendAgentObservation(s, commandEvent(change)), 0); assert.equal(s.observations[0].events.length, 0);
   }
   for (const status of ["done", "failed", "stopped"]) assert.equal(appendAgentObservation(state(), commandEvent({ phase: "adapter-command-acknowledged", status })), 1);
+  for (const status of ["done", "failed", "stopped", "running"]) assert.equal(appendAgentObservation(state(), commandEvent({ phase: "adapter-command-outcome-reviewed", status })), 0);
 });
 
 test("every custom command phase respects source, policy, pause, exclusion, interval and capacity fences", () => {
-  for (const [phase, status] of [["queued", "reserved-locally"], ["claimed", "running"], ["retired", "stopped"], ["acknowledged", "failed"]]) {
+  for (const [phase, status] of [["queued", "reserved-locally"], ["claimed", "running"], ["retired", "stopped"], ["acknowledged", "failed"], ["outcome-reviewed", "unknown"]]) {
     const e = commandEvent({ phase: `adapter-command-${phase}`, status });
     for (const s of [state({ mode: "keyboard-only" }), state({ policy: "work", mode: "managed-companion" }), ...[{ sources: ["deliberate"] }, { status: "paused" }, { status: "stopped" }, { exclusions: ["other"] }, { createdAt: 21 }, { createdAt: 0, recordingSince: 21 }].map(change => state({ observations: [session(change)] }))]) {
       const before = structuredClone(s); assert.equal(appendAgentObservation(s, e), 0); assert.deepEqual(s, before);

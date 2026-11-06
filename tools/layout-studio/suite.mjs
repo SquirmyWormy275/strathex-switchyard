@@ -385,6 +385,10 @@ export function createSuite({ store = createSuiteStore(), platform = process.pla
       if (path === "/api/suite/coding/claude/turns/outcome/resolve") return claudeSubmissions.resolveOutcome(compartment, body);
       if (path === "/api/suite/coding/claude/turns/delete") return claudeSubmissions.remove(compartment, body.id);
       if (path === "/api/suite/agents/enroll") return custom.enroll(compartment, body);
+      if (path === "/api/suite/agents/outcome/review" || path === "/api/suite/agents/outcome/resolve") {
+        if (Object.keys(body).some(k => !["compartment", "agentId", "commandId", "token", "workspaceBaseUrl"].includes(k))) throw Error("Agent outcome review accepts only its exact agent, command and review token.");
+        return path.endsWith("/review") ? custom.reviewOutcome(compartment, body) : custom.resolveOutcome(compartment, body);
+      }
       if (path === "/api/suite/agents/revoke/review" || path === "/api/suite/agents/revoke") {
         if (Object.keys(body).some(k => !["compartment", "agentId", "token", "workspaceBaseUrl"].includes(k))) throw Error("Agent revocation accepts only its exact identity and review token.");
         if (path.endsWith("/review")) return custom.reviewRevoke(compartment, body.agentId);

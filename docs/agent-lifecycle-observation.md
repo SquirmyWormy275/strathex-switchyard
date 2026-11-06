@@ -188,3 +188,10 @@ within a 26-check metadata update. The exact tested module hashes verify. All
 53 sealed files remain byte-identical, and the prepared bundle is removed.
 No live recording, command, provider or model request is started by these checks.
 [Installed evidence](evidence/installed-command-observation-summary.json).
+
+Reviewed uncertainty for a retired custom-agent claim now records the fixed
+`adapter-command-outcome-reviewed` phase with `unknown` status and local lifecycle
+provenance. It shares the original explicit agent-event consent, exclusion,
+pause/interval, privacy and capacity fences. It neither verifies an external
+outcome nor resends work. [Recovery contract](custom-agent-revocation.md#review-an-uncertain-claim),
+[source evidence](evidence/custom-agent-outcome-source-summary.json).

@@ -3,8 +3,12 @@ import assert from "node:assert/strict";
 import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { randomUUID } from "node:crypto";
+import { once } from "node:events";
 import { createSuiteStore } from "./suite-store.mjs";
 import { createCustomAgents } from "./custom-agents.mjs";
+import { createSuite } from "./suite.mjs";
+import { createStudioServer } from "./serve.mjs";
 import { agentRoutes, agentMessageSchema, requestMac } from "../../integrations/agent-protocol.mjs";
 
 async function fixture(fn) {
@@ -128,4 +132,83 @@ test("agent revocation and replacement keep work policy and keyboard-only mode f
   await store.update("personal", "synthetic-keyboard", s => { s.mode = "keyboard-only"; });
   await assert.rejects(bridge.reviewRevoke("personal", "test"), /Keyboard-only/);
   await assert.rejects(enroll(), /Keyboard-only/);
+}));
+
+async function uncertainClaim({ bridge, enroll, message }, intent = "review") {
+  const enrollment = await enroll(); await message(enrollment.token, 1);
+  const claim = await bridge.dispatch("personal", { agentId: "test", sessionId: "same-session", intent, content: "PRIVATE_REVIEWED_HANDOFF" });
+  await assert.rejects(bridge.reviewOutcome("personal", { agentId: "test", commandId: claim.commandId }), /uncertain claim/);
+  await message(enrollment.token, 2, agentRoutes.poll, {});
+  await assert.rejects(bridge.reviewOutcome("personal", { agentId: "test", commandId: claim.commandId }), /uncertain claim/);
+  await message(enrollment.token, 3, agentRoutes.event, { event: { status: "ready" } }, "replacement-session");
+  return { enrollment, claim, input: { agentId: "test", commandId: claim.commandId } };
+}
+
+test("reviewing an uncertain retired claim records only local uncertainty and never retries or verifies external work", () => fixture(async f => {
+  await f.store.update("personal", "synthetic-recording", s => { s.observations = [{ id: "recording", status: "recording", sources: ["agent-events"], exclusions: [], createdAt: 100000, updatedAt: 100000, events: [] }]; });
+  const { enrollment, input } = await uncertainClaim(f, "handoff");
+  const review = await f.bridge.reviewOutcome("personal", input); assert.equal(review.command.content, "PRIVATE_REVIEWED_HANDOFF"); assert.equal(review.commandWillBeRetried, false);
+  const result = await f.bridge.resolveOutcome("personal", { ...input, token: review.confirmation.token });
+  assert.deepEqual([result.status, result.externalOutcomeVerified, result.taskCompletionVerified, result.providerCommandSent], ["reviewed-unconfirmed", false, false, false]);
+  await assert.rejects(f.message(enrollment.token, 4, agentRoutes.ack, { commandId: input.commandId, outcome: "completed" }), /active claim/);
+  assert.equal((await f.message(enrollment.token, 4, agentRoutes.poll, {}, "replacement-session")).payload.result.command, null);
+  const state = await f.store.snapshot("personal"), rows = state.observations[0].events.filter(e => e.phase === "adapter-command-outcome-reviewed");
+  assert.equal(rows.length, 1); assert.equal(rows[0].status, "unknown"); assert.equal(rows[0].provenance, "switchyard-local-lifecycle"); assert.equal(rows[0].taskCompletionVerified, false);
+  for (const value of [input.commandId, "PRIVATE_REVIEWED_HANDOFF", enrollment.token, review.confirmation.token]) assert.equal(JSON.stringify(rows).includes(value), false);
+  await assert.rejects(f.bridge.resolveOutcome("personal", { ...input, token: review.confirmation.token }), /uncertain claim/);
+}));
+
+test("a late authenticated acknowledgement wins both before and after an uncertain-outcome token is consumed", async () => {
+  for (const afterConsume of [false, true]) await fixture(async f => {
+    const { enrollment, input } = await uncertainClaim(f), review = await f.bridge.reviewOutcome("personal", input);
+    const acknowledge = () => f.message(enrollment.token, 4, agentRoutes.ack, { commandId: input.commandId, outcome: "completed" });
+    const update = f.store.update.bind(f.store);
+    if (afterConsume) f.store.update = async (id, op, fn, scope) => { if (op === "agent-outcome-review") await acknowledge(); return update(id, op, fn, scope); };
+    else await acknowledge();
+    try { await assert.rejects(f.bridge.resolveOutcome("personal", { ...input, token: review.confirmation.token }), /uncertain claim/); }
+    finally { f.store.update = update; }
+    const command = (await f.store.snapshot("personal")).agents[0].commands[0]; assert.equal(command.status, "completed"); assert.equal(command.outcomeReviewedAt, undefined);
+  });
+});
+
+test("uncertain-outcome reviews reject replacement, expiry and failed persistence without changing the original claim", () => fixture(async f => {
+  await f.store.update("personal", "synthetic-recording", s => { s.observations = [{ id: "recording", status: "recording", sources: ["agent-events"], exclusions: [], createdAt: 100000, updatedAt: 100000, events: [] }]; });
+  const { input } = await uncertainClaim(f), original = await f.bridge.reviewOutcome("personal", input);
+  await f.revoke(); await f.enroll();
+  await assert.rejects(f.bridge.resolveOutcome("personal", { ...input, token: original.confirmation.token }), /scope|match/i);
+  const expired = await f.bridge.reviewOutcome("personal", input); f.advance(300001);
+  await assert.rejects(f.bridge.resolveOutcome("personal", { ...input, token: expired.confirmation.token }), /expir|unavailable|unknown/i);
+  const review = await f.bridge.reviewOutcome("personal", input), update = f.store.update.bind(f.store), events = (await f.store.snapshot("personal")).observations[0].events;
+  f.store.update = (id, op, fn, scope) => update(id, op, async s => { const r = await fn(s); if (op === "agent-outcome-review") throw Error("synthetic outcome save failure"); return r; }, scope);
+  try { await assert.rejects(f.bridge.resolveOutcome("personal", { ...input, token: review.confirmation.token }), /save failure/); } finally { f.store.update = update; }
+  assert.equal((await f.store.snapshot("personal")).agents[0].commands[0].status, "uncertain-session-ended");
+  assert.deepEqual((await f.store.snapshot("personal")).observations[0].events, events);
+  await assert.rejects(f.bridge.resolveOutcome("personal", { ...input, token: review.confirmation.token }), /consum/i);
+  await f.store.update("personal", "synthetic-keyboard-only", s => { s.mode = "keyboard-only"; });
+  await assert.rejects(f.bridge.reviewOutcome("personal", input), /Keyboard-only/);
+}));
+
+test("only an explicitly reviewed uncertain record becomes eligible for the original bounded command history", () => fixture(async f => {
+  const { input } = await uncertainClaim(f);
+  await f.store.update("personal", "synthetic-full-history", s => { const a = s.agents[0]; a.commands = [a.commands[0], ...Array.from({ length: 63 }, () => ({ ...a.commands[0], id: randomUUID() }))]; });
+  const original = (await f.store.snapshot("personal")).agents[0].commands.slice(1);
+  const request = { agentId: "test", sessionId: "replacement-session", intent: "status" };
+  await assert.rejects(f.bridge.dispatch("personal", request), /Unresolved agent command limit/);
+  const review = await f.bridge.reviewOutcome("personal", input); await f.bridge.resolveOutcome("personal", { ...input, token: review.confirmation.token });
+  const next = await f.bridge.dispatch("personal", request), after = (await f.store.snapshot("personal")).agents[0].commands;
+  assert.equal(after.length, 64); assert.deepEqual(after.slice(0, -1), original); assert.equal(after.at(-1).id, next.commandId); assert.equal(after.at(-1).status, "queued");
+}));
+
+test("uncertain agent outcome routes require owner authentication, exact fields and their own review token", () => fixture(async f => {
+  const suite = createSuite({ store: f.store, agents: { discovery: async () => [], close() {} }, voice: { discovery: async () => ({ available: false }) } }), server = createStudioServer({ suite, bridge: { close() {} } });
+  try {
+    await suite.handle("/api/suite/bootstrap"); const { input } = await uncertainClaim(f);
+    server.listen(0, "127.0.0.1"); await once(server, "listening"); const origin = `http://127.0.0.1:${server.address().port}`;
+    const api = async (action, body, authorized = true) => { const response = await fetch(origin + "/api/suite/agents/outcome/" + action, { method: "POST", headers: { Origin: origin, "Content-Type": "application/json", ...(authorized ? { Authorization: `Bearer ${server.accessToken}` } : {}) }, body: JSON.stringify(body) }); return { status: response.status, body: await response.json() }; };
+    assert.equal((await api("review", input, false)).status, 401); assert.equal((await api("review", { ...input, outcome: "completed" })).status, 409);
+    const review = await api("review", input); assert.equal(review.status, 200);
+    const other = await f.bridge.reviewRevoke("personal", "test"); assert.equal((await api("resolve", { ...input, token: other.confirmation.token })).status, 409);
+    const resolved = await api("resolve", { ...input, token: review.body.confirmation.token }); assert.equal(resolved.status, 200); assert.equal(resolved.body.status, "reviewed-unconfirmed"); assert.equal(resolved.body.providerCommandSent, false);
+    assert.equal((await api("resolve", { ...input, token: review.body.confirmation.token })).status, 409);
+  } finally { await suite.close(); server.closeAllConnections(); if (server.listening) await new Promise(resolve => server.close(resolve)); await server.cleanup(); }
 }));

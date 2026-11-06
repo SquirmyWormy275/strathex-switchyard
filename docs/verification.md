@@ -1289,3 +1289,22 @@ cleanup preflight rejected the owned `.tools` symlink because Git's directory-on
 ignore rule reported it as untracked; no deletion occurred. The corrected preflight
 accepts only aliases with independently verified original identity and target.
 [Complete receipt](evidence/linux-8786f83-complete-summary.json).
+
+## Reviewed custom-agent uncertainty — 2026-11-06
+
+Exact retired-session claims can now receive one-use operator review, preserving
+`reviewed-unconfirmed` status without sending a provider command or asserting an
+external outcome. The complete claim and current enrollment/policy bind the
+review. Late authenticated acknowledgements win both before consumption and
+before final persistence; failed writes preserve claims and observations. Only
+reviewed records can make space under the original bounded history limit.
+
+Eight groups pass 91 tests without skips, including five new recovery cases,
+owner-authenticated HTTP, scope/expiry/replay refusal, retained privacy/recording
+fences and all existing lifecycle cases. Typecheck, the complete 5 MiB package
+budget and child/tree/owned-root cleanup pass. The first attempt failed two
+synthetic recording cases because their `updatedAt` fields were missing; the
+fixtures were corrected without relaxing production retention or test bounds.
+No live installed command, credential or account is changed. Native Windows and
+installed recovery acceptance remain separate.
+[Source receipt](evidence/custom-agent-outcome-source-summary.json).

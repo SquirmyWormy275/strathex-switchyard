@@ -31,6 +31,13 @@ evidence, not instructions to reset. Publish regular commits. Do not merge or re
 
 ## Current implementation and evidence
 
+Custom-agent uncertain claims now support separately reviewed local recovery.
+Five new cases pass within eight groups/91 checks: original uncertainty is retained,
+no command is retried, late authenticated acknowledgements win and only deliberately
+reviewed records become eligible for bounded history retention. Source HTTP,
+privacy, rollback, typecheck/package bounds and owned cleanup pass. Installed
+recovery and native Windows remain separate. [Contract](custom-agent-revocation.md#review-an-uncertain-claim).
+
 The custom-agent backend now supports reviewed revocation, credential replacement
 and enrollment-generation fences for messages, claims and roles. Eight groups/86
 checks pass, including encrypted-state failures and an actual authenticated HTTP
