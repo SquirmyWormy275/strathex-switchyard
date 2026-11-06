@@ -107,8 +107,8 @@ journeys, two Windows guest doubles and six marker/artifact combinations. Origin
 repository/index/HEAD bytes, protected incomplete receipts, replay and owned
 process/staging cleanup verify. Two regressions fail before implementation;
 typecheck and the original package budget pass. An initial selector matched no
-tests and was rejected; it accepts no checks. Installed and native Windows
-marker acceptance remain separate.
+tests and was rejected; it accepts no checks. Installed metadata acceptance now passes seven separate checks; native Windows
+marker acceptance remains separate.
 [Source evidence](evidence/pypi-markers-source-summary.json).
 
 For an installed build containing this change, the repeatable local check is:
@@ -125,6 +125,12 @@ process and changes no task, account or package. Its seven checks are separate
 from actual scanner execution. Evaluation, installation, network and execution
 flags refuse before installed-state access; all four verifier guard tests pass.
 [Verifier evidence](evidence/python-inventory-verifier-source-summary.json).
+
+Normal installed aa98c91 passes all seven checks as part of its 41-check update.
+All fourteen tested module hashes, 54 workspace snapshots and frozen frontend
+verify. The 533-file prepared bundle is removed; only current plus one rollback
+remain. These are metadata/in-memory checks, separate from the real source
+scanner journeys above. [Installed receipt](evidence/installed-python-markers-summary.json).
 
 ## Extras and continuation evidence
 

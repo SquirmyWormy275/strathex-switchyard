@@ -26,6 +26,17 @@ there is no merge or public release acceptance.
 
 ## Current evidence
 
+Normal installed aa98c91 passes **41 metadata/synthetic checks**: 13 task-owner,
+seven Copilot-journal, fourteen agent/helper/SDK and seven Python-inventory checks.
+Fourteen tested module hashes and both verifier hashes bind the running build.
+The Python checks use 87 marker and 39 original reference cases plus fixed
+in-memory reports/artifact comparisons; they evaluate no condition and start
+no scanner process. All 54 semantic workspaces, selected state, pending
+keyboard-only conversation and frozen frontend remain preserved; 53 sealed files
+are byte-identical and one changes only audit metadata. Dated backup/readback
+and current plus one rollback verify. The exact 533-file, 5,221,413-byte prepared
+bundle is removed. [Installed evidence](evidence/installed-python-markers-summary.json).
+
 Conditional Python pins now retain a private marker digest and sorted environment
 variable names. Conditions are parsed without evaluation; matching declared-pin
 advisories and selected artifact comparisons remain visible, with mandatory
@@ -33,7 +44,7 @@ unevaluated/unresolved gaps. Eight focused groups pass 115 checks, including
 two new actual Linux scanner journeys, two Windows guest doubles and six artifact
 combinations. An independent 87-case pip/PyPA fixture covers the grammar and
 preprocessing. Typecheck, original package budget and owned scratch cleanup pass.
-No installed update or native Windows acceptance is claimed for markers.
+Installed metadata checks now pass separately; native Windows marker acceptance remains pending.
 [Contract](python-supply-chain.md#conditional-pins),
 [source evidence](evidence/pypi-markers-source-summary.json).
 
@@ -46,7 +57,7 @@ No installed update or native Windows acceptance is claimed for markers.
 | Installation and runtime | All sixteen original Windows installation/recovery cases pass at `b600a6d`; its independent fresh runtime installs 49 packages and loads/rechecks the offline CPU model, then removes its temporary runtime. [Installation](evidence/installation-scenarios-native-summary.json), [runtime](evidence/windows-runtime-b600-native-summary.json). | Complete Windows `9f35961` now passes separately; ordinary-user/guest journeys remain open. |
 | Latest diagnostic source | Seven focused groups pass 69 tests with five Windows-only skips. Two managed builds, 2,101 portable checks, typecheck and exact owned cleanup pass. [Receipt](evidence/worker-start-observation-source-summary.json). | Actual Windows `d15285b` passes all eight acknowledgement/refusal tests without skips. [Native receipt](evidence/worker-start-refusal-native-summary.json). The full restricted-owner journey is now separately accepted above. |
 | Windows index/history/leases | Native NTFS index and history packets each pass six checks and three independent guardian exits. Both Windows scanner files pass two cases with guest execution doubled; lease groups pass 24 tests and one Linux-only skip. [Evidence](evidence/native-history-index-leases-summary.json). | Packet Git witnesses are synthetic. Actual guest, installed Windows and ordinary-user acceptance remain separate. |
-| Installed app | Linux source `49a5053` passes 20 owner/journal metadata checks and fourteen pure agent/helper/SDK/provenance checks. Twelve tested module hashes, all 54 workspace semantic snapshots, 53 sealed files and frozen frontend bytes verify. Only current plus one rollback remain; the complete 5,218,000-byte prepared bundle is removed. [Receipt and repeatable proof](evidence/installed-scanner-sdk-summary.json). Earlier lifecycle/archive/extras receipts remain source-specific evidence. | No live agent is revoked and no bundled example, recording, scanner, task, provider or public query is started by this update. Frontend and extension activation remain frozen. |
+| Installed app | Linux source `aa98c91` passes **41 metadata/synthetic checks** and fourteen tested module hashes. All 54 semantic workspace snapshots, 53 sealed files and frozen frontend bytes verify. Only current plus one rollback remain; the complete 5,221,413-byte prepared bundle is removed. [Installed evidence](evidence/installed-python-markers-summary.json). | The Python scanner examples run in memory; no live task, scanner process, agent, account, model request or hardware operation starts. Frontend and extension activation remain frozen. |
 | Windows npm archive identity | Corrected `55515d1` completes ten archive tests plus eight original byte-comparison tests, each file with two original Linux-only skips inside its original 300-second bound; guest execution is doubled. [Archive](evidence/npm-archive-native-summary.json), [bytes](evidence/npm-artifact-split-native-summary.json). | Complete Windows release remains separate. |
 | Windows shortcut retirement | `80601e9` passes all sixteen original installation/recovery scenarios and twelve writer checks, no skips and verified cleanup. The fixed stage diagnostics execute with the original bounds. [Native pass](evidence/shortcut-stage-diagnostics-native-summary.json). | `9193471` and `4b2daed` each fail the first installation scenario at the original ten-second shortcut deadline: 24/25 tests pass, all cleanup verifies. The latest pass does not reproduce or establish the cause of the intermittent timeout. [Recurring failures](evidence/windows-shortcut-recurring-timeout-summary.json), [diagnostic source](evidence/shortcut-stage-diagnostics-source-summary.json). |
 | Credential worker retirement | Six groups/69 checks pass, including ten worker tests and two controlled real children. Errors join exact-child retirement; unconfirmed exit blocks replacement. Installed pure synthetic checks also pass within the 27-check update. [Contract](credential-worker-lifecycle.md), [source](evidence/credential-process-source-summary.json), [installed](evidence/installed-agent-security-summary.json). | Live credential failure injection and native Windows acceptance remain separate. No user key is replaced. |

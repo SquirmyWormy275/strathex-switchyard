@@ -7,18 +7,20 @@ unevaluated/unresolved gaps. Eight focused groups pass 115 checks, including
 two new actual Linux scanner journeys, two Windows guest doubles and six artifact
 combinations. An independent 87-case pip/PyPA fixture covers the grammar and
 preprocessing. Typecheck, original package budget and owned scratch cleanup pass.
-No installed update or native Windows acceptance is claimed for markers.
+Installed metadata checks now pass separately; native Windows marker acceptance remains pending.
 [Contract](python-supply-chain.md#conditional-pins),
 [source evidence](evidence/pypi-markers-source-summary.json).
 
-Normal installed `49a5053` passes **34 metadata/synthetic checks**, including
-twelve exact tested module hashes and SDK preflight before any network request.
-All 54 semantic workspace snapshots, selected state and frozen frontend remain
-intact; 53 sealed files are byte-identical and one changes only audit metadata.
-Dated backup/readback and current plus one rollback verify. The exact 533-file,
-5,218,000-byte prepared bundle is removed. No installed task, scanner, model,
-recording, enrolled agent, account or hardware operation runs.
-[Installed evidence](evidence/installed-scanner-sdk-summary.json).
+Normal installed aa98c91 passes **41 metadata/synthetic checks**: 13 task-owner,
+seven Copilot-journal, fourteen agent/helper/SDK and seven Python-inventory checks.
+Fourteen tested module hashes and both verifier hashes bind the running build.
+The Python checks use 87 marker and 39 original reference cases plus fixed
+in-memory reports/artifact comparisons; they evaluate no condition and start
+no scanner process. All 54 semantic workspaces, selected state, pending
+keyboard-only conversation and frozen frontend remain preserved; 53 sealed files
+are byte-identical and one changes only audit metadata. Dated backup/readback
+and current plus one rollback verify. The exact 533-file, 5,221,413-byte prepared
+bundle is removed. [Installed evidence](evidence/installed-python-markers-summary.json).
 
 Automatic scanner review now gathers bounded current files, includes recognized
 ignored secrets and proposes explicit generated-directory exclusions. It captures

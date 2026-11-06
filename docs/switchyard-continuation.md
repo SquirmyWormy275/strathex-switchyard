@@ -38,7 +38,7 @@ unevaluated/unresolved gaps. Eight focused groups pass 115 checks, including
 two new actual Linux scanner journeys, two Windows guest doubles and six artifact
 combinations. An independent 87-case pip/PyPA fixture covers the grammar and
 preprocessing. Typecheck, original package budget and owned scratch cleanup pass.
-No installed update or native Windows acceptance is claimed for markers.
+Installed metadata checks now pass separately; native Windows marker acceptance remains pending.
 [Contract](python-supply-chain.md#conditional-pins),
 [source evidence](evidence/pypi-markers-source-summary.json).
 
@@ -135,18 +135,19 @@ shortcut-helper source `f06674d` has its separate 89-check focused and 33-check
 installed acceptance.
 [Receipt](evidence/linux-68bcc76-complete-summary.json).
 
-The installed baseline is `49a50537794f06e1277e5cafb5611d08ac459215`,
-release `c63f5a21a9cbcb1569cccd4e4212efaf48f0e0e1bf9f7176c8e78839ac747f20`.
-Preserve all 54 original workspace identities, the pending keyboard-only Codex
-workspace, private connection information and the frozen Home bytes. The normal
-versioned update passes 20 owner/journal metadata checks plus fourteen pure
-in-memory agent/helper/SDK/provenance checks. Twelve exact tested module hashes verify. It starts no
-bundled example, recording or provider and revokes no live agent. All 54 semantic snapshots match; 53 sealed files
-are byte-identical and one changed only audit metadata. Keep the current release
-and its one rollback. The 533-file, 5,218,000-byte prepared bundle was verified and
-removed. Compact manifest JSON keeps the complete package below the original
-5 MiB limit; all sixteen installation scenarios pass after that change.
-[Receipt](evidence/installed-scanner-sdk-summary.json).
+The installed baseline is `aa98c91f11be1d41e67a7d5e043359c7114423d1`,
+release `e1355f25ecea493fc47fae4aa544021ed285629f6305e39555d09cbc322df851`.
+Normal installed aa98c91 passes **41 metadata/synthetic checks**: 13 task-owner,
+seven Copilot-journal, fourteen agent/helper/SDK and seven Python-inventory checks.
+Fourteen tested module hashes and both verifier hashes bind the running build.
+The Python checks use 87 marker and 39 original reference cases plus fixed
+in-memory reports/artifact comparisons; they evaluate no condition and start
+no scanner process. All 54 semantic workspaces, selected state, pending
+keyboard-only conversation and frozen frontend remain preserved; 53 sealed files
+are byte-identical and one changes only audit metadata. Dated backup/readback
+and current plus one rollback verify. The exact 533-file, 5,221,413-byte prepared
+bundle is removed. [Installed evidence](evidence/installed-python-markers-summary.json).
+
 The repeatable `scripts/verify-agent-security-host.mjs --read-only-metadata`
 proof verifies exact installed hashes and uses only synthetic in-memory state;
 its fourteen current installed checks pass. The unchanged flags retain their earlier
