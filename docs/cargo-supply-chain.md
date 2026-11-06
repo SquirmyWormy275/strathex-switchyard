@@ -95,3 +95,9 @@ reference archive checksum verifies; it was compiled with the existing Rust
 compiler, and all owned source/build files were removed. The Windows matrix now
 schedules the four guest-double Cargo cases independently.
 [SemVer source and verification](evidence/cargo-semver-summary.json).
+
+
+At `701f915` the independent Windows-host Cargo lane passes all four cases and
+verifies child/tree cleanup. Its 985-byte receipt archive digest and source tree
+verify. Guest execution is still doubled, so this is host contract acceptance
+without claiming a native guest scan. [Windows receipt](evidence/windows-cargo-contract-summary.json).

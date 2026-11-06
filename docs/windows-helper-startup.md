@@ -73,3 +73,24 @@ The native receipt does not prove this was the exact throwing operation. Both
 managed targets and 1,985 portable checks pass; five isolated groups pass 49 tests
 with one Windows-only skip. The original owner and parent-loss journey still
 require native acceptance. [Source evidence](evidence/windows-lease-parent-source-summary.json).
+
+
+## Canonical lock paths
+
+At `701f915` the original owner still fails with the last fixed label
+`lease-input-read`. The newly unconditional `lease-request-read` marker follows
+canonical-path equality and precedes parent-handle opening. The parent-watch
+change therefore has not repaired this failure.
+
+[.NET path normalization](https://github.com/dotnet/runtime/blob/v8.0.24/src/libraries/System.Private.CoreLib/src/System/IO/PathHelper.Windows.cs)
+expands existing 8.3 names. Node path joining preserves that spelling. The next
+source correction resolves the already-created Windows lock path before native
+dispatch and pool lookup, requiring both spellings to name the same ordinary,
+single-linked file on the same drive, compared with bigint file identities.
+Changed identity, links, device/UNC paths and alternate drives refuse. The
+native canonical-path comparison and file-handle checks stay intact.
+
+Five isolated groups pass 52 checks with one Windows-only skip; typecheck passes.
+The native receipt contains no path spelling, so a particular short alias is
+not claimed as observed. The original owner journey remains unaccepted.
+[Failure and correction](evidence/windows-canonical-lock-source-summary.json).

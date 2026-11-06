@@ -1,9 +1,9 @@
 /** Kernel locks release on process exit; no stale PID lock is deleted heuristically. */
 import { spawn } from "node:child_process";
-import { open, lstat } from "node:fs/promises";
+import { open, lstat, realpath } from "node:fs/promises";
 import { constants } from "node:fs";
 import { userInfo } from "node:os";
-import { join } from "node:path";
+import { join, win32 } from "node:path";
 import { fileURLToPath } from "node:url";
 import { privateDirectory } from "./private-fs.mjs";
 import { createKeylessLeasePool } from "./keyless-lease-pool.mjs";
@@ -25,6 +25,23 @@ export function windowsLockRequest({ path, parentPid, trace = false, nonBlocking
   if (bytes.toString("utf8") !== path) throw new Error("The private lock path is not valid Unicode.");
   return `SXSY-LOCK/1\t${parentPid}\t${trace ? 1 : 0}\t${nonBlocking ? 1 : 0}\t${bytes.toString("base64")}\n`;
 }
+
+/** Resolve an existing Windows spelling (including 8.3 names) to the same file.
+ * The native worker still requires a canonical path and pins its own file handle.
+ */
+export async function canonicalWindowsLockPath(path, { readStats = lstat, resolvePath = realpath } = {}) {
+  const local = value => typeof value === "string" && /^[A-Za-z]:\\/.test(value)
+    && !/[\0\r\n]/.test(value) && !value.slice(2).includes(":") && win32.normalize(value) === value;
+  const file = value => value.isFile() && !value.isSymbolicLink() && value.nlink === 1n;
+  if (!local(path)) throw new Error("The Windows lock path is not a normalized local file.");
+  const original = await readStats(path, { bigint: true });
+  if (!file(original)) throw new Error("The Windows lock file is not a single ordinary file.");
+  const canonical = await resolvePath(path);
+  if (!local(canonical) || win32.parse(canonical).root.toLowerCase() !== win32.parse(path).root.toLowerCase()) throw new Error("The Windows lock path changed its local drive boundary.");
+  const resolved = await readStats(canonical, { bigint: true });
+  if (!file(resolved) || resolved.dev !== original.dev || resolved.ino !== original.ino) throw new Error("The Windows lock file changed during path resolution.");
+  return canonical;
+}
 export async function withStateLock(root, id, fn, { onProgress, nonBlocking = false } = {}) {
   if (!/^[a-z][a-z0-9-]{0,63}$/.test(id)) throw new Error("Private lock identity is invalid.");
   const directory = join(root, "locks"), path = join(directory, `${id}.lock`);
@@ -36,7 +53,7 @@ export async function withStateLock(root, id, fn, { onProgress, nonBlocking = fa
   const named = await lstat(path);
   if (!named.isFile() || named.isSymbolicLink() || (process.platform !== "win32" && (named.uid !== userInfo().uid || (named.mode & 0o077)))) throw new Error("Private lock ownership or permissions are invalid.");
   onProgress?.("lease-file");
-  if (process.platform === "win32") return reusableWindowsLeases().withLease(path, fn, { nonBlocking, onProgress });
+  if (process.platform === "win32") return reusableWindowsLeases().withLease(await canonicalWindowsLockPath(path), fn, { nonBlocking, onProgress });
   let child;
   // cat can echo readiness only after flock grants the kernel lease. Its open
   // input pipe keeps that lease alive; EOF also retires it after parent loss.

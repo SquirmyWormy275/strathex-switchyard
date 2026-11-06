@@ -1,5 +1,13 @@
 # Switchyard implementation and acceptance
 
+Windows `701f915` still fails after reading lock input, before the new canonical-path
+progress marker; the parent-watch correction is therefore not an accepted fix
+for that failure. The next source change resolves an existing Windows lock path
+and verifies the same bigint file identity and local drive before native dispatch.
+Native path guards remain unchanged. Five groups/52 passes/one Windows-only skip
+and typecheck pass; native acceptance is pending.
+[Retained failure and source correction](evidence/windows-canonical-lock-source-summary.json).
+
 Editor workflow history now passes **seven groups / 84 tests**. Explicit Personal
 consent records four lifecycle states in the same encrypted journal transaction,
 with private correlation, pause/exclusion fences and no live attachment or
@@ -15,11 +23,11 @@ restricted owner still fails during lock initialization after reading input,
 with zero of eight checks. Both imported artifact digests verify.
 [Native result](evidence/windows-pipe-native-summary.json).
 
-The next source correction removes an unnecessary full-process-access request
+The `701f915` source correction removes an unnecessary full-process-access request
 from the parent watcher. It pins one handle with only birth-query and exit-wait
 rights, retaining parent-loss cleanup and all original token restrictions.
 Two managed builds/1,985 portable checks and five groups/49 passes/one declared
-Windows-only skip pass. Native acceptance remains pending; the previous receipt
+Windows-only skip pass. The original restricted owner still fails before the parent watcher; the previous receipt
 does not establish the exact post-input failure cause.
 [Source evidence](evidence/windows-lease-parent-source-summary.json).
 
@@ -48,11 +56,12 @@ verified retirement. Typecheck, compiled extension and twelve CommonJS methods
 pass; exact test/build cleanup verifies. Production command activation and native
 TUI/0.167.0 acceptance remain open. [Demonstration](evidence/editor-terminal-connection-summary.json).
 
-Latest complete Linux `0ad510e` passes **255/255 groups, 1,682 tests,
+Latest complete Linux `701f915` passes **260/260 groups, 1,713 tests,
 eleven declared skips and zero failures**. Every owned child/tree, checkout,
-dependency alias, build and temporary parent is verified retired. It covers the
-journal, recovery, routing and Suite transitions; later Terminal composition has
-separate focused evidence. [Complete result](evidence/linux-0ad-complete-summary.json).
+dependency alias, build and temporary parent is verified retired. It includes
+editor lifecycle history, retained Terminal composition, exact retirement and
+Cargo prerelease/build matching. Later Windows path correction has separate
+focused evidence. [Complete result](evidence/linux-701-complete-summary.json).
 
 A later exact stop now accepts the protected retirement record when terminal
 disconnect has already completed backend cleanup. Five groups / 39 tests verify

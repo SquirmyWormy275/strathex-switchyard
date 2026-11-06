@@ -1,5 +1,13 @@
 # What has actually been verified
 
+Windows `701f915` still fails after reading lock input, before the new canonical-path
+progress marker; the parent-watch correction is therefore not an accepted fix
+for that failure. The next source change resolves an existing Windows lock path
+and verifies the same bigint file identity and local drive before native dispatch.
+Native path guards remain unchanged. Five groups/52 passes/one Windows-only skip
+and typecheck pass; native acceptance is pending.
+[Retained failure and source correction](evidence/windows-canonical-lock-source-summary.json).
+
 Windows `1fc9d7f` clears copied-helper metadata and console initialization:
 both EOF probes now reach entry and retire exact owned trees. Ordinary owner
 checks (8), restricted metadata (13) and native exchange (31) pass. The original
@@ -7,11 +15,11 @@ restricted owner still fails during lock initialization after reading input,
 with zero of eight checks. Both imported artifact digests verify.
 [Native result](evidence/windows-pipe-native-summary.json).
 
-The next source correction removes an unnecessary full-process-access request
+The `701f915` source correction removes an unnecessary full-process-access request
 from the parent watcher. It pins one handle with only birth-query and exit-wait
 rights, retaining parent-loss cleanup and all original token restrictions.
 Two managed builds/1,985 portable checks and five groups/49 passes/one declared
-Windows-only skip pass. Native acceptance remains pending; the previous receipt
+Windows-only skip pass. The original restricted owner still fails before the parent watcher; the previous receipt
 does not establish the exact post-input failure cause.
 [Source evidence](evidence/windows-lease-parent-source-summary.json).
 
@@ -23,11 +31,12 @@ verify cleanup; typecheck passes. Frontend, installed and native acceptance rema
 separate. [Contract](editor-workflow-observation.md),
 [evidence](evidence/editor-workflow-observation-summary.json).
 
-Latest complete Linux `0ad510e` passes **255/255 groups, 1,682 tests and eleven
+Latest complete Linux `701f915` passes **260/260 groups, 1,713 tests and eleven
 declared skips**, with every child/tree and exact owned checkout/build cleanup
-verified. It includes editor journal, recovery, signed routes and Suite transitions.
-[Receipt](evidence/linux-0ad-complete-summary.json). Later Terminal composition
-passes 46 focused checks; retired-stop correction passes 39.
+verified. It includes editor lifecycle history, retained Terminal composition,
+exact retirement and Cargo prerelease/build matching.
+[Receipt](evidence/linux-701-complete-summary.json). The later Windows path
+correction has separate focused evidence.
 
 Cargo inventory and advisory matching now support bounded prerelease/build
 versions and u64 core numbers. **Nine groups / 94 tests** and **146,326 independent
@@ -42,7 +51,7 @@ Earlier complete Linux `7772cb3` **failed**: 249/250 groups, 1,622 passed tests,
 one failure and eleven declared skips. An editor socket remained after child
 exit during teardown. Exact staging and every child/tree cleanup are verified.
 Signal-safe cleanup and parent lifecycle passed 26 focused checks; subsequent
-complete runs pass, including the current `0ad510e` checkpoint above.
+complete runs pass, including the current `701f915` checkpoint above.
 [Failure and correction](evidence/linux-777-complete-failure-summary.json).
 
 Native Windows `a061be0` clears the original random-startup abort with query-only

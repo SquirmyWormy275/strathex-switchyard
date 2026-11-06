@@ -31,6 +31,14 @@ evidence, not instructions to reset. Publish regular commits. Do not merge or re
 
 ## Current implementation and evidence
 
+Windows `701f915` still fails after reading lock input, before the new canonical-path
+progress marker; the parent-watch correction is therefore not an accepted fix
+for that failure. The next source change resolves an existing Windows lock path
+and verifies the same bigint file identity and local drive before native dispatch.
+Native path guards remain unchanged. Five groups/52 passes/one Windows-only skip
+and typecheck pass; native acceptance is pending.
+[Retained failure and source correction](evidence/windows-canonical-lock-source-summary.json).
+
 Editor workflow history now passes **seven groups / 84 tests**. Explicit Personal
 consent records four lifecycle states in the same encrypted journal transaction,
 with private correlation, pause/exclusion fences and no live attachment or
@@ -138,19 +146,20 @@ the installed update or old live provider verifiers without a relevant new chang
 
 ## Continue independently
 
-1. Complete Linux `0ad510e` passes 255/255 groups, 1,682 tests, eleven declared
+1. Complete Linux `701f915` passes 260/260 groups, 1,713 tests, eleven declared
    skips and zero failures. All exact child/tree/staging cleanup verifies and the
-   marker is removed. [Receipt](evidence/linux-0ad-complete-summary.json).
-   It includes journal, recovery, routing and Suite transitions; later retained
-   Terminal composition and idempotent retired-stop correction have separate
-   focused evidence. Do not repeat this accepted run without a relevant change.
-   Before another justified run, inspect `/tmp/switchyard-full-linux-path.json`.
-   Verify source, phase, process exit, root identities, receipt and every owned
-   alias/build/test parent. Never broaden cleanup or relax deadlines.
+   marker is removed. [Receipt](evidence/linux-701-complete-summary.json).
+   It includes editor lifecycle history, retained Terminal composition, exact
+   retirement and Cargo prerelease/build matching. The later Windows path
+   correction has separate focused evidence. Do not repeat this accepted run
+   without a relevant change. Before another justified run, inspect
+   `/tmp/switchyard-full-linux-path.json`. Verify source, phase, process exit,
+   root identities, receipt and every owned alias/build/test parent. Never
+   broaden cleanup or relax deadlines.
 
-2. Collect the native result for the limited-access parent-watch correction.
+2. Collect the native result for exact Windows lock-path canonicalization.
    The non-console helper and pipe correction now reach entry, but the original
-   owner still fails after lock input. Ordinary Node spawn and parent-loss
+   owner still fails before its canonical-path marker. Ordinary Node spawn and parent-loss
    containment remain. Do not accept the correction without the original
    restricted owner and lease cleanup checks. Detached EOF entry
    is a diagnostic, not acceptance of a lease or the original eight-check owner.

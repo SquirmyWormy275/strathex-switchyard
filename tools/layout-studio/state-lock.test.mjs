@@ -9,7 +9,7 @@ import { createKeylessLeasePool } from "./keyless-lease-pool.mjs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createSuiteStore } from "./suite-store.mjs";
-import { withStateLock, windowsLockRequest } from "./state-lock.mjs";
+import { withStateLock, windowsLockRequest, canonicalWindowsLockPath } from "./state-lock.mjs";
 import { stopOwnedChild } from "./owned-process.mjs";
 import { applicationEnvironment } from "../../deployment/suite/application.mjs";
 
@@ -25,6 +25,34 @@ test("the Windows kernel-lock wire preserves literal Unicode paths and refuses i
   const good = { path: "C:\\private\\personal.lock", parentPid: 1 };
   for (const changed of [{ path: "" }, { path: "x\n1" }, { path: "x\r1" }, { path: "x\u00001" }, { path: "x\ud800" }, { path: "界".repeat(5462) }, { parentPid: 0 }, { parentPid: 2147483648 }, { parentPid: 1.5 }, { parentPid: "1" }, { trace: 1 }, { nonBlocking: "false" }]) assert.throws(() => windowsLockRequest({ ...good, ...changed }));
   assert.ok(windowsLockRequest({ ...good, path: "x".repeat(16384) }).length < 22000);
+});
+
+const lockStats = patch => ({ dev: 9n, ino: 9007199254740992n, nlink: 1n, isFile: () => true, isSymbolicLink: () => false, ...patch });
+test("Windows short-name spelling resolves to the same exact file before the native canonical-path request", async () => {
+  const path = "C:\\Users\\SYNTH~1\\Temp\\personal.lock", canonical = "C:\\Users\\Synthetic user\\Temp\\personal.lock", calls = [];
+  const ports = { readStats: async (path, options) => { calls.push(path); assert.deepEqual(options, { bigint: true }); return lockStats(); }, resolvePath: async value => { assert.equal(value, path); return canonical; } };
+  assert.equal(await canonicalWindowsLockPath(path, ports), canonical);
+  assert.deepEqual(calls, [path, canonical]);
+  const wire = windowsLockRequest({ path: canonical, parentPid: 42 });
+  assert.equal(Buffer.from(wire.trimEnd().split("\t")[4], "base64").toString("utf8"), canonical);
+});
+test("Windows lock path resolution refuses alternate drives, namespaces and changed file identities", async () => {
+  const path = "C:\\private\\personal.lock";
+  for (const canonical of ["D:\\private\\personal.lock", "\\\\server\\share\\personal.lock", "\\\\?\\C:\\private\\personal.lock", "C:\\private\\..\\personal.lock", "C:\\private\\personal.lock:stream"]) {
+    await assert.rejects(canonicalWindowsLockPath(path, { readStats: async () => lockStats(), resolvePath: async () => canonical }));
+  }
+  for (const patch of [{ ino: 9007199254740993n }, { dev: 10n }, { nlink: 2n }, { isFile: () => false }, { isSymbolicLink: () => true }]) {
+    let reads = 0;
+    await assert.rejects(canonicalWindowsLockPath(path, { readStats: async () => lockStats(++reads === 2 ? patch : {}), resolvePath: async () => path }));
+    assert.equal(reads, 2);
+  }
+});
+test("Windows lock aliases cannot turn an original link or invalid path into an ordinary target", async () => {
+  let resolutions = 0;
+  const resolvePath = async () => { resolutions++; return "C:\\private\\personal.lock"; };
+  for (const path of ["relative", "C:relative", "C:\\private\\.\\personal.lock", "C:\\private\\personal.lock\n"]) await assert.rejects(canonicalWindowsLockPath(path, { readStats: async () => { throw Error("unexpected lookup"); }, resolvePath }));
+  for (const patch of [{ nlink: 2n }, { isFile: () => false }, { isSymbolicLink: () => true }]) await assert.rejects(canonicalWindowsLockPath("C:\\private\\personal.lock", { readStats: async () => lockStats(patch), resolvePath }));
+  assert.equal(resolutions, 0);
 });
 
 test("the native Windows lease worker refuses replaced and hard-linked lock files and malformed release", { skip: process.platform !== "win32" }, async t => {
