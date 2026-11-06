@@ -73,7 +73,7 @@ The latest accepted complete Linux checkpoint, `7897835`, passes **241 groups**:
 checkout cleanup verified. The Windows native lease replacement at `ce5be6a`
 passes eighteen tests plus one declared skip, the Supply Chain scenario, and all
 23 policy-output tests. **Full Windows acceptance remains failed** because the
-restricted primary child still fails DLL initialization.
+restricted primary child still exits before its owner journey verifies.
 [Current status and exact evidence](docs/switchyard-status.md).
 
 | Explore | Start here |

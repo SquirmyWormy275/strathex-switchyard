@@ -18,16 +18,19 @@ Start with the [requirement ledger](switchyard-requirements.md) for complete sco
 | Installed Linux application `c5d2d28` | Six update/seven metadata checks and fifteen checks each for Supply Chain and Release. | Four actual offline scanner exits, original 54 workspace identities, selection, private endpoint and frozen frontend are restored; owned staging is removed. [Installed receipt](evidence/installed-cvss-context-summary.json). |
 | Codex owned Unix task adapter | Three checks against the installed CLI; two account metadata operations, revocation and exact shutdown. | Actual listener/bridge/socket ownership and retirement. No native thread, prompt or login change. Production remains stdio; complete task/IDE composition is unfinished. [Adapter](evidence/codex-unix-task-adapter-summary.json), [readiness correction](evidence/linux-startup-windows-user-object-summary.json). |
 
-**Full Windows acceptance remains failed.** The restricted primary child still
-exits with `STATUS_DLL_INIT_FAILED`. Its token can open the owned private window
-station and desktop; diagnostic handle closure and namespace restoration pass.
-The child failure and preserved fixture remain recorded. The native namespace
-probe at `b83b1a0` closes every handle and reports matching original/restricted
-access outcomes; it does not identify the DLL failure's cause. The next candidate
-uses fully detached startup for the fixed file/pipe-only child, keeping every
-token, desktop, Job and exit guard. Both targets compile; 1,816 managed checks,
-eight report tests and typecheck pass. Native acceptance is pending.
-[Failure, exact observation and candidate](evidence/windows-restricted-console-candidate-summary.json).
+**Full Windows acceptance remains failed.** At `7a16bfe`, 58 of 59 filesystem
+workflow jobs pass. The detached restricted primary child exits with code 134
+and produces no owner result; the prior mode exited with DLL-initialization
+status 3221225794. This change is not an accepted repair. Its private desktop and
+namespace access probes complete, while the failed fixture is preserved.
+[Exact latest failure](evidence/windows-detached-native-summary.json).
+
+The task creator now verifies its own native account, original repository and
+exact durable reservation before thread effects, including after asynchronous
+setup. Late refusal preserves acknowledged identity and prevents replay. Six
+related files pass 81 tests with provider doubles and exact child cleanup; no
+native task, prompt or account change was requested.
+[Creator boundary evidence](evidence/coding-creator-boundary-summary.json).
 
 The earlier failed complete Linux and Windows runs remain failed. A focused pass
 does not replace complete acceptance. [Earlier checkpoints](switchyard-status-history-6.md)

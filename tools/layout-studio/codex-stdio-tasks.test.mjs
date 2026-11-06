@@ -232,3 +232,18 @@ test("restricted private transports retain every native restriction and refuse n
   for (const mode of ["proxy", "global-daemon"]) assert.throws(() => codexRestrictedProcessArguments(executable, [], { mode }), /transport/);
   assert.throws(() => codexRestrictedProcessArguments(executable, [], { socketPath }), /transport/);
 });
+
+test("task effect boundaries run after project setup and preserve acknowledged identity when a later boundary refuses", async () => {
+  for (const refusal of [1, 2]) await fixture(async ({ driver, repositoryRoot, frames }) => {
+    let boundaries = 0;
+    await assert.rejects(driver.start(repositoryRoot, "synthetic-bound-task", "personal", { beforeEffect: async () => {
+      boundaries++; assert.equal(frames.some(frame => frame.method === "config/read" && frame.params.cwd === repositoryRoot), true);
+      if (boundaries === refusal) throw Error("Synthetic exact task boundary changed");
+    } }), error => {
+      assert.match(error.message, /exact task boundary changed/); assert.equal(error.createdThreadId, refusal === 2 ? "synthetic-created" : undefined); return true;
+    });
+    assert.equal(frames.filter(frame => frame.method === "thread/start").length, refusal === 2 ? 1 : 0);
+    assert.equal(frames.some(frame => frame.method === "thread/inject_items" || frame.method === "turn/start"), false);
+    assert.equal((await driver.stopCompartment("personal")).stopped, true);
+  });
+});

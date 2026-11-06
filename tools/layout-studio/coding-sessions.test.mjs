@@ -41,7 +41,7 @@ test("uncertain Codex creation contributes only local uncertainty metadata witho
 
 test("dedicated native task creators release the writer before registration and never resume an attached client implicitly", () => fixture(async ({ service, options, repositoryRoot, calls }) => {
   let writer = false, closed = 0;
-  const owned = createCodingSessions({ ...options, taskDriverFactory: () => ({ start: async () => { writer = true; return { threadId: "synthetic-created-thread" }; }, close: async () => { writer = false; closed++; return [{ stopped: true }]; } }) });
+  const owned = createCodingSessions({ ...options, taskDriverFactory: () => ({ account: options.daemon.account, start: async () => { writer = true; return { threadId: "synthetic-created-thread" }; }, close: async () => { writer = false; closed++; return [{ stopped: true }]; } }) });
   try {
     const task = await owned.create("personal", { requestId: randomUUID(), repositoryRoot, label: "Dedicated task" });
     assert.equal(task.nativeTransport, "owned-stdio"); assert.equal(writer, false); assert.equal(closed, 1); assert.equal(task.capabilities.resumable, false); assert.equal(task.capabilities.textReviewAvailable, true);
@@ -51,7 +51,7 @@ test("dedicated native task creators release the writer before registration and 
 
 test("an unconfirmed creator exit preserves its returned identity and blocks another native creator", () => fixture(async ({ options, store, repositoryRoot }) => {
   let stopped = false, starts = 0, factories = 0;
-  const owned = createCodingSessions({ ...options, taskDriverFactory: () => { factories++; return { start: async () => { starts++; return { threadId: "synthetic-created-thread" }; }, close: async () => [{ stopped }] }; } });
+  const owned = createCodingSessions({ ...options, taskDriverFactory: () => { factories++; return { account: options.daemon.account, start: async () => { starts++; return { threadId: "synthetic-created-thread" }; }, close: async () => [{ stopped }] }; } });
   try {
     await assert.rejects(owned.create("personal", { requestId: randomUUID(), repositoryRoot, label: "Uncertain owner" }), /creator did not verify exit/);
     const task = (await store.snapshot("personal")).codingSessions[0]; assert.equal(task.sessionId, "synthetic-created-thread"); assert.equal(task.status, "creation-uncertain");
@@ -61,7 +61,7 @@ test("an unconfirmed creator exit preserves its returned identity and blocks ano
 
 test("stopping a pending dedicated creator retains a late native identity without registering or relaunching it", () => fixture(async ({ options, store, repositoryRoot }) => {
   let entered, release, starts = 0; const ready = new Promise((r) => { entered = r; });
-  const owned = createCodingSessions({ ...options, taskDriverFactory: () => ({ start: async () => { starts++; entered(); await new Promise((r) => { release = r; }); return { threadId: "synthetic-created-thread" }; }, close: async () => [{ stopped: true }] }) });
+  const owned = createCodingSessions({ ...options, taskDriverFactory: () => ({ account: options.daemon.account, start: async () => { starts++; entered(); await new Promise((r) => { release = r; }); return { threadId: "synthetic-created-thread" }; }, close: async () => [{ stopped: true }] }) });
   try {
     const input = { requestId: randomUUID(), repositoryRoot, label: "Pending creator" }, pending = owned.create("personal", input), rejected = assert.rejects(pending, /stopped after.*acknowledgement/); await ready;
     await owned.stopCompartment("personal"); release(); await rejected;
@@ -147,3 +147,39 @@ test("the authenticated suite routes an exact coding role to runtime status and 
     await assert.rejects(suite.handle("/api/suite/roles/bind", { compartment: "personal", roleId: "builder", provider: "codex", targetKind: "coding-task", targetId: task.id, intent: "resume" }), /runtime status only/);
   } finally { await suite.close(); }
 }));
+
+test("a dedicated creator with another native login cannot create a reserved task or replay the request", () => fixture(async ({ options, store, repositoryRoot }) => {
+  let starts = 0, closes = 0;
+  const owned = createCodingSessions({ ...options, taskDriverFactory: () => ({
+    account: async () => ({ type: "chatgpt", fingerprint: "b".repeat(64) }),
+    start: async () => { starts++; return { threadId: "wrong-account-thread" }; },
+    close: async () => { closes++; return [{ stopped: true }]; }
+  }) });
+  try {
+    const request = { requestId: randomUUID(), repositoryRoot, label: "Exact account" };
+    await assert.rejects(owned.create("personal", request), /creator's native login differs/);
+    assert.equal(starts, 0); assert.equal(closes, 1);
+    const saved = (await store.snapshot("personal")).codingSessions[0]; assert.equal(saved.status, "creation-uncertain"); assert.equal(saved.sessionId, null);
+    assert.equal((await owned.create("personal", request)).duplicatePrevented, true); assert.equal(starts, 0);
+  } finally { await owned.close(); }
+}));
+
+test("creator effects recheck account, original repository and durable reservation after asynchronous setup", async () => {
+  for (const boundary of ["account", "repository", "reservation"]) await fixture(async ({ root, options, store, repositoryRoot }) => {
+    let login = "a".repeat(64), effects = 0, closes = 0;
+    const owned = createCodingSessions({ ...options, taskDriverFactory: () => ({
+      account: async () => ({ type: "chatgpt", fingerprint: login }),
+      start: async (_root, _id, compartment, { beforeEffect }) => {
+        if (boundary === "account") login = "b".repeat(64);
+        if (boundary === "repository") { await rename(repositoryRoot, join(root, "preserved-original")); await mkdir(join(repositoryRoot, ".git"), { recursive: true }); }
+        if (boundary === "reservation") await store.update(compartment, "synthetic-reservation-change", state => { state.codingSessions[0].status = "registered"; });
+        await beforeEffect(); effects++; return { threadId: "must-not-exist" };
+      },
+      close: async () => { closes++; return [{ stopped: true }]; }
+    }) });
+    try {
+      await assert.rejects(owned.create("personal", { requestId: randomUUID(), repositoryRoot, label: "Late boundary" }), /login differs|directory was replaced|reservation changed/);
+      assert.equal(effects, 0); assert.equal(closes, 1); assert.equal((await store.snapshot("personal")).codingSessions[0].sessionId, null);
+    } finally { await owned.close(); }
+  });
+});

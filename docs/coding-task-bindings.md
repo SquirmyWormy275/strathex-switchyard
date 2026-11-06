@@ -19,6 +19,14 @@ New tasks use a separate restricted creator. Its exact direct child must exit
 before registration, releasing the native writer for later reviewed text. An
 uncertain creator exit preserves the returned identity and prevents a new
 creator from replacing it. The metadata connection never owns that writer.
+The creator now checks its own native login against the reserved account, rather
+than assuming the metadata connection enrolled the same account. Before thread
+creation and marker injection, the driver repeats the boundary after asynchronous
+project setup: fresh compartment permission, original directory identity, exact
+durable reservation and stop generation. A late refusal preserves an acknowledged
+thread identity. Six related files pass 81 tests with provider doubles and verified
+child cleanup; live account switching remains separate.
+[Exact source and receipts](evidence/coding-creator-boundary-summary.json).
 
 | Operation | Behavior |
 | --- | --- |

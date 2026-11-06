@@ -39,7 +39,7 @@ Keep small receipts and source; retire exact owned staging after exit verifies.
 | Source | Accepted evidence | Limit |
 | --- | --- | --- |
 | Linux `7897835` | Complete 241-group run: 1,501 passed tests, ten declared skips; all child/tree and owned checkout/dependency/build cleanup verifies. [Receipt](evidence/linux-789-complete-summary.json). | Later changes have focused evidence. Its full-run marker and checkout are removed. Inspect `/tmp/switchyard-full-linux-path.json` before starting any later full run. |
-| Native Windows `ce5be6a` | Eighteen lease tests and one declared skip; Supply Chain scenario and 23 policy-output tests pass. Digests and child/tree cleanup verify. [Receipts](evidence/native-state-lease-ce5-summary.json). | Restricted primary-child DLL initialization still fails. Earlier PowerShell startup failures remain recorded. |
+| Native Windows `ce5be6a` | Eighteen lease tests and one declared skip; Supply Chain scenario and 23 policy-output tests pass. Digests and child/tree cleanup verify. [Receipts](evidence/native-state-lease-ce5-summary.json). | The restricted primary-child journey still fails; its latest detached run exits 134. Earlier PowerShell startup failures remain recorded. |
 | Installed Linux `c5d2d28` | Six update/seven metadata checks, fifteen checks each for Supply Chain/Release, four actual scanner exits and original 54 workspace identities restored. [Installed evidence](evidence/installed-cvss-context-summary.json). | Published source is newer than the installed application. Do not confuse source verification with installed acceptance. |
 | Owned Codex Unix task adapter | Actual installed CLI: two read-only account operations, verifier permission revocation and exact listener/bridge/socket retirement. [Evidence](evidence/codex-unix-task-adapter-summary.json). | Explicit adapter; main Studio uses stdio. Complete task/IDE composition remains unfinished. No native thread, prompt or account change is authorized in the current backend work. |
 
@@ -50,18 +50,20 @@ runtime path. There is no PowerShell fallback. Keep the original acquisition,
 release and child/test deadlines. [Contract](private-state-locking.md).
 
 Both managed targets compile with zero warnings/errors; 1,816 portable checks
-pass. The native namespace diagnostic at `b83b1a0` completes, closes every handle
-and reports matching original/restricted access outcomes; its child still fails.
-The next candidate changes only file/pipe-owner startup to `DETACHED_PROCESS`,
-keeping all token/desktop/Job/exit requirements. Eight report tests and typecheck
-pass; exact-source native execution is pending. No causal repair claim is made.
-[Observation and candidate](evidence/windows-restricted-console-candidate-summary.json).
+pass. Native namespace access at `b83b1a0` completes with closed handles and
+matching original/restricted outcomes. At `7a16bfe`, detached startup changes the
+child's exit to 134 without an owner result; 58/59 workflow jobs pass, so the
+whole workflow remains failed. Its exact fixture is preserved. Investigate the
+file/pipe-only child's standard handles next; do not relax token, desktop, Job,
+process identity, deadline or exit requirements.
+[Latest native failure](evidence/windows-detached-native-summary.json).
 
-The separate private USER-object diagnostic at `7897835` passes access, closure
-and namespace restoration, while the child still fails `STATUS_DLL_INIT_FAILED`.
-Its failed native fixture is preserved. A passing diagnostic is not child or
-ordinary-account acceptance. Do not relax SID, privilege, integrity, Job, exact
-process identity or exit requirements to make that proof pass.
+The subsequent Codex creator boundary verifies its own account and the original
+repository/reservation before thread creation and marker injection, including
+after asynchronous project setup. Six related files pass 81 tests and typecheck.
+No native thread, model prompt or account change was requested. Full persistent
+task/IDE composition remains unfinished.
+[Creator evidence](evidence/coding-creator-boundary-summary.json).
 
 F77 source research verifies 26 pinned files across two builds with no allowed
 haptic operations. Use cached readouts only. Real Claude/tmux registered navigation
@@ -72,7 +74,7 @@ workspace/focus and retires owned processes/socket/cache.
 
 ## Next executable tasks
 
-1. Collect exact-source native Windows detached-startup results. Verify
+1. Implement and verify explicit standard handles for the detached native child. Verify
    artifact digest and source/merge identity, distinguish access observations from
    child acceptance, and repair the actual initialization failure without broadening
    token/desktop/service authority. Continue other work while CI runs.

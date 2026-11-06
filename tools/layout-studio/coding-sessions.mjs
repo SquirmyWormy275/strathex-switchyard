@@ -110,7 +110,23 @@ export function createCodingSessions({ store, resolveCli = trustedCli, platform 
       let createdThreadId;
       try {
         assertGeneration(compartment, generation);
-        const result = taskDriverFactory ? await ownedTask(compartment, (driver) => driver.start(root, `switchyard-${requestId}`, compartment), generation) : await daemon.start(root, `switchyard-${requestId}`, compartment), sessionId = result.threadId;
+        const launch = async driver => {
+          const beforeEffect = async () => {
+            await access(compartment); assertGeneration(compartment, generation);
+            if (typeof driver.account !== "function") throw new Error("The task creator cannot verify its own native account.");
+            const creator = await driver.account(compartment);
+            if (creator?.type !== "chatgpt" || creator.fingerprint !== login.fingerprint) throw new Error("The task creator's native login differs from the reserved account. No context was redirected.");
+            const current = (await store.snapshot(compartment)).codingSessions?.find(task => task.id === requestId);
+            if (!current || current.provider !== "codex" || current.status !== "creating" || current.sessionId !== null || current.repositoryRoot !== root || current.accountFingerprint !== login.fingerprint || current.repositoryIdentity?.device !== identity.device || current.repositoryIdentity?.inode !== identity.inode) throw new Error("The exact task reservation changed before its native effect.");
+            await verifyRepositoryIdentity({ repositoryRoot: root, repositoryIdentity: identity });
+            await store.authorize(compartment, { provider: "codex" }); assertGeneration(compartment, generation);
+          };
+          await beforeEffect();
+          // The native driver repeats this boundary after asynchronous project
+          // configuration and before both thread creation and marker injection.
+          return driver.start(root, `switchyard-${requestId}`, compartment, { beforeEffect });
+        };
+        const result = taskDriverFactory ? await ownedTask(compartment, launch, generation) : await launch(daemon), sessionId = result.threadId;
         if (typeof sessionId !== "string" || !thread.test(sessionId)) throw new Error("The new thread identity is invalid.");
         createdThreadId = sessionId;
         // Save the returned identity before a later read/account/claim can fail.

@@ -103,16 +103,19 @@ export function createCodexStdioTasks({ store, root = join(process.env.XDG_STATE
       if (!validId(id)) throw new Error("Choose an exact thread identity."); await directoryIdentity(expectedRoot);
       return use(c, async (client) => { const value = await client.request("thread/read", { threadId: id, includeTurns: false }); if (value.thread?.id !== id) throw new Error("Codex returned a different thread."); await exactRoot(value.thread.cwd, expectedRoot); return { ...observed(value.thread), repositoryRoot: expectedRoot }; });
     },
-    async start(expectedRoot, taskId, c) {
+    async start(expectedRoot, taskId, c, { beforeEffect = async () => {} } = {}) {
+      if (typeof beforeEffect !== "function") throw new Error("An owned task needs a callable effect boundary.");
       if (!validId(taskId)) throw new Error("Choose a bounded task binding identity."); await directoryIdentity(expectedRoot);
       let createdThreadId;
       try {
         return await use(c, async (client, authorize) => {
           await restrictedRoot(client, expectedRoot, authorize);
+          await beforeEffect(); await authorize();
           const value = await client.request("thread/start", { cwd: expectedRoot, serviceName: "strathex-switchyard", sandbox: "read-only", approvalPolicy: "on-request", config: codexDesignConfig(client.serverNames) });
           if (validId(value.thread?.id)) createdThreadId = value.thread.id;
           if (!createdThreadId || value.cwd !== expectedRoot || value.thread.cwd !== expectedRoot || value.sandbox?.type !== "readOnly" || value.approvalPolicy !== "on-request") throw new Error("The empty Codex thread did not verify its exact identity and read-only permissions.");
           await restrictedRoot(client, expectedRoot, authorize);
+          await beforeEffect(); await authorize();
           // Persist a local assistant marker without sending a model/user turn.
           await client.request("thread/inject_items", { threadId: createdThreadId, items: [{ type: "message", role: "assistant", content: [{ type: "output_text", text: `Switchyard task binding: ${taskId}. No user request has been submitted. Await the operator's instructions.` }] }] });
           return { threadId: createdThreadId };
