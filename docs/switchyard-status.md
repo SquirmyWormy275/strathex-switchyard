@@ -1,5 +1,13 @@
 # Switchyard implementation and acceptance
 
+The signed editor connection and typed client now pass **seven groups / 96 tests**.
+The routed demonstration uses real protected state and Linux carriers with a
+synthetic provider/terminal. Workspace, keyboard-only and shutdown cleanup joins
+before original-owner retirement; uncertain exit preserves the relevant refusal.
+Typecheck, compiled extension and CommonJS client checks pass, and generated build
+output is removed. Retained Terminal composition and command activation remain
+unfinished. [Routing evidence](evidence/editor-routing-summary.json).
+
 Latest complete Linux `072e066` passes **252/252 groups, 1,649 tests,
 eleven declared skips and zero failures**. Every child/tree and the exact owned
 checkout, dependencies, builds and temporary parent are retired.

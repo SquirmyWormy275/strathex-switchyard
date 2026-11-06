@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createConnection } from 'node:net';
-import { createHash,randomBytes,randomUUID } from 'node:crypto';
+import { createHash,createHmac,randomBytes,randomUUID } from 'node:crypto';
 import { mkdtemp,mkdir,copyFile,writeFile,readFile,readlink,readdir,chmod,unlink,rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -10,6 +10,9 @@ import { createCodingEditorAuthorizations } from './coding-editor-authorizations
 import { createCodingEditorConnections } from './coding-editor-connections.mjs';
 import { openOwnedCodexListener } from './codex-owned-listener.mjs';
 import { codexDesignConfig } from './agents.mjs';
+import { createSuite } from './suite.mjs';
+import { createStudioServer } from './serve.mjs';
+import { once } from 'node:events';
 const native={skip:process.platform!=='linux'};
 const hash=v=>createHash('sha256').update(JSON.stringify(v)).digest('hex');
 const gate=()=>{let resolve;const promise=new Promise(r=>resolve=r);return{promise,resolve};};
@@ -21,7 +24,7 @@ async function terminal(path,sockets){const socket=createConnection(path);socket
  close:()=>socket.destroy(),send:m=>socket.write(frame(m)),async upgrade(){await until(()=>bytes.includes('\r\n\r\n'));const end=bytes.indexOf('\r\n\r\n');assert.ok(bytes.subarray(0,end).toString().startsWith('HTTP/1.1 101'));bytes=bytes.subarray(end+4);},async message(){return until(()=>{if(bytes.length<2)return;assert.equal(bytes[1]&128,0);let size=bytes[1]&127,offset=2;if(size===126){if(bytes.length<4)return;size=bytes.readUInt16BE(2);offset=4;}if(size===127){if(bytes.length<10)return;size=Number(bytes.readBigUInt64BE(2));offset=10;}if(bytes.length<offset+size)return;const message=JSON.parse(bytes.subarray(offset,offset+size));bytes=bytes.subarray(offset+size);return message;});}
 };}
 async function fixture(t){
- const root=await mkdtemp(join(tmpdir(),'syec-')),socketRoot=await mkdtemp('/tmp/syec-'),providerRoot=join(root,'provider'),keys=new Map(),services=[],sockets=[];await mkdir(providerRoot,{mode:0o700});
+ const root=await mkdtemp(join(tmpdir(),'syec-')),socketRoot=await mkdtemp('/tmp/syec-'),providerRoot=join(root,'provider'),keys=new Map(),services=[],sockets=[],cleanup=[];await mkdir(providerRoot,{mode:0o700});
  await copyFile(new URL('./test-support/codex-owned-listener-fixture.cjs',import.meta.url),join(providerRoot,'app-server'));await writeFile(join(providerRoot,'account'),'synthetic@example.invalid');await writeFile(join(providerRoot,'fixture.json'),JSON.stringify({config:codexDesignConfig(),repositoryRoot:'/synthetic/repository'}));
  const provider=await openOwnedCodexListener({executable:process.execPath,cwd:providerRoot,runtimeRoot:providerRoot}),control=await provider.connect();
  const store=createSuiteStore({root:join(root,'state'),secrets:{get:async(c,p)=>keys.get(c+p),set:async(c,p,v)=>keys.set(c+p,v)}});await store.initialize('personal');await store.update('personal','fixture',s=>{s.mode='personal-companion';});
@@ -30,10 +33,10 @@ async function fixture(t){
  const owners={async editorTarget(){await control.recheckAccount();assert.deepEqual(await provider.inspectBinding(),target.endpoint);return{target:structuredClone(target),targetDigest:hash(target),metadataObserved:true,nativeLoadAcknowledged:true,nativeTaskLoaded:false,authorityGranted:false,terminalLaunched:false,ideAttached:false,modelPromptSubmitted:false,completionVerified:false};},async openEditorClient(_c,s,{onClient}){assert.equal(s.ownerRequestId,selected.ownerRequestId);bridges++;return provider.openEditorClient({onClient:async client=>{await hook();await onClient(client);}});}};owners.editorReturnTarget=owners.editorTarget;
  const authorizations=createCodingEditorAuthorizations({store,owners,isActive:async()=>active});const review=await authorizations.review('personal',selected),issued=await authorizations.issue('personal',{...selected,token:review.confirmation.token});await authorizations.consume('personal',{...selected,permit:issued.permit});
  const service=()=>{const api=createCodingEditorConnections({store,authorizations,owners,root:socketRoot});services.push(api);return api;},api=service();
- t.after(async()=>{hook=async()=>{};for(const socket of sockets)socket.destroy();const results=await Promise.all(services.map(s=>s.close()));if(!uncertain)assert.ok(results.every(r=>r.stopped));await authorizations.close();assert.equal((await provider.stop()).stopped,true);
+ t.after(async()=>{hook=async()=>{};for(const close of cleanup.toReversed())await close();for(const socket of sockets)socket.destroy();const results=await Promise.all(services.map(s=>s.close()));if(!uncertain)assert.ok(results.every(r=>r.stopped));await authorizations.close();assert.equal((await provider.stop()).stopped,true);
   for(const row of (await store.snapshot('personal')).codingEditorConnections??[]){if(row.upstream)assert.equal(await gone(row.upstream.pid),true);if(row.ingress?.pid)assert.equal(await gone(row.ingress.pid),true);}
   if(!uncertain)assert.deepEqual(await readdir(socketRoot),[]);await rm(socketRoot,{recursive:true});await rm(root,{recursive:true});});
- return{api,service,selected,target,store,socketRoot,providerRoot,provider,async open(){return api.open('personal',selected);},async connect(endpoint){const t=await terminal(endpoint.socketPath,sockets);await api.pinPeer('personal',selected,await peer());await t.upgrade();return t;},get bridges(){return bridges;},set active(v){active=v;},set hook(v){hook=v;},expectUncertain(){uncertain=true;}};
+ return{api,service,selected,target,store,socketRoot,providerRoot,provider,owners,beforeCleanup:fn=>cleanup.push(fn),async open(){return api.open('personal',selected);},async connect(endpoint,pin=p=>api.pinPeer('personal',selected,p)){const t=await terminal(endpoint.socketPath,sockets);await pin(await peer());await t.upgrade();return t;},get bridges(){return bridges;},set active(v){active=v;},set hook(v){hook=v;},expectUncertain(){uncertain=true;}};
 }
 
 test('protected reservation, real ingress and pinned provider compose through acknowledgement and exact retirement',native,async t=>{
@@ -72,4 +75,29 @@ test('a substituted socket is preserved and retirement remains uncertain',native
 test('inactive workspace or an unprivate socket parent prevents a new reservation or native bridge',native,async t=>{
  const f=await fixture(t);f.active=false;await assert.rejects(f.open());assert.equal(f.bridges,0);assert.equal((await f.store.snapshot('personal')).codingEditorConnections,undefined);assert.deepEqual(await readdir(f.socketRoot),[]);
  f.active=true;await chmod(f.socketRoot,0o755);try{await assert.rejects(f.open());assert.equal(f.bridges,0);assert.equal((await f.store.snapshot('personal')).codingEditorConnections,undefined);}finally{await chmod(f.socketRoot,0o700);}
+});
+
+
+async function routed(f) {
+ const events=[],owners={...f.owners,async stopCompartment(){events.push('owner-stop');assert.deepEqual(await readdir(f.socketRoot),[]);return{stopped:true};},async close(){events.push('owner-close');assert.deepEqual(await readdir(f.socketRoot),[]);return[];}};
+ const suite=createSuite({store:f.store,platform:'linux',codingTaskOwners:owners,codingEditorConnections:f.api,agents:{discovery:async()=>[],close:async()=>{}},voice:{discovery:async()=>({available:false})}});
+ f.beforeCleanup(()=>suite.close());await suite.handle('/api/suite/bootstrap');return{suite,events};
+}
+test('signed Suite routes carry the actual protected connection through synthetic acknowledgement and exact retirement',native,async t=>{
+ const f=await fixture(t),{suite}=await routed(f),token='s'.repeat(43),instance={id:randomUUID(),build:'a'.repeat(64)},server=createStudioServer({suite,token,instance,onApplicationStop:()=>suite.close(),bridge:{close(){}}});server.listen(0,'127.0.0.1');await once(server,'listening');
+ f.beforeCleanup(async()=>{server.closeAllConnections();await new Promise((r,j)=>server.close(e=>e?j(e):r()));});const origin='http://127.0.0.1:'+server.address().port;
+ const names={open:'editorConnectionOpen','pin-peer':'editorConnectionPeer',observe:'editorConnectionObserve',stop:'editorConnectionStop',recover:'editorConnectionRecover'};
+ async function call(action,extra={}){const route='/instance/v1/editor-connection-'+action,selection={compartment:'personal',...f.selected,...extra},raw=JSON.stringify({schema:'switchyard-instance/v1',operation:names[action],nonce:randomBytes(32).toString('base64url'),at:Date.now(),instanceId:instance.id,build:instance.build,selection});const sig=createHmac('sha256',token).update(`SWITCHYARD-INSTANCE-V1\nREQUEST\nPOST\n${route}\n`).update(raw).digest('hex');const response=await fetch(origin+route,{method:'POST',headers:{'Content-Type':'application/json','X-Switchyard-Instance-Request':sig},body:raw});assert.equal(response.status,200);const result=await response.json();assert.equal(result.editorConnection.schema,'switchyard-editor-connection-result/v1');assert.deepEqual(result.editorConnection.selection,f.selected);return result.editorConnection.result;}
+ const opened=await call('open'),terminal=await f.connect(opened.endpoint,peer=>call('pin-peer',{peer}));terminal.send({id:1,method:'initialize',params:{clientInfo:{name:'codex_tui',version:'0.166.0'}}});await terminal.message();terminal.send({method:'initialized',params:{}});
+ terminal.send({id:2,method:'thread/resume',params:{threadId:f.target.sessionId,cwd:f.target.repositoryRoot,sandbox:'read-only',approvalPolicy:'on-request'}});await terminal.message();await until(async()=>(await call('observe')).protocolAcknowledged);assert.equal((await call('open')).endpoint,undefined);assert.equal(f.bridges,1);
+ assert.equal((await call('stop')).stoppedVerified,true);assert.equal((await call('recover')).duplicatePrevented,true);assert.deepEqual(await readdir(f.socketRoot),[]);
+});
+test('Suite workspace, mode and shutdown transitions retire editor carriers before original owners',native,async t=>{
+ for(const transition of ['workspace','mode','shutdown']){
+  const f=await fixture(t),{suite,events}=await routed(f);await f.open();
+  if(transition==='workspace'){await suite.handle('/api/suite/compartment/create',{compartment:'second'});await suite.handle('/api/suite/compartment/select',{compartment:'second'});assert.equal(await f.store.selection(),'second');}
+  if(transition==='mode'){const result=await suite.handle('/api/suite/mode',{compartment:'personal',mode:'keyboard-only'});assert.equal(result.ownedProcessesStopped,true);}
+  if(transition==='shutdown')await suite.close();
+  assert.deepEqual(await readdir(f.socketRoot),[]);assert.ok(events.includes(transition==='shutdown'?'owner-close':'owner-stop'));assert.equal((await f.store.snapshot('personal')).codingEditorConnections[0].status,'stopped');
+ }
 });

@@ -133,9 +133,10 @@ export function createCodingEditorJournal({ store, authorizations, now=Date.now 
       });
     });},
     recover(c,input,verify) {const s=selection(input);require(typeof verify==='function');return track(()=>store.withResourceLock('client-launch',key(c,s),async lock=>{
-      require(!closed && !leases.has(key(c,s)));await store.authorize(c);const original=structuredClone(rowFor(await store.snapshot(c),s));
+      require(!closed);await store.authorize(c);const original=structuredClone(rowFor(await store.snapshot(c),s));
       require(original?.schema==='switchyard-editor-connection/v1' && uuid(original.taskId) && digest(original.targetDigest) && digest(original.policyDigest) && Number.isSafeInteger(original.revision) && original.revision>=0);
       if(original.status==='stopped')return {...view(original),duplicatePrevented:true};
+      require(!leases.has(key(c,s)));
       require(['reserved','directory-planned','private','upstream','ingress-reserved','ingress-started','ready','peer-pinned','peer-requested','connected','acknowledged','uncertain'].includes(original.status));
       if(!hostIdentity(original.host))return {...view(original),recoveryBlocked:true};
       const current=async()=>{require(!closed);await store.authorize(c);lock.assert();require(hash(rowFor(await store.snapshot(c),s))===hash(original));};

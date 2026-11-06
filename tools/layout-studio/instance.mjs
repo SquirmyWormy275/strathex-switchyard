@@ -3,6 +3,8 @@ import { createHmac, randomBytes, randomUUID, timingSafeEqual } from "node:crypt
 import { request as httpRequest } from "node:http";
 const routes = { probe: "/instance/v1/probe", stop: "/instance/v1/stop", editorTarget: "/instance/v1/editor-target", editorReview: "/instance/v1/editor-review", editorIssue: "/instance/v1/editor-issue", editorConsume: "/instance/v1/editor-consume", editorReturnTarget: "/instance/v1/editor-return-target" };
 const editorActions = { editorReview: "review", editorIssue: "issue", editorConsume: "consume", editorReturnTarget: "return-target" };
+const connectionActions = { editorConnectionOpen: "open", editorConnectionPeer: "pin-peer", editorConnectionObserve: "observe", editorConnectionStop: "stop", editorConnectionRecover: "recover" };
+for (const [operation, action] of Object.entries(connectionActions)) routes[operation] = "/instance/v1/editor-connection-" + action;
 const schema = "switchyard-instance/v1";
 const mac = (token, direction, route, raw) => createHmac("sha256", token).update(`SWITCHYARD-INSTANCE-V1\n${direction}\nPOST\n${route}\n`).update(raw).digest("hex");
 const same = (a, b) => typeof a === "string" && typeof b === "string" && /^[a-f0-9]{64}$/.test(a) && /^[a-f0-9]{64}$/.test(b) && timingSafeEqual(Buffer.from(a, "hex"), Buffer.from(b, "hex"));
@@ -13,7 +15,7 @@ export function endpointIdentity(endpoint) {
   if (endpoint.schema !== "switchyard-active-endpoint/v1" || !validIdentity(endpoint.instance) || !Number.isSafeInteger(endpoint.pid) || endpoint.pid < 1 || url.protocol !== "http:" || url.hostname !== "127.0.0.1" || url.pathname !== "/" || url.search || url.username || url.password || !token || +url.port < 1024 || +url.port > 65535) throw new Error("This endpoint has no supported authenticated application identity. Preserve the existing instance for inspection.");
   return { url, token, identity: endpoint.instance };
 }
-export function createInstanceGateway({ token, identity, onStop, onEditorTarget, onEditorAuthorization, now = () => Date.now() }) {
+export function createInstanceGateway({ token, identity, onStop, onEditorTarget, onEditorAuthorization, onEditorConnection, now = () => Date.now() }) {
   if (!validIdentity(identity) || !/^[A-Za-z0-9_-]{43}$/.test(token) || typeof onStop !== "function") throw new Error("A private application identity and owned stop handler are required.");
   let stopping = false;
   return async (req, res, origin) => {
@@ -22,14 +24,14 @@ export function createInstanceGateway({ token, identity, onStop, onEditorTarget,
     if (!operation || req.method !== "POST" || req.headers.origin || req.headers["content-type"] !== "application/json") { reject(); return; }
     try {
       const chunks = []; let length = 0;
-      for await (const b of req) { length += b.length; if (length > 2048) throw new Error(); chunks.push(b); }
+      for await (const b of req) { length += b.length; if (length > (operation === "editorConnectionPeer" ? 8192 : 2048)) throw new Error(); chunks.push(b); }
       const raw = Buffer.concat(chunks), supplied = req.headers["x-switchyard-instance-request"];
       if (!same(supplied, mac(token, "REQUEST", req.url, raw))) throw new Error();
       const v = JSON.parse(raw.toString("utf8"));
-      const authorization = Object.hasOwn(editorActions, operation), returning = operation === "editorReturnTarget";
-      const expected = ["at", "build", "instanceId", "nonce", "operation", "schema", ...(operation === "editorTarget" || authorization ? ["selection"] : [])].sort();
+      const authorization = Object.hasOwn(editorActions, operation), returning = operation === "editorReturnTarget", connection = Object.hasOwn(connectionActions, operation);
+      const expected = ["at", "build", "instanceId", "nonce", "operation", "schema", ...(operation === "editorTarget" || authorization || connection ? ["selection"] : [])].sort();
       if (JSON.stringify(Object.keys(v).sort()) !== JSON.stringify(expected) || v.schema !== schema || v.operation !== operation || v.instanceId !== identity.id || v.build !== identity.build || !/^[A-Za-z0-9_-]{43}$/.test(v.nonce) || !Number.isSafeInteger(v.at) || Math.abs(now() - v.at) > 10000) throw new Error();
-      let targetObservation, editorAuthorization;
+      let targetObservation, editorAuthorization, editorConnection;
       if (operation === "editorTarget") {
         const s = v.selection;
         if (stopping || typeof onEditorTarget !== "function" || !s || typeof s !== "object" || Array.isArray(s) || Object.keys(s).sort().join() !== "compartment,loadRequestId,ownerRequestId" || typeof s.compartment !== "string" || !/^[a-z][a-z0-9-]{0,63}$/.test(s.compartment) || ![s.ownerRequestId, s.loadRequestId].every(id => typeof id === "string" && /^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/.test(id))) throw new Error();
@@ -43,7 +45,18 @@ export function createInstanceGateway({ token, identity, onStop, onEditorTarget,
         if (returning) targetObservation = result; else editorAuthorization = result;
         if (stopping) throw new Error();
       }
-      const response = JSON.stringify({ schema, operation, nonce: v.nonce, instanceId: identity.id, build: identity.build, pid: process.pid, origin, status: operation === "stop" || stopping ? "stopping" : "ready", ...(operation === "editorTarget" || returning ? { targetObservation } : {}), ...(authorization && !returning ? { editorAuthorization } : {}) });
+      if (connection) {
+        const s = v.selection, ids = ["ownerRequestId", "loadRequestId", "requestId", "editorId"], pin = operation === "editorConnectionPeer";
+        if (stopping || typeof onEditorConnection !== "function" || !s || typeof s !== "object" || Array.isArray(s) || Object.keys(s).sort().join() !== ["compartment", ...ids, ...(pin ? ["peer"] : [])].sort().join() || typeof s.compartment !== "string" || !/^[a-z][a-z0-9-]{0,63}$/.test(s.compartment) || !ids.every(key => typeof s[key] === "string" && /^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/.test(s[key]))) throw new Error();
+        if (pin) {
+          const p = s.peer;
+          if (!p || typeof p !== "object" || Array.isArray(p) || Object.keys(p).sort().join() !== "birth,executable,executableSha256,pid" || !Number.isSafeInteger(p.pid) || p.pid < 1 || p.pid > 2147483647 || typeof p.birth !== "string" || !/^[1-9][0-9]{0,19}$/.test(p.birth) || typeof p.executable !== "string" || !p.executable.startsWith("/") || Buffer.byteLength(p.executable) > 4096 || /[\\\x00-\x1f\x7f]/.test(p.executable) || typeof p.executableSha256 !== "string" || !/^[a-f0-9]{64}$/.test(p.executableSha256)) throw new Error();
+          Object.freeze(p);
+        }
+        editorConnection = await onEditorConnection(connectionActions[operation], Object.freeze({ ...s }));
+        if (stopping) throw new Error();
+      }
+      const response = JSON.stringify({ schema, operation, nonce: v.nonce, instanceId: identity.id, build: identity.build, pid: process.pid, origin, status: operation === "stop" || stopping ? "stopping" : "ready", ...(operation === "editorTarget" || returning ? { targetObservation } : {}), ...(authorization && !returning ? { editorAuthorization } : {}), ...(connection ? { editorConnection } : {}) });
       if (Buffer.byteLength(response) > 32768) throw new Error();
       res.writeHead(200, { "Content-Type": "application/json", "X-Switchyard-Instance-Response": mac(token, "RESPONSE-200", req.url, response) });
       if (operation === "stop" && !stopping) { stopping = true; res.once("finish", () => { void Promise.resolve().then(onStop).catch(() => {}); }); }

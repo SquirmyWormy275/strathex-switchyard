@@ -90,3 +90,29 @@ test("each signed editor authorization operation has its own closed route and fi
     assert.equal(stops(), 1);
   }, { suite, bridge: { close() {} } });
 });
+
+test("signed editor connections bind exact routes and peer fields, reject browser requests, and fence pending replies at stop", async () => {
+  const calls=[], selection={compartment:'personal',requestId:randomUUID(),editorId:randomUUID(),ownerRequestId:randomUUID(),loadRequestId:randomUUID()};
+  let gate,entered;
+  const suite={async handle(path,body){calls.push({path,body});assert.ok(Object.isFrozen(body));if(body.peer)assert.ok(Object.isFrozen(body.peer));if(gate){entered();await gate;}return{authorityGranted:false};}};
+  await serverFixture(async({endpoint})=>{
+    const origin=new URL(endpoint.url).origin;
+    for(const [suffix,operation] of [['open','editorConnectionOpen'],['pin-peer','editorConnectionPeer'],['observe','editorConnectionObserve'],['stop','editorConnectionStop'],['recover','editorConnectionRecover']]){
+      const route='/instance/v1/editor-connection-'+suffix,selected={...selection,...(suffix==='pin-peer'?{peer:{pid:123,birth:'4',executable:'/synthetic/codex',executableSha256:'a'.repeat(64)}}:{})};
+      const send=async(change={},headers={},destination=route)=>{
+        const raw=JSON.stringify({schema:'switchyard-instance/v1',operation,nonce:randomBytes(32).toString('base64url'),at:Date.now(),instanceId:endpoint.instance.id,build,selection:selected,...change});
+        const signature=createHmac('sha256',token).update(`SWITCHYARD-INSTANCE-V1\nREQUEST\nPOST\n${route}\n`).update(raw).digest('hex');
+        return fetch(origin+destination,{method:'POST',headers:{'Content-Type':'application/json','X-Switchyard-Instance-Request':signature,...headers},body:raw});
+      };
+      const accepted=await send();assert.equal(accepted.status,200);const raw=await accepted.text();assert.equal(JSON.parse(raw).editorConnection.authorityGranted,false);
+      assert.equal(accepted.headers.get('x-switchyard-instance-response'),createHmac('sha256',token).update(`SWITCHYARD-INSTANCE-V1\nRESPONSE-200\nPOST\n${route}\n`).update(raw).digest('hex'));
+      assert.equal(calls.at(-1).path,'/api/suite/coding/codex/editor-connections/'+suffix);assert.deepEqual(calls.at(-1).body,selected);const count=calls.length;
+      for(const change of [{selection:{...selected,prompt:'never'}},{selection:{...selected,requestId:'latest'}},{selection:{...selected,permit:randomUUID()}},{operation:'editorConsume'},{at:Date.now()-11000},{build:'b'.repeat(64)}])assert.equal((await send(change)).status,403);
+      if(suffix==='pin-peer')for(const peer of [null,{...selected.peer,command:'never'},{...selected.peer,pid:0},{...selected.peer,birth:'latest'},{...selected.peer,executable:'relative'}])assert.equal((await send({selection:{...selected,peer}})).status,403);
+      assert.equal((await send({},{Origin:origin})).status,403);assert.equal((await send({},{},'/instance/v1/editor-connection-foreign')).status,403);assert.equal(calls.length,count);
+      if(suffix==='recover'){
+        let release;gate=new Promise(r=>release=r);const ready=new Promise(r=>entered=r),pending=send();await ready;await requestInstance(endpoint,{operation:'stop'});release();assert.equal((await pending).status,403);assert.equal((await send()).status,403);
+      }
+    }
+  },{suite,bridge:{close(){}}});
+});

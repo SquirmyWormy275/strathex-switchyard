@@ -1,4 +1,5 @@
 /** Shared product state and bounded operations behind the authenticated origin. */
+import { createCodingEditorConnections } from "./coding-editor-connections.mjs";
 import { createCodingEditorAuthorizations } from "./coding-editor-authorizations.mjs";
 import { randomUUID, createHash } from "node:crypto";
 import { homedir } from "node:os";
@@ -44,7 +45,7 @@ import { clientRecipe } from "../../integrations/client-recipes.mjs";
 import { linuxProcess } from "./native-process.mjs";
 
 const kinds = ["interruption", "resume", "switch", "handoff", "status", "review", "approval", "failure", "recovery", "other"];
-export function createSuite({ store = createSuiteStore(), platform = process.platform, agents, voice = localVoice(), hypr = runHypr, nativeProcess = linuxProcess, devices, copilot, copilotFactory = createCopilot, coding, codingTaskOwners, codingTaskOwnersFactory = createCodingTaskOwners, codexSubmissions, claudeCoding, claudeSubmissions, keyboardIndicators = createKeyboardIndicators(), taskAuthority, taskAuthorityFactory = createTaskAuthority, repositoryRecovery, repositoryCommits, repositoryExecution, storageSetup, fixtureAdministration, shieldExceptions, clientLaunch, spawnExample = spawn, foreground, scheduleForeground = setInterval, clearForeground = clearInterval } = {}) {
+export function createSuite({ store = createSuiteStore(), platform = process.platform, agents, voice = localVoice(), hypr = runHypr, nativeProcess = linuxProcess, devices, copilot, copilotFactory = createCopilot, coding, codingTaskOwners, codingTaskOwnersFactory = createCodingTaskOwners, codingEditorConnections, codingEditorConnectionsFactory = createCodingEditorConnections, editorRuntimeRoot = process.env.XDG_RUNTIME_DIR, codexSubmissions, claudeCoding, claudeSubmissions, keyboardIndicators = createKeyboardIndicators(), taskAuthority, taskAuthorityFactory = createTaskAuthority, repositoryRecovery, repositoryCommits, repositoryExecution, storageSetup, fixtureAdministration, shieldExceptions, clientLaunch, spawnExample = spawn, foreground, scheduleForeground = setInterval, clearForeground = clearInterval } = {}) {
   agents ??= createAgentService({ store, runtimeRoot: join(process.env.XDG_RUNTIME_DIR || process.env.LOCALAPPDATA || join(homedir(), ".local/state"), "switchyard-design") });
   devices ??= createDeviceService({ store });
   coding ??= createCodingSessions({ store });
@@ -65,6 +66,15 @@ export function createSuite({ store = createSuiteStore(), platform = process.pla
   const copilotTransitions = new Map();
   codingTaskOwners ??= codingTaskOwnersFactory({ store, platform, isActive: async c => { await loadSelection(); return !closed && !copilotTransitions.has(c) && c === activeCompartment && await store.selection() === c; } });
   const codingEditorAuthorizations = createCodingEditorAuthorizations({ store, owners: codingTaskOwners, isActive: async c => { await loadSelection(); return !closed && !copilotTransitions.has(c) && c === activeCompartment && await store.selection() === c; } });
+  const editorConnections = () => {
+    if (platform !== "linux") throw Error("The reviewed editor connection is implemented only on Linux.");
+    return codingEditorConnections ??= codingEditorConnectionsFactory({ store, authorizations: codingEditorAuthorizations, owners: codingTaskOwners, root: editorRuntimeRoot });
+  };
+  const stopEditorConnections = async c => {
+    const result = await codingEditorConnections?.stopCompartment(c);
+    if (result && result.stopped !== true) throw Error("The original editor connection has not verified retirement.");
+    return { stopped: true };
+  };
   copilot ??= copilotFactory({ store, isActive: async c => { await loadSelection(); return !closed && !copilotTransitions.has(c) && c === activeCompartment && await store.selection() === c; } });
   const matrixDiagnostics = createMatrixDiagnostics({ store, devices, isActive: async (c) => { await loadSelection(); return c === activeCompartment; } });
   taskAuthority ??= taskAuthorityFactory({ store, localCommitExecutionImplemented: true, executionActions: connectedExecutionActions(platform), isActive: async c => { await loadSelection(); return c === activeCompartment; }, checkNative: (c, task) => task.provider === "codex" ? coding.status(c, task.id) : claudeCoding.status(c, task.id) });
@@ -186,6 +196,7 @@ export function createSuite({ store = createSuiteStore(), platform = process.pla
         if (activeCompartment !== compartment) {
           await copilot.stopCompartment?.(activeCompartment);
           await matrixDiagnostics.stopCompartment(activeCompartment);
+          await stopEditorConnections(activeCompartment);
           const codingOwnerStop = await codingTaskOwners.stopCompartment(activeCompartment);
           if (codingOwnerStop?.stopped !== true) throw new Error("The original coding task owner has not verified exit; workspace selection was preserved.");
           const executionStop = await repositoryExecution.stopCompartment(activeCompartment), commitStop = await repositoryCommits.stopCompartment(activeCompartment), recoveryStop = await repositoryRecovery.stopCompartment(activeCompartment), clientStop = await clientLaunch.stopCompartment(activeCompartment), authorityStop = await taskAuthority.stopCompartment(activeCompartment), storageStop=await storageSetup.stopCompartment(activeCompartment), fixturesStop=await fixtureAdministration.stopCompartment(activeCompartment), exceptionsStop=await shieldExceptions.stopCompartment(activeCompartment);
@@ -214,7 +225,8 @@ export function createSuite({ store = createSuiteStore(), platform = process.pla
           // Stop the exact print continuation before reconciling the original
           // background inventory, which can briefly report the same session.
           const claudeTextStop = await claudeSubmissions.stopCompartment(compartment).catch(() => ({ stopped: false }));
-          const stopped = await Promise.all([executionStop, commitStop, recoveryStop, clientStop, authorityStop, storageStop, fixturesStop, exceptionsStop, codingTaskOwners.stopCompartment(compartment), foreground.stopCompartment?.(compartment), agents.stopCompartment?.(compartment), coding.stopCompartment?.(compartment), codexSubmissions.stopCompartment(compartment), claudeTextStop, voiceQueue.stopCompartment(compartment), claudeCoding.stopCompartment?.(compartment), ...["custom", "langchain"].map((kind) => stopExample(compartment, kind))]);
+          const editorStop = await stopEditorConnections(compartment).catch(() => ({ stopped: false }));
+          const stopped = await Promise.all([editorStop, executionStop, commitStop, recoveryStop, clientStop, authorityStop, storageStop, fixturesStop, exceptionsStop, codingTaskOwners.stopCompartment(compartment), foreground.stopCompartment?.(compartment), agents.stopCompartment?.(compartment), coding.stopCompartment?.(compartment), codexSubmissions.stopCompartment(compartment), claudeTextStop, voiceQueue.stopCompartment(compartment), claudeCoding.stopCompartment?.(compartment), ...["custom", "langchain"].map((kind) => stopExample(compartment, kind))]);
           result.ownedProcessesStopped = stopped.every((r) => !r || r.stopped !== false && r.status !== "stop-unconfirmed");
           if (!result.ownedProcessesStopped) throw new Error("Keyboard-only mode was saved, but an owned process stop is unconfirmed. No new provider or recording operation is permitted.");
         }
@@ -285,6 +297,20 @@ export function createSuite({ store = createSuiteStore(), platform = process.pla
       if (path === "/api/suite/coding/authority/list") return taskAuthority.list(compartment);
       if (path === "/api/suite/coding/authority/revalidate") return taskAuthority.revalidate(compartment, body.id);
       if (path === "/api/suite/coding/authority/revoke") return taskAuthority.revoke(compartment, body.id);
+      if (path.startsWith("/api/suite/coding/codex/editor-connections/")) {
+        const action = path.slice("/api/suite/coding/codex/editor-connections/".length), ids = ["requestId", "editorId", "ownerRequestId", "loadRequestId"];
+        if (!["open", "pin-peer", "observe", "stop", "recover"].includes(action) || Object.keys(body).some(key => !["compartment", "workspaceBaseUrl", ...ids, ...(action === "pin-peer" ? ["peer"] : [])].includes(key)) || !ids.every(key => typeof body[key] === "string" && /^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/.test(body[key]))) throw Error("Choose one exact editor connection without unrelated fields.");
+        const selection = Object.freeze(Object.fromEntries(ids.map(key => [key, body[key]])));
+        // Retirement needs only protected state access. Admission also requires
+        // the original workspace; the lifecycle rechecks its consumed review.
+        if (!["stop", "recover"].includes(action)) {
+          await loadSelection();
+          if (closed || copilotTransitions.has(compartment) || activeCompartment !== compartment || await store.selection() !== compartment) throw Error("Select the original editor workspace before using its connection.");
+        }
+        const connections = editorConnections();
+        const result = action === "pin-peer" ? await connections.pinPeer(compartment, selection, body.peer) : await connections[action](compartment, selection);
+        return { schema: "switchyard-editor-connection-result/v1", action, selection, result };
+      }
       if (path.startsWith("/api/suite/coding/codex/editor/")) {
         const action = path.slice("/api/suite/coding/codex/editor/".length);
         const fields = { review: [], issue: ["token"], consume: ["permit"], "return-target": [] };
@@ -537,6 +563,13 @@ export function createSuite({ store = createSuiteStore(), platform = process.pla
       if (binding.targetKind === "client-surface") return { available: true, implementation: connection.implementation, provider: binding.provider, roleId: binding.roleId, intent: binding.intent, capability: "launch-only", recipeId: binding.targetId, sessionIdentified: false, evidence: "exact fixed homepage launch request; no account, window focus, resume or conversation identity verified" };
       return { available: true, implementation: connection.implementation, provider: binding.provider, roleId: binding.roleId, intent: binding.intent, evidence: binding.targetKind === "coding-task" ? "exact coding-task identity; runtime status or owned read-only daemon resume, without window focus, completion or mediated-control authority" : "exact owned configuration conversation or authenticated adapter session; not general coding-task control" };
     },
-    async close() { closed = true; const boundaryStops = await Promise.allSettled([codingEditorAuthorizations.close(), codingTaskOwners.close().then(results => { if (!Array.isArray(results) || results.some(r => r?.stopped !== true)) throw new Error("Original coding task owner exit is unconfirmed."); }), copilot.close?.(), matrixDiagnostics.close(), repositoryExecution.close(), repositoryCommits.close(), repositoryRecovery.close(), clientLaunch.close(), taskAuthority.close(), storageSetup.close(), fixtureAdministration.close(), shieldExceptions.close()]); readoutProfiles.close(); for (const timer of monitors.values()) clearForeground(timer); monitors.clear(); for (const key of new Set([...examples.keys(), ...exampleStarts.keys()])) exampleGenerations.set(key, (exampleGenerations.get(key) ?? 0) + 1); await Promise.allSettled(exampleStarts.values()); let claudeStopError; try { await claudeSubmissions.close(); } catch (error) { claudeStopError = error; } await Promise.all([foreground.close?.(), agents.close(), coding.close?.(), codexSubmissions.close(), voiceQueue.close(), claudeCoding.close?.(), keyboardIndicators.close().then(result => { if (result.stopped !== true) throw new Error("Owned indicator probe exit is unconfirmed."); }), ...[...examples.values()].map((child) => stopOwnedChild(child))]); if (claudeStopError) throw claudeStopError; const failedBoundary = boundaryStops.find(r => r.status === "rejected"); if (failedBoundary) throw failedBoundary.reason; }
+    async close() { closed = true; const boundaryStops = await Promise.allSettled([(async () => {
+        let editorError;
+        try { const result = await codingEditorConnections?.close(); if (result && result.stopped !== true) throw Error("Original editor connection retirement is unconfirmed."); } catch (error) { editorError = error; }
+        await codingEditorAuthorizations.close();
+        const results = await codingTaskOwners.close();
+        if (!Array.isArray(results) || results.some(r => r?.stopped !== true)) throw new Error("Original coding task owner exit is unconfirmed.");
+        if (editorError) throw editorError;
+      })(), copilot.close?.(), matrixDiagnostics.close(), repositoryExecution.close(), repositoryCommits.close(), repositoryRecovery.close(), clientLaunch.close(), taskAuthority.close(), storageSetup.close(), fixtureAdministration.close(), shieldExceptions.close()]); readoutProfiles.close(); for (const timer of monitors.values()) clearForeground(timer); monitors.clear(); for (const key of new Set([...examples.keys(), ...exampleStarts.keys()])) exampleGenerations.set(key, (exampleGenerations.get(key) ?? 0) + 1); await Promise.allSettled(exampleStarts.values()); let claudeStopError; try { await claudeSubmissions.close(); } catch (error) { claudeStopError = error; } await Promise.all([foreground.close?.(), agents.close(), coding.close?.(), codexSubmissions.close(), voiceQueue.close(), claudeCoding.close?.(), keyboardIndicators.close().then(result => { if (result.stopped !== true) throw new Error("Owned indicator probe exit is unconfirmed."); }), ...[...examples.values()].map((child) => stopOwnedChild(child))]); if (claudeStopError) throw claudeStopError; const failedBoundary = boundaryStops.find(r => r.status === "rejected"); if (failedBoundary) throw failedBoundary.reason; }
   };
 }

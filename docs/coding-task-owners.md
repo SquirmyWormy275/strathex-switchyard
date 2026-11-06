@@ -481,3 +481,28 @@ failure is retained. [Evidence](evidence/editor-recovery-summary.json).
 Signed routes, typed client responses and retained Terminal activation remain
 unfinished. Native TUI and installed 0.167.0 compatibility are unaccepted. These
 controlled demonstrations do not exercise live accounts, tasks, models or hardware.
+
+## Use signed connection operations
+
+The instance gateway now exposes closed, individually signed open, peer-pin,
+observe, stop and recover requests. Each binds the reviewed editor selection to
+the exact application build, process and nonce. Replies are checked by the typed
+VS Code client; socket endpoints appear only on a fresh successful open. Duplicate
+or historical retirement metadata cannot be interpreted as a current connection.
+Requests carry no browser bearer, prompt, command or automatic retry.
+
+Suite constructs the Linux lifecycle lazily with an existing private runtime root.
+Workspace changes, keyboard-only mode and shutdown join editor retirement before
+stopping original task owners. Uncertain exit blocks workspace selection, reports
+keyboard-only refusal after saving that mode, and still attempts owner shutdown.
+
+Seven complete groups pass 96 tests, including an actual signed HTTP → protected
+journal → Linux ingress/upstream demonstration with synthetic terminal/provider
+messages. Typecheck, compiled extension and CommonJS client checks pass; all exact
+test and build cleanup verifies. A test that sampled acknowledgement before the
+final current-state recheck is retained as failed evidence; bounded observation now
+waits for the actual acknowledgement without changing production ordering.
+[Evidence](evidence/editor-routing-summary.json).
+
+Retained Terminal composition, command activation and native TUI/0.167.0 validation
+remain unfinished or unaccepted. No real account, task, model or hardware action ran.

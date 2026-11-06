@@ -37,8 +37,10 @@ original host/boot, directory, upstream, ingress and terminal identities. Abrupt
 synthetic host loss permits exact stale-socket retirement without provider/account
 access. Live hosts, unidentified spawn windows, missing original-host proof and
 foreign entries remain preserved. Terminal disconnect withdraws acknowledgement
-and joins exact dedicated cleanup. Signed routes, typed responses and the retained
-Terminal still need wiring; native TUI compatibility remains unaccepted.
+and joins exact dedicated cleanup. Signed routes and typed responses now pass seven groups / 96 tests, including
+actual protected lifecycle routing and joined Suite transitions. Retained Terminal
+composition and command activation remain unfinished; native TUI compatibility
+is unaccepted. [Routing evidence](evidence/editor-routing-summary.json).
 [Recovery evidence](evidence/editor-recovery-summary.json),
 [composed lifecycle](evidence/editor-connections-summary.json),
 [relay](evidence/editor-relay-summary.json).
@@ -134,7 +136,7 @@ the installed update or old live provider verifiers without a relevant new chang
    ownership callbacks, which remain doubled in this cohort. The later dedicated original upstream and restricted relay pass their synthetic
    end-to-end check. The protected journal component also passes real-store tests.
    The protected lifecycle and interrupted-host recovery now compose these components.
-   Wire signed routes and the retained Terminal next;
+   Signed routes and typed responses are now connected; compose the retained Terminal next;
    no live task/IDE acknowledgement is granted. [Carrier](evidence/editor-ingress-summary.json),
    [parent lifecycle](evidence/editor-ingress-owner-summary.json).
 4. Continue other ledger requirements, including remaining Shield coverage,

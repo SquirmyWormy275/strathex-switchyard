@@ -15,7 +15,7 @@ async function fixture(t: TestContext) {
   const selected = { compartment: "personal", ownerRequestId: randomUUID(), loadRequestId: randomUUID() };
   const target = { schema: "switchyard-codex-editor-target/v1", ownerRequestId: selected.ownerRequestId, loadRequestId: selected.loadRequestId, taskId: randomUUID(), sessionId: randomUUID(), repositoryRoot: "/exact repository", repositoryIdentity: { device: "1", inode: "2" }, accountFingerprint: "b".repeat(64), permissions: "read-only/on-request", endpoint: { socketPath: "/tmp/exact-private-socket", socketDevice: "1", socketInode: "3", peerPid: 1234, peerBirth: "456", peerExecutableSha256: "c".repeat(64) } };
   const result = () => ({ target, targetDigest: createHash("sha256").update(JSON.stringify(target)).digest("hex"), metadataObserved: true, nativeLoadAcknowledged: true, nativeTaskLoaded: false, authorityGranted: false, terminalLaunched: false, ideAttached: false, modelPromptSubmitted: false, completionVerified: false });
-  const controls: { forged: boolean; afterProbe?: () => Promise<void> | void; alter?: (value: ReturnType<typeof result>) => unknown; alterAuthorization?: (value: any) => unknown; hold?: boolean; routeStatus?: number } = { forged: false };
+  const controls: { forged: boolean; afterProbe?: () => Promise<void> | void; alter?: (value: ReturnType<typeof result>) => unknown; alterAuthorization?: (value: any) => unknown; alterConnection?: (value: any) => unknown; hold?: boolean; routeStatus?: number } = { forged: false };
   const calls: { path: string; bearer: boolean; payload?: unknown }[] = [];
   const gateway = createInstanceGateway({ token, identity, onStop: () => { throw Error("Stop is outside this read-only client"); }, onEditorTarget: async (selection: unknown) => {
     calls.at(-1)!.payload = selection;
@@ -30,11 +30,19 @@ async function fixture(t: TestContext) {
     const value: any = action === "review" ? { status: "requires-confirmation", selection, target, confirmation: { token: randomUUID(), record: { id: randomUUID(), action: "launch_codex_editor", sessionId: target.sessionId, targetSnapshotId: createHash("sha256").update(JSON.stringify(["switchyard-editor-launch/v1", compartment, scopeSelection])).digest("hex"), scopeDigest: "f".repeat(64), reason: "Review this exact synthetic editor.", reauthenticated: false, createdAt: new Date(at).toISOString(), expiresAt: new Date(at + 300000).toISOString() } }, terminalLaunchAuthorized: false, terminalLaunched: false, ideAttached: false, modelPromptSubmitted: false, completionVerified: false }
       : { ...selection, status: action === "issue" ? "issued" : "consumed", terminalLaunchAuthorized: action === "consume", terminalLaunched: false, ideAttached: false, modelPromptSubmitted: false, completionVerified: false, targetDigest: result().targetDigest, expiresAt: Date.now() + 30000, ...(action === "issue" ? { permit: randomUUID() } : { target }) };
     return controls.alterAuthorization ? controls.alterAuthorization(value) : value;
+  }, onEditorConnection: async (action: string, input: any) => {
+    calls.at(-1)!.payload = input; if (controls.afterProbe) await controls.afterProbe();
+    const { compartment: _compartment, peer: _peer, ...selection } = input;
+    const flags = { terminalLaunched: false, ideAttached: false, authorityGranted: false, completionVerified: false };
+    const result = ["stop", "recover"].includes(action) ? { ...selection, status: "stopped", protocolAcknowledgementRecorded: true, stoppedVerified: true, ...flags }
+      : { requestId: selection.requestId, status: action === "open" ? "ready" : "acknowledged", peerVerified: action !== "open", protocolAcknowledged: action !== "open", ...flags, ...(action === "open" ? { duplicatePrevented: false, endpoint: { socketPath: "/tmp/synthetic-editor-connection/s", socketDevice: "1", socketInode: "2" } } : {}) };
+    const value = { schema: "switchyard-editor-connection-result/v1", action, selection, result };
+    return controls.alterConnection ? controls.alterConnection(value) : value;
   } });
   let origin: string;
   const server = createServer(async (req, res) => {
     calls.push({ path: req.url ?? "", bearer: Boolean(req.headers.authorization) });
-    assert.ok(["/instance/v1/editor-target", "/instance/v1/editor-review", "/instance/v1/editor-issue", "/instance/v1/editor-consume", "/instance/v1/editor-return-target"].includes(req.url!)); assert.equal(req.headers.authorization, undefined); assert.equal(req.headers.origin, undefined);
+    assert.ok(["/instance/v1/editor-target", "/instance/v1/editor-review", "/instance/v1/editor-issue", "/instance/v1/editor-consume", "/instance/v1/editor-return-target", ...["open", "pin-peer", "observe", "stop", "recover"].map(action => "/instance/v1/editor-connection-"+action)].includes(req.url!)); assert.equal(req.headers.authorization, undefined); assert.equal(req.headers.origin, undefined);
     if (controls.hold) return;
     if (controls.forged) { res.end(JSON.stringify({ status: "ready" })); return; }
     await gateway(req, res, origin);
@@ -130,4 +138,40 @@ test("signed return transport binds all four editor identities and refuses extra
   assert.equal(f.calls.length, 1);
   f.controls.alter = v => ({ ...v, authorityGranted: true }); await assert.rejects(f.client.returnEditorTarget(selected));
   assert.equal(f.calls.some(row => row.bearer), false);
+});
+
+
+test("signed connection client binds all five operations and keeps historical cleanup distinct from current acknowledgement", { skip: process.platform !== "linux" }, async t => {
+  const f = await fixture(t), selected = { ...f.selected, requestId: randomUUID(), editorId: randomUUID() }, peer = { pid: 123, birth: "456", executable: "/synthetic/codex", executableSha256: "a".repeat(64) };
+  const opened = await f.client.openEditorConnection(selected); assert.ok("endpoint" in opened); assert.ok(Object.isFrozen(opened.endpoint)); assert.equal(opened.protocolAcknowledged, false);
+  const pinned = await f.client.pinEditorPeer({ ...selected, peer }); assert.equal(pinned.protocolAcknowledged, true); assert.equal(pinned.ideAttached, false);
+  const observed = await f.client.observeEditorConnection(selected); assert.ok(Object.isFrozen(observed));
+  for (const stopped of [await f.client.stopEditorConnection(selected), await f.client.recoverEditorConnection(selected)]) { assert.equal(stopped.stoppedVerified, true); assert.equal(stopped.protocolAcknowledgementRecorded, true); assert.equal("protocolAcknowledged" in stopped, false); }
+  assert.deepEqual(f.calls.map(c => c.path), ["open", "pin-peer", "observe", "stop", "recover"].map(a => "/instance/v1/editor-connection-"+a)); assert.equal(f.calls.some(c => c.bearer), false);
+  assert.deepEqual(f.calls[1].payload, { ...selected, peer }); assert.ok(Object.isFrozen((f.calls[1].payload as any).peer));
+});
+test("connection client rejects substituted signed identities, endpoint fields and unsupported authority claims", { skip: process.platform !== "linux" }, async t => {
+  for (const mutate of [
+    (v: any) => { v.action = "recover"; }, (v: any) => { v.selection.editorId = randomUUID(); }, (v: any) => { v.result.requestId = randomUUID(); },
+    (v: any) => { v.result.ideAttached = true; }, (v: any) => { v.result.endpoint.socketPath = "/tmp/../foreign"; }, (v: any) => { v.result.endpoint.token = "PRIVATE"; },
+    (v: any) => { v.result.duplicatePrevented = true; }, (v: any) => { v.result.protocolAcknowledged = true; }, (v: any) => { v.result.command = "never"; }
+  ]) {
+    const f = await fixture(t), selected = { ...f.selected, requestId: randomUUID(), editorId: randomUUID() }; f.controls.alterConnection = value => { mutate(value); return value; }; await assert.rejects(f.client.openEditorConnection(selected)); assert.equal(f.calls.length, 1);
+  }
+  const f = await fixture(t), selected = { ...f.selected, requestId: randomUUID(), editorId: randomUUID() };
+  for (const extra of [{ command: "never" }, { permit: randomUUID() }, { requestId: "latest" }]) await assert.rejects(f.client.openEditorConnection({ ...selected, ...extra } as any));
+  for (const peer of [{ pid: 1, birth: "2", executable: "/x", executableSha256: "a".repeat(64), command: "never" }, { pid: 1, birth: "2", executable: "/tmp/../x", executableSha256: "a".repeat(64) }]) await assert.rejects(f.client.pinEditorPeer({ ...selected, peer }));
+  assert.equal(f.calls.length, 0);
+});
+test("connection response loss or replacement never retries opening and duplicate metadata yields no endpoint", { skip: process.platform !== "linux" }, async t => {
+  for (const drift of ["forged", "instance", "duplicate", "cancel"]) {
+    const f = await fixture(t), selected = { ...f.selected, requestId: randomUUID(), editorId: randomUUID() };
+    if (drift === "forged") f.controls.forged = true;
+    if (drift === "instance") f.controls.afterProbe = () => writeFile(f.endpointPath, JSON.stringify({ ...f.endpoint, pid: process.pid + 1 }));
+    if (drift === "cancel") f.controls.afterProbe = () => f.client.close();
+    if (drift === "duplicate") f.controls.alterConnection = v => ({ ...v, result: { ...v.selection, status: "ready", protocolAcknowledgementRecorded: false, stoppedVerified: false, terminalLaunched: false, ideAttached: false, authorityGranted: false, completionVerified: false, duplicatePrevented: true } });
+    if (drift === "duplicate") { const value = await f.client.openEditorConnection(selected); assert.equal(value.duplicatePrevented, true); assert.equal("endpoint" in value, false); }
+    else await assert.rejects(f.client.openEditorConnection(selected));
+    assert.equal(f.calls.length, 1);
+  }
 });

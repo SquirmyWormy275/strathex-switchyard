@@ -81,7 +81,7 @@ const extensionTests = ["commands", "companion-bridge", "controller", "named-pip
   .map((name) => ({
     file: `apps/vscode-extension/test/${name}.test.ts`,
     ...(name === "controller" && process.platform !== "linux" ? { expectedSkipped: 3 } : {}),
-    ...(name === "studio-task-client" && process.platform !== "linux" ? { expectedSkipped: 9 } : {}),
+    ...(name === "studio-task-client" && process.platform !== "linux" ? { expectedSkipped: 12 } : {}),
     ...(name === "studio-editor-launch" && process.platform !== "linux" ? { expectedSkipped: 13 } : {}),
     ...(name === "studio-terminal-process" && process.platform !== "linux" ? { expectedSkipped: 5 } : {}),
     ...(name === "named-pipe-transport" ? { timeoutMs: 120_000, expectedSkipped: process.platform === "win32" ? 1 : 7 } : {})
@@ -273,7 +273,7 @@ export const requiredGroups = [
   { file: "tools/layout-studio/coding-sessions.test.mjs" },
   { file: "tools/layout-studio/coding-editor-authorizations.test.mjs" },
   { file: "tools/layout-studio/coding-editor-journal.test.mjs" },
-  { file: "tools/layout-studio/coding-editor-connections.test.mjs", ...(process.platform !== "linux" ? { expectedSkipped: 8 } : {}) },
+  { file: "tools/layout-studio/coding-editor-connections.test.mjs", ...(process.platform !== "linux" ? { expectedSkipped: 10 } : {}) },
   { file: "tools/layout-studio/codex-editor-recovery.test.mjs", ...(process.platform !== "linux" ? { expectedSkipped: 3 } : {}) },
   { file: "tools/layout-studio/coding-task-owners.test.mjs", ...(process.platform !== "linux" ? { expectedSkipped: 2 } : {}) },
   { file: "tools/layout-studio/codex-stdio-tasks.test.mjs" },

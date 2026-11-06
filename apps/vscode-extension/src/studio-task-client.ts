@@ -99,6 +99,55 @@ function editorAuthorization(value: unknown, selected: StudioEditorRequest, oper
   return Object.freeze(value) as unknown as StudioEditorAuthorization;
 }
 
+export interface StudioEditorPeer {
+  readonly pid: number; readonly birth: string; readonly executable: string; readonly executableSha256: string;
+}
+export interface StudioEditorConnectionObservation {
+  readonly requestId: string; readonly status: string; readonly peerVerified: boolean; readonly protocolAcknowledged: boolean;
+  readonly terminalLaunched: false; readonly ideAttached: false; readonly authorityGranted: false; readonly completionVerified: false;
+}
+export interface StudioEditorConnectionRecord {
+  readonly requestId: string; readonly editorId: string; readonly ownerRequestId: string; readonly loadRequestId: string;
+  readonly status: string; readonly protocolAcknowledgementRecorded: boolean; readonly stoppedVerified: boolean;
+  readonly terminalLaunched: false; readonly ideAttached: false; readonly authorityGranted: false; readonly completionVerified: false;
+  readonly duplicatePrevented?: true; readonly recoveryBlocked?: true;
+}
+export interface StudioEditorConnectionReady extends StudioEditorConnectionObservation {
+  readonly duplicatePrevented: false;
+  readonly endpoint: Readonly<{ socketPath: string; socketDevice: string; socketInode: string }>;
+}
+type ConnectionAction = "open" | "pin-peer" | "observe" | "stop" | "recover";
+const connectionOperations = { open: "editorConnectionOpen", "pin-peer": "editorConnectionPeer", observe: "editorConnectionObserve", stop: "editorConnectionStop", recover: "editorConnectionRecover" } as const;
+type ConnectionOperation = typeof connectionOperations[ConnectionAction];
+function editorPeer(value: unknown): StudioEditorPeer {
+  requireValue(object(value) && keys(value, ["pid", "birth", "executable", "executableSha256"]) && Number.isSafeInteger(value.pid) && (value.pid as number)>0 && (value.pid as number)<=2147483647 && typeof value.birth === "string" && /^[1-9][0-9]{0,19}$/.test(value.birth) && hash(value.executableSha256));
+  requireValue(typeof value.executable === "string" && isAbsolute(value.executable) && normalize(value.executable) === value.executable && Buffer.byteLength(value.executable)<=4096 && !/[\\\x00-\x1f\x7f]/.test(value.executable));
+  return Object.freeze({ ...value }) as unknown as StudioEditorPeer;
+}
+function connectionResult(value: unknown, selected: StudioEditorRequest, action: ConnectionAction): StudioEditorConnectionObservation | StudioEditorConnectionReady | StudioEditorConnectionRecord {
+  requireValue(object(value) && keys(value, ["schema", "action", "selection", "result"]) && value.schema === "switchyard-editor-connection-result/v1" && value.action === action && object(value.selection) && keys(value.selection, editorIds) && editorIds.every(key => (value.selection as Record<string, unknown>)[key] === selected[key]));
+  const result = value.result, flags = ["terminalLaunched", "ideAttached", "authorityGranted", "completionVerified"];
+  requireValue(object(result) && result.requestId === selected.requestId && flags.every(key => result[key] === false));
+  if (action === "stop" || action === "recover" || action === "open" && result.duplicatePrevented === true) {
+    const extra = [...(result.duplicatePrevented === true ? ["duplicatePrevented"] : []), ...(result.recoveryBlocked === true ? ["recoveryBlocked"] : [])];
+    requireValue(keys(result, [...editorIds, "status", "protocolAcknowledgementRecorded", "stoppedVerified", ...flags, ...extra]) && editorIds.every(key => result[key] === selected[key]));
+    requireValue(typeof result.protocolAcknowledgementRecorded === "boolean" && ["reserved", "directory-planned", "private", "upstream", "ingress-reserved", "ingress-started", "ready", "peer-pinned", "peer-requested", "connected", "acknowledged", "uncertain", "stopped"].includes(result.status as string) && result.stoppedVerified === (result.status === "stopped"));
+    requireValue(action === "recover" || result.recoveryBlocked === undefined);
+    if (action === "stop") requireValue(["stopped", "uncertain"].includes(result.status as string));
+    return Object.freeze(result) as unknown as StudioEditorConnectionRecord;
+  }
+  const opening = action === "open";
+  requireValue(keys(result, ["requestId", "status", "peerVerified", "protocolAcknowledged", ...flags, ...(opening ? ["endpoint", "duplicatePrevented"] : [])]));
+  requireValue(["ready", "peer-requested", "connected", "acknowledged"].includes(result.status as string) && typeof result.peerVerified === "boolean" && typeof result.protocolAcknowledged === "boolean" && result.protocolAcknowledged === (result.status === "acknowledged") && (!result.protocolAcknowledged || result.peerVerified));
+  if (opening) {
+    const endpoint = result.endpoint;
+    requireValue(result.duplicatePrevented === false && result.status === "ready" && result.peerVerified === false && object(endpoint) && keys(endpoint, ["socketPath", "socketDevice", "socketInode"]) && integer(endpoint.socketDevice) && integer(endpoint.socketInode));
+    requireValue(typeof endpoint.socketPath === "string" && isAbsolute(endpoint.socketPath) && normalize(endpoint.socketPath) === endpoint.socketPath && Buffer.byteLength(endpoint.socketPath)<=100 && !/[\\\x00-\x1f\x7f]/.test(endpoint.socketPath));
+    Object.freeze(endpoint);
+  }
+  return Object.freeze(result) as unknown as StudioEditorConnectionObservation | StudioEditorConnectionReady;
+}
+
 /** Signed target/review/permit transport. No command registration, task load or terminal launch. */
 export class StudioTaskClient {
   private readonly active = new Set<ClientRequest>();
@@ -141,13 +190,13 @@ export class StudioTaskClient {
       req.once("close", () => { clearTimeout(timer); this.active.delete(req); }); req.once("error", reject); req.end(body);
     });
   }
-  private async exchange(operation: "editorReturnTarget" | "editorTarget" | "editorReview" | "editorIssue" | "editorConsume", selected: StudioEditorSelection): Promise<unknown> {
-    const e = await this.endpoint(), route = { editorTarget: "/instance/v1/editor-target", editorReview: "/instance/v1/editor-review", editorIssue: "/instance/v1/editor-issue", editorConsume: "/instance/v1/editor-consume", editorReturnTarget: "/instance/v1/editor-return-target" }[operation], nonce = randomBytes(32).toString("base64url");
+  private async exchange(operation: ConnectionOperation | "editorReturnTarget" | "editorTarget" | "editorReview" | "editorIssue" | "editorConsume", selected: StudioEditorSelection): Promise<unknown> {
+    const e = await this.endpoint(), route = { editorTarget: "/instance/v1/editor-target", editorReview: "/instance/v1/editor-review", editorIssue: "/instance/v1/editor-issue", editorConsume: "/instance/v1/editor-consume", editorReturnTarget: "/instance/v1/editor-return-target", editorConnectionOpen: "/instance/v1/editor-connection-open", editorConnectionPeer: "/instance/v1/editor-connection-pin-peer", editorConnectionObserve: "/instance/v1/editor-connection-observe", editorConnectionStop: "/instance/v1/editor-connection-stop", editorConnectionRecover: "/instance/v1/editor-connection-recover" }[operation], nonce = randomBytes(32).toString("base64url");
     const body = JSON.stringify({ schema: "switchyard-instance/v1", operation, nonce, at: Date.now(), instanceId: e.instance.id, build: e.instance.build, selection: selected });
     const proof = await this.post(new URL(route, e.url.origin), body, { "X-Switchyard-Instance-Request": mac(e.token, "REQUEST", route, body) });
     requireValue(proof.status === 200 && hash(proof.signature) && timingSafeEqual(Buffer.from(proof.signature, "hex"), Buffer.from(mac(e.token, "RESPONSE-200", route, proof.body), "hex")));
     const identity: unknown = JSON.parse(proof.body);
-    const field = operation === "editorTarget" || operation === "editorReturnTarget" ? "targetObservation" : "editorAuthorization";
+    const field = operation.startsWith("editorConnection") ? "editorConnection" : operation === "editorTarget" || operation === "editorReturnTarget" ? "targetObservation" : "editorAuthorization";
     requireValue(object(identity) && keys(identity, ["schema", "operation", "nonce", "instanceId", "build", "pid", "origin", "status", field]) && identity.schema === "switchyard-instance/v1" && identity.operation === operation && identity.nonce === nonce && identity.instanceId === e.instance.id && identity.build === e.instance.build && identity.pid === e.pid && identity.origin === e.url.origin && identity.status === "ready");
     requireValue((await this.endpoint()).bytes === e.bytes);
     await this.current(); return identity[field];
@@ -160,5 +209,22 @@ export class StudioTaskClient {
   async reviewEditor(input: StudioEditorRequest): Promise<StudioEditorReview> { const selected = editorSelection(input); return editorReview(await this.exchange("editorReview", selected), selected); }
   async issueEditor(input: StudioEditorRequest & { readonly token: string }): Promise<StudioEditorAuthorization> { const selected = editorSelection(input, "token"); return editorAuthorization(await this.exchange("editorIssue", selected), selected, "editorIssue"); }
   async consumeEditor(input: StudioEditorRequest & { readonly permit: string }): Promise<StudioEditorAuthorization> { const selected = editorSelection(input, "permit"); return editorAuthorization(await this.exchange("editorConsume", selected), selected, "editorConsume"); }
+  async openEditorConnection(input: StudioEditorRequest): Promise<StudioEditorConnectionReady | StudioEditorConnectionRecord> {
+    const selected = editorSelection(input); return connectionResult(await this.exchange("editorConnectionOpen", selected), selected, "open") as StudioEditorConnectionReady | StudioEditorConnectionRecord;
+  }
+  async pinEditorPeer(input: StudioEditorRequest & { readonly peer: StudioEditorPeer }): Promise<StudioEditorConnectionObservation> {
+    requireValue(object(input) && keys(input as unknown as Record<string, unknown>, ["compartment", ...editorIds, "peer"]));
+    const { peer: supplied, ...selection } = input, selected = editorSelection(selection), peer = editorPeer(supplied);
+    return connectionResult(await this.exchange("editorConnectionPeer", Object.freeze({ ...selected, peer })), selected, "pin-peer") as StudioEditorConnectionObservation;
+  }
+  async observeEditorConnection(input: StudioEditorRequest): Promise<StudioEditorConnectionObservation> {
+    const selected = editorSelection(input); return connectionResult(await this.exchange("editorConnectionObserve", selected), selected, "observe") as StudioEditorConnectionObservation;
+  }
+  async stopEditorConnection(input: StudioEditorRequest): Promise<StudioEditorConnectionRecord> {
+    const selected = editorSelection(input); return connectionResult(await this.exchange("editorConnectionStop", selected), selected, "stop") as StudioEditorConnectionRecord;
+  }
+  async recoverEditorConnection(input: StudioEditorRequest): Promise<StudioEditorConnectionRecord> {
+    const selected = editorSelection(input); return connectionResult(await this.exchange("editorConnectionRecover", selected), selected, "recover") as StudioEditorConnectionRecord;
+  }
   close(): void { this.closed = true; for (const request of this.active) request.destroy(Error("Switchyard editor observation stopped.")); }
 }

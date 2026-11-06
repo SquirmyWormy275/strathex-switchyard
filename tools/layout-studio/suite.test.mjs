@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { randomUUID } from "node:crypto";
 import { EventEmitter, once } from "node:events";
 import { mkdtemp, readFile, writeFile, mkdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -19,6 +20,27 @@ async function fixture(fn) {
   const store = createSuiteStore({ root, secrets });
   try { await fn({ root, store, keys, secrets }); } finally { await rm(root, { recursive: true, force: true }); }
 }
+
+test("editor connection initialization is lazy, Linux-only and rejects unrelated fields before construction",()=>fixture(async({store})=>{
+  await store.initialize('personal');const ids={requestId:randomUUID(),editorId:randomUUID(),ownerRequestId:randomUUID(),loadRequestId:randomUUID()};
+  for(const platform of ['linux','win32']){
+    let constructed=0;const suite=createSuite({store,platform,codingEditorConnectionsFactory:()=>{constructed++;throw Error('synthetic construction refused');},agents:{discovery:async()=>[],close:async()=>{}},voice:{discovery:async()=>({available:false})}});
+    try{
+      await suite.handle('/api/suite/bootstrap');assert.equal(constructed,0);
+      await assert.rejects(suite.handle('/api/suite/coding/codex/editor-connections/open',{...ids,command:'never'}),/unrelated fields/);assert.equal(constructed,0);
+      await assert.rejects(suite.handle('/api/suite/coding/codex/editor-connections/open',ids),platform==='linux'?/synthetic construction/:/only on Linux/);assert.equal(constructed,platform==='linux'?1:0);
+    }finally{await suite.close();}
+  }
+}));
+test("uncertain editor cleanup preserves workspace selection, saves keyboard-only refusal and still joins owner shutdown",()=>fixture(async({store})=>{
+  const calls=[],editor={stopCompartment:async()=>{calls.push('editor-stop');return{stopped:false};},close:async()=>{calls.push('editor-close');return{stopped:false};}};
+  const owner={stopCompartment:async()=>{calls.push('owner-stop');return{stopped:true};},close:async()=>{calls.push('owner-close');return[];}};
+  const suite=createSuite({store,codingEditorConnections:editor,codingTaskOwners:owner,agents:{discovery:async()=>[],close:async()=>{}},voice:{discovery:async()=>({available:false})}});
+  await suite.handle('/api/suite/bootstrap');await suite.handle('/api/suite/compartment/create',{compartment:'second'});
+  await assert.rejects(suite.handle('/api/suite/compartment/select',{compartment:'second'}),/editor connection/);assert.equal(await store.selection(),'personal');assert.deepEqual(calls,['editor-stop']);
+  await assert.rejects(suite.handle('/api/suite/mode',{mode:'keyboard-only'}),/stop is unconfirmed/);assert.equal((await store.snapshot('personal')).mode,'keyboard-only');assert.deepEqual(calls.slice(-2),['editor-stop','owner-stop']);
+  await assert.rejects(suite.close(),/editor connection retirement/);assert.deepEqual(calls.slice(-2),['editor-close','owner-close']);
+}));
 
 test("permission-bound snapshots use fresh authenticated state and never cache an unavailable compartment key", () => fixture(async ({ root, store, keys, secrets }) => {
   await store.initialize("personal"); await store.initialize("work", "work");
