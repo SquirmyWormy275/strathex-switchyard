@@ -14,9 +14,26 @@ test("fixed Node imports retain only known method presence and exact image hash,
 function stdio() { return { schema: "switchyard-restricted-child-stdio/v1", standardHandles: 3, inheritanceRestricted: true, stdinEof: true, stdoutBytes: 0, stderrBytes: 0, outputBounded: true, handlesClosedVerified: true, drainsCompleted: true, stderr: { category: "empty", function: null, code: null, sourceFile: null, sourceLine: null } }; }
 function sample() { return { success: true, nativeRestrictedHostProof: {
   standardIo: stdio(),
+  selfTokenQueryAccessVerified: true,
+  selfTokenQueryAcl: ["cold-probe", "node-owner"].map(scope => ({ schema: "switchyard-child-self-query-acl/v1", scope, status: "verified", grantedMask: 8, changeRequested: true, beforeAclSha256: "a".repeat(64), afterAclSha256: "b".repeat(64), originalAcesPreserved: true, exactQueryEntryVerified: true, tokenRestrictionsRechecked: true, handlesClosedVerified: true, buffersClearedVerified: true })),
   schema: "switchyard-restricted-host-process-proof/v1", success: true, processCreationApi: "CreateProcessAsUserW", consoleCreationMode: "detached-process", startupDesktop: "owned-noninteractive", interactiveDesktopInherited: false, privateDesktopClosedVerified: true, creatorPrivileges: { quotaAssigned: true, quotaEnabled: false, assignPrimaryAssigned: false, assignPrimaryEnabled: false, impersonateAssigned: true, impersonateEnabled: true }, creatorQuotaRestoredVerified: true, restrictingSidListVerified: true, restrictingSidCount: 4, primaryTokenVerified: true, sameUserVerified: true, mediumIntegrityVerified: true, administratorsDenyOnlyVerified: true, volumePrivilegeAbsentVerified: true, onlyTraversePrivilegeAssignedVerified: true, historicalFilteredFlags: [false, false, false], historicalFilterBytes: [1, 1, 1], tokenRecheckedAfterExit: true, treeExitVerified: true, hostOwnerChecks: 8,
   hostOwner: { schema: "switchyard-native-broker-owner-proof/v1", success: true, checks: Array.from({ length: 8 }, (_, i) => "synthetic independently verified boundary " + i), nativeExitVerified: true, fixtureRemoved: true, ordinaryUserToken: false, guestLaunched: false, setupRequested: false, accountCreated: false }, ordinaryUserAccountAccepted: false, guestLaunched: false, accountCreated: false
 } }; }
+test("a self-query ACL correction cannot accept broader access, missing original restrictions, replayed hashes or incomplete mutation evidence", () => {
+  assert.equal(verifyRestrictedOwnerReport(sample()).selfTokenQueryAccessVerified, true);
+  for (const mutate of [p => { p.selfTokenQueryAccessVerified = false; }, p => { delete p.selfTokenQueryAcl; }, p => { p.selfTokenQueryAcl.pop(); }, p => { p.selfTokenQueryAcl[1].scope = "cold-probe"; }, p => { p.selfTokenQueryAcl[0].grantedMask = 10; }, p => { p.selfTokenQueryAcl[0].status = "apply-requested"; }, p => { p.selfTokenQueryAcl[0].beforeAclSha256 = null; }, p => { p.selfTokenQueryAcl[0].afterAclSha256 = "a".repeat(64); }, p => { p.selfTokenQueryAcl[0].changeRequested = false; }, p => { p.selfTokenQueryAcl[0].sid = "NEVER_RETAIN"; }, ...["originalAcesPreserved", "exactQueryEntryVerified", "tokenRestrictionsRechecked", "handlesClosedVerified", "buffersClearedVerified"].map(k => p => { p.selfTokenQueryAcl[0][k] = false; })]) {
+    const value = sample(); mutate(value.nativeRestrictedHostProof); assert.throws(() => verifyRestrictedOwnerReport(value));
+  }
+  const idempotent = sample(); idempotent.nativeRestrictedHostProof.selfTokenQueryAcl[1].changeRequested = false; idempotent.nativeRestrictedHostProof.selfTokenQueryAcl[1].beforeAclSha256 = "b".repeat(64); assert.ok(verifyRestrictedOwnerReport(idempotent));
+  for (const status of ["reserved", "apply-requested", "readback"]) {
+    const row = { ...sample().nativeRestrictedHostProof.selfTokenQueryAcl[0], status, afterAclSha256: null, originalAcesPreserved: false, exactQueryEntryVerified: false, tokenRestrictionsRechecked: false, handlesClosedVerified: false };
+    const input = { schema: "switchyard-storage-broker-protocol-proof/v1", success: false, restrictedHostSelfTokenQueryAcl: [row] };
+    assert.deepEqual(storageBrokerFailureEvidence(input).restrictedHostSelfTokenQueryAcl, [row]); assert.throws(() => verifyRestrictedOwnerReport(input));
+    for (const changes of [{ grantedMask: 0x1fffff }, { sid: "NEVER_RETAIN" }, { status: "NEVER_RETAIN" }, { beforeAclSha256: "NEVER_RETAIN" }]) {
+      const projected = storageBrokerFailureEvidence({ ...input, restrictedHostSelfTokenQueryAcl: [{ ...row, ...changes }] }); assert.equal(projected.restrictedHostSelfTokenQueryAcl, undefined); assert.equal(JSON.stringify(projected).includes("NEVER_RETAIN"), false);
+    }
+  }
+});
 test("child standard output evidence accepts only closed fixed diagnostics, with no path or account disclosure", () => {
   const pipes = { ...stdio(), stderrBytes: 120, stderr: { category: "assertion", function: "uv_pipe_open", code: "EINVAL", sourceFile: "node.cc", sourceLine: 1128 } };
   const input = { schema: "switchyard-storage-broker-protocol-proof/v1", success: false, restrictedHostStdio: pipes, restrictedHostChildExit: { waitResult: 0, exitCode: 134, resultAvailable: false } };

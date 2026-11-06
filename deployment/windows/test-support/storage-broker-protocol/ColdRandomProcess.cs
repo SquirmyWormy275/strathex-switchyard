@@ -45,6 +45,7 @@ internal static partial class NativeRestrictedHostProof
             }
             pipes.ChildStarted(); Native(IsProcessInJob(child, job, out bool member)); Require(member);
             Native(OpenProcessToken(child.DangerousGetHandle(), 8, out token)); VerifyToken(token, user, recordHistory: false);
+            PermitOwnTokenQuery(child, user, "cold-probe");
             CaptureTokenObjectSecurity(child, user, "cold-probe");
             Native(ResumeThread(thread) != uint.MaxValue);
             wait = WaitForSingleObject(child, 10000); Require(wait is 0 or 258);
@@ -82,6 +83,13 @@ internal static partial class NativeRestrictedHostProof
             }
         }
         Require(child != null && token != null && child.IsClosed && thread!.IsClosed && token.IsClosed);
+        if (validReport && report != null)
+        {
+            var access = report.selfTokenAccess;
+            SelfTokenQueryAccessVerified = access.query.opened && access.query.error == 0 && access.query.closeError == 0
+                && !access.queryDuplicate.opened && access.queryDuplicate.error == 5
+                && !access.queryDuplicateImpersonate.opened && access.queryDuplicateImpersonate.error == 5;
+        }
         return new { schema = "switchyard-cold-restricted-random/v4", executableSha256 = expectedHash, waitResult = wait, exitCode = code, reportValid = validReport, report, primaryTokenVerified = true, tokenRecheckedAfterExit = true, treeExitVerified = true, processHandlesClosedVerified = true, creatorQuotaRestoredVerified = true, standardIo = stdio, nodeStartupAccepted = false };
     }
 }

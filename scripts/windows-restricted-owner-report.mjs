@@ -1,6 +1,17 @@
 /** Validate CI proof claims only. This cannot create a token, grant trust or accept a guest/account. */
 import assert from "node:assert/strict";
 const object = value => value !== null && typeof value === "object" && !Array.isArray(value);
+const hashOrNull = value => value === null || typeof value === "string" && /^[a-f0-9]{64}$/.test(value);
+function validSelfQueryAcl(value, complete = false) {
+  const flags = ["originalAcesPreserved", "exactQueryEntryVerified", "tokenRestrictionsRechecked", "handlesClosedVerified", "buffersClearedVerified"];
+  return Array.isArray(value) && value.length <= 2 && (!complete || value.length === 2) && value.every((r, i) => object(r)
+    && Object.keys(r).sort().join() === ["schema", "scope", "status", "grantedMask", "changeRequested", "beforeAclSha256", "afterAclSha256", ...flags].sort().join()
+    && r.schema === "switchyard-child-self-query-acl/v1" && r.scope === ["cold-probe", "node-owner"][i]
+    && ["reserved", "apply-requested", "readback", "verified"].includes(r.status) && r.grantedMask === 8 && typeof r.changeRequested === "boolean"
+    && hashOrNull(r.beforeAclSha256) && hashOrNull(r.afterAclSha256) && flags.every(k => typeof r[k] === "boolean")
+    && (!complete || r.status === "verified" && flags.every(k => r[k] === true) && r.beforeAclSha256 !== null && r.afterAclSha256 !== null
+      && r.changeRequested === (r.beforeAclSha256 !== r.afterAclSha256)));
+}
 const rngImports = { BCryptGenRandom: "bcrypt.dll", CryptAcquireContextW: "advapi32.dll", CryptGenRandom: "advapi32.dll", CryptReleaseContext: "advapi32.dll" };
 /** Static imports are observations, not proof of the runtime OpenSSL branch. */
 export function parseNodeRngImports(text, nodeSha256) {
@@ -37,6 +48,7 @@ export function storageBrokerFailureEvidence(value) {
   if (!object(value) || value.schema !== "switchyard-storage-broker-protocol-proof/v1" || value.success !== false) return undefined;
   const fields = ["schema", "success", "errorCategory", "nativeCode", "errorHResult", "nativeExchangeChecks", "failedCheckPhase", "restrictedHostPhase", "restrictedHostCreatorPrivileges", "restrictedHostHistoricalFilterFlags", "restrictedHostHistoricalFilterBytes", "restrictedHostTokenRead"];
   const result = Object.fromEntries(fields.filter(key => Object.hasOwn(value, key)).map(key => [key, structuredClone(value[key])]));
+  if (validSelfQueryAcl(value.restrictedHostSelfTokenQueryAcl)) result.restrictedHostSelfTokenQueryAcl = structuredClone(value.restrictedHostSelfTokenQueryAcl);
   const child = value.restrictedHostChildExit;
   const types = { waitResult: "uint", exitCode: "uint", resultAvailable: "boolean", childReportedSuccess: "boolean", ownerReportedSuccess: "boolean", completedChecks: "count", failedPhase: "label", failureCategory: "label" };
   if (object(child) && Object.hasOwn(child, "waitResult") && Object.hasOwn(child, "resultAvailable") && Object.entries(child).every(([key, item]) => Object.hasOwn(types, key) && (types[key] === "boolean" ? typeof item === "boolean" : types[key] === "label" ? item === null || typeof item === "string" && /^[A-Za-z0-9-]{1,80}$/.test(item) : Number.isSafeInteger(item) && item >= 0 && item <= (types[key] === "count" ? 8 : 0xffffffff)))) result.restrictedHostChildExit = structuredClone(child);
@@ -85,14 +97,15 @@ export function storageBrokerFailureEvidence(value) {
   }
   return result;
 }
-const verified = ["privateDesktopClosedVerified", "success", "primaryTokenVerified", "sameUserVerified", "mediumIntegrityVerified", "administratorsDenyOnlyVerified", "volumePrivilegeAbsentVerified", "onlyTraversePrivilegeAssignedVerified", "tokenRecheckedAfterExit", "treeExitVerified", "creatorQuotaRestoredVerified", "restrictingSidListVerified"];
+const verified = ["selfTokenQueryAccessVerified", "privateDesktopClosedVerified", "success", "primaryTokenVerified", "sameUserVerified", "mediumIntegrityVerified", "administratorsDenyOnlyVerified", "volumePrivilegeAbsentVerified", "onlyTraversePrivilegeAssignedVerified", "tokenRecheckedAfterExit", "treeExitVerified", "creatorQuotaRestoredVerified", "restrictingSidListVerified"];
 export function verifyRestrictedOwnerReport(result) {
   assert.equal(result?.success, true); const proof = result.nativeRestrictedHostProof;
   assert.ok(object(proof));
-  const fields = ["schema", ...verified, "processCreationApi", "consoleCreationMode", "standardIo", "startupDesktop", "interactiveDesktopInherited", "creatorPrivileges", "restrictingSidCount", "historicalFilteredFlags", "historicalFilterBytes", "hostOwnerChecks", "hostOwner", "ordinaryUserAccountAccepted", "guestLaunched", "accountCreated"];
+  const fields = ["schema", ...verified, "selfTokenQueryAcl", "processCreationApi", "consoleCreationMode", "standardIo", "startupDesktop", "interactiveDesktopInherited", "creatorPrivileges", "restrictingSidCount", "historicalFilteredFlags", "historicalFilterBytes", "hostOwnerChecks", "hostOwner", "ordinaryUserAccountAccepted", "guestLaunched", "accountCreated"];
   assert.deepEqual(Object.keys(proof).sort(), fields.sort());
   assert.equal(proof.schema, "switchyard-restricted-host-process-proof/v1");
   for (const key of verified) assert.equal(proof[key], true);
+  assert.ok(validSelfQueryAcl(proof.selfTokenQueryAcl, true));
   assert.ok(validStdio(proof.standardIo)); assert.equal(proof.standardIo.outputBounded, true);
   assert.equal(proof.processCreationApi, "CreateProcessAsUserW"); assert.equal(proof.consoleCreationMode, "detached-process"); assert.equal(proof.startupDesktop, "owned-noninteractive"); assert.equal(proof.interactiveDesktopInherited, false); assert.equal(proof.restrictingSidCount, 4); assert.equal(proof.hostOwnerChecks, 8);
   for (const key of ["ordinaryUserAccountAccepted", "guestLaunched", "accountCreated"]) assert.equal(proof[key], false);

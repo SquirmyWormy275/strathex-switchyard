@@ -56,7 +56,7 @@ failure remains; a provider's exact failing operation is still unproved.
 [Native evidence](evidence/windows-self-token-native-summary.json). Native
 `d900499` descriptor readback shows only Administrators, SYSTEM and logon ACEs,
 with no allow entry for the four restricting identities. The direct query denial
-is explained; a minimal query-only correction remains untested. [Readback](evidence/windows-token-security-native-summary.json).
+is explained; a minimal query-only correction now passes two builds and sixteen projection tests; native execution remains pending. [Correction source](evidence/windows-self-query-source-summary.json). [Readback](evidence/windows-token-security-native-summary.json).
 
 The editor launcher can now observe the exact retained terminal's kernel PID,
 process birth and original executable identity while rechecking its consumed
@@ -74,7 +74,7 @@ authority. [Evidence](evidence/editor-protocol-summary.json).
 
 | Checkpoint | Result | Practical limit |
 | --- | --- | --- |
-| Complete Linux `5a2c324` | **247/247 groups; 1,591 passed tests; eleven declared skips.** Every child/tree and exact owned checkout, dependency, build and temporary-parent cleanup verifies. [Receipt](evidence/linux-5a2-complete-summary.json). | Includes active-task editor return and CVSS 4, with provider/editor doubles. Later Windows V4 diagnostic source has separate focused evidence. |
+| Complete Linux `d900499` | **248/248 groups; 1,600 passed tests; eleven declared skips.** Every child/tree and exact owned checkout, dependency, build and temporary-parent cleanup verifies. [Receipt](evidence/linux-d900-complete-summary.json). | Includes exact terminal process observation and token-security diagnostic source. Later protocol witness and query-only correction have separate focused evidence. |
 | Reviewed editor launcher `1508ea9` | Five groups / 54 tests, typecheck, extension build and compiled CommonJS load pass. Generated output is removed. [Evidence](evidence/editor-terminal-launch-summary.json). | Real signed HTTP, encrypted state and Linux leases compose with controlled provider/editor doubles. No actual terminal was launched. |
 | Installed Linux `5a2c324` | Six normal update, eleven owner/editor/severity and seven journal checks pass. All 54 semantic snapshots excluding audit match; 52 sealed files remain byte-identical. Launcher backups and exact bundle cleanup verify. [Evidence](evidence/installed-cvss4-summary.json). | Two verification workspaces receive only the expected recovery/journal audit entries. Offline CVSS 4 keeps critical base severity despite zero supplied environment scores. No live task/provider effects or activated editor. |
 | Earlier installed Linux `2c87c03` | Six update, ten owner/editor/severity and seven journal checks pass. All 54 workspace identities remain; 52 sealed files are byte-identical across update. Launcher backups and exact bundle cleanup verify. [Evidence](evidence/installed-editor-authorization-summary.json). | The two opened verification workspaces are resealed by existing restart recovery. Definitions/package/modes, historical pending bytes and metadata-check state verify separately. No full semantic before-snapshot was retained. Three signed authorization checks are unknown-owner refusals, with no new permit/task/provider effects. |
