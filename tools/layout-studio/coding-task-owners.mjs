@@ -1,6 +1,6 @@
 /** Explicit Linux task-owner registry. Loading needs an exact one-use review; no model or IDE authority. */
 import { createHash } from "node:crypto";
-import { join } from "node:path";
+import { join, posix } from "node:path";
 import { createCodexUnixTasks } from "./codex-unix-tasks.mjs";
 import { retireStoppedCodexListener } from "./codex-owned-listener.mjs";
 import { verifyRepositoryIdentity } from "./coding-task-identity.mjs";
@@ -138,6 +138,28 @@ export function createCodingTaskOwners({ store, root, runtimeRoot, resolveCli, r
       const confirmation = await suiteConfirmations(store, c, "codex", now).issue({ ...loadScope(c, row, state), reason: "Load this exact saved task on its original owned native connection with read-only/on-request permissions. No model turn or IDE attachment is included.", reauthenticated: false });
       await loadBoundary(c, ownerRequestId, resource);
       return { status: "requires-confirmation", confirmation, scope: { ownerRequestId, taskId: row.taskId, sessionId: row.sessionId, repositoryRoot: row.repositoryRoot, accountFingerprint: row.accountFingerprint, permissions: "read-only/on-request" }, modelPromptSubmitted: false, nativeTaskLoaded: false, ideAttached: false };
+    },
+    async editorTarget(c, { ownerRequestId, loadRequestId }) {
+      if (![ownerRequestId, loadRequestId].every(uuid)) throw Error("Choose the original owner and acknowledged load UUIDs.");
+      const resource = live.get(key(c, ownerRequestId)); if (!resource) throw Error("This host does not own the original live task connection.");
+      const boundary = async () => {
+        const owner = await loadBoundary(c, ownerRequestId, resource), state = await store.snapshot(c);
+        const load = state.codingTaskLoads?.find(row => row.requestId === loadRequestId);
+        if (!load || load.schema !== "switchyard-coding-task-load/v1" || load.status !== "loaded" || load.ownerRequestId !== ownerRequestId || load.taskId !== owner.taskId || load.acknowledgedThreadId !== owner.sessionId || load.bindingDigest !== owner.bindingDigest || load.ownershipDigest !== owner.ownershipDigest || load.scopeDigest !== digest(loadScope(c, owner, state)) || !uuid(owner.sessionId)) throw Error("The original acknowledged load and current policy do not verify an exact editor target.");
+        return { owner, load };
+      };
+      const initial = await boundary();
+      if (typeof resource.owner.inspectBinding !== "function") throw Error("This owner cannot recheck its original editor endpoint.");
+      const endpoint = await resource.owner.inspectBinding();
+      const fields = ["socketPath", "socketDevice", "socketInode", "peerPid", "peerBirth", "peerExecutableSha256"];
+      if (!endpoint || Object.keys(endpoint).sort().join() !== fields.sort().join() || typeof endpoint.socketPath !== "string" || !endpoint.socketPath.startsWith("/") || Buffer.byteLength(endpoint.socketPath) > 103 || /[\\\x00-\x20\x7f#?%]/.test(endpoint.socketPath) || ![endpoint.socketDevice, endpoint.socketInode, endpoint.peerBirth].every(v => typeof v === "string" && /^[1-9]\d{0,24}$/.test(v)) || !Number.isSafeInteger(endpoint.peerPid) || endpoint.peerPid < 1 || !/^[a-f0-9]{64}$/.test(endpoint.peerExecutableSha256 ?? "") || digest(endpoint) !== digest(resource.owner.binding)) throw Error("The original editor endpoint identity is incomplete or changed.");
+      const observed = await resource.driver.read(initial.owner.sessionId, initial.owner.repositoryRoot, c);
+      if (observed.id !== initial.owner.sessionId || observed.repositoryRoot !== initial.owner.repositoryRoot || observed.observation !== "idle") throw Error("An editor target requires this exact task to remain idle.");
+      const final = await boundary();
+      if (digest(initial) !== digest(final) || digest(await resource.owner.inspectBinding()) !== digest(endpoint)) throw Error("The original editor target changed during preparation.");
+      if (posix.normalize(endpoint.socketPath) !== endpoint.socketPath || digest(initial) !== digest(await boundary())) throw Error("The editor target or policy changed after endpoint inspection.");
+      const target = { schema: "switchyard-codex-editor-target/v1", ownerRequestId, loadRequestId, taskId: final.owner.taskId, sessionId: final.owner.sessionId, repositoryRoot: final.owner.repositoryRoot, repositoryIdentity: structuredClone(resource.original.repositoryIdentity), accountFingerprint: resource.original.accountFingerprint, permissions: "read-only/on-request", endpoint };
+      return { target, targetDigest: digest(target), metadataObserved: true, nativeLoadAcknowledged: true, nativeTaskLoaded: false, authorityGranted: false, terminalLaunched: false, ideAttached: false, modelPromptSubmitted: false, completionVerified: false };
     },
     async load(c, { ownerRequestId, requestId, token }) {
       if (![ownerRequestId, requestId, token].every(uuid)) throw Error("Use the exact owner UUID, stable load UUID and one-use review token.");

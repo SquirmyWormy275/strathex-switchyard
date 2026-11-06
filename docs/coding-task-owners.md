@@ -69,7 +69,7 @@ IDE attachment remain unaccepted or unfinished. [Exact evidence](evidence/review
 ## Authenticated Studio routes
 
 The `/api/suite/coding/codex/owners/` routes are `list`, `open`, `read`,
-`review-load`, `load`, `loads`, `stop` and `recover`. They accept only each
+`review-load`, `load`, `loads`, `editor-target`, `stop` and `recover`. They accept only each
 operation's exact fields and require the original selected workspace. Generic
 snapshots omit protected owner and load records; `list` and `loads` expose safe
 local IDs, statuses and capability limits.
@@ -110,3 +110,31 @@ A throwing bridge close cannot skip stopping its owned listener; a successful
 listener exit cannot upgrade an uncertain bridge exit. The owner stays retained
 and replacement remains blocked. Twenty registry cases and typecheck pass with
 exact cleanup. [Correction evidence](evidence/independent-task-owner-stop-summary.json).
+
+## Prepare an exact editor target
+
+The authenticated `editor-target` operation accepts only the original
+`ownerRequestId` and `loadRequestId`. It requires a successful, acknowledged load
+on this still-live owner, the original account and repository, unchanged policy
+and an idle task. It returns a closed target identity and digest, including the
+actual private socket and native process identity. The digest is metadata, not a
+credential or permission grant.
+
+An existing connected bridge can survive a replaced socket alias. Before exposing
+a target for a new editor connection, the listener therefore rechecks the original
+private directory, socket parent, socket, alias, native PID/birth, process group,
+session and executable path. The registry repeats load/account/policy checks
+around this asynchronous inspection and the metadata read. It refuses stopped,
+foreign-host, uncertain, replaced, active and malformed targets.
+
+Preparation starts no terminal, performs no second resume and changes no saved
+state. `authorityGranted`, `nativeTaskLoaded`, `terminalLaunched` and `ideAttached`
+remain false. The authenticated editor consumer, effect authorization and exact
+terminal/native attachment acknowledgement are still unfinished. A caller must
+revalidate the original target at its eventual effect boundary.
+
+Four isolated groups pass 75 checks, including an actual Unix listener whose
+original bridge keeps answering after its alias is replaced, while new-editor
+target inspection refuses the replacement. Tests restore only their original
+alias before verified owned retirement. Provider behavior is controlled; no live
+account or actual editor attachment is exercised. [Evidence](evidence/editor-target-preparation-summary.json).

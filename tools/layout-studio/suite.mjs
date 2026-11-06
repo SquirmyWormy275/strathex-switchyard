@@ -287,13 +287,14 @@ export function createSuite({ store = createSuiteStore(), platform = process.pla
         await loadSelection();
         if (closed || copilotTransitions.has(compartment) || activeCompartment !== compartment || await store.selection() !== compartment) throw new Error("Select the original task workspace before using its owned connection.");
         const action = path.slice("/api/suite/coding/codex/owners/".length);
-        const fields = { list: [], open: ["requestId", "taskId"], read: ["ownerRequestId"], "review-load": ["ownerRequestId"], load: ["ownerRequestId", "requestId", "token"], loads: [], stop: ["ownerRequestId"], recover: ["ownerRequestId"] };
+        const fields = { list: [], open: ["requestId", "taskId"], read: ["ownerRequestId"], "review-load": ["ownerRequestId"], load: ["ownerRequestId", "requestId", "token"], "editor-target": ["ownerRequestId", "loadRequestId"], loads: [], stop: ["ownerRequestId"], recover: ["ownerRequestId"] };
         if (!Object.hasOwn(fields, action) || Object.keys(body).some(key => !["compartment", "workspaceBaseUrl", ...fields[action]].includes(key))) throw new Error("Choose one exact task-owner operation without unrelated fields.");
         if (action === "list") return codingTaskOwners.list(compartment);
         if (action === "open") return codingTaskOwners.open(compartment, { requestId: body.requestId, taskId: body.taskId });
         if (action === "read") return codingTaskOwners.read(compartment, body.ownerRequestId);
         if (action === "review-load") return codingTaskOwners.reviewLoad(compartment, body.ownerRequestId);
         if (action === "load") return codingTaskOwners.load(compartment, { ownerRequestId: body.ownerRequestId, requestId: body.requestId, token: body.token });
+        if (action === "editor-target") return codingTaskOwners.editorTarget(compartment, { ownerRequestId: body.ownerRequestId, loadRequestId: body.loadRequestId });
         if (action === "loads") return codingTaskOwners.listLoads(compartment);
         if (action === "stop") return codingTaskOwners.stop(compartment, body.ownerRequestId);
         if (action === "recover") return codingTaskOwners.recover(compartment, body.ownerRequestId);

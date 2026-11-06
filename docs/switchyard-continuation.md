@@ -31,6 +31,8 @@ Keep commits on GitHub regularly. Do not merge or release.
 
 The `359a825` full Linux run now passes 242 groups / 1,534 tests with eleven declared skips and exact staging cleanup. At `d798f4f`, native Windows environment observation rejects the missing-SystemRoot hypothesis; cold restricted Node still fails at `ncrypto::CSPRNG`. [Receipt](evidence/windows-environment-native-summary.json).
 
+The backend now prepares an exact editor target only from an acknowledged load on its original live owner. Fresh socket/alias/process checks refuse a replaced endpoint even when the old metadata bridge survives. Four groups / 75 checks pass with cleanup and typecheck. This grants no terminal authority or IDE attachment; editor consumer composition remains unfinished. [Contract](coding-task-owners.md#prepare-an-exact-editor-target).
+
 ## Current executable state
 
 Use `mise exec node@24.14.0 -- …`. Reuse `.tools/dotnet-8.0.424`; do not download

@@ -57,6 +57,18 @@ export async function openOwnedCodexListener({ executable, cwd, serverNames = []
     get accountFingerprint() { return accountFingerprint ?? null; },
     get privateOwnership() { return { root, rootIdentity: { ...rootIdentity }, endpoint, socketPath, socketIdentity: socketIdentity && { ...socketIdentity }, socketParent: socketParent && { ...socketParent }, aliasIdentity: aliasIdentity && { ...aliasIdentity } }; },
     get closed() { return closed || workerClosed; },
+    async inspectBinding() {
+      await admission(); require(owner.binding);
+      // An existing open bridge can survive a replaced path. An editor would
+      // open a new connection, so recheck every original filesystem identity.
+      require(same(await identity(root), rootIdentity) && same(await identity(dirname(socketPath)), socketParent));
+      require(same(await identity(socketPath), socketIdentity) && (await lstat(socketPath)).isSocket());
+      require(same(await identity(endpoint), aliasIdentity) && (await lstat(endpoint)).isSymbolicLink() && await readlink(endpoint) === socketPath);
+      const p = await processInfo(native.pid);
+      require(p && p.uid === uid && p.birth === native.birth && p.group === guardian.guardianPid && p.session === guardian.guardianPid && await realpath(`/proc/${p.pid}/exe`) === executable);
+      await admission(); require(owner.binding);
+      return { ...binding };
+    },
     async connect() {
       await admission();
       for (const client of clients) if (client.closed) { require((await stopOwnedChild(client.child)).stopped); clients.delete(client); }

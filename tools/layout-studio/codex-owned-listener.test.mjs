@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
-import { copyFile, lstat, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { copyFile, lstat, mkdtemp, readFile, rm, writeFile, rename, symlink } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -35,6 +35,18 @@ test("fresh admission and a committed guardian callback precede every native sta
   const f = await fixture(t); let admissions = 0, committed = false;
   const owner = await f.open({ authorize: async () => { admissions++; }, onReady: async scope => { assert.equal(scope.containment, "owned-linux-session"); assert.equal(await absent(join(f.root, "started")), true); committed = true; } });
   assert.equal(committed, true); assert.ok(admissions >= 4); assert.equal(await absent(join(f.root, "started")), false); await owner.connect(); assert.ok(admissions >= 6);
+});
+test("editor endpoint inspection refuses a replaced alias even while its original metadata bridge remains connected", native, async t => {
+  const f = await fixture(t), owner = await f.open(); await assert.rejects(owner.inspectBinding());
+  const client = await owner.connect(), original = await owner.inspectBinding(); assert.deepEqual(original, owner.binding);
+  const { endpoint, socketPath } = owner.privateOwnership, saved = endpoint + "-original";
+  await rename(endpoint, saved);
+  try {
+    await symlink(socketPath, endpoint);
+    assert.deepEqual(await client.request("fixture/echo", { value: "still original connection" }), { value: "still original connection" });
+    await assert.rejects(owner.inspectBinding(), /original owned Codex listener identity/);
+  } finally { await rm(endpoint); await rename(saved, endpoint); }
+  assert.deepEqual(await owner.inspectBinding(), original); assert.equal((await owner.stop()).stopped, true); await assert.rejects(owner.inspectBinding(), /closed/);
 });
 test("a listening socket is not ready until its exact delayed alias has been published", native, async t => {
   const f = await fixture(t, { aliasDelayMs: 150 }), owner = await f.open();

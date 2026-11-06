@@ -201,6 +201,8 @@ test("authenticated Studio routes compose real protected review/load state witho
   f.beforeCleanup(async()=>{await new Promise((resolve,reject)=>server.close(error=>error?reject(error):resolve()));await server.cleanup();});const origin=`http://127.0.0.1:${server.address().port}`;
   const api=async(action,body={},auth=true)=>{const response=await fetch(origin+"/api/suite/coding/codex/owners/"+action,{method:"POST",headers:{"Content-Type":"application/json",Origin:origin,...(auth?{Authorization:`Bearer ${token}`}:{})},body:JSON.stringify({compartment:"personal",...body})});return {status:response.status,body:await response.json()};};
   const owner=f.request();assert.equal((await api("open",owner,false)).status,401);assert.equal(f.owners.length,0);
+  assert.equal((await api("editor-target",{ownerRequestId:owner.requestId,loadRequestId:randomUUID()},false)).status,401);
+  assert.equal((await api("editor-target",{ownerRequestId:owner.requestId,loadRequestId:randomUUID(),prompt:"never"})).status,409);
   assert.equal((await api("open",{...owner,prompt:"not allowed"})).status,409);assert.equal(f.owners.length,0);
   assert.equal((await api("open",owner)).body.status,"bound");const scope={ownerRequestId:owner.requestId};
   const review=await api("review-load",scope);assert.equal(review.status,200);assert.equal(f.calls.includes("resume"),false);
@@ -237,4 +239,53 @@ test("a failed bridge close still attempts original native owner retirement and 
   const f=await fixture(t),service=f.service(),owner=f.request();await service.open("personal",owner);f.controls.closeThrows=true;
   assert.equal((await service.stop("personal",owner.requestId)).stopped,false);assert.equal(f.calls.filter(c=>c==="owner-stop").length,1);assert.equal((await service.list("personal"))[0].stoppedVerified,false);
   await assert.rejects(f.service().open("personal",f.request()),/retirement/);f.controls.closeThrows=false;assert.equal((await service.stop("personal",owner.requestId)).stopped,true);
+});
+
+async function editorFixture(t) {
+  const f = await routedFixture(t); f.task.sessionId = randomUUID();
+  await f.store.update("personal", "fixture-editor-thread", s => { s.codingSessions[0].sessionId = f.task.sessionId; });
+  const owner = f.request(); await f.api("open", owner);
+  const endpoint = { socketPath: "/tmp/synthetic-private-editor-socket", socketDevice: "1", socketInode: "3", peerPid: 1234, peerBirth: "1", peerExecutableSha256: "c".repeat(64) };
+  f.owners[0].binding = endpoint; f.owners[0].inspectBinding = async () => structuredClone(f.owners[0].binding);
+  const review = await f.api("review-load", { ownerRequestId: owner.requestId });
+  const load = { ownerRequestId: owner.requestId, requestId: randomUUID(), token: review.confirmation.token };
+  await f.api("load", load);
+  return { ...f, owner, load, input: { ownerRequestId: owner.requestId, loadRequestId: load.requestId }, endpoint };
+}
+test("editor target preparation binds the acknowledged load and original endpoint without another resume, launch or authority claim", async t => {
+  const f = await editorFixture(t), before = await f.store.snapshot("personal"), calls = f.calls.filter(c => c === "resume").length;
+  const result = await f.api("editor-target", f.input);
+  assert.equal(result.target.sessionId, f.task.sessionId); assert.equal(result.target.repositoryRoot, f.task.repositoryRoot); assert.equal(result.target.accountFingerprint, f.task.accountFingerprint); assert.deepEqual(result.target.endpoint, f.endpoint); assert.match(result.targetDigest, /^[a-f0-9]{64}$/);
+  for (const key of ["authorityGranted", "terminalLaunched", "ideAttached", "nativeTaskLoaded", "modelPromptSubmitted", "completionVerified"]) assert.equal(result[key], false);
+  assert.equal(result.nativeLoadAcknowledged, true); assert.deepEqual(await f.api("editor-target", f.input), result); assert.deepEqual(await f.store.snapshot("personal"), before); assert.equal(f.calls.filter(c => c === "resume").length, calls);
+  for (const extra of [{ prompt: "never" }, { socketPath: "/tmp/foreign" }, { command: "never" }]) await assert.rejects(f.api("editor-target", { ...f.input, ...extra }), /unrelated fields/);
+  await assert.rejects(f.api("editor-target", { ...f.input, loadRequestId: randomUUID() }), /acknowledged load/);
+  await f.api("stop", { ownerRequestId: f.owner.requestId }); await assert.rejects(f.api("editor-target", f.input));
+});
+test("editor preparation refuses stale load, changed policy/account, non-idle task and incomplete endpoint identity", async t => {
+  for (const drift of ["load", "policy", "account", "active", "endpoint", "new-host"]) {
+    const f = await editorFixture(t);
+    if (drift === "load") await f.store.update("personal", "fixture-late-load", s => { s.codingTaskLoads[0].status = "outcome-unconfirmed"; });
+    if (drift === "policy") await f.store.update("personal", "fixture-late-policy", s => { s.mode = "managed-companion"; });
+    if (drift === "account") f.controls.login = "d".repeat(64);
+    if (drift === "active") f.controls.observation = "active";
+    if (drift === "endpoint") f.owners[0].binding = { ...f.endpoint, peerBirth: null };
+    if (drift === "new-host") await assert.rejects(f.service().editorTarget("personal", f.input), /does not own/);
+    else await assert.rejects(f.api("editor-target", f.input), undefined, drift);
+    assert.equal(f.calls.filter(c => c === "resume").length, 1);
+  }
+});
+test("asynchronous editor inspection cannot conceal load replacement, endpoint drift or a policy change at its last boundary", async t => {
+  for (const phase of ["read", "second-inspection", "policy"]) {
+    const f = await editorFixture(t); let inspections = 0;
+    if (phase === "read") f.controls.afterRead = () => f.store.update("personal", "fixture-editor-load-change", s => { s.codingTaskLoads[0].acknowledgedThreadId = randomUUID(); });
+    f.owners[0].inspectBinding = async () => {
+      if (++inspections === 2) {
+        if (phase === "second-inspection") return { ...f.endpoint, socketInode: "99" };
+        if (phase === "policy") await f.store.update("personal", "fixture-editor-policy-change", s => { s.mode = "managed-companion"; });
+      }
+      return structuredClone(f.endpoint);
+    };
+    await assert.rejects(f.api("editor-target", f.input)); assert.equal(f.calls.filter(c => c === "resume").length, 1);
+  }
 });
