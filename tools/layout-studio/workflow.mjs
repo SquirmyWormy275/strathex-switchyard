@@ -36,6 +36,15 @@ export function reconcileWorkflow(value, previous) {
   return parseWorkflow({ ...value, roles, steps });
 }
 
+/** Late metadata cannot enter a recording that began or resumed after it occurred.
+ * Older persisted sessions use createdAt until their next explicit resume.
+ */
+export function observationAcceptsEventAt(session, at) {
+  return Number.isSafeInteger(at) && at >= 0
+    && [session.createdAt, session.recordingSince].every(boundary => boundary === undefined
+      || Number.isSafeInteger(boundary) && boundary >= 0 && at >= boundary);
+}
+
 export function observationSummary(session) {
   const byKind = {};
   for (const event of session.events) { const row = byKind[event.kind] ??= { count: 0, sources: [] }; row.count++; if (!row.sources.includes(event.provenance)) row.sources.push(event.provenance); }

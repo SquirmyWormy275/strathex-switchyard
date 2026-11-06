@@ -30,3 +30,20 @@ native TUI/Windows acceptance remain separate. Two earlier runs retained three
 fixture failures each: their manually seeded recordings omitted the retention
 timestamp. Correcting the fixtures required no retention-policy change.
 [Evidence](evidence/editor-workflow-observation-summary.json).
+
+
+## Recording intervals
+
+Agent, host-action and editor metadata now share a protected timestamp boundary.
+A delayed event from before consent or the latest explicit resume is omitted.
+Resume records its boundary in the existing encrypted state transaction;
+repeating resume does not move it, and a backward wall clock cannot lower it.
+Older recordings use their creation timestamp until deliberately resumed.
+This does not backfill missed intervals, erase existing events or change task
+results. It adds no provider request, authority or frontend control.
+
+Nine isolated groups / 105 tests pass, including the normal encrypted API,
+source-specific boundary cases and the existing rollback/lifecycle tests.
+The host journal fixture now uses its real synthetic recording start rather than
+a timestamp predating consent. Typecheck and exact owned child/tree/temporary
+parent cleanup pass. [Evidence](evidence/observation-window-summary.json).

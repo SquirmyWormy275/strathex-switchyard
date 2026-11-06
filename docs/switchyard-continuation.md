@@ -31,6 +31,13 @@ evidence, not instructions to reset. Publish regular commits. Do not merge or re
 
 ## Current implementation and evidence
 
+Agent, host-action and editor recording now refuse metadata from before initial
+consent or the latest resume. The encrypted interval stays monotonic across
+duplicate resume and backward clock movement. Nine isolated groups / 105 tests,
+typecheck and exact child/tree cleanup pass. Existing event history is retained;
+no live account, native task or frontend operation runs.
+[Recording-boundary evidence](evidence/observation-window-summary.json).
+
 Windows `701f915` still fails after reading lock input, before the new canonical-path
 progress marker; the parent-watch correction is therefore not an accepted fix
 for that failure. The next source change resolves an existing Windows lock path

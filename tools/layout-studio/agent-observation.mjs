@@ -1,5 +1,6 @@
 /** Opt-in metadata only. An observed provider status never proves task completion. */
 import { createHash } from "node:crypto";
+import { observationAcceptsEventAt } from "./workflow.mjs";
 
 const providers = new Set(["codex", "claude-code", "custom-agent"]);
 const phases = new Set(["request-reserved", "identity-bound", "outcome-unconfirmed", "status-observed", "read-only-resume-observed", "owned-stop-observed", "adapter-status-observed", "design-request-reserved", "design-reply-recorded", "design-request-failed", "text-request-reserved", "text-identity-bound", "text-reply-recorded", "text-outcome-unconfirmed", "text-request-failed", "text-outcome-reviewed"]);
@@ -15,7 +16,7 @@ export function appendAgentObservation(state, { provider, subjectId, phase, stat
   const provenance = provider === "custom-agent" ? "authenticated-agent-self-report" : phase === "status-observed" ? "native-provider-status-observation" : "switchyard-local-lifecycle";
   let recorded = 0;
   for (const observation of state.observations ?? []) {
-    if (observation.status !== "recording" || !observation.sources?.includes("agent-events") || observation.exclusions?.includes(category) || !Array.isArray(observation.events)) continue;
+    if (observation.status !== "recording" || !observation.sources?.includes("agent-events") || observation.exclusions?.includes(category) || !Array.isArray(observation.events) || !observationAcceptsEventAt(observation, at)) continue;
     if (observation.events.length >= 2000) { observation.status = "paused"; observation.limitReached = true; continue; }
     const previous = observation.events.findLast(event => event?.provider === provider && event.subjectDigest === subjectDigest && event.phase === phase);
     if (previous && (at < previous.at || ["status-observed", "adapter-status-observed"].includes(phase) && previous.status === observedStatus)) continue;

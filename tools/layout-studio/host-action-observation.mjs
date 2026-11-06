@@ -1,6 +1,7 @@
 /** Opt-in metadata from the protected local execution journal, never provider completion. */
 import { createHash } from "node:crypto";
 import { connectedExecutionActions } from "./repository-execution-actions.mjs";
+import { observationAcceptsEventAt } from "./workflow.mjs";
 
 const actions = new Set([...connectedExecutionActions("linux"), ...connectedExecutionActions("win32")]);
 const adapters = new Set(["switchyard-host-execution/v1", "switchyard-windows-execution/v1"]);
@@ -44,7 +45,7 @@ export function appendHostActionObservation(state, domain, entry) {
   const category = provider === "codex" ? "codex" : "claude";
   let recorded = 0;
   for (const observation of state.observations ?? []) {
-    if (observation.status !== "recording" || !observation.sources?.includes("host-action-events") || observation.exclusions?.includes(category) || !Array.isArray(observation.events)) continue;
+    if (observation.status !== "recording" || !observation.sources?.includes("host-action-events") || observation.exclusions?.includes(category) || !Array.isArray(observation.events) || !observationAcceptsEventAt(observation, at)) continue;
     const previous = observation.events.findLast(e => e?.subjectDigest === subjectDigest && e.phase === phase);
     if (previous && (at < previous.at || previous.status === status)) continue;
     if (observation.events.length >= 2000) { observation.status = "paused"; observation.limitReached = true; observation.updatedAt = Math.max(observation.updatedAt ?? at, at); continue; }

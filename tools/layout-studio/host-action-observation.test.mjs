@@ -19,6 +19,17 @@ const receipt = changes => ({ id: "private-receipt", operationId: "private-opera
 const journal = s => repositoryEffectTransaction(s, "execution", { now: () => 100 });
 async function prepared(s, sess = session(), op = operation()) { const tx = journal(s); await tx.append("session.registered", { session: sess }); await tx.append("operation.created", { operation: op }); return tx; }
 
+test("host journal metadata cannot backfill before initial consent or across a resumed interval", async () => {
+  for (const timing of [{ createdAt: 101 }, { createdAt: 0, recordingSince: 101 }]) {
+    const s = state({ observations: [observation(timing)] }), before = structuredClone(s.observations);
+    await prepared(s);
+    assert.deepEqual(s.observations, before);
+    const tx = repositoryEffectTransaction(s, "execution", { now: () => 101 });
+    await tx.append("receipt.issued", { receipt: receipt() });
+    assert.deepEqual(s.observations[0].events.map(e => [e.phase, e.at]), [["host-action-receipt-recorded", 101]]);
+  }
+});
+
 test("installed observation proof refuses broader or duplicate flags before application or account access", () => {
   const script = fileURLToPath(new URL("../../scripts/verify-shield-host.mjs", import.meta.url));
   for (const args of [["--synthetic", "--host-action-events"], ["--synthetic", "--action=shield_supply_chain", "--host-action-events"], ["--synthetic", "--action=shield_supply_chain", "--pep440-requirements", "--host-action-events", "--host-action-events"], ["--synthetic", "--action=shield_change_scan", "--pep440-requirements", "--host-action-events"]]) {
@@ -90,15 +101,15 @@ test("normal API consent and encrypted transaction rollback protect host observa
   await assert.rejects(suite.handle("/api/suite/observation/start", { ...start, consent: false }), /explicitly/);
   await suite.handle("/api/suite/compartment/create", { compartment: "work", policy: "work" });
   await assert.rejects(suite.handle("/api/suite/observation/start", { ...start, compartment: "work" }), /prohibited|keyboard-only/i);
-  await suite.handle("/api/suite/observation/start", start);
+  const started = await suite.handle("/api/suite/observation/start", start);
   const beforeWrites = (await store.snapshot("personal")).audit.filter(e => e.operation === "repository-effect-journal").length;
-  const j = repositoryEffectJournal(store, "personal", { domain: "execution", now: () => 100 });
+  const j = repositoryEffectJournal(store, "personal", { domain: "execution", now: () => started.createdAt });
   await j.append("session.registered", { session: session() });
   const before = await readFile(join(root, "personal.sealed.json"));
   await assert.rejects(j.transaction(async tx => { await tx.append("operation.created", { operation: operation() }); throw Error("Synthetic lost final commit"); }), /lost final commit/);
   assert.deepEqual(await readFile(join(root, "personal.sealed.json")), before);
   await j.append("operation.created", { operation: operation() });
-  const guarded = repositoryEffectJournal(store, "personal", { domain: "execution", now: () => 100, receiptGuard: () => { throw Error("Synthetic revoked receipt authority"); } });
+  const guarded = repositoryEffectJournal(store, "personal", { domain: "execution", now: () => started.createdAt, receiptGuard: () => { throw Error("Synthetic revoked receipt authority"); } });
   await assert.rejects(guarded.append("receipt.issued", { receipt: receipt() }), /revoked/);
   assert.deepEqual((await store.snapshot("personal")).observations[0].events.map(e => e.phase), ["host-action-prepared"]);
   await j.append("receipt.issued", { receipt: receipt() });

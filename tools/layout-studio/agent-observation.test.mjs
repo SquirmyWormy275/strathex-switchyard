@@ -1,12 +1,28 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { appendAgentObservation } from "./agent-observation.mjs";
+import { observationAcceptsEventAt } from "./workflow.mjs";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
 const session = changes => ({ id: "observation", status: "recording", sources: ["agent-events"], exclusions: [], events: [], updatedAt: 10, ...changes });
 const state = changes => ({ id: "personal", policy: "personal", mode: "personal-companion", observations: [session()], ...changes });
 const event = changes => ({ provider: "codex", subjectId: "private-native-subject", phase: "status-observed", status: "active", at: 20, ...changes });
+
+test("agent metadata respects initial consent and the latest resumed recording interval", () => {
+  for (const timing of [{ createdAt: 21 }, { createdAt: 0, recordingSince: 21 }]) {
+    const s = state({ observations: [session(timing)] }), before = structuredClone(s);
+    assert.equal(appendAgentObservation(s, event()), 0); assert.deepEqual(s, before);
+    assert.equal(appendAgentObservation(s, event({ at: 21 })), 1);
+    assert.equal(s.observations[0].events[0].at, 21);
+  }
+  for (const boundary of [-1, NaN, Infinity, 1.5, "20", null]) {
+    assert.equal(observationAcceptsEventAt({ createdAt: boundary }, 20), false);
+    assert.equal(observationAcceptsEventAt({ createdAt: 0, recordingSince: boundary }, 20), false);
+  }
+  assert.equal(observationAcceptsEventAt({ createdAt: 21, recordingSince: 10 }, 20), false);
+  assert.equal(observationAcceptsEventAt({ createdAt: 20 }, 20), true);
+});
 
 test("the native host proof refuses absent, broader or unrecognized flags before account, workspace or process access", () => {
   const script = fileURLToPath(new URL("../../scripts/verify-agent-observation-host.mjs", import.meta.url));

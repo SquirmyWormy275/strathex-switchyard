@@ -1,5 +1,6 @@
 /** Opt-in historical metadata from the protected editor journal, never live IDE authority. */
 import { createHash } from "node:crypto";
+import { observationAcceptsEventAt } from "./workflow.mjs";
 
 const uuid = value => typeof value === "string" && /^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/.test(value);
 const phases = {
@@ -34,7 +35,7 @@ export function appendEditorObservation(state, row) {
   for (const observation of state.observations ?? []) {
     if (observation.status !== "recording" || !observation.sources?.includes("editor-events") || !Array.isArray(observation.events)
         || ["codex", "vscode", "terminal"].some(category => observation.exclusions?.includes(category))
-        || Number.isSafeInteger(observation.createdAt) && at < observation.createdAt) continue;
+        || !observationAcceptsEventAt(observation, at)) continue;
     const previous = observation.events.findLast(event => event?.subjectDigest === subjectDigest);
     if (previous && (at < previous.at || previous.phase === phase)) continue;
     if (observation.events.length >= 2000) {
