@@ -9,7 +9,7 @@ import { desktopEnvironment, windowsHelperTemporaryEnvironment } from "./process
 const nativeHelper = fileURLToPath(new URL("../../runtime/hotkeys/Switchyard.Hotkeys.exe", import.meta.url));
 export function runtimeWorkerStartFailureEvidence(value) {
   const api = ["stdin-pipe", "stdout-pipe", "stderr-pipe", "stdin-inheritance", "stdout-inheritance", "stderr-inheritance", "attribute-size", "attribute-initialize", "handles-attribute", "job-attribute", "process-create", "worker-id", "worker-birth"];
-  const managed = ["attribute-allocation", "handle-storage", "environment-block", "worker-streams"];
+  const managed = ["pipe-security", "pipe-security-verify", "attribute-allocation", "handle-storage", "environment-block", "worker-streams"];
   if (!value || typeof value !== "object" || Array.isArray(value) || Object.keys(value).sort().join() !== "nativeCode,phase"
       || ![...api, ...managed].includes(value.phase)
       || !(value.nativeCode === null || api.includes(value.phase) && Number.isInteger(value.nativeCode) && value.nativeCode >= 0 && value.nativeCode <= 0xffffffff)) return undefined;

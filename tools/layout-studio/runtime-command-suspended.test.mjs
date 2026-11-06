@@ -41,7 +41,7 @@ test("worker-start failure evidence admits only fixed stages and their numeric A
       const value = { phase, nativeCode }, copy = runtimeWorkerStartFailureEvidence(value); assert.deepEqual(copy, value); copy.phase = "changed"; assert.equal(value.phase, phase);
     }
   }
-  for (const phase of ["attribute-allocation", "handle-storage", "environment-block", "worker-streams"]) {
+  for (const phase of ["pipe-security", "pipe-security-verify", "attribute-allocation", "handle-storage", "environment-block", "worker-streams"]) {
     assert.deepEqual(runtimeWorkerStartFailureEvidence({ phase, nativeCode: null }), { phase, nativeCode: null });
     assert.equal(runtimeWorkerStartFailureEvidence({ phase, nativeCode: 5 }), undefined);
   }

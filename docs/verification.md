@@ -1,5 +1,13 @@
 # What has actually been verified
 
+The private-command-pipe candidate passes 69 focused tests with five Windows-only
+skips, two clean managed builds and 2,101 portable checks. It opens only the
+primary token with QUERY mask 8, creates three pipes with one exact owner entry,
+verifies six handle descriptors and compares unchanged default-DACL bytes.
+Thirty-six native checks are added but unaccepted until Windows executes them.
+The original owner remains 0/8. [Contract](windows-private-command-pipes.md),
+[source receipt](evidence/private-command-pipes-source-summary.json).
+
 Native Windows `d15285b` also passes all eight suspended-worker and creation-
 refusal checks without skips, including absent-cwd error 267, no execution,
 independent Job exit and unchanged malformed/overdue acknowledgement refusals.

@@ -57,18 +57,18 @@ internal static class Program
             Refuses(()=>WindowsStorageBrokerProtocol.Reply(binding,request,changed.RootElement,key));
             using var wrongCurve=ECDsa.Create(ECCurve.NamedCurves.nistP384);
             Refuses(()=>WindowsStorageBrokerProtocol.Reply(binding,request,storage.RootElement,wrongCurve));
-            int exchangeProtocolChecks=ExchangeProtocolProof.Run(),exchangeJournalChecks=ExchangeJournalProof.Run(),exchangeFactsChecks=ExchangeFactsProof.Run(),indexInputChecks=ReviewedIndexProof.Run(),historyInputChecks=ReviewedHistoryProof.Run(),protectedFilesChecks=0,nativeServiceChecks=0,nativeExchangeChecks=0;
+            int exchangeProtocolChecks=ExchangeProtocolProof.Run(),exchangeJournalChecks=ExchangeJournalProof.Run(),exchangeFactsChecks=ExchangeFactsProof.Run(),indexInputChecks=ReviewedIndexProof.Run(),historyInputChecks=ReviewedHistoryProof.Run(),protectedFilesChecks=0,privatePipeChecks=0,nativeServiceChecks=0,nativeExchangeChecks=0;
             object? nativeRestrictedHostProof = null;
             if(args.Length>0)
             {
                 if(!OperatingSystem.IsWindows()||args.Length!=1)throw new InvalidOperationException("Choose only the explicit disposable Windows proof.");
-                if(args[0]=="--native-files")protectedFilesChecks=NativeFilesProof.Run();
+                if(args[0]=="--native-files"){protectedFilesChecks=NativeFilesProof.Run();privatePipeChecks=RuntimePrivatePipeProof.Run();}
                 else if(args[0]=="--native-service")nativeServiceChecks=NativeServiceProof.Run();
                 else if(args[0]=="--native-exchange")nativeExchangeChecks=NativeExchangeProof.Run();
                 else if(args[0]=="--native-host-owner")nativeRestrictedHostProof=NativeRestrictedHostProof.Run();
                 else throw new InvalidOperationException("The native proof flag is not recognized.");
             }
-            Console.WriteLine(JsonSerializer.Serialize(new {schema="switchyard-storage-broker-protocol-proof/v1",success=true,checks,pipeTextProtocolChecks,serviceHeaderChecks,restrictedChildEventChecks,stateLeaseProtocolChecks,restrictedChildStderrChecks,coldRandomParserChecks, stateLockFailureChecks,descendantQueryProtocolChecks,exchangeProtocolChecks,exchangeJournalChecks,exchangeFactsChecks,indexInputChecks,historyInputChecks,protectedFilesChecks,nativeServiceChecks,nativeExchangeChecks,nativeRestrictedHostProof,serviceInstalled=false,volumeOpened=nativeExchangeChecks>0||nativeRestrictedHostProof!=null,guestLaunched=false}));
+            Console.WriteLine(JsonSerializer.Serialize(new {schema="switchyard-storage-broker-protocol-proof/v1",success=true,checks,pipeTextProtocolChecks,serviceHeaderChecks,restrictedChildEventChecks,stateLeaseProtocolChecks,restrictedChildStderrChecks,coldRandomParserChecks, stateLockFailureChecks,descendantQueryProtocolChecks,exchangeProtocolChecks,exchangeJournalChecks,exchangeFactsChecks,indexInputChecks,historyInputChecks,protectedFilesChecks,privatePipeChecks,nativeServiceChecks,nativeExchangeChecks,nativeRestrictedHostProof,serviceInstalled=false,volumeOpened=nativeExchangeChecks>0||nativeRestrictedHostProof!=null,guestLaunched=false}));
             return 0;
         }
         catch(Exception error)

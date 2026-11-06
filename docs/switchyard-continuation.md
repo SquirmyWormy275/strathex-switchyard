@@ -55,6 +55,8 @@ source-only changes have not updated or restarted this installed application.
    Guardian readiness and its start acknowledgement complete; no worker is
    created. The original owner remains **0/8**. The exact API denial is established;
    a pipe-descriptor cause is still an inference requiring a native check.
+   The explicit new-pipe descriptor candidate adds 36 native checks and preserves
+   the token default DACL; [contract](windows-private-command-pipes.md).
    Preserve all eight original owner checks, the ninety-second deadline and
    exact TOKEN_QUERY mask 8. No broader token/process/default-DACL/SID/privilege/
    account rights or runtime fallback. [Observation contract](windows-helper-startup.md),

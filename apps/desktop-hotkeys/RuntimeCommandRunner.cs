@@ -53,6 +53,15 @@ internal static class RuntimeCommandRunner
         observation.NativeCode = unchecked((uint)Marshal.GetLastWin32Error());
         throw NativeError();
     }
+    private static void CreateOwnedPipe(out IntPtr read, out IntPtr write, ref SecurityAttributes security, StartupObservation observation)
+    {
+        // Failed CreatePipe output handles are documented as indeterminate.
+        // Publish handles to cleanup only after successful creation.
+        read = write = IntPtr.Zero;
+        bool created = CreatePipe(out IntPtr createdRead, out IntPtr createdWrite, ref security, 0);
+        RequireWorkerApi(created, observation);
+        read = createdRead; write = createdWrite;
+    }
     private static async Task<string?> ReadLineBounded(TextReader reader)
     {
         var value = new StringBuilder(); var buffer = new char[1];
@@ -248,10 +257,15 @@ internal static class RuntimeCommandRunner
         bool initialized = false, transferred = false;
         try
         {
-            var security = new SecurityAttributes { Length = Marshal.SizeOf<SecurityAttributes>(), Inherit = true };
-            observation.WorkerStage("stdin-pipe"); RequireWorkerApi(CreatePipe(out inputRead, out inputWrite, ref security, 0), observation);
-            observation.WorkerStage("stdout-pipe"); RequireWorkerApi(CreatePipe(out outputRead, out outputWrite, ref security, 0), observation);
-            observation.WorkerStage("stderr-pipe"); RequireWorkerApi(CreatePipe(out errorRead, out errorWrite, ref security, 0), observation);
+            observation.WorkerStage("pipe-security");
+            using var pipeSecurity = new RuntimePrivatePipeSecurity();
+            var security = new SecurityAttributes { Length = Marshal.SizeOf<SecurityAttributes>(), Descriptor = pipeSecurity.Descriptor, Inherit = true };
+            observation.WorkerStage("stdin-pipe"); CreateOwnedPipe(out inputRead, out inputWrite, ref security, observation);
+            observation.WorkerStage("stdout-pipe"); CreateOwnedPipe(out outputRead, out outputWrite, ref security, observation);
+            observation.WorkerStage("stderr-pipe"); CreateOwnedPipe(out errorRead, out errorWrite, ref security, observation);
+            observation.WorkerStage("pipe-security-verify");
+            foreach (IntPtr pipe in new[] { inputRead, inputWrite, outputRead, outputWrite, errorRead, errorWrite }) pipeSecurity.Verify(pipe);
+            pipeSecurity.VerifyDefaultDaclUnchanged();
             observation.WorkerStage("stdin-inheritance"); RequireWorkerApi(SetHandleInformation(inputWrite, 1, 0), observation);
             observation.WorkerStage("stdout-inheritance"); RequireWorkerApi(SetHandleInformation(outputRead, 1, 0), observation);
             observation.WorkerStage("stderr-inheritance"); RequireWorkerApi(SetHandleInformation(errorRead, 1, 0), observation);
