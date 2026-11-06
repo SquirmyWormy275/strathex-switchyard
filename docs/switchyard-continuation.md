@@ -38,7 +38,7 @@ evidence, not instructions to reset. Publish regular commits. Do not merge or re
 | Signed editor client `2c87c03` | Exact instance/build/nonce/selection requests and replies; strict response validation; cancellation after durable consumption refuses replay. [Evidence](evidence/editor-authorization-client-summary.json). | The API bearer stays local. No automatic command registration or retries. |
 | Editor launcher `1508ea9` | One exact Terminal object per review, native executable SHA-256, filesystem/focus/admission checks, retained partial effect and joined shutdown. Five groups / 54 tests, build/typecheck/CommonJS checks and cleanup pass. [Evidence](evidence/editor-terminal-launch-summary.json). | Provider/editor doubles. Command wiring and real terminal process/account/task acknowledgement remain unfinished. Do not infer attachment from focus, title or process ancestry alone. |
 | Installed app `2c87c03` | Release `39c7b555…`; six update, ten owner/editor/severity and seven journal checks pass. [Evidence](evidence/installed-editor-authorization-summary.json). | This installs the backend gateway, not an active editor extension. Signed checks only refuse unknown owners. |
-| Complete Linux | `83d4139`: 244 groups, 1,556 passed tests and eleven declared skips; all exact cleanup verified. [Receipt](evidence/linux-83d-complete-summary.json). | Complete run `1508ea9` is in progress; inspect the marker before starting or cleaning another run. |
+| Complete Linux `1508ea9` | 246 groups, 1,575 passed tests and eleven declared skips; all exact checkout/dependency/build/temporary-parent cleanup verifies. [Receipt](evidence/linux-1508-complete-summary.json). | Its marker is removed. Later Windows import-observation source has separate focused/native evidence. |
 | Windows cold startup | `83d4139` cold native CNG APIs pass under the exact primary token. Original Node exits 134 at CSPRNG, no owner result. [Native result](evidence/windows-cold-random-native-summary.json). | Failed native software validation, not unavailable hardware. Preserve the failed fixture and unchanged acceptance assertions. |
 | Windows import observation `164a622` | Existing `dumpbin` records four fixed RNG import flags and exact Node image hash. Two groups / 19 checks pass. [Source](evidence/windows-node-rng-imports-source-summary.json). | Native build failed before the original Node journey. Exact tool error was unavailable; followup pins the running image and retains bounded phase diagnostics. [Failure](evidence/windows-node-import-build-failure-summary.json). |
 
@@ -58,11 +58,12 @@ active in the update preflight.
 
 ## Continue independently
 
-1. Finish the complete Linux `1508ea9` receipt and exact owned cleanup. Inspect
-   `/tmp/switchyard-full-linux-path.json`; verify its source, phase, process exit,
-   root identities, test receipt and dependency aliases before removal. The test
-   parent is an explicitly owned home directory because `/tmp` has per-user quotas.
-   Never broaden cleanup or relax deadlines to turn a failure into a pass.
+1. Complete Linux `1508ea9` and its exact cleanup are accepted; do not rerun it
+   merely to repeat success. For a future coherent checkpoint inspect
+   `/tmp/switchyard-full-linux-path.json` first. Verify source, phase, process exit,
+   root identities, receipt and dependency aliases before cleanup. Use an owned
+   home temporary parent because `/tmp` has per-user quotas. Never broaden cleanup
+   or relax deadlines to turn a failure into a pass.
 2. Follow up the failed `164a622` Windows import build. It produced no import or
    exchange artifact and did not retest Node startup. Import the next exact-source
    artifact only after source/merge and archive digest checks. The followup pins

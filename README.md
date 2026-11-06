@@ -68,8 +68,8 @@ execution, offline repository scans and recoverable installation. The Home and
 Model F catalog provide the starting experience; complete task/IDE attachment,
 role/device controls and full scanner coverage remain unfinished.
 
-The latest accepted complete Linux checkpoint, `83d4139`, passes **244 groups**:
-**1,556 tests passed**, eleven declared skips, and every child/process-tree and owned
+The latest accepted complete Linux checkpoint, `1508ea9`, passes **246 groups**:
+**1,575 tests passed**, eleven declared skips, and every child/process-tree and owned
 checkout cleanup verified. The Windows native lease replacement at `ce5be6a`
 passes eighteen tests plus one declared skip, the Supply Chain scenario, and all
 23 policy-output tests. **Full Windows acceptance remains failed** because the
