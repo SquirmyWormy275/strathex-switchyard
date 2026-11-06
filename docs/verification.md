@@ -1,5 +1,16 @@
 # What has actually been verified
 
+Conditional Python pins now retain a private marker digest and sorted environment
+variable names. Conditions are parsed without evaluation; matching declared-pin
+advisories and selected artifact comparisons remain visible, with mandatory
+unevaluated/unresolved gaps. Eight focused groups pass 115 checks, including
+two new actual Linux scanner journeys, two Windows guest doubles and six artifact
+combinations. An independent 87-case pip/PyPA fixture covers the grammar and
+preprocessing. Typecheck, original package budget and owned scratch cleanup pass.
+No installed update or native Windows acceptance is claimed for markers.
+[Contract](python-supply-chain.md#conditional-pins),
+[source evidence](evidence/pypi-markers-source-summary.json).
+
 Normal installed `49a5053` passes **34 metadata/synthetic checks**, including
 twelve exact tested module hashes and SDK preflight before any network request.
 All 54 semantic workspace snapshots, selected state and frozen frontend remain
@@ -1511,3 +1522,12 @@ actual shortcut, installed workspace, hardware, provider or account is changed.
 Native Windows interaction and installed acceptance remain separate.
 [Contract](windows-shortcut-helper-lifecycle.md),
 [source evidence](evidence/hotkey-owner-source-summary.json).
+
+The first complete 49a5053 attempt ended with exec status 143 before a final
+receipt. Its cause is unknown and zero groups/tests from that attempt are
+accepted. The runner is absent; a scan found no processes referencing its owned
+paths. Ten known scratch directories and two empty configuration files were
+removed. The unchanged checkout and nine exact aliases are reused by a temporary
+supervised retry with durable start/exit progress and the original child bounds.
+Progress is not a final receipt. The marker changes above are later than this
+immutable full-run source. [Interruption](evidence/linux-49a5053-interrupted-summary.json).

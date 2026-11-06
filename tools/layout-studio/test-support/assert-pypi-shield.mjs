@@ -1,10 +1,11 @@
+import { createHash } from "node:crypto";
 import assert from "node:assert/strict";
 import { access, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { runtimeGuardianStopped } from "../runtime-command.mjs";
 
 export const nonFinalPythonVersions = { requirementsVersion: "01!02.0RC01.post02.dev03+LOCAL-001", advisoryVersion: "1!2.0rc1.post2.dev3+local.1" };
-export async function assertPypiShield(f, { windows = false, nonFinal = false, extras = [] } = {}) {
+export async function assertPypiShield(f, { windows = false, nonFinal = false, extras = [], marker } = {}) {
   const version = nonFinal ? nonFinalPythonVersions.requirementsVersion : "1.2.0";
   const purl = nonFinal ? "pkg:pypi/mixed-name@01%2102.0rc01.post02.dev03%2Blocal-001" : "pkg:pypi/mixed-name@1.2.0";
   const index = await readFile(join(f.root, ".git/index")), head = await f.run("rev-parse", "HEAD"), original = await readFile(join(f.root, "requirements.txt"));
@@ -13,8 +14,9 @@ export async function assertPypiShield(f, { windows = false, nonFinal = false, e
   assert.equal(result.status, "failed", JSON.stringify(result)); assert.ok(result.receiptId);
   const report = result.data.shieldReport, component = report.sbom.components[0], bom = report.cycloneDx;
   assert.equal(report.sbom.schema, "switchyard-lock-inventory/v2");
-  assert.deepEqual(report.sbom.components, [{ ecosystem: "PyPI", name: "mixed-name", version, declaredSha256: ["a".repeat(64)], ...(extras.length ? { extras } : {}), requirementsPath: "requirements.txt" }]);
+  assert.deepEqual(report.sbom.components, [{ ecosystem: "PyPI", name: "mixed-name", version, declaredSha256: ["a".repeat(64)], ...(extras.length ? { extras } : {}), ...(marker ? { marker } : {}), requirementsPath: "requirements.txt" }]);
   if (extras.length) { assert.ok(report.gaps.includes("python_extras_not_resolved")); assert.equal(bom.components[0].properties.find(p => p.name === "switchyard:python-extras").value, JSON.stringify(extras)); }
+  if (marker) { assert.ok(report.gaps.includes("python_markers_not_evaluated")); assert.equal(bom.components[0].properties.find(p => p.name === "switchyard:python-marker-sha256").value, marker.sha256); assert.equal(bom.components[0].properties.find(p => p.name === "switchyard:python-marker-evaluation").value, "not-evaluated"); }
   assert.deepEqual(report.findings.map(row => [row.ruleId, row.severity, row.dimension]), [["PYSEC-synthetic-only", "unknown", "vulnerabilities"]]);
   assert.equal(component.version, version); assert.equal(bom.components[0].purl, purl); assert.equal(bom.components[0].hashes, undefined); assert.equal(bom.dependencies, undefined); assert.equal(bom.compositions[0].aggregate, "unknown");
   for (const gap of ["python_environment_not_resolved", "advisory_severity_unassessed", "license_metadata", "package_source_or_integrity", "publisher_provenance_not_verified"]) assert.ok(report.gaps.includes(gap), gap);
@@ -28,3 +30,6 @@ export async function assertPypiShield(f, { windows = false, nonFinal = false, e
   assert.deepEqual(await readFile(join(f.root, ".git/index")), index); assert.equal(await f.run("rev-parse", "HEAD"), head); assert.deepEqual(await readFile(join(f.root, "requirements.txt")), original);
   await assert.rejects(access(join(f.root, "node_modules")), { code: "ENOENT" });
 }
+
+export const conditionalPythonMarker = 'sys_platform == "win32" and python_version < "0"';
+export const conditionalPythonMarkerMetadata = { sha256: createHash("sha256").update(conditionalPythonMarker).digest("hex"), variables: ["python_version", "sys_platform"] };

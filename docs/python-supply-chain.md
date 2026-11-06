@@ -53,11 +53,63 @@ normalized names. The aggregate dependency inventory retains its 4,096-component
 ceiling across all reviewed manifests.
 
 This is a strict subset of the [pip requirements format](https://pip.pypa.io/en/stable/reference/requirements-file-format/).
-Includes, indexes, URLs, editable/local sources, markers, ranges, wildcards
+Includes, indexes, URLs, editable/local sources, ranges, wildcards
 and other unsupported requirements syntax refuse inventory for that whole file.
 The report adds `unsupported_python_requirements`; it never returns a partial
 package list or follows an include/index. No environment or dependency graph is
 resolved, and a pin does not prove the distribution exists.
+
+## Conditional pins
+
+Exact pins may include bounded environment conditions:
+
+```text
+example[tls]==1.2.3; python_version < "3.12" and sys_platform == "win32"
+```
+
+This is synthetic syntax, not a package recommendation. Switchyard inventories
+the declared pin without evaluating the condition on either host or guest. A
+matching advisory still produces a finding; whether this dependency is applicable
+to the intended environment remains unknown. The mandatory
+`python_markers_not_evaluated` and `python_environment_not_resolved` gaps prevent
+that observation from claiming resolved dependencies or complete coverage.
+Selected artifact comparisons keep their existing byte-only meaning.
+
+The supported [PyPA marker grammar](https://packaging.python.org/en/latest/specifications/dependency-specifiers/)
+includes the eleven ordinary environment variables, quoted ASCII constants,
+comparisons, `in`/`not in`, `and`/`or` and parentheses. Conditions are limited to
+2,048 characters, 256 tokens and sixteen nested parentheses. Unknown variables,
+context-dependent `extra`, `extras` and `dependency_groups`, backslash escapes,
+non-ASCII values and malformed expressions refuse the entire requirements file.
+Option-like ` -` inside a condition also refuses: pip splits options before
+parsing requirements. Hash options must follow the complete condition. Existing
+line, file, hash and component limits remain unchanged. Two conditional pins for
+the same normalized name still refuse; alternatives are not resolved.
+
+The report stores only `marker: { sha256, variables }`: a digest of the trimmed
+condition after continuation/comment preprocessing, plus sorted variable names.
+Literal values and expression text stay out of inventory and CycloneDX output.
+The digest binds declaration bytes; it does not establish semantic equivalence
+or hide guessable values. CycloneDX records the digest, variables and explicit
+`not-evaluated` state as namespaced properties, with unknown composition and no
+invented dependency graph. The host checks the closed metadata shape, mandatory
+gap and exact reconstructed component.
+
+The [87-case marker fixture](../scripts/fixtures/pypi-marker-oracle.json) records
+independent pip 26.2.2 / PyPA packaging 26.2 parsing facts, including every ordinary
+variable, both operand directions, compound conditions, hashes and continued
+comments. Its generator uses already installed tools without evaluation, network
+or installation: `python3 -I -B scripts/generate-pypi-marker-oracle.py`.
+The existing 39-case extras/preprocessing fixture remains unchanged.
+
+Eight focused groups pass **115 checks**, including two new actual Linux scanner
+journeys, two Windows guest doubles and six marker/artifact combinations. Original
+repository/index/HEAD bytes, protected incomplete receipts, replay and owned
+process/staging cleanup verify. Two regressions fail before implementation;
+typecheck and the original package budget pass. An initial selector matched no
+tests and was rejected; it accepts no checks. Installed and native Windows
+marker acceptance remain separate.
+[Source evidence](evidence/pypi-markers-source-summary.json).
 
 ## Extras and continuation evidence
 

@@ -31,6 +31,17 @@ evidence, not instructions to reset. Publish regular commits. Do not merge or re
 
 ## Current implementation and evidence
 
+Conditional Python pins now retain a private marker digest and sorted environment
+variable names. Conditions are parsed without evaluation; matching declared-pin
+advisories and selected artifact comparisons remain visible, with mandatory
+unevaluated/unresolved gaps. Eight focused groups pass 115 checks, including
+two new actual Linux scanner journeys, two Windows guest doubles and six artifact
+combinations. An independent 87-case pip/PyPA fixture covers the grammar and
+preprocessing. Typecheck, original package budget and owned scratch cleanup pass.
+No installed update or native Windows acceptance is claimed for markers.
+[Contract](python-supply-chain.md#conditional-pins),
+[source evidence](evidence/pypi-markers-source-summary.json).
+
 Automatic scanner review now gathers bounded current files, includes recognized
 ignored secrets and proposes explicit generated-directory exclusions. It captures
 file hashes before returning the existing one-use review; unknown ignored paths,
@@ -318,6 +329,15 @@ gap, not a hardware/account blocker; native `9f35961` and complete local Linux
 `cadbccd` keep their separate accepted results. Inspect scheduling without
 extending any child/job bounds. [Evidence](evidence/windows-cad-cancelled-backend-summary.json).
 
-Complete Linux source `49a5053` is currently running all 311 groups, including
+Complete Linux source `49a5053` is being retried across all 311 groups, including
 the later shortcut, SDK and automatic scanner-review changes. Do not replace the
 accepted `68bcc76` result until its final receipt and cleanup are verified.
+
+The first complete 49a5053 attempt ended with exec status 143 before a final
+receipt. Its cause is unknown and zero groups/tests from that attempt are
+accepted. The runner is absent; a scan found no processes referencing its owned
+paths. Ten known scratch directories and two empty configuration files were
+removed. The unchanged checkout and nine exact aliases are reused by a temporary
+supervised retry with durable start/exit progress and the original child bounds.
+Progress is not a final receipt. The marker changes above are later than this
+immutable full-run source. [Interruption](evidence/linux-49a5053-interrupted-summary.json).

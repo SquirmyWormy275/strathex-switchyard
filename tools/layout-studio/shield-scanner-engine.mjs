@@ -289,6 +289,44 @@ export function pypiExtras(values) {
   if (!Array.isArray(values) || values.length > 64) throw Error("Unsupported bounded Python extras.");
   return [...new Set(values.map(value => pypiIdentity(value, "0").name))].sort();
 }
+const pythonMarkerVariables = new Set(["python_version", "python_full_version", "os_name", "sys_platform", "platform_release", "platform_system", "platform_version", "platform_machine", "platform_python_implementation", "implementation_name", "implementation_version"]);
+export function validatePypiMarker(value) {
+  exact(value, ["sha256", "variables"]); digest(value.sha256);
+  if (!Array.isArray(value.variables) || value.variables.length > 11 || value.variables.some(v => !pythonMarkerVariables.has(v)) || JSON.stringify(value.variables) !== JSON.stringify([...new Set(value.variables)].sort())) throw Error("Invalid Python marker declaration metadata.");
+  return value;
+}
+/** Parse a bounded PEP 508 grammar without evaluating it or exporting literals. */
+function pythonMarkerDeclaration(value) {
+  const refuse = () => { throw Error("Unsupported bounded Python environment marker."); };
+  if (!value || value.length > 2048 || /[^\x20-\x7e\t]|\\| -/.test(value)) refuse();
+  const tokens = [], variables = new Set(); let offset = 0;
+  while (offset < value.length) {
+    if (/[ \t]/.test(value[offset])) { offset++; continue; }
+    if (tokens.length >= 256) refuse();
+    const char = value[offset];
+    if (char === '"' || char === "'") {
+      const end = value.indexOf(char, offset + 1); if (end < 0) refuse();
+      tokens.push({ kind: "operand" }); offset = end + 1; continue;
+    }
+    const match = /^(?:not[ \t]+in\b|===|==|!=|<=|>=|~=|[<>()]|[A-Za-z_]+)/.exec(value.slice(offset));
+    if (!match) refuse();
+    const word = match[0]; offset += word.length;
+    if (pythonMarkerVariables.has(word)) { variables.add(word); tokens.push({ kind: "operand" }); }
+    else if (["and", "or", "(", ")"].includes(word)) tokens.push({ kind: word });
+    else if (/^(?:===|==|!=|<=|>=|~=|<|>|in|not[ \t]+in)$/.test(word)) tokens.push({ kind: "compare" });
+    else refuse();
+  }
+  let index = 0;
+  const take = kind => tokens[index]?.kind === kind ? (++index, true) : false;
+  const expression = depth => {
+    if (take("(")) { if (depth >= 16) refuse(); disjunction(depth + 1); if (!take(")")) refuse(); }
+    else if (!take("operand") || !take("compare") || !take("operand")) refuse();
+  };
+  const conjunction = depth => { expression(depth); while (take("and")) expression(depth); };
+  const disjunction = depth => { conjunction(depth); while (take("or")) conjunction(depth); };
+  disjunction(0); if (index !== tokens.length) refuse();
+  return { sha256: sha(value), variables: [...variables].sort() };
+}
 export const isPinnedRequirementsPath = path => typeof path === "string" && /(?:^|\/)requirements(?:[-_.][A-Za-z0-9_-]+)?\.(?:txt|lock)$/i.test(path);
 /** A closed metadata subset, never pip, a resolver, includes or index access. */
 export function parsePinnedRequirements(text) {
@@ -305,11 +343,14 @@ export function parsePinnedRequirements(text) {
     if (continuing) continue;
     const line = pending.replace(/(?:^|\s)#.*$/, "").trim(); pending = "";
     if (!line) continue;
-    const match = /^([A-Za-z0-9][A-Za-z0-9._-]*)[ \t]*(?:\[([^\[\]]*)\][ \t]*)?==[ \t]*([A-Za-z0-9.!+_-]{1,128})(?:[ \t]+((?:--hash=sha256:[a-f0-9]{64})(?:[ \t]+--hash=sha256:[a-f0-9]{64})*))?$/.exec(line);
+    const hashes = /[ \t]+((?:--hash=sha256:[a-f0-9]{64})(?:[ \t]+--hash=sha256:[a-f0-9]{64})*)$/.exec(line);
+    const declaration = hashes ? line.slice(0, hashes.index) : line;
+    const match = /^([A-Za-z0-9][A-Za-z0-9._-]*)[ \t]*(?:\[([^\[\]]*)\][ \t]*)?==[ \t]*([A-Za-z0-9.!+_-]{1,128})[ \t]*(?:;[ \t]*(.*))?$/.exec(declaration);
     if (!match) throw Error("Requirements outside the exact version-pin/hash subset are unsupported.");
-    const identity = pypiIdentity(match[1], match[3]), extras = match[2]?.trim() ? pypiExtras(match[2].split(",").map(value => value.trim())) : [], declaredSha256 = match[4] ? match[4].split(/[ \t]+/).map(value => value.slice(14)).sort() : [];
+    const identity = pypiIdentity(match[1], match[3]), extras = match[2]?.trim() ? pypiExtras(match[2].split(",").map(value => value.trim())) : [], declaredSha256 = hashes ? hashes[1].split(/[ \t]+/).map(value => value.slice(14)).sort() : [];
+    const marker = match[4] === undefined ? undefined : pythonMarkerDeclaration(match[4].trim());
     if (names.has(identity.name) || declaredSha256.length > 64 || new Set(declaredSha256).size !== declaredSha256.length || components.length >= 4096) throw Error("Duplicate or excessive Python requirements metadata.");
-    names.add(identity.name); components.push({ ...identity, declaredSha256, ...(extras.length ? { extras } : {}) });
+    names.add(identity.name); components.push({ ...identity, declaredSha256, ...(extras.length ? { extras } : {}), ...(marker ? { marker } : {}) });
   }
   if (continuing) throw Error("Unfinished Python requirements continuation.");
   return components;
@@ -468,7 +509,7 @@ export function shieldCycloneDxComponent(c) { if(c.ecosystem==="Cargo")return ca
       ...(c.license ? { licenses: [{ license: { name: c.license } }] } : {}), properties: [
         { name: "switchyard:ecosystem", value: c.ecosystem },
         ...licenseCatalogProperties(c.license),
-        ...(c.ecosystem === "PyPI" ? [{ name: "switchyard:requirements-file", value: c.requirementsPath }, { name: "switchyard:declared-sha256", value: JSON.stringify(c.declaredSha256) }, { name: "switchyard:python-environment", value: "not-resolved" }, ...(c.extras ? [{ name: "switchyard:python-extras", value: JSON.stringify(c.extras) }] : [])] : [{ name: "switchyard:lockfile", value: c.lockPath }, { name: "switchyard:package-location", value: c.location }, { name: "switchyard:installed-as", value: c.installedAs }]),
+        ...(c.ecosystem === "PyPI" ? [{ name: "switchyard:requirements-file", value: c.requirementsPath }, { name: "switchyard:declared-sha256", value: JSON.stringify(c.declaredSha256) }, { name: "switchyard:python-environment", value: "not-resolved" }, ...(c.extras ? [{ name: "switchyard:python-extras", value: JSON.stringify(c.extras) }] : []), ...(c.marker ? [{ name: "switchyard:python-marker-sha256", value: c.marker.sha256 }, { name: "switchyard:python-marker-variables", value: JSON.stringify(c.marker.variables) }, { name: "switchyard:python-marker-evaluation", value: "not-evaluated" }] : [])] : [{ name: "switchyard:lockfile", value: c.lockPath }, { name: "switchyard:package-location", value: c.location }, { name: "switchyard:installed-as", value: c.installedAs }]),
         ...(c.workspace?[{name:"switchyard:source-kind",value:"workspace-link"},{name:"switchyard:workspace-path",value:c.workspace.path},{name:"switchyard:workspace-lock-metadata-sha256",value:c.workspace.lockMetadataSha256},{name:"switchyard:workspace-source",value:"not-verified"}]:[]),
         ...(c.integritySha256 ? [{ name: "switchyard:integrity-string-sha256", value: c.integritySha256 }] : []),
         ...archiveProperties(c.artifact?.archive),
@@ -623,6 +664,7 @@ export async function scanShieldInputs(proposed, { readInput }) {
       for (const component of declared) {
         if (components.length >= 4096) throw Error("Aggregate dependency inventory exceeds its original component bound.");
         if (component.extras) gaps.add("python_extras_not_resolved");
+        if (component.marker) gaps.add("python_markers_not_evaluated");
         const referenceKey = shieldArtifactReferenceKey({ ...component, requirementsPath: file.path }), reference = artifacts.get(referenceKey);
         if (reference) {
           const observed = artifactDigests.get(reference.path), acceptedSha256 = [...component.declaredSha256];

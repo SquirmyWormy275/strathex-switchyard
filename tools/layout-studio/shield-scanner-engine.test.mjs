@@ -9,9 +9,72 @@ import { join } from "node:path";
 import { scanShieldInputs, shieldActions, shieldEngineVersion, validateShieldRequest, createShieldFileReader, parsePinnedRequirements, pypiIdentity, parsePypiVersion, pypiVersionKey, comparePypiVersions, npmLicenseDeclaration, parseNpmVersion, compareNpmVersions } from "./shield-scanner-engine.mjs";
 const sha = b => createHash("sha256").update(b).digest("hex");
 import { parseShieldScannerReport } from "./repository-shield.mjs";
-import {scannerFixture} from "./test-support/shield-scanner-fixture.mjs";
+import {scannerFixture, pypiArtifactFixture} from "./test-support/shield-scanner-fixture.mjs";
 import { spdxLicenseMembership, spdxLicenseListVersion } from "./shield-scanner-engine.mjs";
 import { pypiExtras, shieldCycloneDxComponent } from "./shield-scanner-engine.mjs";
+
+test("Python marker declaration metadata matches independently parsed pip and PyPA facts without evaluation", async () => {
+  const oracle = JSON.parse(await readFile(new URL("../../scripts/fixtures/pypi-marker-oracle.json", import.meta.url), "utf8"));
+  assert.equal(oracle.schema, "switchyard-pypi-marker-oracle/v1"); assert.equal(oracle.cases.length, 87); assert.equal(oracle.markersEvaluated, false);
+  for (const row of oracle.cases) assert.deepEqual(parsePinnedRequirements(row.input), row.components, row.input);
+});
+
+test("Python marker declarations retain advisory findings, private literals and mandatory unevaluated coverage", async () => {
+  const marker = 'python_version < "0" and platform_version == "NEVER_COPY_MARKER_LITERAL"';
+  const f = scannerFixture({ action: "release_shield", files: { "requirements.txt": "Demo[TLS]==1.2.3; " + marker + " --hash=sha256:" + "a".repeat(64) }, advisory: [{ ecosystem: "PyPI", name: "demo", version: "1.2.3", advisories: [{ id: "SYNTHETIC-CONDITIONAL-PIN", severity: "high" }] }] });
+  const report = await f.scan(), context = { engine: report.engine, requestSha256: report.requestSha256, request: f.request };
+  assert.equal(report.outcome, "failed"); assert.equal(report.findings[0].ruleId, "SYNTHETIC-CONDITIONAL-PIN");
+  assert.deepEqual(report.sbom.components[0].marker, { sha256: sha(marker), variables: ["platform_version", "python_version"] });
+  assert.equal(JSON.stringify(report).includes("NEVER_COPY_MARKER_LITERAL"), false);
+  assert.equal(report.cycloneDx.components[0].properties.find(p => p.name === "switchyard:python-marker-evaluation").value, "not-evaluated");
+  assert.equal(report.cycloneDx.components[0].properties.find(p => p.name === "switchyard:python-marker-sha256").value, sha(marker));
+  assert.equal(report.cycloneDx.components[0].hashes, undefined);
+  assert.deepEqual(parseShieldScannerReport(JSON.stringify(report), context, f.request.action), report);
+  for (const marker of [null, {}, { sha256: "x", variables: [] }, { sha256: "a".repeat(64), variables: ["extra"] }, { sha256: "a".repeat(64), variables: ["os_name", "os_name"] }, { sha256: "a".repeat(64), variables: ["sys_platform", "os_name"] }, { sha256: "a".repeat(64), variables: [], evaluated: true }]) {
+    const changed = structuredClone(report); changed.sbom.components[0].marker = marker;
+    assert.throws(() => parseShieldScannerReport(JSON.stringify(changed), context, f.request.action));
+  }
+  for (const gap of ["python_environment_not_resolved", "python_markers_not_evaluated"]) {
+    const changed = structuredClone(report); changed.gaps = changed.gaps.filter(g => g !== gap);
+    assert.throws(() => parseShieldScannerReport(JSON.stringify(changed), context, f.request.action));
+  }
+  for (const property of ["switchyard:python-marker-sha256", "switchyard:python-marker-variables", "switchyard:python-marker-evaluation"]) {
+    const changed = structuredClone(report); changed.cycloneDx.components[0].properties.find(p => p.name === property).value = "forged";
+    assert.throws(() => parseShieldScannerReport(JSON.stringify(changed), context, f.request.action));
+  }
+});
+
+test("Python marker grammar refuses ambiguous syntax and retains bounded whole-file admission", async () => {
+  const atom = 'os_name=="posix"';
+  assert.equal(parsePinnedRequirements('demo==1; ' + '('.repeat(16) + atom + ')'.repeat(16)).length, 1);
+  assert.equal(parsePinnedRequirements('demo==1; ' + Array(64).fill(atom).join(' or ')).length, 1);
+  assert.equal(parsePinnedRequirements('demo==1; os_name=="' + 'x'.repeat(2048 - 'os_name==""'.length) + '"').length, 1);
+  const invalid = ['', 'unknown == "x"', 'extra == "tls"', 'extras in "tls"', 'dependency_groups == "dev"',
+    'python_version', 'python_version = "3"', 'python_version == 3', 'python_version < "3" < "4"',
+    'os_name == "x" xor os_name == "y"', 'not (os_name == "x")', 'os_name == "x" and',
+    '(os_name == "x"', 'os_name == "x")', 'os_name == "x"; os_name == "y"',
+    'os_name == "x" or __import__("os")', 'os_name == "x\\y"', 'os_name == "é"',
+    'platform_version == "x -q"', 'os_name == "x\n"', 'os_name == "unterminated',
+    '('.repeat(17) + atom + ')'.repeat(17), Array(65).fill(atom).join(' or '),
+    'os_name=="' + 'x'.repeat(2049 - 'os_name==""'.length) + '"'];
+  for (const marker of invalid) assert.throws(() => parsePinnedRequirements('ordinary==2\ndemo==1; ' + marker), marker);
+  for (const text of ['demo==1; '+atom+'\nDEMO==2; os_name=="nt"', 'demo==1 --hash=sha256:'+'a'.repeat(64)+'; '+atom, 'demo==1; '+atom+' --hash=sha256:'+'a'.repeat(63)]) assert.throws(() => parsePinnedRequirements(text));
+  const refused = await scannerFixture({ action: "shield_supply_chain", files: { "requirements.txt": 'ordinary==2\ndemo==1; extra == "NEVER_COPY_UNSUPPORTED_LITERAL"' } }).scan();
+  assert.deepEqual(refused.sbom.components, []); assert.ok(refused.gaps.includes("unsupported_python_requirements"));
+  assert.equal(JSON.stringify(refused).includes("NEVER_COPY_UNSUPPORTED_LITERAL"), false);
+});
+
+test("conditional Python pins retain matched, mismatched and absent-hash artifact observations", async () => {
+  for (const action of ["shield_supply_chain", "release_shield"]) for (const artifactStatus of ["matched", "mismatched", "unsupported-integrity"]) {
+    const f = pypiArtifactFixture({ action, artifactStatus, marker: 'python_version < "0"' }), report = await f.scan();
+    assert.equal(report.sbom.components[0].artifact.status, artifactStatus);
+    assert.ok(report.gaps.includes("python_markers_not_evaluated")); assert.ok(report.gaps.includes("artifact_contents_not_inspected"));
+    assert.equal(report.outcome, artifactStatus === "mismatched" ? "failed" : "incomplete");
+    assert.equal(report.findings.some(row => row.ruleId === "artifact.integrity-mismatch"), artifactStatus === "mismatched");
+    assert.equal(report.cycloneDx.components[0].hashes, undefined);
+    assert.deepEqual(parseShieldScannerReport(JSON.stringify(report), { engine: report.engine, requestSha256: report.requestSha256, request: f.request }, action), report);
+  }
+});
 
 test("pinned Python extras and physical-line preprocessing match independently recorded pip and PyPA facts", async () => {
   const oracle = JSON.parse(await readFile(new URL("../../scripts/fixtures/pypi-requirements-oracle.json", import.meta.url), "utf8"));
@@ -301,8 +364,8 @@ test("Python requirement pins normalize distribution names and retain declared h
   for (const version of ["0", "1.0", "2026.10.2", "1.2.3.4"]) assert.ok(parsePypiVersion(version).release.length);
 });
 
-test("Python requirement includes, indexes, URLs, editable paths, markers and unsupported syntax never become partial package inventory", () => {
-  const values = ["-r private.txt", "--index-url https://user:NEVER_COPY_SECRET@example.invalid/simple", "-e ../private", "name @ https://example.invalid/source.whl", "name>=1.0", "name==1.0; python_version<'3.12'", "name==1.0rcX", "name==1!", "name==1.0..post1", "name==1.0+", "name==1.*", "name==1.0dev1post2", "name==1.0\nNAME==1.0", "name==1.0 --hash=sha256:"+"a".repeat(63), "name==1.0 --hash=sha256:"+"a".repeat(64)+" --hash=sha256:"+"a".repeat(64), "name==1.0 " + String.fromCharCode(92), "name==1.0\0"];
+test("Python requirement includes, indexes, URLs, editable paths and unsupported syntax never become partial package inventory", () => {
+  const values = ["-r private.txt", "--index-url https://user:NEVER_COPY_SECRET@example.invalid/simple", "-e ../private", "name @ https://example.invalid/source.whl", "name>=1.0", "name==1.0; unknown_variable<'3.12'", "name==1.0rcX", "name==1!", "name==1.0..post1", "name==1.0+", "name==1.*", "name==1.0dev1post2", "name==1.0\nNAME==1.0", "name==1.0 --hash=sha256:"+"a".repeat(63), "name==1.0 --hash=sha256:"+"a".repeat(64)+" --hash=sha256:"+"a".repeat(64), "name==1.0 " + String.fromCharCode(92), "name==1.0\0"];
   for (const value of values) assert.throws(() => parsePinnedRequirements("ordinary==1.0\n" + value));
   assert.throws(() => parsePinnedRequirements("#".repeat(256*1024+1))); assert.throws(() => parsePinnedRequirements("\n".repeat(8193)));
 });

@@ -16,18 +16,18 @@ export function cargoLockFixture({ action, clean = false, cargoVersion = "1.2.3"
     {ecosystem:"crates.io",name:"example",version:cargoVersion,advisories:clean?[]:[{id:"RUSTSEC-synthetic-only",severity:"unknown"}]}
   ]});
 }
-export function pinnedRequirementsFixture({ action, clean = false, requirementsVersion = "1.2.0", advisoryVersion = requirementsVersion, extras = "" } = {}) {
-  return scannerFixture({ action, files: { "app.js": "const ordinary = 1;", "requirements.txt": "# declared metadata only\nMixed_Name"+extras+"=="+requirementsVersion+" \\\n  --hash=sha256:" + "a".repeat(64) + "\n" }, advisory: [
+export function pinnedRequirementsFixture({ action, clean = false, requirementsVersion = "1.2.0", advisoryVersion = requirementsVersion, extras = "", marker = "" } = {}) {
+  return scannerFixture({ action, files: { "app.js": "const ordinary = 1;", "requirements.txt": "# declared metadata only\nMixed_Name"+extras+"=="+requirementsVersion+(marker ? "; " + marker : "")+" \\\n  --hash=sha256:" + "a".repeat(64) + "\n" }, advisory: [
     { ecosystem: "npm", name: "mixed-name", version: "1.2.0", advisories: [{ id: "GHSA-other-ecosystem", severity: "high" }] },
     { ecosystem: "PyPI", name: "mixed-name", version: advisoryVersion, advisories: clean ? [] : [{ id: "PYSEC-synthetic-only", severity: "unknown" }] }
   ] });
 }
-export function pypiArtifactFixture({ action = "shield_supply_chain", artifactStatus = "matched", alternative = 0 } = {}) {
+export function pypiArtifactFixture({ action = "shield_supply_chain", artifactStatus = "matched", alternative = 0, marker = "" } = {}) {
   // Synthetic raw bytes only; neither payload is a valid wheel/archive.
   const variants = [Buffer.from([0x50, 0x4b, 0, 0, 0x50, 0x59, 0x30]), Buffer.from([0x50, 0x4b, 0, 0, 0x50, 0x59, 0x31])], selected = Buffer.from(variants[alternative]);
   if (artifactStatus === "mismatched") selected[6] ^= 4;
   const version = "1!02.0rc1.post2.dev3+LOCAL.4", hashes = artifactStatus === "unsupported-integrity" ? "" : variants.map(bytes => " --hash=sha256:" + sha(bytes)).join("");
-  const f = scannerFixture({ action, files: { "app.js": "const ordinary = 1;", "requirements.txt": "Mixed_Name==" + version + hashes + "\n", "reviewed-package.whl": selected }, advisory: [{ ecosystem: "PyPI", name: "mixed-name", version, advisories: [] }] });
+  const f = scannerFixture({ action, files: { "app.js": "const ordinary = 1;", "requirements.txt": "Mixed_Name==" + version + (marker ? "; " + marker : "") + hashes + "\n", "reviewed-package.whl": selected }, advisory: [{ ecosystem: "PyPI", name: "mixed-name", version, advisories: [] }] });
   f.request.packageArtifacts = [{ ecosystem: "PyPI", requirementsPath: "requirements.txt", name: "mixed-name", version, path: "reviewed-package.whl" }];
   return f;
 }
