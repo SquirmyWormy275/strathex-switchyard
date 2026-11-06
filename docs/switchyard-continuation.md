@@ -85,6 +85,14 @@ was removed after manifest verification. [Receipt](evidence/installed-spdx-osv-s
    tests with eight declared Linux-only skips and guest execution doubled.
    [Scanner receipt](evidence/osv-boundaries-native-scanner-summary.json).
    The installed SPDX/OSV metadata checks now pass through the normal update.
+   Selected npm archive identity now passes six isolated groups/78 checks and
+   one additional alias/version case, including actual Linux execution and
+   Windows guest doubles. The parser never extracts or executes members; real
+   offline npm output also passes after its portable omitted-owner fields were
+   accounted for. Initial failed source/zero-plan receipts remain recorded.
+   [Archive evidence](evidence/npm-archive-identity-summary.json). Reconcile the
+   next complete Linux run marker when present; native Windows acceptance of
+   this extension remains pending. Installed source remains d8a0a96.
    Continue other independently executable ledger requirements, including Shield
    coverage, ecosystems, publisher provenance, verified local vulnerability
    context and workflow observation. These are unfinished implementation,

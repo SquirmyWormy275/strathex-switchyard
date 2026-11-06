@@ -953,3 +953,32 @@ match. No scanner, native task, model prompt, public query, Microsoft request or
 keyboard operation occurs. Only current plus one rollback are retained; the
 prepared bundle's 533 files / 5,219,707 bytes are removed after manifest checks.
 [Installed receipt](evidence/installed-spdx-osv-summary.json).
+
+## Selected npm archive identity (2026-11-06)
+
+The source extension compares bounded gzip/USTAR `package/package.json` name/
+version with the exact reviewed npm lock entry, independently of byte integrity.
+Matching metadata stays incomplete; detected identity mismatch fails, while
+unsupported/ambiguous/malformed input retains a fixed gap. No path is extracted
+and no package code or lifecycle script is executed. Expansion reserves 4 MiB
+per artifact within a 32 MiB scan budget; other original bounds remain.
+
+Six isolated groups pass **78 tests**, with one additional exact alias/version
+case. Twelve actual Linux npm scans and twelve Windows guest-double scans verify
+both actions, signed report/BOM/receipt binding, replay refusal, original files/
+index/HEAD and exact child/tree cleanup. Python/Cargo regressions, engine,
+typecheck and original application/release packaging limits pass. The first
+six-group attempt failed: host validation was placed in the Python branch and
+concurrent source edits triggered the correct pinned-engine refusal. Its 11
+failed assertions remain failed evidence. The abbreviated follow-up selector
+also failed the zero-plan guard; only the corrected exact selector is accepted.
+
+An actual offline npm pack with every lifecycle disabled initially exposed
+omitted portable uid/gid fields. The corrected parser accepts those unused owner
+fields without applying ownership and accepts the exact original 368-byte archive.
+All ten owned source/cache/output files (2,930 bytes) were removed. The tiny
+synthetic archive remains a portable regression fixture. There were no package,
+SDK, runtime, model, account, installed app, frontend or HID changes.
+Native Windows and installed acceptance remain separate; this does not establish
+publisher provenance, source-member scanning or license compliance.
+[Source, failed attempts and cleanup evidence](evidence/npm-archive-identity-summary.json).

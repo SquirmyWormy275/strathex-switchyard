@@ -5,7 +5,8 @@ reviewing changes and handing work between tools. **The full Rev2 suite is still
 a partial implementation.** The F77 is the pilot device; it does not limit scope.
 
 The Linux backend has a passing complete test checkpoint, and a versioned
-application is installed through the same backend changes.
+application has separately verified installed metadata checks. Later archive
+identity work has focused source acceptance.
 The restricted Windows storage owner now passes all eight original checks with
 verified retirement. Complete Windows release acceptance remains pending. Hardware,
 account and visual acceptance remain separate from those implementation results.
@@ -53,7 +54,10 @@ Rev2 scope independently of these checkpoints.
 - Production editor command activation and remaining guided role/device wiring.
   Frontend and command activation are deliberately frozen for owner review.
 - Broader Shield coverage and dependency syntax/resolution, publisher provenance,
-  archive contents, actual license texts and verified local vulnerability context.
+  complete archive contents, actual license texts and verified local vulnerability context.
+  Selected npm archive identity comparison is implemented with bounded, non-extracting
+  gzip/USTAR parsing: six groups/78 checks plus one exact alias/version check pass.
+  [Artifact contract](npm-artifact-integrity.md).
   Pinned SPDX identifier membership now passes source and native Windows host
   checks (guest execution doubled), with explicit unknown
   and deprecated metadata. [Catalog](npm-license-declarations.md).
