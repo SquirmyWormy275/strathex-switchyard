@@ -28,7 +28,42 @@ export const windowsInstallationScenarios = Object.freeze([
   "pre-promotion owner loss recovers only verified staging copies and exact incomplete source prefixes",
   "interrupted installation recovery accepts the full release file ceiling plus its manifest and preserves unrelated edits"
 ]);
+// Task-owner scenarios keep the original 45-second child bound. Each owns
+// its fixture; native Linux-only cases retain their declared skip elsewhere.
+export const windowsTaskOwnerScenarios = Object.freeze([
+  "persistent metadata ownership binds one original task/account/repository without task creation or IDE authority",
+  "two service instances serialize duplicate admission through the real private kernel lease",
+  "changed creator account or original task repository refuses binding and retires the exact owned listener",
+  "persistence failures preserve no-replay request identity and cannot deliver later task reads",
+  "unconfirmed native exit blocks replacement and recovery can only retire the original saved identity",
+  "replaced protected ownership or revoked permission cannot return metadata from an older live connection",
+  "protected task registry composes the actual owned Unix listener and bridge while the provider is a controlled double",
+  "late ownership drift and stopped startup cannot acknowledge a retained connection as current",
+  "verified exit of an in-memory owner cannot retire a substituted protected native identity",
+  "reviewed owned loading consumes one exact token and preserves request identity across duplicate and restarted callers",
+  "load refuses substituted token, changed owner contents, policy or task permissions before a native resume",
+  "active and unfamiliar task states refuse loading without changing running permissions",
+  "load boundaries refuse asynchronous drift and retain exact late acknowledgement without replay",
+  "concurrent reviewed requests cannot load one original owner twice",
+  "shutdown joins an in-flight load and prevents its late native effect",
+  "authenticated Studio routes compose real protected review/load state without accepting prompts or granting IDE authority",
+  "normal workspace selection retires exact owned connections and refuses inactive or externally selected task routes",
+  "keyboard-only mode joins task-owner shutdown and preserves failed retirement without enabling new starts",
+  "an external workspace change during native project setup refuses the late task effect",
+  "a failed bridge close still attempts original native owner retirement and cannot upgrade the uncertain bridge exit",
+  "a dedicated editor client uses only the original acknowledged task owner and rechecks after registration",
+  "authenticated editor routes consume one reviewed launch permission without launching a terminal or exposing its protected record",
+  "editor target preparation binds the acknowledged load and original endpoint without another resume, launch or authority claim",
+  "editor preparation refuses stale load, changed policy/account, non-idle task and incomplete endpoint identity",
+  "asynchronous editor inspection cannot conceal load replacement, endpoint drift or a policy change at its last boundary",
+  "the editor client authenticates the real Studio route and reads original protected target metadata without another native effect"
+]);
+export const windowsTaskOwnerLinuxScenarios = Object.freeze([
+  "protected task registry composes the actual owned Unix listener and bridge while the provider is a controlled double",
+  "the editor client authenticates the real Studio route and reads original protected target metadata without another native effect"
+]);
 const scenarios = Object.freeze({
+  "tools/layout-studio/coding-task-owners.test.mjs": windowsTaskOwnerScenarios,
   "deployment/suite/installation.test.mjs": windowsInstallationScenarios,
   "tools/layout-studio/repository-windows-shield.test.mjs": windowsShieldScenarios,
   "tools/layout-studio/repository-windows-execution-stop.test.mjs": windowsStopScenarios

@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { requiredGroups } from "./run-isolated-tests.mjs";
-import { windowsScenarioGroups, selectWindowsContractGroups, selectWindowsStorageScenario, windowsStorageScenarioSuites, windowsShieldScenarios, windowsStopScenarios, windowsInstallationScenarios } from "./windows-scenario-groups.mjs";
+import { windowsScenarioGroups, selectWindowsContractGroups, selectWindowsStorageScenario, windowsStorageScenarioSuites, windowsShieldScenarios, windowsStopScenarios, windowsInstallationScenarios, windowsTaskOwnerScenarios, windowsTaskOwnerLinuxScenarios } from "./windows-scenario-groups.mjs";
 
 const shield = "tools/layout-studio/repository-windows-shield.test.mjs", stop = "tools/layout-studio/repository-windows-execution-stop.test.mjs";
 test("both Windows verification entry points select all eight independent Shield and stop scenarios with their unchanged child bounds", () => {
@@ -120,4 +120,21 @@ test("installation selections cover every original case exactly once without cha
   }
   for (const name of names) assert.equal(selected.filter(group => group.pattern === name).length, 1);
   for (const broken of [selected.slice(1), [...selected, selected[0]], selected.map((g, i) => i ? g : { ...g, pattern: ".*" })]) assert.throws(() => selectWindowsContractGroups([file], broken));
+});
+
+
+test("every task-owner case runs once with the original bound and only its own native skip", async () => {
+  const file = "tools/layout-studio/coding-task-owners.test.mjs";
+  const source = await readFile(new URL("../" + file, import.meta.url), "utf8");
+  const names = [...source.matchAll(/^test\("([^"\n]+)"/gm)].map(match => match[1]);
+  const native = [...source.matchAll(/^test\("([^"\n]+)",\s*\{\s*skip:\s*process.platform\s*!==\s*"linux"\s*\}/gm)].map(match => match[1]);
+  assert.equal(names.length, 26); assert.equal(new Set(names).size, 26);
+  assert.deepEqual(windowsTaskOwnerScenarios, names); assert.deepEqual(windowsTaskOwnerLinuxScenarios, native); assert.equal(native.length, 2);
+  const groups = selectWindowsContractGroups([file], requiredGroups);
+  assert.deepEqual(groups.map(group => group.pattern), names);
+  for (const group of groups) {
+    assert.ok(requiredGroups.includes(group)); assert.equal(group.timeoutMs, undefined);
+    assert.equal(group.expectedSkipped ?? 0, process.platform !== "linux" && native.includes(group.pattern) ? 1 : 0);
+  }
+  for (const broken of [groups.slice(1), [...groups, groups[0]], groups.map((group, index) => index ? group : { ...group, pattern: ".*" })]) assert.throws(() => selectWindowsContractGroups([file], broken));
 });

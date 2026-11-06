@@ -5,7 +5,7 @@ import { mkdir, mkdtemp, realpath, rename, rm, writeFile } from "node:fs/promise
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 import { dirname, isAbsolute, join, resolve } from "node:path";
-import { windowsScenarioGroups } from "./windows-scenario-groups.mjs";
+import { windowsScenarioGroups, windowsTaskOwnerLinuxScenarios } from "./windows-scenario-groups.mjs";
 import { terminateOwnedProcessTree } from "./test-support/process-tree.mjs";
 
 export const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -286,7 +286,7 @@ export const requiredGroups = [
   { file: "tools/layout-studio/coding-editor-journal.test.mjs" },
   { file: "tools/layout-studio/coding-editor-connections.test.mjs", ...(process.platform !== "linux" ? { expectedSkipped: 10 } : {}) },
   { file: "tools/layout-studio/codex-editor-recovery.test.mjs", ...(process.platform !== "linux" ? { expectedSkipped: 3 } : {}) },
-  { file: "tools/layout-studio/coding-task-owners.test.mjs", ...(process.platform !== "linux" ? { expectedSkipped: 2 } : {}) },
+  ...windowsScenarioGroups("tools/layout-studio/coding-task-owners.test.mjs").map(group => ({ ...group, ...(process.platform !== "linux" && windowsTaskOwnerLinuxScenarios.includes(group.pattern) ? { expectedSkipped: 1 } : {}) })),
   { file: "tools/layout-studio/codex-stdio-tasks.test.mjs" },
   { file: "tools/layout-studio/codex-unix-tasks.test.mjs", ...(process.platform !== "linux" ? { expectedSkipped: 6 } : {}) },
   { file: "tools/layout-studio/codex-editor-protocol.test.mjs" },

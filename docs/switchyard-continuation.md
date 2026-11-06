@@ -31,6 +31,20 @@ evidence, not instructions to reset. Publish regular commits. Do not merge or re
 
 ## Current implementation and evidence
 
+Native Windows `dbbcce8` finishes all four preliminary backend jobs within
+their twenty-minute limits: **170/171 groups accepted**, with 971 passing tests
+and 135 declared skips from completed plans. The remaining task-owner file
+reaches its original 45-second child deadline after 22 partial pass reports;
+no cases from that incomplete plan are accepted. The previously failing native
+state-lock group now passes ten tests with one Linux-only skip.
+[Native receipts](evidence/windows-backend-dbbc-native-summary.json).
+All 26 independent task-owner cases now have exact manifest entries and their
+original 45-second child bound; the two Linux-only skips remain explicit.
+The test file and production code are unchanged. Thirty focused groups pass
+**66 tests / one declared Windows-only skip**, including every task-owner case
+once. Native follow-up remains pending.
+[Source receipt](evidence/task-owner-scenarios-source-summary.json).
+
 Native Windows `cff471e` verifies the first guardian's exact QUERY-mask-8
 allowance and reaches `probe-identity-created-native-self-birth`. That later
 phase establishes that named Job creation/configuration cleared, but the
