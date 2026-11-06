@@ -1,5 +1,26 @@
 # What has actually been verified
 
+Complete Windows source cadbccd now passes its separate full verification packet:
+**416 test/build groups, 2,443 passing tests, 204 declared skips and no failures**.
+The source/merge trees, artifact/receipt digests, original source group inventory,
+child deadlines and cleanup all verify. The overall workflow nevertheless failed
+at final enforcement because preliminary backend shard 3 was cancelled without
+a receipt. That shard remains unaccepted; the passing complete packet does not
+turn the workflow green. This checkpoint includes credential/revocation/outcome
+work and predates stopped-agent, helper, SDK, automatic-review and marker changes.
+[Native complete evidence](evidence/windows-complete-cadbccd-summary.json).
+
+The supervised Linux retry at 49a5053 finished **306/311 groups**, with 1,889
+passing tests, sixteen declared skips, four failed build groups and one failed
+test. It is not a complete pass. The temporary job inherited mise shims for nested
+builds; no trust settings were changed. Its UMask=0077 also made a deliberately
+public permission fixture private, unlike the normal shell's 0022 mask. All child
+and process-tree cleanup verified; the owned checkout, nine aliases, empty test
+parent and marker were removed. The last complete Linux pass remains 68bcc76.
+Future supervised launches must put the existing pinned Node binary directory
+first on PATH and preserve the deliberate permission fixture's intended mode.
+[Failed run and cleanup](evidence/linux-49a5053-failed-summary.json).
+
 Conditional Python pins now retain a private marker digest and sorted environment
 variable names. Conditions are parsed without evaluation; matching declared-pin
 advisories and selected artifact comparisons remain visible, with mandatory
@@ -1529,7 +1550,7 @@ The first complete 49a5053 attempt ended with exec status 143 before a final
 receipt. Its cause is unknown and zero groups/tests from that attempt are
 accepted. The runner is absent; a scan found no processes referencing its owned
 paths. Ten known scratch directories and two empty configuration files were
-removed. The unchanged checkout and nine exact aliases are reused by a temporary
-supervised retry with durable start/exit progress and the original child bounds.
+removed. The unchanged checkout was reused by the supervised retry above, then removed
+with all nine aliases after that retry failed. Original child bounds remained unchanged.
 Progress is not a final receipt. The marker changes above are later than this
 immutable full-run source. [Interruption](evidence/linux-49a5053-interrupted-summary.json).

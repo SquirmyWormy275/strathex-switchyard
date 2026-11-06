@@ -12,9 +12,9 @@ declared skips, including stopped-agent recovery, foreground-helper ownership,
 compact provenance and measured Windows scheduling. The later shortcut-helper
 correction has separate 89-check focused and 33-check installed evidence.
 The restricted Windows storage owner now passes all eight original checks with
-verified retirement. Complete Windows source `9f35961` passes 414 test/build groups,
-2,398 tests and 202 declared skips. Later credential and custom-agent changes have
-separate acceptance. Hardware,
+verified retirement. Complete Windows source `cadbccd` passes its separate 416-group packet: 2,443 tests
+and 204 declared skips. The workflow still fails because of a cancelled preliminary
+backend shard. Later stopped-agent/helper/SDK/scanner changes remain separate. Hardware,
 account and visual acceptance remain separate from those implementation results.
 
 Use the [requirement ledger](switchyard-requirements.md) for the complete scope,
@@ -25,6 +25,27 @@ Work is published on [draft PR 20](https://github.com/SquirmyWormy275/strathex-s
 there is no merge or public release acceptance.
 
 ## Current evidence
+
+Complete Windows source cadbccd now passes its separate full verification packet:
+**416 test/build groups, 2,443 passing tests, 204 declared skips and no failures**.
+The source/merge trees, artifact/receipt digests, original source group inventory,
+child deadlines and cleanup all verify. The overall workflow nevertheless failed
+at final enforcement because preliminary backend shard 3 was cancelled without
+a receipt. That shard remains unaccepted; the passing complete packet does not
+turn the workflow green. This checkpoint includes credential/revocation/outcome
+work and predates stopped-agent, helper, SDK, automatic-review and marker changes.
+[Native complete evidence](evidence/windows-complete-cadbccd-summary.json).
+
+The supervised Linux retry at 49a5053 finished **306/311 groups**, with 1,889
+passing tests, sixteen declared skips, four failed build groups and one failed
+test. It is not a complete pass. The temporary job inherited mise shims for nested
+builds; no trust settings were changed. Its UMask=0077 also made a deliberately
+public permission fixture private, unlike the normal shell's 0022 mask. All child
+and process-tree cleanup verified; the owned checkout, nine aliases, empty test
+parent and marker were removed. The last complete Linux pass remains 68bcc76.
+Future supervised launches must put the existing pinned Node binary directory
+first on PATH and preserve the deliberate permission fixture's intended mode.
+[Failed run and cleanup](evidence/linux-49a5053-failed-summary.json).
 
 Normal installed aa98c91 passes **41 metadata/synthetic checks**: 13 task-owner,
 seven Copilot-journal, fourteen agent/helper/SDK and seven Python-inventory checks.
@@ -252,15 +273,11 @@ gap, not a hardware/account blocker; native `9f35961` and complete local Linux
 `cadbccd` keep their separate accepted results. Inspect scheduling without
 extending any child/job bounds. [Evidence](evidence/windows-cad-cancelled-backend-summary.json).
 
-Complete Linux source `49a5053` is being retried across all 311 groups, including
-the later shortcut, SDK and automatic scanner-review changes. Do not replace the
-accepted `68bcc76` result until its final receipt and cleanup are verified.
-
 The first complete 49a5053 attempt ended with exec status 143 before a final
 receipt. Its cause is unknown and zero groups/tests from that attempt are
 accepted. The runner is absent; a scan found no processes referencing its owned
 paths. Ten known scratch directories and two empty configuration files were
-removed. The unchanged checkout and nine exact aliases are reused by a temporary
-supervised retry with durable start/exit progress and the original child bounds.
+removed. The unchanged checkout was reused by the supervised retry above, then removed
+with all nine aliases after that retry failed. Original child bounds remained unchanged.
 Progress is not a final receipt. The marker changes above are later than this
 immutable full-run source. [Interruption](evidence/linux-49a5053-interrupted-summary.json).
