@@ -31,6 +31,14 @@ evidence, not instructions to reset. Publish regular commits. Do not merge or re
 
 ## Current implementation and evidence
 
+Windows fixture-registry source 2ab67fc fails one of twenty tests because its
+native Python path-spelling probe reaches the original five-second startup
+deadline. The unchanged test at 39db1fe subsequently passes all twenty checks,
+with original bounds, equal source/merge trees, artifact/receipt digests and
+child/tree cleanup verified. The cause is unknown; no repair or deadline change
+is claimed. Other PyPI/OSV jobs in the follow-up workflow were cancelled and
+contribute zero accepted checks. [Native follow-up](evidence/windows-fixture-registry-followup-summary.json).
+
 The deliberately public VS Code endpoint fixture now applies and reads back its
 intended mode explicitly, so a private test-runner umask cannot turn the fixture
 into a private file. Production transport permissions are unchanged. With umask

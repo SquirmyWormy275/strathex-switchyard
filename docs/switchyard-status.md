@@ -26,6 +26,14 @@ there is no merge or public release acceptance.
 
 ## Current evidence
 
+Windows fixture-registry source 2ab67fc fails one of twenty tests because its
+native Python path-spelling probe reaches the original five-second startup
+deadline. The unchanged test at 39db1fe subsequently passes all twenty checks,
+with original bounds, equal source/merge trees, artifact/receipt digests and
+child/tree cleanup verified. The cause is unknown; no repair or deadline change
+is claimed. Other PyPI/OSV jobs in the follow-up workflow were cancelled and
+contribute zero accepted checks. [Native follow-up](evidence/windows-fixture-registry-followup-summary.json).
+
 Normal installed 39db1fe passes **44 metadata/synthetic checks**: thirteen
 task-owner, seven Copilot-journal, fourteen agent/helper/SDK and ten Python
 inventory checks. Fourteen exact installed module hashes verify. The Python
