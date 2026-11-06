@@ -22,6 +22,8 @@ Installed source `2c87c03` passes six update, ten owner/editor/severity and seve
 
 The reviewed editor launcher now composes signed authorization with one exact Terminal creation. Five groups/54 tests cover context drift, executable/socket replacement, duplicate calls, partial creation and shutdown joins; extension build and compiled loading pass. Provider/editor effects use doubles. Command wiring and native task/account acknowledgement remain unfinished. [Evidence](evidence/editor-terminal-launch-summary.json).
 
+Windows CI now records four fixed RNG import-presence flags for its exact Node image, using the existing `dumpbin` tool and matching image digests. Two groups/19 tests pass; native observation is pending. Static imports do not establish the executed OpenSSL branch or repair the existing CSPRNG failure. [Source evidence](evidence/windows-node-rng-imports-source-summary.json).
+
 ## Latest verified checkpoints
 
 | Checkpoint | Result | What it establishes |

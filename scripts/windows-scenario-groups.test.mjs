@@ -56,7 +56,8 @@ test("native filesystem, setup and restricted exchange CI lanes preserve every o
     ["Verify actual native filesystems and guardians without opening a guest", "filesystem"]
   ]) assert.ok(native.includes(`- name: ${name}\n        if: matrix.lane == '${lane}'\n`));
   const uploads = [...native.matchAll(/- name: (Retain[^\n]+)\n        if: always\(\) && matrix\.lane == '(filesystem|native-setup|restricted-exchange)'/g)];
-  assert.equal(uploads.length, 9); assert.equal(new Set(uploads.map(row => row[1])).size, 9);
+  assert.equal(uploads.length, 10); assert.equal(new Set(uploads.map(row => row[1])).size, 10);
+  assert.ok(uploads.some(row => row[1] === "Retain fixed imports of the exact Node image" && row[2] === "restricted-exchange"));
   assert.match(native, /timeout-minutes: 20/); assert.match(native, /--exchange/);
   assert.match(workflow, /osv-scanner, pypi-scanner, license-scanner, copilot-account, copilot-lifecycle, copilot-requests,/);
   const source = await readFile(new URL("./verify-windows-storage-contracts.mjs", import.meta.url), "utf8");

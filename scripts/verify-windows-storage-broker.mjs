@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /** Install only this exact metadata bootstrap on a disposable elevated CI host. */
 import assert from "node:assert/strict";
-import { verifyRestrictedOwnerReport, storageBrokerFailureEvidence } from "./windows-restricted-owner-report.mjs";
+import { verifyRestrictedOwnerReport, storageBrokerFailureEvidence, verifyNodeRngImports } from "./windows-restricted-owner-report.mjs";
 import {createHash,randomUUID} from "node:crypto";
 import {readFile,mkdtemp,rm} from "node:fs/promises";
 import {join,isAbsolute,dirname} from "node:path";
@@ -24,6 +24,7 @@ const receipt=join(process.env.RUNNER_TEMP||tmpdir(),setup?"switchyard-native-se
 async function save(){await privateWrite(receipt,JSON.stringify({...evidence,nativeOwners:owners},null,2)+"\n");}
 async function broker(action,extra={}){return JSON.parse(await owned(helper,["--windows-storage-broker"],{inputText:JSON.stringify({schema:"switchyard-windows-storage-broker-host/v1",action,...extra})}));}
 try{
+ if(exchange){const bytes=await readFile(join(dirname(helper),"Switchyard.NodeRngImports.json"));assert.ok(bytes.length<=4096);evidence.nodeRngImports=verifyNodeRngImports(JSON.parse(bytes.toString("utf8")),sha(await readFile(process.execPath)));await save();}
  const preflight=await broker("metadata");assert.equal(preflight.status,"unavailable","Preserve any pre-existing broker installation.");assert.equal(preflight.installationAbsentVerified,true,"Unavailable metadata cannot stand in for verified absence of the original installation.");checks.push("no pre-existing broker was reused");
  const whoami=join(process.env.SystemRoot||process.env.SYSTEMROOT||"C:\\Windows","System32","whoami.exe"),identity=await owned(whoami,["/user","/fo","csv","/nh"]),matches=identity.match(/S-1-5-21-(?:[0-9]{1,10}-){3}[0-9]{1,10}/g);assert.equal(matches?.length,1);const clientSid=matches[0],scope=sha(clientSid),binding={clientSid,installationId,helperSha256};evidence.ownerScope=scope;
  const nativeInstall=setup?JSON.parse(await owned(setup,["--install-bootstrap",clientSid,installationId,helperSha256])):null;if(nativeInstall){assert.equal(nativeInstall.status,"completed");assert.equal(nativeInstall.effectStarted,true);}

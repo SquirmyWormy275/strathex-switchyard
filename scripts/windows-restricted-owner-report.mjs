@@ -1,6 +1,25 @@
 /** Validate CI proof claims only. This cannot create a token, grant trust or accept a guest/account. */
 import assert from "node:assert/strict";
 const object = value => value !== null && typeof value === "object" && !Array.isArray(value);
+const rngImports = { BCryptGenRandom: "bcrypt.dll", CryptAcquireContextW: "advapi32.dll", CryptGenRandom: "advapi32.dll", CryptReleaseContext: "advapi32.dll" };
+/** Static imports are observations, not proof of the runtime OpenSSL branch. */
+export function parseNodeRngImports(text, nodeSha256) {
+  assert.equal(typeof text, "string"); assert.ok(Buffer.byteLength(text) > 0 && Buffer.byteLength(text) <= 1048576);
+  assert.match(nodeSha256, /^[a-f0-9]{64}$/); assert.ok(!text.includes("\0") && /^\s*Dump of file .+$/m.test(text) && /^\s*Summary\s*$/m.test(text));
+  let dll = null; const imports = Object.fromEntries(Object.keys(rngImports).map(name => [name, false]));
+  for (const line of text.split(/\r?\n/)) {
+    const module = /^\s+([A-Za-z0-9_.-]+\.dll)\s*$/.exec(line); if (module) { dll = module[1].toLowerCase(); continue; }
+    const entry = /^\s+[A-Fa-f0-9]{1,8}\s+(BCryptGenRandom|CryptAcquireContextW|CryptGenRandom|CryptReleaseContext)\s*$/.exec(line);
+    if (entry) { assert.equal(dll, rngImports[entry[1]], "The observed RNG import belongs to an unexpected module."); imports[entry[1]] = true; }
+  }
+  return { schema: "switchyard-node-rng-imports/v1", nodeSha256, tool: "dumpbin-imports", imports, runtimeBranchVerified: false, nodeStartupAccepted: false };
+}
+export function verifyNodeRngImports(value, nodeSha256) {
+  assert.ok(object(value)); assert.deepEqual(Object.keys(value).sort(), ["schema", "nodeSha256", "tool", "imports", "runtimeBranchVerified", "nodeStartupAccepted"].sort());
+  assert.match(nodeSha256, /^[a-f0-9]{64}$/); assert.equal(value.schema, "switchyard-node-rng-imports/v1"); assert.equal(value.nodeSha256, nodeSha256); assert.equal(value.tool, "dumpbin-imports");
+  assert.ok(object(value.imports)); assert.deepEqual(Object.keys(value.imports).sort(), Object.keys(rngImports).sort()); assert.ok(Object.values(value.imports).every(flag => typeof flag === "boolean"));
+  assert.equal(value.runtimeBranchVerified, false); assert.equal(value.nodeStartupAccepted, false); return structuredClone(value);
+}
 const stdioFields = ["schema", "standardHandles", "inheritanceRestricted", "stdinEof", "stdoutBytes", "stderrBytes", "outputBounded", "handlesClosedVerified", "drainsCompleted", "stderr"].sort();
 function validStdio(value) {
   if (!object(value) || Object.keys(value).sort().join() !== stdioFields.join() || value.schema !== "switchyard-restricted-child-stdio/v1" || value.standardHandles !== 3) return false;

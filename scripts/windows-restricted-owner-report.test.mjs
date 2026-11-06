@@ -1,6 +1,16 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { verifyRestrictedOwnerReport, storageBrokerFailureEvidence } from "./windows-restricted-owner-report.mjs";
+import { verifyRestrictedOwnerReport, storageBrokerFailureEvidence, parseNodeRngImports, verifyNodeRngImports } from "./windows-restricted-owner-report.mjs";
+test("fixed Node imports retain only known method presence and exact image hash, never a runtime branch claim", () => {
+  const text = "Dump of file C:\\NEVER_RETAIN\\node.exe\n\n  bcrypt.dll\n     2A BCryptGenRandom\n  ADVAPI32.dll\n     10 CryptAcquireContextW\n     11 CryptGenRandom\n     12 CryptReleaseContext\n     13 UnrelatedSecretMethod\n  Summary\n";
+  const value = parseNodeRngImports(text, "a".repeat(64));
+  assert.deepEqual(value.imports, { BCryptGenRandom: true, CryptAcquireContextW: true, CryptGenRandom: true, CryptReleaseContext: true });
+  assert.equal(value.runtimeBranchVerified, false); assert.equal(value.nodeStartupAccepted, false); assert.equal(JSON.stringify(value).includes("NEVER_RETAIN"), false);
+  const copy = verifyNodeRngImports(value, "a".repeat(64)); copy.imports.BCryptGenRandom = false; assert.equal(value.imports.BCryptGenRandom, true);
+  assert.deepEqual(parseNodeRngImports("Dump of file node.exe\n  KERNEL32.dll\n    1 GetProcAddress\n  Summary\n", "a".repeat(64)).imports, { BCryptGenRandom: false, CryptAcquireContextW: false, CryptGenRandom: false, CryptReleaseContext: false });
+  for (const bad of ["", text.replace("Summary", "truncated"), text.replace("bcrypt.dll", "foreign.dll"), text + "\0", "x".repeat(1048577)]) assert.throws(() => parseNodeRngImports(bad, "a".repeat(64)));
+  for (const extra of [{ nodeStartupAccepted: true }, { runtimeBranchVerified: true }, { nodeSha256: "b".repeat(64) }, { path: "NEVER_RETAIN" }, { imports: { ...value.imports, extra: true } }, { imports: { ...value.imports, CryptGenRandom: 1 } }]) assert.throws(() => verifyNodeRngImports({ ...value, ...extra }, "a".repeat(64)));
+});
 function stdio() { return { schema: "switchyard-restricted-child-stdio/v1", standardHandles: 3, inheritanceRestricted: true, stdinEof: true, stdoutBytes: 0, stderrBytes: 0, outputBounded: true, handlesClosedVerified: true, drainsCompleted: true, stderr: { category: "empty", function: null, code: null, sourceFile: null, sourceLine: null } }; }
 function sample() { return { success: true, nativeRestrictedHostProof: {
   standardIo: stdio(),
