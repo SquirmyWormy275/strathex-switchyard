@@ -66,6 +66,14 @@ the 26-check update; native Windows and live installed command execution remain 
 
 ## What the backend does
 
+Windows shortcut helpers now retain uncertain ownership, share initialization and
+bind operations to their exact native owner. Failed registration needs verified
+absence or exact exit before rollback; uncertain records stay recovery-pending
+and are never automatically hydrated. Six regressions pass within eight groups/
+89 checks, including two real controlled children. Typecheck/package/cleanup pass;
+installed and native Windows interaction remain separate.
+[Contract](windows-shortcut-helper-lifecycle.md).
+
 Windows foreground observation now retains an uncertain exact helper, joins
 overlapping stops and refuses replacement until exit. Late replies cannot survive
 pause/shutdown, and Suite shutdown reports an unconfirmed owner. Ten source groups

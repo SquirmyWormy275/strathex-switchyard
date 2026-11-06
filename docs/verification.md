@@ -1439,3 +1439,24 @@ retains no accepted cases or exact cleanup; its precise active child/cause remai
 unknown. Corrected native Windows acceptance is pending.
 [Contract](windows-backend-scheduling.md),
 [source receipt](evidence/windows-measured-scheduling-source-summary.json).
+
+
+## Windows shortcut ownership and uncertain registration — 2026-11-06
+
+The bridge now retains uncertain exact helpers, joins concurrent hydration and
+retirement, captures its native owner across awaits and reports unconfirmed
+shutdown. Failed registration requires verified absence or exact helper exit
+before rollback. Otherwise it stays recovery-pending; only applied/kept bindings
+are restored on a new helper, and every retained native ID remains reserved.
+Late replies cannot read or roll back through a replacement process. A kill
+exception still rejects pending native requests and clears their timers.
+
+Six new regressions pass within eight groups/89 checks, including two controlled
+real Node children, encrypted saved-state preservation and independent exits.
+The initial ownership regression remains failed evidence; an intermediate
+86-check pass preceded the final late-reply/real-process/kill checks. Typecheck,
+original full package budget and exact child/tree/owned-root cleanup pass. No
+actual shortcut, installed workspace, hardware, provider or account is changed.
+Native Windows interaction and installed acceptance remain separate.
+[Contract](windows-shortcut-helper-lifecycle.md),
+[source evidence](evidence/hotkey-owner-source-summary.json).

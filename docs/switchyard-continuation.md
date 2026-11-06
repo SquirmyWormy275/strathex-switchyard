@@ -31,6 +31,13 @@ evidence, not instructions to reset. Publish regular commits. Do not merge or re
 
 ## Current implementation and evidence
 
+Latest source work fixes shortcut-helper retirement, shared hydration and stale
+owner readback/rollback. Uncertain registrations are retained for Restore and
+never automatically hydrated; IDs remain reserved. Eight groups/89 checks include
+six regressions and two controlled real child exits. Typecheck/package/cleanup
+pass. Installed and actual Windows acceptance of this correction remain separate.
+[Contract](windows-shortcut-helper-lifecycle.md).
+
 Windows preliminary batches now use measured scheduling costs from all 198
 accepted native `9f35961` groups, while retaining every current group/scenario
 and original child/job bound. Fixed progress identifies the active group without
