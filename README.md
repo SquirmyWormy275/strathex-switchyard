@@ -74,7 +74,7 @@ Windows storage journey now passes all eight original checks, including exact
 exit and fixture/service retirement. Complete Windows source `9f35961` passes
 **414 test/build groups / 2,398 tests**, with 202 declared skips and exact cleanup.
 The latest agent and helper ownership corrections have focused checks and a
-33-check installed demonstration; a
+34-check installed demonstration; a
 recurring first-install shortcut timeout remains under investigation. Source,
 installed, interactive, hardware and account acceptance remain separate.
 [Current status and exact evidence](docs/switchyard-status.md).

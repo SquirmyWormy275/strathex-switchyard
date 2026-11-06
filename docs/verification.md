@@ -1,5 +1,14 @@
 # What has actually been verified
 
+Normal installed `49a5053` passes **34 metadata/synthetic checks**, including
+twelve exact tested module hashes and SDK preflight before any network request.
+All 54 semantic workspace snapshots, selected state and frozen frontend remain
+intact; 53 sealed files are byte-identical and one changes only audit metadata.
+Dated backup/readback and current plus one rollback verify. The exact 533-file,
+5,218,000-byte prepared bundle is removed. No installed task, scanner, model,
+recording, enrolled agent, account or hardware operation runs.
+[Installed evidence](evidence/installed-scanner-sdk-summary.json).
+
 Automatic scanner review now gathers bounded current files, includes recognized
 ignored secrets and proposes explicit generated-directory exclusions. It captures
 file hashes before returning the existing one-use review; unknown ignored paths,

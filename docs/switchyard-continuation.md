@@ -39,7 +39,8 @@ and performs no scan until the separate established confirmations. Twenty-five
 groups pass 100 checks, followed by five composed review cases (102 distinct
 checks), including one actual Linux scanner exit and one Windows guest double.
 All sixteen installation scenarios and the original package budget pass.
-Installed and native Windows acceptance remain separate.
+Installed exact-module/preflight verification now passes within 34 metadata
+checks; live task/scanner use and native Windows acceptance remain separate.
 [Guide](scanner-input-inventory.md), [evidence](evidence/scanner-review-source-summary.json).
 
 Custom-agent SDKs now complete sequence persistence before transmission. Node
@@ -49,8 +50,8 @@ save sends nothing and consumes its local counter; restart resumes above saved
 state. Two regressions reproduce before correction. Four focused groups pass
 66 distinct checks, and a final 15-check integration pass includes two actual
 Python processes against controlled loopback servers. Typecheck, original
-package bounds and exact cleanup pass. Installed/live-agent and native Windows
-acceptance remain separate.
+package bounds and exact cleanup pass. Installed exact-module/preflight verification passes; live-agent and native
+Windows acceptance remain separate.
 [SDK contract](../integrations/README.md), [source evidence](evidence/sdk-persistence-source-summary.json).
 
 Latest source work fixes shortcut-helper retirement, shared hydration and stale
@@ -123,21 +124,21 @@ shortcut-helper source `f06674d` has its separate 89-check focused and 33-check
 installed acceptance.
 [Receipt](evidence/linux-68bcc76-complete-summary.json).
 
-The installed baseline is `f06674dce1cce5455486b621528bc003d2aad958`,
-release `db4c036d778247073a7be6f861ecdac49117ee1387349bfcd591a741a3108414`.
+The installed baseline is `49a50537794f06e1277e5cafb5611d08ac459215`,
+release `c63f5a21a9cbcb1569cccd4e4212efaf48f0e0e1bf9f7176c8e78839ac747f20`.
 Preserve all 54 original workspace identities, the pending keyboard-only Codex
 workspace, private connection information and the frozen Home bytes. The normal
-versioned update passes 20 owner/journal metadata checks plus thirteen pure
-in-memory agent/helper/provenance checks. Nine exact tested module hashes verify. It starts no
+versioned update passes 20 owner/journal metadata checks plus fourteen pure
+in-memory agent/helper/SDK/provenance checks. Twelve exact tested module hashes verify. It starts no
 bundled example, recording or provider and revokes no live agent. All 54 semantic snapshots match; 53 sealed files
 are byte-identical and one changed only audit metadata. Keep the current release
-and its one rollback. The 535-file, 5,227,462-byte prepared bundle was verified and
+and its one rollback. The 533-file, 5,218,000-byte prepared bundle was verified and
 removed. Compact manifest JSON keeps the complete package below the original
 5 MiB limit; all sixteen installation scenarios pass after that change.
-[Receipt](evidence/installed-helper-ownership-summary.json).
+[Receipt](evidence/installed-scanner-sdk-summary.json).
 The repeatable `scripts/verify-agent-security-host.mjs --read-only-metadata`
 proof verifies exact installed hashes and uses only synthetic in-memory state;
-its thirteen current installed checks pass. The unchanged flags retain their earlier
+its fourteen current installed checks pass. The unchanged flags retain their earlier
 28-check focused guard/package acceptance.
 [Verifier evidence](evidence/installed-agent-security-verifier-summary.json).
 Earlier installed `4b2daed` and `5a8d159` retain separate lifecycle/archive/extras evidence.
@@ -316,3 +317,7 @@ accepted. The separate complete release remains active. This is a CI acceptance
 gap, not a hardware/account blocker; native `9f35961` and complete local Linux
 `cadbccd` keep their separate accepted results. Inspect scheduling without
 extending any child/job bounds. [Evidence](evidence/windows-cad-cancelled-backend-summary.json).
+
+Complete Linux source `49a5053` is currently running all 311 groups, including
+the later shortcut, SDK and automatic scanner-review changes. Do not replace the
+accepted `68bcc76` result until its final receipt and cleanup are verified.

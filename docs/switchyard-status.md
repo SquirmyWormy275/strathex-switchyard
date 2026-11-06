@@ -35,7 +35,7 @@ there is no merge or public release acceptance.
 | Installation and runtime | All sixteen original Windows installation/recovery cases pass at `b600a6d`; its independent fresh runtime installs 49 packages and loads/rechecks the offline CPU model, then removes its temporary runtime. [Installation](evidence/installation-scenarios-native-summary.json), [runtime](evidence/windows-runtime-b600-native-summary.json). | Complete Windows `9f35961` now passes separately; ordinary-user/guest journeys remain open. |
 | Latest diagnostic source | Seven focused groups pass 69 tests with five Windows-only skips. Two managed builds, 2,101 portable checks, typecheck and exact owned cleanup pass. [Receipt](evidence/worker-start-observation-source-summary.json). | Actual Windows `d15285b` passes all eight acknowledgement/refusal tests without skips. [Native receipt](evidence/worker-start-refusal-native-summary.json). The full restricted-owner journey is now separately accepted above. |
 | Windows index/history/leases | Native NTFS index and history packets each pass six checks and three independent guardian exits. Both Windows scanner files pass two cases with guest execution doubled; lease groups pass 24 tests and one Linux-only skip. [Evidence](evidence/native-history-index-leases-summary.json). | Packet Git witnesses are synthetic. Actual guest, installed Windows and ordinary-user acceptance remain separate. |
-| Installed app | Linux source `f06674d` passes 20 owner/journal metadata checks and thirteen pure agent/helper/provenance checks. Nine tested module hashes, all 54 workspace semantic snapshots, 53 sealed files and frozen frontend bytes verify. Only current plus one rollback remain; the complete 5,227,462-byte prepared bundle is removed. [Receipt and repeatable proof](evidence/installed-helper-ownership-summary.json). Earlier lifecycle/archive/extras receipts remain source-specific evidence. | No live agent is revoked and no bundled example, recording, scanner, task, provider or public query is started by this update. Frontend and extension activation remain frozen. |
+| Installed app | Linux source `49a5053` passes 20 owner/journal metadata checks and fourteen pure agent/helper/SDK/provenance checks. Twelve tested module hashes, all 54 workspace semantic snapshots, 53 sealed files and frozen frontend bytes verify. Only current plus one rollback remain; the complete 5,218,000-byte prepared bundle is removed. [Receipt and repeatable proof](evidence/installed-scanner-sdk-summary.json). Earlier lifecycle/archive/extras receipts remain source-specific evidence. | No live agent is revoked and no bundled example, recording, scanner, task, provider or public query is started by this update. Frontend and extension activation remain frozen. |
 | Windows npm archive identity | Corrected `55515d1` completes ten archive tests plus eight original byte-comparison tests, each file with two original Linux-only skips inside its original 300-second bound; guest execution is doubled. [Archive](evidence/npm-archive-native-summary.json), [bytes](evidence/npm-artifact-split-native-summary.json). | Complete Windows release remains separate. |
 | Windows shortcut retirement | `80601e9` passes all sixteen original installation/recovery scenarios and twelve writer checks, no skips and verified cleanup. The fixed stage diagnostics execute with the original bounds. [Native pass](evidence/shortcut-stage-diagnostics-native-summary.json). | `9193471` and `4b2daed` each fail the first installation scenario at the original ten-second shortcut deadline: 24/25 tests pass, all cleanup verifies. The latest pass does not reproduce or establish the cause of the intermittent timeout. [Recurring failures](evidence/windows-shortcut-recurring-timeout-summary.json), [diagnostic source](evidence/shortcut-stage-diagnostics-source-summary.json). |
 | Credential worker retirement | Six groups/69 checks pass, including ten worker tests and two controlled real children. Errors join exact-child retirement; unconfirmed exit blocks replacement. Installed pure synthetic checks also pass within the 27-check update. [Contract](credential-worker-lifecycle.md), [source](evidence/credential-process-source-summary.json), [installed](evidence/installed-agent-security-summary.json). | Live credential failure injection and native Windows acceptance remain separate. No user key is replaced. |
@@ -74,7 +74,8 @@ and performs no scan until the separate established confirmations. Twenty-five
 groups pass 100 checks, followed by five composed review cases (102 distinct
 checks), including one actual Linux scanner exit and one Windows guest double.
 All sixteen installation scenarios and the original package budget pass.
-Installed and native Windows acceptance remain separate.
+Installed exact-module/preflight verification now passes within 34 metadata
+checks; live task/scanner use and native Windows acceptance remain separate.
 [Guide](scanner-input-inventory.md), [evidence](evidence/scanner-review-source-summary.json).
 
 Custom-agent SDKs now complete sequence persistence before transmission. Node
@@ -84,8 +85,8 @@ save sends nothing and consumes its local counter; restart resumes above saved
 state. Two regressions reproduce before correction. Four focused groups pass
 66 distinct checks, and a final 15-check integration pass includes two actual
 Python processes against controlled loopback servers. Typecheck, original
-package bounds and exact cleanup pass. Installed/live-agent and native Windows
-acceptance remain separate.
+package bounds and exact cleanup pass. Installed exact-module/preflight verification passes; live-agent and native
+Windows acceptance remain separate.
 [SDK contract](../integrations/README.md), [source evidence](evidence/sdk-persistence-source-summary.json).
 
 Windows shortcut helpers now retain uncertain ownership, share initialization and
@@ -228,3 +229,7 @@ accepted. The separate complete release remains active. This is a CI acceptance
 gap, not a hardware/account blocker; native `9f35961` and complete local Linux
 `cadbccd` keep their separate accepted results. Inspect scheduling without
 extending any child/job bounds. [Evidence](evidence/windows-cad-cancelled-backend-summary.json).
+
+Complete Linux source `49a5053` is currently running all 311 groups, including
+the later shortcut, SDK and automatic scanner-review changes. Do not replace the
+accepted `68bcc76` result until its final receipt and cleanup are verified.

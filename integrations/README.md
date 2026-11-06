@@ -192,3 +192,8 @@ line on private stdin with `supervised: true`; that pipe stays open for the owne
 lifetime. Both bundled examples exit on EOF, including abrupt parent loss while
 an HTTP request is pending. This is a lifecycle protocol for these fixed examples,
 not an OS containment claim or a way to kill an arbitrary external agent.
+
+Installed `49a5053` now verifies the exact tested modules and SDK preflight
+within 34 metadata/synthetic checks, preserving all 54 workspaces and frozen
+frontend bytes. This installed verification starts no live task, scanner or
+enrolled agent. [Installed evidence](../docs/evidence/installed-scanner-sdk-summary.json).

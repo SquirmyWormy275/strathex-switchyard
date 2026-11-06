@@ -19,7 +19,7 @@ const { verifySuiteRelease } = await import("../deployment/suite/release.mjs");
 const root = join(installationRoot(), "versions", app.build), m = await verifySuiteRelease(root, { expectedId: app.build, platform: "linux", checkRuntime: true }), checks = [], moduleDigests = {};
 assert.equal(m.development, false);
 const built = { source: m.sourceCommit, id: m.id };
-for (const [evidence, names] of [["credential-process-source-summary.json", ["tools/layout-studio/credential-process.mjs", "tools/layout-studio/suite-store.mjs"]], ["agent-stop-retirement-source-summary.json", ["tools/layout-studio/custom-agents.mjs"]], ["custom-agent-outcome-source-summary.json", ["tools/layout-studio/agent-observation.mjs", "tools/layout-studio/suite.mjs", "packages/control-plane/src/confirmations.ts"]], ["foreground-owner-source-summary.json", ["deployment/suite/release.mjs", "tools/layout-studio/foreground.mjs"]], ["hotkey-owner-source-summary.json", ["tools/layout-studio/windows-host.mjs"]]]) {
+for (const [evidence, names] of [["credential-process-source-summary.json", ["tools/layout-studio/credential-process.mjs", "tools/layout-studio/suite-store.mjs"]], ["agent-stop-retirement-source-summary.json", ["tools/layout-studio/custom-agents.mjs"]], ["custom-agent-outcome-source-summary.json", ["tools/layout-studio/agent-observation.mjs", "packages/control-plane/src/confirmations.ts"]], ["foreground-owner-source-summary.json", ["tools/layout-studio/foreground.mjs"]], ["hotkey-owner-source-summary.json", ["tools/layout-studio/windows-host.mjs"]], ["scanner-review-source-summary.json", ["tools/layout-studio/suite.mjs", "tools/layout-studio/task-authority.mjs", "deployment/suite/release.mjs"]], ["sdk-persistence-source-summary.json", ["integrations/agent-sdk.mjs", "integrations/switchyard_agent.py"]]]) {
     const e = JSON.parse(await readFile(new URL("../docs/evidence/" + evidence, import.meta.url), "utf8"));
     for (const name of names) {
         const digest = createHash("sha256").update(await readFile(join(root, name))).digest("hex");
@@ -27,7 +27,7 @@ for (const [evidence, names] of [["credential-process-source-summary.json", ["to
         moduleDigests[name] = digest;
     }
 }
-checks.push("nine-exact-tested-installed-module-hashes");
+checks.push("twelve-exact-tested-installed-module-hashes");
 const load = name => import(pathToFileURL(join(root, name)).href), { createCredentialProcessRunner } = await load("tools/layout-studio/credential-process.mjs");
 const children = [], close = (c, code = 0, signal = null) => { c.exitCode = code; c.signalCode = signal; c.emit("close", code, signal); }, spawn = () => { const c = new EventEmitter(); Object.assign(c, { stdin: new PassThrough(), stdout: new PassThrough(), stderr: new PassThrough(), exitCode: null, signalCode: null, kill() { close(c, 1); return true; } }); children.push(c); return c; };
 const run = createCredentialProcessRunner({ spawnProcess: spawn });
@@ -171,6 +171,12 @@ const provenance = "third_party/model-f-catalog/SOURCES.json", installedProvenan
 assert.deepEqual(JSON.parse(installedProvenance), sourceProvenance);
 assert.equal(installedProvenance, JSON.stringify(sourceProvenance) + "\n");
 checks.push("installed-compact-catalog-provenance-preserves-every-source-field");
+const { switchyardAgent } = await load("integrations/agent-sdk.mjs"), syntheticEnrollment = { baseUrl: "http://127.0.0.1:1/", compartment: "synthetic", agentId: "synthetic", token: "x".repeat(43) };
+assert.throws(() => switchyardAgent({ ...syntheticEnrollment, onSequence: "invalid" }), /persistence callback/);
+let sequenceSaves = 0;
+await assert.rejects(switchyardAgent({ ...syntheticEnrollment, onSequence: () => { sequenceSaves++; } }).poll(), /Publish an exact ready session/);
+assert.equal(sequenceSaves, 0);
+checks.push("installed-sdk-preflight-refuses-invalid-hook-and-unpublished-session-before-network");
 const evidence = { schema: "switchyard-installed-agent-security-metadata/v3", at: new Date().toISOString(), moduleDigests, verifierSourceSha256: createHash("sha256").update(await readFile(new URL(import.meta.url))).digest("hex"), sourceCommit: built.source, applicationRelease: built.id, checks, success: true, pureInMemoryOnly: true, liveUserCredentialsUsed: false, liveAgentsRevoked: 0, nativeProcessesStarted: 0, nativeShortcutRegistrations: 0, providerOrModelRequests: 0, hardwareOperations: 0 };
 const { privateDirectory } = await import("../tools/layout-studio/private-fs.mjs");
 const outputRoot = join(process.env.XDG_STATE_HOME || join(homedir(), ".local/state"), "strathex-switchyard/runtime-verification");

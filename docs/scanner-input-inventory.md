@@ -137,3 +137,8 @@ bundle is 5,228,487 bytes, with the original budget unchanged. All sixteen
 installation scenarios pass. These source checks do not accept live installed
 scanning, a real Windows guest or frontend controls.
 [Evidence](evidence/scanner-review-source-summary.json).
+
+Installed `49a5053` now verifies the exact tested modules and SDK preflight
+within 34 metadata/synthetic checks, preserving all 54 workspaces and frozen
+frontend bytes. This installed verification starts no live task, scanner or
+enrolled agent. [Installed evidence](evidence/installed-scanner-sdk-summary.json).
