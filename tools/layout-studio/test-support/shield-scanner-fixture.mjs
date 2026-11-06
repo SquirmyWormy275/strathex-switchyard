@@ -16,8 +16,8 @@ export function cargoLockFixture({ action, clean = false, cargoVersion = "1.2.3"
     {ecosystem:"crates.io",name:"example",version:cargoVersion,advisories:clean?[]:[{id:"RUSTSEC-synthetic-only",severity:"unknown"}]}
   ]});
 }
-export function pinnedRequirementsFixture({ action, clean = false, requirementsVersion = "1.2.0", advisoryVersion = requirementsVersion } = {}) {
-  return scannerFixture({ action, files: { "app.js": "const ordinary = 1;", "requirements.txt": "# declared metadata only\nMixed_Name=="+requirementsVersion+" \\\n  --hash=sha256:" + "a".repeat(64) + "\n" }, advisory: [
+export function pinnedRequirementsFixture({ action, clean = false, requirementsVersion = "1.2.0", advisoryVersion = requirementsVersion, extras = "" } = {}) {
+  return scannerFixture({ action, files: { "app.js": "const ordinary = 1;", "requirements.txt": "# declared metadata only\nMixed_Name"+extras+"=="+requirementsVersion+" \\\n  --hash=sha256:" + "a".repeat(64) + "\n" }, advisory: [
     { ecosystem: "npm", name: "mixed-name", version: "1.2.0", advisories: [{ id: "GHSA-other-ecosystem", severity: "high" }] },
     { ecosystem: "PyPI", name: "mixed-name", version: advisoryVersion, advisories: clean ? [] : [{ id: "PYSEC-synthetic-only", severity: "unknown" }] }
   ] });

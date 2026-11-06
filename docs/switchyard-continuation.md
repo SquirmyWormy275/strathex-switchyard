@@ -95,9 +95,11 @@ was removed after manifest verification. [Receipt](evidence/installed-npm-archiv
    complete Linux 7e45654 failure separately: 305/306 groups, 1,783 accepted tests,
    sixteen declared skips and the original combined artifact deadline. Exact owned
    cleanup removed its checkout, nine aliases, 782 generated files and run marker.
-   [Failed receipt](evidence/linux-7e45654-timeout-summary.json). A new isolated
-   complete run at 55515d1 uses the corrected split; reconcile its active marker
-   before cleanup. Native
+   [Failed receipt](evidence/linux-7e45654-timeout-summary.json). The corrected
+   complete 55515d1 run passes all 307 groups, 1,805 tests and sixteen declared
+   skips. Exact owned cleanup removes its checkout, nine aliases, 782 generated
+   files, temporary parent and marker; all three other worktrees remain.
+   [Complete receipt](evidence/linux-55515d1-complete-summary.json). Native
    Windows 7e45654 times out the combined artifact file at its original 300-second
    bound; all other 65 boundary jobs pass. The correction separates byte/identity
    cases into independent files and CI lanes, preserving original assertions
@@ -110,8 +112,8 @@ was removed after manifest verification. [Receipt](evidence/installed-npm-archiv
    The separate installation lane fails one of sixteen scenarios during native
    shortcut creation. The original ten-second shortcut deadline remains; its
    underlying cause is not established. [Failure](evidence/windows-shortcut-timeout-summary.json).
-   Its exact failed job was requested for rerun after the workflow finished;
-   reconcile that separately. The original byte-comparison file also passes
+   Its unchanged-source retry was cancelled (job 128110089870) without an accepted
+   native result. The original byte-comparison file also passes
    eight native tests and two declared Linux-only skips at 55515d1.
    [Byte receipt](evidence/npm-artifact-split-native-summary.json).
    A confirmed cleanup race is now corrected without extending the original
@@ -131,6 +133,12 @@ was removed after manifest verification. [Receipt](evidence/installed-npm-archiv
    coverage, ecosystems, publisher provenance, verified local vulnerability
    context and workflow observation. These are unfinished implementation,
    separate from unavailable hardware, accounts or interactive environments.
+   Exact Python extras and corrected continuation/comment processing now pass
+   ten focused groups/106 checks and a 39-case pip/PyPA oracle. Two new actual
+   Linux scans and two Windows guest-double journeys retain original state,
+   receipt/replay and cleanup guarantees. Typecheck/package bounds pass; no
+   installed update or native Windows extras acceptance is claimed.
+   [Evidence](evidence/pypi-extras-source-summary.json).
 5. Keep frontend and editor command activation frozen. The protected editor
    journal, signed routes, restricted upstream and retained Terminal compose
    through actual Linux carriers with provider/editor doubles. Native TUI,

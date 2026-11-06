@@ -7,9 +7,9 @@ a partial implementation.** The F77 is the pilot device; it does not limit scope
 The Linux backend has a passing complete test checkpoint, and a versioned
 application has separately verified installed metadata checks. Later archive
 identity work has focused source acceptance.
-The subsequent complete Linux `7e45654` run passes 305/306 groups and fails the
-combined artifact file's original deadline. Its corrected split passes focused
-checks; complete Linux and native Windows follow-up remain pending.
+The corrected complete Linux `55515d1` run passes all 307 groups, 1,805 tests
+and sixteen declared skips. Both separately scheduled npm files also pass on
+native Windows; later shortcut work has separate focused acceptance.
 The restricted Windows storage owner now passes all eight original checks with
 verified retirement. Complete Windows release acceptance remains pending. Hardware,
 account and visual acceptance remain separate from those implementation results.
@@ -25,7 +25,7 @@ there is no merge or public release acceptance.
 
 | Boundary | Verified result | Still open |
 | --- | --- | --- |
-| Complete Linux source | `6e967a3`: **306 groups, 1,793 passing tests, sixteen declared skips, zero failures.** All owned children, checkout, dependency aliases and generated files were removed. [Receipt](evidence/linux-6e967a3-complete-summary.json). | Provider/guest doubles remain explicit. This includes SPDX membership, OSV inclusive/union boundaries and all independently scheduled task-owner cases. |
+| Complete Linux source | `55515d1`: **307 groups, 1,805 passing tests, sixteen declared skips, zero failures.** All owned children, checkout, dependency aliases and generated files were removed. [Receipt](evidence/linux-55515d1-complete-summary.json). | Provider/guest doubles remain explicit. Later shortcut and Python changes have separate focused checks. |
 | Windows backend batches | `dbbcce8`: 170 of 171 groups accepted, 971 passing tests and 135 declared skips. The native lease group passes. [Receipts](evidence/windows-backend-dbbc-native-summary.json). | The older complete release also finishes 385/386 groups with 2,336 accepted tests and 195 declared skips; its sole failure is that same task-owner file timeout, excluded from accepted totals. [Complete failed receipt](evidence/windows-complete-dbbc-failed-summary.json). All 26 original cases now run independently under the same 45-second child bound; all pass locally. Native `9fde0a3` now completes all 26 independent cases: 24 pass, two declared Linux-only skips, original 45-second bounds and verified cleanup. [Native receipt](evidence/task-owner-native-summary.json). [Correction](evidence/task-owner-scenarios-source-summary.json), [independent job](evidence/pipe-buffer-and-task-source-summary.json). |
 | Restricted Windows owner | `6e967a3`: **8/8 original owner checks pass**, with 68 exact QUERY-mask-8 registrations, native tree exit, token recheck, private-desktop closure and fixture/service/file retirement. All six GUI setup checks pass. [Owner receipt](evidence/windows-restricted-owner-accepted-summary.json), [setup](evidence/setup-final-native-summary.json). | This controlled native CI proof does not accept an ordinary user account, interactive UAC or actual guest journey. |
 | Installation and runtime | All sixteen original Windows installation/recovery cases pass at `b600a6d`; its independent fresh runtime installs 49 packages and loads/rechecks the offline CPU model, then removes its temporary runtime. [Installation](evidence/installation-scenarios-native-summary.json), [runtime](evidence/windows-runtime-b600-native-summary.json). | These independent passes do not accept the failed complete Windows release or ordinary-user/guest journeys. |
@@ -65,6 +65,11 @@ Rev2 scope independently of these checkpoints.
   Frontend and command activation are deliberately frozen for owner review.
 - Broader Shield coverage and dependency syntax/resolution, publisher provenance,
   complete archive contents, actual license texts and verified local vulnerability context.
+  Exact Python pins now retain bounded normalized extras and process continuations
+  before comments. Ten groups/106 checks and 39 independent pip/PyPA cases pass,
+  including actual Linux scans and Windows guest doubles. Optional dependencies
+  remain explicitly unresolved; installed/native acceptance is pending.
+  [Python evidence](evidence/pypi-extras-source-summary.json).
   Selected npm archive identity comparison is implemented with bounded, non-extracting
   gzip/USTAR parsing: six groups/78 checks plus one exact alias/version check pass.
   Native Windows hit the original combined-file deadline; the corrected split

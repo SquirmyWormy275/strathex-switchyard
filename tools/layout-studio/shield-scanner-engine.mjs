@@ -285,25 +285,33 @@ export function pypiIdentity(name, version) {
   parsePypiVersion(version);
   return { ecosystem: "PyPI", name: name.toLowerCase().replace(/[-_.]+/g, "-"), version };
 }
+export function pypiExtras(values) {
+  if (!Array.isArray(values) || values.length > 64) throw Error("Unsupported bounded Python extras.");
+  return [...new Set(values.map(value => pypiIdentity(value, "0").name))].sort();
+}
 export const isPinnedRequirementsPath = path => typeof path === "string" && /(?:^|\/)requirements(?:[-_.][A-Za-z0-9_-]+)?\.(?:txt|lock)$/i.test(path);
 /** A closed metadata subset, never pip, a resolver, includes or index access. */
 export function parsePinnedRequirements(text) {
   if (typeof text !== "string" || Buffer.byteLength(text) > 256 * 1024 || /[\0\v\f]/.test(text) || /\r(?!\n)/.test(text)) throw Error("Unsupported bounded Python requirements input.");
   const lines = text.replace(/\r\n/g, "\n").split("\n"); if (lines.length > 8192) throw Error("Python requirements exceed their line bound.");
-  const components = [], names = new Set(); let pending = "";
+  const components = [], names = new Set(); let pending = "", continuing = false;
   for (const raw of lines) {
-    let line = raw.replace(/(?:^|\s)#.*$/, "").trim(); if (!line) continue;
-    const continued = line.endsWith("\\"); if (continued) line = line.slice(0, -1).trim();
-    if (!line || line.includes("\\") || pending.length + line.length > 8192) throw Error("Unsupported Python requirements continuation.");
-    pending += (pending ? " " : "") + line;
-    if (continued) continue;
-    const match = /^([A-Za-z0-9][A-Za-z0-9._-]*)[ \t]*==[ \t]*([A-Za-z0-9.!+_-]{1,128})(?:[ \t]+((?:--hash=sha256:[a-f0-9]{64})(?:[ \t]+--hash=sha256:[a-f0-9]{64})*))?$/.exec(pending);
+    // pip joins physical lines before stripping comments. A comment-only line
+    // ends a continuation; a trailing backslash inside that comment is inert.
+    const comment = /^\s*#/.test(raw); continuing = raw.endsWith("\\") && !comment;
+    const part = comment ? " " + raw : continuing ? raw.slice(0, -1) : raw;
+    if (pending.length + part.length > 8192) throw Error("Unsupported Python requirements continuation.");
+    pending += part;
+    if (continuing) continue;
+    const line = pending.replace(/(?:^|\s)#.*$/, "").trim(); pending = "";
+    if (!line) continue;
+    const match = /^([A-Za-z0-9][A-Za-z0-9._-]*)[ \t]*(?:\[([^\[\]]*)\][ \t]*)?==[ \t]*([A-Za-z0-9.!+_-]{1,128})(?:[ \t]+((?:--hash=sha256:[a-f0-9]{64})(?:[ \t]+--hash=sha256:[a-f0-9]{64})*))?$/.exec(line);
     if (!match) throw Error("Requirements outside the exact version-pin/hash subset are unsupported.");
-    const identity = pypiIdentity(match[1], match[2]), declaredSha256 = match[3] ? match[3].split(/[ \t]+/).map(value => value.slice(14)).sort() : [];
+    const identity = pypiIdentity(match[1], match[3]), extras = match[2]?.trim() ? pypiExtras(match[2].split(",").map(value => value.trim())) : [], declaredSha256 = match[4] ? match[4].split(/[ \t]+/).map(value => value.slice(14)).sort() : [];
     if (names.has(identity.name) || declaredSha256.length > 64 || new Set(declaredSha256).size !== declaredSha256.length || components.length >= 4096) throw Error("Duplicate or excessive Python requirements metadata.");
-    names.add(identity.name); components.push({ ...identity, declaredSha256 }); pending = "";
+    names.add(identity.name); components.push({ ...identity, declaredSha256, ...(extras.length ? { extras } : {}) });
   }
-  if (pending) throw Error("Unfinished Python requirements continuation.");
+  if (continuing) throw Error("Unfinished Python requirements continuation.");
   return components;
 }
 function npmLocationName(location) {
@@ -460,7 +468,7 @@ export function shieldCycloneDxComponent(c) { if(c.ecosystem==="Cargo")return ca
       ...(c.license ? { licenses: [{ license: { name: c.license } }] } : {}), properties: [
         { name: "switchyard:ecosystem", value: c.ecosystem },
         ...licenseCatalogProperties(c.license),
-        ...(c.ecosystem === "PyPI" ? [{ name: "switchyard:requirements-file", value: c.requirementsPath }, { name: "switchyard:declared-sha256", value: JSON.stringify(c.declaredSha256) }, { name: "switchyard:python-environment", value: "not-resolved" }] : [{ name: "switchyard:lockfile", value: c.lockPath }, { name: "switchyard:package-location", value: c.location }, { name: "switchyard:installed-as", value: c.installedAs }]),
+        ...(c.ecosystem === "PyPI" ? [{ name: "switchyard:requirements-file", value: c.requirementsPath }, { name: "switchyard:declared-sha256", value: JSON.stringify(c.declaredSha256) }, { name: "switchyard:python-environment", value: "not-resolved" }, ...(c.extras ? [{ name: "switchyard:python-extras", value: JSON.stringify(c.extras) }] : [])] : [{ name: "switchyard:lockfile", value: c.lockPath }, { name: "switchyard:package-location", value: c.location }, { name: "switchyard:installed-as", value: c.installedAs }]),
         ...(c.workspace?[{name:"switchyard:source-kind",value:"workspace-link"},{name:"switchyard:workspace-path",value:c.workspace.path},{name:"switchyard:workspace-lock-metadata-sha256",value:c.workspace.lockMetadataSha256},{name:"switchyard:workspace-source",value:"not-verified"}]:[]),
         ...(c.integritySha256 ? [{ name: "switchyard:integrity-string-sha256", value: c.integritySha256 }] : []),
         ...archiveProperties(c.artifact?.archive),
@@ -614,6 +622,7 @@ export async function scanShieldInputs(proposed, { readInput }) {
       if (declared.length) { gaps.add("license_metadata"); gaps.add("package_source_or_integrity"); }
       for (const component of declared) {
         if (components.length >= 4096) throw Error("Aggregate dependency inventory exceeds its original component bound.");
+        if (component.extras) gaps.add("python_extras_not_resolved");
         const referenceKey = shieldArtifactReferenceKey({ ...component, requirementsPath: file.path }), reference = artifacts.get(referenceKey);
         if (reference) {
           const observed = artifactDigests.get(reference.path), acceptedSha256 = [...component.declaredSha256];

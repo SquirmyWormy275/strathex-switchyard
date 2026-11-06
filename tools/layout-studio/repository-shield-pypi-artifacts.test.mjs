@@ -17,6 +17,19 @@ function replaceFile(f, path, bytes) {
   Object.assign(f.request.files.find(row => row.path === path), { size: bytes.length, sha256: sha(bytes) });
 }
 
+test("Python extras preserve selected artifact comparisons without accepting optional dependency resolution", async () => {
+  for (const action of ["shield_supply_chain", "release_shield"]) for (const artifactStatus of ["matched", "mismatched", "unsupported-integrity"]) {
+    const f = pypiArtifactFixture({ action, artifactStatus });
+    replaceFile(f, "requirements.txt", f.content.get("requirements.txt").toString().replace("Mixed_Name==", "Mixed_Name[TLS,foo_bar,FOO.bar]=="));
+    const report = await f.scan(), c = report.sbom.components[0];
+    assert.deepEqual(c.extras, ["foo-bar", "tls"]); assert.equal(c.artifact.status, artifactStatus);
+    assert.equal(report.outcome, artifactStatus === "mismatched" ? "failed" : "incomplete");
+    for (const gap of ["python_extras_not_resolved", "python_environment_not_resolved", "artifact_contents_not_inspected", "publisher_provenance_not_verified"]) assert.ok(report.gaps.includes(gap));
+    assert.deepEqual(admit(report, f), report); assert.equal(report.cycloneDx.dependencies, undefined);
+    assert.equal(report.cycloneDx.components[0].properties.find(p => p.name === "switchyard:python-extras").value, '["foo-bar","tls"]');
+  }
+});
+
 test("Python accepts either declared artifact hash while mismatch and absent hashes retain incomplete scope", async () => {
   for (const [artifactStatus, alternative] of [["matched", 0], ["matched", 1], ["mismatched", 0], ["unsupported-integrity", 0]]) {
     const f = pypiArtifactFixture({ artifactStatus, alternative }), r = await f.scan(), c = r.sbom.components[0], a = c.artifact;

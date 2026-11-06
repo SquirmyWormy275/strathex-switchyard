@@ -1,5 +1,23 @@
 # What has actually been verified
 
+Pinned Python requirements now retain normalized, bounded extra declarations
+without claiming optional dependency resolution. Physical continuations precede
+comment removal, preventing commented text from becoming false inventory.
+Ten focused groups/105 tests plus one six-combination artifact regression pass
+**106 checks**. A 39-case independent pip/PyPA fixture, new actual Linux scanner
+exits, Windows guest doubles, original state/receipt/replay/cleanup, typecheck
+and the original package budget pass. Installed/native acceptance remains open.
+[Source evidence](evidence/pypi-extras-source-summary.json).
+
+The corrected complete Linux `55515d1` checkpoint passes **307/307 groups,
+1,805 tests, sixteen declared skips and zero failures**. All children and process
+trees exit; its owned checkout, nine aliases, 782 generated files (11,766,655 bytes),
+temporary parent and marker are removed. All three other worktrees remain.
+This accepts the split archive scheduling, independently of later shortcut and
+Python changes. [Complete receipt](evidence/linux-55515d1-complete-summary.json).
+The unchanged-source Windows shortcut retry is cancelled without an accepted
+native result; its original failure remains failed evidence.
+
 Shortcut failure cleanup now joins owned direct-child exit before removing its
 temporary output. Unconfirmed exit retains the owned file and fails explicitly.
 The original ten-second execution deadline and exact COM readback are unchanged.

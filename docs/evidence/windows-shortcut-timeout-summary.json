@@ -35,5 +35,11 @@
   "failure": "Native shortcut creation timed out.",
   "originalShortcutDeadlineMs": 10000,
   "rootCauseEstablished": false,
-  "partialPlanAccepted": false
+  "partialPlanAccepted": false,
+  "unchangedSourceRetry": {
+    "jobId": 128110089870,
+    "conclusion": "cancelled",
+    "nativeResultAccepted": false,
+    "logAvailable": false
+  }
 }

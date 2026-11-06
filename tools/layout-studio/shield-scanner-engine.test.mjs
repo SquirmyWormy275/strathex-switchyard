@@ -11,6 +11,55 @@ const sha = b => createHash("sha256").update(b).digest("hex");
 import { parseShieldScannerReport } from "./repository-shield.mjs";
 import {scannerFixture} from "./test-support/shield-scanner-fixture.mjs";
 import { spdxLicenseMembership, spdxLicenseListVersion } from "./shield-scanner-engine.mjs";
+import { pypiExtras, shieldCycloneDxComponent } from "./shield-scanner-engine.mjs";
+
+test("pinned Python extras and physical-line preprocessing match independently recorded pip and PyPA facts", async () => {
+  const oracle = JSON.parse(await readFile(new URL("../../scripts/fixtures/pypi-requirements-oracle.json", import.meta.url), "utf8"));
+  assert.equal(oracle.schema, "switchyard-pypi-requirements-oracle/v1"); assert.equal(oracle.cases.length, 39);
+  for (const row of oracle.cases) assert.deepEqual(parsePinnedRequirements(row.input), row.components, row.input);
+});
+
+test("Python extras retain normalized union semantics, empty brackets, hashes and original bounds", () => {
+  assert.deepEqual(pypiExtras(["foo.bar", "FOO__bar", "TLS", "tls"]), ["foo-bar", "tls"]);
+  const hash = "a".repeat(64), parsed = parsePinnedRequirements("Demo [ TLS, foo.bar, FOO__bar ] == 1.2.3 \\\n --hash=sha256:" + hash);
+  assert.deepEqual(parsed, [{ ecosystem: "PyPI", name: "demo", version: "1.2.3", declaredSha256: [hash], extras: ["foo-bar", "tls"] }]);
+  assert.deepEqual(parsePinnedRequirements("demo[ ]==1.2.3"), parsePinnedRequirements("demo==1.2.3"));
+  assert.equal(parsePinnedRequirements("demo[" + Array.from({ length: 64 }, (_, i) => "e" + i).join(",") + "]==1")[0].extras.length, 64);
+  for (const extras of ["a,,b", "a,", ",a", "-a", "a-", "a/b", "a b", "a;python_version", "${PRIVATE_EXTRA}", "é", "x".repeat(129), Array(65).fill("a").join(",")]) assert.throws(() => parsePinnedRequirements("demo[" + extras + "]==1"), extras);
+  for (const value of [null, "tls", {}, [1], [null]]) assert.throws(() => pypiExtras(value));
+  assert.equal(parsePinnedRequirements("x==1" + " ".repeat(8188)).length, 1);
+  assert.throws(() => parsePinnedRequirements("x==1" + " ".repeat(8189)));
+  assert.equal(parsePinnedRequirements("x==1" + " ".repeat(8187) + "\\\n ").length, 1);
+  assert.throws(() => parsePinnedRequirements("x==1" + " ".repeat(8187) + "\\\n  "));
+});
+
+test("Python comment continuations cannot invent declarations and unsupported extras refuse the whole inventory", async () => {
+  const input = "first==1 # comment \\\nconcealed==2\nlast[tls]==3", f = scannerFixture({ action: "shield_supply_chain", files: { "requirements.txt": input } }), result = await f.scan();
+  assert.deepEqual(result.sbom.components.map(c => c.name), ["first", "last"]);
+  assert.ok(result.gaps.includes("python_extras_not_resolved"));
+  const refused = await scannerFixture({ action: "shield_supply_chain", files: { "requirements.txt": "first==1\nlast[../private]==3" } }).scan();
+  assert.deepEqual(refused.sbom.components, []); assert.ok(refused.gaps.includes("unsupported_python_requirements"));
+});
+
+test("Python extras remain declarations in the BOM and cannot conceal unresolved coverage or advisory findings", async () => {
+  const f = scannerFixture({ action: "shield_supply_chain", files: { "requirements.txt": "Demo[TLS,foo_bar]==1.2.3" }, advisory: [{ ecosystem: "PyPI", name: "demo", version: "1.2.3", advisories: [{ id: "SYNTHETIC-EXTRA-BASE", severity: "high" }] }] });
+  const report = await f.scan(), context = { engine: report.engine, requestSha256: report.requestSha256, request: f.request };
+  assert.equal(report.outcome, "failed"); assert.deepEqual(report.sbom.components[0].extras, ["foo-bar", "tls"]);
+  assert.equal(report.cycloneDx.components[0].properties.find(p => p.name === "switchyard:python-extras").value, '["foo-bar","tls"]');
+  assert.equal(report.cycloneDx.dependencies, undefined); assert.equal(report.cycloneDx.compositions[0].aggregate, "unknown");
+  assert.deepEqual(parseShieldScannerReport(JSON.stringify(report), context, f.request.action), report);
+  for (const extras of [null, [], "tls", ["TLS"], ["foo-bar", "foo-bar"], ["tls", "foo-bar"], ["../private"], Array.from({ length: 65 }, (_, i) => "extra" + i)]) {
+    const changed = structuredClone(report); changed.sbom.components[0].extras = extras;
+    changed.cycloneDx.components = changed.sbom.components.map(shieldCycloneDxComponent);
+    assert.throws(() => parseShieldScannerReport(JSON.stringify(changed), context, f.request.action));
+  }
+  for (const gap of ["python_environment_not_resolved", "python_extras_not_resolved"]) {
+    const changed = structuredClone(report); changed.gaps = changed.gaps.filter(g => g !== gap);
+    assert.throws(() => parseShieldScannerReport(JSON.stringify(changed), context, f.request.action));
+  }
+  const changed = structuredClone(report); changed.cycloneDx.components[0].properties.find(p => p.name === "switchyard:python-extras").value = '[]';
+  assert.throws(() => parseShieldScannerReport(JSON.stringify(changed), context, f.request.action));
+});
 
 test("the pinned SPDX catalog recognizes every license and exception in its own namespace without changing policy choices", async () => {
   const catalog = JSON.parse(await readFile(new URL("../../scripts/data/spdx-license-identifiers.json", import.meta.url), "utf8"));
@@ -252,8 +301,8 @@ test("Python requirement pins normalize distribution names and retain declared h
   for (const version of ["0", "1.0", "2026.10.2", "1.2.3.4"]) assert.ok(parsePypiVersion(version).release.length);
 });
 
-test("Python requirement includes, indexes, URLs, editable paths, markers, extras and unsupported syntax never become partial package inventory", () => {
-  const values = ["-r private.txt", "--index-url https://user:NEVER_COPY_SECRET@example.invalid/simple", "-e ../private", "name @ https://example.invalid/source.whl", "name>=1.0", "name[extra]==1.0", "name==1.0; python_version<'3.12'", "name==1.0rcX", "name==1!", "name==1.0..post1", "name==1.0+", "name==1.*", "name==1.0dev1post2", "name==1.0\nNAME==1.0", "name==1.0 --hash=sha256:"+"a".repeat(63), "name==1.0 --hash=sha256:"+"a".repeat(64)+" --hash=sha256:"+"a".repeat(64), "name==1.0 " + String.fromCharCode(92), "name==1.0\0"];
+test("Python requirement includes, indexes, URLs, editable paths, markers and unsupported syntax never become partial package inventory", () => {
+  const values = ["-r private.txt", "--index-url https://user:NEVER_COPY_SECRET@example.invalid/simple", "-e ../private", "name @ https://example.invalid/source.whl", "name>=1.0", "name==1.0; python_version<'3.12'", "name==1.0rcX", "name==1!", "name==1.0..post1", "name==1.0+", "name==1.*", "name==1.0dev1post2", "name==1.0\nNAME==1.0", "name==1.0 --hash=sha256:"+"a".repeat(63), "name==1.0 --hash=sha256:"+"a".repeat(64)+" --hash=sha256:"+"a".repeat(64), "name==1.0 " + String.fromCharCode(92), "name==1.0\0"];
   for (const value of values) assert.throws(() => parsePinnedRequirements("ordinary==1.0\n" + value));
   assert.throws(() => parsePinnedRequirements("#".repeat(256*1024+1))); assert.throws(() => parsePinnedRequirements("\n".repeat(8193)));
 });

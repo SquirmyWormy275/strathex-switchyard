@@ -30,6 +30,22 @@ Versions are limited to 128 ASCII characters and 32 release/local segments;
 whitespace, controls and unsupported syntax refuse. Integer comparisons do not
 round large components through JavaScript numbers. Optional SHA-256 declarations must use
 literal lowercase hex. Comments, CRLF and backslash continuations are supported.
+Physical lines are joined before comments are removed, matching pip's documented
+order. A declaration absorbed into a continued comment cannot become a package
+in the inventory. Comment-only lines end continuations; ambiguous or unfinished
+syntax remains unsupported. The original logical-row bound includes the joined
+physical bytes.
+
+Exact pins may also include extras, for example `Requests[security,socks]==2.19.1`.
+Up to 64 declared names, each at most 128 ASCII characters, are normalized with
+the same rules as distribution names. Their union is sorted and deduplicated;
+empty brackets are equivalent to no extras. The inventory and CycloneDX preserve
+these as declarations. The base distribution still receives its exact-version
+advisory and selected-artifact comparisons. `python_extras_not_resolved` and
+`python_environment_not_resolved` remain mandatory: no optional dependency is
+resolved, downloaded, installed or silently treated as covered.
+[Extra semantics](https://packaging.python.org/en/latest/specifications/dependency-specifiers/#extras),
+[name normalization](https://packaging.python.org/en/latest/specifications/name-normalization/).
 
 Each requirements file is limited to 256 KiB, 8,192 physical lines, 8,192
 characters per logical row, 64 distinct hashes per package and no duplicate
@@ -37,11 +53,30 @@ normalized names. The aggregate dependency inventory retains its 4,096-component
 ceiling across all reviewed manifests.
 
 This is a strict subset of the [pip requirements format](https://pip.pypa.io/en/stable/reference/requirements-file-format/).
-Includes, indexes, URLs, editable/local sources, extras, markers, ranges, wildcards
+Includes, indexes, URLs, editable/local sources, markers, ranges, wildcards
 and other unsupported requirements syntax refuse inventory for that whole file.
 The report adds `unsupported_python_requirements`; it never returns a partial
 package list or follows an include/index. No environment or dependency graph is
 resolved, and a pin does not prove the distribution exists.
+
+## Extras and continuation evidence
+
+Ten focused groups plus one exact regression pass **106 checks**. The new Supply
+Chain/Release cases exercise actual Linux scanner exit and Windows guest doubles,
+original repository/index/HEAD preservation, signed incomplete receipts, replay
+refusal and exact cleanup. Six additional combinations verify that extras preserve
+matched, mismatched and absent-hash artifact outcomes. Typecheck, packaging and
+the original 5 MiB package test budget pass.
+
+The committed [39-case reference fixture](../scripts/fixtures/pypi-requirements-oracle.json)
+comes from existing pip 26.2.2 preprocessing and its vendored PyPA packaging 26.2.
+It records module hashes and independently parsed names, versions, extras and
+continued comments. No package, runtime or dependency is downloaded. Use
+`python3 -I -B scripts/generate-pypi-requirements-oracle.py` only with an already
+installed pip to regenerate it. Additional refusal checks retain the original
+row/hash limits and reject malformed extras, substituted BOM metadata and omitted
+unresolved-coverage gaps. Native Windows and installed extras acceptance remain
+separate. [Exact evidence](evidence/pypi-extras-source-summary.json).
 
 ## Advisories and portable inventory
 
