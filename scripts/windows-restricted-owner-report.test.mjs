@@ -44,6 +44,23 @@ test("probe observation retains original exceptions and projects only fixed oper
   }
 });
 
+test("managed startup phases reach bounded owner evidence without conferring readiness or copying unknown details", async () => {
+  for (const [runtimeStartupFailure, suffix] of [
+    [{ phase: "job-create", nativeCode: 5 }, "native-job-create-code5"],
+    [{ phase: "job-configure", nativeCode: 0xffffffff }, "native-job-configure-code4294967295"],
+    [{ phase: "self-birth", nativeCode: null }, "native-self-birth"],
+    [{ phase: "self-birth", nativeCode: null, raw: "NEVER_RETAIN" }, "refused"],
+  ]) {
+    const observation = createWindowsOwnerProbeObservation(), error = Object.assign(new Error("NEVER_RETAIN"), { runtimeStartupFailure });
+    const native = observation.native({ identity: async () => { throw error; } });
+    await assert.rejects(native.identity(), value => value === error);
+    assert.equal(observation.failurePhase, "probe-identity-return-" + suffix);
+    const child = { waitResult: 0, resultAvailable: true, failedPhase: observation.failurePhase };
+    const projected = storageBrokerFailureEvidence({ schema: "switchyard-storage-broker-protocol-proof/v1", success: false, restrictedHostChildExit: child });
+    assert.deepEqual(projected.restrictedHostChildExit, child); assert.equal(JSON.stringify(projected).includes("NEVER_RETAIN"), false);
+  }
+});
+
 test("fixed Node imports retain only known method presence and exact image hash, never a runtime branch claim", () => {
   const text = "Dump of file C:\\NEVER_RETAIN\\node.exe\n\n  bcrypt.dll\n     2A BCryptGenRandom\n  ADVAPI32.dll\n     10 CryptAcquireContextW\n     11 CryptGenRandom\n     12 CryptReleaseContext\n     13 UnrelatedSecretMethod\n  Summary\n";
   const value = parseNodeRngImports(text, "a".repeat(64));

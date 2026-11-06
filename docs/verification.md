@@ -1,5 +1,13 @@
 # What has actually been verified
 
+The Windows guardian now reports only fixed pre-readiness startup phases, with
+API-specific numeric codes for Job create/configure failures. The host preserves
+refusal and all ownership checks; it does not turn diagnostic output into exit
+or execution acceptance. Six groups / 78 tests, two managed builds / 2,006
+portable checks, typecheck and exact owned cleanup pass. Native follow-up is
+pending. [Contract](windows-helper-startup.md),
+[evidence](evidence/runtime-startup-observation-summary.json).
+
 ## npm prereleases and native Windows probe result
 
 Collector 8 now accepts bounded literal npm SemVer including prerelease/build

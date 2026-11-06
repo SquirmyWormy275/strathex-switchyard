@@ -7,6 +7,12 @@ import { fileURLToPath } from "node:url";
 import { stopOwnedChild } from "./owned-process.mjs";
 import { desktopEnvironment, windowsHelperTemporaryEnvironment } from "./process-environment.mjs";
 const nativeHelper = fileURLToPath(new URL("../../runtime/hotkeys/Switchyard.Hotkeys.exe", import.meta.url));
+export function runtimeStartupFailureEvidence(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value) || Object.keys(value).sort().join() !== "nativeCode,phase"
+      || !["request-fields", "environment", "executable-attributes", "executable-open", "executable-hash", "job-create", "job-configure", "self-birth", "ready-write"].includes(value.phase)
+      || !(value.nativeCode === null || ["job-create", "job-configure"].includes(value.phase) && Number.isInteger(value.nativeCode) && value.nativeCode >= 0 && value.nativeCode <= 0xffffffff)) return undefined;
+  return { phase: value.phase, nativeCode: value.nativeCode };
+}
 export async function runtimeGuardianStopped(frame, { windowsHelper = nativeHelper } = {}) {
   if (frame?.schema !== "switchyard-runtime-command/v1" || !/^[a-f0-9-]{36}$/.test(frame.id) || !Number.isSafeInteger(frame.guardianPid) || frame.guardianPid < 1 || !/^[0-9]+$/.test(frame.birth ?? "") || frame.containment !== (process.platform === "linux" ? "owned-linux-session" : "windows-job")) throw new Error("The interrupted runtime guardian scope is invalid; preserve its stage.");
   if (process.platform === "linux") {
@@ -71,13 +77,19 @@ export async function runRuntimeCommand(executable, args, { timeout = 120000, en
   child.stdin.on("error", () => {});
   child.stdout.setEncoding("utf8");
   child.stdout.on("data", (chunk) => {
+    if (failure) return;
     buffer += chunk; if (Buffer.byteLength(buffer) > maxOutputBytes * 2 + 65536) { fail("Runtime verification exceeded its output bound."); return; }
     let end;
     while ((end = buffer.indexOf("\n")) >= 0) {
       let frame; try { frame = JSON.parse(buffer.slice(0, end)); } catch { fail("Invalid native runtime response."); return; } buffer = buffer.slice(end + 1);
       if (!frame || typeof frame !== "object" || Array.isArray(frame)) { fail("Invalid native runtime response object."); return; }
       if (frame.schema !== request.schema || frame.id !== request.id || frame.containment !== (linux ? "owned-linux-session" : "windows-job")) { fail("Native runtime response scope changed."); return; }
-      if (frame.event === "ready" && !ready) {
+      if (!linux && frame.event === "startup-failure" && !ready && Object.keys(frame).sort().join() === "containment,event,id,nativeCode,phase,schema" && runtimeStartupFailureEvidence({ phase: frame.phase, nativeCode: frame.nativeCode })) {
+        fail("The native runtime guardian failed before readiness.");
+        failure.code = "RUNTIME_STOP_UNCONFIRMED";
+        failure.runtimeStartupFailure = runtimeStartupFailureEvidence({ phase: frame.phase, nativeCode: frame.nativeCode });
+        return;
+      } else if (frame.event === "ready" && !ready) {
         ready = true; clearTimeout(readiness);
         if (frame.guardianPid !== child.pid || typeof frame.birth !== "string" || !/^[0-9]+$/.test(frame.birth)) { fail("The native runtime guardian identity changed."); return; }
         const capabilities = Array.isArray(frame.capabilities) ? frame.capabilities : [];

@@ -1,5 +1,28 @@
 # Windows helper startup candidate
 
+## Restricted setup-identity guardian
+
+Native `6f2097b` reaches protected initialization and mode update, then fails as
+`probe-identity-created-worker-exit`. The guardian child is created but never
+reports readiness. [Exact native result](evidence/windows-owner-probe-native-summary.json).
+
+The helper now emits an optional closed `startup-failure` frame before readiness
+with the original request ID and a fixed phase. Phases distinguish environment,
+image attributes/open/hash, Job creation/configuration, self-birth lookup and
+readiness output. Only the two Job APIs can attach their immediately captured
+Win32 error code. Paths, credentials, URLs and raw exception text are excluded.
+
+The host retains refusal and `RUNTIME_STOP_UNCONFIRMED`; this frame does not
+acknowledge a command or establish exit. Unknown fields/stages refuse, and no
+later frame can invoke readiness after failure. The existing native environment
+test now verifies an invalid environment fails before acknowledgement with the
+exact environment phase. The original eight restricted-owner checks remain.
+
+Six groups / 78 tests, two managed builds with no warnings/errors, 2,006 portable
+checks and typecheck pass. All 124 owned build files (3,207,249 bytes) and test
+process/staging cleanup verify. No SDK download or local installation occurred.
+Native follow-up is pending. [Source evidence](evidence/runtime-startup-observation-summary.json).
+
 At `4faa8a1`, version 2 native leases pass 24 checks/one declared skip with
 cleanup. The restricted owner clears protected state initialization and mode
 update, then fails later at its read-only storage probe. The complete owner is

@@ -14,6 +14,14 @@ internal static class RuntimeCommandRunner
     private const string Schema = "switchyard-runtime-command/v1";
     private static readonly object Lifecycle = new();
     private static bool ParentGone;
+    private sealed class StartupObservation
+    {
+        public string? Id;
+        public string Phase = "request-fields";
+        public uint? NativeCode;
+        public bool Ready;
+        public object? Failure => !Ready && Id is not null ? new { schema = Schema, id = Id, @event = "startup-failure", containment = "windows-job", phase = Phase, nativeCode = NativeCode } : null;
+    }
     private static Exception NativeError() => new InvalidOperationException("The native runtime boundary is unavailable.");
     private static async Task<string?> ReadLineBounded(TextReader reader)
     {
@@ -30,8 +38,15 @@ internal static class RuntimeCommandRunner
     public static int Run()
     {
         if (!OperatingSystem.IsWindows()) return 2;
-        try { return RunAsync().GetAwaiter().GetResult(); }
-        catch { return 2; } // Paths, credentials and signed installer URLs are never logged.
+        var startup = new StartupObservation();
+        try { return RunAsync(startup).GetAwaiter().GetResult(); }
+        catch
+        {
+            // Only fixed stages and an API-specific numeric failure are emitted.
+            // This is a refusal, never readiness, execution or cleanup evidence.
+            try { if (startup.Failure is object failure) Write(failure); } catch { }
+            return 2; // Paths, credentials and signed installer URLs are never logged.
+        }
     }
     public static int ReadStatus()
     {
@@ -53,11 +68,12 @@ internal static class RuntimeCommandRunner
         catch { return 2; }
     }
     private static string JobName(string id) => "Local\\Switchyard.Runtime." + id;
-    private static async Task<int> RunAsync()
+    private static async Task<int> RunAsync(StartupObservation startup)
     {
         using var document = JsonDocument.Parse(await ReadLineBounded(Console.In) ?? throw NativeError());
         var request = document.RootElement;
         string id = request.GetProperty("id").GetString() ?? "";
+        if (request.GetProperty("schema").GetString() == Schema && Guid.TryParseExact(id, "D", out _)) startup.Id = id;
         string executable = request.GetProperty("executable").GetString() ?? "";
         string cwd = request.GetProperty("cwd").GetString() ?? "";
         string digest = request.GetProperty("executableSha256").GetString() ?? "";
@@ -76,6 +92,7 @@ internal static class RuntimeCommandRunner
         }
         int stderrLimit = request.TryGetProperty("maxStderrBytes", out var stderrValue) ? stderrValue.GetInt32() : 0;
         if (stderrLimit < 0 || stderrLimit > 16384) throw NativeError();
+        startup.Phase = "environment";
         var env = request.GetProperty("environment");
         if (env.ValueKind != JsonValueKind.Object || env.EnumerateObject().Count() > 64) throw NativeError();
         var environment = new SortedDictionary<string, string>(StringComparer.OrdinalIgnoreCase);
@@ -86,11 +103,18 @@ internal static class RuntimeCommandRunner
             // desktop allowlist; parentheses are not valid POSIX identifiers.
             if (!Regex.IsMatch(entry.Name, "^(?:[A-Za-z_][A-Za-z0-9_]*|ProgramFiles\\(x86\\)|CommonProgramFiles\\(x86\\))$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant) || value.Length > 8192 || value.Contains('\0') || !environment.TryAdd(entry.Name, value)) throw NativeError();
         }
+        startup.Phase = "executable-attributes";
         if ((File.GetAttributes(executable) & (FileAttributes.Directory | FileAttributes.ReparsePoint)) != 0) throw NativeError();
+        startup.Phase = "executable-open";
         using var executableLock = new FileStream(executable, FileMode.Open, FileAccess.Read, FileShare.Read);
+        startup.Phase = "executable-hash";
         if (Convert.ToHexString(SHA256.HashData(executableLock)).ToLowerInvariant() != digest) throw NativeError();
-        using var job = CreateJob(id);
-        Write(new { schema = Schema, id, @event = "ready", guardianPid = Environment.ProcessId, birth = Process.GetCurrentProcess().StartTime.ToUniversalTime().Ticks.ToString(), containment = "windows-job", capabilities = new[] { "bounded-stdin", "bounded-stdin-512k", "bounded-stderr" } });
+        using var job = CreateJob(id, startup);
+        startup.Phase = "self-birth";
+        string birth = Process.GetCurrentProcess().StartTime.ToUniversalTime().Ticks.ToString();
+        startup.Phase = "ready-write";
+        Write(new { schema = Schema, id, @event = "ready", guardianPid = Environment.ProcessId, birth, containment = "windows-job", capabilities = new[] { "bounded-stdin", "bounded-stdin-512k", "bounded-stderr" } });
+        startup.Ready = true;
         using var ack = JsonDocument.Parse(await ReadLineBounded(Console.In) ?? throw NativeError());
         if (ack.RootElement.GetProperty("schema").GetString() != Schema || ack.RootElement.GetProperty("id").GetString() != id || !ack.RootElement.GetProperty("start").GetBoolean()) throw NativeError();
         _ = Task.Run(async () =>
@@ -183,13 +207,16 @@ internal static class RuntimeCommandRunner
             if (attributes != IntPtr.Zero) Marshal.FreeHGlobal(attributes); if (handles != IntPtr.Zero) Marshal.FreeHGlobal(handles); if (jobs != IntPtr.Zero) Marshal.FreeHGlobal(jobs); if (env != IntPtr.Zero) Marshal.FreeHGlobal(env);
         }
     }
-    private static SafeJobHandle CreateJob(string id)
+    private static SafeJobHandle CreateJob(string id, StartupObservation startup)
     {
+        startup.Phase = "job-create";
         SafeJobHandle job = CreateJobObjectW(IntPtr.Zero, JobName(id));
-        if (job.IsInvalid || Marshal.GetLastWin32Error() == 183) { job.Dispose(); throw NativeError(); }
+        int createError = Marshal.GetLastWin32Error();
+        if (job.IsInvalid || createError == 183) { startup.NativeCode = unchecked((uint)createError); job.Dispose(); throw NativeError(); }
+        startup.Phase = "job-configure";
         var information = new ExtendedLimits { Basic = new BasicLimits { Flags = 0x2000 } };
         IntPtr pointer = Marshal.AllocHGlobal(Marshal.SizeOf<ExtendedLimits>());
-        try { Marshal.StructureToPtr(information, pointer, false); if (!SetInformationJobObject(job, 9, pointer, (uint)Marshal.SizeOf<ExtendedLimits>())) { job.Dispose(); throw NativeError(); } }
+        try { Marshal.StructureToPtr(information, pointer, false); if (!SetInformationJobObject(job, 9, pointer, (uint)Marshal.SizeOf<ExtendedLimits>())) { startup.NativeCode = unchecked((uint)Marshal.GetLastWin32Error()); job.Dispose(); throw NativeError(); } }
         finally { Marshal.FreeHGlobal(pointer); }
         return job;
     }

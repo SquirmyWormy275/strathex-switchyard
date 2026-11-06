@@ -1,4 +1,5 @@
 /** CI-only fixed phase observation. Delegates every call and never accepts a result. */
+import { runtimeStartupFailureEvidence } from "../tools/layout-studio/runtime-command.mjs";
 const reasons = new Map([
   ["Runtime worker exit could not be fully verified. Preserve its staging/recovery state.", "worker-exit"],
   ["The native runtime guardian did not verify readiness.", "readiness"],
@@ -17,7 +18,8 @@ export function createWindowsOwnerProbeObservation() {
   let operation = "native", failure = null;
   const record = (stage, error) => {
     // No raw exception, code, path, child output or account identifier is projected.
-    failure ??= `probe-${operation}-${stage}-${reasons.get(error?.message) ?? "refused"}`;
+    const native = runtimeStartupFailureEvidence(error?.runtimeStartupFailure);
+    failure ??= native ? `probe-${operation}-${stage}-native-${native.phase}${native.nativeCode === null ? "" : "-code" + native.nativeCode}` : `probe-${operation}-${stage}-${reasons.get(error?.message) ?? "refused"}`;
   };
   return {
     get failurePhase() { return failure; },

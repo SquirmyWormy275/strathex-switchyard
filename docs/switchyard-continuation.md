@@ -31,6 +31,14 @@ evidence, not instructions to reset. Publish regular commits. Do not merge or re
 
 ## Current implementation and evidence
 
+The Windows guardian now reports only fixed pre-readiness startup phases, with
+API-specific numeric codes for Job create/configure failures. The host preserves
+refusal and all ownership checks; it does not turn diagnostic output into exit
+or execution acceptance. Six groups / 78 tests, two managed builds / 2,006
+portable checks, typecheck and exact owned cleanup pass. Native follow-up is
+pending. [Contract](windows-helper-startup.md),
+[evidence](evidence/runtime-startup-observation-summary.json).
+
 npm prerelease/build handling now joins collector, signed feed, scanner inventory
 and strict host verification. Twelve groups / 101 tests plus 556 grammar cases
 and 276,676 existing node-semver reference comparisons pass with typecheck and

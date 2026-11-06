@@ -4,11 +4,20 @@ import { spawn } from "node:child_process";
 import { mkdtemp, readFile, rm, symlink } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { runRuntimeCommand, runtimeGuardianStopped } from "./runtime-command.mjs";
+import { runRuntimeCommand, runtimeGuardianStopped, runtimeStartupFailureEvidence } from "./runtime-command.mjs";
 import { runtimeEnvironment } from "./runtime-setup.mjs";
 import { runOwnedNativeCommand } from "./owned-native-command.mjs";
 import { createHash } from "node:crypto";
 import { windowsHelperTemporaryEnvironment } from "./process-environment.mjs";
+
+test("runtime startup refusal evidence excludes private output and unrelated native codes", () => {
+  for (const phase of ["request-fields", "environment", "executable-attributes", "executable-open", "executable-hash", "job-create", "job-configure", "self-birth", "ready-write"]) {
+    const value = { phase, nativeCode: null }, copy = runtimeStartupFailureEvidence(value);
+    assert.deepEqual(copy, value); copy.phase = "changed"; assert.equal(value.phase, phase);
+  }
+  for (const nativeCode of [0, 5, 183, 0xffffffff]) assert.deepEqual(runtimeStartupFailureEvidence({ phase: "job-create", nativeCode }), { phase: "job-create", nativeCode });
+  for (const value of [null, [], { phase: "self-birth" }, { phase: "NEVER_RETAIN", nativeCode: null }, { phase: "job-create", nativeCode: "5" }, { phase: "job-create", nativeCode: -1 }, { phase: "job-create", nativeCode: 1.5 }, { phase: "job-create", nativeCode: 0x100000000 }, { phase: "self-birth", nativeCode: 5 }, { phase: "job-create", nativeCode: 5, path: "NEVER_RETAIN" }]) assert.equal(runtimeStartupFailureEvidence(value), undefined);
+});
 
 test("fixed Windows helper temp coordinates exclude secrets and startup overrides and reject ambiguous or redirected syntax",()=>{
   assert.deepEqual(windowsHelperTemporaryEnvironment({TEMP:"C:\\Users\\pilot\\Temp",TMP:"D:\\private-temp",API_KEY:"synthetic",DOTNET_STARTUP_HOOKS:"untrusted"}),{TEMP:"D:\\private-temp",TMP:"D:\\private-temp"});
@@ -47,7 +56,12 @@ test("native guardian environment blocks respect platform identifiers and reject
   if (process.platform !== "win32") { const marker = join(root, "must-not-start"); await assert.rejects(runRuntimeCommand(process.execPath, ["-e", `require('node:fs').writeFileSync(${JSON.stringify(marker)},'unexpected')`], { ...options, env })); await assert.rejects(readFile(marker), { code: "ENOENT" }); return; }
   const code = "process.stdout.write(JSON.stringify([process.env['ProgramFiles(x86)'],process.env['CommonProgramFiles(x86)']]))";
   assert.deepEqual(JSON.parse(await runRuntimeCommand(process.execPath, ["-e", code], { ...options, env })), [env["ProgramFiles(x86)"], env["CommonProgramFiles(x86)"]]);
-  await assert.rejects(runRuntimeCommand(process.execPath, ["-e", "process.stdout.write('must-not-start')"], { ...options, env: { ...env, "Invalid(Name)": "rejected" } }));
+  let acknowledged = false;
+  await assert.rejects(runRuntimeCommand(process.execPath, ["-e", "process.stdout.write('must-not-start')"], { ...options, env: { ...env, "Invalid(Name)": "rejected" }, onGuardianReady: () => { acknowledged = true; } }), error => {
+    assert.deepEqual(error.runtimeStartupFailure, { phase: "environment", nativeCode: null });
+    assert.equal(error.code, "RUNTIME_STOP_UNCONFIRMED"); return true;
+  });
+  assert.equal(acknowledged, false);
 }));
 test("runtime guardian reports a verified nonzero exit without returning sensitive stderr", { skip }, async () => {
   await assert.rejects(runRuntimeCommand(process.execPath, ["-e", "process.stderr.write('synthetic-secret');process.exit(17)"], options), (error) => { assert.match(error.message, /failed/); assert.ok(!error.message.includes("synthetic-secret")); assert.notEqual(error.code, "RUNTIME_STOP_UNCONFIRMED"); return true; });
