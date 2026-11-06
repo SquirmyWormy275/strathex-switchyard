@@ -33,7 +33,7 @@ the package inventory. Private registry URLs stay out of reports. Source hashes
 separate equal package names and versions across registries. Prerelease and build
 identifiers retain their exact spelling.
 
-The original limits remain: 128 total artifact references shared with npm, 512
+The original limits remain: 128 total artifact references shared with npm and Python, 512
 reviewed files, 2 MiB per file and 16 MiB total. Empty or unreviewed files,
 duplicate identities, manifest/artifact aliases and unsupported actions refuse.
 Missing packages, unsupported locks, local packages and Git sources cannot
@@ -72,7 +72,9 @@ The test files contain synthetic binary bytes, deliberately not valid archives.
 Source-separated and differently spelled build identities, mixed npm/Cargo
 requests, missing references, altered bytes, report tampering and finding-limit
 behavior are checked. The dedicated Windows CI lane retains a 300-second bound;
-native Windows host execution is pending. Installed acceptance and real guest,
+native Windows host execution at c367dff passes nine tests with two declared
+Linux-only skips and verified cleanup. [Native receipt](evidence/cargo-artifact-windows-native-summary.json).
+Installed acceptance and real guest,
 hardware or account journeys are separate. No runtime/dependency downloads or
 installed application changes were made.
 

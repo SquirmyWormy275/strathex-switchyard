@@ -20,6 +20,15 @@ export function pinnedRequirementsFixture({ action, clean = false, requirementsV
     { ecosystem: "PyPI", name: "mixed-name", version: advisoryVersion, advisories: clean ? [] : [{ id: "PYSEC-synthetic-only", severity: "unknown" }] }
   ] });
 }
+export function pypiArtifactFixture({ action = "shield_supply_chain", artifactStatus = "matched", alternative = 0 } = {}) {
+  // Synthetic raw bytes only; neither payload is a valid wheel/archive.
+  const variants = [Buffer.from([0x50, 0x4b, 0, 0, 0x50, 0x59, 0x30]), Buffer.from([0x50, 0x4b, 0, 0, 0x50, 0x59, 0x31])], selected = Buffer.from(variants[alternative]);
+  if (artifactStatus === "mismatched") selected[6] ^= 4;
+  const version = "1!02.0rc1.post2.dev3+LOCAL.4", hashes = artifactStatus === "unsupported-integrity" ? "" : variants.map(bytes => " --hash=sha256:" + sha(bytes)).join("");
+  const f = scannerFixture({ action, files: { "app.js": "const ordinary = 1;", "requirements.txt": "Mixed_Name==" + version + hashes + "\n", "reviewed-package.whl": selected }, advisory: [{ ecosystem: "PyPI", name: "mixed-name", version, advisories: [] }] });
+  f.request.packageArtifacts = [{ ecosystem: "PyPI", requirementsPath: "requirements.txt", name: "mixed-name", version, path: "reviewed-package.whl" }];
+  return f;
+}
 export function cargoArtifactFixture({ action = "shield_supply_chain", artifactStatus = "matched", source = "registry+https://github.com/rust-lang/crates.io-index", cargoVersion = "1.2.3-rc.1+build.7" } = {}) {
   // Deliberately synthetic raw bytes, not a valid archive or publisher assertion.
   const original = Buffer.from([0x1f, 0x8b, 0, 0, 0x43, 0x41, 0x52, 0x47]), selected = Buffer.from(original);

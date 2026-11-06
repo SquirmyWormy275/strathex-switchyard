@@ -1,26 +1,48 @@
 # What has actually been verified
 
+Selected Python artifact comparison now supports exact requirements pins and
+multiple declared SHA-256 alternatives through Supply Chain and Release. Fourteen
+behavior/harness groups pass 98 checks; the initial packaging guard correctly
+fails at 1,006 bytes above 5 MiB. Removing three implementations reached only
+through erased types from the app bundle restores it to **5,096,071 bytes**;
+their repository source remains unchanged. The corrected packaging, application,
+sixteen installation cases and Python execution follow-up passes **19 groups /
+37 tests**, with typecheck and exact cleanup. Six actual Linux and six Windows
+guest-double scans retain original bytes and receipts. Native Windows host
+acceptance is pending.
+[Contract](python-artifact-integrity.md), [evidence](evidence/python-artifact-integrity-summary.json).
+
+Native Windows `b600a6d` now passes all sixteen original installation/recovery
+cases exactly once, with unchanged assertions, original 120-second child bounds
+and verified child/tree cleanup. The earlier timeout and local zero-plan attempt
+remain failed evidence. The complete Windows release is still running; restricted
+owner acceptance remains separate and failed.
+[Native installation receipt](evidence/installation-scenarios-native-summary.json).
+
+Native Windows `c367dff` also passes nine Cargo artifact tests with two declared
+Linux-only skips under the original 300-second bound. The guest remains doubled.
+[Cargo native receipt](evidence/cargo-artifact-windows-native-summary.json).
+
 Installation scheduling now uses sixteen exact case names, each in its own
 bounded child, with the original 120-second child limit and six-minute CI step.
 The original test file and production code are unchanged. Nineteen groups /
 48 tests pass, including every installation case exactly once and exact cleanup.
 An initial regex-selector attempt selected no cases and correctly failed; that
-receipt is retained. Native Windows scheduling acceptance remains pending.
+receipt is retained. Native Windows scheduling acceptance now passes all sixteen cases; see the receipt above.
 [Scheduling evidence](evidence/installation-scenarios-source-summary.json).
 
 Windows `7e5c495` also retains a separate installation-group timeout: fifteen
 case reports succeeded before the original 120-second deadline, but there was no
 complete TAP plan, so the group is failed with zero accepted cases. The earlier
-`3363e8b` sixteen-case acceptance remains source-specific. Independent-case scheduling is now source-tested above; native acceptance
-remains pending. This is a CI failure, not unavailable hardware.
+`3363e8b` sixteen-case acceptance remains source-specific. Independent-case scheduling now passes native acceptance above. This is a CI failure, not unavailable hardware.
 [Timeout evidence](evidence/windows-installation-timeout-summary.json).
 
 Selected Cargo artifact-byte comparison is implemented through reviewed Supply
 Chain and Release execution. Exact package/version/source binding, mismatch
 findings, receipt replay and cleanup pass fifteen groups / 105 tests and a
 21-test manifest-alias follow-up; typecheck passes. Four actual Linux scans and
-four Windows guest-double runs preserve original bytes/index/HEAD. Native Windows
-host acceptance is pending; publisher/archive-content verification remains open.
+four Windows guest-double runs preserve original bytes/index/HEAD. Native Windows host acceptance now passes nine tests and two declared Linux skips;
+publisher/archive-content verification remains open.
 [Contract](cargo-artifact-integrity.md), [evidence](evidence/cargo-artifact-integrity-summary.json).
 
 Native `7e5c495` now compares the same pinned cold image with and without

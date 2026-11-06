@@ -44,7 +44,7 @@
     "allChildAndTreeCleanupVerified": true
   },
   "behavior": "All sixteen original assertions run exactly once as existing literal selectors. Missing, duplicated or broadened selections refuse. The original source test file and production installation code are unchanged. Each child keeps the 120-second bound and the CI contract step keeps six minutes; no complete Windows acceptance is inferred.",
-  "nativeWindowsAcceptance": "Pending corrected independent-case scheduling. Earlier 7e5c495 timeout remains failed.",
+  "nativeWindowsAcceptance": "b600a6d: all sixteen original cases pass exactly once under the original per-child bound, with cleanup; see installation-scenarios-native-summary.json. Earlier failed attempts remain retained.",
   "installedChanged": false,
   "downloads": false
 }

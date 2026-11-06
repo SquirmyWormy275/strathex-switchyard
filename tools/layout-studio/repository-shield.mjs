@@ -88,7 +88,20 @@ export function parseShieldScannerReport(output,shield,action) {
     if(!component||!files.has(component.lockPath??component.requirementsPath))throw Error("Dependency inventory is outside its witnessed manifest.");
     let key;
     if(component.ecosystem==="PyPI"){
-      if(!exact(component,["ecosystem","name","version","requirementsPath","declaredSha256"])||!isPinnedRequirementsPath(component.requirementsPath)||pypiIdentity(component.name,component.version).name!==component.name||!Array.isArray(component.declaredSha256)||component.declaredSha256.length>64||component.declaredSha256.some(value=>!digest(value))||new Set(component.declaredSha256).size!==component.declaredSha256.length||component.declaredSha256.join()!==component.declaredSha256.slice().sort().join())throw Error("Invalid exact Python requirement inventory.");
+      if(!exact(component,["ecosystem","name","version","requirementsPath","declaredSha256",...(Object.hasOwn(component,"artifact")?["artifact"]:[])])||!isPinnedRequirementsPath(component.requirementsPath)||pypiIdentity(component.name,component.version).name!==component.name||!Array.isArray(component.declaredSha256)||component.declaredSha256.length>64||component.declaredSha256.some(value=>!digest(value))||new Set(component.declaredSha256).size!==component.declaredSha256.length||component.declaredSha256.join()!==component.declaredSha256.slice().sort().join())throw Error("Invalid exact Python requirement inventory.");
+      const referenceKey = shieldArtifactReferenceKey(component), reference = artifactReferences.get(referenceKey);
+      if (reference) {
+        const a = component.artifact, file = files.get(reference.path);
+        if (!exact(a, ["path", "sha256", "size", "algorithm", "acceptedSha256", "status"]) || a.path !== reference.path || a.sha256 !== file?.sha256 || a.size !== file?.size || a.algorithm !== "sha256"
+          || JSON.stringify(a.acceptedSha256) !== JSON.stringify(component.declaredSha256)
+          || a.status !== (!component.declaredSha256.length ? "unsupported-integrity" : component.declaredSha256.includes(a.sha256) ? "matched" : "mismatched")) throw Error("Python artifact observation differs from its exact reviewed bytes and declared alternatives.");
+        if (a.status !== "matched" && !report.gaps.includes("package_artifact_not_verified")) throw Error("Unmatched Python artifacts must retain their coverage gap.");
+        if (a.status === "mismatched") {
+          const fingerprint = sha(`artifact.integrity-mismatch\0PyPI\0${component.requirementsPath}\0${files.get(component.requirementsPath).sha256}\0${component.name}\0${component.version}\0${a.path}\0${a.sha256}`);
+          if (!report.findings.some(f => f.ruleId === "artifact.integrity-mismatch" && f.dimension === "provenance" && f.severity === "high" && f.path === component.requirementsPath && f.line === null && f.fingerprint === fingerprint) && !(report.findings.length === 512 && report.gaps.includes("finding_limit"))) throw Error("A mismatched Python artifact cannot lose its failed integrity finding.");
+        }
+        observedArtifacts.add(referenceKey);
+      } else if (Object.hasOwn(component, "artifact") || !report.gaps.includes("package_artifact_not_verified")) throw Error("Unreviewed Python artifacts cannot claim verified bytes.");
       key="PyPI\0"+component.requirementsPath+"\0"+component.name;
     }else if(component.ecosystem==="Cargo"){
       validateCargoComponent(component);key=JSON.stringify(["Cargo",component.lockPath,component.name,component.version,component.sourceSha256]);

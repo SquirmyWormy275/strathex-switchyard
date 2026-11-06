@@ -286,7 +286,8 @@ export function npmArtifactSha512(value) {
 }
 const artifactKey = (lockPath, location) => JSON.stringify([lockPath, location]);
 export const shieldArtifactReferenceKey = row => row.ecosystem === "Cargo"
-  ? JSON.stringify(["Cargo", row.lockPath, row.name, row.version, row.sourceSha256]) : artifactKey(row.lockPath, row.location);
+  ? JSON.stringify(["Cargo", row.lockPath, row.name, row.version, row.sourceSha256])
+  : row.ecosystem === "PyPI" ? JSON.stringify(["PyPI", row.requirementsPath, row.name, row.version]) : artifactKey(row.lockPath, row.location);
 function workspaceLink(packages, link, cache) {
   if (!object(link) || link.link !== true || Object.keys(link).some(key => !["link", "resolved"].includes(key)) || typeof link.resolved !== "string") throw Error("Unsupported workspace link.");
   const path = scannerPath(link.resolved);
@@ -306,7 +307,7 @@ export function shieldCycloneDxComponent(c) { if(c.ecosystem==="Cargo")return ca
         ...(c.ecosystem === "PyPI" ? [{ name: "switchyard:requirements-file", value: c.requirementsPath }, { name: "switchyard:declared-sha256", value: JSON.stringify(c.declaredSha256) }, { name: "switchyard:python-environment", value: "not-resolved" }] : [{ name: "switchyard:lockfile", value: c.lockPath }, { name: "switchyard:package-location", value: c.location }, { name: "switchyard:installed-as", value: c.installedAs }]),
         ...(c.workspace?[{name:"switchyard:source-kind",value:"workspace-link"},{name:"switchyard:workspace-path",value:c.workspace.path},{name:"switchyard:workspace-lock-metadata-sha256",value:c.workspace.lockMetadataSha256},{name:"switchyard:workspace-source",value:"not-verified"}]:[]),
         ...(c.integritySha256 ? [{ name: "switchyard:integrity-string-sha256", value: c.integritySha256 }] : []),
-        ...(c.artifact ? [{ name: "switchyard:artifact-path", value: c.artifact.path }, { name: "switchyard:artifact-sha256", value: c.artifact.sha256 }, { name: "switchyard:artifact-observed-sha512", value: c.artifact.observedSha512 }, { name: "switchyard:artifact-integrity", value: c.artifact.status }, { name: "switchyard:artifact-content", value: "not-inspected" }] : [])
+        ...(c.artifact ? [{ name: "switchyard:artifact-path", value: c.artifact.path }, { name: "switchyard:artifact-sha256", value: c.artifact.sha256 }, ...(c.artifact.algorithm === "sha512" ? [{ name: "switchyard:artifact-observed-sha512", value: c.artifact.observedSha512 }] : []), { name: "switchyard:artifact-integrity", value: c.artifact.status }, { name: "switchyard:artifact-content", value: "not-inspected" }] : [])
       ] }; }
 function feed(v) { exact(v, ["id", "path", "sha256"]); return { id: identifier(v.id), path: scannerPath(v.path), sha256: digest(v.sha256) }; }
 function indexSource(v) {
@@ -342,6 +343,13 @@ export function validateShieldRequest(v) {
     if (!["shield_supply_chain", "release_shield"].includes(v.action)) throw Error("Package artifacts require a supply-chain or release review.");
     const sources = new Map(files.map(f => [f.path, f])), seen = new Set();
     packageArtifacts = array(v.packageArtifacts, 128).map(row => {
+      if (row?.ecosystem === "PyPI") {
+        exact(row, ["ecosystem", "requirementsPath", "name", "version", "path"]);
+        const requirementsPath = scannerPath(row.requirementsPath), path = scannerPath(row.path), { name, version } = pypiIdentity(row.name, row.version);
+        const key = shieldArtifactReferenceKey({ ecosystem: "PyPI", requirementsPath: requirementsPath.toLowerCase(), name, version });
+        if (name !== row.name || !isPinnedRequirementsPath(requirementsPath) || !sources.has(requirementsPath) || !sources.has(path) || sources.get(path).size === 0 || path === requirementsPath || seen.has(key)) throw Error("Python artifact references require unique exact reviewed pins, normalized names and file bytes.");
+        seen.add(key); return { ecosystem: "PyPI", requirementsPath, name, version, path };
+      }
       if (row?.ecosystem === "Cargo") {
         exact(row, ["ecosystem", "lockPath", "name", "version", "sourceSha256", "path"]);
         const lockPath = scannerPath(row.lockPath), path = scannerPath(row.path), { name, version } = cargoIdentity(row.name, row.version), sourceSha256 = digest(row.sourceSha256);
@@ -355,7 +363,7 @@ export function validateShieldRequest(v) {
       if (!sources.has(lockPath) || lockPath.split("/").at(-1) !== "package-lock.json" || !sources.has(path) || sources.get(path).size === 0 || path === lockPath || !npmLocationName(location) || seen.has(key)) throw Error("Artifact references require unique exact reviewed npm locations and file bytes.");
       seen.add(key); return { lockPath, location, path };
     });
-    if (!packageArtifacts.length || packageArtifacts.some(row => isCargoLockPath(row.path) || isPinnedRequirementsPath(row.path) || row.path.split("/").at(-1) === "package-lock.json" || packageArtifacts.some(other => row.path === other.lockPath))) throw Error("Artifact content cannot double as a declared manifest.");
+    if (!packageArtifacts.length || packageArtifacts.some(row => isCargoLockPath(row.path) || isPinnedRequirementsPath(row.path) || row.path.split("/").at(-1) === "package-lock.json" || packageArtifacts.some(other => row.path === (other.lockPath ?? other.requirementsPath)))) throw Error("Artifact content cannot double as a declared manifest.");
   }
   return { schema: v.schema, version: 1, action: v.action, scope: v.scope, files, scanner, advisory, ...(packageArtifacts ? { packageArtifacts } : {}) };
 }
@@ -447,6 +455,15 @@ export async function scanShieldInputs(proposed, { readInput }) {
       if (declared.length) { gaps.add("license_metadata"); gaps.add("package_source_or_integrity"); }
       for (const component of declared) {
         if (components.length >= 4096) throw Error("Aggregate dependency inventory exceeds its original component bound.");
+        const referenceKey = shieldArtifactReferenceKey({ ...component, requirementsPath: file.path }), reference = artifacts.get(referenceKey);
+        if (reference) {
+          const observed = artifactDigests.get(reference.path), acceptedSha256 = [...component.declaredSha256];
+          const status = !acceptedSha256.length ? "unsupported-integrity" : acceptedSha256.includes(observed.sha256) ? "matched" : "mismatched";
+          component.artifact = { path: observed.path, sha256: observed.sha256, size: observed.size, algorithm: "sha256", acceptedSha256, status };
+          consumedArtifacts.add(referenceKey);
+          if (status !== "matched") gaps.add("package_artifact_not_verified");
+          if (status === "mismatched") add({ ruleId: "artifact.integrity-mismatch", dimension: "provenance", severity: "high", path: file.path, line: null, fingerprint: sha(`artifact.integrity-mismatch\0PyPI\0${file.path}\0${file.sha256}\0${component.name}\0${component.version}\0${observed.path}\0${observed.sha256}`) });
+        } else gaps.add("package_artifact_not_verified");
         components.push({ ...component, requirementsPath: file.path });
         const known = advisoryByIdentity.get(advisoryIdentityKey(component));
         if (!known) gaps.add("advisory_package_coverage");

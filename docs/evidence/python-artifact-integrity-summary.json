@@ -1,0 +1,114 @@
+{
+  "schema": "switchyard-python-artifact-integrity/v1",
+  "basis": "b600a6d29e5d9ffd9c4439640ad70ff5fa14e439",
+  "sourceSha256": {
+    ".github/workflows/switchyard-windows-filesystem.yml": "0e6016a2f0ffc5e649182adc2bc824dcd789246032a4ce4020988483996359fc",
+    "deployment/suite/release.mjs": "b787a279c1a58d5359fcd719deea3e00a60bcc79674a9827b403b7ef7b886529",
+    "deployment/suite/release.test.mjs": "48c8cae013283845b5efb7baf8969028d2488fc5f531742351ac62c292f52c96",
+    "scripts/run-isolated-tests.mjs": "5e316b933fcf3bdd0df54f60a8dec7392aa960c58abb846aefb0d0e763f2e970",
+    "scripts/run-isolated-tests.test.mjs": "cd38700f18e9cc3f36ada5d64883e9b3f7f3ac63d3a35d2e1c1cf8005b694108",
+    "scripts/verify-windows-storage-contracts.mjs": "eafb9857fc6d9e36428c86339d388a6cef82ce05457390a5b7133f04cd982244",
+    "scripts/windows-scenario-groups.test.mjs": "bb0a18e6c9ad3125d568a4ff41ec1e4f9df3beb79217141cad8d6c003ffe4f4d",
+    "tools/layout-studio/shield-scanner-engine.mjs": "321853b6b93afd46c31ec5b832172319ed1904b21f45c7b675b5761bd61d7241",
+    "tools/layout-studio/repository-shield.mjs": "bc56c5ffc7563df421424cd7bfbffb2128d18abce3218d2bbcb86989a00f63e3",
+    "tools/layout-studio/repository-shield-pypi-artifacts.test.mjs": "29774d0edd2f6b014ce82ef9c847797015a75abd6217b037d751e590b6f726d0",
+    "tools/layout-studio/test-support/shield-scanner-fixture.mjs": "d00b9a0bdf45fcefd8128cddac93acec935d0563f0d5343bdb36a902671722ee",
+    "tools/layout-studio/test-support/repository-shield-fixture.mjs": "f30e8b9b5bd905afac8e9ac2f91e8d11cf4ad25c11d44ff07fcfa8a4b9f1341d",
+    "tools/layout-studio/test-support/windows-execution-fixture.mjs": "980a90c39dd8cf4ebc9439a004c816ba29c1bfa11730996f6a9d729e80a7f380"
+  },
+  "initial": {
+    "receipt": "isolated-test-9df0d236-a9ac-412c-bec6-41887455c580.json",
+    "totals": {
+      "required": 15,
+      "passed": 14,
+      "failed": 1,
+      "tests": 103,
+      "passedTests": 102,
+      "failedTests": 1,
+      "skippedTests": 0,
+      "cancelledTests": 0,
+      "todoTests": 0
+    },
+    "acceptedBehaviorGroups": 14,
+    "acceptedBehaviorTests": 98,
+    "failure": "The original package-size guard correctly rejected a bundle 1,006 bytes above 5 MiB; all fourteen behavior/harness groups passed. The initial whole run remains failed.",
+    "allChildAndTreeCleanupVerified": true
+  },
+  "corrected": {
+    "receipt": "isolated-test-c3d8ac64-f62f-4b98-840f-0ec7b86850e4.json",
+    "totals": {
+      "required": 19,
+      "passed": 19,
+      "failed": 0,
+      "tests": 37,
+      "passedTests": 37,
+      "failedTests": 0,
+      "skippedTests": 0,
+      "cancelledTests": 0,
+      "todoTests": 0
+    },
+    "allChildAndTreeCleanupVerified": true,
+    "coverage": [
+      "bundled runtime closure and original size guard",
+      "actual application lifecycle",
+      "all sixteen original installation/recovery cases",
+      "Python artifact validation and real Linux/Windows guest-double execution"
+    ]
+  },
+  "typecheckPassed": true,
+  "packaging": {
+    "beforeBytes": 5243886,
+    "beforeFiles": 535,
+    "afterBytes": 5096071,
+    "afterFiles": 532,
+    "originalBudgetBytes": 5242880,
+    "netBytesSaved": 147815,
+    "originalBudgetPreserved": true,
+    "removedFromAppBundleOnly": [
+      {
+        "path": "packages/control-plane/src/workflow-artifacts.ts",
+        "bytes": 118499,
+        "sha256": "9a0c0c12492e301f93efdb1cd43fa2a78bb64fb8d81ea9526a3ad1ef026eb513"
+      },
+      {
+        "path": "packages/control-plane/src/context-packages.ts",
+        "bytes": 9750,
+        "sha256": "21c16e4e2892f5f1acdc4a66b1cd5a85c848badcf4f7bbbf1766e66ee34b2c01"
+      },
+      {
+        "path": "packages/control-plane/src/voice.ts",
+        "bytes": 19749,
+        "sha256": "03a7ae9a9d02e9c9f630f725b79c3d6b18d25de5586943b1d46a9d503f99b185"
+      }
+    ],
+    "sourceImplementationsPreserved": true,
+    "reason": "The shipped runtime references workflow-artifacts only through an erased import type; that unshipped implementation is the only bundled importer of context-packages and voice. Static TypeScript AST inspection found no runtime import edges to these three implementations. The actual bundled runtime imports and startup/install/recovery tests pass without them. No user-facing feature, license, frozen asset or runtime dependency was removed.",
+    "temporaryBundleRemoved": true
+  },
+  "demonstrations": {
+    "linuxActualScans": 6,
+    "windowsGuestDoubleScans": 6,
+    "actions": [
+      "shield_supply_chain",
+      "release_shield"
+    ],
+    "statuses": [
+      "matched",
+      "mismatched",
+      "unsupported-integrity"
+    ],
+    "signedFeeds": true,
+    "protectedOriginalReceipts": true,
+    "replayRefused": true,
+    "originalRequirementsArtifactIndexHeadPreserved": true,
+    "syntheticBytesAreRealArchives": false
+  },
+  "scope": [
+    "One exact requirements-file pin and normalized name bind each artifact. Advisory PEP 440 equivalence cannot substitute a different literal pin.",
+    "A match with any declared SHA-256 alternative stays incomplete; mismatch fails, and absent hashes stay explicitly unsupported/unverified.",
+    "No environment resolution, archive inspection, embedded identity, publisher or installed-package acceptance is inferred."
+  ],
+  "nativeWindowsHostAcceptance": "Pending dedicated pypi-artifact-scanner lane; guest remains doubled.",
+  "installedChanged": false,
+  "downloads": false
+}

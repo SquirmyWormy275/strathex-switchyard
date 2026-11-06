@@ -1,0 +1,33 @@
+{
+  "schema": "switchyard-installation-scenarios-native/v1",
+  "sourceCommit": "b600a6d29e5d9ffd9c4439640ad70ff5fa14e439",
+  "executionCommit": "91353d21983d081a236ddf34c4f1e3fe270447d2",
+  "sourceAndExecutionTree": "59d44ee9c1e85fe6198ca6d849e4eb8fca6499f2",
+  "runId": 42246264428,
+  "jobId": 127989796107,
+  "artifactId": 13518502448,
+  "archiveBytes": 3089,
+  "archiveSha256": "5290b4e4bb54e63e3b2e7c8a7622843953605ea1484a302e7eb9213eb3b4a016",
+  "zipSavedLocally": false,
+  "privateReceipt": "windows-installation-b600-native.json",
+  "totals": {
+    "required": 16,
+    "passed": 16,
+    "failed": 0,
+    "tests": 16,
+    "passedTests": 16,
+    "failedTests": 0,
+    "skippedTests": 0,
+    "cancelledTests": 0,
+    "todoTests": 0
+  },
+  "minimumChildDurationMs": 6628,
+  "maximumChildDurationMs": 22186,
+  "childTimeoutMs": 120000,
+  "allOriginalCasesVerifiedExactlyOnce": true,
+  "allChildAndTreeCleanupVerified": true,
+  "nativeWindowsAccepted": true,
+  "completeWindowsReleaseAccepted": false,
+  "restrictedOwnerAccepted": false,
+  "installedChanged": false
+}

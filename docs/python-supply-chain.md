@@ -12,8 +12,9 @@ packaging==25.0
 ```
 
 This is a deliberately vulnerable test example, not a version recommendation.
-Declared hashes are retained as declarations. They do not verify a downloaded
-wheel, installed distribution or publisher signature.
+Declared hashes remain declarations unless an artifact is explicitly selected
+for [byte comparison](python-artifact-integrity.md). Such comparison does not
+verify an installed distribution, archive contents or publisher signature.
 
 ## Supported input
 

@@ -26,6 +26,7 @@ const suites = {
   "cargo-scanner": "tools/layout-studio/repository-windows-shield-cargo.test.mjs",
   "artifact-scanner": "tools/layout-studio/repository-shield-artifacts.test.mjs",
   "cargo-artifact-scanner": "tools/layout-studio/repository-shield-cargo-artifacts.test.mjs",
+  "pypi-artifact-scanner": "tools/layout-studio/repository-shield-pypi-artifacts.test.mjs",
   "license-scanner": "tools/layout-studio/repository-windows-shield-licenses.test.mjs",
   "copilot-account": "tools/layout-studio/copilot-account-binding.test.mjs",
   "copilot-lifecycle": "tools/layout-studio/copilot-lifecycle.test.mjs",

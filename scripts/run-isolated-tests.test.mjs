@@ -147,6 +147,7 @@ test("only explicitly slow integration or release groups extend the bounded defa
       ["tools/layout-studio/repository-shield-workspaces.test.mjs", process.platform === "win32" ? 300_000 : 120_000],
       ["tools/layout-studio/repository-shield-artifacts.test.mjs", process.platform === "win32" ? 300_000 : 120_000],
       ["tools/layout-studio/repository-shield-cargo-artifacts.test.mjs", process.platform === "win32" ? 300_000 : 120_000],
+      ["tools/layout-studio/repository-shield-pypi-artifacts.test.mjs", process.platform === "win32" ? 300_000 : 120_000],
       ...["repository-windows-shield","repository-windows-shield-recovery"].map(name=>[`tools/layout-studio/${name}.test.mjs`,process.platform==="win32"?300_000:120_000]),
       ["tools/layout-studio/repository-pipeline-fixtures.test.mjs", 120_000],
       ["tools/layout-studio/repository-validation-policy.test.mjs", process.platform === "win32" ? 300_000 : 120_000],

@@ -311,7 +311,7 @@
     "No resolution, archive-content, publisher, license or complete Shield acceptance is inferred.",
     "Original file/reference/finding bounds remain; npm and Cargo share the reference ceiling."
   ],
-  "nativeWindowsHostAcceptance": "Pending dedicated cargo-artifact-scanner lane; guest remains doubled.",
+  "nativeWindowsHostAcceptance": "c367dff: nine tests pass and two declared Linux-only cases skip under the original 300-second bound; guest remains doubled. See cargo-artifact-windows-native-summary.json.",
   "installedChanged": false,
   "downloads": false
 }

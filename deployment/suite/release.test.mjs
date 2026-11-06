@@ -21,6 +21,8 @@ test("suite bundles contain the actual offline backend, frozen frontend and lice
     assert.ok(manifest.files.some(file => file.path === `frontend/${name}`));
   }
   assert.ok(manifest.files.some(file => file.path === "tools/layout-studio/catalog.mjs"), "The readout backend still needs its shared catalog.");
+  for (const name of ["workflow-artifacts", "context-packages", "voice"]) assert.equal(manifest.files.some(file => file.path === `packages/control-plane/src/${name}.ts`), false, "Separate companion implementations reached only through erased types must not inflate the installed app.");
+  await import(pathToFileURL(join(bundle.directory, "packages/control-plane/src/runtime.ts")).href);
   const catalog = await import(pathToFileURL(join(bundle.directory, "tools/layout-studio/model-f-source.mjs")).href);
   assert.deepEqual(catalog.default, JSON.parse(await readFile(join(bundle.directory, "frontend/model-f-catalog.json"), "utf8")), "The packaged backend must consume the exact frozen catalog.");
   const { cvssV4Metrics } = await import(pathToFileURL(join(bundle.directory, "tools/layout-studio/cvss-v4-metrics.mjs")).href);
