@@ -22,6 +22,7 @@ internal static class Program
             byte[] reply = WindowsStorageBrokerProtocol.Reply(binding, request, storage.RootElement, key), publicKey = key.ExportSubjectPublicKeyInfo();
             int serviceHeaderChecks = ServiceHeaderProof.Run();
             int restrictedChildEventChecks = RestrictedChildApplicationEventsProof.Run();
+            int stateLeaseProtocolChecks = StateLeaseProtocolProof.Run();
             int checks = 0;
             void Require(bool value) { if (!value) throw new InvalidOperationException("Storage broker protocol proof failed."); checks++; }
             void Refuses(Action action)
@@ -62,7 +63,7 @@ internal static class Program
                 else if(args[0]=="--native-host-owner")nativeRestrictedHostProof=NativeRestrictedHostProof.Run();
                 else throw new InvalidOperationException("The native proof flag is not recognized.");
             }
-            Console.WriteLine(JsonSerializer.Serialize(new {schema="switchyard-storage-broker-protocol-proof/v1",success=true,checks,serviceHeaderChecks,restrictedChildEventChecks,exchangeProtocolChecks,exchangeJournalChecks,exchangeFactsChecks,indexInputChecks,historyInputChecks,protectedFilesChecks,nativeServiceChecks,nativeExchangeChecks,nativeRestrictedHostProof,serviceInstalled=false,volumeOpened=nativeExchangeChecks>0||nativeRestrictedHostProof!=null,guestLaunched=false}));
+            Console.WriteLine(JsonSerializer.Serialize(new {schema="switchyard-storage-broker-protocol-proof/v1",success=true,checks,serviceHeaderChecks,restrictedChildEventChecks,stateLeaseProtocolChecks,exchangeProtocolChecks,exchangeJournalChecks,exchangeFactsChecks,indexInputChecks,historyInputChecks,protectedFilesChecks,nativeServiceChecks,nativeExchangeChecks,nativeRestrictedHostProof,serviceInstalled=false,volumeOpened=nativeExchangeChecks>0||nativeRestrictedHostProof!=null,guestLaunched=false}));
             return 0;
         }
         catch(Exception error)

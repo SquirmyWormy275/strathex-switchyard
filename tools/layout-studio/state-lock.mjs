@@ -11,7 +11,7 @@ import { createKeylessLeasePool } from "./keyless-lease-pool.mjs";
 let windowsLeases;
 function reusableWindowsLeases() {
   return windowsLeases ??= createKeylessLeasePool({ spawnWorker(path) {
-    const child = spawn(join(process.env.SystemRoot || "C:\\Windows", "System32/WindowsPowerShell/v1.0/powershell.exe"), ["-NoLogo", "-NoProfile", "-NonInteractive", "-File", fileURLToPath(new URL("./state-lock.ps1", import.meta.url)), "-Reusable"], { shell: false, windowsHide: true, stdio: ["pipe", "pipe", "pipe"] });
+    const child = spawn(fileURLToPath(new URL("../../runtime/hotkeys/Switchyard.Hotkeys.exe", import.meta.url)), ["--state-lease-worker"], { shell: false, windowsHide: true, stdio: ["pipe", "pipe", "pipe"] });
     child.stdin.write(windowsLockRequest({ path, parentPid: process.pid }));
     return child;
   } });

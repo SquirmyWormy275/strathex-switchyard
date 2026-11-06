@@ -14,7 +14,11 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  build-state-helper:
+    uses: ./.github/workflows/switchyard-windows-state-helper.yml
+
   verify-windows-release:
+    needs: build-state-helper
     runs-on: windows-2022
     timeout-minutes: 90
     env:
@@ -49,6 +53,9 @@ jobs:
       - name: Install locked JavaScript dependencies
         shell: pwsh
         run: npm.cmd ci --ignore-scripts
+
+      - name: Install the exact-source native state helper
+        uses: ./.github/actions/install-state-helper
 
       - name: Verify the native Switchyard backend before the complete release build
         id: backend-tests

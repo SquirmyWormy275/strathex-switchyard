@@ -1,6 +1,31 @@
 # Serialize private state across store instances
 
-## Current Windows worker reuse
+## Current native Windows worker
+
+The default Windows path now invokes the existing shipped helper with only
+`--state-lease-worker`. The helper accepts the bounded pipe protocol described
+below, with no PowerShell startup, shell parsing or executable-path override.
+It pins the original parent process handle and the lock file's volume, index and
+creation time. Each transaction reopens that exact ordinary single-link file with
+exclusive sharing and reparse-point refusal; replacement cannot redirect a lease.
+The idle worker retains no file handle, compartment data or key. Parent loss/EOF
+retires the worker; watcher disposal joins any pending observation before closing
+the original process handle. Acquisition/release and pool bounds are unchanged.
+
+Windows source runs now require the same helper at
+`runtime/hotkeys/Switchyard.Hotkeys.exe`, built from
+`apps/desktop-hotkeys/Switchyard.Hotkeys.csproj` with the repository's reviewed
+.NET toolchain. Packaged releases already include it. CI builds that exact source
+once per workflow run and verifies its source revision, size and digest before
+staging; a missing helper fails closed, without falling back to PowerShell.
+
+Both targets compile and 1,816 portable managed checks pass, including forty
+protocol cases. Four focused JS files pass 43 tests and one declared Windows-only
+skip. Native sharing, replacement/hard-link refusal, malformed release and
+parent-loss acceptance are pending Windows CI. The earlier timeout failures
+remain failed. [Source and limits](evidence/native-state-lease-source-summary.json).
+
+## Earlier PowerShell worker reuse
 
 Every protected mutation still holds an exclusive kernel file lock. Each state
 read still retrieves its compartment key and authenticates fresh encrypted bytes.

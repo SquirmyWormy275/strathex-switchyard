@@ -4,6 +4,8 @@ on:
   pull_request:
     paths:
       - '.github/workflows/client-platform.yml'
+      - '.github/workflows/switchyard-windows-state-helper.yml'
+      - '.github/actions/install-state-helper/**'
       - 'integrations/**'
       - 'apps/desktop-hotkeys/**'
       - 'apps/windows-companion/src/repository-runtime.ts'
@@ -25,7 +27,11 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  build-state-helper:
+    uses: ./.github/workflows/switchyard-windows-state-helper.yml
+
   verify-client-platform:
+    needs: build-state-helper
     runs-on: windows-2022
     timeout-minutes: 15
     env:
@@ -48,6 +54,9 @@ jobs:
           python-version: 3.13.3
       - name: Install locked source dependencies
         run: npm.cmd ci --ignore-scripts
+
+      - name: Install the exact-source native state helper
+        uses: ./.github/actions/install-state-helper
       - name: Verify native WinRT metadata and bounded client contracts without launching a URI
         run: node scripts/verify-client-platform.mjs
       - name: Retain bounded verification receipts

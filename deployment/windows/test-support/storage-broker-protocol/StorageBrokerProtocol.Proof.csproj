@@ -9,6 +9,7 @@
     <EnableNETAnalyzers>true</EnableNETAnalyzers>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="../../../../apps/desktop-hotkeys/StateLeaseWorker.cs" Link="StateLeaseWorker.cs" />
     <Compile Include="../../../../apps/desktop-hotkeys/WindowsStorageBrokerServiceHeader.cs" Link="WindowsStorageBrokerServiceHeader.cs" />
     <Compile Include="../../../../apps/desktop-hotkeys/WindowsStorageBrokerProtocol.cs" Link="WindowsStorageBrokerProtocol.cs" />
     <Compile Include="../../../../apps/desktop-hotkeys/WindowsStorageBrokerExchangeProtocol.cs" Link="WindowsStorageBrokerExchangeProtocol.cs" />

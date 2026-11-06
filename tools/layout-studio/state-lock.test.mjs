@@ -2,7 +2,10 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { once } from "node:events";
-import { mkdtemp, rm, symlink, readFile, readdir } from "node:fs/promises";
+import { mkdtemp, rm, symlink, readFile, readdir, writeFile, rename, link } from "node:fs/promises";
+import { fileURLToPath } from "node:url";
+import { createInterface } from "node:readline";
+import { createKeylessLeasePool } from "./keyless-lease-pool.mjs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createSuiteStore } from "./suite-store.mjs";
@@ -22,6 +25,33 @@ test("the Windows kernel-lock wire preserves literal Unicode paths and refuses i
   const good = { path: "C:\\private\\personal.lock", parentPid: 1 };
   for (const changed of [{ path: "" }, { path: "x\n1" }, { path: "x\r1" }, { path: "x\u00001" }, { path: "x\ud800" }, { path: "界".repeat(5462) }, { parentPid: 0 }, { parentPid: 2147483648 }, { parentPid: 1.5 }, { parentPid: "1" }, { trace: 1 }, { nonBlocking: "false" }]) assert.throws(() => windowsLockRequest({ ...good, ...changed }));
   assert.ok(windowsLockRequest({ ...good, path: "x".repeat(16384) }).length < 22000);
+});
+
+test("the native Windows lease worker refuses replaced and hard-linked lock files and malformed release", { skip: process.platform !== "win32" }, async t => {
+  const root = await mkdtemp(join(tmpdir(), "switchyard-native-lease-")), helper = fileURLToPath(new URL("../../runtime/hotkeys/Switchyard.Hotkeys.exe", import.meta.url));
+  const workers = [], pool = createKeylessLeasePool({ spawnWorker(path) {
+    const child = spawn(helper, ["--state-lease-worker"], { windowsHide: true, stdio: ["pipe", "pipe", "pipe"] });
+    workers.push(child); child.stdin.write(windowsLockRequest({ path, parentPid: process.pid })); return child;
+  } });
+  t.after(async () => { await pool.close(); for (const child of workers) await stopOwnedChild(child); await rm(root, { recursive: true, force: true }); });
+  const path = join(root, "私用 literal $() `';.lock"); await writeFile(path, "original");
+  const pinned = spawn(helper, ["--state-lease-worker"], { windowsHide: true, stdio: ["pipe", "pipe", "pipe"] }); workers.push(pinned);
+  const pinnedExit = once(pinned, "close"), lines = createInterface({ input: pinned.stdout, crlfDelay: Infinity }), replies = lines[Symbol.asyncIterator]();
+  pinned.stdin.on("error", () => {}); pinned.stderr.resume(); pinned.stdin.write(windowsLockRequest({ path, parentPid: process.pid }));
+  assert.equal((await replies.next()).value, "READY");
+  await rename(path, join(root, "original.lock")); await writeFile(path, "replacement");
+  pinned.stdin.end("ACQUIRE 1 0\n"); assert.equal((await pinnedExit)[0], 2); assert.equal((await replies.next()).done, true); lines.close();
+  let entered = false; assert.equal(await readFile(path, "utf8"), "replacement");
+  const linked = join(root, "hard-linked.lock"); await link(path, linked);
+  await assert.rejects(pool.withLease(linked, async () => { entered = true; }), /unavailable/); assert.equal(entered, false);
+  const malformedPath = join(root, "malformed.lock"); await writeFile(malformedPath, "preserved");
+  const child = spawn(helper, ["--state-lease-worker"], { windowsHide: true, stdio: ["pipe", "pipe", "pipe"] }); workers.push(child);
+  const exited = once(child, "close"); child.stdin.on("error", () => {});
+  child.stdin.end(windowsLockRequest({ path: malformedPath, parentPid: process.pid }) + "ACQUIRE 1 0\nRELEASE 2\n");
+  let output = "", diagnostic = ""; child.stdout.on("data", b => { output += b; }); child.stderr.on("data", b => { diagnostic += b; });
+  const [code] = await exited; assert.equal(code, 2); assert.match(output, /LOCKED 1/); assert.doesNotMatch(output, /RELEASED/);
+  assert.equal(diagnostic.trim().split(/\r?\n/).every(line => ["lease-entered", "lease-input-read"].includes(line)), true);
+  await pool.withLease(malformedPath, async lease => { lease.assert(); }); assert.equal(await readFile(malformedPath, "utf8"), "preserved");
 });
 
 test("independent store instances serialize initialization and updates without replacing a compartment key or losing writes", async () => {

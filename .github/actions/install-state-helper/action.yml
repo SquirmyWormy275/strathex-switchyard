@@ -1,0 +1,23 @@
+name: Install this run's exact Windows state helper
+description: Verify the same-source build before source tests use the fixed native helper path.
+runs:
+  using: composite
+  steps:
+    - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
+      with:
+        name: switchyard-state-helper-${{ github.sha }}
+        path: ${{ runner.temp }}/switchyard-source-state-helper
+    - name: Verify source, bytes and digest before staging
+      shell: pwsh
+      run: |
+        $ErrorActionPreference = 'Stop'
+        $stage = Join-Path $env:RUNNER_TEMP 'switchyard-source-state-helper'
+        $proof = Get-Content -LiteralPath (Join-Path $stage 'build.json') -Raw | ConvertFrom-Json
+        $exe = Join-Path $stage 'Switchyard.Hotkeys.exe'
+        $image = Get-Item -LiteralPath $exe
+        if ($proof.schema -cne 'switchyard-state-helper-build/v1' -or $proof.source -cne $env:GITHUB_SHA -or $proof.sha256 -cnotmatch '^[a-f0-9]{64}$' -or $proof.bytes -lt 1 -or $proof.bytes -gt 134217728 -or $image.Length -ne $proof.bytes -or ($image.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0 -or (Get-FileHash -LiteralPath $exe -Algorithm SHA256).Hash.ToLowerInvariant() -cne $proof.sha256) { throw 'The exact-source native state helper did not verify.' }
+        $target = Join-Path $env:GITHUB_WORKSPACE 'runtime\hotkeys'
+        if (Test-Path -LiteralPath $target) { throw 'Preserve any pre-existing source runtime.' }
+        New-Item -ItemType Directory -Path $target | Out-Null
+        Copy-Item -LiteralPath $exe -Destination (Join-Path $target 'Switchyard.Hotkeys.exe')
+        if ((Get-FileHash -LiteralPath (Join-Path $target 'Switchyard.Hotkeys.exe') -Algorithm SHA256).Hash.ToLowerInvariant() -cne $proof.sha256) { throw 'Staged state helper bytes changed.' }

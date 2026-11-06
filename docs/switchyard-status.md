@@ -5,10 +5,11 @@ The F77 is the connected pilot, not a scope limit. The [requirement ledger](swit
 separates unfinished software from checks requiring an exact device, account or
 host. [Verification](verification.md) retains accepted and failed checkpoints.
 
-The latest accepted complete Linux checkpoint is immutable `d4128e6`: 238/238
-groups, 1,471 passed tests and ten declared skips. Every child/process-tree exit
-and owned fixture/dependency-alias/worktree removal verifies. Later source changes
-have separate focused evidence. [Exact complete checkpoint](evidence/linux-d412-complete-summary.json).
+The latest accepted complete Linux checkpoint is immutable `7897835`: 241/241
+groups, 1,501 passed tests and ten declared skips. Every child/process-tree exit
+and owned dependency-alias/build-output/worktree removal verifies. Later native
+lease worker changes have separate focused evidence.
+[Exact complete checkpoint](evidence/linux-789-complete-summary.json).
 
 The newer complete Linux `5fe6e95` run remains failed: 239/241 groups,
 1,495 passed tests, four failures and ten declared skips. Exact child/process-tree
@@ -16,8 +17,7 @@ and owned checkout cleanup verifies. The listener socket/alias readiness race no
 has a bounded correction and deterministic regression; supervisor fixtures keep
 the same real process/cache checks using a small owned executable after Node
 copies hit the local quota. Four related files/25 tests, typecheck and three
-actual native Codex metadata/retirement checks pass. A fresh complete run is still
-required. [Exact failed run and correction](evidence/linux-startup-windows-user-object-summary.json).
+actual native Codex metadata/retirement checks pass. The corrected complete `7897835` run now passes as recorded above. [Exact failed run and correction](evidence/linux-startup-windows-user-object-summary.json).
 
 Native Windows `ec3afe7` scanner registry passes all twenty tests with a
 digest-verified receipt and cleanup. Its separate Shield job still hits the
@@ -28,6 +28,16 @@ handle closure and restoration before the original child launch. Both managed
 targets compile with zero warnings/errors; 1,776 portable checks pass. Native
 probe execution and both software repairs remain pending.
 [Source and separate native outcomes](evidence/linux-startup-windows-user-object-summary.json).
+
+Windows state locks now use a closed mode in the existing shipped native helper,
+removing PowerShell startup from the default path. Fresh kernel handles, exact file
+identity, parent ownership and original deadlines remain required. Both targets
+compile; 1,816 portable managed checks and four local files/43 tests pass, with one
+Windows-only skip. Four Windows workflows stage a same-source, digest-verified
+helper before tests; native acceptance is pending. The separate USER-object probe
+at `7897835` opens both objects and verifies handle closure/namespace restoration,
+but the child still fails DLL initialization and its failed fixture is retained.
+[Exact source and separate native diagnostic](evidence/native-state-lease-source-summary.json).
 
 Native Windows `4911642` passes thirty filesystem checks and both six-check
 service/setup lifecycles, including thirteen restricted metadata checks in each.
