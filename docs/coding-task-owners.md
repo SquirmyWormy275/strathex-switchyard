@@ -104,3 +104,9 @@ seven owner metadata/refusal and seven existing journal metadata checks. All
 are preserved. Dated launcher copies and installed bytes match their journal;
 the temporary bundle is removed. No native provider, task resume, model, keyboard
 or microphone operation occurred. [Installed evidence](evidence/installed-task-owner-summary.json).
+
+Bridge close and original native-owner retirement are attempted independently.
+A throwing bridge close cannot skip stopping its owned listener; a successful
+listener exit cannot upgrade an uncertain bridge exit. The owner stays retained
+and replacement remains blocked. Twenty registry cases and typecheck pass with
+exact cleanup. [Correction evidence](evidence/independent-task-owner-stop-summary.json).

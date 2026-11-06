@@ -22,7 +22,7 @@ async function fixture(t) {
   const controls = { login: task.accountFingerprint, stopped: true, fail: null, afterRead: async () => {}, allowResume: false, beforeResume: async () => {}, afterResume: async () => {}, observation: "idle" }, calls = [], owners = [], services = [], cleanup = [];
   function driverFactory(options) {
     calls.push("factory"); let started = false, closed = false;
-    const owner = { scope: null, binding: null, accountFingerprint: null, privateOwnership: { root: join(root, "synthetic-listener-"+owners.length), rootIdentity: { device:"1",inode:"2",uid:1000,mode:448 } }, async stop() { closed = true; return { stopped: controls.stopped }; } }; owners.push(owner);
+    const owner = { scope: null, binding: null, accountFingerprint: null, privateOwnership: { root: join(root, "synthetic-listener-"+owners.length), rootIdentity: { device:"1",inode:"2",uid:1000,mode:448 } }, async stop() { calls.push("owner-stop"); closed = true; return { stopped: controls.stopped }; } }; owners.push(owner);
     async function stage(name, ...args) { if (controls.fail === name) throw Error("synthetic persistence refused"); await options[name]("personal", ...args); calls.push(name); }
     return {
       async account() {
@@ -37,7 +37,7 @@ async function fixture(t) {
         return { type:"chatgpt",fingerprint:controls.login };
       },
       async read(id, path) { calls.push("read"); await controls.afterRead(); return { id,repositoryRoot:path,observation:controls.observation }; },
-      async close() { calls.push("close"); closed = true; return [{ stopped:controls.stopped }]; },
+      async close() { calls.push("close"); closed = true; if(controls.closeThrows)throw Error("synthetic bridge exit unavailable"); return [{ stopped:controls.stopped }]; },
       async start() { throw Error("No native thread creation is allowed in this proof"); },
       async resume(id, path, c, {beforeEffect}) {
         assert.equal(controls.allowResume,true,"Only an explicitly opted-in provider double may load a synthetic task");
@@ -230,4 +230,11 @@ test("an external workspace change during native project setup refuses the late 
   const f=await routedFixture(t),owner=f.request();await f.suite.handle("/api/suite/compartment/create",{compartment:"other",policy:"personal"});await f.api("open",owner);
   const review=await f.api("review-load",{ownerRequestId:owner.requestId});f.controls.beforeResume=()=>f.store.selection("other");
   await assert.rejects(f.api("load",{ownerRequestId:owner.requestId,requestId:randomUUID(),token:review.confirmation.token}),/no longer active/);assert.equal(f.calls.includes("resume"),false);assert.equal((await f.store.snapshot("personal")).codingTaskLoads[0].status,"outcome-unconfirmed");await f.store.selection("personal");
+});
+
+
+test("a failed bridge close still attempts original native owner retirement and cannot upgrade the uncertain bridge exit",async t=>{
+  const f=await fixture(t),service=f.service(),owner=f.request();await service.open("personal",owner);f.controls.closeThrows=true;
+  assert.equal((await service.stop("personal",owner.requestId)).stopped,false);assert.equal(f.calls.filter(c=>c==="owner-stop").length,1);assert.equal((await service.list("personal"))[0].stoppedVerified,false);
+  await assert.rejects(f.service().open("personal",f.request()),/retirement/);f.controls.closeThrows=false;assert.equal((await service.stop("personal",owner.requestId)).stopped,true);
 });

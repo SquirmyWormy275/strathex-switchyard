@@ -50,9 +50,10 @@ export function createCodingTaskOwners({ store, root, runtimeRoot, resolveCli, r
   async function stopRecord(c, id, resource) {
     if (resource.stopping) return resource.stopping;
     resource.stopping = (async () => {
-      let result;
-      try { const exits = await resource.driver.close(); result = Array.isArray(exits) && exits.every(e => e?.stopped === true) && (!resource.owner || (await resource.owner.stop()).stopped === true); }
-      catch { result = false; }
+      let driverStopped = false, ownerStopped = !resource.owner;
+      try { const exits = await resource.driver.close(); driverStopped = Array.isArray(exits) && exits.every(e => e?.stopped === true); } catch { /* Still retire the original native owner independently. */ }
+      if (resource.owner) { try { ownerStopped = (await resource.owner.stop()).stopped === true; } catch { ownerStopped = false; } }
+      let result = driverStopped && ownerStopped;
       await update(c, id, "coding-owner-retirement", row => {
         // Native exit belongs to this in-memory owner, never a replacement
         // protected record. Earlier startup checkpoints may omit later fields.
