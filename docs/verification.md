@@ -1206,3 +1206,24 @@ tree equality, original deadlines and complete child/tree cleanup. This accepts
 the bounded extras/continuation and artifact checks, not an actual guest,
 installed Windows journey or the failed installation/full-release boundary.
 [Python receipts](evidence/pypi-extras-native-summary.json).
+
+## Credential retirement and native shortcut diagnostics — 2026-11-06
+
+The credential runner previously rejected timeouts before confirming worker exit
+and allowed a null signal-exit code to reach callers as success. It now joins
+exact direct-child retirement, rejects unverifiable status and blocks concurrent
+replacement during pending or unconfirmed retirement. Existing Secret Service
+and DPAPI calls retain their arguments, targets, 10-second deadline and 32 KiB
+output bound. Six isolated groups pass 69 checks with no skips, including ten
+worker regressions and two controlled real Node workers. Typecheck, package
+budget and exact owned temporary-root removal pass. No live credential request,
+stored-key replacement or installed update is part of this proof.
+[Contract](credential-worker-lifecycle.md), [receipt](evidence/credential-process-source-summary.json).
+
+Native source `80601e9`, equal-tree merge `adcfa37`, workflow 42289047696,
+job 128137982344 and artifact 13539966260 pass 17 groups/28 tests without skips:
+all sixteen original installation scenarios and twelve writer cases. Original
+execution and child deadlines, artifact size/digest, source/merge tree equality
+and child/tree cleanup verify. The timeout does not reproduce, so the two prior
+failures remain unresolved evidence; instrumentation is not a root-cause repair.
+[Native receipt](evidence/shortcut-stage-diagnostics-native-summary.json).

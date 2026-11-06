@@ -9,7 +9,8 @@ application has separately verified installed metadata checks. Later archive
 identity work has focused source acceptance.
 The corrected complete Linux `5a8d159` run passes all 308 groups, 1,823 tests
 and sixteen declared skips, covering combined archive, shortcut and Python changes.
-The newer bundled-agent retirement correction has separate 72-check acceptance.
+The newer bundled-agent retirement correction has separate 72-check acceptance;
+credential-worker retirement has 69 focused passing checks.
 The restricted Windows storage owner now passes all eight original checks with
 verified retirement. Complete Windows release acceptance remains pending. Hardware,
 account and visual acceptance remain separate from those implementation results.
@@ -33,7 +34,8 @@ there is no merge or public release acceptance.
 | Windows index/history/leases | Native NTFS index and history packets each pass six checks and three independent guardian exits. Both Windows scanner files pass two cases with guest execution doubled; lease groups pass 24 tests and one Linux-only skip. [Evidence](evidence/native-history-index-leases-summary.json). | Packet Git witnesses are synthetic. Actual guest, installed Windows and ordinary-user acceptance remain separate. |
 | Installed app | Linux source `e7cec91` passes 20 owner/journal metadata checks and six pure in-memory command-history checks. Exact tested module hashes, all 54 workspace semantic snapshots, 53 sealed files and frozen frontend bytes verify. Only current plus one rollback remain; prepared staging is removed. [Receipt](evidence/installed-command-observation-summary.json). Earlier lifecycle/archive/extras receipts remain source-specific evidence. | No bundled example, recording, scanner, task, provider or public query is started by this update. Frontend and extension activation remain frozen. |
 | Windows npm archive identity | Corrected `55515d1` completes ten archive tests plus eight original byte-comparison tests, each file with two original Linux-only skips inside its original 300-second bound; guest execution is doubled. [Archive](evidence/npm-archive-native-summary.json), [bytes](evidence/npm-artifact-split-native-summary.json). | Complete Windows release remains separate. |
-| Windows shortcut retirement | `9f35961` passes all sixteen original installation/recovery scenarios and nine writer checks, no skips and verified cleanup. [Earlier pass](evidence/shortcut-writer-native-summary.json). | Newer `9193471` and `4b2daed` each fail the first installation scenario at the original ten-second shortcut deadline: 24/25 tests pass, all cleanup verifies. The cause remains unresolved. Fixed stage diagnostics now pass 19 groups/36 source checks, preserving all deadlines and bounds; native follow-up is pending. [Recurring failures](evidence/windows-shortcut-recurring-timeout-summary.json), [diagnostic source](evidence/shortcut-stage-diagnostics-source-summary.json). |
+| Windows shortcut retirement | `80601e9` passes all sixteen original installation/recovery scenarios and twelve writer checks, no skips and verified cleanup. The fixed stage diagnostics execute with the original bounds. [Native pass](evidence/shortcut-stage-diagnostics-native-summary.json). | `9193471` and `4b2daed` each fail the first installation scenario at the original ten-second shortcut deadline: 24/25 tests pass, all cleanup verifies. The latest pass does not reproduce or establish the cause of the intermittent timeout. [Recurring failures](evidence/windows-shortcut-recurring-timeout-summary.json), [diagnostic source](evidence/shortcut-stage-diagnostics-source-summary.json). |
+| Credential worker retirement | Six groups/69 checks pass, including ten worker tests and two controlled real children. Errors join exact-child retirement; unconfirmed exit blocks replacement. Typecheck, package bounds and owned cleanup pass. [Contract](credential-worker-lifecycle.md), [evidence](evidence/credential-process-source-summary.json). | No live Secret Service/DPAPI change, native Windows or installed acceptance is claimed. |
 
 Failed runs remain failed evidence. Partial test output is excluded when the
 final plan is missing. Provider and guest doubles are explicitly identified in
@@ -81,7 +83,9 @@ the 26-check update; native Windows and live installed command execution remain 
   [Cleanup evidence](evidence/shortcut-writer-retirement-source-summary.json).
   The original shortcut startup timeout recurs in two later checkpoints; cleanup
   remains verified, but the cause is unresolved. Fixed bounded stage diagnostics
-  await native execution. [Failures](evidence/windows-shortcut-recurring-timeout-summary.json).
+  now pass all 28 native checks without reproducing the timeout.
+  [Failures](evidence/windows-shortcut-recurring-timeout-summary.json),
+  [latest pass](evidence/shortcut-stage-diagnostics-native-summary.json).
 - Production editor command activation and remaining guided role/device wiring.
   Frontend and command activation are deliberately frozen for owner review.
 - Broader Shield coverage and dependency syntax/resolution, publisher provenance,

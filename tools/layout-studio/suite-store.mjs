@@ -1,6 +1,6 @@
 /** Compartment-scoped authenticated encryption and policy enforcement. */
 import { createCipheriv, createDecipheriv, createHash, createHmac, timingSafeEqual, randomBytes, randomUUID } from "node:crypto";
-import { spawn } from "node:child_process";
+import { boundedCredentialProcess as boundedProcess } from "./credential-process.mjs";
 import { privateDirectory, privateRead, privateWrite } from "./private-fs.mjs";
 import { withStateLock } from "./state-lock.mjs";
 export { privateDirectory, privateRead, privateWrite } from "./private-fs.mjs";
@@ -27,21 +27,6 @@ const templates = {
   personal: { providers: ["codex", "claude-code", "native-chatgpt", "native-vscode", "custom-agent", "local-transcription", "github-copilot", "claude-desktop", "cursor", "figma"], accounts: [], export: true, recording: true, crossCompartment: false, retentionDays: 30 },
   work: { providers: ["microsoft-365-copilot"], accounts: [], export: false, recording: false, crossCompartment: false, retentionDays: 7 }
 };
-
-async function boundedProcess(executable, args, input, timeout = 10000) {
-  return new Promise((resolve, reject) => {
-    const child = spawn(executable, args, { shell: false, windowsHide: true, stdio: ["pipe", "pipe", "pipe"] });
-    let output = Buffer.alloc(0), stderrBytes = 0, done = false;
-    const timer = setTimeout(() => { child.kill(); finish(new Error("The platform credential store timed out.")); }, timeout);
-    function finish(error, result) { if (done) return; done = true; clearTimeout(timer); if (error) reject(error); else resolve(result); }
-    child.on("error", () => finish(new Error("The platform credential store is unavailable.")));
-    child.stdout.on("data", (chunk) => { output = Buffer.concat([output, chunk]); if (output.length > 32768) { child.kill(); finish(new Error("Credential response exceeded its bound.")); } });
-    child.stderr.on("data", (chunk) => { stderrBytes += chunk.length; });
-    child.stdin.on("error", () => {});
-    child.on("close", (code) => finish(null, { code, text: output.toString("utf8").trim(), stderrBytes }));
-    child.stdin.end(input);
-  });
-}
 
 /** Secrets use a distinct OS-protected entry per compartment and purpose. */
 export function platformSecrets({ root }) {

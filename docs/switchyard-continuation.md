@@ -31,6 +31,15 @@ evidence, not instructions to reset. Publish regular commits. Do not merge or re
 
 ## Current implementation and evidence
 
+Credential workers now join exact-child retirement on timeout/error, reject
+signal-only status and block concurrent replacement while exit is uncertain.
+Six groups/69 checks pass, including two real controlled children, without using
+live credentials. Typecheck, package bounds and owned cleanup pass. Native and
+installed acceptance remain separate. [Contract](credential-worker-lifecycle.md).
+Native shortcut diagnostics at `80601e9` pass all sixteen original installation
+scenarios and twelve writer cases with cleanup. The intermittent ten-second
+timeout did not reproduce; its cause remains open. [Evidence](evidence/shortcut-stage-diagnostics-native-summary.json).
+
 Read [current status](switchyard-status.md) first. It separates complete Linux
 checks, native Windows results, focused source checks and installed acceptance.
 The [verification record](verification.md) retains historical receipts and failed
