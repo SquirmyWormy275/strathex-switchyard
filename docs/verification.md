@@ -1,5 +1,20 @@
 # What has actually been verified
 
+Shortcut failure cleanup now joins owned direct-child exit before removing its
+temporary output. Unconfirmed exit retains the owned file and fails explicitly.
+The original ten-second execution deadline and exact COM readback are unchanged.
+Twenty-three focused groups pass 67 tests; a nine-test follow-up adds two actual
+controlled Node writers, making **69 distinct accepted checks**. Child/tree and
+owned temporary-parent cleanup pass. Windows shortcut/COM acceptance and the
+original timeout's cause remain unestablished.
+[Source evidence](evidence/shortcut-writer-retirement-source-summary.json).
+
+Both corrected Windows npm files are now accepted at `55515d1`: ten archive
+checks and eight original byte checks, each with its two declared Linux-only
+skips and original 300-second bound. Guests remain doubled.
+[Byte receipt](evidence/npm-artifact-split-native-summary.json),
+[archive receipt](evidence/npm-archive-native-summary.json).
+
 The normal installed `0cb823b` update passes **26 metadata checks**, including
 the exact offline npm archive fixture, mismatched identity, truncated input,
 decompression budget and impossible report refusal. All 54 original workspace

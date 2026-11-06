@@ -1,10 +1,8 @@
 /** Stable loader contents and native desktop entry generation. */
-import { spawn } from "node:child_process";
-import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
-import { fileURLToPath } from "node:url";
 import { privateDirectory } from "../../tools/layout-studio/private-fs.mjs";
+import { prepareWindowsShortcut } from "./shortcut-process.mjs";
 const shellQuote = (s) => `'${s.replaceAll("'", `'"'"'`)}'`;
 const desktopQuote = (s) => `"${s.replaceAll("%", "%%").replace(/[\\"`$]/g, (c) => `\\${c}`)}"`;
 export const stableLoader = Buffer.from(`// Switchyard installed entry. Managed by the verified suite installer.
@@ -44,15 +42,6 @@ export async function launcherContents({ root, nodePath, platform = process.plat
   if (platform !== "win32" || /[%!^&<>|]/.test(nodePath + loader)) throw new Error("Unsupported native launcher path; existing launchers were preserved.");
   await privateDirectory(join(stateRoot, "shortcut-staging"));
   const path = join(stateRoot, "shortcut-staging", `${randomUUID()}.lnk`);
-  try {
-    await new Promise((resolve, reject) => {
-      const exe = join(process.env.SystemRoot || "C:\\Windows", "System32/WindowsPowerShell/v1.0/powershell.exe"), script = fileURLToPath(new URL("./shortcut.ps1", import.meta.url));
-      const child = spawn(exe, ["-NoLogo", "-NoProfile", "-NonInteractive", "-File", script], { shell: false, windowsHide: true, stdio: ["pipe", "pipe", "ignore"] });
-      let output = ""; const timer = setTimeout(() => { child.kill(); reject(new Error("Native shortcut creation timed out.")); }, 10000);
-      child.stdout.on("data", (b) => { output += b; if (output.length > 1024) child.kill(); }); child.stdin.on("error", () => {});
-      child.once("error", reject); child.once("close", (code) => { clearTimeout(timer); code === 0 && output.trim() === "VERIFIED" ? resolve() : reject(new Error("Native shortcut creation or exact readback failed.")); });
-      child.stdin.end(JSON.stringify({ path, nodePath, loader, directory: root }));
-    });
-    return { command: { bytes: Buffer.from(`@echo off\r\n"${nodePath}" "${loader}" %*\r\n`), mode: 0o700 }, desktop: { bytes: await readFile(path), mode: 0o600 } };
-  } finally { await import("node:fs/promises").then(({ rm }) => rm(path, { force: true })); }
+  const bytes = await prepareWindowsShortcut({ path, nodePath, loader, directory: root });
+  return { command: { bytes: Buffer.from(`@echo off\r\n"${nodePath}" "${loader}" %*\r\n`), mode: 0o700 }, desktop: { bytes, mode: 0o600 } };
 }

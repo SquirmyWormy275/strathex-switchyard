@@ -32,7 +32,7 @@ there is no merge or public release acceptance.
 | Latest diagnostic source | Seven focused groups pass 69 tests with five Windows-only skips. Two managed builds, 2,101 portable checks, typecheck and exact owned cleanup pass. [Receipt](evidence/worker-start-observation-source-summary.json). | Actual Windows `d15285b` passes all eight acknowledgement/refusal tests without skips. [Native receipt](evidence/worker-start-refusal-native-summary.json). The full restricted-owner journey is now separately accepted above. |
 | Windows index/history/leases | Native NTFS index and history packets each pass six checks and three independent guardian exits. Both Windows scanner files pass two cases with guest execution doubled; lease groups pass 24 tests and one Linux-only skip. [Evidence](evidence/native-history-index-leases-summary.json). | Packet Git witnesses are synthetic. Actual guest, installed Windows and ordinary-user acceptance remain separate. |
 | Installed app | Linux source `0cb823b` passes 26 installed owner/editor/journal/offline-severity/SPDX/OSV/archive metadata checks. All 54 workspace semantic snapshots and frozen frontend bytes are preserved. The new archive parser reads the retained offline npm fixture without extraction or execution. [Receipt](evidence/installed-npm-archive-summary.json). | This metadata update starts no scanner, task, provider or public query. Frontend and extension activation remain frozen. |
-| Windows npm archive identity | Corrected `55515d1` completes ten tests with two original Linux-only skips inside the original 300-second file bound; guest execution is doubled. [Native receipt](evidence/npm-archive-native-summary.json). | Complete Windows release remains separate. Its installation lane has a new native shortcut timeout: 15/16 scenarios pass, and the failed scenario is retained. [Failure](evidence/windows-shortcut-timeout-summary.json). |
+| Windows npm archive identity | Corrected `55515d1` completes ten archive tests plus eight original byte-comparison tests, each file with two original Linux-only skips inside its original 300-second bound; guest execution is doubled. [Archive](evidence/npm-archive-native-summary.json), [bytes](evidence/npm-artifact-split-native-summary.json). | Complete Windows release remains separate. Its installation lane has a new native shortcut timeout: 15/16 scenarios pass, and the failed scenario is retained. [Failure](evidence/windows-shortcut-timeout-summary.json). |
 
 Failed runs remain failed evidence. Partial test output is excluded when the
 final plan is missing. Provider and guest doubles are explicitly identified in
@@ -56,6 +56,11 @@ Rev2 scope independently of these checkpoints.
 
 - Corrected complete Windows release verification; the separate restricted
   storage-owner journey is now accepted in controlled native CI.
+  Native shortcut timeout remains under investigation. A separately identified
+  cleanup race is corrected: failures join the writer's exit before removing its
+  owned output, and unconfirmed exits preserve staging. Twenty-three focused
+  groups/69 distinct checks pass; native acceptance is pending.
+  [Cleanup evidence](evidence/shortcut-writer-retirement-source-summary.json).
 - Production editor command activation and remaining guided role/device wiring.
   Frontend and command activation are deliberately frozen for owner review.
 - Broader Shield coverage and dependency syntax/resolution, publisher provenance,

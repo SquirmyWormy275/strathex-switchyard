@@ -110,6 +110,16 @@ was removed after manifest verification. [Receipt](evidence/installed-npm-archiv
    The separate installation lane fails one of sixteen scenarios during native
    shortcut creation. The original ten-second shortcut deadline remains; its
    underlying cause is not established. [Failure](evidence/windows-shortcut-timeout-summary.json).
+   Its exact failed job was requested for rerun after the workflow finished;
+   reconcile that separately. The original byte-comparison file also passes
+   eight native tests and two declared Linux-only skips at 55515d1.
+   [Byte receipt](evidence/npm-artifact-split-native-summary.json).
+   A confirmed cleanup race is now corrected without extending the original
+   ten-second execution bound: failure joins direct-child retirement and only
+   then removes temporary output; unconfirmed exit preserves owned staging.
+   Twenty-three focused groups/69 distinct checks pass, including two actual
+   controlled Node writers. Windows COM/shortcut acceptance is still pending.
+   [Source evidence](evidence/shortcut-writer-retirement-source-summary.json).
    Installed source is now 0cb823b, with 26 permitted metadata checks.
    Native NTFS index/history staging now each pass six original checks and
    three independent guardian exits at 6b4089c. Their Windows scanner files

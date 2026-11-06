@@ -97,6 +97,22 @@ provides `switchyard.cmd` in that directory. Native shortcut creation reads back
 the exact target and arguments. Neither path installs a login autostart service.
 Add `--no-start` to installation/update for deliberate headless setup.
 
+The Windows shortcut writer retains its ten-second execution deadline and bounded
+request/response. On timeout, excess output or process error, the installer waits
+for the owned direct child to exit before removing its temporary shortcut. The
+existing bounded termination helper allows 1.5 seconds for ordinary shutdown and
+1.5 seconds for final readback; these are cleanup bounds, not extra execution
+time. An unconfirmed exit fails explicitly and preserves the exact owned staging
+file. A verified response is accepted only after successful process closure.
+
+Twenty-three focused groups accept 69 distinct checks, including actual controlled
+Node writers, late output after termination, unconfirmed exit and the original
+installation/rollback/package tests. These controlled writers do not exercise
+Windows COM. The native ten-second creation failure remains recorded separately;
+this cleanup correction does not establish its cause or native resolution.
+[Source evidence](evidence/shortcut-writer-retirement-source-summary.json),
+[native failure](evidence/windows-shortcut-timeout-summary.json).
+
 Only the current program version and one rollback version are retained. A stable
 loader verifies the pinned Node executable and expected release before loading
 the application. Installed Linux host shortcuts use that stable entry, so
