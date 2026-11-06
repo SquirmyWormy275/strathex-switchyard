@@ -20,3 +20,7 @@ Records live outside the repository at `${XDG_STATE_HOME:-$HOME/.local/state}/st
 Use a pseudonymous task alias; never enter a customer, repository, person, prompt, file path, credential, or proprietary name. Capture at least ten representative sessions and note relevant omissions in a separate reviewed study record. The aggregate can guide implementation priority while the current 65 chord assignments stay fixed. See [the study protocol](03-workflow-study.md).
 
 Live monitoring of Codex/ChatGPT or Claude requires an authorized adapter that binds an exact native session and attests its observation capability. The existing [read-only managed-session view](../README.md) can display companion-registered sessions but does not infer native agent state from an open window. Automatic counts should be added only after those adapters have passed host acceptance.
+
+The Suite's separate Windows category observer retains ownership of its read-only
+helper until exact exit. Uncertain shutdown blocks replacement and cannot produce
+a successful Suite close. [Lifecycle and source verification](foreground-helper-lifecycle.md).

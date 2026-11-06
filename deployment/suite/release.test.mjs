@@ -49,6 +49,8 @@ test("suite bundles contain the actual offline backend, frozen frontend and lice
   const manifestBytes = await readFile(join(bundle.directory, "switchyard-release.json"));
   assert.deepEqual(JSON.parse(manifestBytes), manifest);
   assert.ok(bundle.bytes + manifestBytes.length < 5 * 1024 * 1024, "The full Linux package, including its integrity manifest, must stay below the original budget.");
+  const provenancePath = "third_party/model-f-catalog/SOURCES.json", provenance = JSON.parse(await readFile(join(options.sourceRoot, provenancePath), "utf8"));
+  assert.equal(await readFile(join(bundle.directory, provenancePath), "utf8"), JSON.stringify(provenance) + "\n", "Compact provenance retains every source revision, hash, notice and metadata field.");
   assert.ok(manifest.files.some((f) => f.path.endsWith("mymakercorner/LICENSE"))); assert.ok(manifest.files.some((f) => f.path === "integrations/switchyard_agent.py"));
   for (const name of ["pure-template.svg", "template-faces.json", "pure-template.pdf", "README.md", "ReadMe.txt"]) assert.ok(manifest.files.some((f) => f.path === `third-party/cyber_engineer/${name}`));
   assert.equal(manifest.files.some((f) => /(?:\.test\.|test-support\/|\.sealed\.|\.git\/|node_modules\/|\.venv\/|__pycache__\/|\.pyc$|base\.en\/)/.test(f.path)), false);

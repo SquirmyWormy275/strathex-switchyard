@@ -81,6 +81,11 @@ export async function buildSuiteRelease({ sourceRoot, sourceFiles, outputRoot, f
   if ([...frontendOnly].some(name => !front.files.some(file => file.file === name))) throw new Error("The frozen frontend is missing its browser module closure.");
   for (const name of await walk(join(sourceRoot, "tools/layout-studio"))) if (!frontendOnly.has(name) && !name.endsWith(".test.mjs") && !name.endsWith(".pyc") && !name.startsWith("test-support/")) await add(`tools/layout-studio/${name}`);
   for (const prefix of ["integrations", "examples/custom-agent", "examples/langchain-agent", "deployment/suite", "third_party/model-f-catalog"]) for (const name of await walk(join(sourceRoot, prefix))) if (!name.endsWith(".test.mjs") && !name.endsWith(".pyc") && !name.startsWith("test-support/")) await add(`${prefix}/${name}`);
+  // This first-party provenance index is parsed as JSON by every consumer.
+  // Ship every field without formatting whitespace; pinned upstream files and
+  // the independently frozen frontend remain byte-for-byte unchanged.
+  const catalogProvenance = "third_party/model-f-catalog/SOURCES.json";
+  if (inputs.has(catalogProvenance)) inputs.set(catalogProvenance, Buffer.from(JSON.stringify(JSON.parse(inputs.get(catalogProvenance).toString("utf8"))) + "\n"));
   // Only the suite runtime dependency closure, not unrelated entry points.
   // workflow-artifacts is referenced only by an erased type import here; its
   // context-packages/voice implementations belong to the separate companion.

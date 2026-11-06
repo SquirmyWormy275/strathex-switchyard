@@ -66,6 +66,15 @@ the 26-check update; native Windows and live installed command execution remain 
 
 ## What the backend does
 
+Windows foreground observation now retains an uncertain exact helper, joins
+overlapping stops and refuses replacement until exit. Late replies cannot survive
+pause/shutdown, and Suite shutdown reports an unconfirmed owner. Ten source groups
+pass 87 checks, with two controlled real Node children; a final eleven-check
+foreground pass verifies recovery after exact close. Catalog provenance ships
+as equivalent compact JSON to preserve the original package budget. Installed and
+native Windows acceptance remain separate.
+[Contract](foreground-helper-lifecycle.md), [evidence](evidence/foreground-owner-source-summary.json).
+
 Authenticated custom-agent stop events now retire pending commands atomically:
 unclaimed work cancels locally, claimed outcomes remain uncertain, and a fresh
 session identity is required before accepting new work. Exact late acknowledgements
@@ -172,3 +181,13 @@ Historical snapshots: [8](switchyard-status-history-8.md), [7](switchyard-status
 [6](switchyard-status-history-6.md), [5](switchyard-status-history-5.md),
 [4](switchyard-status-history-4.md), [3](switchyard-status-history-3.md),
 [2](switchyard-status-history-2.md), [1](switchyard-status-history-1.md).
+
+
+Windows `cadbccd` preliminary backend shard 3 is cancelled after 20 minutes
+3 seconds, with no final receipt and a failed empty artifact upload. Its elapsed
+time matches the configured twenty-minute job bound; the runner log supplies no
+more specific cause. No tests from that incomplete shard or exact cleanup are
+accepted. The separate complete release remains active. This is a CI acceptance
+gap, not a hardware/account blocker; native `9f35961` and complete local Linux
+`cadbccd` keep their separate accepted results. Inspect scheduling without
+extending any child/job bounds. [Evidence](evidence/windows-cad-cancelled-backend-summary.json).

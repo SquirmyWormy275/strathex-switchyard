@@ -31,6 +31,14 @@ evidence, not instructions to reset. Publish regular commits. Do not merge or re
 
 ## Current implementation and evidence
 
+Latest source work preserves foreground-helper ownership after uncertain exit,
+blocks replacement and propagates uncertainty through Suite shutdown. Ten groups/
+87 checks plus an eleven-check foreground follow-up pass with two real controlled
+Node child exits. Typecheck/catalog verification and exact cleanup pass. Lossless
+provenance JSON compaction keeps the full test bundle below the original 5 MiB
+limit. This later correction is not yet installed or accepted on native Windows.
+[Contract](foreground-helper-lifecycle.md).
+
 The latest source correction retires commands when an adapter publishes stopped,
 preserves uncertain claims and rejects active status under the same stopped
 identity. Three regressions fail before the fix and pass within eight groups/94
@@ -258,3 +266,13 @@ retiring owned processes; no trust bypass is authorized.
 
 Historical milestones and original failures remain in
 [verification](verification.md) and [status history](switchyard-status-history-7.md).
+
+
+Windows `cadbccd` preliminary backend shard 3 is cancelled after 20 minutes
+3 seconds, with no final receipt and a failed empty artifact upload. Its elapsed
+time matches the configured twenty-minute job bound; the runner log supplies no
+more specific cause. No tests from that incomplete shard or exact cleanup are
+accepted. The separate complete release remains active. This is a CI acceptance
+gap, not a hardware/account blocker; native `9f35961` and complete local Linux
+`cadbccd` keep their separate accepted results. Inspect scheduling without
+extending any child/job bounds. [Evidence](evidence/windows-cad-cancelled-backend-summary.json).

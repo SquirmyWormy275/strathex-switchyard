@@ -1388,3 +1388,32 @@ conversation remains. Dated backup/readback, frozen frontend and current plus on
 rollback verify. The 535-file, 5,231,798-byte prepared bundle is removed.
 No live agent, credential, provider, recording, model, Microsoft account or hardware
 operation is performed. [Installed evidence](evidence/installed-agent-stop-summary.json).
+
+
+## Foreground helper ownership and package recovery — 2026-11-06
+
+A cancelled/closed foreground driver previously lost its owned-child record
+before exit was confirmed. The new regression reproduces a replacement after
+uncertain exit. Retirement now joins overlapping operations, retains uncertainty,
+discards late replies and reports failed Suite shutdown. Six new tests include
+two controlled real Node children; exact-close recovery is separately asserted.
+
+Ten groups pass 87 tests, with a final eleven-check foreground follow-up. Typecheck,
+27 models/104 catalog configurations and all exact child/tree/temporary cleanup
+verify. The first corrected run passes 74/75 tests but fails the unchanged full
+5 MiB package limit by 1,401 bytes. Compacting only the copied first-party source
+provenance JSON preserves every value and all pinned upstream bytes, saving 9,793
+bytes. The final full test bundle is 5,234,949 bytes. Both initial failures remain
+recorded. Installed, native Windows and interactive category acceptance remain
+separate. [Contract](foreground-helper-lifecycle.md),
+[source receipt](evidence/foreground-owner-source-summary.json).
+
+
+Windows `cadbccd` preliminary backend shard 3 is cancelled after 20 minutes
+3 seconds, with no final receipt and a failed empty artifact upload. Its elapsed
+time matches the configured twenty-minute job bound; the runner log supplies no
+more specific cause. No tests from that incomplete shard or exact cleanup are
+accepted. The separate complete release remains active. This is a CI acceptance
+gap, not a hardware/account blocker; native `9f35961` and complete local Linux
+`cadbccd` keep their separate accepted results. Inspect scheduling without
+extending any child/job bounds. [Evidence](evidence/windows-cad-cancelled-backend-summary.json).
