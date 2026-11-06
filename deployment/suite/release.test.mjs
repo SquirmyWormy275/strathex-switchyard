@@ -5,7 +5,7 @@ import { readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { buildSuiteRelease, verifySuiteRelease, readReleaseFile } from "./release.mjs";
-import { fixture } from "./test-support/fixture.mjs";
+import { fixture, sourceRoot } from "./test-support/fixture.mjs";
 test("release verification rejects a different adjacent 64-bit file identity before reading content", async () => {
   const original = 2n ** 60n, replacement = original + 1n; assert.equal(Number(original), Number(replacement));
   let swapped = true, reads = 0, closed = 0;
@@ -28,6 +28,8 @@ test("suite bundles contain the actual offline backend, frozen frontend and lice
   assert.deepEqual([v4.baseScore, v4.score, v4.severity], [9.3, 0, "critical"]);
   const scoringData = await readFile(join(bundle.directory, "tools/layout-studio/cvss-v4-data.mjs"), "utf8");
   assert.match(scoringData, /SPDX-License-Identifier: BSD-2-Clause/); assert.match(scoringData, /Copyright \(c\) 2023 FIRST\.ORG, Inc\., Red Hat, and contributors/); assert.match(scoringData, /THIS SOFTWARE IS PROVIDED/);
+  const ingressPath = "tools/layout-studio/codex-editor-ingress.py";
+  assert.equal(await readFile(join(bundle.directory, ingressPath), "utf8"), await readFile(join(sourceRoot, ingressPath), "utf8"));
   const { createCodexEditorProtocol } = await import(pathToFileURL(join(bundle.directory, "tools/layout-studio/codex-editor-protocol.mjs")).href);
   const protocol = createCodexEditorProtocol({ sessionId: "11111111-1111-4111-8111-111111111111", repositoryRoot: "/synthetic/repository", accountFingerprint: "a".repeat(64) });
   assert.equal(protocol.observation().ideAttached, false); protocol.close(); assert.equal(protocol.observation().protocolAcknowledged, false);

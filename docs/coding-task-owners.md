@@ -339,3 +339,29 @@ The witness itself opens no transport or provider. Peer-bound relay composition
 and final editor acknowledgement remain unfinished; `ideAttached`, kernel peer,
 terminal process, authority and completion flags remain false in its result.
 [Evidence](evidence/editor-protocol-summary.json).
+
+
+## Verify the terminal side of the stream
+
+`codex-editor-ingress.py` is an internal Linux carrier. Its parent supplies an
+existing private directory identity and an unused socket name. After `ready`,
+the parent supplies the exact terminal PID, process birth, executable path and
+SHA-256. The carrier accepts one connection and verifies Linux peer credentials
+and the opened executable before HTTP upgrade or JSON delivery. It searches no
+process tree and never reconnects to another client.
+
+The wire uses bounded [WebSocket framing](https://www.rfc-editor.org/rfc/rfc6455)
+with masked client frames, Unicode fragmentation, ping/pong and close handling.
+Unsupported negotiation, binary data, duplicate JSON keys and malformed or
+oversized messages close the carrier. Parent and peer identity stay checked;
+initial setup is bounded to eight seconds. Graceful stop removes only the exact
+owned socket. Parent death kills the carrier, leaving the owner responsible for
+identity-checked socket cleanup; a replacement name is preserved.
+
+Eleven lifecycle and synthetic wire tests plus five package checks pass. One
+wire demonstration feeds exact account/resume messages into the existing
+protocol witness. This is not an activated editor attachment: the parent
+lifecycle, retained Terminal launch, upstream original-owner transport and native
+TUI compatibility remain unfinished. The carrier selects no account or task,
+sends no provider prompt and grants no forwarding or completion authority.
+[Evidence, including the corrected shutdown failure](evidence/editor-ingress-summary.json).

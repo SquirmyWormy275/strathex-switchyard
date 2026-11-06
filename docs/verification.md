@@ -19,7 +19,7 @@ vectors. Six groups / 58 tests, typecheck and exact source/build cleanup pass;
 actual Linux scanner and Windows guest-double evidence remain distinct from
 installed acceptance. [Evidence](evidence/cvss-v4-summary.json).
 
-Latest focused backend checkpoint: the exact consumed-editor return path supports
+Earlier focused backend checkpoint: the exact consumed-editor return path supports
 idle and active original tasks without another launch/resume. Five groups / 60
 tests, typecheck, compiled extension load and owned cleanup pass with controlled
 provider/editor doubles. [Evidence](evidence/editor-active-return-summary.json).
@@ -30,6 +30,14 @@ exit 134. [Native evidence](evidence/windows-provider-lookup-native-summary.json
 Switchyard is a partial implementation of the full Rev2 suite. The F77 is its
 pilot device. Software checks, installed Linux demonstrations, native Windows
 filesystem tests and physical/account acceptance are separate evidence.
+
+Latest editor transport source passes eleven Linux lifecycle/wire tests and five
+package checks, plus typecheck. Exact peer, deadline, parent loss and substituted
+socket cases verify with synthetic processes; a retained shutdown traceback
+failure is corrected and rerun. Final editor/upstream composition is unfinished.
+[Evidence](evidence/editor-ingress-summary.json). Native Windows `71614e0` isolates
+the remaining owner failure to its state-lock helper startup (`0xC0000142`), with
+no first worker marker. [Native failure](evidence/windows-state-lock-native-summary.json).
 
 Latest complete Linux evidence is `d900499`: **248/248 groups, 1,600 passed
 tests and eleven declared skips**, with every child/tree and exact owned checkout,

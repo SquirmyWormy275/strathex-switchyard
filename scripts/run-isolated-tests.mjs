@@ -276,6 +276,7 @@ export const requiredGroups = [
   { file: "tools/layout-studio/codex-stdio-tasks.test.mjs" },
   { file: "tools/layout-studio/codex-unix-tasks.test.mjs", ...(process.platform !== "linux" ? { expectedSkipped: 6 } : {}) },
   { file: "tools/layout-studio/codex-editor-protocol.test.mjs" },
+  { file: "tools/layout-studio/codex-editor-ingress.test.mjs", ...(process.platform !== "linux" ? { expectedSkipped: 11 } : {}) },
   { file: "tools/layout-studio/codex-unix-transport.test.mjs", ...(process.platform !== "linux" ? { expectedSkipped: 6 } : {}) },
   { file: "tools/layout-studio/codex-owned-listener.test.mjs", ...(process.platform !== "linux" ? { expectedSkipped: 10 } : {}) },
   { file: "tools/layout-studio/codex-turn.test.mjs" },

@@ -23,7 +23,10 @@ random providers succeed. Duplicate/impersonation access remains denied; the
 original ACEs and token restrictions verify. The unchanged pinned Node reaches
 JavaScript and reports exit 2 at `private-state-initialize`, before any of its
 eight owner checks. This is failed software validation, not a hardware/account
-blocker. The original failed fixture is preserved. [Native evidence](evidence/windows-self-query-native-summary.json).
+blocker. The original failed fixture is preserved. [Native evidence](evidence/windows-self-query-native-summary.json). The
+later `71614e0` diagnostic identifies the exact state-lock helper exiting with
+`0xC0000142` during startup before its first worker marker; the DLL/resource
+remains unknown. [Latest failure](evidence/windows-state-lock-native-summary.json).
 
 The earlier `78b640d` CSPRNG exit 134 remains recorded as failed historical
 evidence. Static imports did not prove the executed OpenSSL branch.
@@ -85,6 +88,12 @@ authority. [Evidence](evidence/editor-protocol-summary.json).
 | Earlier installed Linux `2c87c03` | Six update, ten owner/editor/severity and seven journal checks pass. All 54 workspace identities remain; 52 sealed files are byte-identical across update. Launcher backups and exact bundle cleanup verify. [Evidence](evidence/installed-editor-authorization-summary.json). | The two opened verification workspaces are resealed by existing restart recovery. Definitions/package/modes, historical pending bytes and metadata-check state verify separately. No full semantic before-snapshot was retained. Three signed authorization checks are unknown-owner refusals, with no new permit/task/provider effects. |
 | Native Windows `78b640d` | Exact Node import flags and cold CNG success are observed; token, process/tree, pipe, provider and buffer checks verify. Separate filesystem/setup jobs pass. [Receipt](evidence/windows-node-rng-imports-native-summary.json). | Original Node still exits 134 with no owner result; the failed fixture is preserved. The later legacy-first probe identifies Access Denied; the exact denied operation and Node repair remain open. |
 | Windows state leases `ce5be6a` | Eighteen native tests, one declared skip, the Supply Chain scenario and 23 policy-output checks pass. [Evidence](evidence/native-state-lease-ce5-summary.json). | This verifies exact lease boundaries, not complete Windows guest or ordinary-user setup acceptance. |
+
+The internal Linux editor ingress now checks one exact terminal peer before
+WebSocket upgrade and carries bounded JSON frames. Eleven lifecycle/wire tests,
+five package checks and typecheck pass, including a synthetic account/task
+witness. Parent/launcher/upstream composition remains unfinished; no real IDE
+attachment is claimed. [Evidence](evidence/editor-ingress-summary.json).
 
 ## Implemented backend capabilities
 

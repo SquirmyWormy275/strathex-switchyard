@@ -37,7 +37,7 @@ Node image. Both legacy cold providers succeed. The original owner journey now
 fails at private-state initialization, exit 2, zero of eight checks. Preserve
 its fixture; investigate the bounded lease-helper diagnostic next. The source now
 retains exact fixed phases/exit codes with 37 JS tests (one declared skip) and
-1,965 portable managed checks; native followup is pending. [Diagnostic source](evidence/windows-state-lock-failure-source-summary.json). Do not add
+1,965 portable managed checks; native followup isolates the helper startup failure. [Diagnostic source](evidence/windows-state-lock-failure-source-summary.json). Do not add
 rights or change accounts to clear this failure. [Receipt](evidence/windows-self-query-native-summary.json).
 
 | Area | Current state | Next boundary |
@@ -83,31 +83,15 @@ the installed update or old live provider verifiers without a relevant new chang
    root identities, receipt and dependency aliases before cleanup. Use an owned
    home temporary parent because `/tmp` has per-user quotas. Never broaden cleanup
    or relax deadlines to turn a failure into a pass.
-2. V3 native evidence at `47a49c8` verifies both user/machine default-provider
-   lookups succeed (Strong provider), while default and fixed Enhanced-provider
-   opens both fail with Access Denied. Later CNG succeeds; original Node remains
-   exit 134 without an owner result. Source/merge/archive identity and native
-   cleanup verify. [Evidence](evidence/windows-provider-lookup-native-summary.json).
-   The exact denied resource during provider open remains unknown. Preserve the
-   original token, provider defaults, registry, runtime image and failed fixture;
-   do not substitute a broader account or entropy/runtime fallback.
-
-   V4 at `32eba3c` now verifies all three self-token handle requests fail with
-   Access Denied, including TOKEN_QUERY alone. No token/DACL mutation occurred.
-   This does not establish that CryptoAPI attempted that operation. Original
-   Node remains exit 134; source/merge/archive and native cleanup verify.
-   [Native evidence](evidence/windows-self-token-native-summary.json).
-   Read-only `d900499` metadata now verifies the same three owner/DACL entries
-   on both actual suspended children: Administrators, SYSTEM and the logon SID.
-   None matches the four restricting identities. This explains the direct query
-   denial, but does not prove CryptoAPI's internal operation. Node remains 134;
-   the original fixture is preserved. [Evidence](evidence/windows-token-security-native-summary.json).
-   The query-only correction is implemented in the CI proof: exact existing-user
-   TOKEN_QUERY only, original ACE byte readback, restrictions and unfinished-effect
-   evidence. Two builds, 1,936 portable checks and sixteen projection tests pass.
-   Native validation remains pending. Do not add duplicate/impersonation or broader
-   permissions as a fallback; original Node success and all owner assertions are
-   still required. [Source](evidence/windows-self-query-source-summary.json).
+2. Native `a061be0` verifies the exact query-only child token correction and
+   starts the original Node. At `71614e0`, the remaining failure is the state-lock
+   helper: exit `0xC0000142` during worker-startup, with no entry marker observed.
+   Node reports private-state initialization failure and zero of eight owner
+   checks. Preserve the failed fixture and every restriction/owner assertion.
+   The failing DLL/resource and descendant token descriptor are not yet known;
+   do not assume they match the parent or add broader rights/account/runtime
+   fallbacks. [Latest failure](evidence/windows-state-lock-native-summary.json),
+   [query-only result](evidence/windows-self-query-native-summary.json).
 
 3. Implement native acknowledgement for the exact reviewed editor terminal and
    original owner/account/task. A separate observed connection or ordinary focus
@@ -122,6 +106,12 @@ the installed update or old live provider verifiers without a relevant new chang
    Three groups / 33 tests and package/typecheck pass with synthetic frames.
    It has no transport or forwarding authority. Connect a peer-bound stream
    before claiming attachment. [Evidence](evidence/editor-protocol-summary.json).
+   The new Linux ingress carrier now checks that exact peer before HTTP upgrade
+   and bridges bounded masked WebSocket/JSONL frames. Eleven native synthetic
+   tests plus five package checks and typecheck pass, including parent loss,
+   deadline, substituted-name preservation and protocol-witness composition.
+   Complete the parent lifecycle/launcher/upstream relay next; the carrier alone
+   grants no task/IDE acknowledgement. [Evidence](evidence/editor-ingress-summary.json).
 4. Continue other ledger requirements, including remaining Shield coverage,
    ecosystems, publisher provenance, verified local vulnerability context and workflow observation. These are
    unfinished software, separate from hardware/account acceptance.
