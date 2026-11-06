@@ -68,8 +68,8 @@ execution, offline repository scans and recoverable installation. The Home and
 Model F catalog provide the starting experience; complete task/IDE attachment,
 role/device controls and full scanner coverage remain unfinished.
 
-The accepted complete Linux checkpoint `dad5400` passes **281 groups / 1,776
-tests**, with fifteen declared skips and verified owned cleanup. **Full Windows
+The accepted complete Linux checkpoint `a5520be` passes **306 groups / 1,782
+tests**, with sixteen declared skips and verified owned cleanup. **Full Windows
 acceptance remains failed:** the restricted owner reaches guardian readiness,
 then Windows denies creation of its stdin pipe before worker creation.
 Independent Windows installation/recovery and fresh-runtime checks pass. Source,

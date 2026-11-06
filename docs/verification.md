@@ -829,3 +829,40 @@ bounded import tables and absence of eager UI imports. Four isolated groups pass
 50 tests with all child/tree cleanup; Windows compilation/runtime acceptance is
 pending. No SDK, runtime, model, account or installed application changed locally.
 [Contract](windows-setup-metadata-startup.md), [source evidence](evidence/setup-deferred-imports-source-summary.json).
+
+
+## Complete Linux SPDX checkpoint and Windows host acceptance (2026-11-06)
+
+Clean isolated source `a5520be` passes **306 groups, 1,782 tests, sixteen declared
+skips, zero failures** (1,798 tests total). Every child and process tree exits.
+The owned worktree, nine dependency aliases, five generated output directories,
+782 generated files / 11,766,655 bytes, empty temporary parent and run marker are
+removed after source/identity/inventory verification. All three other worktrees
+are preserved. This is the accepted complete Linux checkpoint, not acceptance
+of later Windows-only source changes.
+[Full source and cleanup evidence](evidence/linux-a552-complete-summary.json).
+
+The same source, native Windows execution `3aeddc45`, equal tree `f007ed68`,
+passes the two license scanner journeys without skips. Actual Windows protected
+host execution uses guest doubles; exact feeds, declared catalog evidence, receipt
+replay, repository preservation and child/tree cleanup verify. No actual guest,
+publisher/license text, provider account or installed app acceptance is inferred.
+[Native SPDX evidence](evidence/spdx-catalog-native-summary.json).
+
+### Deferred setup imports: native preflight passes, restricted startup still fails
+
+Source `56d115efebbec5d70f6232a83a1c64fa76cf49d6` runs as equal-tree merge
+`a79b0c1757bbc156b337c2dd3ee049aac757d639` in workflow 42268548295.
+The actual setup image passes six original preflight checks and verifies both
+delayed UI imports and System32 dependency flags. Its restricted worker still
+exits 3221225794 with zero output; the original owner is 0/8. Both bounded ZIP
+digests and source/merge tree binding were checked in memory; only small private
+receipts and public summaries remain. No installed changes were made.
+[Native summary](evidence/setup-deferred-imports-native-summary.json).
+
+The follow-up setup candidate uses the GUI subsystem with explicit
+`wmainCRTStartup`, preserving the normal CRT and original wide-argument entrypoint.
+It is based on the earlier native console-mode comparison, without asserting a
+specific failing DLL. The native PE parser rejects console and unknown subsystem
+images; the six preflight and eight restricted-owner assertions remain required.
+[Candidate rationale](windows-setup-metadata-startup.md).

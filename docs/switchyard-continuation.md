@@ -44,10 +44,10 @@ source-only changes have not updated or restarted this installed application.
 
 ## Continue independently
 
-1. Complete Linux `dad5400` passes all 281 groups: 1,776 passing tests, fifteen
+1. Complete Linux `a5520be` passes all 306 groups: 1,782 passing tests, sixteen
    declared skips and no failures. Its owned checkout, nine dependency aliases,
    782 generated files, temporary parent and run marker were removed; other
-   worktrees were preserved. [Receipt](evidence/linux-dad-complete-summary.json).
+   worktrees were preserved. [Receipt](evidence/linux-a552-complete-summary.json).
    Do not repeat a complete run without relevant changes or unresolved concerns.
    Future runs use an exact owned home-directory temporary root; this machine's
    `/tmp` user quota was exhausted. Do not alter mounts or delete unrelated data.
@@ -57,9 +57,11 @@ source-only changes have not updated or restarted this installed application.
    `probe-identity-return-structured-result`. The original owner remains **0/8**.
    [Native receipt](evidence/private-pipe-native-summary.json).
    Native `20dc066` reports worker DLL initialization failure, exit 3221225794
-   and zero output bytes. Source defers shell32/ole32 until their effect-path calls
-   and verifies the actual import tables in preflight. Inspect the native candidate
-   next; its specific DLL hypothesis remains unproven.
+   and zero output bytes. Native `56d115e` verifies deferred shell32/ole32 imports
+   and all six ordinary setup checks, but reproduces the restricted failure.
+   The next candidate selects the GUI subsystem with the ordinary wmain CRT
+   entrypoint to avoid console initialization. Inspect its native result next;
+   the specific failing DLL remains unproven.
    [Failure and correction](windows-setup-metadata-startup.md).
    Preserve all eight owner checks, the ninety-second deadline and exact QUERY
    mask 8. No broader token/process/default-DACL/SID/privilege/account rights or

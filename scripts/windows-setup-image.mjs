@@ -9,6 +9,7 @@ export function verifyNativeSetupImage(bytes) {
   const optional = pe + 24, optionalSize = u16(pe + 20), sections = u16(pe + 6), table = optional + optionalSize;
   assert.equal(u16(optional), 0x20b); assert.ok(optionalSize >= 112 + 14 * 8 && sections > 0 && sections < 32); range(optional, optionalSize); range(table, sections * 40);
   assert.ok(u32(optional + 108) >= 14);
+  assert.equal(u16(optional + 68), 2, "Pipe-driven setup must not require console subsystem initialization.");
   const rva = (value, length) => {
     assert.ok(value > 0 && value + length <= 0x100000000);
     const matches = [];
@@ -44,5 +45,5 @@ export function verifyNativeSetupImage(bytes) {
   const eager = imports(false), delayed = imports(true);
   assert.deepEqual(delayed, ["ole32.dll", "shell32.dll"]);
   assert.ok(!eager.some(dll => ["ole32.dll", "shell32.dll", "user32.dll", "gdi32.dll", "combase.dll", "oleaut32.dll"].includes(dll)), "Metadata must not eagerly import UI libraries.");
-  return { dependentLoadFlags: 0x800, deferredUiImportsVerified: true, runtimeModuleIsolationVerified: false };
+  return { imageSubsystem: "windows-gui", dependentLoadFlags: 0x800, deferredUiImportsVerified: true, runtimeModuleIsolationVerified: false };
 }

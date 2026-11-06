@@ -33,3 +33,37 @@ original native transport behavior and release packaging. All child/tree cleanup
 is verified. There is no local Windows compiler acceptance; CI must build and
 execute this candidate using its existing toolchain. The installed app is unchanged.
 [Source evidence](evidence/setup-deferred-imports-source-summary.json).
+
+## Native result and console startup candidate
+
+Native source `56d115e` builds and passes all six ordinary setup checks. Its
+actual PE import table verifies the deferred shell/COM libraries and System32
+dependency flags. The restricted worker still exits `0xC0000142` with zero
+output; all eight original owner checks remain unaccepted. Deferred imports
+alone did not resolve the failure.
+[Native receipt](evidence/setup-deferred-imports-native-summary.json).
+
+An earlier exact-image native helper comparison under the same restricted token
+reached code only when console initialization was avoided. The subsequent GUI
+helper also reached its entrypoint in both launch modes. This is relevant evidence
+for the next setup candidate, not proof that setup has the same failing dependency.
+[Comparison](evidence/windows-lease-console-native-summary.json),
+[helper follow-up](windows-helper-startup.md).
+
+Setup already communicates through inherited handles and has no console input,
+console output or console allocation API. The next candidate selects the Windows
+GUI subsystem while explicitly retaining `wmainCRTStartup`, so the ordinary C++
+runtime initialization, wide command-line arguments and existing `wmain` remain.
+The native PE proof now refuses a console-subsystem image. No GUI window is added
+by this linker setting; the existing explicit elevation API remains the sole UI
+branch. Production process creation, Job containment and suspended acknowledgement
+are unchanged.
+[Microsoft subsystem selection](https://learn.microsoft.com/en-us/cpp/build/reference/subsystem-specify-subsystem?view=msvc-170),
+[CRT entrypoint](https://learn.microsoft.com/en-us/cpp/build/reference/entry-entry-point-symbol?view=msvc-170).
+
+The exact-image native preflight and original restricted owner must execute this
+candidate in CI. Source checks do not establish Windows startup acceptance.
+
+Four focused groups pass **50 tests, zero skips**, including console/unknown
+subsystem refusal, original native transport and packaging checks. Child/tree
+cleanup verifies. [Source receipt](evidence/setup-gui-source-summary.json).

@@ -116,3 +116,9 @@ and process tree exits and owned staging is removed. Typecheck, deterministic
 SBOM regeneration and application/release packaging checks pass. Installed and
 native Windows guest acceptance remain separate.
 [Source evidence](evidence/spdx-catalog-source-summary.json).
+
+Native Windows source `a5520be` now passes both Supply Chain and Release license
+journeys with twelve declarations, exact signed feeds/report/BOM/receipt binding
+and verified child/tree cleanup. Windows guest execution remains doubled; no
+actual guest, account, installed app or license text is accepted by these checks.
+[Windows evidence](evidence/spdx-catalog-native-summary.json).
