@@ -28,6 +28,9 @@ test("suite bundles contain the actual offline backend, frozen frontend and lice
   assert.deepEqual([v4.baseScore, v4.score, v4.severity], [9.3, 0, "critical"]);
   const scoringData = await readFile(join(bundle.directory, "tools/layout-studio/cvss-v4-data.mjs"), "utf8");
   assert.match(scoringData, /SPDX-License-Identifier: BSD-2-Clause/); assert.match(scoringData, /Copyright \(c\) 2023 FIRST\.ORG, Inc\., Red Hat, and contributors/); assert.match(scoringData, /THIS SOFTWARE IS PROVIDED/);
+  const { createCodexEditorProtocol } = await import(pathToFileURL(join(bundle.directory, "tools/layout-studio/codex-editor-protocol.mjs")).href);
+  const protocol = createCodexEditorProtocol({ sessionId: "11111111-1111-4111-8111-111111111111", repositoryRoot: "/synthetic/repository", accountFingerprint: "a".repeat(64) });
+  assert.equal(protocol.observation().ideAttached, false); protocol.close(); assert.equal(protocol.observation().protocolAcknowledged, false);
   assert.ok(bundle.bytes < 5 * 1024 * 1024); assert.equal(manifest.integrity, "sha256-content-manifest-not-signed");
   assert.ok(manifest.files.some((f) => f.path.endsWith("mymakercorner/LICENSE"))); assert.ok(manifest.files.some((f) => f.path === "integrations/switchyard_agent.py"));
   for (const name of ["pure-template.svg", "template-faces.json", "pure-template.pdf", "README.md", "ReadMe.txt"]) assert.ok(manifest.files.some((f) => f.path === `third-party/cyber_engineer/${name}`));

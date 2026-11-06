@@ -53,13 +53,22 @@ Native V4 at `32eba3c` observes Access Denied from all three self-token handle
 requests, including query-only access, under the original restricted primary.
 Source/merge/archive identity and native cleanup verify. The original Node
 failure remains; a provider's exact failing operation is still unproved.
-[Native evidence](evidence/windows-self-token-native-summary.json).
+[Native evidence](evidence/windows-self-token-native-summary.json). Native
+`d900499` descriptor readback shows only Administrators, SYSTEM and logon ACEs,
+with no allow entry for the four restricting identities. The direct query denial
+is explained; a minimal query-only correction remains untested. [Readback](evidence/windows-token-security-native-summary.json).
 
 The editor launcher can now observe the exact retained terminal's kernel PID,
 process birth and original executable identity while rechecking its consumed
 selection. Three groups / 38 tests and compiled extension checks pass with owned
 synthetic processes and provider/editor doubles. Actual connection/account/task
 acknowledgement remains unfinished. [Evidence](evidence/editor-process-summary.json).
+
+A separate bounded protocol witness now verifies account samples around the
+exact resume reply and invalidates on drift or replay. Three groups / 33 tests,
+package import and typecheck pass with synthetic frames. It is not yet connected
+to a peer-authenticated terminal stream and grants no forwarding or attachment
+authority. [Evidence](evidence/editor-protocol-summary.json).
 
 ## Latest verified checkpoints
 

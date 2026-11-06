@@ -315,3 +315,27 @@ The three-group, 38-test cohort uses real owned Node children with provider/edit
 doubles, and the compiled extension performs a read-only observation of its own
 check process. No actual IDE or native provider task is started.
 [Exact evidence](evidence/editor-process-summary.json).
+
+## Match one connection's protocol
+
+The internal `createCodexEditorProtocol` witness requires the original account
+fingerprint, thread and repository. It correlates typed request IDs on one stream,
+a verified account response before the resume request, the exact first-party
+read-only/on-request resume reply, and a new account request/response after that
+reply. Requests sent earlier cannot substitute for the final account sample.
+Pending account reads withdraw acknowledgement; account changes, native errors,
+replay and malformed/bounded-input failures invalidate permanently. Closing a
+connection removes live protocol acknowledgement while preserving failure reasons.
+
+The witness retains only request identity/method/ordering metadata. Its safe view
+contains fixed flags/reasons, with no raw account, task, repository or message
+content. Frame-result booleans describe observations and must not be treated as
+permission to forward requests. Unknown unrelated messages are not a grant of
+execution authority. Only the declared minimal resume parameter contract is
+supported; native TUI compatibility is not established.
+
+Three groups / 33 tests, packaged import and typecheck pass with synthetic frames.
+The witness itself opens no transport or provider. Peer-bound relay composition
+and final editor acknowledgement remain unfinished; `ideAttached`, kernel peer,
+terminal process, authority and completion flags remain false in its result.
+[Evidence](evidence/editor-protocol-summary.json).

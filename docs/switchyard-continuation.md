@@ -88,10 +88,15 @@ the installed update or old live provider verifiers without a relevant new chang
    This does not establish that CryptoAPI attempted that operation. Original
    Node remains exit 134; source/merge/archive and native cleanup verify.
    [Native evidence](evidence/windows-self-token-native-summary.json).
-   The next read-only parent diagnostic captures bounded, classified owner/DACL
-   entries from both suspended child tokens. Two managed builds, 1,936 portable
-   checks and fifteen projection tests pass; native capture is pending. No ACL
-   changes are made. [Source](evidence/windows-token-security-source-summary.json).
+   Read-only `d900499` metadata now verifies the same three owner/DACL entries
+   on both actual suspended children: Administrators, SYSTEM and the logon SID.
+   None matches the four restricting identities. This explains the direct query
+   denial, but does not prove CryptoAPI's internal operation. Node remains 134;
+   the original fixture is preserved. [Evidence](evidence/windows-token-security-native-summary.json).
+   Next test only the exact existing user's TOKEN_QUERY entry on the owned child
+   token, preserving all original ACEs, restriction SIDs, privileges, integrity,
+   runtime and owner assertions. Do not grant duplicate/impersonation or broader
+   permissions as a fallback; require original Node success and full readback.
 
 3. Implement native acknowledgement for the exact reviewed editor terminal and
    original owner/account/task. A separate observed connection or ordinary focus
@@ -101,6 +106,11 @@ the installed update or old live provider verifiers without a relevant new chang
    with cancellation and no PID/title/ancestry fallback. Three groups / 38 tests
    plus compiled extension checks pass. This is a process witness, not connection
    or task acknowledgement. [Evidence](evidence/editor-process-summary.json).
+   A bounded protocol witness now matches the exact resume reply and account
+   samples before/after it, invalidating on boundary/replay/malformed frames.
+   Three groups / 33 tests and package/typecheck pass with synthetic frames.
+   It has no transport or forwarding authority. Connect a peer-bound stream
+   before claiming attachment. [Evidence](evidence/editor-protocol-summary.json).
 4. Continue other ledger requirements, including remaining Shield coverage,
    ecosystems, publisher provenance, verified local vulnerability context and workflow observation. These are
    unfinished software, separate from hardware/account acceptance.
