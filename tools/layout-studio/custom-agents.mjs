@@ -41,7 +41,11 @@ export function createCustomAgents({ store, now = () => Date.now() }) {
           if (!event || Object.keys(event).join() !== "status" || !["ready", "busy", "waiting", "idle", "failed", "stopped"].includes(event.status)) throw new Error("The agent event is outside the versioned contract.");
           if (a.sessionId !== body.sessionId) {
             if (event.status !== "ready") throw new Error("A new agent session must publish ready before other events.");
-            for (const command of a.commands) if (["queued", "claimed"].includes(command.status)) { command.status = command.status === "queued" ? "cancelled-before-claim" : "uncertain-session-ended"; command.provenance = "session identity changed; never automatically re-delivered; external outcome unverified"; }
+            for (const command of a.commands) if (["queued", "claimed"].includes(command.status)) {
+              command.status = command.status === "queued" ? "cancelled-before-claim" : "uncertain-session-ended";
+              command.provenance = "session identity changed; never automatically re-delivered; external outcome unverified";
+              appendAgentObservation(s, { provider: "custom-agent", subjectId: command.id, phase: "adapter-command-retired", status: command.status === "cancelled-before-claim" ? "stopped" : "unknown", intent: command.intent, at: now() });
+            }
           }
           a.protocolVersion = 2; a.lastSeen = now(); a.sessionId = body.sessionId; a.reportedStatus = event.status; a.provenance = "authenticated adapter self-report; not verified task completion";
           appendAgentObservation(s, { provider: "custom-agent", subjectId: `${a.id}:${body.sessionId}`, phase: "adapter-status-observed", status: event.status, at: now() });
@@ -53,12 +57,14 @@ export function createCustomAgents({ store, now = () => Date.now() }) {
           const next = a.commands.find((c) => c.status === "queued" && c.sessionId === a.sessionId);
           if (!next) return { command: null };
           next.status = "claimed"; next.claimedAt = now();
+          appendAgentObservation(s, { provider: "custom-agent", subjectId: next.id, phase: "adapter-command-claimed", status: "running", intent: next.intent, at: next.claimedAt });
           return { command: { id: next.id, intent: next.intent, sessionId: next.sessionId, content: next.content ?? null }, replay: "claimed commands are never automatically re-delivered" };
         }
         if (path === agentRoutes.ack) {
           const command = a.commands.find((c) => c.id === body.commandId);
           if (!command || !["claimed", "uncertain-session-ended"].includes(command.status) || command.sessionId !== body.sessionId || !["completed", "failed", "cancelled"].includes(body.outcome)) throw new Error("The command acknowledgement has no exact active claim.");
           command.status = body.outcome; command.finishedAt = now(); command.provenance = "agent acknowledgement; external task outcome unverified";
+          appendAgentObservation(s, { provider: "custom-agent", subjectId: command.id, phase: "adapter-command-acknowledged", status: body.outcome === "completed" ? "done" : body.outcome === "failed" ? "failed" : "stopped", intent: command.intent, at: command.finishedAt });
           return { accepted: true, provenance: command.provenance };
         }
         throw new Error("Unknown agent route.");
@@ -81,6 +87,7 @@ export function createCustomAgents({ store, now = () => Date.now() }) {
           a.commands.splice(removable, 1);
         }
         a.commands.push(command);
+        appendAgentObservation(s, { provider: "custom-agent", subjectId: command.id, phase: "adapter-command-queued", status: "reserved-locally", intent, at: command.createdAt });
         return { commandId: command.id, status: command.status, provenance: "queued for an authenticated exact-session adapter; completion unverified" };
       }, { provider: "custom-agent" });
     }

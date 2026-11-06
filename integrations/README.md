@@ -25,6 +25,12 @@ processes must coordinate that one enrollment's sequence, or use distinct enroll
 identities. Do not retry a claimed command after a timeout: inspect its uncertain
 outcome. Claims are delivered once and are never automatically replayed.
 
+With an explicit Personal `agent-events` recording, the bridge also records
+bounded command queue/claim/retirement/acknowledgement metadata. Handoff text,
+credentials and raw identities stay out of that history. Local claims and agent
+self-reports remain distinct, and pausing recording does not cause later backfill.
+[Observation contract and evidence](../docs/agent-lifecycle-observation.md#custom-agent-command-history).
+
 ## Distinct client recipes
 
 `POST /api/suite/integrations/catalog` with `{ compartment }` reports documented

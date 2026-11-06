@@ -18,7 +18,8 @@ Each event contains fixed provider/phase/status metadata, timestamp and a
 compartment-specific subject digest. It excludes raw task/session IDs, labels,
 account fingerprints, repository paths, prompts and returned content. Local
 lifecycle bookkeeping and provider-status observations have distinct provenance;
-custom-agent events remain authenticated self-reports. Every event keeps
+custom-agent status and acknowledgements remain authenticated self-reports, while
+command queue/claim/retirement use local-lifecycle provenance. Every event keeps
 `taskCompletionVerified: false` and `timeSavingMeasured: false`. A reported finished
 turn does not establish completion of the user's task.
 
@@ -32,6 +33,40 @@ continue to apply. No event creates task authority or starts another provider.
 This covers operations seen by the named task adapters. Broader external agent
 event streams and exact IDE tab attachments remain separate implementation work.
 Work policy continues to prohibit recording.
+
+## Custom-agent command history
+
+The same explicit `agent-events` recording now includes commands handled through
+the authenticated custom-agent bridge. These events retain one of its six fixed
+intents, a compartment-specific command digest and a bounded phase/status pair.
+They omit raw command/session/agent IDs, labels, credentials and handoff content.
+The command digest uses a separate namespace from adapter-status observations.
+No new recording source or automatic recording is enabled.
+
+| Phase | Meaning and provenance |
+| --- | --- |
+| `adapter-command-queued` | Local reservation; no delivery established. |
+| `adapter-command-claimed` | Local one-use claim committed for an authenticated poll; receipt by the external process remains unverified. |
+| `adapter-command-retired` | A changed session cancelled an unclaimed command or left a claimed command uncertain; no replay or external cancellation claim. |
+| `adapter-command-acknowledged` | The authenticated adapter reported completed, failed or cancelled; external task completion remains unverified. |
+
+Each hook runs inside the existing command-state transaction. Failed persistence
+commits neither the command transition nor its observation. Replayed claims,
+duplicate dispatch and repeated acknowledgements add no events. A late exact
+acknowledgement can resolve its old claim without refreshing the replacement
+session. Paused/excluded/out-of-interval events are omitted and never backfilled.
+The existing Personal policy, companion mode, consent, exclusions and 2,000-event
+ceiling still apply. These are status metadata, not deliberate user marks or
+evidence of intent, completion, measured time savings or permission to act.
+
+Seven isolated groups pass 92 checks, including five new focused cases and an
+extended real bundled-agent journey through the authenticated HTTP server and
+encrypted store. The command is claimed and acknowledged, sensitive text stays
+out of observations and plaintext state, and both owned example processes exit.
+Failed-save injection uses a memory store; provider checks elsewhere use doubles.
+Typecheck, the original package budget and exact owned cleanup pass. Native
+Windows and installed acceptance of this addition remain separate.
+[Evidence](evidence/custom-agent-command-observation-summary.json).
 
 Configuration conversations now append local request reservation, validated
 reply persistence and failure events inside their existing encrypted transaction.

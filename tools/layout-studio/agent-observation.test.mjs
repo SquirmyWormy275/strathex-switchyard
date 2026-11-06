@@ -8,6 +8,41 @@ import { fileURLToPath } from "node:url";
 const session = changes => ({ id: "observation", status: "recording", sources: ["agent-events"], exclusions: [], events: [], updatedAt: 10, ...changes });
 const state = changes => ({ id: "personal", policy: "personal", mode: "personal-companion", observations: [session()], ...changes });
 const event = changes => ({ provider: "codex", subjectId: "private-native-subject", phase: "status-observed", status: "active", at: 20, ...changes });
+const commandEvent = changes => event({ provider: "custom-agent", subjectId: "private-command", phase: "adapter-command-queued", status: "reserved-locally", intent: "handoff", ...changes });
+
+test("custom command history separates local bookkeeping from agent acknowledgements and keeps one private correlation", () => {
+  const s = state(), phases = [["queued", "reserved-locally"], ["claimed", "running"], ["retired", "unknown"], ["acknowledged", "done"]];
+  for (const [index, [phase, status]] of phases.entries()) {
+    const e = commandEvent({ phase: `adapter-command-${phase}`, status, at: 20 + index, content: "NEVER_RETAIN", token: "NEVER_RETAIN", sessionId: "NEVER_RETAIN" });
+    assert.equal(appendAgentObservation(s, e), 1); assert.equal(appendAgentObservation(s, { ...e, at: e.at + 1 }), 0);
+  }
+  const rows = s.observations[0].events;
+  assert.equal(new Set(rows.map(e => e.subjectDigest)).size, 1);
+  assert.equal(rows.every(e => e.intent === "handoff" && e.kind === "status" && e.taskCompletionVerified === false && e.timeSavingMeasured === false), true);
+  assert.deepEqual(rows.map(e => e.provenance), ["switchyard-local-lifecycle", "switchyard-local-lifecycle", "switchyard-local-lifecycle", "authenticated-agent-self-report"]);
+  assert.equal(JSON.stringify(rows).includes("NEVER_RETAIN"), false); assert.equal(JSON.stringify(rows).includes("private-command"), false);
+  const other = state({ id: "other" }); appendAgentObservation(other, commandEvent()); assert.notEqual(other.observations[0].events[0].subjectDigest, rows[0].subjectDigest);
+  const status = state(); appendAgentObservation(status, commandEvent({ phase: "adapter-status-observed", status: "ready" }));
+  assert.notEqual(status.observations[0].events[0].subjectDigest, rows[0].subjectDigest); assert.equal(Object.hasOwn(status.observations[0].events[0], "intent"), false);
+});
+
+test("custom command phases refuse unsupported providers, intents and outcome combinations", () => {
+  for (const change of [{ provider: "codex" }, { provider: "claude-code" }, { intent: "execute" }, { intent: "NEVER_RETAIN" }, { status: "done" }, { phase: "adapter-command-claimed", status: "done" }, { phase: "adapter-command-acknowledged", status: "running" }, { phase: "adapter-command-retired", status: "done" }]) {
+    const s = state(); assert.equal(appendAgentObservation(s, commandEvent(change)), 0); assert.equal(s.observations[0].events.length, 0);
+  }
+  for (const status of ["done", "failed", "stopped"]) assert.equal(appendAgentObservation(state(), commandEvent({ phase: "adapter-command-acknowledged", status })), 1);
+});
+
+test("every custom command phase respects source, policy, pause, exclusion, interval and capacity fences", () => {
+  for (const [phase, status] of [["queued", "reserved-locally"], ["claimed", "running"], ["retired", "stopped"], ["acknowledged", "failed"]]) {
+    const e = commandEvent({ phase: `adapter-command-${phase}`, status });
+    for (const s of [state({ mode: "keyboard-only" }), state({ policy: "work", mode: "managed-companion" }), ...[{ sources: ["deliberate"] }, { status: "paused" }, { status: "stopped" }, { exclusions: ["other"] }, { createdAt: 21 }, { createdAt: 0, recordingSince: 21 }].map(change => state({ observations: [session(change)] }))]) {
+      const before = structuredClone(s); assert.equal(appendAgentObservation(s, e), 0); assert.deepEqual(s, before);
+    }
+    const s = state({ observations: [session({ events: Array.from({ length: 2000 }, () => ({ kind: "status", provenance: "original" })) })] });
+    assert.equal(appendAgentObservation(s, e), 0); assert.equal(s.observations[0].events.length, 2000); assert.equal(s.observations[0].status, "paused");
+  }
+});
 
 test("agent metadata respects initial consent and the latest resumed recording interval", () => {
   for (const timing of [{ createdAt: 21 }, { createdAt: 0, recordingSince: 21 }]) {

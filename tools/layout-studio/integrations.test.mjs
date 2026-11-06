@@ -121,6 +121,51 @@ test("session replacement preserves uncertain claims and accepts a late exact ac
 
 async function listening(server, t) { await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve)); t.after(() => new Promise((resolve) => { server.closeAllConnections(); server.close(resolve); })); return `http://127.0.0.1:${server.address().port}/`; }
 
+test("authenticated custom command history records exact claims, late acknowledgements and replacement without replay or content", async () => {
+  const store = memoryStore(); let sequence = 0, clock = 100000;
+  store.states.personal.observations.push({ status: "recording", sources: ["agent-events"], events: [], createdAt: clock });
+  const bridge = createCustomAgents({ store, now: () => clock }), enrollment = await bridge.enroll("personal", { id: "private-agent", name: "PRIVATE_LABEL", capabilities: ["handoff", "review"] });
+  const send = async (path, sessionId, fields = {}) => { const b = { schema: agentMessageSchema, compartment: "personal", agentId: enrollment.agentId, sessionId, sequence: ++sequence, at: clock, ...fields }; return (await bridge.message(path, b, requestMac(enrollment.token, path, JSON.stringify(b)))).payload.result; };
+  const events = () => store.states.personal.observations[0].events.filter(e => e.phase.startsWith("adapter-command-"));
+  await send(agentRoutes.event, "PRIVATE_SESSION", { event: { status: "ready" } });
+  const input = { agentId: enrollment.agentId, sessionId: "PRIVATE_SESSION", intent: "handoff", content: "PRIVATE_HANDOFF_CONTENT" };
+  const queued = await bridge.dispatch("personal", input); await assert.rejects(bridge.dispatch("personal", input), /duplicate/);
+  assert.equal((await send(agentRoutes.poll, "PRIVATE_SESSION")).command.id, queued.commandId); assert.equal((await send(agentRoutes.poll, "PRIVATE_SESSION")).command, null);
+  const unclaimed = await bridge.dispatch("personal", { ...input, intent: "review" });
+  await send(agentRoutes.event, "NEW_PRIVATE_SESSION", { event: { status: "ready" } });
+  const lastSeen = store.states.personal.agents[0].lastSeen; clock++;
+  await send(agentRoutes.ack, "PRIVATE_SESSION", { commandId: queued.commandId, outcome: "completed" });
+  await assert.rejects(send(agentRoutes.ack, "PRIVATE_SESSION", { commandId: queued.commandId, outcome: "completed" }), /exact active claim/);
+  assert.equal(store.states.personal.agents[0].lastSeen, lastSeen); assert.equal(store.states.personal.agents[0].sessionId, "NEW_PRIVATE_SESSION");
+  assert.deepEqual(events().map(e => [e.phase, e.status]), [["adapter-command-queued", "reserved-locally"], ["adapter-command-claimed", "running"], ["adapter-command-queued", "reserved-locally"], ["adapter-command-retired", "unknown"], ["adapter-command-retired", "stopped"], ["adapter-command-acknowledged", "done"]]);
+  const first = events()[0].subjectDigest; assert.deepEqual(events().filter(e => e.subjectDigest === first).map(e => e.intent), ["handoff", "handoff", "handoff", "handoff"]);
+  assert.equal(events().every(e => e.taskCompletionVerified === false && e.timeSavingMeasured === false), true);
+  for (const privateValue of [queued.commandId, unclaimed.commandId, enrollment.token, enrollment.agentId, "PRIVATE_LABEL", "PRIVATE_SESSION", "NEW_PRIVATE_SESSION", "PRIVATE_HANDOFF_CONTENT"]) assert.equal(JSON.stringify(events()).includes(privateValue), false);
+  const committedClaim = store.history.find(h => h.state.agents[0]?.commands[0]?.status === "claimed");
+  assert.equal(committedClaim.state.observations[0].events.some(e => e.phase === "adapter-command-claimed"), true);
+});
+
+test("custom command events commit atomically and paused acknowledgements are not backfilled", async () => {
+  const store = memoryStore(); let sequence = 0, fail = false;
+  store.states.personal.observations.push({ status: "recording", sources: ["agent-events"], events: [] });
+  const update = store.update.bind(store); store.update = (id, operation, fn, request) => update(id, operation, async s => { const result = await fn(s); if (fail) throw Error("synthetic persistence failure"); return result; }, request);
+  const bridge = createCustomAgents({ store, now: () => 100000 }), enrollment = await bridge.enroll("personal", { id: "test", name: "Synthetic", capabilities: ["review"] });
+  const send = async (path, fields = {}) => { const b = { schema: agentMessageSchema, compartment: "personal", agentId: "test", sessionId: "one", sequence: ++sequence, at: 100000, ...fields }; return (await bridge.message(path, b, requestMac(enrollment.token, path, JSON.stringify(b)))).payload.result; };
+  await send(agentRoutes.event, { event: { status: "ready" } });
+  const input = { agentId: "test", sessionId: "one", intent: "review" }, before = structuredClone(store.states.personal); fail = true;
+  await assert.rejects(bridge.dispatch("personal", input), /persistence failure/); assert.deepEqual(store.states.personal, before); fail = false;
+  const queued = await bridge.dispatch("personal", input); const reserved = structuredClone(store.states.personal); fail = true;
+  await assert.rejects(send(agentRoutes.poll), /persistence failure/); assert.deepEqual(store.states.personal, reserved); fail = false;
+  await send(agentRoutes.poll); const claimed = structuredClone(store.states.personal); fail = true;
+  await assert.rejects(send(agentRoutes.ack, { commandId: queued.commandId, outcome: "failed" }), /persistence failure/); assert.deepEqual(store.states.personal, claimed); fail = false;
+  store.states.personal.observations[0].status = "paused";
+  await send(agentRoutes.ack, { commandId: queued.commandId, outcome: "failed" });
+  assert.equal(store.states.personal.agents[0].commands[0].status, "failed");
+  store.states.personal.observations[0].status = "recording";
+  await assert.rejects(send(agentRoutes.ack, { commandId: queued.commandId, outcome: "failed" }), /exact active claim/);
+  assert.equal(store.states.personal.observations[0].events.some(e => e.phase === "adapter-command-acknowledged"), false);
+});
+
 test("Node SDK exchanges authenticated HTTP events and one exact claim through the actual local server", async (t) => {
   const store = memoryStore(), bridge = createCustomAgents({ store });
   const enrollment = await bridge.enroll("personal", { id: "test", name: "Synthetic", capabilities: ["review"] });

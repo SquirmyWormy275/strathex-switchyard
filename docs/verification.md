@@ -1147,3 +1147,19 @@ Provider and Windows guest doubles remain declared. This complete result covers
 the combined shortcut and Python changes; the newer bundled-agent correction
 has its separate focused/installed evidence. No new complete run is needed for
 documentation changes. [Receipt](evidence/linux-5a8d159-complete-summary.json).
+
+## Custom-agent command history — 2026-11-06
+
+Seven isolated groups pass 92 tests with no skips or failures. The five new
+focused cases and extended real bundled-agent journey cover local queue/claim/
+retirement versus authenticated acknowledgement provenance; private command
+correlation; omission of raw content, credentials and IDs; policy/source/exclusion/
+pause/interval/capacity fences; atomic failed-save behavior; late acknowledgement
+without replacement-session refresh; and duplicate/replay refusal without
+backfill. The actual HTTP server, encrypted store and two bundled Node processes
+verify command acknowledgement and exact retirement. Failed-save injection uses
+a memory store; provider checks elsewhere retain explicit doubles. Typecheck and
+the original package budget pass, and exact owned temporary staging is removed.
+No real provider account, model task, hardware, frontend or extension activation
+changes occur. Native Windows and installed acceptance remain separate.
+[Receipt](evidence/custom-agent-command-observation-summary.json).

@@ -314,7 +314,7 @@ test("a throwing bundled-example stop preserves its exact child without exposing
   assert.equal(children.length, 1);
 }));
 
-test("real bundled example joins authenticated readiness, duplicate refusal, stop and keyboard-only retirement", { timeout: 15000 }, () => fixture(async ({ store }) => {
+test("real bundled example joins authenticated readiness, duplicate refusal, stop and keyboard-only retirement", { timeout: 15000 }, () => fixture(async ({ store, root }) => {
   const children = [];
   const suite = createSuite({ store, agents: { discovery: async () => [], close() {} }, voice: { discovery: async () => ({ available: false }) },
     spawnExample: (...args) => { const child = spawn(...args); children.push(child); return child; }
@@ -331,10 +331,19 @@ test("real bundled example joins authenticated readiness, duplicate refusal, sto
   };
   try {
     await suite.handle("/api/suite/bootstrap"); await suite.handle("/api/suite/mode", { mode: "personal-companion" });
+    const observation = await suite.handle("/api/suite/observation/start", { sources: ["agent-events"], exclusions: [], consent: true });
     server.listen(0, "127.0.0.1"); await once(server, "listening");
     const request = { example: "custom", workspaceBaseUrl: `http://127.0.0.1:${server.address().port}/` };
     await suite.handle("/api/suite/agents/example", request); const firstSession = await ready(children[0]);
     assert.equal((await suite.handle("/api/suite/agents/example", request)).duplicatePrevented, true); assert.equal(children.length, 1);
+    const queued = await suite.handle("/api/suite/agents/dispatch", { agentId: "custom-example", sessionId: firstSession, intent: "handoff", content: "SYNTHETIC_PRIVATE_HANDOFF_TEXT" });
+    const deadline = Date.now() + 5000;
+    while (Date.now() < deadline && (await store.snapshot("personal")).agents[0].commands[0].status !== "completed") await new Promise(resolve => setTimeout(resolve, 20));
+    const observed = (await store.snapshot("personal")).observations.find(o => o.id === observation.id).events.filter(e => e.phase.startsWith("adapter-command-"));
+    assert.deepEqual(observed.map(e => [e.phase, e.provenance]), [["adapter-command-queued", "switchyard-local-lifecycle"], ["adapter-command-claimed", "switchyard-local-lifecycle"], ["adapter-command-acknowledged", "authenticated-agent-self-report"]]);
+    assert.equal(observed.every(e => e.intent === "handoff" && !e.taskCompletionVerified && !e.timeSavingMeasured), true);
+    for (const value of [queued.commandId, firstSession, "SYNTHETIC_PRIVATE_HANDOFF_TEXT"]) assert.equal(JSON.stringify(observed).includes(value), false);
+    assert.equal((await readFile(join(root, "personal.sealed.json"), "utf8")).includes("SYNTHETIC_PRIVATE_HANDOFF_TEXT"), false);
     const results = await Promise.all([suite.handle("/api/suite/agents/example/stop", request), suite.handle("/api/suite/agents/example/stop", request)]);
     assert.equal(results.every(r => r.status === "stopped" && r.taskCompletionVerified === false), true);
     assert.ok(children[0].exitCode !== null || children[0].signalCode !== null);

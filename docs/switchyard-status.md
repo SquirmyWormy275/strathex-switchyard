@@ -52,6 +52,13 @@ including two real authenticated Node sessions and confirmed exits. Installed me
 Windows and live installed example acceptance remain pending.
 [Contract](bundled-agent-lifecycle.md), [source evidence](evidence/bundled-example-lifecycle-source-summary.json).
 
+Custom-agent commands now contribute opted-in queue/claim/retirement/acknowledgement
+metadata, with local versus authenticated self-report provenance and no raw content.
+Seven groups/92 checks pass, including actual encrypted HTTP/bundled-agent execution,
+privacy, rollback and pause/replay fences. Native Windows and installed acceptance
+of this addition remain separate. [Contract](agent-lifecycle-observation.md#custom-agent-command-history),
+[evidence](evidence/custom-agent-command-observation-summary.json).
+
 ## What the backend does
 
 | Capability | Implemented behavior and reference |

@@ -51,7 +51,7 @@ Copilot-only policy. Imported layouts never enable providers or recording.
   inputs through separate approval, Linux containment and durable native evidence.
 - [Current implementation and evidence](docs/switchyard-status.md): what runs,
   what has been checked, and what still needs implementation.
-- [Verification at a glance](docs/verification.md): accepted checkpoints,
+- [Detailed verification record](docs/verification.md): accepted checkpoints,
   native demonstrations, reproducible checks and their practical limits.
 - [Full suite requirement ledger](docs/switchyard-requirements.md): every handover
   requirement, including checks that require hardware or approved accounts.
@@ -68,7 +68,7 @@ execution, offline repository scans and recoverable installation. The Home and
 Model F catalog provide the starting experience; complete task/IDE attachment,
 role/device controls and full scanner coverage remain unfinished.
 
-The accepted complete Linux checkpoint `6e967a3` passes **306 groups / 1,793
+The accepted complete Linux checkpoint `5a8d159` passes **308 groups / 1,823
 tests**, with sixteen declared skips and verified owned cleanup. The restricted
 Windows storage journey now passes all eight original checks, including exact
 exit and fixture/service retirement. Complete Windows release acceptance remains

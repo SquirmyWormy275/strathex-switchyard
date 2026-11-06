@@ -57,6 +57,15 @@ The four Windows backend batches at `9f35961` are now digest-verified: 198 group
 1,022 passes, 142 declared skips, no failures and all cleanup verified. Its combined
 release run 42281533502 is still active. [Receipt](evidence/windows-backend-9f35961-native-summary.json).
 
+Latest uninstalled addition: custom-agent command history now retains only opted-in
+queue/claim/retirement/acknowledgement metadata. Seven groups/92 checks pass with
+real encrypted HTTP/bundled-agent execution, explicit provider doubles, source/
+interval/exclusion/pause fences, rollback and exact cleanup. Typecheck/package
+bounds pass. Keep actual completion and measured savings false. Native Windows
+and installed acceptance of this addition remain separate.
+[Contract](agent-lifecycle-observation.md#custom-agent-command-history),
+[evidence](evidence/custom-agent-command-observation-summary.json).
+
 ## Continue independently
 
 1. Complete Linux `6e967a3` passes all 306 groups: 1,793 passing tests, sixteen
