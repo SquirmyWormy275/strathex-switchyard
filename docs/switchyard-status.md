@@ -24,11 +24,18 @@ aborts at `ncrypto::CSPRNG`, exit 134, before its owner result. Both artifact
 digests and source/merge identity verify. Imports do not prove the executed
 OpenSSL branch. [Native evidence](evidence/windows-node-rng-imports-native-summary.json).
 
-A new cold probe observes the legacy API calls first under the same original
-restricted token, then the CNG calls. Both managed targets compile; 1,884 portable
-checks and nineteen focused tests pass with owned cleanup. Native execution is
-pending. No privilege, account, desktop or RNG fallback is added.
-[Source evidence](evidence/windows-cold-legacy-random-source-summary.json).
+At `a37751c`, the legacy-first native probe reports **Access Denied (Win32 error
+5)** from `CryptAcquireContextW` before generation. Later CNG calls succeed.
+Source/merge identity, artifact digest and token/process/pipe/buffer cleanup
+verify; Node still exits 134 and its failed fixture is preserved. The exact
+denied provider lookup or resource remains unidentified.
+[Native evidence](evidence/windows-cold-legacy-random-native-summary.json).
+
+The editor launcher also returns to its exact retained terminal object through
+fresh signed idle-owner metadata. Three groups/24 tests, typecheck and compiled
+extension checks pass with provider/editor doubles. Closed or same-title objects
+cannot trigger replacement. Command wiring and native acknowledgement remain
+unfinished. [Evidence](evidence/editor-return-summary.json).
 
 ## Latest verified checkpoints
 
@@ -37,7 +44,7 @@ pending. No privilege, account, desktop or RNG fallback is added.
 | Complete Linux `1508ea9` | **246/246 groups; 1,575 passed tests; eleven declared skips.** Every child/tree and exact owned checkout, dependency, build and temporary-parent cleanup verifies. [Receipt](evidence/linux-1508-complete-summary.json). | Includes the signed client and editor launcher with provider/editor doubles. Later Windows import-observation source has separate focused/native evidence. |
 | Reviewed editor launcher `1508ea9` | Five groups / 54 tests, typecheck, extension build and compiled CommonJS load pass. Generated output is removed. [Evidence](evidence/editor-terminal-launch-summary.json). | Real signed HTTP, encrypted state and Linux leases compose with controlled provider/editor doubles. No actual terminal was launched. |
 | Installed Linux `2c87c03` | Six update, ten owner/editor/severity and seven journal checks pass. All 54 workspace identities remain; 52 sealed files are byte-identical across update. Launcher backups and exact bundle cleanup verify. [Evidence](evidence/installed-editor-authorization-summary.json). | The two opened verification workspaces are resealed by existing restart recovery. Definitions/package/modes, historical pending bytes and metadata-check state verify separately. No full semantic before-snapshot was retained. Three signed authorization checks are unknown-owner refusals, with no new permit/task/provider effects. |
-| Native Windows `78b640d` | Exact Node import flags and cold CNG success are observed; token, process/tree, pipe, provider and buffer checks verify. Separate filesystem/setup jobs pass. [Receipt](evidence/windows-node-rng-imports-native-summary.json). | Original Node still exits 134 with no owner result; the failed fixture is preserved. The legacy-first probe awaits separate native acceptance. |
+| Native Windows `78b640d` | Exact Node import flags and cold CNG success are observed; token, process/tree, pipe, provider and buffer checks verify. Separate filesystem/setup jobs pass. [Receipt](evidence/windows-node-rng-imports-native-summary.json). | Original Node still exits 134 with no owner result; the failed fixture is preserved. The later legacy-first probe identifies Access Denied; the exact denied operation and Node repair remain open. |
 | Windows state leases `ce5be6a` | Eighteen native tests, one declared skip, the Supply Chain scenario and 23 policy-output checks pass. [Evidence](evidence/native-state-lease-ce5-summary.json). | This verifies exact lease boundaries, not complete Windows guest or ordinary-user setup acceptance. |
 
 ## Implemented backend capabilities

@@ -261,3 +261,13 @@ encrypted authorization store and kernel leases with controlled provider/editor
 doubles. Typecheck, extension build, compiled CommonJS load and exact generated
 output cleanup pass. No actual editor terminal or provider task was opened.
 [Source-specific evidence](evidence/editor-terminal-launch-summary.json).
+
+The launcher's explicit `focus(review)` method now returns to that retained
+Terminal object after reobserving the original idle owner/account/task through
+signed transport. It repeats the focused workspace, executable and filesystem
+checks. It creates no new confirmation, permit or terminal. Closed objects,
+account drift, changed workspace and shutdown refuse; a same-title neighbor
+never substitutes. Three groups / 24 tests and compiled extension checks pass
+with controlled provider/editor doubles and exact cleanup. This is limited to
+the existing idle-owner contract; active-task return, command wiring and native
+acknowledgement remain unfinished. [Evidence](evidence/editor-return-summary.json).

@@ -1,0 +1,101 @@
+{
+  "schema": "switchyard-cold-legacy-random-native/v1",
+  "sourceCommit": "a37751cd92e1090b7f93ab8965c5600c0f6391ab",
+  "executionCommit": "58a1f3b12af2f2eab33f48ab11f3cdd6008c5c4e",
+  "sourceAndExecutionTree": "d33739156aa7fabd6ebe5cc6126aea92340389e4",
+  "sourceTreeAndMergeParentsVerified": true,
+  "runId": 42181603453,
+  "restrictedJobId": 127772553465,
+  "artifact": {
+    "id": 13485577402,
+    "sha256": "e11bbe79e9f94e1b11c128e6de8506a4b695a691f3d0568b34ff1956dbebfb45",
+    "privateReceipt": "windows-legacy-random-a377-native.json"
+  },
+  "archiveDigestVerified": true,
+  "archiveRetainedOnDisk": false,
+  "nodeRngImports": {
+    "schema": "switchyard-node-rng-imports/v1",
+    "nodeSha256": "63c259c81e5d472b5f11c8d506070130cb04a1ecf84b80377a34ed6ec9048088",
+    "tool": "dumpbin-imports",
+    "imports": {
+      "BCryptGenRandom": false,
+      "CryptAcquireContextW": true,
+      "CryptGenRandom": true,
+      "CryptReleaseContext": true
+    },
+    "runtimeBranchVerified": false,
+    "nodeStartupAccepted": false
+  },
+  "coldProbe": {
+    "schema": "switchyard-cold-restricted-random/v2",
+    "executableSha256": "a50646d1bf937f92eec78b1d61ff913fca0ec466af31bdc370b225078a056b1b",
+    "waitResult": 0,
+    "exitCode": 0,
+    "reportValid": true,
+    "report": {
+      "systemStatus": 0,
+      "providerOpenStatus": 0,
+      "providerStatus": 0,
+      "providerCloseStatus": 0,
+      "handlesClosedVerified": true,
+      "buffersClearedVerified": true,
+      "firstApi": "legacy-cryptoapi",
+      "legacy": {
+        "providerOpened": false,
+        "providerOpenError": 5,
+        "generated": null,
+        "generateError": null,
+        "providerCloseError": null,
+        "handlesClosedVerified": true,
+        "buffersClearedVerified": true
+      }
+    },
+    "primaryTokenVerified": true,
+    "tokenRecheckedAfterExit": true,
+    "treeExitVerified": true,
+    "processHandlesClosedVerified": true,
+    "creatorQuotaRestoredVerified": true,
+    "standardIo": {
+      "schema": "switchyard-restricted-child-stdio/v1",
+      "standardHandles": 3,
+      "inheritanceRestricted": true,
+      "stdinEof": true,
+      "stdoutBytes": 0,
+      "stderrBytes": 0,
+      "outputBounded": true,
+      "handlesClosedVerified": true,
+      "drainsCompleted": true,
+      "stderr": {
+        "category": "empty",
+        "function": null,
+        "code": null,
+        "sourceFile": null,
+        "sourceLine": null
+      }
+    },
+    "nodeStartupAccepted": false
+  },
+  "nodeExit": {
+    "waitResult": 0,
+    "exitCode": 134,
+    "resultAvailable": false
+  },
+  "nodeStderr": {
+    "category": "assertion",
+    "function": "ncrypto::CSPRNG",
+    "code": null,
+    "sourceFile": "node.cc",
+    "sourceLine": 1221
+  },
+  "failedFixtureRemoved": false,
+  "independentJobConclusions": {
+    "filesystem": "success",
+    "nativeSetup": "success"
+  },
+  "finding": "The first legacy CryptAcquireContextW call using PROV_RSA_FULL with CRYPT_VERIFYCONTEXT | CRYPT_SILENT fails with Win32 error 5 (Access Denied). Generation and release are not attempted because no provider handle is acquired. Subsequent CNG calls succeed.",
+  "limits": [
+    "The exact denied provider lookup, registry/object or implementation operation is not yet identified.",
+    "Original Node still exits 134 at CSPRNG. Static imports and this native API denial narrow the cause but do not establish a repaired Node journey.",
+    "No token, privilege, registry, provider default, account, desktop or entropy fallback is changed."
+  ]
+}

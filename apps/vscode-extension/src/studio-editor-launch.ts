@@ -104,6 +104,25 @@ export class StudioEditorLauncher {
       p.focusVerified = true; return this.observation(review);
     });
   }
+  focus(review: StudioEditorReview): Promise<StudioEditorLaunchObservation> {
+    return this.track(async () => {
+      const p = this.reviews.get(review); requireCurrent(!this.closed && p?.terminal && p.createCalled);
+      p.focusVerified = false;
+      // Returning to an existing object creates no new launch permission and
+      // never recreates a closed/ambiguous terminal. Reobserve the original
+      // idle owner/account/task before revealing its retained object.
+      const current = async () => {
+        await this.current(review.target, p);
+        requireCurrent(this.options.host.window.terminals.includes(p.terminal!));
+        const { compartment, ownerRequestId, loadRequestId } = p.selection;
+        const observed = await this.options.client.editorTarget({ compartment, ownerRequestId, loadRequestId });
+        requireCurrent(observed.targetDigest === p.targetDigest && digest(observed.target) === p.targetDigest);
+        await this.current(review.target, p);
+      };
+      await revealExactTerminal(this.options.host.window, p.terminal, current);
+      p.focusVerified = true; return this.observation(review);
+    });
+  }
   observation(review: StudioEditorReview): StudioEditorLaunchObservation {
     const p = this.reviews.get(review); requireCurrent(p);
     return Object.freeze({ requestId: p.selection.requestId, launchAttempted: p.attempted, terminalCreationRequested: p.createCalled, terminalObjectReturned: Boolean(p.terminal), focusVerified: p.focusVerified, nativeTaskLoaded: false, ideAttached: false, modelPromptSubmitted: false, completionVerified: false });

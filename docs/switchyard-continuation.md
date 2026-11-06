@@ -36,12 +36,12 @@ evidence, not instructions to reset. Publish regular commits. Do not merge or re
 | Original task owners and loading | Authenticated owner/load routes bind the original live account, repository, task, socket and process. Durable reviews prevent replay; stop/workspace/shutdown paths join owned work. [Contract](coding-task-owners.md). | Existing creation/text routes remain stdio. No new real task loading is authorized by this work. |
 | Editor authorization `637a27f` | Review, issue and consume bind one editor selection and policy. A 30-second hashed permit is spent before delivery. Five groups / 59 tests pass. [Evidence](evidence/editor-authorization-summary.json). | Lost replies remain spent; a permit grants only the particular launch, not task completion or native attachment. |
 | Signed editor client `2c87c03` | Exact instance/build/nonce/selection requests and replies; strict response validation; cancellation after durable consumption refuses replay. [Evidence](evidence/editor-authorization-client-summary.json). | The API bearer stays local. No automatic command registration or retries. |
-| Editor launcher `1508ea9` | One exact Terminal object per review, native executable SHA-256, filesystem/focus/admission checks, retained partial effect and joined shutdown. Five groups / 54 tests, build/typecheck/CommonJS checks and cleanup pass. [Evidence](evidence/editor-terminal-launch-summary.json). | Provider/editor doubles. Command wiring and real terminal process/account/task acknowledgement remain unfinished. Do not infer attachment from focus, title or process ancestry alone. |
+| Editor launcher `1508ea9` | One exact Terminal object per review, native executable SHA-256, filesystem/focus/admission checks, retained partial effect and joined shutdown. Five groups / 54 tests, build/typecheck/CommonJS checks and cleanup pass. [Evidence](evidence/editor-terminal-launch-summary.json). | Provider/editor doubles. A later explicit return method reobserves the original idle task and focuses the exact retained object without another launch; three groups/24 tests pass. [Return evidence](evidence/editor-return-summary.json). Command wiring and real terminal process/account/task acknowledgement remain unfinished. Do not infer attachment from focus, title or process ancestry alone. |
 | Installed app `2c87c03` | Release `39c7b555…`; six update, ten owner/editor/severity and seven journal checks pass. [Evidence](evidence/installed-editor-authorization-summary.json). | This installs the backend gateway, not an active editor extension. Signed checks only refuse unknown owners. |
 | Complete Linux `1508ea9` | 246 groups, 1,575 passed tests and eleven declared skips; all exact checkout/dependency/build/temporary-parent cleanup verifies. [Receipt](evidence/linux-1508-complete-summary.json). | Its marker is removed. Later Windows import-observation source has separate focused/native evidence. |
 | Windows cold startup | `83d4139` cold native CNG APIs pass under the exact primary token. Original Node exits 134 at CSPRNG, no owner result. [Native result](evidence/windows-cold-random-native-summary.json). | Failed native software validation, not unavailable hardware. Preserve the failed fixture and unchanged acceptance assertions. |
 | Windows import observation `78b640d` | Digest-verified artifacts show legacy CryptoAPI imports, no observed BCryptGenRandom import, cold CNG success and unchanged Node exit 134. [Native evidence](evidence/windows-node-rng-imports-native-summary.json). | Imports do not prove the executed branch. Earlier `164a622` build failure remains recorded; its exact cause was not recovered. |
-| Cold legacy-first probe | Both managed targets, 1,884 portable checks and nineteen focused tests pass; exact staging removed. [Source](evidence/windows-cold-legacy-random-source-summary.json). | Native execution pending. The original Node acceptance and token restrictions remain unchanged. |
+| Cold legacy-first probe `a37751c` | Native CryptAcquireContextW fails with error 5 before generation; later CNG calls pass. Digest/source/token/process cleanup verify. [Native evidence](evidence/windows-cold-legacy-random-native-summary.json). | Exact denied provider lookup/resource remains unknown. Original Node still exits 134; failed fixture preserved. |
 
 The latest installed update preserves all 54 workspace identities and 52 sealed
 files byte-for-byte. Existing restart recovery reseals `personal` and
@@ -65,11 +65,11 @@ active in the update preflight.
    root identities, receipt and dependency aliases before cleanup. Use an owned
    home temporary parent because `/tmp` has per-user quotas. Never broaden cleanup
    or relax deadlines to turn a failure into a pass.
-2. Import the next exact-source Windows legacy-first probe result after checking
-   source/merge identity and both archive digests. The `78b640d` artifact confirms
-   legacy CryptoAPI imports and repeats the CSPRNG failure; it does not prove the
-   executing OpenSSL branch. The V2 probe observes those legacy calls first in a
-   cold native child, then CNG, while retaining original Node/token acceptance.
+2. Diagnose the exact legacy-provider access denial now observed at `a37751c`.
+   CryptAcquireContextW with the upstream flags fails with Win32 error 5 before
+   generation; subsequent CNG calls succeed. Node still exits 134. Distinguish
+   default-provider lookup from provider implementation/resource access without
+   changing token restrictions, privileges, provider defaults or registry state.
 3. Implement native acknowledgement for the exact reviewed editor terminal and
    original owner/account/task. A separate observed connection or ordinary focus
    must not be treated as that terminal's acknowledgement. Keep UI wiring frozen;

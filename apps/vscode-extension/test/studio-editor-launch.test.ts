@@ -81,3 +81,12 @@ test("shutdown joins an in-flight context check and fences every later terminal 
   let joined=false;const closing=f.launcher.close().then(()=>{joined=true;});await new Promise(resolve=>setImmediate(resolve));assert.equal(joined,false);
   release();await launching;await closing;assert.equal(joined,true);assert.equal(f.calls.length,0);assert.deepEqual(f.routes,["review"]);
 });
+test("returning to a reviewed idle task uses its exact terminal object without another authorization or creation",linux,async t=>{
+  const f=await fixture(t),review=await f.launcher.review(f.selected);await f.launcher.launch(review);const original=f.terminals[0];
+  const neighbor=f.window.createTerminal({name:original.name});neighbor.show();assert.equal(f.window.activeTerminal,neighbor);
+  const before=await f.store.snapshot("personal"),result=await f.launcher.focus(review);assert.equal(result.focusVerified,true);assert.equal(result.ideAttached,false);assert.equal(f.window.activeTerminal,original);assert.equal(f.calls.length,2);assert.deepEqual(f.routes,["review","issue","consume"]);assert.deepEqual(await f.store.snapshot("personal"),before);
+  f.terminals.splice(f.terminals.indexOf(original),1);neighbor.show();await assert.rejects(f.launcher.focus(review));assert.equal(f.window.activeTerminal,neighbor);assert.equal(f.calls.length,2);assert.equal(f.launcher.observation(review).focusVerified,false);
+});
+test("returning to a retained terminal refuses account drift, another window context and shutdown without creating a replacement",linux,async t=>{
+  for(const drift of ["account","workspace","shutdown"]){const f=await fixture(t),review=await f.launcher.review(f.selected);await f.launcher.launch(review);if(drift==="account")f.target.accountFingerprint="e".repeat(64);if(drift==="workspace")f.workspace.workspaceFolders=[];if(drift==="shutdown")await f.launcher.close();await assert.rejects(f.launcher.focus(review));assert.equal(f.calls.length,1);assert.deepEqual(f.routes,["review","issue","consume"]);assert.equal(f.launcher.observation(review).ideAttached,false);}
+});

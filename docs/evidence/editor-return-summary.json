@@ -1,0 +1,27 @@
+{
+  "schema": "switchyard-reviewed-editor-return-summary/v1",
+  "basis": "a37751cd92e1090b7f93ab8965c5600c0f6391ab",
+  "sourceSha256": {
+    "apps/vscode-extension/src/studio-editor-launch.ts": "e6bea4cce105f310884c48e2f222466ff7cb4635d5f8f29dd596493c6355d606",
+    "apps/vscode-extension/test/studio-editor-launch.test.ts": "96b5685248f44b0917fe55a68dde54f0c87d441227ba8ed6612ea585ca045c93",
+    "scripts/run-isolated-tests.mjs": "edc217bfd58188ece717673a39975b9956ceec7cc6fc3eafd4bd27beb9e2350b"
+  },
+  "focused": {
+    "receipt": "isolated-test-d81352d4-faf4-4921-aa36-782e18dedacf.json",
+    "groups": 3,
+    "passedTests": 24,
+    "allChildAndTreeCleanupVerified": true
+  },
+  "typecheck": true,
+  "extensionBuild": true,
+  "compiledReceipt": "editor-return-compiled-1793950644059.json",
+  "compiledCommonJsLoadAndClosedFocusRefusal": true,
+  "generatedOutputRemoved": true,
+  "behavior": "Reobserve the original idle owner/account/task through signed transport, recheck focused workspace/executable/socket/repository, and reveal only the exact retained terminal object. No new review, permit or terminal is created.",
+  "limits": [
+    "The actual signed gateway, encrypted state and leases compose with controlled provider/editor doubles.",
+    "Closed terminals, account drift, another workspace and shutdown refuse. Same-title terminals cannot substitute or trigger replacement.",
+    "This is an idle-owned-task return path. Broader active-task behavior, command wiring and native task/account acknowledgement remain unfinished.",
+    "No live terminal, provider, model, account or hardware operation occurs."
+  ]
+}
