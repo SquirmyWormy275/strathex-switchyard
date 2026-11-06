@@ -36,6 +36,28 @@ test("fresh admission and a committed guardian callback precede every native sta
   const owner = await f.open({ authorize: async () => { admissions++; }, onReady: async scope => { assert.equal(scope.containment, "owned-linux-session"); assert.equal(await absent(join(f.root, "started")), true); committed = true; } });
   assert.equal(committed, true); assert.ok(admissions >= 4); assert.equal(await absent(join(f.root, "started")), false); await owner.connect(); assert.ok(admissions >= 6);
 });
+test("a dedicated editor bridge requires an authenticated owner and registration before any protocol request", native, async t => {
+  const f = await fixture(t), owner = await f.open(); let registered;
+  await assert.rejects(owner.openEditorClient({ onClient: async c => { registered = c; } })); assert.equal(registered, undefined);
+  await owner.connect(); const prior = await readFile(join(f.root, 'calls'), 'utf8');
+  const client = await owner.openEditorClient({ onClient: async c => { registered = c; assert.equal(c.sequence, 0); assert.equal(c.accountFingerprint, owner.accountFingerprint); } });
+  assert.equal(client, registered); assert.equal(client.sequence, 0); assert.equal(await readFile(join(f.root, 'calls'), 'utf8'), prior);
+  assert.equal((await owner.stop()).stopped, true); assert.equal(client.closed, true); assert.equal(await gone(client.child.pid), true);
+});
+test("failed registration retires its exact editor bridge without changing the original metadata account", native, async t => {
+  const f = await fixture(t), owner = await f.open(), original = await owner.connect(); let bridge;
+  await assert.rejects(owner.openEditorClient({ onClient: async c => { bridge = c; throw Error('synthetic durable failure'); } }));
+  assert.equal(bridge.closed, true); assert.equal(await gone(bridge.child.pid), true); assert.equal(original.closed, false); assert.equal(owner.accountFingerprint, original.accountFingerprint);
+  assert.deepEqual(await original.request('fixture/echo', { value: 'still original' }), { value: 'still original' });
+});
+test("owner stop joins pending editor registration and prevents its later delivery", native, async t => {
+  const f = await fixture(t), owner = await f.open(); await owner.connect();
+  let entered, release, bridge; const started = new Promise(r => entered = r), held = new Promise(r => release = r);
+  const opening = owner.openEditorClient({ onClient: async c => { bridge = c; entered(); await held; } }), rejected = assert.rejects(opening);
+  await started; let stopped = false; const stop = owner.stop().then(result => { stopped = true; return result; });
+  await new Promise(r => setImmediate(r)); assert.equal(stopped, false); assert.equal(bridge.closed, true);
+  release(); await rejected; assert.equal((await stop).stopped, true); assert.equal(await gone(bridge.child.pid), true);
+});
 test("editor endpoint inspection refuses a replaced alias even while its original metadata bridge remains connected", native, async t => {
   const f = await fixture(t), owner = await f.open(); await assert.rejects(owner.inspectBinding());
   const client = await owner.connect(), original = await owner.inspectBinding(); assert.deepEqual(original, owner.binding);

@@ -1,0 +1,115 @@
+/** Restricted editor protocol on one original connection. Transport ownership stays with the caller. */
+import { assertCodexDesignConfig, codexAccountFingerprint, reviewedCodexVersion } from './agents.mjs';
+import { createCodexEditorProtocol } from './codex-editor-protocol.mjs';
+import { codexAccountBoundary } from './codex-requests.mjs';
+
+const object = v => v !== null && typeof v === 'object' && !Array.isArray(v);
+const exact = (v, names) => object(v) && Object.keys(v).every(k => names.includes(k));
+const id = v => Number.isSafeInteger(v) || typeof v === 'string' && v.length > 0 && v.length <= 128 && !/[\x00-\x1f\x7f]/.test(v);
+const label = v => typeof v === 'string' && v.length > 0 && v.length <= 128 && !/[\x00-\x1f\x7f]/.test(v);
+const require = v => { if (!v) throw Error('The original restricted editor connection did not verify.'); };
+const MAX = 1048576;
+
+export function createCodexEditorRelay({ target, client, assertCurrent, send, onAcknowledged, signal } = {}) {
+  const witness = createCodexEditorProtocol(target), selected = Object.freeze({ ...target });
+  require(client && ['request','send','on','off','close'].every(k => typeof client[k] === 'function') && !client.closed);
+  require([assertCurrent,send,onAcknowledged].every(f => typeof f === 'function') && signal instanceof AbortSignal);
+  const controller = new AbortController(), seen = new Set(), notifications = new Set();
+  let phase = 'initialize', closed = false, failure = false, acknowledged = false, attempted = false, accountSequence = 0, count = 0, bytes = 0, tail = Promise.resolve(), stopping;
+  const live = () => { require(!closed && !signal.aborted && !client.closed); };
+  const current = async () => { live(); await assertCurrent(); live(); };
+  const observation = () => Object.freeze({ schema: 'switchyard-editor-relay/v1', phase, protocolAcknowledged: !closed && !client.closed && acknowledged && witness.observation().protocolAcknowledged,
+    connectionClosed: closed, failed: failure, ideAttached: false, authorityGranted: false, completionVerified: false });
+  const close = () => { if (closed) return; closed = true; acknowledged = false; phase = 'closed'; controller.abort(); witness.close(); signal.removeEventListener('abort', abort); client.off('notification', notify); client.off('disconnected', disconnected); client.close(); };
+  const fail = () => { failure = true; close(); };
+  const abort = () => close();
+  const disconnected = () => fail();
+  const deliver = async message => { await current(); await send(message, controller.signal); await current(); };
+  const request = async (method, params) => { await current(); const reply = await client.request(method, params); await current(); return reply; };
+  async function account(tag) {
+    const message = { id: tag, method: 'account/read', params: { refreshToken: false } };
+    acknowledged = false; require(witness.client(message));
+    const result = await request(message.method, message.params);
+    require(codexAccountFingerprint(result?.account) === selected.accountFingerprint && witness.server({ id: tag, result }));
+    return result;
+  }
+  function notify(value) {
+    if (closed) return;
+    // Account boundaries withdraw admission synchronously, even while a reply
+    // or durable acknowledgement callback is awaiting completion.
+    if (codexAccountBoundary(value)) { fail(); return; }
+    if (!['thread/status/changed','thread/closed'].includes(value?.method)) return;
+    if (!object(value.params) || value.params.threadId !== selected.sessionId) { fail(); return; }
+    if (value.method === 'thread/closed' || !['idle','active'].includes(value.params.status?.type)) { fail(); return; }
+    if (!acknowledged) return;
+    if (notifications.size >= 32) { fail(); return; }
+    const message = { method: 'thread/status/changed', params: { threadId: selected.sessionId, status: structuredClone(value.params.status) } };
+    if (Buffer.byteLength(JSON.stringify(message)) > MAX) { fail(); return; }
+    const work = deliver(message).catch(fail); notifications.add(work); void work.finally(() => notifications.delete(work));
+  }
+  async function handle(m) {
+    await current();
+    if (phase === 'initialize') {
+      require(m.method === 'initialize' && m.id !== undefined && exact(m.params, ['clientInfo','capabilities']));
+      const info = m.params.clientInfo, caps = m.params.capabilities;
+      require(exact(info, ['name','title','version']) && typeof info.name === 'string' && /^[A-Za-z0-9_-]{1,64}$/.test(info.name) && label(info.version) && (info.title === undefined || label(info.title)));
+      require(caps === undefined || exact(caps, ['experimentalApi']) && (caps.experimentalApi === undefined || caps.experimentalApi === false));
+      const result = await request('initialize', m.params); client.nativeVersion = reviewedCodexVersion(result, info.name);
+      phase = 'initialized'; await deliver({ id: m.id, result }); return;
+    }
+    if (phase === 'initialized') {
+      require(m.method === 'initialized' && m.id === undefined && (m.params === undefined || exact(m.params, []) ));
+      await current(); client.send({ method: 'initialized', params: {} }); await current();
+      assertCodexDesignConfig((await request('config/read', { includeLayers: false }))?.config);
+      // This read is on this exact connection, before any task request.
+      await account('switchyard-before-initialize'); client.accountFingerprint = selected.accountFingerprint; client.restrictionsVerified = true;
+      phase = 'ready'; return;
+    }
+    require(m.id !== undefined && ['ready','acknowledged'].includes(phase));
+    if (m.method === 'thread/resume') {
+      require(!attempted && exact(m.params, ['threadId','cwd','sandbox','approvalPolicy','excludeTurns']) && m.params.threadId === selected.sessionId && m.params.cwd === selected.repositoryRoot
+        && m.params.sandbox === 'read-only' && m.params.approvalPolicy === 'on-request' && (m.params.excludeTurns === undefined || typeof m.params.excludeTurns === 'boolean'));
+      attempted = true; phase = 'resuming'; acknowledged = false;
+      await account('switchyard-before-resume');
+      require(witness.client({ ...m, id: 'switchyard-resume' }));
+      const result = await request('thread/resume', m.params); require(witness.server({ id: 'switchyard-resume', result }));
+      await account('switchyard-after-resume'); require(witness.observation().protocolAcknowledged);
+      await current(); await onAcknowledged(witness.observation(), controller.signal); await current();
+      await deliver({ id: m.id, result }); phase = 'acknowledged'; acknowledged = true; return;
+    }
+    if (m.method === 'account/read') {
+      require(exact(m.params, ['refreshToken']) && m.params.refreshToken === false);
+      const result = await account('switchyard-account-' + ++accountSequence); await deliver({ id: m.id, result }); acknowledged = attempted && witness.observation().protocolAcknowledged; return;
+    }
+    if (m.method === 'config/read') {
+      require(exact(m.params, ['includeLayers']) && m.params.includeLayers === false);
+      const result = await request(m.method, m.params); assertCodexDesignConfig(result?.config); await deliver({ id: m.id, result }); return;
+    }
+    if (m.method === 'thread/read') {
+      require(acknowledged && exact(m.params, ['threadId','includeTurns']) && m.params.threadId === selected.sessionId && (m.params.includeTurns === undefined || typeof m.params.includeTurns === 'boolean'));
+      const result = await request(m.method, m.params); require(result?.thread?.id === selected.sessionId && result.thread.cwd === selected.repositoryRoot && ['idle','active'].includes(result.thread.status?.type));
+      await deliver({ id: m.id, result }); return;
+    }
+    // No default forwarding. Turn, login, config-write, other-task and unknown
+    // requests have no authority under this reviewed attachment permission.
+    throw Error('This request is outside the reviewed editor attachment.');
+  }
+  const relay = Object.freeze({
+    observation,
+    receive(value) {
+      let message, size;
+      try {
+        live(); require(object(value)); const text = JSON.stringify(value); size = Buffer.byteLength(text); require(size <= MAX && bytes + size <= 2 * MAX && count < 64);
+        message = JSON.parse(text); require(exact(message, ['id','method','params']) && typeof message.method === 'string' && /^[A-Za-z][A-Za-z0-9/_-]{0,127}$/.test(message.method) && (message.id === undefined || id(message.id)));
+        if (message.id !== undefined) { const key = typeof message.id + ':' + message.id; require(!seen.has(key) && seen.size < 4096); seen.add(key); }
+      } catch (error) { fail(); return Promise.reject(error); }
+      count++; bytes += size;
+      const operation = tail.then(() => handle(message)).catch(error => { fail(); throw error; }).finally(() => { count--; bytes -= size; });
+      tail = operation.catch(() => {}); return operation;
+    },
+    close,
+    stop() { if (!stopping) { close(); stopping = (async () => { await tail; await Promise.allSettled([...notifications]); return { closed: true, processExitVerified: false }; })(); } return stopping; }
+  });
+  client.on('notification', notify); client.on('disconnected', disconnected); signal.addEventListener('abort', abort, { once: true }); if (signal.aborted) close();
+  return relay;
+}

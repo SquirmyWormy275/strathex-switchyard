@@ -32,7 +32,7 @@ server.on("upgrade", (request, socket) => {
         const thread = { id: message.params?.threadId || "synthetic-owned-task", cwd: settings.repositoryRoot, status: { type: "idle" }, turns: [] };
         if (message.method === "thread/list") result = { data: [thread] };
         if (message.method === "thread/read") result = { thread };
-        if (["thread/start", "thread/resume"].includes(message.method)) result = { thread, cwd: settings.repositoryRoot, sandbox: { type: "readOnly" }, approvalPolicy: "on-request" };
+        if (["thread/start", "thread/resume"].includes(message.method)) result = { thread, cwd: settings.repositoryRoot, sandbox: { type: "readOnly" }, approvalPolicy: "on-request", modelProvider: "openai" };
         if (message.method === "thread/inject_items") result = {};
       }
       if (result) socket.write(frame({ id: message.id, result }));

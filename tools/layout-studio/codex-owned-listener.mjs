@@ -48,7 +48,7 @@ export async function openOwnedCodexListener({ executable, cwd, serverNames = []
   for (const name of [".git", ".codex", "AGENTS.md"]) try { await lstat(join(cwd, name)); throw Error("Choose a neutral private provider startup directory; no project was adopted."); } catch (error) { if (error.code !== "ENOENT") throw error; }
   const root = await mkdtemp(join(runtimeRoot, "syl-")), rootIdentity = await identity(root), endpoint = join(root, "s"), socketPath = join("/tmp", `codex-daemon-${uid}`, sha(endpoint));
   let child, closed = false, stopPending, guardian, native, socketIdentity, socketParent, aliasIdentity, binding, accountFingerprint, workerClosed = false, failure, acknowledged = false;
-  const clients = new Set(), requestId = randomUUID();
+  const clients = new Set(), editorOpenings = new Set(), requestId = randomUUID();
   const current = () => { if (closed || failure || workerClosed) throw failure ?? Error("The owned Codex listener is closed."); };
   const admission = async () => { current(); await authorize(); current(); };
   const owner = {
@@ -85,11 +85,39 @@ export async function openOwnedCodexListener({ executable, cwd, serverNames = []
       }
       catch (error) { owner.close(); client.close(); const result = await stopOwnedChild(client.child); if (result.stopped) clients.delete(client); throw error; }
     },
+    openEditorClient({ onClient } = {}) {
+      // A dedicated connection lets the editor's resume and both account
+      // samples share one peer. It starts no handshake or task on its own.
+      require(typeof onClient === "function" && editorOpenings.size < 4);
+      const operation = (async () => {
+        await admission(); require(owner.binding);
+        const original = await owner.inspectBinding();
+        for (const client of clients) if (client.closed) { require((await stopOwnedChild(client.child)).stopped); clients.delete(client); }
+        require(clients.size < 4 && accountFingerprint);
+        const client = createPinnedCodexUnixClient(executable, cwd, serverNames, original); clients.add(client);
+        client.accountFingerprint = accountFingerprint;
+        client.on("disconnected", reason => {
+          if (reason?.code === "ACCOUNT_UNCONFIRMED") { failure ??= reason; owner.close(); }
+          else if ([...clients].every(client => client.closed)) owner.close();
+        });
+        try {
+          await onClient(client); await admission(); require(!client.closed && owner.binding);
+          require(JSON.stringify(await owner.inspectBinding()) === JSON.stringify(original)); return client;
+        } catch (error) {
+          client.close(); if ((await stopOwnedChild(client.child)).stopped) clients.delete(client);
+          else owner.close(); throw error;
+        }
+      })();
+      editorOpenings.add(operation);
+      void operation.then(() => editorOpenings.delete(operation), () => editorOpenings.delete(operation));
+      return operation;
+    },
     close() { closed = true; for (const client of clients) client.close(); child?.stdin.end(); },
     async stop() {
       if (stopPending) return stopPending;
       owner.close();
       stopPending = (async () => {
+        await Promise.allSettled([...editorOpenings]);
         let confirmed = true;
         for (const client of clients) { try { if (!(await stopOwnedChild(client.child)).stopped) confirmed = false; } catch { confirmed = false; } }
         if (confirmed) clients.clear();

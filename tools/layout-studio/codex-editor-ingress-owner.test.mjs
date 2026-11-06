@@ -2,15 +2,18 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createConnection } from 'node:net';
 import { createHash,randomBytes } from 'node:crypto';
-import { mkdtemp,lstat,readFile,readlink,readdir,rmdir,rename,writeFile,unlink } from 'node:fs/promises';
+import { mkdtemp,lstat,readFile,readlink,readdir,rmdir,rename,writeFile,unlink,copyFile,rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { openCodexEditorIngress } from './codex-editor-ingress.mjs';
+import { openOwnedCodexListener } from './codex-owned-listener.mjs';
+import { createCodexEditorRelay } from './codex-editor-relay.mjs';
+import { codexDesignConfig } from './agents.mjs';
 const native={skip:process.platform!=='linux'};
 const gate=()=>{let resolve;const promise=new Promise(r=>resolve=r);return{promise,resolve};};
 async function until(fn){const deadline=Date.now()+5000;while(Date.now()<deadline){const result=await fn();if(result)return result;await new Promise(r=>setTimeout(r,10));}throw Error('Parent carrier checkpoint did not settle');}
 let peerPromise;function peer(){return peerPromise??=(async()=>{const text=await readFile(`/proc/${process.pid}/stat`,'utf8');return{pid:process.pid,birth:text.slice(text.lastIndexOf(') ')+2).split(' ')[19],executable:await readlink(`/proc/${process.pid}/exe`),executableSha256:createHash('sha256').update(await readFile(process.execPath)).digest('hex')};})();}
-function frame(value){const data=Buffer.from(JSON.stringify(value));assert.ok(data.length<126);const mask=Buffer.from([7,11,13,17]);return Buffer.concat([Buffer.from([129,128|data.length]),mask,Buffer.from(data.map((b,i)=>b^mask[i%4]))]);}
+function frame(value){const data=Buffer.from(JSON.stringify(value));assert.ok(data.length<65536);const mask=Buffer.from([7,11,13,17]);return Buffer.concat([data.length<126?Buffer.from([129,128|data.length]):Buffer.from([129,254,data.length>>8,data.length&255]),mask,Buffer.from(data.map((b,i)=>b^mask[i%4]))]);}
 async function fixture(t,options={}){
  const directory=await mkdtemp(join(tmpdir(),'sxep-')),socketPath=join(directory,'s'),records=[],messages=[],abort=new AbortController(),sockets=[];let owner,unconfirmed=false;
  t.after(async()=>{abort.abort();for(const s of sockets)s.destroy();if(owner){if(unconfirmed)await assert.rejects(owner.stop());else await owner.stop();}assert.deepEqual(await readdir(directory),[]);await rmdir(directory);});
@@ -27,6 +30,27 @@ test('parent records intent before binding, pins one peer, joins messages and re
  const c=await f.connect();const observation=await owner.pinPeer(await peer());await c.upgrade();assert.equal(observation.peerVerified,true);assert.equal(observation.ideAttached,false);assert.equal(observation.authorityGranted,false);
  c.socket.write(frame({id:1,method:'fixture/read'}));await until(()=>f.messages.length);assert.deepEqual(f.messages,[{id:1,method:'fixture/read'}]);await owner.send({id:1,result:{ok:true}});assert.deepEqual(await c.message(),{id:1,result:{ok:true}});
  const pending=owner.stop();assert.equal(owner.stop(),pending);assert.deepEqual(await pending,{stopped:true,socketRemoved:true,directoryRemoved:false});assert.equal(owner.observation().peerVerified,false);assert.equal(owner.observation().processExitVerified,true);assert.equal(f.records.at(-1).phase,'stopped');await assert.rejects(lstat(f.socketPath),{code:'ENOENT'});
+});
+test('an exact synthetic terminal peer crosses ingress and a dedicated pinned upstream connection for one acknowledged task',native,async t=>{
+ let relay,provider,client;
+ const f=await fixture(t,{onMessage:async m=>relay.receive(m)}),root=await mkdtemp(join(tmpdir(),'syrelay-')),repositoryRoot='/synthetic/repository',sessionId='11111111-1111-4111-8111-111111111111',acks=[];
+ try{
+  await copyFile(new URL('./test-support/codex-owned-listener-fixture.cjs',import.meta.url),join(root,'app-server'));
+  await writeFile(join(root,'account'),'synthetic@example.invalid');await writeFile(join(root,'fixture.json'),JSON.stringify({config:codexDesignConfig(),repositoryRoot}));
+  provider=await openOwnedCodexListener({executable:process.execPath,cwd:root,runtimeRoot:root});await provider.connect();
+  client=await provider.openEditorClient({onClient:async c=>{assert.equal(c.sequence,0);}});
+  relay=createCodexEditorRelay({target:{sessionId,repositoryRoot,accountFingerprint:provider.accountFingerprint},client,signal:f.abort.signal,assertCurrent:async()=>{assert.ok(provider.binding);await provider.inspectBinding();},send:async m=>f.owner.send(m),onAcknowledged:async o=>acks.push(o)});
+  const ingress=await f.open(),terminal=await f.connect();await ingress.pinPeer(await peer());await terminal.upgrade();
+  terminal.socket.write(frame({id:1,method:'initialize',params:{clientInfo:{name:'codex_tui',version:'0.166.0'}}}));assert.equal((await terminal.message()).id,1);
+  terminal.socket.write(frame({method:'initialized',params:{}}));await until(()=>relay.observation().phase==='ready');
+  const before=(await readFile(join(root,'calls'),'utf8')).trim().split('\n').length;
+  terminal.socket.write(frame({id:2,method:'thread/resume',params:{threadId:sessionId,cwd:repositoryRoot,sandbox:'read-only',approvalPolicy:'on-request',excludeTurns:true}}));
+  const reply=await terminal.message();assert.equal(reply.id,2);assert.equal(reply.result.thread.id,sessionId);await until(()=>relay.observation().protocolAcknowledged);
+  const calls=(await readFile(join(root,'calls'),'utf8')).trim().split('\n');assert.deepEqual(calls.slice(before),['account/read','thread/resume','account/read']);assert.equal(acks.length,1);assert.equal(ingress.observation().peerVerified,true);assert.equal(relay.observation().ideAttached,false);
+  terminal.socket.write(frame({id:3,method:'turn/start',params:{threadId:sessionId,input:[{type:'text',text:'NEVER_FORWARD'}]}}));await until(()=>relay.observation().connectionClosed);assert.equal((await readFile(join(root,'calls'),'utf8')).includes('turn/start'),false);
+ }finally{
+  if(relay)await relay.stop();if(f.owner)await f.owner.stop();if(provider)assert.equal((await provider.stop()).stopped,true);if(client)assert.equal(client.closed,true);await rm(root,{recursive:true});
+ }
 });
 
 test('early cancellation performs no bind and cancellation joins an outstanding admission callback',native,async t=>{

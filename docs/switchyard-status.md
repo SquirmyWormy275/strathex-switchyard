@@ -7,10 +7,25 @@ checkout, dependencies, builds and temporary parent are retired.
 The earlier `7772cb3` socket-cleanup failure remains retained; this run includes
 the signal-safe correction and parent ingress lifecycle.
 
-Windows `702897d` stopped before its new console comparison because a verifier
-still expected forty parser checks after the inventory increased to fifty. The
-count is corrected; native rerun is required.
-[Failed receipt and correction](evidence/windows-verifier-inventory-summary.json).
+Windows `700e7f2` reaches the console comparison: the hidden-console helper
+fails before entry; detached startup reaches its fixed entry marker with the same
+token restrictions and explicit Job containment. Both owned trees retire.
+The unchanged restricted Node journey still fails at private-state initialization;
+the ordinary eight-check journey and separate filesystem/setup jobs pass.
+[Native result](evidence/windows-lease-console-native-summary.json).
+The earlier stale verifier inventory failure remains retained.
+
+The internal editor relay now passes **seven groups / 79 tests**, including a
+real Linux socket path from an exact synthetic terminal peer through the ingress
+and a dedicated pinned provider-double connection. Original account samples
+bracket the single exact resume; a model-turn attempt is refused. Production
+journal/routes, retained Terminal activation and native TUI compatibility remain
+unfinished. [Evidence](evidence/editor-relay-summary.json).
+
+The installed Codex CLI is now **0.167.0**. Offline schema generation succeeds and
+its scratch files are removed; the reviewed adapter still refuses versions other
+than **0.166.0**. Runtime compatibility has not been accepted.
+[Static-only check](evidence/codex-0167-static-summary.json).
 
 Switchyard gives a Model F keyboard stable controls for returning to tasks,
 reviewing work and handing context between tools. It is a **partial implementation
@@ -84,11 +99,11 @@ selection. Three groups / 38 tests and compiled extension checks pass with owned
 synthetic processes and provider/editor doubles. Actual connection/account/task
 acknowledgement remains unfinished. [Evidence](evidence/editor-process-summary.json).
 
-A separate bounded protocol witness now verifies account samples around the
-exact resume reply and invalidates on drift or replay. Three groups / 33 tests,
-package import and typecheck pass with synthetic frames. It is not yet connected
-to a peer-authenticated terminal stream and grants no forwarding or attachment
-authority. [Evidence](evidence/editor-protocol-summary.json).
+The earlier standalone protocol witness verifies account samples around the
+exact resume reply and invalidates on drift or replay. Its initial three groups /
+33 tests remain separate evidence. It is now composed with the restricted relay
+and peer-verified carriers described above; the witness alone grants no forwarding
+or attachment authority. [Earlier evidence](evidence/editor-protocol-summary.json).
 
 ## Latest verified checkpoints
 

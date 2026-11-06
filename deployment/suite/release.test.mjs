@@ -30,6 +30,8 @@ test("suite bundles contain the actual offline backend, frozen frontend and lice
   assert.match(scoringData, /SPDX-License-Identifier: BSD-2-Clause/); assert.match(scoringData, /Copyright \(c\) 2023 FIRST\.ORG, Inc\., Red Hat, and contributors/); assert.match(scoringData, /THIS SOFTWARE IS PROVIDED/);
   const { openCodexEditorIngress } = await import(pathToFileURL(join(bundle.directory, "tools/layout-studio/codex-editor-ingress.mjs")).href);
   assert.equal(typeof openCodexEditorIngress, "function");
+  const { createCodexEditorRelay } = await import(pathToFileURL(join(bundle.directory, "tools/layout-studio/codex-editor-relay.mjs")).href);
+  assert.equal(typeof createCodexEditorRelay, "function");
   const ingressPath = "tools/layout-studio/codex-editor-ingress.py";
   assert.equal(await readFile(join(bundle.directory, ingressPath), "utf8"), await readFile(join(sourceRoot, ingressPath), "utf8"));
   const { createCodexEditorProtocol } = await import(pathToFileURL(join(bundle.directory, "tools/layout-studio/codex-editor-protocol.mjs")).href);

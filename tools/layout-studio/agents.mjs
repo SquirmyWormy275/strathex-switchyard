@@ -81,7 +81,7 @@ export async function readCodexMcpNames(executable, cwd, { onProbe = () => {} } 
     codexDesignConfig(names); return names;
   } finally { probe.close(); if (!(await stopOwnedChild(probe.child)).stopped) throw new Error("The native configuration probe did not verify exit. No replacement was launched."); }
 }
-function reviewedCodexVersion(hello, name) {
+export function reviewedCodexVersion(hello, name) {
   const agent = hello?.userAgent, prefix = `${name}/`;
   if (typeof agent !== "string" || agent.length > 512 || /[\0\r\n]/.test(agent) || !agent.startsWith(prefix)) throw new Error("Codex did not identify a verified native adapter version. Saved work was preserved.");
   const version = /^(\d+\.\d+\.\d+) \(/.exec(agent.slice(prefix.length))?.[1];

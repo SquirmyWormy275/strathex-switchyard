@@ -395,3 +395,26 @@ stop during each startup wait, the carrier/parent lifecycle and package checks
 pass together (26 tests). The eight-second startup deadline is unchanged. The
 failed full receipt remains failed pending a new full run.
 [Correction evidence](evidence/linux-777-complete-failure-summary.json).
+
+## Restrict the editor connection
+
+The internal relay now uses a dedicated connection from the original live owner.
+Registration completes before any protocol request; owner stop joins pending
+registration and retires that bridge with its other clients. The relay checks
+effective restrictions and account identity on that connection, permits one exact
+read-only/on-request resume, then checks the account again before retaining and
+delivering acknowledgement. Unknown methods, new tasks, turns, account changes
+and configuration writes have no forwarding path.
+
+The Linux demonstration uses real ingress and upstream socket carriers, kernel
+peer checks, and a synthetic terminal/provider. It verifies the exact resume and
+refuses a model-turn attempt, then retires all owned processes and sockets.
+Cancellation, changed accounts, unloading, lost replies, bounded queues and
+pending callbacks are covered by seven groups / 79 tests.
+[Exact source and evidence](evidence/editor-relay-summary.json).
+
+Production journal/routes and retained Terminal activation remain unfinished.
+The test retention callback is not the protected production journal. Native TUI
+message/capability compatibility is unverified, and the installed 0.167.0 CLI
+remains outside the adapter's reviewed 0.166.0 version. No actual task attachment
+or model request is claimed by this demonstration.
