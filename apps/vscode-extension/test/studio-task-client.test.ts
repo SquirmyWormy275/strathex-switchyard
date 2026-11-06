@@ -25,6 +25,7 @@ async function fixture(t: TestContext) {
     calls.at(-1)!.payload = input; if (controls.afterProbe) await controls.afterProbe();
     const { compartment, token: _token, permit: _permit, ...selection } = input;
     const scopeSelection = { ownerRequestId: selection.ownerRequestId, loadRequestId: selection.loadRequestId, requestId: selection.requestId, editorId: selection.editorId };
+    if (action === "return-target") { const value = result(); return controls.alter ? controls.alter(value) : value; }
     const at = Date.now();
     const value: any = action === "review" ? { status: "requires-confirmation", selection, target, confirmation: { token: randomUUID(), record: { id: randomUUID(), action: "launch_codex_editor", sessionId: target.sessionId, targetSnapshotId: createHash("sha256").update(JSON.stringify(["switchyard-editor-launch/v1", compartment, scopeSelection])).digest("hex"), scopeDigest: "f".repeat(64), reason: "Review this exact synthetic editor.", reauthenticated: false, createdAt: new Date(at).toISOString(), expiresAt: new Date(at + 300000).toISOString() } }, terminalLaunchAuthorized: false, terminalLaunched: false, ideAttached: false, modelPromptSubmitted: false, completionVerified: false }
       : { ...selection, status: action === "issue" ? "issued" : "consumed", terminalLaunchAuthorized: action === "consume", terminalLaunched: false, ideAttached: false, modelPromptSubmitted: false, completionVerified: false, targetDigest: result().targetDigest, expiresAt: Date.now() + 30000, ...(action === "issue" ? { permit: randomUUID() } : { target }) };
@@ -33,7 +34,7 @@ async function fixture(t: TestContext) {
   let origin: string;
   const server = createServer(async (req, res) => {
     calls.push({ path: req.url ?? "", bearer: Boolean(req.headers.authorization) });
-    assert.ok(["/instance/v1/editor-target", "/instance/v1/editor-review", "/instance/v1/editor-issue", "/instance/v1/editor-consume"].includes(req.url!)); assert.equal(req.headers.authorization, undefined); assert.equal(req.headers.origin, undefined);
+    assert.ok(["/instance/v1/editor-target", "/instance/v1/editor-review", "/instance/v1/editor-issue", "/instance/v1/editor-consume", "/instance/v1/editor-return-target"].includes(req.url!)); assert.equal(req.headers.authorization, undefined); assert.equal(req.headers.origin, undefined);
     if (controls.hold) return;
     if (controls.forged) { res.end(JSON.stringify({ status: "ready" })); return; }
     await gateway(req, res, origin);
@@ -118,4 +119,15 @@ test("authorization transport rejects unsigned or changed-instance replies, copi
     else { const value = await f.client.consumeEditor(selected); assert.equal(value.editorId, original.editorId); assert.equal(value.terminalLaunchAuthorized, drift !== "duplicate"); }
     assert.equal(f.calls.some(row => row.bearer), false);
   }
+});
+
+test("signed return transport binds all four editor identities and refuses extra fields or promoted authority", { skip: process.platform !== "linux" }, async t => {
+  const f = await fixture(t), selected = { ...f.selected, requestId: randomUUID(), editorId: randomUUID() };
+  const result = await f.client.returnEditorTarget(selected);
+  assert.deepEqual(f.calls.map(row => row.path), ["/instance/v1/editor-return-target"]); assert.deepEqual(f.calls[0].payload, selected);
+  assert.deepEqual(result.target, f.target); assert.equal(result.authorityGranted, false); assert.ok(Object.isFrozen(result.target));
+  for (const extra of [{ permit: randomUUID() }, { token: randomUUID() }, { prompt: "never" }, { editorId: undefined }]) await assert.rejects(f.client.returnEditorTarget({ ...selected, ...extra } as any));
+  assert.equal(f.calls.length, 1);
+  f.controls.alter = v => ({ ...v, authorityGranted: true }); await assert.rejects(f.client.returnEditorTarget(selected));
+  assert.equal(f.calls.some(row => row.bearer), false);
 });

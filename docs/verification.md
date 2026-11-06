@@ -1,5 +1,13 @@
 # What has actually been verified
 
+Latest focused backend checkpoint: the exact consumed-editor return path supports
+idle and active original tasks without another launch/resume. Five groups / 60
+tests, typecheck, compiled extension load and owned cleanup pass with controlled
+provider/editor doubles. [Evidence](evidence/editor-active-return-summary.json).
+Windows V3 provider lookup at `47a49c8` is now observed natively: both lookups
+succeed, both provider opens return Access Denied, and original Node remains
+exit 134. [Native evidence](evidence/windows-provider-lookup-native-summary.json).
+
 Switchyard is a partial implementation of the full Rev2 suite. The F77 is its
 pilot device. Software checks, installed Linux demonstrations, native Windows
 filesystem tests and physical/account acceptance are separate evidence.

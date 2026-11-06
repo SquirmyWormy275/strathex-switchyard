@@ -271,3 +271,28 @@ never substitutes. Three groups / 24 tests and compiled extension checks pass
 with controlled provider/editor doubles and exact cleanup. This is limited to
 the existing idle-owner contract; active-task return, command wiring and native
 acknowledgement remain unfinished. [Evidence](evidence/editor-return-summary.json).
+
+## Returning while the original task is active
+
+The later `returnEditorTarget` client operation uses the fixed signed
+`/instance/v1/editor-return-target` route. The Suite's `editor/return-target`
+route requires all four original owner/load/request/editor UUIDs and a retained
+consumed authorization. Under the task lease it rechecks that record, original
+target and policy digest, current account, repository and native endpoint. The
+owner may report idle or active; unavailable/unknown states still refuse.
+Initial review and launch paths remain idle-only.
+
+Returning does not issue or refresh a permit, resume the task or mutate protected
+state. The short creation expiry applies to the original launch, so it does not
+prevent later return to an existing object. The launcher must still hold the exact
+Terminal object and recheck its original focused context and filesystem identity.
+A consumed record alone cannot create or recover a terminal object.
+
+Five groups / 60 tests pass, including the real Suite, signed client, encrypted
+store and Linux leases with provider/editor doubles. They cover active return,
+unchanged state, no additional resume, missing or foreign grants, altered records,
+account drift, cancellation, shutdown and same-title terminal refusal. Typecheck,
+compiled extension checks and exact generated-output cleanup pass. Command wiring
+and native terminal/account/task acknowledgement remain unfinished; these checks
+make no IDE attachment claim.
+[Source-specific evidence](evidence/editor-active-return-summary.json).

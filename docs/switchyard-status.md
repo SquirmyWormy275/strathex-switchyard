@@ -28,16 +28,21 @@ At `a37751c`, the legacy-first native probe reports **Access Denied (Win32 error
 5)** from `CryptAcquireContextW` before generation. Later CNG calls succeed.
 Source/merge identity, artifact digest and token/process/pipe/buffer cleanup
 verify; Node still exits 134 and its failed fixture is preserved. The exact
-denied provider lookup or resource remains unidentified.
+denied resource remains unidentified; the later lookup comparison is below.
 [Native evidence](evidence/windows-cold-legacy-random-native-summary.json).
 
-The editor launcher also returns to its exact retained terminal object through
-fresh signed idle-owner metadata. Three groups/24 tests, typecheck and compiled
-extension checks pass with provider/editor doubles. Closed or same-title objects
-cannot trigger replacement. Command wiring and native acknowledgement remain
-unfinished. [Evidence](evidence/editor-return-summary.json).
+The editor launcher returns to its exact retained terminal while the original
+task is idle or active. A separate signed read requires that editor's consumed
+authorization and current owner/load/account/repository/socket/policy. It grants
+no new launch and leaves the protected journal unchanged. Five groups / 60 tests,
+typecheck and compiled extension checks pass with provider/editor doubles.
+[Evidence](evidence/editor-active-return-summary.json).
 
-The next diagnostic retains that first cold call and compares read-only user/machine provider lookup with one fixed explicit Enhanced-provider call. Both managed targets, 1,912 portable checks and nineteen focused tests pass with exact cleanup; native execution is pending. No provider default, registry, account or token state is changed. [Source evidence](evidence/windows-provider-lookup-source-summary.json).
+At `47a49c8`, both user and machine default-provider lookups succeed and identify
+the Strong provider. Default and explicitly named Enhanced-provider opens still
+return Access Denied; subsequent CNG succeeds. The exact denied resource is
+unknown, and original Node startup remains failed. Source/digest and native
+cleanup evidence verify. [Native result](evidence/windows-provider-lookup-native-summary.json).
 
 ## Latest verified checkpoints
 

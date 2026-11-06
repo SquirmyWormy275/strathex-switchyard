@@ -81,8 +81,8 @@ const extensionTests = ["commands", "companion-bridge", "controller", "named-pip
   .map((name) => ({
     file: `apps/vscode-extension/test/${name}.test.ts`,
     ...(name === "controller" && process.platform !== "linux" ? { expectedSkipped: 3 } : {}),
-    ...(name === "studio-task-client" && process.platform !== "linux" ? { expectedSkipped: 8 } : {}),
-    ...(name === "studio-editor-launch" && process.platform !== "linux" ? { expectedSkipped: 9 } : {}),
+    ...(name === "studio-task-client" && process.platform !== "linux" ? { expectedSkipped: 9 } : {}),
+    ...(name === "studio-editor-launch" && process.platform !== "linux" ? { expectedSkipped: 10 } : {}),
     ...(name === "named-pipe-transport" ? { timeoutMs: 120_000, expectedSkipped: process.platform === "win32" ? 1 : 7 } : {})
   }));
 const providerHostTests = ["backends", "config", "council-resources", "dispatch-lease", "linux-path-security", "main", "reanchor", "redaction", "release", "server", "service", "workflow-context"]

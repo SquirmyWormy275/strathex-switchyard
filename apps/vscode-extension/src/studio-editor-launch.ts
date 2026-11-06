@@ -7,7 +7,7 @@ import { revealExactTerminal } from "./terminal-focus.ts";
 import type { StudioEditorRequest, StudioEditorReview, StudioEditorSelection, StudioEditorTarget, StudioTaskClient } from "./studio-task-client.ts";
 import type { TerminalLike, VscodeLike } from "./vscode-like.ts";
 
-type Client = Pick<StudioTaskClient, "editorTarget" | "reviewEditor" | "issueEditor" | "consumeEditor" | "close">;
+type Client = Pick<StudioTaskClient, "editorTarget" | "returnEditorTarget" | "reviewEditor" | "issueEditor" | "consumeEditor" | "close">;
 type Host = Pick<VscodeLike, "window" | "workspace">;
 const digest = (value: unknown) => createHash("sha256").update(JSON.stringify(value)).digest("hex");
 const identity = (s: BigIntStats) => [s.dev, s.ino, s.size, s.uid, s.mode, s.mtimeNs, s.ctimeNs].join(":");
@@ -110,12 +110,11 @@ export class StudioEditorLauncher {
       p.focusVerified = false;
       // Returning to an existing object creates no new launch permission and
       // never recreates a closed/ambiguous terminal. Reobserve the original
-      // idle owner/account/task before revealing its retained object.
+      // idle or active owner/account/task with its consumed editor selection.
       const current = async () => {
         await this.current(review.target, p);
         requireCurrent(this.options.host.window.terminals.includes(p.terminal!));
-        const { compartment, ownerRequestId, loadRequestId } = p.selection;
-        const observed = await this.options.client.editorTarget({ compartment, ownerRequestId, loadRequestId });
+        const observed = await this.options.client.returnEditorTarget(p.selection);
         requireCurrent(observed.targetDigest === p.targetDigest && digest(observed.target) === p.targetDigest);
         await this.current(review.target, p);
       };

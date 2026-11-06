@@ -26,10 +26,10 @@ async function fixture(t: TestContext) {
   const observation = () => ({ target: structuredClone(target), targetDigest: createHash("sha256").update(JSON.stringify(target)).digest("hex"), metadataObserved: true, nativeLoadAcknowledged: true, nativeTaskLoaded: false, authorityGranted: false, terminalLaunched: false, ideAttached: false, modelPromptSubmitted: false, completionVerified: false });
   const keys = new Map<string,string>(), store = createSuiteStore({ root: join(root, "state"), secrets: { get: async (c: string,p: string) => keys.get(c+":"+p), set: async (c: string,p: string,v: string) => keys.set(c+":"+p,v) } });
   await store.initialize("personal"); await store.update("personal", "fixture", (s: any) => { s.mode = "personal-companion"; });
-  const auth = createCodingEditorAuthorizations({ store, owners: { editorTarget: async () => observation() } });
-  const controls: { after?: (action: string) => Promise<void> | void; check?: () => Promise<void> | void; createThrows?: boolean; afterCreate?: () => void; showThrows?: boolean } = {};
+  const controls: { observation?: "idle" | "active"; after?: (action: string) => Promise<void> | void; check?: () => Promise<void> | void; createThrows?: boolean; afterCreate?: () => void; showThrows?: boolean } = {};
+  const auth = createCodingEditorAuthorizations({ store, owners: { editorTarget: async () => { assert.notEqual(controls.observation, "active"); return observation(); }, editorReturnTarget: async () => observation() } });
   const routes: string[] = [], token = "x".repeat(43), instance = { id: randomUUID(), build: "f".repeat(64) };
-  const gateway = createInstanceGateway({ token, identity: instance, onStop: () => { throw Error("No stop operation"); }, onEditorTarget: observation, onEditorAuthorization: async (action: string, { compartment, ...input }: any) => { routes.push(action); const result = await auth[action](compartment,input); await controls.after?.(action); return result; } });
+  const gateway = createInstanceGateway({ token, identity: instance, onStop: () => { throw Error("No stop operation"); }, onEditorTarget: observation, onEditorAuthorization: async (action: string, { compartment, ...input }: any) => { routes.push(action); const result = await auth[action === "return-target" ? "returnTarget" : action](compartment,input); await controls.after?.(action); return result; } });
   let origin: string; const server = createServer((req,res) => { assert.equal(req.headers.authorization,undefined); void gateway(req,res,origin); }); server.listen(0,"127.0.0.1"); await once(server,"listening"); const address = server.address(); assert.ok(address && typeof address !== "string"); origin = `http://127.0.0.1:${address.port}`;
   await writeFile(endpointPath,JSON.stringify({schema:"switchyard-active-endpoint/v1",instance,pid:process.pid,url:origin+"/#access="+token}),{mode:0o600});
   const client = new StudioTaskClient({endpointPath}), activeListeners = new Set<(t: TerminalLike | undefined) => unknown>(), closeListeners = new Set<(t: TerminalLike) => unknown>();
@@ -81,12 +81,23 @@ test("shutdown joins an in-flight context check and fences every later terminal 
   let joined=false;const closing=f.launcher.close().then(()=>{joined=true;});await new Promise(resolve=>setImmediate(resolve));assert.equal(joined,false);
   release();await launching;await closing;assert.equal(joined,true);assert.equal(f.calls.length,0);assert.deepEqual(f.routes,["review"]);
 });
-test("returning to a reviewed idle task uses its exact terminal object without another authorization or creation",linux,async t=>{
+test("returning to a reviewed active task uses its exact terminal object without another authorization or creation",linux,async t=>{
   const f=await fixture(t),review=await f.launcher.review(f.selected);await f.launcher.launch(review);const original=f.terminals[0];
   const neighbor=f.window.createTerminal({name:original.name});neighbor.show();assert.equal(f.window.activeTerminal,neighbor);
-  const before=await f.store.snapshot("personal"),result=await f.launcher.focus(review);assert.equal(result.focusVerified,true);assert.equal(result.ideAttached,false);assert.equal(f.window.activeTerminal,original);assert.equal(f.calls.length,2);assert.deepEqual(f.routes,["review","issue","consume"]);assert.deepEqual(await f.store.snapshot("personal"),before);
+  f.controls.observation="active";
+  const before=await f.store.snapshot("personal"),result=await f.launcher.focus(review);assert.equal(result.focusVerified,true);assert.equal(result.ideAttached,false);assert.equal(f.window.activeTerminal,original);assert.equal(f.calls.length,2);assert.deepEqual(f.routes.slice(0,3),["review","issue","consume"]);assert.ok(f.routes.slice(3).length>0);assert.ok(f.routes.slice(3).every(r=>r==="return-target"));assert.deepEqual(await f.store.snapshot("personal"),before);
   f.terminals.splice(f.terminals.indexOf(original),1);neighbor.show();await assert.rejects(f.launcher.focus(review));assert.equal(f.window.activeTerminal,neighbor);assert.equal(f.calls.length,2);assert.equal(f.launcher.observation(review).focusVerified,false);
 });
 test("returning to a retained terminal refuses account drift, another window context and shutdown without creating a replacement",linux,async t=>{
-  for(const drift of ["account","workspace","shutdown"]){const f=await fixture(t),review=await f.launcher.review(f.selected);await f.launcher.launch(review);if(drift==="account")f.target.accountFingerprint="e".repeat(64);if(drift==="workspace")f.workspace.workspaceFolders=[];if(drift==="shutdown")await f.launcher.close();await assert.rejects(f.launcher.focus(review));assert.equal(f.calls.length,1);assert.deepEqual(f.routes,["review","issue","consume"]);assert.equal(f.launcher.observation(review).ideAttached,false);}
+  for(const drift of ["account","workspace","shutdown"]){const f=await fixture(t),review=await f.launcher.review(f.selected);await f.launcher.launch(review);if(drift==="account")f.target.accountFingerprint="e".repeat(64);if(drift==="workspace")f.workspace.workspaceFolders=[];if(drift==="shutdown")await f.launcher.close();await assert.rejects(f.launcher.focus(review));assert.equal(f.calls.length,1);assert.deepEqual(f.routes.slice(0,3),["review","issue","consume"]);assert.ok(f.routes.slice(3).every(r=>r==="return-target"));assert.equal(f.launcher.observation(review).ideAttached,false);}
+});
+
+test("return cannot create a terminal or use an unconsumed authorization and fences a cancelled metadata reply",linux,async t=>{
+  for(const phase of ["before-launch","journal","reply"]){const f=await fixture(t),review=await f.launcher.review(f.selected);
+    if(phase!=="before-launch")await f.launcher.launch(review);
+    const before=f.calls.length;
+    if(phase==="journal")await f.store.update("personal","fixture-lost-authorization",(s:any)=>{s.codingEditorAuthorizations[0].status="issued";});
+    if(phase==="reply")f.controls.after=action=>{if(action==="return-target")f.client.close();};
+    await assert.rejects(f.launcher.focus(review));assert.equal(f.calls.length,before);assert.equal(f.launcher.observation(review).focusVerified,false);assert.equal(f.launcher.observation(review).ideAttached,false);
+  }
 });

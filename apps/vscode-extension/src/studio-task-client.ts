@@ -141,13 +141,13 @@ export class StudioTaskClient {
       req.once("close", () => { clearTimeout(timer); this.active.delete(req); }); req.once("error", reject); req.end(body);
     });
   }
-  private async exchange(operation: "editorTarget" | "editorReview" | "editorIssue" | "editorConsume", selected: StudioEditorSelection): Promise<unknown> {
-    const e = await this.endpoint(), route = { editorTarget: "/instance/v1/editor-target", editorReview: "/instance/v1/editor-review", editorIssue: "/instance/v1/editor-issue", editorConsume: "/instance/v1/editor-consume" }[operation], nonce = randomBytes(32).toString("base64url");
+  private async exchange(operation: "editorReturnTarget" | "editorTarget" | "editorReview" | "editorIssue" | "editorConsume", selected: StudioEditorSelection): Promise<unknown> {
+    const e = await this.endpoint(), route = { editorTarget: "/instance/v1/editor-target", editorReview: "/instance/v1/editor-review", editorIssue: "/instance/v1/editor-issue", editorConsume: "/instance/v1/editor-consume", editorReturnTarget: "/instance/v1/editor-return-target" }[operation], nonce = randomBytes(32).toString("base64url");
     const body = JSON.stringify({ schema: "switchyard-instance/v1", operation, nonce, at: Date.now(), instanceId: e.instance.id, build: e.instance.build, selection: selected });
     const proof = await this.post(new URL(route, e.url.origin), body, { "X-Switchyard-Instance-Request": mac(e.token, "REQUEST", route, body) });
     requireValue(proof.status === 200 && hash(proof.signature) && timingSafeEqual(Buffer.from(proof.signature, "hex"), Buffer.from(mac(e.token, "RESPONSE-200", route, proof.body), "hex")));
     const identity: unknown = JSON.parse(proof.body);
-    const field = operation === "editorTarget" ? "targetObservation" : "editorAuthorization";
+    const field = operation === "editorTarget" || operation === "editorReturnTarget" ? "targetObservation" : "editorAuthorization";
     requireValue(object(identity) && keys(identity, ["schema", "operation", "nonce", "instanceId", "build", "pid", "origin", "status", field]) && identity.schema === "switchyard-instance/v1" && identity.operation === operation && identity.nonce === nonce && identity.instanceId === e.instance.id && identity.build === e.instance.build && identity.pid === e.pid && identity.origin === e.url.origin && identity.status === "ready");
     requireValue((await this.endpoint()).bytes === e.bytes);
     await this.current(); return identity[field];
@@ -156,6 +156,7 @@ export class StudioTaskClient {
     requireValue(object(input) && keys(input as unknown as Record<string, unknown>, ["compartment", "ownerRequestId", "loadRequestId"]) && /^[a-z][a-z0-9-]{0,63}$/.test(input.compartment) && uuid(input.ownerRequestId) && uuid(input.loadRequestId));
     const selected = Object.freeze({ ...input }); return observation(await this.exchange("editorTarget", selected), selected);
   }
+  async returnEditorTarget(input: StudioEditorRequest): Promise<StudioEditorObservation> { const selected = editorSelection(input); return observation(await this.exchange("editorReturnTarget", selected), selected); }
   async reviewEditor(input: StudioEditorRequest): Promise<StudioEditorReview> { const selected = editorSelection(input); return editorReview(await this.exchange("editorReview", selected), selected); }
   async issueEditor(input: StudioEditorRequest & { readonly token: string }): Promise<StudioEditorAuthorization> { const selected = editorSelection(input, "token"); return editorAuthorization(await this.exchange("editorIssue", selected), selected, "editorIssue"); }
   async consumeEditor(input: StudioEditorRequest & { readonly permit: string }): Promise<StudioEditorAuthorization> { const selected = editorSelection(input, "permit"); return editorAuthorization(await this.exchange("editorConsume", selected), selected, "editorConsume"); }

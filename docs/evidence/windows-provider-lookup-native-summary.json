@@ -1,0 +1,124 @@
+{
+  "schema": "switchyard-provider-lookup-native/v1",
+  "sourceCommit": "47a49c8fe077e5d6e8fca34b709c63749df8a6e6",
+  "executionCommit": "e63535d57f2994ec70d6d8c33b592ba2dec310f7",
+  "sourceAndExecutionTree": "432cae58a2a171d29540d2a087ed97fe440f5aa7",
+  "sourceTreeAndMergeParentsVerified": true,
+  "runId": 42183143836,
+  "restrictedJobId": 127777438625,
+  "artifact": {
+    "id": 13486047651,
+    "sha256": "b6874d9c47929a2eaed52159f65418ec8a2e6e682d16d5e5c4a05691af7f9b85",
+    "privateReceipt": "windows-provider-lookup-47a-native.json"
+  },
+  "archiveDigestVerified": true,
+  "archiveRetainedOnDisk": false,
+  "nodeRngImports": {
+    "schema": "switchyard-node-rng-imports/v1",
+    "nodeSha256": "63c259c81e5d472b5f11c8d506070130cb04a1ecf84b80377a34ed6ec9048088",
+    "tool": "dumpbin-imports",
+    "imports": {
+      "BCryptGenRandom": false,
+      "CryptAcquireContextW": true,
+      "CryptGenRandom": true,
+      "CryptReleaseContext": true
+    },
+    "runtimeBranchVerified": false,
+    "nodeStartupAccepted": false
+  },
+  "coldRandom": {
+    "schema": "switchyard-cold-restricted-random/v3",
+    "executableSha256": "432b65804e3ffdf7508e6613ea3d403417b74ab9b8d9770017361c74eee8316d",
+    "waitResult": 0,
+    "exitCode": 0,
+    "reportValid": true,
+    "report": {
+      "systemStatus": 0,
+      "providerOpenStatus": 0,
+      "providerStatus": 0,
+      "providerCloseStatus": 0,
+      "handlesClosedVerified": true,
+      "buffersClearedVerified": true,
+      "firstApi": "legacy-cryptoapi",
+      "legacy": {
+        "providerOpened": false,
+        "providerOpenError": 5,
+        "generated": null,
+        "generateError": null,
+        "providerCloseError": null,
+        "handlesClosedVerified": true,
+        "buffersClearedVerified": true
+      },
+      "enhancedProvider": {
+        "providerOpened": false,
+        "providerOpenError": 5,
+        "generated": null,
+        "generateError": null,
+        "providerCloseError": null,
+        "handlesClosedVerified": true,
+        "buffersClearedVerified": true
+      },
+      "providerLookups": {
+        "user": {
+          "succeeded": true,
+          "error": 0,
+          "providerClass": "strong",
+          "bufferClearedVerified": true
+        },
+        "machine": {
+          "succeeded": true,
+          "error": 0,
+          "providerClass": "strong",
+          "bufferClearedVerified": true
+        }
+      }
+    },
+    "primaryTokenVerified": true,
+    "tokenRecheckedAfterExit": true,
+    "treeExitVerified": true,
+    "processHandlesClosedVerified": true,
+    "creatorQuotaRestoredVerified": true,
+    "standardIo": {
+      "schema": "switchyard-restricted-child-stdio/v1",
+      "standardHandles": 3,
+      "inheritanceRestricted": true,
+      "stdinEof": true,
+      "stdoutBytes": 0,
+      "stderrBytes": 0,
+      "outputBounded": true,
+      "handlesClosedVerified": true,
+      "drainsCompleted": true,
+      "stderr": {
+        "category": "empty",
+        "function": null,
+        "code": null,
+        "sourceFile": null,
+        "sourceLine": null
+      }
+    },
+    "nodeStartupAccepted": false
+  },
+  "nodeExit": {
+    "waitResult": 0,
+    "exitCode": 134,
+    "resultAvailable": false
+  },
+  "nodeStderr": {
+    "category": "assertion",
+    "function": "ncrypto::CSPRNG",
+    "code": null,
+    "sourceFile": "node.cc",
+    "sourceLine": 1221
+  },
+  "failedFixtureRemoved": false,
+  "independentJobConclusions": {
+    "filesystem": "success",
+    "nativeSetup": "success"
+  },
+  "finding": "User and machine default-provider lookups both succeed and identify the Strong provider. The first default CryptoAPI open and the later fixed Enhanced-provider open both fail with Win32 Access Denied (5). Subsequent CNG calls succeed under the unchanged restricted primary token.",
+  "limits": [
+    "Default-provider lookup succeeds in this cold probe, but the exact resource or operation denied during provider open is not identified.",
+    "Original Node still exits 134 at CSPRNG without an owner result. This is failed software validation, not missing hardware.",
+    "No provider default, registry, account, token, privilege, environment or runtime image was changed. The original failed fixture is preserved."
+  ]
+}

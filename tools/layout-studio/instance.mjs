@@ -1,8 +1,8 @@
 /** Mutual local-instance authentication without disclosing the browser access token. */
 import { createHmac, randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
 import { request as httpRequest } from "node:http";
-const routes = { probe: "/instance/v1/probe", stop: "/instance/v1/stop", editorTarget: "/instance/v1/editor-target", editorReview: "/instance/v1/editor-review", editorIssue: "/instance/v1/editor-issue", editorConsume: "/instance/v1/editor-consume" };
-const editorActions = { editorReview: "review", editorIssue: "issue", editorConsume: "consume" };
+const routes = { probe: "/instance/v1/probe", stop: "/instance/v1/stop", editorTarget: "/instance/v1/editor-target", editorReview: "/instance/v1/editor-review", editorIssue: "/instance/v1/editor-issue", editorConsume: "/instance/v1/editor-consume", editorReturnTarget: "/instance/v1/editor-return-target" };
+const editorActions = { editorReview: "review", editorIssue: "issue", editorConsume: "consume", editorReturnTarget: "return-target" };
 const schema = "switchyard-instance/v1";
 const mac = (token, direction, route, raw) => createHmac("sha256", token).update(`SWITCHYARD-INSTANCE-V1\n${direction}\nPOST\n${route}\n`).update(raw).digest("hex");
 const same = (a, b) => typeof a === "string" && typeof b === "string" && /^[a-f0-9]{64}$/.test(a) && /^[a-f0-9]{64}$/.test(b) && timingSafeEqual(Buffer.from(a, "hex"), Buffer.from(b, "hex"));
@@ -26,7 +26,7 @@ export function createInstanceGateway({ token, identity, onStop, onEditorTarget,
       const raw = Buffer.concat(chunks), supplied = req.headers["x-switchyard-instance-request"];
       if (!same(supplied, mac(token, "REQUEST", req.url, raw))) throw new Error();
       const v = JSON.parse(raw.toString("utf8"));
-      const authorization = Object.hasOwn(editorActions, operation);
+      const authorization = Object.hasOwn(editorActions, operation), returning = operation === "editorReturnTarget";
       const expected = ["at", "build", "instanceId", "nonce", "operation", "schema", ...(operation === "editorTarget" || authorization ? ["selection"] : [])].sort();
       if (JSON.stringify(Object.keys(v).sort()) !== JSON.stringify(expected) || v.schema !== schema || v.operation !== operation || v.instanceId !== identity.id || v.build !== identity.build || !/^[A-Za-z0-9_-]{43}$/.test(v.nonce) || !Number.isSafeInteger(v.at) || Math.abs(now() - v.at) > 10000) throw new Error();
       let targetObservation, editorAuthorization;
@@ -39,10 +39,11 @@ export function createInstanceGateway({ token, identity, onStop, onEditorTarget,
       if (authorization) {
         const s = v.selection, ids = ["ownerRequestId", "loadRequestId", "requestId", "editorId", ...(operation === "editorIssue" ? ["token"] : operation === "editorConsume" ? ["permit"] : [])];
         if (stopping || typeof onEditorAuthorization !== "function" || !s || typeof s !== "object" || Array.isArray(s) || Object.keys(s).sort().join() !== ["compartment", ...ids].sort().join() || typeof s.compartment !== "string" || !/^[a-z][a-z0-9-]{0,63}$/.test(s.compartment) || !ids.every(key => typeof s[key] === "string" && /^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/.test(s[key]))) throw new Error();
-        editorAuthorization = await onEditorAuthorization(editorActions[operation], Object.freeze({ ...s }));
+        const result = await onEditorAuthorization(editorActions[operation], Object.freeze({ ...s }));
+        if (returning) targetObservation = result; else editorAuthorization = result;
         if (stopping) throw new Error();
       }
-      const response = JSON.stringify({ schema, operation, nonce: v.nonce, instanceId: identity.id, build: identity.build, pid: process.pid, origin, status: operation === "stop" || stopping ? "stopping" : "ready", ...(operation === "editorTarget" ? { targetObservation } : {}), ...(authorization ? { editorAuthorization } : {}) });
+      const response = JSON.stringify({ schema, operation, nonce: v.nonce, instanceId: identity.id, build: identity.build, pid: process.pid, origin, status: operation === "stop" || stopping ? "stopping" : "ready", ...(operation === "editorTarget" || returning ? { targetObservation } : {}), ...(authorization && !returning ? { editorAuthorization } : {}) });
       if (Buffer.byteLength(response) > 32768) throw new Error();
       res.writeHead(200, { "Content-Type": "application/json", "X-Switchyard-Instance-Response": mac(token, "RESPONSE-200", req.url, response) });
       if (operation === "stop" && !stopping) { stopping = true; res.once("finish", () => { void Promise.resolve().then(onStop).catch(() => {}); }); }

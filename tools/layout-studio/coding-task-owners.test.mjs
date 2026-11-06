@@ -263,7 +263,7 @@ test("authenticated editor routes consume one reviewed launch permission without
     return { status: response.status, body: await response.json() };
   };
   assert.equal((await api("review", input, false)).status, 401);
-  for (const action of ["review", "issue", "consume"]) assert.equal((await api(action, { ...input, command: "never" })).status, 409);
+  for (const action of ["review", "issue", "consume", "return-target"]) { assert.equal((await api(action, { ...input, command: "never" })).status, 409); assert.equal((await api(action, input, false)).status, 401); }
   const review = await api("review", input); assert.equal(review.status, 200);
   const issued = await api("issue", { ...input, token: review.body.confirmation.token }); assert.equal(issued.status, 200); assert.equal(issued.body.terminalLaunchAuthorized, false);
   const consumed = await api("consume", { ...input, permit: issued.body.permit }); assert.equal(consumed.status, 200); assert.equal(consumed.body.terminalLaunchAuthorized, true); assert.equal(consumed.body.terminalLaunched, false); assert.equal(consumed.body.ideAttached, false);
@@ -326,6 +326,12 @@ test("the editor client authenticates the real Studio route and reads original p
   assert.equal(consumed.terminalLaunchAuthorized, true); assert.equal(consumed.terminalLaunched, false); assert.equal(consumed.ideAttached, false); assert.deepEqual(consumed.target, result.target);
   const replay = await client.consumeEditor({ ...selected, permit: issued.permit }); assert.equal(replay.duplicatePrevented, true); assert.equal(replay.terminalLaunchAuthorized, false);
   assert.equal((await f.store.snapshot("personal")).codingEditorAuthorizations[0].status, "consumed");
+  const returnBefore = await f.store.snapshot("personal"); f.controls.observation = "active";
+  await assert.rejects(client.editorTarget({ compartment: "personal", ...f.input }));
+  const returning = await client.returnEditorTarget(selected); assert.deepEqual(returning, result); assert.equal(returning.authorityGranted, false);
+  assert.deepEqual(await f.store.snapshot("personal"), returnBefore); assert.equal(f.calls.filter(c => c === "resume").length, 1);
+  for (const changed of [{ editorId: randomUUID() }, { requestId: randomUUID() }, { loadRequestId: randomUUID() }]) await assert.rejects(client.returnEditorTarget({ ...selected, ...changed }));
+  f.controls.observation = "unknown"; await assert.rejects(client.returnEditorTarget(selected)); f.controls.observation = "idle";
   const cancelledSelection = { ...selected, requestId: randomUUID() }, cancelledReview = await client.reviewEditor(cancelledSelection);
   const cancelledIssue = await client.issueEditor({ ...cancelledSelection, token: cancelledReview.confirmation.token });
   f.controls.afterRead = async () => { if ((await f.store.snapshot("personal")).codingEditorAuthorizations.find(row => row.requestId === cancelledSelection.requestId)?.status === "consumed") client.close(); };
@@ -334,5 +340,5 @@ test("the editor client authenticates the real Studio route and reads original p
   const replacementClient = new StudioTaskClient({ endpointPath }); f.beforeCleanup(() => replacementClient.close());
   const cancelledReplay = await replacementClient.consumeEditor({ ...cancelledSelection, permit: cancelledIssue.permit });
   assert.equal(cancelledReplay.duplicatePrevented, true); assert.equal(cancelledReplay.terminalLaunchAuthorized, false);
-  f.controls.login = "f".repeat(64); await assert.rejects(replacementClient.editorTarget({ compartment: "personal", ...f.input })); assert.equal(f.calls.filter(c => c === "resume").length, 1);
+  f.controls.login = "f".repeat(64); await assert.rejects(replacementClient.returnEditorTarget(selected)); await assert.rejects(replacementClient.editorTarget({ compartment: "personal", ...f.input })); assert.equal(f.calls.filter(c => c === "resume").length, 1);
 });

@@ -287,10 +287,10 @@ export function createSuite({ store = createSuiteStore(), platform = process.pla
       if (path === "/api/suite/coding/authority/revoke") return taskAuthority.revoke(compartment, body.id);
       if (path.startsWith("/api/suite/coding/codex/editor/")) {
         const action = path.slice("/api/suite/coding/codex/editor/".length);
-        const fields = { review: [], issue: ["token"], consume: ["permit"] };
+        const fields = { review: [], issue: ["token"], consume: ["permit"], "return-target": [] };
         if (!Object.hasOwn(fields, action) || Object.keys(body).some(key => !["compartment", "workspaceBaseUrl", "ownerRequestId", "loadRequestId", "requestId", "editorId", ...fields[action]].includes(key))) throw new Error("Choose one exact editor authorization without unrelated fields.");
         const { compartment: _compartment, workspaceBaseUrl: _workspaceBaseUrl, ...input } = body;
-        return codingEditorAuthorizations[action](compartment, input);
+        return codingEditorAuthorizations[action === "return-target" ? "returnTarget" : action](compartment, input);
       }
       if (path.startsWith("/api/suite/coding/codex/owners/")) {
         await loadSelection();

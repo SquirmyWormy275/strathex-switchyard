@@ -17,9 +17,9 @@ export function createCodingEditorAuthorizations({ store, owners, isActive = asy
   let closed = false; const pending = new Set();
   const current = async c => { if (closed || !await isActive(c)) throw Error("The original editor workspace is no longer active."); await store.authorize(c, { provider: "codex" }); if (closed) throw Error("Editor authorization stopped."); };
   const policy = state => digest([state.policy, state.mode, state.accounts]);
-  async function capture(c, selected) {
+  async function capture(c, selected, returning = false) {
     await current(c);
-    const observation = await owners.editorTarget(c, { ownerRequestId: selected.ownerRequestId, loadRequestId: selected.loadRequestId });
+    const observation = await owners[returning ? "editorReturnTarget" : "editorTarget"](c, { ownerRequestId: selected.ownerRequestId, loadRequestId: selected.loadRequestId });
     await current(c); const state = await store.snapshot(c);
     if (observation?.metadataObserved !== true || observation.nativeLoadAcknowledged !== true || observation.authorityGranted !== false || observation.terminalLaunched !== false || observation.ideAttached !== false || observation.modelPromptSubmitted !== false || observation.completionVerified !== false || observation.nativeTaskLoaded !== false || observation.targetDigest !== digest(observation.target) || observation.target.ownerRequestId !== selected.ownerRequestId || observation.target.loadRequestId !== selected.loadRequestId || !uuid(observation.target.taskId) || !uuid(observation.target.sessionId) || observation.target.permissions !== "read-only/on-request") throw Error("The exact acknowledged editor target is unavailable.");
     const result = { target: structuredClone(observation.target), targetDigest: observation.targetDigest, policyDigest: policy(state) };
@@ -82,6 +82,27 @@ export function createCodingEditorAuthorizations({ store, owners, isActive = asy
         await recheck(c, selected, observed); lease.assert();
         if (now() >= row.expiresAt || now() < row.createdAt) throw Error("The consumed editor authorization expired before delivery.");
         return { ...view({ ...row, status: "consumed" }), terminalLaunchAuthorized: true, target: observed.target, targetDigest: observed.targetDigest, expiresAt: row.expiresAt };
+      });
+    }); },
+    returnTarget(c, input) { const selected = selection(input); return track(async () => {
+      await current(c);
+      const original = retained(await store.snapshot(c), selected);
+      if (!original || original.schema !== "switchyard-editor-authorization/v1" || original.status !== "consumed" || !uuid(original.taskId)
+          || !Number.isSafeInteger(original.createdAt) || original.expiresAt !== original.createdAt + 30000
+          || !Number.isSafeInteger(original.consumedAt) || original.consumedAt < original.createdAt || original.consumedAt >= original.expiresAt || now() < original.consumedAt) throw Error("Return requires the original consumed editor authorization.");
+      return store.withResourceLock("coding-task", `${c}:${original.taskId}`, async lease => {
+        const observed = await capture(c, selected, true); lease.assert();
+        const matches = async () => {
+          await current(c); const state = await store.snapshot(c), saved = retained(state, selected); lease.assert();
+          if (closed || digest(saved) !== digest(original) || original.taskId !== observed.target.taskId || original.targetDigest !== observed.targetDigest || original.policyDigest !== observed.policyDigest || policy(state) !== observed.policyDigest || original.scopeDigest !== digest(scope(c, selected, observed)) || now() < original.consumedAt) throw Error("The original consumed editor selection or policy changed.");
+        };
+        await matches();
+        if (digest(await capture(c, selected, true)) !== digest(observed)) throw Error("The original editor return target changed.");
+        await matches();
+        // Expiry bounds the original creation only. This read grants no new
+        // permission, does not resume the task and does not mutate the journal.
+        return { target: observed.target, targetDigest: observed.targetDigest, metadataObserved: true, nativeLoadAcknowledged: true,
+          nativeTaskLoaded: false, authorityGranted: false, terminalLaunched: false, ideAttached: false, modelPromptSubmitted: false, completionVerified: false };
       });
     }); },
     async close() { closed = true; await Promise.allSettled([...pending]); }
