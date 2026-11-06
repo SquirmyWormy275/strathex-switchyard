@@ -53,6 +53,7 @@ test('terminal disconnect withdraws acknowledgement and automatically retires it
  const f=await fixture(t),opened=await f.open(),terminal=await f.connect(opened.endpoint);terminal.send({id:1,method:'initialize',params:{clientInfo:{name:'codex_tui',version:'0.166.0'}}});await terminal.message();terminal.send({method:'initialized',params:{}});
  terminal.send({id:2,method:'thread/resume',params:{threadId:f.target.sessionId,cwd:f.target.repositoryRoot,sandbox:'read-only',approvalPolicy:'on-request'}});await terminal.message();await until(async()=>(await f.api.observe('personal',f.selected)).protocolAcknowledged);
  terminal.close();await until(async()=>(await f.store.snapshot('personal')).codingEditorConnections[0].status==='stopped');await assert.rejects(f.api.observe('personal',f.selected));assert.deepEqual(await readdir(f.socketRoot),[]);assert.equal(f.provider.closed,false);
+ const before=await f.store.snapshot('personal');assert.equal((await f.api.stop('personal',f.selected)).stoppedVerified,true);assert.equal((await f.api.stop('personal',f.selected)).duplicatePrevented,true);await assert.rejects(f.api.stop('personal',{...f.selected,editorId:randomUUID()}));assert.deepEqual(await f.store.snapshot('personal'),before);
 });
 test('workspace stop joins its exact carrier and bridge without replaying the consumed review',native,async t=>{
  const f=await fixture(t);await f.open();const a=f.api.stopCompartment('personal'),b=f.api.stopCompartment('personal');assert.equal(a,b);assert.equal((await a).stopped,true);

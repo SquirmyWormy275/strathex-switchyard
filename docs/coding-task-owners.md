@@ -535,3 +535,16 @@ twelve CommonJS method checks and exact test/build cleanup pass.
 Production command activation and frozen frontend exposure remain unfinished.
 Native Codex TUI behavior and installed 0.167.0 compatibility are unaccepted; no
 real provider account, native task, model or keyboard action ran.
+
+## Join a terminal that has already disconnected
+
+Carrier cleanup can finish before the editor's close notification arrives. Exact
+stop now returns the protected verified retirement record after its live handle
+is gone. It makes no provider request, changes no journal data and grants no new
+handle. An unknown, uncertain or differently bound request still refuses.
+
+Five groups / 39 tests include ending the actual synthetic terminal process,
+independently observing backend retirement, then successfully closing the retained
+launcher. Duplicate exact stop stays immutable and another editor UUID refuses.
+[Evidence](evidence/editor-retired-stop-summary.json). This correction is later
+than the accepted 255-group complete Linux routing run.

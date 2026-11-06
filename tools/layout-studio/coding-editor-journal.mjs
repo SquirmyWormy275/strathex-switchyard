@@ -147,6 +147,11 @@ export function createCodingEditorJournal({ store, authorizations, now=Date.now 
       await store.update(c,'coding-editor-connection-recover',state=>{require(!closed);lock.assert();require(hash(rowFor(state,s))===hash(original));Object.assign(rowFor(state,s),next);});return view(next);
     }));},
     async list(c) { await store.authorize(c);return ((await store.snapshot(c))[field]??[]).map(view); },
+    stopped(c,input) {const s=selection(input);return track(async()=>{
+      require(!closed);await store.authorize(c);const row=rowFor(await store.snapshot(c),s);
+      require(!closed && row?.schema==='switchyard-editor-connection/v1' && row.status==='stopped');
+      return {...view(row),duplicatePrevented:true};
+    });},
     async close() {closed=true;await Promise.allSettled([...pending]);}
   });
 }

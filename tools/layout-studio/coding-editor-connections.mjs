@@ -81,7 +81,7 @@ export function createCodingEditorConnections({ store, authorizations, owners, r
       try{await current(r);await r.handle.record({kind:'peer',...copied});await current(r);await r.ingress.pinPeer(copied);await current(r);return observation(r);}catch(error){try{await stop(r);}catch{error.editorRetirementUnconfirmed=true;}throw error;}
     });},
     observe(c,input) {const s=selected(input);return track(c,async()=>{const r=live.get(key(c,s));require(r && hash(r.s)===hash(s));await current(r);return observation(r);});},
-    stop(c,input) {const s=selected(input);return track(c,async()=>{const r=live.get(key(c,s));require(r && hash(r.s)===hash(s));return stop(r);});},
+    stop(c,input) {const s=selected(input);return track(c,async()=>{const r=live.get(key(c,s));if(!r)return journal.stopped(c,s);require(hash(r.s)===hash(s));return stop(r);});},
     recover(c,input) {const s=selected(input);return track(c,async()=>{
       require(!closed && !transitions.has(c) && !live.has(key(c,s)));
       return journal.recover(c,s,(row,beforeEffect)=>retireStoppedEditorConnection({root,row,beforeEffect}));

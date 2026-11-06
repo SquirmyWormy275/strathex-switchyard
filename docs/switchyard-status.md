@@ -8,8 +8,16 @@ verified retirement. Typecheck, compiled extension and twelve CommonJS methods
 pass; exact test/build cleanup verifies. Production command activation and native
 TUI/0.167.0 acceptance remain open. [Demonstration](evidence/editor-terminal-connection-summary.json).
 
-A complete Linux run of routing checkpoint `0ad510e` is in progress. Its result
-will be recorded separately from this later launcher work.
+Latest complete Linux `0ad510e` passes **255/255 groups, 1,682 tests,
+eleven declared skips and zero failures**. Every owned child/tree, checkout,
+dependency alias, build and temporary parent is verified retired. It covers the
+journal, recovery, routing and Suite transitions; later Terminal composition has
+separate focused evidence. [Complete result](evidence/linux-0ad-complete-summary.json).
+
+A later exact stop now accepts the protected retirement record when terminal
+disconnect has already completed backend cleanup. Five groups / 39 tests verify
+immutable duplicate stop, refusal of substituted identities and launcher shutdown
+after actual synthetic terminal exit. [Evidence](evidence/editor-retired-stop-summary.json).
 
 The signed editor connection and typed client now pass **seven groups / 96 tests**.
 The routed demonstration uses real protected state and Linux carriers with a
@@ -19,7 +27,7 @@ Typecheck, compiled extension and CommonJS client checks pass, and generated bui
 output is removed. Retained Terminal composition has later focused evidence;
 command activation remains unfinished. [Routing evidence](evidence/editor-routing-summary.json).
 
-Latest complete Linux `072e066` passes **252/252 groups, 1,649 tests,
+Earlier complete Linux `072e066` passes **252/252 groups, 1,649 tests,
 eleven declared skips and zero failures**. Every child/tree and the exact owned
 checkout, dependencies, builds and temporary parent are retired.
 [Complete result](evidence/linux-072-complete-summary.json).

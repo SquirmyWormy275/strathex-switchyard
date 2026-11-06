@@ -54,6 +54,8 @@ test('retained Terminal, signed client, protected Suite and real Linux carriers 
  const review=await launcher.review(selected),result=await launcher.launch(review);assert.equal(result.protocolAcknowledgementObserved,true);assert.equal(result.nativeProcessObserved,true);assert.equal(result.ideAttached,false);assert.equal(result.modelPromptSubmitted,false);assert.equal(calls.length,1);assert.equal(bridges,1);
  const row=(await store.snapshot('personal')).codingEditorConnections[0];assert.equal(row.status,'acknowledged');assert.equal(row.peer.pid,children[0]!.pid);assert.equal(row.acknowledgement.accountAfterVerified,true);
  await assert.rejects(launcher.launch(review));assert.equal((await launcher.focus(review)).focusVerified,true);assert.equal(calls.length,1);
+ assert.equal((await stopOwnedChild(children[0])).stopped,true);
+ const deadline=Date.now()+5000;while((await store.snapshot('personal')).codingEditorConnections[0].status!=='stopped'){assert.ok(Date.now()<deadline);await new Promise(r=>setTimeout(r,15));}
  await launcher.close();assert.equal((await store.snapshot('personal')).codingEditorConnections[0].status,'stopped');assert.deepEqual(await readdir(runtime),[]);assert.equal(provider.closed,false);assert.equal(activeListeners.size,0);assert.equal(closeListeners.size,0);
  const providerCalls=await readFile(join(providerRoot,'calls'),'utf8');assert.equal(providerCalls.split('\n').filter(line=>line==='thread/resume').length,1);assert.equal(providerCalls.includes('turn/start'),false);
 });

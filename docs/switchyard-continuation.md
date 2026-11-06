@@ -41,7 +41,10 @@ and joins exact dedicated cleanup. Signed routes and typed responses now pass se
 actual protected lifecycle routing and joined Suite transitions. Retained Terminal composition now passes six groups / 46 tests, including an owned
 synthetic terminal process through the signed service and real carriers. Command
 activation remains unfinished; native TUI compatibility is unaccepted.
-[Terminal demonstration](evidence/editor-terminal-connection-summary.json). [Routing evidence](evidence/editor-routing-summary.json).
+[Terminal demonstration](evidence/editor-terminal-connection-summary.json).
+Later stop after autonomous carrier cleanup is idempotent for the exact protected
+record; five groups / 39 tests pass with actual synthetic terminal exit and
+immutable refusal of substituted identities. [Evidence](evidence/editor-retired-stop-summary.json). [Routing evidence](evidence/editor-routing-summary.json).
 [Recovery evidence](evidence/editor-recovery-summary.json),
 [composed lifecycle](evidence/editor-connections-summary.json),
 [relay](evidence/editor-relay-summary.json).
@@ -97,12 +100,13 @@ the installed update or old live provider verifiers without a relevant new chang
 
 ## Continue independently
 
-1. Complete Linux `072e066` passes 252/252 groups, 1,649 tests, eleven declared
+1. Complete Linux `0ad510e` passes 255/255 groups, 1,682 tests, eleven declared
    skips and zero failures. All exact child/tree/staging cleanup verifies and the
-   marker is removed. [Receipt](evidence/linux-072-complete-summary.json).
-   It includes the relay; the later journal has separate focused evidence.
-   Earlier `d243d81` is accepted and `7772cb3` remains failed. The newer `0ad510e` complete run is active under the existing marker; reconcile
-   it before starting another. Inspect `/tmp/switchyard-full-linux-path.json` first.
+   marker is removed. [Receipt](evidence/linux-0ad-complete-summary.json).
+   It includes journal, recovery, routing and Suite transitions; later retained
+   Terminal composition and idempotent retired-stop correction have separate
+   focused evidence. Do not repeat this accepted run without a relevant change.
+   Before another justified run, inspect `/tmp/switchyard-full-linux-path.json`.
    Verify source, phase, process exit, root identities, receipt and every owned
    alias/build/test parent. Never broaden cleanup or relax deadlines.
 
