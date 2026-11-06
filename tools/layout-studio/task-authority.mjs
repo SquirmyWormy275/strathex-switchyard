@@ -100,7 +100,39 @@ export function createTaskAuthority({ store, checkNative, isActive = async () =>
   }
   const scope = (c, result) => scopeHash(["switchyard-task-authority/v1", c, result.binding, result.workspace, result.snapshot.id, result.proposed]);
   const view = record => ({ ...structuredClone(record), status: record.grant.revokedAt ? "revoked" : Date.parse(record.grant.expiresAt) <= now() ? "expired" : "issued", targetCurrentness: "requires-revalidation", nativePermissionsChanged: false, providerTaskCompletionVerified: false, localCommitExecutionImplemented: Boolean(localCommitExecutionImplemented), connectedExecutionActions: [...executionActions] });
+  async function scannerInventory(c, input, generation) {
+    const { state, task } = await access(c, input.taskId, generation), binding = taskDigest(task), workspace = workspaceDigest(state);
+    if (typeof checkNative !== "function" || typeof inspection.scannerInputs !== "function") throw Error("The native scanner inventory verifier is unavailable.");
+    const authorize = async () => { const fresh = await access(c, task.id, generation, task.provider); if (taskDigest(fresh.task) !== binding || workspaceDigest(fresh.state) !== workspace) throw Error("The exact task, account or workspace changed during scanner inventory."); };
+    await checkNative(c, task); await authorize();
+    const report = await inspection.scannerInputs(c, task, authorize);
+    await authorize(); await checkNative(c, task); await authorize();
+    return { report, task, binding, workspace };
+  }
+  async function reviewCaptured(c, result, generation) {
+    current(c, generation);
+    const confirmation = await suiteConfirmations(store, c, result.task.provider, now).issue({ action: "issue_task_authority", sessionId: result.task.sessionId, targetSnapshotId: result.snapshot.id, scopeDigest: scope(c, result),
+      reason: "Authorize only the displayed connected host actions for these literal files, plan revision, native task/account and repository snapshot. Explicitly included ignored files are read-only inputs to the pinned Shield scanner, never commit or general execution inputs. Provider tools and native permissions stay unchanged. Every effect still needs its separate exact review." + (result.proposed.classifications.excludedIgnoredTrees?.length ? " The displayed ignored generated trees are excluded by explicit Shield-only policy: their directory identities are witnessed, their contents are not scanned or hashed, and this cannot establish a complete security pass." : ""), reauthenticated: false });
+    current(c, generation); return { status: "requires-confirmation", confirmation, scope: { ...result.proposed, provider: result.task.provider, sessionId: result.task.sessionId, accountFingerprint: result.task.accountFingerprint, repositoryRoot: result.task.repositoryRoot, repositoryIdentity: result.task.repositoryIdentity, targetSnapshot: result.snapshot, allowedActions: result.proposed.actions }, nativePermissionsChanged: false };
+  }
   return {
+    async reviewScanner(c, input) { return exclusive(c, async generation => {
+      if (!input || Object.keys(input).some(key => !["taskId", "compartment", "action", "planRevision", "lifetimeMinutes"].includes(key)) || input.compartment !== undefined && input.compartment !== c || !linuxShieldActions.includes(input.action)) throw Error("Prepare only one connected Shield action for one exact task; custom paths, exclusions and imported approvals require their separate review.");
+      // Validate action/revision/lifetime before any native query; real paths
+      // replace this validation-only placeholder after the bounded inventory.
+      const base = proposal({ ...input, paths: ["placeholder"], actions: [input.action] }, executionActions);
+      const inventory = await scannerInventory(c, input, generation), rows = inventory.report.rows;
+      if (rows.some(row => row.recommendation === "needs-classification")) throw Error("Ignored paths still require explicit classification. Use the scanner input preview and exact file review.");
+      const selected = rows.filter(row => row.kind === "file-path"), proposed = proposal({ ...base, paths: selected.map(row => row.path), classifications: {
+        includedUntracked: selected.filter(row => row.source === "untracked").map(row => row.path),
+        includedIgnored: selected.filter(row => row.source === "ignored").map(row => row.path),
+        excludedIgnoredTrees: rows.filter(row => row.recommendation === "review-build-tree-exclusion").map(row => row.path)
+      } }, executionActions);
+      const result = await capture(c, proposed, generation);
+      const capturedPaths = [...result.files.tracked, ...result.files.untracked, ...result.files.ignored.filter(file => file.classification === "included")].map(file => file.path).sort();
+      if (result.snapshot.head !== inventory.report.head || result.binding !== inventory.binding || result.workspace !== inventory.workspace || JSON.stringify(capturedPaths) !== JSON.stringify(proposed.paths) || result.files.tracked.some(file => file.state === "tracked_missing")) throw Error("The complete proposed scanner file set, revision or task scope changed or has missing files. Review again.");
+      return { ...await reviewCaptured(c, result, generation), preparation: { policy: "bounded-current-files/v1", inventoryDigest: inventory.report.metadataDigest, fileCount: proposed.paths.length, excludedTreeCount: proposed.classifications.excludedIgnoredTrees?.length ?? 0, scanPerformed: false, authorityGranted: false, securityCoverageComplete: false } };
+    }); },
     async historyInputs(c,input){return exclusive(c,async generation=>{
       if(!input||Object.keys(input).some(key=>!["taskId","compartment","paths","depth"].includes(key))||!uuid(input.taskId)||input.compartment!==undefined&&input.compartment!==c)throw Error("Witness only named bounded history inputs for one bound task; arbitrary commits, refs, commands and policies are refused.");
       const selected=historySelection(input.paths,input.depth),{state,task}=await access(c,input.taskId,generation),binding=taskDigest(task),workspace=workspaceDigest(state);
@@ -142,16 +174,8 @@ export function createTaskAuthority({ store, checkNative, isActive = async () =>
     }); },
     async scannerInputs(c, input) { return exclusive(c, async generation => {
       if (!input || Object.keys(input).some(key => !["taskId", "compartment"].includes(key)) || !uuid(input.taskId) || input.compartment !== undefined && input.compartment !== c) throw Error("Inspect scanner inputs for one exact bound task; arbitrary paths, commands and policies are refused.");
-      const { state, task } = await access(c, input.taskId, generation), binding = taskDigest(task), workspace = workspaceDigest(state);
-      if (typeof checkNative !== "function" || typeof inspection.scannerInputs !== "function") throw Error("The native scanner inventory verifier is unavailable.");
-      const authorize = async () => {
-        const fresh = await access(c, task.id, generation, task.provider);
-        if (taskDigest(fresh.task) !== binding || workspaceDigest(fresh.state) !== workspace) throw Error("The exact task, account or workspace changed during scanner inventory.");
-      };
-      await checkNative(c, task); await authorize();
-      const result = await inspection.scannerInputs(c, task, authorize);
-      await authorize(); await checkNative(c, task); await authorize();
-      return { ...result, taskId: task.id, provider: task.provider, nativePermissionsChanged: false };
+      const { report, task } = await scannerInventory(c, input, generation);
+      return { ...report, taskId: task.id, provider: task.provider, nativePermissionsChanged: false };
     }); },
     /** Host ports only. No public route accepts a grant, snapshot or native identity. */
     authorityLedger(c) {
@@ -178,10 +202,7 @@ export function createTaskAuthority({ store, checkNative, isActive = async () =>
       return { ...actual, record: structuredClone(record) };
     }); },
     async review(c, input) { return exclusive(c, async generation => {
-      const result = await capture(c, proposal(input, executionActions), generation); current(c, generation);
-      const confirmation = await suiteConfirmations(store, c, result.task.provider, now).issue({ action: "issue_task_authority", sessionId: result.task.sessionId, targetSnapshotId: result.snapshot.id, scopeDigest: scope(c, result),
-        reason: "Authorize only the displayed connected host actions for these literal files, plan revision, native task/account and repository snapshot. Explicitly included ignored files are read-only inputs to the pinned Shield scanner, never commit or general execution inputs. Provider tools and native permissions stay unchanged. Every effect still needs its separate exact review." + (result.proposed.classifications.excludedIgnoredTrees?.length ? " The displayed ignored generated trees are excluded by explicit Shield-only policy: their directory identities are witnessed, their contents are not scanned or hashed, and this cannot establish a complete security pass." : ""), reauthenticated: false });
-      current(c, generation); return { status: "requires-confirmation", confirmation, scope: { ...result.proposed, provider: result.task.provider, sessionId: result.task.sessionId, accountFingerprint: result.task.accountFingerprint, repositoryRoot: result.task.repositoryRoot, repositoryIdentity: result.task.repositoryIdentity, targetSnapshot: result.snapshot, allowedActions: result.proposed.actions }, nativePermissionsChanged: false };
+      return reviewCaptured(c, await capture(c, proposal(input, executionActions), generation), generation);
     }); },
     async issue(c, input) { return exclusive(c, async generation => {
       if (!uuid(input.token)) throw new Error("Use the exact one-use approval from this task authority review.");

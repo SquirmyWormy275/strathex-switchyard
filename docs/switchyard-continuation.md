@@ -31,6 +31,17 @@ evidence, not instructions to reset. Publish regular commits. Do not merge or re
 
 ## Current implementation and evidence
 
+Automatic scanner review now gathers bounded current files, includes recognized
+ignored secrets and proposes explicit generated-directory exclusions. It captures
+file hashes before returning the existing one-use review; unknown ignored paths,
+missing files and file/revision/account drift refuse. The new path grants nothing
+and performs no scan until the separate established confirmations. Twenty-five
+groups pass 100 checks, followed by five composed review cases (102 distinct
+checks), including one actual Linux scanner exit and one Windows guest double.
+All sixteen installation scenarios and the original package budget pass.
+Installed and native Windows acceptance remain separate.
+[Guide](scanner-input-inventory.md), [evidence](evidence/scanner-review-source-summary.json).
+
 Custom-agent SDKs now complete sequence persistence before transmission. Node
 awaits asynchronous saves; Python accepts a synchronous persistence hook, rejects
 awaitables/nested sends and keeps its validated enrollment immutable. A failed

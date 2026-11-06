@@ -46,6 +46,8 @@ test("suite bundles contain the actual offline backend, frozen frontend and lice
   const protocol = createCodexEditorProtocol({ sessionId: "11111111-1111-4111-8111-111111111111", repositoryRoot: "/synthetic/repository", accountFingerprint: "a".repeat(64) });
   assert.equal(protocol.observation().ideAttached, false); protocol.close(); assert.equal(protocol.observation().protocolAcknowledged, false);
   assert.ok(bundle.bytes < 5 * 1024 * 1024); assert.equal(manifest.integrity, "sha256-content-manifest-not-signed");
+  for (const path of ["integrations/README.md", "tools/layout-studio/README.md"]) { assert.equal(manifest.files.some(file => file.path === path), false); assert.ok((await readFile(join(sourceRoot, path))).length > 0); }
+  assert.ok(manifest.files.some(file => file.path === "ATTRIBUTION.md"));
   const manifestBytes = await readFile(join(bundle.directory, "switchyard-release.json"));
   assert.deepEqual(JSON.parse(manifestBytes), manifest);
   assert.ok(bundle.bytes + manifestBytes.length < 5 * 1024 * 1024, "The full Linux package, including its integrity manifest, must stay below the original budget.");

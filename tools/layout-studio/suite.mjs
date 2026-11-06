@@ -266,6 +266,10 @@ export function createSuite({ store = createSuiteStore(), platform = process.pla
         return shieldExceptions.list(compartment);
       }
       if (path === "/api/suite/coding/authority/review") return taskAuthority.review(compartment, body);
+      if (path === "/api/suite/coding/authority/scanner-review") {
+        const { workspaceBaseUrl, ...input } = body;
+        return taskAuthority.reviewScanner(compartment, input);
+      }
       if (path === "/api/suite/coding/authority/scanner-inputs") {
         const { workspaceBaseUrl, ...input } = body;
         return taskAuthority.scannerInputs(compartment, input);

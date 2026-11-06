@@ -74,7 +74,10 @@ export async function buildSuiteRelease({ sourceRoot, sourceFiles, outputRoot, f
   const front = JSON.parse((await bytes(join(frontendRoot, "manifest.json"))).toString("utf8"));
   if (front.schema !== "switchyard-front-end-review/v1" || hash(JSON.stringify(front.files)) !== front.digest) throw new Error("Choose a verified frozen frontend review; preparing a new review is a separate action.");
   if (!Array.isArray(sourceFiles) || !sourceFiles.length || sourceFiles.some((name) => { try { portableName(name); return false; } catch { return true; } })) throw new Error("Provide the explicit tracked source inventory; untracked local files must never enter a bundle.");
-  const tracked = new Set(sourceFiles), inputs = new Map(), add = async (from, to = from) => { portableName(to); if (!tracked.has(from)) return; if (inputs.has(to)) throw new Error("A release input was duplicated."); inputs.set(to, await bytes(join(sourceRoot, from))); };
+  // Repository walkthroughs link to source-only docs and are not runtime inputs.
+  // Attribution and every third-party notice remain in the bundle below.
+  const sourceOnlyDocs = new Set(["integrations/README.md", "tools/layout-studio/README.md"]);
+  const tracked = new Set(sourceFiles), inputs = new Map(), add = async (from, to = from) => { portableName(to); if (!tracked.has(from) || sourceOnlyDocs.has(from)) return; if (inputs.has(to)) throw new Error("A release input was duplicated."); inputs.set(to, await bytes(join(sourceRoot, from))); };
   // These browser entry points and static assets ship once in the verified frozen
   // frontend. Shared modules (for example catalog.mjs) remain in the backend.
   const frontendOnly = new Set(["index.html", "style.css", "app.mjs", "home.mjs", "shell.mjs", "keyboard-view.mjs", "suite-ui.mjs", "device-ui.mjs", "model-f-catalog.json"]);

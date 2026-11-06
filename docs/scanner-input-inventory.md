@@ -1,5 +1,42 @@
 # Prepare scanner inputs
 
+## Prepare a review automatically
+
+`POST /api/suite/coding/authority/scanner-review` prepares an exact current-file
+review for one bound task and one connected Shield action:
+
+```json
+{
+  "taskId": "11111111-1111-4111-8111-111111111111",
+  "action": "shield_codebase_audit",
+  "planRevision": "review-1"
+}
+```
+
+The UUID above is an example; use the actual task identity. This route gathers
+tracked and new files, includes recognized ignored secret inputs, and proposes
+whole ignored generated directories as explicit exclusions. It then captures
+the actual file hashes and excluded-directory identities through the existing
+protected inspector. It refuses unknown ignored paths, missing tracked files,
+changed file sets, revision drift and task/account/workspace changes. Use the
+metadata preview below and the ordinary exact-file review for unsupported cases.
+
+The response contains the normal `requires-confirmation` review, exact `scope`
+and a `preparation` summary. Nothing is granted or scanned. Display every included
+path and exclusion before passing the unchanged proposal fields and its one-use
+token to `coding/authority/issue`. Issuance captures the inputs again; later scans
+still need their existing separate execution review. The generated proposal
+cannot authorize commits, general commands or arbitrary ignored-tree exclusions.
+
+The existing feature-branch, native-task and Personal companion requirements
+remain. At most 256 selected files and 32 named generated roots fit this path;
+no files are silently truncated. Generated contents, staged/history versions and
+broader security coverage remain unverified. A complete target snapshot means
+the displayed scope is witnessed, not that the repository passed a security scan.
+Frontend controls remain pending.
+
+## Preview names before choosing a scope
+
 The authenticated `coding/authority/scanner-inputs` API accepts one bound native
 `taskId` in the active Personal companion compartment. It returns a read-only
 metadata preview to help an operator choose inputs for a later exact scan.
@@ -70,7 +107,8 @@ The verifier removes its own large sparse build fixture after inspection, before
 the separate scanner authority review. Existing authority still requires exact classified file hashes. A separate
 [reviewed generated-tree policy](ignored-build-tree-policy.md) can now exclude
 whole named ignored roots using explicit directory-identity witnesses; the
-preview does not apply that policy or grant it. Automatic complete-target scan assembly, persisted
+preview does not apply that policy or grant it. The automatic current-file review
+above now assembles supported bounded selections. General complete-target scan assembly, persisted
 operator-configured general exclusions,
 history scanning and the frontend remain unfinished implementation. A separate
 [explicit Linux staged-input scan](staged-shield-inputs.md) now preserves both
@@ -78,3 +116,24 @@ index and worktree origin; automatic assembly remains unfinished. Windows stagin
 actual NTFS/guest acceptance remains separate.
 See [explicit ignored scanner inputs](ignored-scanner-inputs.md) for the distinct
 reviewed read-only scan path.
+
+## Automatic review verification
+
+Twenty-five groups pass 100 checks; a five-case composed follow-up brings this
+change to 102 distinct checks. The authenticated HTTP review covers one-use
+issuance, ignored secrets, explicit build exclusions, hash drift and preserved
+original files/index/HEAD. One actual Linux scanner run and one Windows guest
+double retain authenticated incomplete findings, replay refusal and cleanup.
+Native task identity and Git guardian witnesses use controlled doubles in these
+fixtures; the Linux scanner process itself executes and independently exits.
+
+The first focused run exposed two fixture assertions that assumed an empty
+confirmation array existed. A later broad run caught the omitted new timeout
+inventory entry and a complete test bundle exceeding 5 MiB by 410 bytes. Both
+failed receipts remain recorded. The builder now leaves two unused first-party
+README copies in the repository; attribution, third-party notices, pinned
+upstream files and the frozen frontend remain. The corrected complete test
+bundle is 5,228,487 bytes, with the original budget unchanged. All sixteen
+installation scenarios pass. These source checks do not accept live installed
+scanning, a real Windows guest or frontend controls.
+[Evidence](evidence/scanner-review-source-summary.json).

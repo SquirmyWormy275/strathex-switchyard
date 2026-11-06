@@ -236,6 +236,7 @@ export const requiredGroups = [
   { file: "tools/layout-studio/repository-shield-licenses.test.mjs", ...nativeTestOverrides("tools/layout-studio/repository-shield-licenses.test.mjs"), expectedSkipped: process.platform === "linux" ? 0 : 2 },
   { file: "tools/layout-studio/repository-windows-shield-licenses.test.mjs", ...nativeTestOverrides("tools/layout-studio/repository-windows-shield-licenses.test.mjs") },
   { file: "tools/layout-studio/shield-input-inventory.test.mjs" },
+  { file: "tools/layout-studio/scanner-review.test.mjs", timeoutMs: process.platform === "win32" ? 240_000 : 120_000, expectedSkipped: process.platform === "linux" ? 0 : 1 },
   { file: "tools/layout-studio/git-index-inputs.test.mjs" },
   { file: "tools/layout-studio/git-history-inputs.test.mjs" },
   { file: "tools/layout-studio/task-history-inputs.test.mjs", ...nativeTestOverrides("tools/layout-studio/task-history-inputs.test.mjs"), expectedSkipped: process.platform === "linux" ? 0 : 1 },
