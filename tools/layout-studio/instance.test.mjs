@@ -62,3 +62,31 @@ test("signed editor metadata reaches only its closed read-only route and cannot 
     await requestInstance(endpoint, { operation: "stop" }); assert.equal((await send()).status, 403); assert.equal(calls, 1);
   }, { suite, bridge: { close() {} } });
 });
+test("each signed editor authorization operation has its own closed route and fields; stop fences pending replies", async () => {
+  const calls = [], selection = { compartment: "personal", ownerRequestId: randomUUID(), loadRequestId: randomUUID(), requestId: randomUUID(), editorId: randomUUID() };
+  let gate, entered;
+  const suite = { async handle(path, body) { calls.push({ path, body }); assert.ok(Object.isFrozen(body)); if (gate) { entered(); await gate; } return { terminalLaunched: false }; } };
+  await serverFixture(async ({ endpoint, stops }) => {
+    const origin = new URL(endpoint.url).origin;
+    for (const action of ["review", "issue", "consume"]) {
+      const route = "/instance/v1/editor-" + action, operation = "editor" + action[0].toUpperCase() + action.slice(1), selected = { ...selection, ...(action === "issue" ? { token: randomUUID() } : action === "consume" ? { permit: randomUUID() } : {}) };
+      const send = async (change = {}, headers = {}, destination = route) => {
+        const raw = JSON.stringify({ schema: "switchyard-instance/v1", operation, nonce: randomBytes(32).toString("base64url"), at: Date.now(), instanceId: endpoint.instance.id, build, selection: selected, ...change });
+        const signature = createHmac("sha256", token).update(`SWITCHYARD-INSTANCE-V1\nREQUEST\nPOST\n${route}\n`).update(raw).digest("hex");
+        return fetch(origin + destination, { method: "POST", headers: { "Content-Type": "application/json", "X-Switchyard-Instance-Request": signature, ...headers }, body: raw });
+      };
+      const accepted = await send(); assert.equal(accepted.status, 200); const raw = await accepted.text();
+      assert.equal(accepted.headers.get("x-switchyard-instance-response"), createHmac("sha256", token).update(`SWITCHYARD-INSTANCE-V1\nRESPONSE-200\nPOST\n${route}\n`).update(raw).digest("hex"));
+      assert.equal(JSON.parse(raw).editorAuthorization.terminalLaunched, false); assert.equal(calls.at(-1).path, "/api/suite/coding/codex/editor/" + action); assert.deepEqual(calls.at(-1).body, selected);
+      const count = calls.length;
+      for (const change of [{ selection: null }, { selection: { ...selected, editorId: "latest" } }, { selection: { ...selected, prompt: "never" } }, { selection: { ...selected, command: "never" } }, { selection: { ...selected, [action === "issue" ? "permit" : "token"]: randomUUID() } }, { operation: "editorTarget" }, { at: Date.now() - 11000 }]) assert.equal((await send(change)).status, 403);
+      assert.equal((await send({}, { Origin: origin })).status, 403); assert.equal((await send({}, {}, "/instance/v1/editor-target")).status, 403); assert.equal(calls.length, count);
+      await assert.rejects(requestInstance(endpoint, { operation }), /Unsupported/);
+      if (action === "consume") {
+        let release; gate = new Promise(r => { release = r; }); const ready = new Promise(r => { entered = r; }); const pending = send(); await ready;
+        await requestInstance(endpoint, { operation: "stop" }); release(); assert.equal((await pending).status, 403); assert.equal((await send()).status, 403);
+      }
+    }
+    assert.equal(stops(), 1);
+  }, { suite, bridge: { close() {} } });
+});

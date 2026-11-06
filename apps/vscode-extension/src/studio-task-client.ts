@@ -18,6 +18,7 @@ const digest = (v: unknown) => createHash("sha256").update(JSON.stringify(v)).di
 const mac = (token: string, direction: string, route: string, body: string) => createHmac("sha256", token).update(`SWITCHYARD-INSTANCE-V1\n${direction}\nPOST\n${route}\n`).update(body).digest("hex");
 
 export interface StudioEditorSelection { readonly compartment: string; readonly ownerRequestId: string; readonly loadRequestId: string; }
+export interface StudioEditorRequest extends StudioEditorSelection { readonly requestId: string; readonly editorId: string; }
 export interface StudioEditorTarget {
   readonly schema: "switchyard-codex-editor-target/v1";
   readonly ownerRequestId: string; readonly loadRequestId: string; readonly taskId: string; readonly sessionId: string;
@@ -48,7 +49,57 @@ function observation(value: unknown, selected: StudioEditorSelection): StudioEdi
   return Object.freeze(value) as unknown as StudioEditorObservation;
 }
 
-/** Read-only client. No command registration, browser action, task load or terminal launch. */
+export interface StudioEditorReview {
+  readonly status: "requires-confirmation"; readonly selection: Omit<StudioEditorRequest, "compartment">; readonly target: StudioEditorTarget;
+  readonly confirmation: Readonly<{ token: string; record: Readonly<{ id: string; action: "launch_codex_editor"; sessionId: string; targetSnapshotId: string; scopeDigest: string; reason: string; reauthenticated: false; createdAt: string; expiresAt: string }> }>;
+  readonly terminalLaunchAuthorized: false; readonly terminalLaunched: false; readonly ideAttached: false; readonly modelPromptSubmitted: false; readonly completionVerified: false;
+}
+export interface StudioEditorAuthorization {
+  readonly requestId: string; readonly editorId: string; readonly ownerRequestId: string; readonly loadRequestId: string;
+  readonly status: "issued" | "consumed"; readonly terminalLaunchAuthorized: boolean;
+  readonly terminalLaunched: false; readonly ideAttached: false; readonly modelPromptSubmitted: false; readonly completionVerified: false;
+  readonly permit?: string; readonly expiresAt?: number; readonly targetDigest?: string; readonly target?: StudioEditorTarget; readonly duplicatePrevented?: true;
+}
+const editorIds = ["ownerRequestId", "loadRequestId", "requestId", "editorId"] as const;
+const editorFlags = ["terminalLaunchAuthorized", "terminalLaunched", "ideAttached", "modelPromptSubmitted", "completionVerified"] as const;
+function editorSelection(input: StudioEditorRequest, extra: "token" | "permit" | undefined = undefined): StudioEditorRequest & Record<string, unknown> {
+  requireValue(object(input) && keys(input as unknown as Record<string, unknown>, ["compartment", ...editorIds, ...(extra ? [extra] : [])]) && /^[a-z][a-z0-9-]{0,63}$/.test(input.compartment) && editorIds.every(key => uuid(input[key])));
+  if (extra) requireValue(uuid((input as unknown as Record<string, unknown>)[extra]));
+  return Object.freeze({ ...input });
+}
+function editorTarget(value: unknown, selected: StudioEditorSelection): StudioEditorTarget {
+  return observation({ target: value, targetDigest: digest(value), metadataObserved: true, nativeLoadAcknowledged: true, nativeTaskLoaded: false, authorityGranted: false, terminalLaunched: false, ideAttached: false, modelPromptSubmitted: false, completionVerified: false }, selected).target;
+}
+function editorReview(value: unknown, selected: StudioEditorRequest): StudioEditorReview {
+  requireValue(object(value) && keys(value, ["status", "selection", "target", "confirmation", ...editorFlags]) && value.status === "requires-confirmation" && editorFlags.every(key => value[key] === false));
+  const selection = value.selection, confirmation = value.confirmation;
+  requireValue(object(selection) && keys(selection, editorIds) && editorIds.every(key => selection[key] === selected[key]));
+  const target = editorTarget(value.target, selected);
+  requireValue(object(confirmation) && keys(confirmation, ["record", "token"]) && uuid(confirmation.token));
+  const record = confirmation.record;
+  requireValue(object(record) && keys(record, ["id", "action", "sessionId", "targetSnapshotId", "scopeDigest", "reason", "reauthenticated", "createdAt", "expiresAt"]) && uuid(record.id) && record.action === "launch_codex_editor" && record.sessionId === target.sessionId && hash(record.scopeDigest) && record.reauthenticated === false);
+  requireValue(record.targetSnapshotId === digest(["switchyard-editor-launch/v1", selected.compartment, Object.fromEntries(editorIds.map(key => [key, selected[key]]))]));
+  requireValue(typeof record.reason === "string" && record.reason.length > 0 && record.reason.length <= 2048 && !/[\x00-\x1f\x7f]/.test(record.reason) && typeof record.createdAt === "string" && typeof record.expiresAt === "string");
+  const created = Date.parse(record.createdAt), expires = Date.parse(record.expiresAt), at = Date.now();
+  requireValue(Number.isFinite(created) && created <= at && expires > at && expires - created === 300000);
+  Object.freeze(selection); Object.freeze(record); Object.freeze(confirmation);
+  return Object.freeze(value) as unknown as StudioEditorReview;
+}
+function editorAuthorization(value: unknown, selected: StudioEditorRequest, operation: "editorIssue" | "editorConsume"): StudioEditorAuthorization {
+  requireValue(object(value)); const duplicate = value.duplicatePrevented === true;
+  const extra = duplicate ? ["duplicatePrevented"] : operation === "editorIssue" ? ["permit", "expiresAt", "targetDigest"] : ["target", "targetDigest", "expiresAt"];
+  requireValue(keys(value, [...editorIds, "status", ...editorFlags, ...extra]) && editorIds.every(key => value[key] === selected[key]) && ["issued", "consumed"].includes(value.status as string));
+  requireValue(editorFlags.filter(key => key !== "terminalLaunchAuthorized").every(key => value[key] === false) && value.terminalLaunchAuthorized === (!duplicate && operation === "editorConsume"));
+  if (operation === "editorConsume" || !duplicate) requireValue(value.status === (operation === "editorIssue" ? "issued" : "consumed"));
+  if (!duplicate) {
+    requireValue(hash(value.targetDigest) && Number.isSafeInteger(value.expiresAt) && (value.expiresAt as number) > Date.now() && (value.expiresAt as number) <= Date.now() + 30000);
+    if (operation === "editorIssue") requireValue(uuid(value.permit));
+    else { editorTarget(value.target, selected); requireValue(digest(value.target) === value.targetDigest); }
+  }
+  return Object.freeze(value) as unknown as StudioEditorAuthorization;
+}
+
+/** Signed target/review/permit transport. No command registration, task load or terminal launch. */
 export class StudioTaskClient {
   private readonly active = new Set<ClientRequest>();
   private closed = false;
@@ -90,17 +141,23 @@ export class StudioTaskClient {
       req.once("close", () => { clearTimeout(timer); this.active.delete(req); }); req.once("error", reject); req.end(body);
     });
   }
-  async editorTarget(input: StudioEditorSelection): Promise<StudioEditorObservation> {
-    requireValue(object(input) && keys(input as unknown as Record<string, unknown>, ["compartment", "ownerRequestId", "loadRequestId"]) && /^[a-z][a-z0-9-]{0,63}$/.test(input.compartment) && uuid(input.ownerRequestId) && uuid(input.loadRequestId));
-    const selected = Object.freeze({ ...input });
-    const e = await this.endpoint(), route = "/instance/v1/editor-target", nonce = randomBytes(32).toString("base64url");
-    const body = JSON.stringify({ schema: "switchyard-instance/v1", operation: "editorTarget", nonce, at: Date.now(), instanceId: e.instance.id, build: e.instance.build, selection: selected });
+  private async exchange(operation: "editorTarget" | "editorReview" | "editorIssue" | "editorConsume", selected: StudioEditorSelection): Promise<unknown> {
+    const e = await this.endpoint(), route = { editorTarget: "/instance/v1/editor-target", editorReview: "/instance/v1/editor-review", editorIssue: "/instance/v1/editor-issue", editorConsume: "/instance/v1/editor-consume" }[operation], nonce = randomBytes(32).toString("base64url");
+    const body = JSON.stringify({ schema: "switchyard-instance/v1", operation, nonce, at: Date.now(), instanceId: e.instance.id, build: e.instance.build, selection: selected });
     const proof = await this.post(new URL(route, e.url.origin), body, { "X-Switchyard-Instance-Request": mac(e.token, "REQUEST", route, body) });
     requireValue(proof.status === 200 && hash(proof.signature) && timingSafeEqual(Buffer.from(proof.signature, "hex"), Buffer.from(mac(e.token, "RESPONSE-200", route, proof.body), "hex")));
     const identity: unknown = JSON.parse(proof.body);
-    requireValue(object(identity) && keys(identity, ["schema", "operation", "nonce", "instanceId", "build", "pid", "origin", "status", "targetObservation"]) && identity.schema === "switchyard-instance/v1" && identity.operation === "editorTarget" && identity.nonce === nonce && identity.instanceId === e.instance.id && identity.build === e.instance.build && identity.pid === e.pid && identity.origin === e.url.origin && identity.status === "ready");
+    const field = operation === "editorTarget" ? "targetObservation" : "editorAuthorization";
+    requireValue(object(identity) && keys(identity, ["schema", "operation", "nonce", "instanceId", "build", "pid", "origin", "status", field]) && identity.schema === "switchyard-instance/v1" && identity.operation === operation && identity.nonce === nonce && identity.instanceId === e.instance.id && identity.build === e.instance.build && identity.pid === e.pid && identity.origin === e.url.origin && identity.status === "ready");
     requireValue((await this.endpoint()).bytes === e.bytes);
-    await this.current(); return observation(identity.targetObservation, selected);
+    await this.current(); return identity[field];
   }
+  async editorTarget(input: StudioEditorSelection): Promise<StudioEditorObservation> {
+    requireValue(object(input) && keys(input as unknown as Record<string, unknown>, ["compartment", "ownerRequestId", "loadRequestId"]) && /^[a-z][a-z0-9-]{0,63}$/.test(input.compartment) && uuid(input.ownerRequestId) && uuid(input.loadRequestId));
+    const selected = Object.freeze({ ...input }); return observation(await this.exchange("editorTarget", selected), selected);
+  }
+  async reviewEditor(input: StudioEditorRequest): Promise<StudioEditorReview> { const selected = editorSelection(input); return editorReview(await this.exchange("editorReview", selected), selected); }
+  async issueEditor(input: StudioEditorRequest & { readonly token: string }): Promise<StudioEditorAuthorization> { const selected = editorSelection(input, "token"); return editorAuthorization(await this.exchange("editorIssue", selected), selected, "editorIssue"); }
+  async consumeEditor(input: StudioEditorRequest & { readonly permit: string }): Promise<StudioEditorAuthorization> { const selected = editorSelection(input, "permit"); return editorAuthorization(await this.exchange("editorConsume", selected), selected, "editorConsume"); }
   close(): void { this.closed = true; for (const request of this.active) request.destroy(Error("Switchyard editor observation stopped.")); }
 }

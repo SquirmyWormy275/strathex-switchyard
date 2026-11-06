@@ -4,6 +4,18 @@ Switchyard is a partial implementation of the full Rev2 suite. The F77 is its
 pilot device. Software checks, installed Linux demonstrations, native Windows
 filesystem tests and physical/account acceptance are separate evidence.
 
+Latest complete Linux evidence is `83d4139`: **244/244 groups, 1,556 passed
+tests and eleven declared skips**, with all owned cleanup verified. Later editor
+authorization and its signed consumer have separate focused evidence.
+[Complete run](evidence/linux-83d-complete-summary.json),
+[backend authorization](evidence/editor-authorization-summary.json),
+[signed consumer](evidence/editor-authorization-client-summary.json).
+
+The latest native cold CNG probe succeeds under the original restricted primary
+token; Node still aborts at CSPRNG with exit 134. This is a failed software
+validation, not an unavailable-hardware check.
+[Exact Windows result](evidence/windows-cold-random-native-summary.json).
+
 | Path | Accepted evidence | Practical limit |
 | --- | --- | --- |
 | Installed owner metadata `4b5e3cc` | Six normal update checks, seven owner-route metadata/refusal checks and seven existing metadata checks pass. Original 54 workspaces, selected sealed bytes/private endpoint/frozen Home and dated launcher hashes verify; temporary bundle removed. [Receipt](evidence/installed-task-owner-summary.json). | Zero native provider starts, task loads, model turns or hardware operations. Actual loading and IDE attachment remain separate acceptance. |

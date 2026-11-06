@@ -16,6 +16,8 @@ The backend now prepares an exact editor target only from an acknowledged load o
 
 The cold native CNG probe at `83d4139` passes both API forms under the exact restricted primary token. Its token recheck, process/tree/pipe retirement, provider closure and buffer clearing verify. Node still aborts at `ncrypto::CSPRNG` before JavaScript, exit 134; the failed fixture is preserved. This narrows the investigation beyond a universal cold BCrypt access failure, without identifying the OpenSSL cause or claiming a repair. [Native evidence](evidence/windows-cold-random-native-summary.json).
 
+The signed editor review/issue/consume client now reaches the protected backend with strict instance and selection binding. Cancellation after durable consumption leaves the authorization spent. Focused cohorts, typecheck and compiled extension checks pass; actual terminal creation and native acknowledgement remain unfinished. [Evidence](evidence/editor-authorization-client-summary.json).
+
 ## Latest verified checkpoints
 
 | Checkpoint | Result | What it establishes |

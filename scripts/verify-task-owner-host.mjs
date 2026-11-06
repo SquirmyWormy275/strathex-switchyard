@@ -33,10 +33,10 @@ const definitions = state => hash(JSON.stringify([state.profile, state.workflow,
 const stateRoot = join(process.env.XDG_STATE_HOME || join(homedir(), ".local/state"), "strathex-switchyard/suite"), stateFile = join(stateRoot, selected + ".sealed.json");
 const evidence = { schema: "switchyard-installed-task-owner-metadata/v1", at: new Date().toISOString(), applicationRelease: installed.build, checks: [], nativeProviderStarts: 0, nativeTaskLoads: 0, modelPromptsSubmitted: 0, keyboardOpened: false, microphoneOpened: false, workspaceCreated: false, frontendChanged: false, nativeTaskLoadingAccepted: false, ideAttachmentAccepted: false }; let failure;
 try {
-  for (const path of ["tools/layout-studio/coding-task-owners.mjs", "tools/layout-studio/codex-owned-listener.mjs", "tools/layout-studio/codex-stdio-tasks.mjs", "tools/layout-studio/suite.mjs", "tools/layout-studio/suite-store.mjs", "tools/layout-studio/confirmations.mjs", "tools/layout-studio/instance.mjs", "tools/layout-studio/serve.mjs", "tools/layout-studio/cvss-v2-metrics.mjs", "tools/layout-studio/osv-advisory-source.mjs"]) assert.equal(hash(await readFile(join(installationRoot(), "versions", installed.build, path))), hash(await readFile(new URL("../" + path, import.meta.url))));
+  for (const path of ["tools/layout-studio/coding-task-owners.mjs", "tools/layout-studio/coding-editor-authorizations.mjs", "packages/control-plane/src/confirmations.ts", "tools/layout-studio/codex-owned-listener.mjs", "tools/layout-studio/codex-stdio-tasks.mjs", "tools/layout-studio/suite.mjs", "tools/layout-studio/suite-store.mjs", "tools/layout-studio/confirmations.mjs", "tools/layout-studio/instance.mjs", "tools/layout-studio/serve.mjs", "tools/layout-studio/cvss-v2-metrics.mjs", "tools/layout-studio/osv-advisory-source.mjs"]) assert.equal(hash(await readFile(join(installationRoot(), "versions", installed.build, path))), hash(await readFile(new URL("../" + path, import.meta.url))));
   evidence.checks.push("normal installed release contains the exact task owner, resume boundary, state and route source");
   assert.equal((before.observations ?? []).some(row => row.status === "recording") || (before.voice ?? []).some(row => row.status === "recording") || (before.conversations ?? []).some(row => row.status === "pending"), false, "Preserve active user work before normal workspace initialization.");
-  const snapshot = await api("snapshot", { compartment: selected }); assert.equal(Object.hasOwn(snapshot, "codingTaskOwners"), false); assert.equal(Object.hasOwn(snapshot, "codingTaskLoads"), false);
+  const snapshot = await api("snapshot", { compartment: selected }); assert.equal(Object.hasOwn(snapshot, "codingTaskOwners"), false); assert.equal(Object.hasOwn(snapshot, "codingTaskLoads"), false); assert.equal(Object.hasOwn(snapshot, "codingEditorAuthorizations"), false);
   evidence.checks.push("generic installed snapshot does not expose private request journals or tombstones");
   const sealed = hash(await privateRead(stateFile));
   const expectedCompartments = await store.list(), inventory = await api("compartment/inventory", {});
@@ -61,7 +61,16 @@ try {
   await api(prefix + "load", { compartment: selected, ownerRequestId: missing, requestId: randomUUID(), token: randomUUID(), replay: true }, 409);
   evidence.checks.push("unknown owner and unexpected effect fields refuse before provider start or task resume");
   const { StudioTaskClient } = await import("../apps/vscode-extension/src/studio-task-client.ts"), editor = new StudioTaskClient({ endpointPath: endpointFile, assertCurrent: current });
-  try { await assert.rejects(editor.editorTarget({ compartment: selected, ownerRequestId: missing, loadRequestId: randomUUID() }), /original Switchyard editor target did not authenticate or validate/); }
+  try {
+    await assert.rejects(editor.editorTarget({ compartment: selected, ownerRequestId: missing, loadRequestId: randomUUID() }), /original Switchyard editor target did not authenticate or validate/);
+    const input = { compartment: selected, ownerRequestId: missing, loadRequestId: randomUUID(), requestId: randomUUID(), editorId: randomUUID() };
+    assert.equal((before.codingEditorAuthorizations ?? []).some(row => row.requestId === input.requestId), false);
+    await assert.rejects(editor.reviewEditor(input), /original Switchyard editor target did not authenticate or validate/);
+    await assert.rejects(editor.issueEditor({ ...input, token: randomUUID() }), /original Switchyard editor target did not authenticate or validate/);
+    await assert.rejects(editor.consumeEditor({ ...input, permit: randomUUID() }), /original Switchyard editor target did not authenticate or validate/);
+    evidence.signedEditorAuthorizationRefusals = 3;
+    evidence.checks.push("signed editor review, issue and consume refuse unknown ownership without confirmation, permit or terminal effects");
+  }
   finally { editor.close(); }
   evidence.signedEditorUnknownOwnerRefused = true; evidence.checks.push("exact-source editor consumer refuses an unknown installed target without a bearer, terminal or native task effect");
   const installedRoot = join(installationRoot(), "versions", installed.build), { cvssV2Metrics } = await import(pathToFileURL(join(installedRoot, "tools/layout-studio/cvss-v2-metrics.mjs"))), { normalizeOsvRecord } = await import(pathToFileURL(join(installedRoot, "tools/layout-studio/osv-advisory-source.mjs")));

@@ -196,13 +196,36 @@ operations.
 
 This is permission for a specific local editor launch, not proof that one
 occurred. `terminalLaunched`, `ideAttached`, `modelPromptSubmitted` and
-`completionVerified` remain false. The extension must still obtain this grant
-through authenticated transport, recheck its original focused window and exact
-executable, create the terminal once, and observe the native task/account
-acknowledgement. Those connections remain unfinished.
+`completionVerified` remain false. The signed extension transport now obtains this grant through the fixed instance
+routes. Focused-window and exact-executable checks, one terminal creation and
+native task/account acknowledgement still need their end-to-end connection.
 
 Five isolated groups pass 59 tests, including an actual authenticated HTTP
 review/issue/consume journey through the protected owner service with a
 controlled provider. Typecheck and all child/tree cleanup pass. No live provider
 task, model request, terminal or hardware operation is performed.
 [Evidence](evidence/editor-authorization-summary.json).
+
+## Signed editor review and authorization consumer
+
+The extension client now exposes `reviewEditor`, `issueEditor` and
+`consumeEditor` through three fixed signed instance routes. Each request and
+reply binds the original private endpoint, listener/build, nonce and exact
+workspace/owner/load/request/editor IDs. The client accepts only the matching
+confirmation domain, current permit and closed response schema. It transmits
+scoped review tokens and permits inside signed requests; the application bearer
+stays local. Stopping the client or changing its endpoint refuses delivery.
+
+The composed software demonstration reaches the real protected backend through
+the HTTP gateway, using controlled provider metadata. It covers review, issue,
+consume and replay refusal. Closing the client after durable consumption loses
+the reply; a fresh client still sees the request spent. No automatic retry can
+turn that lost reply into another launch authorization.
+
+Three focused groups pass 39 tests, four regression groups pass 38, and the final
+owner cohort passes 25 after adding cancellation coverage. These counts overlap.
+Two verifier argument-guard tests, typecheck, extension compilation and compiled
+CommonJS method checks also pass. Child/tree cleanup and removal of the exact
+generated extension output verify. Actual terminal creation, command wiring and
+native attachment acknowledgement remain unfinished.
+[Source-specific evidence](evidence/editor-authorization-client-summary.json).

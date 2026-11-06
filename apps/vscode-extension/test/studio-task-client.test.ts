@@ -15,17 +15,25 @@ async function fixture(t: TestContext) {
   const selected = { compartment: "personal", ownerRequestId: randomUUID(), loadRequestId: randomUUID() };
   const target = { schema: "switchyard-codex-editor-target/v1", ownerRequestId: selected.ownerRequestId, loadRequestId: selected.loadRequestId, taskId: randomUUID(), sessionId: randomUUID(), repositoryRoot: "/exact repository", repositoryIdentity: { device: "1", inode: "2" }, accountFingerprint: "b".repeat(64), permissions: "read-only/on-request", endpoint: { socketPath: "/tmp/exact-private-socket", socketDevice: "1", socketInode: "3", peerPid: 1234, peerBirth: "456", peerExecutableSha256: "c".repeat(64) } };
   const result = () => ({ target, targetDigest: createHash("sha256").update(JSON.stringify(target)).digest("hex"), metadataObserved: true, nativeLoadAcknowledged: true, nativeTaskLoaded: false, authorityGranted: false, terminalLaunched: false, ideAttached: false, modelPromptSubmitted: false, completionVerified: false });
-  const controls: { forged: boolean; afterProbe?: () => Promise<void> | void; alter?: (value: ReturnType<typeof result>) => unknown; hold?: boolean; routeStatus?: number } = { forged: false };
+  const controls: { forged: boolean; afterProbe?: () => Promise<void> | void; alter?: (value: ReturnType<typeof result>) => unknown; alterAuthorization?: (value: any) => unknown; hold?: boolean; routeStatus?: number } = { forged: false };
   const calls: { path: string; bearer: boolean; payload?: unknown }[] = [];
   const gateway = createInstanceGateway({ token, identity, onStop: () => { throw Error("Stop is outside this read-only client"); }, onEditorTarget: async (selection: unknown) => {
     calls.at(-1)!.payload = selection;
     if (controls.afterProbe) await controls.afterProbe();
     const value = result(); return controls.alter ? controls.alter(value) : value;
+  }, onEditorAuthorization: async (action: string, input: any) => {
+    calls.at(-1)!.payload = input; if (controls.afterProbe) await controls.afterProbe();
+    const { compartment, token: _token, permit: _permit, ...selection } = input;
+    const scopeSelection = { ownerRequestId: selection.ownerRequestId, loadRequestId: selection.loadRequestId, requestId: selection.requestId, editorId: selection.editorId };
+    const at = Date.now();
+    const value: any = action === "review" ? { status: "requires-confirmation", selection, target, confirmation: { token: randomUUID(), record: { id: randomUUID(), action: "launch_codex_editor", sessionId: target.sessionId, targetSnapshotId: createHash("sha256").update(JSON.stringify(["switchyard-editor-launch/v1", compartment, scopeSelection])).digest("hex"), scopeDigest: "f".repeat(64), reason: "Review this exact synthetic editor.", reauthenticated: false, createdAt: new Date(at).toISOString(), expiresAt: new Date(at + 300000).toISOString() } }, terminalLaunchAuthorized: false, terminalLaunched: false, ideAttached: false, modelPromptSubmitted: false, completionVerified: false }
+      : { ...selection, status: action === "issue" ? "issued" : "consumed", terminalLaunchAuthorized: action === "consume", terminalLaunched: false, ideAttached: false, modelPromptSubmitted: false, completionVerified: false, targetDigest: result().targetDigest, expiresAt: Date.now() + 30000, ...(action === "issue" ? { permit: randomUUID() } : { target }) };
+    return controls.alterAuthorization ? controls.alterAuthorization(value) : value;
   } });
   let origin: string;
   const server = createServer(async (req, res) => {
     calls.push({ path: req.url ?? "", bearer: Boolean(req.headers.authorization) });
-    assert.equal(req.url, "/instance/v1/editor-target"); assert.equal(req.headers.authorization, undefined); assert.equal(req.headers.origin, undefined);
+    assert.ok(["/instance/v1/editor-target", "/instance/v1/editor-review", "/instance/v1/editor-issue", "/instance/v1/editor-consume"].includes(req.url!)); assert.equal(req.headers.authorization, undefined); assert.equal(req.headers.origin, undefined);
     if (controls.hold) return;
     if (controls.forged) { res.end(JSON.stringify({ status: "ready" })); return; }
     await gateway(req, res, origin);
@@ -79,4 +87,35 @@ test("client shutdown cancels an in-flight proof and cannot disclose a bearer or
   const pending = f.client.editorTarget(f.selected), rejected = assert.rejects(pending);
   while (!f.calls.length) await new Promise(resolve => setImmediate(resolve));
   f.client.close(); await rejected; await assert.rejects(f.client.editorTarget(f.selected)); assert.equal(f.calls.some(row => row.bearer), false);
+});
+test("signed editor authorization validates exact reviews and consumed permissions while retaining false native-effect claims", { skip: process.platform !== "linux" }, async t => {
+  const f = await fixture(t), selected = { ...f.selected, requestId: randomUUID(), editorId: randomUUID() };
+  const review = await f.client.reviewEditor(selected); assert.deepEqual(review.target, f.target); assert.equal(review.terminalLaunchAuthorized, false);
+  const issued = await f.client.issueEditor({ ...selected, token: review.confirmation.token }); assert.equal(issued.terminalLaunchAuthorized, false); assert.ok(issued.permit);
+  const consumed = await f.client.consumeEditor({ ...selected, permit: issued.permit }); assert.equal(consumed.terminalLaunchAuthorized, true); assert.equal(consumed.terminalLaunched, false); assert.equal(consumed.ideAttached, false); assert.deepEqual(consumed.target, f.target);
+  for (const value of [review, review.selection, review.confirmation, review.confirmation.record, issued, consumed, consumed.target]) assert.ok(Object.isFrozen(value));
+  assert.deepEqual(f.calls.map(row => row.path), ["/instance/v1/editor-review", "/instance/v1/editor-issue", "/instance/v1/editor-consume"]); assert.equal(f.calls.some(row => row.bearer), false); assert.equal(JSON.stringify(f.calls).includes("s".repeat(43)), false);
+});
+test("signed replies cannot substitute review domain, editor identity, expiry, target or native effect claims", { skip: process.platform !== "linux" }, async t => {
+  for (const [method, mutate] of [
+    ["reviewEditor", (v: any) => { v.selection.editorId = randomUUID(); }], ["reviewEditor", (v: any) => { v.confirmation.record.action = "load_codex_task"; }], ["reviewEditor", (v: any) => { v.confirmation.record.targetSnapshotId = "a".repeat(64); }], ["reviewEditor", (v: any) => { v.confirmation.record.expiresAt = new Date(Date.now() - 1).toISOString(); }], ["reviewEditor", (v: any) => { v.confirmation.record.reauthenticated = true; }],
+    ["issueEditor", (v: any) => { v.permit = "latest"; }], ["issueEditor", (v: any) => { v.expiresAt = Date.now() - 1; }], ["issueEditor", (v: any) => { v.terminalLaunchAuthorized = true; }], ["issueEditor", (v: any) => { v.editorId = randomUUID(); }],
+    ["consumeEditor", (v: any) => { v.target.accountFingerprint = "e".repeat(64); }], ["consumeEditor", (v: any) => { v.target.endpoint.socketPath = "/foreign"; }], ["consumeEditor", (v: any) => { v.terminalLaunched = true; }], ["consumeEditor", (v: any) => { v.ideAttached = true; }], ["consumeEditor", (v: any) => { v.duplicatePrevented = true; }], ["consumeEditor", (v: any) => { v.expiresAt = Date.now() + 31000; }]
+  ] as const) {
+    const f = await fixture(t), selected = { ...f.selected, requestId: randomUUID(), editorId: randomUUID(), ...(method === "issueEditor" ? { token: randomUUID() } : method === "consumeEditor" ? { permit: randomUUID() } : {}) };
+    f.controls.alterAuthorization = value => { mutate(value); return value; };
+    await assert.rejects(f.client[method](selected as any));
+  }
+});
+test("authorization transport rejects unsigned or changed-instance replies, copies selected IDs and accepts only non-authorizing replay metadata", { skip: process.platform !== "linux" }, async t => {
+  for (const drift of ["forged", "endpoint", "selection", "duplicate"]) {
+    const f = await fixture(t), selected = { ...f.selected, requestId: randomUUID(), editorId: randomUUID(), permit: randomUUID() }, original = { ...selected };
+    if (drift === "forged") f.controls.forged = true;
+    if (drift === "endpoint") f.controls.afterProbe = () => writeFile(f.endpointPath, JSON.stringify({ ...f.endpoint, pid: process.pid + 1 }));
+    if (drift === "selection") f.controls.afterProbe = () => { selected.editorId = randomUUID(); };
+    if (drift === "duplicate") f.controls.alterAuthorization = value => { const { target: _t, targetDigest: _d, expiresAt: _e, ...base } = value; return { ...base, duplicatePrevented: true, terminalLaunchAuthorized: false }; };
+    if (["forged", "endpoint"].includes(drift)) await assert.rejects(f.client.consumeEditor(selected));
+    else { const value = await f.client.consumeEditor(selected); assert.equal(value.editorId, original.editorId); assert.equal(value.terminalLaunchAuthorized, drift !== "duplicate"); }
+    assert.equal(f.calls.some(row => row.bearer), false);
+  }
 });
