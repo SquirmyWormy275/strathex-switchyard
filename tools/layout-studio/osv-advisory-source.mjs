@@ -1,6 +1,6 @@
 /** Fixed public OSV transport. Output is unsigned data, never installed trust. */
 import { createHash } from "node:crypto";
-import { shieldEngineVersion, pypiIdentity, cratesIoIdentity, parsePypiVersion, pypiVersionKey, comparePypiVersions } from "./shield-scanner-engine.mjs";
+import { shieldEngineVersion, pypiIdentity, cratesIoIdentity, parseCargoVersion, compareCargoVersions, parsePypiVersion, pypiVersionKey, comparePypiVersions } from "./shield-scanner-engine.mjs";
 import { cvssV2Metrics, cvssV2BaseAlgorithm, cvssV2MetricsAlgorithm } from "./cvss-v2-metrics.mjs";
 import { cvssV3BaseAlgorithm } from "./cvss-v3-base.mjs";
 import { cvssV3Metrics, cvssV3MetricsAlgorithm } from "./cvss-v3-metrics.mjs";
@@ -10,14 +10,15 @@ const endpoint = "https://api.osv.dev/v1/query", sha = bytes => createHash("sha2
 const object = value => value !== null && typeof value === "object" && !Array.isArray(value);
 function sourceVersion(value, ecosystem = "npm") {
   if (ecosystem === "PyPI") { parsePypiVersion(value); return value; }
-  if (typeof value !== "string" || !/^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/.test(value) || value.length > 32) throw Error("OSV collection currently supports exact stable npm/crates.io versions only.");
+  if (ecosystem === "crates.io") { parseCargoVersion(value); return { cargo: value }; }
+  if (typeof value !== "string" || !/^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/.test(value) || value.length > 32) throw Error("OSV collection currently supports exact stable npm versions only.");
   const parts = value.split(".").map(Number);
   if (parts.some(part => !Number.isSafeInteger(part) || part > 2147483647)) throw Error("OSV version exceeds its supported numeric bound.");
   return parts;
 }
-function compare(left, right) { if (typeof left === "string" && typeof right === "string") return comparePypiVersions(left, right); for (let i = 0; i < Math.max(left.length,right.length); i++) if ((left[i]??0) !== (right[i]??0)) return (left[i]??0) < (right[i]??0) ? -1 : 1; return 0; }
+function compare(left, right) { if (typeof left === "string" && typeof right === "string") return comparePypiVersions(left, right); if (left.cargo !== undefined && right.cargo !== undefined) return compareCargoVersions(left.cargo, right.cargo); for (let i = 0; i < Math.max(left.length,right.length); i++) if ((left[i]??0) !== (right[i]??0)) return (left[i]??0) < (right[i]??0) ? -1 : 1; return 0; }
 export function osvPackageQueries(input) {
-  if (!Array.isArray(input) || !input.length || input.length > 32) throw Error("Collect 1–32 explicitly named exact stable npm/crates.io or bounded PEP 440 PyPI versions.");
+  if (!Array.isArray(input) || !input.length || input.length > 32) throw Error("Collect 1–32 explicitly named stable npm, bounded Cargo SemVer or PEP 440 PyPI versions.");
   const seen = new Set();
   return input.map(value => {
     if (!object(value) || Object.keys(value).sort().join() !== "ecosystem,name,version") throw Error("OSV accepts only a closed literal package identity.");
@@ -28,10 +29,10 @@ export function osvPackageQueries(input) {
     else throw Error("OSV accepts only literal npm/PyPI/crates.io identities; arbitrary URLs, purls, commands and ecosystems are refused.");
     const parts=sourceVersion(query.version,query.ecosystem);
     if (Array.isArray(parts)) while(parts.length>1&&parts.at(-1)===0)parts.pop();
-    const key=query.ecosystem+":"+query.name+"@"+(query.ecosystem === "PyPI" ? pypiVersionKey(query.version) : parts.join("."));
+    const key=query.ecosystem+":"+query.name+"@"+(query.ecosystem === "PyPI" ? pypiVersionKey(query.version) : query.ecosystem === "crates.io" ? query.version : parts.join("."));
     if (seen.has(key)) throw Error("OSV package queries must be distinct."); seen.add(key);
     return query;
-  }).sort((a, b) => (a.ecosystem < b.ecosystem ? -1 : a.ecosystem > b.ecosystem ? 1 : 0)|| (a.name < b.name ? -1 : a.name > b.name ? 1 : compare(sourceVersion(a.version,a.ecosystem), sourceVersion(b.version,b.ecosystem))));
+  }).sort((a, b) => (a.ecosystem < b.ecosystem ? -1 : a.ecosystem > b.ecosystem ? 1 : 0)|| (a.name < b.name ? -1 : a.name > b.name ? 1 : compare(sourceVersion(a.version,a.ecosystem), sourceVersion(b.version,b.ecosystem))) || (a.version < b.version ? -1 : a.version > b.version ? 1 : 0));
 }
 function timestamp(value) {
   if (typeof value !== "string" || value.length > 40 || !/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(?:\.\d{1,9})?Z$/.test(value) || !Number.isFinite(Date.parse(value))) throw Error("OSV record has no supported modification timestamp.");
@@ -120,7 +121,7 @@ export function normalizeOsvRecord(record, query, observedAt) {
       try { return comparePypiVersions(value, query.version) === 0; } catch { return false; }
     })) { proof ??= "pep440-version-equivalent"; matched.push(affected); continue; }
     if (!Array.isArray(affected.ranges) || affected.ranges.length > 32) continue;
-    for (const range of affected.ranges) if (rangeContains(range, query.version,query.ecosystem)) { proof ??= query.ecosystem==="PyPI"?"pep440-pypi-version-range":"stable-semver-range"; matched.push(affected); break; }
+    for (const range of affected.ranges) if (rangeContains(range, query.version,query.ecosystem)) { proof ??= query.ecosystem==="PyPI"?"pep440-pypi-version-range":query.ecosystem==="crates.io"?"cargo-semver-range":"stable-semver-range"; matched.push(affected); break; }
   }
   if (!proof) throw Error("OSV response did not independently establish this exact package ecosystem/name/version as affected; fuzzy matches are not accepted.");
   const { severity, ...assessment } = severityAssessment(record, matched);
@@ -181,5 +182,5 @@ export async function collectOsvAdvisories(input, { fetchImpl = globalThis.fetch
   const finished = now();
   if (performance.now() > deadline || !Number.isFinite(finished) || finished < started || finished - started > totalTimeoutMs + 5000) throw Error("OSV collection clock or total deadline changed; no complete feed was produced.");
   const feed = { schema: "switchyard-shield-advisories/v1", version: 1, engine: shieldEngineVersion, packages };
-  return { feed, provenance: { schema: "switchyard-osv-collection/v1", collector: "switchyard-osv-collector/6", normalizedFeedSha256: sha(JSON.stringify(feed)), source: endpoint, startedAt, finishedAt: new Date(finished).toISOString(), unsigned: true, upstreamSignatureVerified: false, authorityGranted: false, completeRepositoryCoverage: false, severityAssessment: "cvss-v2-v3-v4-base-when-supported", packages: observations } };
+  return { feed, provenance: { schema: "switchyard-osv-collection/v1", collector: "switchyard-osv-collector/7", normalizedFeedSha256: sha(JSON.stringify(feed)), source: endpoint, startedAt, finishedAt: new Date(finished).toISOString(), unsigned: true, upstreamSignatureVerified: false, authorityGranted: false, completeRepositoryCoverage: false, severityAssessment: "cvss-v2-v3-v4-base-when-supported", packages: observations } };
 }

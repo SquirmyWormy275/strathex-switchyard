@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {scannerFixture,cargoLockFixture} from './test-support/shield-scanner-fixture.mjs';
 import {parseShieldScannerReport} from './repository-shield.mjs';
 import {createHash} from 'node:crypto';
-import {parseCargoLock,cargoPublicSource,cargoIdentity,cratesIoIdentity,validateCargoComponent,cargoCycloneDxComponent} from './shield-scanner-engine.mjs';
+import {parseCargoVersion,compareCargoVersions,parseCargoLock,cargoPublicSource,cargoIdentity,cratesIoIdentity,validateCargoComponent,cargoCycloneDxComponent} from './shield-scanner-engine.mjs';
 const packageText=(source=cargoPublicSource)=>`[[package]]\nname = "example"\nversion = "1.2.3"\nsource = ${JSON.stringify(source)}\n${source.startsWith('registry+')?'checksum = "'+'a'.repeat(64)+'"\n':''}`;
 test('Cargo 3/4 declarations preserve source distinctions and keep private Git identities out of the BOM',()=>{
  for(const version of [3,4]){
@@ -14,11 +14,11 @@ test('Cargo 3/4 declarations preserve source distinctions and keep private Git i
 });
 test('ambiguous keys, tables, strings, lists, duplicate package sources and unfinished input refuse the entire Cargo inventory',()=>{
  const valid='version = 4\n'+packageText();
- for(const text of [valid+'name = "replacement"\n',valid+'[metadata]\n',valid+packageText(),valid.replace('version = 4','version = 5'),valid.replace('name = "example"','name = \'example\''),valid+'dependencies = [\n "unfinished",\n',valid+'dependencies = ["a" "b"]\n',valid+'dependencies = ["a", "a"]\n',valid.replace('example','example\\/invalid'),valid.replace('1.2.3','1.2.3-beta.1'),valid.replace('a'.repeat(64),'invalid')])assert.throws(()=>parseCargoLock(text));
+ for(const text of [valid+'name = "replacement"\n',valid+'[metadata]\n',valid+packageText(),valid.replace('version = 4','version = 5'),valid.replace('name = "example"','name = \'example\''),valid+'dependencies = [\n "unfinished",\n',valid+'dependencies = ["a" "b"]\n',valid+'dependencies = ["a", "a"]\n',valid.replace('example','example\\/invalid'),valid.replace('1.2.3','1.2.3-beta.01'),valid.replace('a'.repeat(64),'invalid')])assert.throws(()=>parseCargoLock(text));
 });
-test('Cargo identity is stable-only, bounded and independent of public registry identity',()=>{
+test('Cargo identity is bounded and independent of public registry identity',()=>{
  assert.deepEqual(cargoIdentity('Local_Crate','18446744073709551615.0.0'),{name:'Local_Crate',version:'18446744073709551615.0.0'});
- for(const [name,version] of [['name','18446744073709551616.0.0'],['name','01.2.3'],['name','1.2'],['../name','1.2.3'],['name','1.2.3+build']])assert.throws(()=>cargoIdentity(name,version));
+ for(const [name,version] of [['name','18446744073709551616.0.0'],['name','01.2.3'],['name','1.2'],['../name','1.2.3'],['name','1.2.3+build..part']])assert.throws(()=>cargoIdentity(name,version));
  assert.throws(()=>cratesIoIdentity('Local_Crate','1.2.3'));assert.equal(cratesIoIdentity('normal-crate','1.2.3').ecosystem,'crates.io');
 });
 test('closed Cargo components cannot promote private sources, declared checksums or unrelated paths',()=>{
@@ -53,4 +53,18 @@ test('Cargo feeds match only exact public registry identities and host validatio
 test('unsupported Cargo syntax returns no partial inventory and a clean selected feed stays incomplete',async()=>{
  const invalid=await scannerFixture({action:'release_shield',files:{'Cargo.lock':'version = 4\n'+packageText()+'[unsupported]\n'}}).scan();assert.equal(invalid.sbom.components.length,0);assert.ok(invalid.gaps.includes('unsupported_cargo_lock'));
  const clean=await cargoLockFixture({action:'release_shield',clean:true}).scan();assert.equal(clean.outcome,'incomplete');assert.equal(clean.findings.length,0);assert.equal(clean.cycloneDx.compositions[0].aggregate,'unknown');
+});
+
+test('Cargo SemVer preserves literal prerelease/build identity while comparing precedence without build metadata',()=>{
+ const ordered=['1.0.0-alpha','1.0.0-alpha.1','1.0.0-alpha.beta','1.0.0-beta','1.0.0-beta.2','1.0.0-beta.11','1.0.0-rc.1','1.0.0'];
+ for(let i=0;i<ordered.length;i++)for(let j=0;j<ordered.length;j++)assert.equal(compareCargoVersions(ordered[i],ordered[j]),Math.sign(i-j));
+ for(const [a,b] of [['1.0.0-9007199254740992','1.0.0-9007199254740993'],['18446744073709551614.0.0','18446744073709551615.0.0'],['1.0.0-999999999999999999999999999','1.0.0-1000000000000000000000000000'],['1.0.0-A','1.0.0-a']])assert.equal(compareCargoVersions(a,b),-1);
+ assert.equal(compareCargoVersions('1.2.3-rc.2+001','1.2.3-rc.2+different'),0);
+ const lock='version = 4\n'+packageText().replace('1.2.3','1.2.3-rc.2+001')+packageText().replace('1.2.3','1.2.3-rc.2+002');
+ const components=parseCargoLock(lock).map(c=>cargoCycloneDxComponent({...c,lockPath:'Cargo.lock'}));
+ assert.equal(components.length,2);assert.notEqual(components[0]['bom-ref'],components[1]['bom-ref']);assert.equal(components[0].version,'1.2.3-rc.2+001');assert.equal(components[0].purl,'pkg:cargo/example@1.2.3-rc.2%2B001');
+});
+test('Cargo version grammar rejects malformed identifiers, overflow, whitespace and oversized declarations',()=>{
+ for(const version of ['1.2.3-','1.2.3+','1.2.3-a..b','1.2.3+a..b','1.2.3-01','1.2.3-a.01','1.2.3-ä','1.2.3+a_b','1.2.3++a','v1.2.3','1.2.3\n',' 1.2.3','1.2.18446744073709551616','1.2.3+'+'a'.repeat(251)])assert.throws(()=>parseCargoVersion(version),version);
+ for(const version of ['1.2.3-0','1.2.3-0a','1.2.3--','1.2.3+0001','1.2.3-a-b+0.00','1.2.3+'+'a'.repeat(250)])assert.ok(parseCargoVersion(version));
 });

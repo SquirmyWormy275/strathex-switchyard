@@ -215,7 +215,7 @@ export const requiredGroups = [
   { file: "tools/layout-studio/repository-windows-execution-output.test.mjs", ...nativeTestOverrides("tools/layout-studio/repository-windows-execution-output.test.mjs") },
   { file: "tools/layout-studio/repository-execution.test.mjs", timeoutMs: 240_000, ...nativeTestOverrides("tools/layout-studio/repository-execution.test.mjs"), ...(process.platform !== "linux" ? { expectedSkipped: 1 } : {}) },
   { file: "tools/layout-studio/cargo-lock-inventory.test.mjs" },
-  { file: "tools/layout-studio/repository-shield-cargo.test.mjs", ...nativeTestOverrides("tools/layout-studio/repository-shield-cargo.test.mjs"), expectedSkipped: process.platform === "linux" ? 0 : 2 },
+  { file: "tools/layout-studio/repository-shield-cargo.test.mjs", ...nativeTestOverrides("tools/layout-studio/repository-shield-cargo.test.mjs"), expectedSkipped: process.platform === "linux" ? 0 : 4 },
   { file: "tools/layout-studio/repository-windows-shield-cargo.test.mjs", ...nativeTestOverrides("tools/layout-studio/repository-windows-shield-cargo.test.mjs") },
   { file: "tools/layout-studio/shield-scanner-engine.test.mjs" },
   { file: "tools/layout-studio/repository-shield-index.test.mjs", timeoutMs: 120_000, expectedSkipped: process.platform === "linux" ? 0 : 3 },

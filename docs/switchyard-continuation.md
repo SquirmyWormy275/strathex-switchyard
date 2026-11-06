@@ -54,13 +54,14 @@ four portable groups / 42 checks pass for the correction, but native CI remains
 pending. This does not repair restricted-token helper startup.
 [Evidence](evidence/windows-archived-helper-summary.json).
 
-Cargo declaration inventory now passes **eight groups / 81 tests**, including
-actual Linux Supply Chain/Release scans and explicitly doubled Windows guests.
-Forty-eight supported lockfile examples agree with the installed Python TOML
-reader. Typecheck, unchanged development BOM and exact child/scratch cleanup pass.
-Broader Cargo syntax, resolution, licenses and publisher provenance remain
-unfinished; installed and native Windows guest acceptance are unperformed.
-[Contract](cargo-supply-chain.md), [evidence](evidence/cargo-supply-chain-summary.json).
+Cargo inventory and advisory matching now support bounded prerelease/build
+versions and u64 core numbers. **Nine groups / 94 tests** and **146,326 independent
+Rust SemVer comparisons** pass, including actual Linux scans and Windows guest
+doubles. The Windows CI matrix has an independent Cargo lane. Typecheck and exact
+owned cleanup pass. Broader syntax, resolution, licenses and provenance remain
+unfinished; installed and native guest acceptance are separate.
+[Contract](cargo-supply-chain.md), [current evidence](evidence/cargo-semver-summary.json),
+[earlier TOML checks](evidence/cargo-supply-chain-summary.json).
 
 The composed editor lifecycle and recovery now pass six groups / 64 tests,
 typecheck, JavaScript parse and package checks. The real protected journal records

@@ -79,9 +79,31 @@ const cargoDigest = value => typeof value === 'string' && /^[a-f0-9]{64}$/.test(
 export const cargoPublicSource = 'registry+https://github.com/rust-lang/crates.io-index';
 export const cargoPublicSourceSha256 = sha(cargoPublicSource);
 export const isCargoLockPath = path => typeof path === 'string' && path.length <= 512 && path.split('/').at(-1) === 'Cargo.lock' && path.split('/').every(part => part && !['.','..'].includes(part) && !/[\\\x00-\x1f\x7f:]/.test(part));
+export function parseCargoVersion(version) {
+  cargoRequire(typeof version === 'string' && version.length <= 256 && /^[0-9A-Za-z.+-]+$/.test(version));
+  const match = /^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(?:-([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?(?:\+([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?$/.exec(version);
+  cargoRequire(match);
+  const core = match.slice(1, 4), pre = match[4]?.split('.') ?? [], build = match[5]?.split('.') ?? [];
+  cargoRequire(core.every(part => BigInt(part) <= 18446744073709551615n));
+  cargoRequire(pre.every(part => !/^[0-9]+$/.test(part) || part === '0' || part[0] !== '0'));
+  return { core, pre, build };
+}
+/** SemVer precedence ignores build metadata; inventory identity retains it. */
+export function compareCargoVersions(left, right) {
+  const a = parseCargoVersion(left), b = parseCargoVersion(right);
+  const numeric = (x, y) => x.length !== y.length ? (x.length < y.length ? -1 : 1) : x < y ? -1 : x > y ? 1 : 0;
+  for (let i = 0; i < 3; i++) { const order = numeric(a.core[i], b.core[i]); if (order) return order; }
+  if (!a.pre.length || !b.pre.length) return !a.pre.length && !b.pre.length ? 0 : a.pre.length ? -1 : 1;
+  for (let i = 0; i < Math.min(a.pre.length, b.pre.length); i++) {
+    const x = a.pre[i], y = b.pre[i], xn = /^[0-9]+$/.test(x), yn = /^[0-9]+$/.test(y);
+    const order = xn && yn ? numeric(x, y) : xn !== yn ? (xn ? -1 : 1) : x < y ? -1 : x > y ? 1 : 0;
+    if (order) return order;
+  }
+  return a.pre.length < b.pre.length ? -1 : a.pre.length > b.pre.length ? 1 : 0;
+}
 export function cargoIdentity(name, version) {
   cargoRequire(typeof name === 'string' && /^[A-Za-z_][A-Za-z0-9_-]{0,63}$/.test(name));
-  cargoRequire(typeof version === 'string' && version.length <= 64 && /^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$/.test(version) && version.split('.').every(part => BigInt(part) <= 18446744073709551615n));
+  parseCargoVersion(version);
   return { name, version };
 }
 export function cratesIoIdentity(name,version) {
@@ -145,7 +167,7 @@ export function validateCargoComponent(c) {
 export function cargoCycloneDxComponent(c) {
   validateCargoComponent(c);
   return {type:'library','bom-ref':'switchyard:'+sha(JSON.stringify(['Cargo',c.lockPath,c.name,c.version,c.sourceSha256])),name:c.name,version:c.version,
-    ...(c.sourceKind==='crates.io'?{purl:`pkg:cargo/${c.name}@${c.version}`} : {}),properties:[
+    ...(c.sourceKind==='crates.io'?{purl:`pkg:cargo/${c.name}@${encodeURIComponent(c.version)}`} : {}),properties:[
       {name:'switchyard:ecosystem',value:'Cargo'},{name:'switchyard:lockfile',value:c.lockPath},{name:'switchyard:cargo-source-kind',value:c.sourceKind},
       ...(c.sourceSha256?[{name:'switchyard:declared-source-sha256',value:c.sourceSha256}]:[]),...(c.declaredSha256?[{name:'switchyard:declared-sha256',value:c.declaredSha256}]:[]),
       {name:'switchyard:declared-dependencies-sha256',value:c.dependenciesSha256},{name:'switchyard:cargo-resolution',value:'not-performed'}

@@ -16,9 +16,9 @@ describe these declarations.
 ## Supported input and explicit gaps
 
 The parser accepts a bounded subset of Cargo-generated version 3 and 4 lockfiles:
-`[[package]]` entries with `name`, stable `major.minor.patch` version, optional
+`[[package]]` entries with `name`, SemVer version, optional
 `source`, registry `checksum` and optional string-array `dependencies`.
-Comments, LF/CRLF and supported basic quoted strings are accepted. Version
+Comments, LF/CRLF and supported basic quoted strings are accepted. Versions are limited to 256 ASCII characters. Core numeric
 components are bounded unsigned 64-bit integers; names are at most 64 ASCII
 characters. Public identities use lowercase names. Registry checksums require
 64 lowercase hexadecimal characters.
@@ -27,7 +27,7 @@ Each file is limited to 1 MiB, 32,768 lines and 8,192 characters per line.
 Dependency strings are limited to 2,048 characters, with at most 4,096 distinct
 entries and 256 KiB per array. The aggregate inventory across manifests remains
 limited to 4,096 components. Duplicate package identities, malformed strings,
-unknown fields/tables, older/newer formats, prereleases and build metadata refuse
+unknown fields/tables and older/newer formats refuse
 inventory for that entire file with `unsupported_cargo_lock`. No partial package
 list is returned for a malformed file.
 
@@ -49,16 +49,19 @@ local packages retain advisory coverage gaps. The
 `crates.io` and supports `SEMVER` intervals.
 
 The separate [OSV collector](osv-advisory-source.md) accepts an explicit
-`--crate=NAME@EXACT_STABLE_VERSION` query. It never reads a project's lockfile or
-automatically sends package identities upstream. Its stable-version range
-comparator retains the existing tighter limit: 32 characters and numeric
-components no greater than 2,147,483,647. Collection, signing and trust enrollment
-remain separate operations.
+`--crate=NAME@EXACT_SEMVER_VERSION` query. It never reads a project's lockfile or
+automatically sends package identities upstream. The collector now uses the same bounded Cargo parser and exact
+[SemVer precedence](https://semver.org/spec/v2.0.0.html): prereleases sort before
+final releases, numeric identifiers compare without floating-point conversion,
+and build metadata does not change range precedence. Literal query, inventory
+and advisory identities retain build metadata; an explicit affected-version list
+cannot borrow another build identity. Collection, signing and trust enrollment
+remain separate operations. npm collection retains its earlier stable-only bound.
 
 `switchyard-lock-inventory/v2` Cargo components include their witnessed lockfile,
 source kind, source-string hash, declared checksum and dependency-array hash.
 Private source URLs and dependency strings are not emitted. Only public crates
-receive a `pkg:cargo/…` package URL. Declared checksums appear as metadata
+receive a `pkg:cargo/…` package URL, with build separators percent-encoded. Declared checksums appear as metadata
 properties, never verified CycloneDX artifact hashes. The host validates each
 closed component and reconstructs its CycloneDX 1.6 representation. Dependency
 relationships remain absent and composition remains `unknown`.
@@ -84,3 +87,11 @@ send no model request. Installed acceptance and native Windows guest acceptance
 remain separate, unperformed checks.
 
 [Source hashes, isolated results and independent TOML comparison](evidence/cargo-supply-chain-summary.json).
+
+The SemVer extension passes nine isolated groups/94 checks and 146,326 independent
+comparisons against Rust semver 1.0.28: 402 grammar and 145,924 precedence cases,
+including u64 boundaries and large numeric prerelease identifiers. The public
+reference archive checksum verifies; it was compiled with the existing Rust
+compiler, and all owned source/build files were removed. The Windows matrix now
+schedules the four guest-double Cargo cases independently.
+[SemVer source and verification](evidence/cargo-semver-summary.json).

@@ -3,7 +3,7 @@ import { access, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { runtimeGuardianStopped } from "../runtime-command.mjs";
 
-export async function assertCargoShield(f, { windows = false } = {}) {
+export async function assertCargoShield(f, { windows = false, cargoVersion = "1.2.3" } = {}) {
   const index = await readFile(join(f.root, ".git/index"));
   const head = await f.run("rev-parse", "HEAD");
   const original = await readFile(join(f.root, "Cargo.lock"));
@@ -19,13 +19,13 @@ export async function assertCargoShield(f, { windows = false } = {}) {
   assert.equal(report.sbom.schema, "switchyard-lock-inventory/v2");
   assert.deepEqual(components.map(c => [c.ecosystem, c.name, c.version, c.sourceKind]), [
     ["Cargo", "synthetic-app", "0.1.0", "local"],
-    ["Cargo", "example", "1.2.3", "crates.io"],
-    ["Cargo", "example", "1.2.3", "git"]
+    ["Cargo", "example", cargoVersion, "crates.io"],
+    ["Cargo", "example", cargoVersion, "git"]
   ]);
   assert.deepEqual(report.findings.map(row => [row.ruleId, row.severity, row.dimension]), [
     ["RUSTSEC-synthetic-only", "unknown", "vulnerabilities"]
   ]);
-  assert.equal(bom.components[1].purl, "pkg:cargo/example@1.2.3");
+  assert.equal(bom.components[1].purl, "pkg:cargo/example@"+encodeURIComponent(cargoVersion));
   assert.equal(bom.components[2].purl, undefined);
   assert.ok(bom.components.every(c => c.hashes === undefined));
   assert.equal(new Set(bom.components.map(c => c["bom-ref"])).size, 3);

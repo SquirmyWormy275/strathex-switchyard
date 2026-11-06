@@ -108,7 +108,7 @@ test("V2 package scope, source-method mismatch, zero impact and mixed unsupporte
 test("OSV calculates quantitative base severity only from complete supported vectors and preserves every source/algorithm hash", async () => {
   const source = record(); source.severity = [...severity(lowVector), ...severity(highVector)];
   const result = normalizeOsvRecord(source, query, now()); assert.equal(result.advisory.severity, "critical"); assert.equal(result.evidence.severityAssessment, "cvss-v3-base-calculated"); assert.equal(result.evidence.cvssV3Base.maximumScore, 9.8); assert.equal(result.evidence.cvssV3Base.scope, "record"); assert.equal(result.evidence.cvssV3Base.vectors.length, 2); assert.ok(result.evidence.cvssV3Base.vectors.every(row => /^[a-f0-9]{64}$/.test(row.vectorSha256))); assert.equal(JSON.stringify(result).includes("CVSS:3."), false);
-  const collected = await collectOsvAdvisories([query], { now, fetchImpl: async () => response({ vulns: [source] }) }); assert.equal(collected.provenance.collector, "switchyard-osv-collector/6");
+  const collected = await collectOsvAdvisories([query], { now, fetchImpl: async () => response({ vulns: [source] }) }); assert.equal(collected.provenance.collector, "switchyard-osv-collector/7");
   const f = scannerFixture({ action: "shield_supply_chain", files: { "package-lock.json": JSON.stringify({ lockfileVersion: 3, packages: { "node_modules/example": { version: "1.2.3", license: "MIT" } } }) }, advisory: collected.feed.packages }), report = await f.scan();
   assert.equal(report.outcome, "failed"); assert.equal(report.completeness, "incomplete"); assert.equal(report.findings[0].severity, "critical"); assert.equal(report.gaps.includes("advisory_severity_unassessed"), false); assert.deepEqual(parseShieldScannerReport(JSON.stringify(report), { engine: report.engine, requestSha256: report.requestSha256, request: f.request }, f.request.action), report);
 });
@@ -165,7 +165,26 @@ test("V4 mixed-version ratings, source scope, zero base, malformed ordering and 
 test("explicit crates.io collection proves exact stable ranges and never borrows npm or private-source identities", async()=>{
  const query={ecosystem:"crates.io",name:"example",version:"1.2.3"},at=Date.parse("2026-11-06T00:00:00Z"),record={id:"RUSTSEC-synthetic-only",modified:"2026-11-05T00:00:00Z",affected:[{package:{ecosystem:"crates.io",name:"example"},ranges:[{type:"SEMVER",events:[{introduced:"1.0.0"},{fixed:"1.2.4"}]}]}]};
  assert.equal(normalizeOsvRecord(record,query,at).advisory.severity,"unknown");
- for(const changed of [{...query,ecosystem:"npm"},{...query,version:"1.2.4"},{...query,name:"Example"},{...query,version:"1.2.3-beta"},{...query,source:"git+ssh://private.invalid"}])assert.throws(()=>normalizeOsvRecord(record,changed,at));
+ for(const changed of [{...query,ecosystem:"npm"},{...query,version:"1.2.4"},{...query,name:"Example"},{...query,version:"1.2.3-beta.01"},{...query,source:"git+ssh://private.invalid"}])assert.throws(()=>normalizeOsvRecord(record,changed,at));
  const requests=[];const result=await collectOsvAdvisories([query],{now:()=>at,fetchImpl:async(url,options)=>{requests.push({url,body:JSON.parse(options.body)});return new Response(JSON.stringify({vulns:[record]}),{status:200,headers:{"Content-Type":"application/json"}});}});
  assert.equal(requests.length,1);assert.equal(requests[0].url,"https://api.osv.dev/v1/query");assert.deepEqual(requests[0].body,{package:{ecosystem:"crates.io",name:"example"},version:"1.2.3"});assert.equal(result.feed.packages[0].ecosystem,"crates.io");assert.equal(result.provenance.upstreamSignatureVerified,false);
+});
+
+test("Cargo advisory ranges compare prereleases and u64 versions exactly while build identities stay distinct", async()=>{
+ const at=Date.parse("2026-11-06T00:00:00Z"),query={ecosystem:"crates.io",name:"example",version:"1.2.3-rc.2+001"};
+ const record={id:"RUSTSEC-semver-synthetic",modified:"2026-11-05T00:00:00Z",affected:[{package:{ecosystem:"crates.io",name:"example"},ranges:[{type:"SEMVER",events:[{introduced:"1.2.3-rc.1"},{fixed:"1.2.3"}]}]}]};
+ for(const version of ['1.2.3-rc.1','1.2.3-rc.2+001','1.2.3-rc.2+002','1.2.3-rc.99'])assert.equal(normalizeOsvRecord(record,{...query,version},at).evidence.affectedVersionEvidence,'cargo-semver-range');
+ for(const version of ['1.2.3-beta.99','1.2.3','1.2.3+001','1.2.4-rc.1'])assert.throws(()=>normalizeOsvRecord(record,{...query,version},at));
+ assert.deepEqual(osvPackageQueries([{...query,version:'1.2.3-rc.2+002'},query]).map(p=>p.version),['1.2.3-rc.2+001','1.2.3-rc.2+002']);
+ record.affected[0].ranges[0].events=[{introduced:'18446744073709551614.0.0'},{fixed:'18446744073709551615.0.0'}];
+ assert.equal(normalizeOsvRecord(record,{...query,version:'18446744073709551614.0.0'},at).evidence.affectedVersionEvidence,'cargo-semver-range');
+ assert.throws(()=>normalizeOsvRecord(record,{...query,version:'18446744073709551615.0.0'},at));
+ record.affected[0].ranges=[];record.affected[0].versions=[query.version];
+ assert.equal(normalizeOsvRecord(record,query,at).evidence.affectedVersionEvidence,'literal-version');
+ assert.throws(()=>normalizeOsvRecord(record,{...query,version:'1.2.3-rc.2+002'},at));
+ const collected=await collectOsvAdvisories([query],{now:()=>at,fetchImpl:async(url,options)=>{assert.equal(JSON.parse(options.body).version,query.version);return response({vulns:[record]});}});
+ assert.equal(collected.feed.packages[0].version,query.version);assert.equal(collected.provenance.collector,'switchyard-osv-collector/7');
+ const fixture=scannerFixture({action:'shield_supply_chain',files:{'Cargo.lock':'version = 4\n[[package]]\nname = "example"\nversion = "'+query.version+'"\nsource = "registry+https://github.com/rust-lang/crates.io-index"\nchecksum = "'+'a'.repeat(64)+'"\n'},advisory:collected.feed.packages});
+ const report=await fixture.scan();assert.equal(report.outcome,'failed');assert.equal(report.findings[0].ruleId,record.id);
+ assert.deepEqual(parseShieldScannerReport(JSON.stringify(report),{engine:report.engine,requestSha256:report.requestSha256,request:fixture.request},fixture.request.action),report);
 });

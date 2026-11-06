@@ -5,12 +5,13 @@ export function licenseDeclarationsFixture({ action } = {}) {
   const declarations = { choice: "(MIT OR GPL-3.0-only)", required: "MIT AND GPL-3.0-only", unsupported: "MIT OR GPL-2.0-only WITH Classpath-exception-2.0", precedence: "MIT OR Apache-2.0 AND GPL-3.0-only" };
   return scannerFixture({ action, files: { "app.js": "const ordinary = 1;", "package-lock.json": JSON.stringify({ lockfileVersion: 3, packages: Object.fromEntries(Object.entries(declarations).map(([name, license]) => ["node_modules/" + name, { version: "1.0.0", license }])) }) }, advisory: Object.keys(declarations).map(name => ({ ecosystem: "npm", name, version: "1.0.0", advisories: [] })) });
 }
-export function cargoLockFixture({ action, clean = false } = {}) {
+export function cargoLockFixture({ action, clean = false, cargoVersion = "1.2.3" } = {}) {
   const source="registry+https://github.com/rust-lang/crates.io-index";
-  const lock='version = 4\n[[package]]\nname = "synthetic-app"\nversion = "0.1.0"\ndependencies = ["example"]\n[[package]]\nname = "example"\nversion = "1.2.3"\nsource = "'+source+'"\nchecksum = "'+'a'.repeat(64)+'"\n[[package]]\nname = "example"\nversion = "1.2.3"\nsource = "git+ssh://private.invalid/repository#'+'b'.repeat(40)+'"\n';
+  const template='version = 4\n[[package]]\nname = "synthetic-app"\nversion = "0.1.0"\ndependencies = ["example"]\n[[package]]\nname = "example"\nversion = "1.2.3"\nsource = "'+source+'"\nchecksum = "'+'a'.repeat(64)+'"\n[[package]]\nname = "example"\nversion = "1.2.3"\nsource = "git+ssh://private.invalid/repository#'+'b'.repeat(40)+'"\n';
+  const lock=template.replaceAll("1.2.3",cargoVersion);
   return scannerFixture({action,files:{"app.js":"const ordinary = 1;","Cargo.lock":lock},advisory:[
-    {ecosystem:"npm",name:"example",version:"1.2.3",advisories:[{id:"NPM-wrong-ecosystem",severity:"critical"}]},
-    {ecosystem:"crates.io",name:"example",version:"1.2.3",advisories:clean?[]:[{id:"RUSTSEC-synthetic-only",severity:"unknown"}]}
+    {ecosystem:"npm",name:"example",version:cargoVersion,advisories:[{id:"NPM-wrong-ecosystem",severity:"critical"}]},
+    {ecosystem:"crates.io",name:"example",version:cargoVersion,advisories:clean?[]:[{id:"RUSTSEC-synthetic-only",severity:"unknown"}]}
   ]});
 }
 export function pinnedRequirementsFixture({ action, clean = false, requirementsVersion = "1.2.0", advisoryVersion = requirementsVersion } = {}) {
