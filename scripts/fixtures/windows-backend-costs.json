@@ -1,0 +1,1017 @@
+{
+  "schema": "switchyard-windows-backend-costs/v1",
+  "sourceCommit": "9f35961ca18087b2406e7e2ad716b5fe97ebc2bb",
+  "sourceEvidence": "docs/evidence/windows-backend-9f35961-native-summary.json",
+  "purpose": "Scheduling estimates only; never execution deadlines or acceptance evidence for another source.",
+  "fallbackCostMs": 60000,
+  "receipts": [
+    {
+      "shard": 1,
+      "receiptSha256": "a883e9e3ad45fa602e4eb69399c66620d0e9fbc849ff43d438ab2d6a3e9facff"
+    },
+    {
+      "shard": 2,
+      "receiptSha256": "046c9c75d4c899f6b0ddafe248a82bac808b7f1d9ad32db7da261747bd7b0912"
+    },
+    {
+      "shard": 3,
+      "receiptSha256": "2dce891894d777cc0e59a6226ad6942793c27e03b1dc1f4e89e3bf696c1a12d4"
+    },
+    {
+      "shard": 4,
+      "receiptSha256": "ab9e30b7726ec3dee5ee303fdbe4bd7d14999270c5355b17cedb53bc2edc16d9"
+    }
+  ],
+  "groups": [
+    {
+      "file": "deployment/suite/application.test.mjs",
+      "pattern": null,
+      "costMs": 23929
+    },
+    {
+      "file": "deployment/suite/connection-restoration.test.mjs",
+      "pattern": null,
+      "costMs": 2390
+    },
+    {
+      "file": "deployment/suite/inspect.test.mjs",
+      "pattern": null,
+      "costMs": 7305
+    },
+    {
+      "file": "deployment/suite/installation.test.mjs",
+      "pattern": "a dated verified recovery entry restores an interrupted uninstall even after the main loader was removed",
+      "costMs": 5982
+    },
+    {
+      "file": "deployment/suite/installation.test.mjs",
+      "pattern": "a failed persistent write restores every earlier launcher and the exact previous installation record",
+      "costMs": 9974
+    },
+    {
+      "file": "deployment/suite/installation.test.mjs",
+      "pattern": "a failed uninstall write restores the owned program and keeps restart recovery durable",
+      "costMs": 6863
+    },
+    {
+      "file": "deployment/suite/installation.test.mjs",
+      "pattern": "a restoration conflict retains all program entries and resumes the previous running application",
+      "costMs": 5022
+    },
+    {
+      "file": "deployment/suite/installation.test.mjs",
+      "pattern": "a second registered instance blocks uninstall without stopping either owner",
+      "costMs": 5084
+    },
+    {
+      "file": "deployment/suite/installation.test.mjs",
+      "pattern": "active host connections block uninstall before any application stop or persistent mutation",
+      "costMs": 6670
+    },
+    {
+      "file": "deployment/suite/installation.test.mjs",
+      "pattern": "an explicit no-start update stops the previous generation without restarting the new one",
+      "costMs": 6667
+    },
+    {
+      "file": "deployment/suite/installation.test.mjs",
+      "pattern": "forced owner exit leaves a durable journal; another installer restores the exact before state without touching unrelated files",
+      "costMs": 9803
+    },
+    {
+      "file": "deployment/suite/installation.test.mjs",
+      "pattern": "installation keeps current and one rollback version, records dated backups, preserves data and removes only owned entries",
+      "costMs": 13044
+    },
+    {
+      "file": "deployment/suite/installation.test.mjs",
+      "pattern": "interrupted installation recovery accepts the full release file ceiling plus its manifest and preserves unrelated edits",
+      "costMs": 6604
+    },
+    {
+      "file": "deployment/suite/installation.test.mjs",
+      "pattern": "pre-promotion owner loss recovers only verified staging copies and exact incomplete source prefixes",
+      "costMs": 7631
+    },
+    {
+      "file": "deployment/suite/installation.test.mjs",
+      "pattern": "recovery preflights all edits before writing, and respects a committed update whose pending marker survived",
+      "costMs": 6991
+    },
+    {
+      "file": "deployment/suite/installation.test.mjs",
+      "pattern": "the stable installed loader verifies and addresses the actual application across update and rollback",
+      "costMs": 20505
+    },
+    {
+      "file": "deployment/suite/installation.test.mjs",
+      "pattern": "unconfirmed owner exit leaves a durable removal journal and blocks restoration until recovery",
+      "costMs": 6855
+    },
+    {
+      "file": "deployment/suite/installation.test.mjs",
+      "pattern": "uninstall verifies exact owner exit and restores host connections before removing persistent program entries",
+      "costMs": 7365
+    },
+    {
+      "file": "deployment/suite/installation.test.mjs",
+      "pattern": "unowned or edited desktop entries and corrupted new releases preserve the current application",
+      "costMs": 7679
+    },
+    {
+      "file": "deployment/suite/release.test.mjs",
+      "pattern": null,
+      "costMs": 5187
+    },
+    {
+      "file": "deployment/suite/runtime-maintenance.test.mjs",
+      "pattern": null,
+      "costMs": 4302
+    },
+    {
+      "file": "deployment/suite/shortcut-process.test.mjs",
+      "pattern": null,
+      "costMs": 2337
+    },
+    {
+      "file": "scripts/run-isolated-tests.test.mjs",
+      "pattern": null,
+      "costMs": 4958
+    },
+    {
+      "file": "scripts/windows-backend-shards.test.mjs",
+      "pattern": null,
+      "costMs": 153
+    },
+    {
+      "file": "tools/layout-studio/agent-observation.test.mjs",
+      "pattern": null,
+      "costMs": 896
+    },
+    {
+      "file": "tools/layout-studio/agents-claude.test.mjs",
+      "pattern": null,
+      "costMs": 14166
+    },
+    {
+      "file": "tools/layout-studio/cargo-lock-inventory.test.mjs",
+      "pattern": null,
+      "costMs": 293
+    },
+    {
+      "file": "tools/layout-studio/catalog-identity.test.mjs",
+      "pattern": null,
+      "costMs": 4322
+    },
+    {
+      "file": "tools/layout-studio/catalog.test.mjs",
+      "pattern": null,
+      "costMs": 652
+    },
+    {
+      "file": "tools/layout-studio/claude-account.test.mjs",
+      "pattern": null,
+      "costMs": 166
+    },
+    {
+      "file": "tools/layout-studio/claude-coding.test.mjs",
+      "pattern": null,
+      "costMs": 22081
+    },
+    {
+      "file": "tools/layout-studio/claude-submissions.test.mjs",
+      "pattern": null,
+      "costMs": 35040
+    },
+    {
+      "file": "tools/layout-studio/client-launch.test.mjs",
+      "pattern": null,
+      "costMs": 13436
+    },
+    {
+      "file": "tools/layout-studio/codex-editor-ingress-owner.test.mjs",
+      "pattern": null,
+      "costMs": 269
+    },
+    {
+      "file": "tools/layout-studio/codex-editor-ingress.test.mjs",
+      "pattern": null,
+      "costMs": 205
+    },
+    {
+      "file": "tools/layout-studio/codex-editor-protocol.test.mjs",
+      "pattern": null,
+      "costMs": 231
+    },
+    {
+      "file": "tools/layout-studio/codex-editor-recovery.test.mjs",
+      "pattern": null,
+      "costMs": 295
+    },
+    {
+      "file": "tools/layout-studio/codex-editor-relay.test.mjs",
+      "pattern": null,
+      "costMs": 304
+    },
+    {
+      "file": "tools/layout-studio/codex-owned-listener.test.mjs",
+      "pattern": null,
+      "costMs": 205
+    },
+    {
+      "file": "tools/layout-studio/codex-stdio-tasks.test.mjs",
+      "pattern": null,
+      "costMs": 22132
+    },
+    {
+      "file": "tools/layout-studio/codex-submissions.test.mjs",
+      "pattern": null,
+      "costMs": 27597
+    },
+    {
+      "file": "tools/layout-studio/codex-turn.test.mjs",
+      "pattern": null,
+      "costMs": 199
+    },
+    {
+      "file": "tools/layout-studio/codex-unix-tasks.test.mjs",
+      "pattern": null,
+      "costMs": 211
+    },
+    {
+      "file": "tools/layout-studio/codex-unix-transport.test.mjs",
+      "pattern": null,
+      "costMs": 226
+    },
+    {
+      "file": "tools/layout-studio/coding-editor-authorizations.test.mjs",
+      "pattern": null,
+      "costMs": 22878
+    },
+    {
+      "file": "tools/layout-studio/coding-editor-connections.test.mjs",
+      "pattern": null,
+      "costMs": 621
+    },
+    {
+      "file": "tools/layout-studio/coding-editor-journal.test.mjs",
+      "pattern": null,
+      "costMs": 32680
+    },
+    {
+      "file": "tools/layout-studio/coding-sessions.test.mjs",
+      "pattern": null,
+      "costMs": 22314
+    },
+    {
+      "file": "tools/layout-studio/coding-task-owners.test.mjs",
+      "pattern": "a dedicated editor client uses only the original acknowledged task owner and rechecks after registration",
+      "costMs": 3484
+    },
+    {
+      "file": "tools/layout-studio/coding-task-owners.test.mjs",
+      "pattern": "a failed bridge close still attempts original native owner retirement and cannot upgrade the uncertain bridge exit",
+      "costMs": 2540
+    },
+    {
+      "file": "tools/layout-studio/coding-task-owners.test.mjs",
+      "pattern": "active and unfamiliar task states refuse loading without changing running permissions",
+      "costMs": 5491
+    },
+    {
+      "file": "tools/layout-studio/coding-task-owners.test.mjs",
+      "pattern": "an external workspace change during native project setup refuses the late task effect",
+      "costMs": 3605
+    },
+    {
+      "file": "tools/layout-studio/coding-task-owners.test.mjs",
+      "pattern": "asynchronous editor inspection cannot conceal load replacement, endpoint drift or a policy change at its last boundary",
+      "costMs": 7817
+    },
+    {
+      "file": "tools/layout-studio/coding-task-owners.test.mjs",
+      "pattern": "authenticated Studio routes compose real protected review/load state without accepting prompts or granting IDE authority",
+      "costMs": 3809
+    },
+    {
+      "file": "tools/layout-studio/coding-task-owners.test.mjs",
+      "pattern": "authenticated editor routes consume one reviewed launch permission without launching a terminal or exposing its protected record",
+      "costMs": 4825
+    },
+    {
+      "file": "tools/layout-studio/coding-task-owners.test.mjs",
+      "pattern": "changed creator account or original task repository refuses binding and retires the exact owned listener",
+      "costMs": 3780
+    },
+    {
+      "file": "tools/layout-studio/coding-task-owners.test.mjs",
+      "pattern": "concurrent reviewed requests cannot load one original owner twice",
+      "costMs": 3513
+    },
+    {
+      "file": "tools/layout-studio/coding-task-owners.test.mjs",
+      "pattern": "editor preparation refuses stale load, changed policy/account, non-idle task and incomplete endpoint identity",
+      "costMs": 13675
+    },
+    {
+      "file": "tools/layout-studio/coding-task-owners.test.mjs",
+      "pattern": "editor target preparation binds the acknowledged load and original endpoint without another resume, launch or authority claim",
+      "costMs": 3642
+    },
+    {
+      "file": "tools/layout-studio/coding-task-owners.test.mjs",
+      "pattern": "keyboard-only mode joins task-owner shutdown and preserves failed retirement without enabling new starts",
+      "costMs": 3369
+    },
+    {
+      "file": "tools/layout-studio/coding-task-owners.test.mjs",
+      "pattern": "late ownership drift and stopped startup cannot acknowledge a retained connection as current",
+      "costMs": 3373
+    },
+    {
+      "file": "tools/layout-studio/coding-task-owners.test.mjs",
+      "pattern": "load boundaries refuse asynchronous drift and retain exact late acknowledgement without replay",
+      "costMs": 4670
+    },
+    {
+      "file": "tools/layout-studio/coding-task-owners.test.mjs",
+      "pattern": "load refuses substituted token, changed owner contents, policy or task permissions before a native resume",
+      "costMs": 8285
+    },
+    {
+      "file": "tools/layout-studio/coding-task-owners.test.mjs",
+      "pattern": "normal workspace selection retires exact owned connections and refuses inactive or externally selected task routes",
+      "costMs": 4176
+    },
+    {
+      "file": "tools/layout-studio/coding-task-owners.test.mjs",
+      "pattern": "persistence failures preserve no-replay request identity and cannot deliver later task reads",
+      "costMs": 4879
+    },
+    {
+      "file": "tools/layout-studio/coding-task-owners.test.mjs",
+      "pattern": "persistent metadata ownership binds one original task/account/repository without task creation or IDE authority",
+      "costMs": 3237
+    },
+    {
+      "file": "tools/layout-studio/coding-task-owners.test.mjs",
+      "pattern": "protected task registry composes the actual owned Unix listener and bridge while the provider is a controlled double",
+      "costMs": 481
+    },
+    {
+      "file": "tools/layout-studio/coding-task-owners.test.mjs",
+      "pattern": "replaced protected ownership or revoked permission cannot return metadata from an older live connection",
+      "costMs": 2645
+    },
+    {
+      "file": "tools/layout-studio/coding-task-owners.test.mjs",
+      "pattern": "reviewed owned loading consumes one exact token and preserves request identity across duplicate and restarted callers",
+      "costMs": 3379
+    },
+    {
+      "file": "tools/layout-studio/coding-task-owners.test.mjs",
+      "pattern": "shutdown joins an in-flight load and prevents its late native effect",
+      "costMs": 2977
+    },
+    {
+      "file": "tools/layout-studio/coding-task-owners.test.mjs",
+      "pattern": "the editor client authenticates the real Studio route and reads original protected target metadata without another native effect",
+      "costMs": 621
+    },
+    {
+      "file": "tools/layout-studio/coding-task-owners.test.mjs",
+      "pattern": "two service instances serialize duplicate admission through the real private kernel lease",
+      "costMs": 2675
+    },
+    {
+      "file": "tools/layout-studio/coding-task-owners.test.mjs",
+      "pattern": "unconfirmed native exit blocks replacement and recovery can only retire the original saved identity",
+      "costMs": 2829
+    },
+    {
+      "file": "tools/layout-studio/coding-task-owners.test.mjs",
+      "pattern": "verified exit of an in-memory owner cannot retire a substituted protected native identity",
+      "costMs": 2703
+    },
+    {
+      "file": "tools/layout-studio/configuration.test.mjs",
+      "pattern": null,
+      "costMs": 908
+    },
+    {
+      "file": "tools/layout-studio/conversation-bindings.test.mjs",
+      "pattern": null,
+      "costMs": 7114
+    },
+    {
+      "file": "tools/layout-studio/copilot-account-binding.test.mjs",
+      "pattern": null,
+      "costMs": 4441
+    },
+    {
+      "file": "tools/layout-studio/copilot-lifecycle.test.mjs",
+      "pattern": null,
+      "costMs": 15791
+    },
+    {
+      "file": "tools/layout-studio/copilot-requests.test.mjs",
+      "pattern": null,
+      "costMs": 23244
+    },
+    {
+      "file": "tools/layout-studio/cvss-v2-metrics.test.mjs",
+      "pattern": null,
+      "costMs": 4572
+    },
+    {
+      "file": "tools/layout-studio/cvss-v3-base.test.mjs",
+      "pattern": null,
+      "costMs": 182
+    },
+    {
+      "file": "tools/layout-studio/cvss-v3-metrics.test.mjs",
+      "pattern": null,
+      "costMs": 12300
+    },
+    {
+      "file": "tools/layout-studio/cvss-v4-metrics.test.mjs",
+      "pattern": null,
+      "costMs": 9294
+    },
+    {
+      "file": "tools/layout-studio/devices.test.mjs",
+      "pattern": null,
+      "costMs": 293
+    },
+    {
+      "file": "tools/layout-studio/editor-observation.test.mjs",
+      "pattern": null,
+      "costMs": 4124
+    },
+    {
+      "file": "tools/layout-studio/foreground.test.mjs",
+      "pattern": null,
+      "costMs": 4512
+    },
+    {
+      "file": "tools/layout-studio/git-history-inputs.test.mjs",
+      "pattern": null,
+      "costMs": 122
+    },
+    {
+      "file": "tools/layout-studio/git-index-inputs.test.mjs",
+      "pattern": null,
+      "costMs": 133
+    },
+    {
+      "file": "tools/layout-studio/haptic-capabilities.test.mjs",
+      "pattern": null,
+      "costMs": 2940
+    },
+    {
+      "file": "tools/layout-studio/host-action-observation.test.mjs",
+      "pattern": null,
+      "costMs": 3694
+    },
+    {
+      "file": "tools/layout-studio/ignored-tree-policy.test.mjs",
+      "pattern": null,
+      "costMs": 208
+    },
+    {
+      "file": "tools/layout-studio/instance.test.mjs",
+      "pattern": null,
+      "costMs": 670
+    },
+    {
+      "file": "tools/layout-studio/integrations.test.mjs",
+      "pattern": null,
+      "costMs": 885
+    },
+    {
+      "file": "tools/layout-studio/keyboard-indicators.test.mjs",
+      "pattern": null,
+      "costMs": 169
+    },
+    {
+      "file": "tools/layout-studio/keyless-lease-pool.test.mjs",
+      "pattern": null,
+      "costMs": 6075
+    },
+    {
+      "file": "tools/layout-studio/legend-export.test.mjs",
+      "pattern": null,
+      "costMs": 3998
+    },
+    {
+      "file": "tools/layout-studio/linux-namespace-budget.test.mjs",
+      "pattern": null,
+      "costMs": 322
+    },
+    {
+      "file": "tools/layout-studio/linux-temporary-workspace.test.mjs",
+      "pattern": null,
+      "costMs": 532
+    },
+    {
+      "file": "tools/layout-studio/matrix-diagnostics.test.mjs",
+      "pattern": null,
+      "costMs": 9837
+    },
+    {
+      "file": "tools/layout-studio/model.test.mjs",
+      "pattern": null,
+      "costMs": 556
+    },
+    {
+      "file": "tools/layout-studio/native-focus-gateway.test.mjs",
+      "pattern": null,
+      "costMs": 7188
+    },
+    {
+      "file": "tools/layout-studio/osv-advisory-source.test.mjs",
+      "pattern": null,
+      "costMs": 603
+    },
+    {
+      "file": "tools/layout-studio/owned-process.test.mjs",
+      "pattern": null,
+      "costMs": 161
+    },
+    {
+      "file": "tools/layout-studio/physical-intent.test.mjs",
+      "pattern": null,
+      "costMs": 10009
+    },
+    {
+      "file": "tools/layout-studio/portable-package.test.mjs",
+      "pattern": null,
+      "costMs": 4050
+    },
+    {
+      "file": "tools/layout-studio/private-fs.test.mjs",
+      "pattern": null,
+      "costMs": 649
+    },
+    {
+      "file": "tools/layout-studio/readout-profiles.test.mjs",
+      "pattern": null,
+      "costMs": 4447
+    },
+    {
+      "file": "tools/layout-studio/receipt-authority-state.test.mjs",
+      "pattern": null,
+      "costMs": 18389
+    },
+    {
+      "file": "tools/layout-studio/repository-commits.test.mjs",
+      "pattern": null,
+      "costMs": 11636
+    },
+    {
+      "file": "tools/layout-studio/repository-effects.test.mjs",
+      "pattern": null,
+      "costMs": 4958
+    },
+    {
+      "file": "tools/layout-studio/repository-execution-staging.test.mjs",
+      "pattern": null,
+      "costMs": 1746
+    },
+    {
+      "file": "tools/layout-studio/repository-execution-stop.test.mjs",
+      "pattern": null,
+      "costMs": 7667
+    },
+    {
+      "file": "tools/layout-studio/repository-execution-supervisor.test.mjs",
+      "pattern": null,
+      "costMs": 10929
+    },
+    {
+      "file": "tools/layout-studio/repository-execution.test.mjs",
+      "pattern": null,
+      "costMs": 109122
+    },
+    {
+      "file": "tools/layout-studio/repository-ignored-scanner-inputs.test.mjs",
+      "pattern": null,
+      "costMs": 36242
+    },
+    {
+      "file": "tools/layout-studio/repository-pipeline-fixtures.test.mjs",
+      "pattern": null,
+      "costMs": 414
+    },
+    {
+      "file": "tools/layout-studio/repository-pipeline.test.mjs",
+      "pattern": null,
+      "costMs": 525
+    },
+    {
+      "file": "tools/layout-studio/repository-receipt-authority.test.mjs",
+      "pattern": null,
+      "costMs": 28091
+    },
+    {
+      "file": "tools/layout-studio/repository-recovery.test.mjs",
+      "pattern": null,
+      "costMs": 23768
+    },
+    {
+      "file": "tools/layout-studio/repository-shield-artifacts.test.mjs",
+      "pattern": null,
+      "costMs": 192023
+    },
+    {
+      "file": "tools/layout-studio/repository-shield-cargo-artifacts.test.mjs",
+      "pattern": null,
+      "costMs": 122230
+    },
+    {
+      "file": "tools/layout-studio/repository-shield-cargo.test.mjs",
+      "pattern": null,
+      "costMs": 530
+    },
+    {
+      "file": "tools/layout-studio/repository-shield-exceptions.test.mjs",
+      "pattern": null,
+      "costMs": 404
+    },
+    {
+      "file": "tools/layout-studio/repository-shield-history.test.mjs",
+      "pattern": null,
+      "costMs": 469
+    },
+    {
+      "file": "tools/layout-studio/repository-shield-ignored-trees.test.mjs",
+      "pattern": null,
+      "costMs": 37778
+    },
+    {
+      "file": "tools/layout-studio/repository-shield-index.test.mjs",
+      "pattern": null,
+      "costMs": 547
+    },
+    {
+      "file": "tools/layout-studio/repository-shield-licenses.test.mjs",
+      "pattern": null,
+      "costMs": 401
+    },
+    {
+      "file": "tools/layout-studio/repository-shield-npm-archives.test.mjs",
+      "pattern": null,
+      "costMs": 187866
+    },
+    {
+      "file": "tools/layout-studio/repository-shield-osv-source.test.mjs",
+      "pattern": null,
+      "costMs": 215681
+    },
+    {
+      "file": "tools/layout-studio/repository-shield-pypi-artifacts.test.mjs",
+      "pattern": null,
+      "costMs": 183611
+    },
+    {
+      "file": "tools/layout-studio/repository-shield-pypi.test.mjs",
+      "pattern": null,
+      "costMs": 405
+    },
+    {
+      "file": "tools/layout-studio/repository-shield-workspaces.test.mjs",
+      "pattern": null,
+      "costMs": 62423
+    },
+    {
+      "file": "tools/layout-studio/repository-shield.test.mjs",
+      "pattern": null,
+      "costMs": 554
+    },
+    {
+      "file": "tools/layout-studio/repository-temporary-build.test.mjs",
+      "pattern": null,
+      "costMs": 526
+    },
+    {
+      "file": "tools/layout-studio/repository-validation-policy.test.mjs",
+      "pattern": null,
+      "costMs": 32063
+    },
+    {
+      "file": "tools/layout-studio/repository-windows-execution-output.test.mjs",
+      "pattern": null,
+      "costMs": 63413
+    },
+    {
+      "file": "tools/layout-studio/repository-windows-execution-recovery.test.mjs",
+      "pattern": null,
+      "costMs": 61313
+    },
+    {
+      "file": "tools/layout-studio/repository-windows-execution-stop.test.mjs",
+      "pattern": "a failed atomic Windows stop admission sends no cancellation and cannot reuse its consumed approval",
+      "costMs": 20875
+    },
+    {
+      "file": "tools/layout-studio/repository-windows-execution-stop.test.mjs",
+      "pattern": "a lost final Windows stop write recovers only its existing protected receipt and exact exit without another cancellation",
+      "costMs": 23716
+    },
+    {
+      "file": "tools/layout-studio/repository-windows-execution-stop.test.mjs",
+      "pattern": "a separately approved Windows stop has its own operation, budget and receipt while preserving the original admission",
+      "costMs": 21733
+    },
+    {
+      "file": "tools/layout-studio/repository-windows-execution.test.mjs",
+      "pattern": null,
+      "costMs": 59994
+    },
+    {
+      "file": "tools/layout-studio/repository-windows-pipeline-recovery.test.mjs",
+      "pattern": null,
+      "costMs": 27921
+    },
+    {
+      "file": "tools/layout-studio/repository-windows-pipeline.test.mjs",
+      "pattern": null,
+      "costMs": 62313
+    },
+    {
+      "file": "tools/layout-studio/repository-windows-shield-cargo.test.mjs",
+      "pattern": null,
+      "costMs": 127794
+    },
+    {
+      "file": "tools/layout-studio/repository-windows-shield-exceptions.test.mjs",
+      "pattern": null,
+      "costMs": 83969
+    },
+    {
+      "file": "tools/layout-studio/repository-windows-shield-history.test.mjs",
+      "pattern": null,
+      "costMs": 89869
+    },
+    {
+      "file": "tools/layout-studio/repository-windows-shield-index.test.mjs",
+      "pattern": null,
+      "costMs": 52051
+    },
+    {
+      "file": "tools/layout-studio/repository-windows-shield-licenses.test.mjs",
+      "pattern": null,
+      "costMs": 62699
+    },
+    {
+      "file": "tools/layout-studio/repository-windows-shield-pypi.test.mjs",
+      "pattern": null,
+      "costMs": 61625
+    },
+    {
+      "file": "tools/layout-studio/repository-windows-shield-recovery.test.mjs",
+      "pattern": null,
+      "costMs": 71930
+    },
+    {
+      "file": "tools/layout-studio/repository-windows-shield.test.mjs",
+      "pattern": "Windows clean Shield input cannot establish complete coverage",
+      "costMs": 30727
+    },
+    {
+      "file": "tools/layout-studio/repository-windows-shield.test.mjs",
+      "pattern": "Windows release_shield retains pinned scanner observations and incomplete failed receipts",
+      "costMs": 31353
+    },
+    {
+      "file": "tools/layout-studio/repository-windows-shield.test.mjs",
+      "pattern": "Windows shield_change_scan retains pinned scanner observations and incomplete failed receipts",
+      "costMs": 35334
+    },
+    {
+      "file": "tools/layout-studio/repository-windows-shield.test.mjs",
+      "pattern": "Windows shield_codebase_audit retains pinned scanner observations and incomplete failed receipts",
+      "costMs": 31300
+    },
+    {
+      "file": "tools/layout-studio/repository-windows-shield.test.mjs",
+      "pattern": "Windows shield_supply_chain retains pinned scanner observations and incomplete failed receipts",
+      "costMs": 31335
+    },
+    {
+      "file": "tools/layout-studio/runtime-command-suspended.test.mjs",
+      "pattern": null,
+      "costMs": 292
+    },
+    {
+      "file": "tools/layout-studio/runtime-command.test.mjs",
+      "pattern": null,
+      "costMs": 173
+    },
+    {
+      "file": "tools/layout-studio/runtime-consumers.test.mjs",
+      "pattern": null,
+      "costMs": 181
+    },
+    {
+      "file": "tools/layout-studio/runtime-lifecycle.test.mjs",
+      "pattern": null,
+      "costMs": 13749
+    },
+    {
+      "file": "tools/layout-studio/runtime.test.mjs",
+      "pattern": null,
+      "costMs": 2825
+    },
+    {
+      "file": "tools/layout-studio/scanner-fixture-invalidation.test.mjs",
+      "pattern": null,
+      "costMs": 13001
+    },
+    {
+      "file": "tools/layout-studio/scanner-fixture-removal.test.mjs",
+      "pattern": null,
+      "costMs": 16156
+    },
+    {
+      "file": "tools/layout-studio/scanner-fixtures.test.mjs",
+      "pattern": null,
+      "costMs": 23327
+    },
+    {
+      "file": "tools/layout-studio/shield-exception-ledger.test.mjs",
+      "pattern": null,
+      "costMs": 2846
+    },
+    {
+      "file": "tools/layout-studio/shield-exceptions.test.mjs",
+      "pattern": null,
+      "costMs": 10693
+    },
+    {
+      "file": "tools/layout-studio/shield-input-inventory.test.mjs",
+      "pattern": null,
+      "costMs": 7708
+    },
+    {
+      "file": "tools/layout-studio/shield-scanner-engine.test.mjs",
+      "pattern": null,
+      "costMs": 971
+    },
+    {
+      "file": "tools/layout-studio/state-lock.test.mjs",
+      "pattern": null,
+      "costMs": 5722
+    },
+    {
+      "file": "tools/layout-studio/suite.test.mjs",
+      "pattern": null,
+      "costMs": 28003
+    },
+    {
+      "file": "tools/layout-studio/task-authority-ignored-inputs.test.mjs",
+      "pattern": null,
+      "costMs": 22440
+    },
+    {
+      "file": "tools/layout-studio/task-authority-ignored-trees.test.mjs",
+      "pattern": null,
+      "costMs": 21923
+    },
+    {
+      "file": "tools/layout-studio/task-authority.test.mjs",
+      "pattern": null,
+      "costMs": 58681
+    },
+    {
+      "file": "tools/layout-studio/task-history-inputs.test.mjs",
+      "pattern": null,
+      "costMs": 23341
+    },
+    {
+      "file": "tools/layout-studio/task-index-inputs.test.mjs",
+      "pattern": null,
+      "costMs": 19378
+    },
+    {
+      "file": "tools/layout-studio/task-window.test.mjs",
+      "pattern": null,
+      "costMs": 134
+    },
+    {
+      "file": "tools/layout-studio/tmux-task-window.test.mjs",
+      "pattern": null,
+      "costMs": 150
+    },
+    {
+      "file": "tools/layout-studio/vial-dynamic.test.mjs",
+      "pattern": null,
+      "costMs": 213
+    },
+    {
+      "file": "tools/layout-studio/vial-encoders.test.mjs",
+      "pattern": null,
+      "costMs": 210
+    },
+    {
+      "file": "tools/layout-studio/vial-rules.test.mjs",
+      "pattern": null,
+      "costMs": 178
+    },
+    {
+      "file": "tools/layout-studio/voice-queue.test.mjs",
+      "pattern": null,
+      "costMs": 5652
+    },
+    {
+      "file": "tools/layout-studio/windows-broker-exchanges.test.mjs",
+      "pattern": null,
+      "costMs": 24001
+    },
+    {
+      "file": "tools/layout-studio/windows-exchange-images.test.mjs",
+      "pattern": null,
+      "costMs": 51069
+    },
+    {
+      "file": "tools/layout-studio/windows-guest-tools.test.mjs",
+      "pattern": null,
+      "costMs": 10416
+    },
+    {
+      "file": "tools/layout-studio/windows-history-inputs.test.mjs",
+      "pattern": null,
+      "costMs": 340
+    },
+    {
+      "file": "tools/layout-studio/windows-history-staging.test.mjs",
+      "pattern": null,
+      "costMs": 4964
+    },
+    {
+      "file": "tools/layout-studio/windows-host.test.mjs",
+      "pattern": null,
+      "costMs": 2769
+    },
+    {
+      "file": "tools/layout-studio/windows-index-inputs.test.mjs",
+      "pattern": null,
+      "costMs": 322
+    },
+    {
+      "file": "tools/layout-studio/windows-index-staging.test.mjs",
+      "pattern": null,
+      "costMs": 5341
+    },
+    {
+      "file": "tools/layout-studio/windows-pipeline-evidence.test.mjs",
+      "pattern": null,
+      "costMs": 592
+    },
+    {
+      "file": "tools/layout-studio/windows-reviewed-inputs.test.mjs",
+      "pattern": null,
+      "costMs": 6728
+    },
+    {
+      "file": "tools/layout-studio/windows-reviewed-run.test.mjs",
+      "pattern": null,
+      "costMs": 245
+    },
+    {
+      "file": "tools/layout-studio/windows-reviewed-runner.test.mjs",
+      "pattern": null,
+      "costMs": 28555
+    },
+    {
+      "file": "tools/layout-studio/windows-sandbox-native.test.mjs",
+      "pattern": null,
+      "costMs": 7310
+    },
+    {
+      "file": "tools/layout-studio/windows-sandbox-sessions.test.mjs",
+      "pattern": null,
+      "costMs": 10479
+    },
+    {
+      "file": "tools/layout-studio/windows-shield-evidence.test.mjs",
+      "pattern": null,
+      "costMs": 442
+    },
+    {
+      "file": "tools/layout-studio/windows-storage-native.test.mjs",
+      "pattern": null,
+      "costMs": 13547
+    },
+    {
+      "file": "tools/layout-studio/windows-storage-setup.test.mjs",
+      "pattern": null,
+      "costMs": 13615
+    },
+    {
+      "file": "tools/layout-studio/xwhatsit-expansion.test.mjs",
+      "pattern": null,
+      "costMs": 223
+    }
+  ]
+}

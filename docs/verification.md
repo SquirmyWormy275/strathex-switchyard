@@ -1417,3 +1417,25 @@ accepted. The separate complete release remains active. This is a CI acceptance
 gap, not a hardware/account blocker; native `9f35961` and complete local Linux
 `cadbccd` keep their separate accepted results. Inspect scheduling without
 extending any child/job bounds. [Evidence](evidence/windows-cad-cancelled-backend-summary.json).
+
+
+## Measured Windows scheduling and bounded progress — 2026-11-06
+
+The four preliminary Windows jobs retain their twenty-minute limits and every
+original child/group contract. Placement now uses the 198 accepted native
+9f35961 durations, bound to their four published receipt digests. The two newer
+groups use scheduling estimates only. The 200 current groups change from
+estimated loads of 654/1117/935/870 seconds to about 894 seconds each, without
+changing executable arguments, scenarios, skips or deadlines. These are historical
+estimates, not corrected native runtime acceptance.
+
+Bounded progress identifies each exact group before start and after verified
+child cleanup. It carries no child output, remains explicitly incomplete, and
+cannot substitute for the final receipt. A reporter fault preserves child cleanup
+and the final receipt while rejecting overall verification. Four source groups
+pass 40 checks; the workload regression fails before the change. Typecheck,
+package bounds and exact temporary-root cleanup pass. The cancelled native shard
+retains no accepted cases or exact cleanup; its precise active child/cause remain
+unknown. Corrected native Windows acceptance is pending.
+[Contract](windows-backend-scheduling.md),
+[source receipt](evidence/windows-measured-scheduling-source-summary.json).

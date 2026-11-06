@@ -566,11 +566,23 @@ async function cleanupIsolatedRoot(cleanup, testRoot, testParent) {
 }
 
 async function writeReceipt(directory, receipt) { await mkdir(directory, { recursive: true }); const finalPath = join(directory, `isolated-test-${receipt.runId}.json`); const temporaryPath = `${finalPath}.${randomUUID()}.tmp`; try { await writeFile(temporaryPath, JSON.stringify(receipt, null, 2), { encoding: "utf8", mode: 0o600 }); await rename(temporaryPath, finalPath); return finalPath; } finally { await rm(temporaryPath, { force: true }).catch(() => {}); } }
-export async function runVerification({ groups = requiredGroups, cwd = root, outputDirectory = receiptDirectory, executable = process.execPath, timeoutMs, cleanup, sourceEnvironment, receiptWriter = writeReceipt } = {}) {
+export async function runVerification({ groups = requiredGroups, cwd = root, outputDirectory = receiptDirectory, executable = process.execPath, timeoutMs, cleanup, sourceEnvironment, receiptWriter = writeReceipt, onProgress } = {}) {
   if (groups === requiredGroups) assertRequiredTestManifest(groups);
+  if (onProgress !== undefined && typeof onProgress !== "function") throw Error("Verification progress requires a reporter function.");
   // Reject a bad later allowance before launching any earlier test processes.
   for (const group of groups) effectiveGroupTimeout(group, timeoutMs);
-  const runId = randomUUID(); const startedAt = new Date().toISOString(); const children = []; for (const group of groups) children.push(await runChild(group, { cwd, executable, timeoutMs, cleanup, sourceEnvironment }));
+  const runId = randomUUID(); const startedAt = new Date().toISOString(); const children = []; let progressFailed = false;
+  const report = async (phase, group, index, child) => {
+    if (!onProgress) return;
+    const progress = Object.freeze({ schema: "switchyard-test-progress/v1", runId, verificationComplete: false, phase, group: index + 1, requiredGroups: groups.length,
+      file: group.file, pattern: group.pattern ?? null, ...(child ? { groupAccepted: child.success, durationMs: child.durationMs } : {}) });
+    try { await onProgress(progress); } catch { progressFailed = true; }
+  };
+  for (const [index, group] of groups.entries()) {
+    await report("started", group, index);
+    const child = await runChild(group, { cwd, executable, timeoutMs, cleanup, sourceEnvironment }); children.push(child);
+    await report("exited", group, index, child);
+  }
   const passed = children.filter((item) => item.success).length;
   const tests = children.reduce((total, child) => total + (child.testCounts?.total ?? 0), 0);
   const passedTests = children.reduce((total, child) => total + (child.testCounts?.passed ?? 0), 0);
@@ -579,6 +591,8 @@ export async function runVerification({ groups = requiredGroups, cwd = root, out
   const cancelledTests = children.reduce((total, child) => total + (child.testCounts?.cancelled ?? 0), 0);
   const todoTests = children.reduce((total, child) => total + (child.testCounts?.todo ?? 0), 0);
   const receipt = { version: 1, runId, startedAt, endedAt: new Date().toISOString(), requiredGroups: groups, children, totals: { required: groups.length, passed, failed: groups.length - passed, tests, passedTests, failedTests, skippedTests, cancelledTests, todoTests }, receiptWrite: { completed: true, error: null }, success: passed === groups.length };
+  if (onProgress) receipt.progressWrite = { completed: !progressFailed, error: progressFailed ? "progress-reporter-failed" : null };
+  if (progressFailed) receipt.success = false;
   try { return { receipt, receiptPath: await receiptWriter(outputDirectory, receipt) }; }
   catch { receipt.receiptWrite = { completed: false, error: "atomic-receipt-write-failed" }; receipt.success = false; return { receipt, receiptPath: null }; }
 }

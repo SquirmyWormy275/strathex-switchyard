@@ -3,6 +3,18 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { requiredGroups, discoverRequiredTestFiles } from "./run-isolated-tests.mjs";
 import { selectWindowsBackendShard, windowsBackendShards } from "./windows-backend-shards.mjs";
+import costs from "./fixtures/windows-backend-costs.json" with { type: "json" };
+
+test("native measured workloads fit evenly inside the unchanged preliminary job budget", () => {
+  const known = new Map(costs.groups.map(g => [JSON.stringify([g.file, g.pattern]), g.costMs]));
+  const shards = windowsBackendShards.map(shard => selectWindowsBackendShard(shard));
+  const loads = shards.map(groups => groups.reduce((sum, g) => sum + (known.get(JSON.stringify([g.file, g.pattern ?? null])) ?? costs.fallbackCostMs), 0));
+  assert.ok(Math.max(...loads) <= 950000, `The historical workload leaves too little room for setup: ${loads.join(",")}`);
+  assert.ok(Math.max(...loads) - Math.min(...loads) < 60000, "One batch must not inherit several long native cases just because a new file shifts an array index.");
+  assert.deepEqual(windowsBackendShards.map(shard => selectWindowsBackendShard(shard)), shards);
+  assert.equal(costs.groups.length, 198); assert.equal(known.size, 198);
+  assert.equal(costs.sourceCommit, "9f35961ca18087b2406e7e2ad716b5fe97ebc2bb");
+});
 
 test("four Windows backend shards preserve every original file and exact manifest scenario once", () => {
   const shards = windowsBackendShards.map(shard => selectWindowsBackendShard(shard)), all = shards.flat();

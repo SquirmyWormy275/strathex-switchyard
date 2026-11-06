@@ -117,6 +117,12 @@ Windows acceptance remain separate.
 
 ## Unfinished implementation
 
+The Windows preliminary scheduler now balances exact groups using accepted native
+timings and reports bounded start/exit progress. Four source groups/40 checks pass,
+preserving all child limits and four twenty-minute jobs. The cancelled run remains
+unaccepted; the correction still needs native Windows acceptance.
+[Contract](windows-backend-scheduling.md).
+
 - Native Windows verification of changes newer than the passing `9f35961`
   complete release; the restricted storage-owner journey is separately accepted
   in controlled native CI.

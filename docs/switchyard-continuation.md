@@ -31,6 +31,13 @@ evidence, not instructions to reset. Publish regular commits. Do not merge or re
 
 ## Current implementation and evidence
 
+Windows preliminary batches now use measured scheduling costs from all 198
+accepted native `9f35961` groups, while retaining every current group/scenario
+and original child/job bound. Fixed progress identifies the active group without
+being accepted as a complete receipt. Four groups/40 checks and typecheck pass;
+the exact temporary root is removed. Native correction acceptance remains pending.
+[Contract](windows-backend-scheduling.md).
+
 Latest source work preserves foreground-helper ownership after uncertain exit,
 blocks replacement and propagates uncertainty through Suite shutdown. Ten groups/
 87 checks plus an eleven-check foreground follow-up pass with two real controlled

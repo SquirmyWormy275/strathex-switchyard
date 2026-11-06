@@ -10,6 +10,42 @@ import { assertRequiredTestManifest, createStrictTestEnvironment, linuxGroups, r
 const executable = process.execPath;
 async function group(directory, name, code) { const file = join(directory, `${name}.test.mjs`); await writeFile(file, code, "utf8"); return { file }; }
 async function verify(groups, outputDirectory, timeoutMs = 1_000) { return runVerification({ groups, outputDirectory, timeoutMs, executable: process.execPath }); }
+
+test("progress identifies the active exact group without exposing child output or accepting incomplete verification", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "sxsy-progress-")), events = [];
+  try {
+    const passed = await group(directory, "pass", "import test from 'node:test';console.log('PRIVATE_CHILD_OUTPUT');test('pass',()=>{});");
+    const failed = await group(directory, "fail", "import test from 'node:test';test('fail',()=>{throw Error('PRIVATE_CHILD_FAILURE')});");
+    const result = await runVerification({ groups: [passed, failed], outputDirectory: directory, executable, onProgress: event => { assert.equal(Object.isFrozen(event), true); events.push(event); } });
+    assert.deepEqual(events.map(e => [e.phase, e.group, e.file]), [["started", 1, passed.file], ["exited", 1, passed.file], ["started", 2, failed.file], ["exited", 2, failed.file]]);
+    assert.equal(events.every(e => e.verificationComplete === false && e.requiredGroups === 2 && e.runId === result.receipt.runId), true);
+    assert.equal(events[1].groupAccepted, true); assert.equal(events[3].groupAccepted, false);
+    assert.equal(JSON.stringify(events).includes("PRIVATE_CHILD"), false);
+    assert.equal(result.receipt.success, false); assert.equal(result.receipt.progressWrite.completed, true);
+    assert.equal(result.receipt.children.every(c => c.cleanupCompleted && c.processTreeTermination.completed), true);
+  } finally { await rm(directory, { recursive: true, force: true }); }
+});
+
+test("a failing progress reporter preserves final child receipts and cleanup but cannot yield accepted verification", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "sxsy-progress-fault-"));
+  try {
+    const passed = await group(directory, "pass", "import test from 'node:test';test('pass',()=>{});");
+    const result = await runVerification({ groups: [passed], outputDirectory: directory, executable, onProgress: async () => { throw Error("PRIVATE_REPORTER_FAILURE"); } });
+    assert.equal(result.receipt.children[0].success, true); assert.equal(result.receipt.children[0].cleanupCompleted, true);
+    assert.equal(result.receipt.totals.passedTests, 1); assert.equal(result.receipt.success, false);
+    assert.deepEqual(result.receipt.progressWrite, { completed: false, error: "progress-reporter-failed" });
+    const saved = await readFile(result.receiptPath, "utf8"); assert.equal(saved.includes("PRIVATE_REPORTER_FAILURE"), false);
+    assert.equal(JSON.parse(saved).success, false);
+  } finally { await rm(directory, { recursive: true, force: true }); }
+});
+
+test("invalid progress configuration is rejected before starting any test child", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "sxsy-progress-preflight-")), marker = join(directory, "unexpected-child");
+  try {
+    await assert.rejects(runVerification({ groups: [{ file: "must-not-run", args: ["-e", `require('node:fs').writeFileSync(${JSON.stringify(marker)},'unexpected')`] }], outputDirectory: directory, onProgress: true }), /reporter function/);
+    await assert.rejects(readFile(marker), { code: "ENOENT" });
+  } finally { await rm(directory, { recursive: true, force: true }); }
+});
 test("Windows authority policy selection includes every admission/state child and rejects partial or unknown inventories", () => {
   const selected = selectWindowsPolicyContractGroups("authority", requiredGroups);
   assert.deepEqual(selected.map(g => g.file), ["scripts/run-isolated-tests.test.mjs", "tools/layout-studio/task-authority.test.mjs", "tools/layout-studio/receipt-authority-state.test.mjs"]);
