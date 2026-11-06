@@ -56,9 +56,11 @@ source-only changes have not updated or restarted this installed application.
    guardian/worker/status QUERY mask 8 verification, then fails at
    `probe-identity-return-structured-result`. The original owner remains **0/8**.
    [Native receipt](evidence/private-pipe-native-summary.json).
-   Next inspect the bounded worker exit code and output byte count. This CI-only
-   observation preserves original results, exceptions, permissions and privacy.
-   [Source receipt](evidence/worker-result-observation-source-summary.json).
+   Native `20dc066` reports worker DLL initialization failure, exit 3221225794
+   and zero output bytes. Source defers shell32/ole32 until their effect-path calls
+   and verifies the actual import tables in preflight. Inspect the native candidate
+   next; its specific DLL hypothesis remains unproven.
+   [Failure and correction](windows-setup-metadata-startup.md).
    Preserve all eight owner checks, the ninety-second deadline and exact QUERY
    mask 8. No broader token/process/default-DACL/SID/privilege/account rights or
    runtime fallback. [Pipe contract](windows-private-command-pipes.md).

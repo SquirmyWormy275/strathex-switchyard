@@ -2,6 +2,36 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { verifyRestrictedOwnerReport, storageBrokerFailureEvidence, parseNodeRngImports, verifyNodeRngImports } from "./windows-restricted-owner-report.mjs";
 import { createWindowsOwnerProbeObservation } from "./windows-owner-probe-observation.mjs";
+import { verifyNativeSetupImage } from "./windows-setup-image.mjs";
+
+function setupImage() {
+  const bytes = Buffer.alloc(4096), u16 = (offset, value) => bytes.writeUInt16LE(value, offset), u32 = (offset, value) => bytes.writeUInt32LE(value, offset);
+  u16(0, 0x5a4d); u32(0x3c, 0x80); u32(0x80, 0x4550); u16(0x84, 0x8664); u16(0x86, 1); u16(0x94, 0xf0); u16(0x98, 0x20b); u32(0x98 + 108, 16);
+  u32(0x188 + 12, 0x1000); u32(0x188 + 16, 0x800); u32(0x188 + 20, 0x200);
+  for (const [index, value, size] of [[1, 0x1200, 60], [10, 0x1100, 80], [13, 0x1300, 96]]) { u32(0x98 + 112 + index * 8, value); u32(0x98 + 116 + index * 8, size); }
+  u32(0x300, 80); u16(0x300 + 78, 0x800);
+  u32(0x400 + 12, 0x1400); u32(0x414 + 12, 0x1420);
+  u32(0x500, 1); u32(0x504, 0x1440); u32(0x520, 1); u32(0x524, 0x1460);
+  for (const [offset, name] of [[0x600, "KERNEL32.dll"], [0x620, "ADVAPI32.dll"], [0x640, "SHELL32.dll"], [0x660, "ole32.dll"]]) bytes.write(name + "\0", offset);
+  return bytes;
+}
+
+test("native setup PE proof preserves System32 loading and requires deferred shell/COM imports without loading a DLL", () => {
+  assert.deepEqual(verifyNativeSetupImage(setupImage()), { dependentLoadFlags: 0x800, deferredUiImportsVerified: true, runtimeModuleIsolationVerified: false });
+  const changes = [
+    b => b.writeUInt16LE(0x14c, 0x84), b => b.writeUInt16LE(0x10b, 0x98), b => b.writeUInt16LE(0, 0x300 + 78),
+    b => b.writeUInt32LE(0xfffffff0, 0x3c), b => b.writeUInt16LE(32, 0x86), b => b.writeUInt32LE(13, 0x98 + 108),
+    b => b.writeUInt32LE(0x90000000, 0x400 + 12), b => b.writeUInt32LE(16385, 0x98 + 116 + 13 * 8),
+    b => b.writeUInt32LE(2, 0x500), b => b.writeUInt32LE(0, 0x98 + 112 + 13 * 8),
+    b => b.writeUInt32LE(64, 0x98 + 116 + 13 * 8), b => b.writeUInt32LE(0x1440, 0x524),
+    b => b.write("SHELL32.dll\0", 0x600), b => b.write("USER32.dll\0", 0x600), b => b.write("GDI32.dll\0", 0x600),
+    b => b.write("../private.dll\0", 0x640), b => b.fill(0x61, 0x640, 0x640 + 81), b => b.writeUInt32LE(0, 0x500 + 4),
+    b => b.writeUInt32LE(0xfffffff0, 0x188 + 20),
+    b => { b.writeUInt16LE(2, 0x86); b.copy(b, 0x1b0, 0x188, 0x1b0); }
+  ];
+  for (const change of changes) { const bytes = setupImage(); change(bytes); assert.throws(() => verifyNativeSetupImage(bytes)); }
+  for (const value of [null, {}, Buffer.alloc(100), setupImage().subarray(0, 600), Buffer.alloc(16 * 1024 * 1024 + 1)]) assert.throws(() => verifyNativeSetupImage(value));
+});
 
 test("probe observation delegates original arguments, callbacks and result without accepting native work", async () => {
   const observation = createWindowsOwnerProbeObservation(), calls = [], child = {}, frame = {}, result = {}, argument = {}, options = {

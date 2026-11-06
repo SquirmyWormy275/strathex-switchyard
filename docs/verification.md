@@ -812,3 +812,20 @@ fails. Oversized, unknown and stale metadata are excluded. Two isolated groups
 pass 35 tests, no skips, all child/tree cleanup verified. Permissions, installed
 state, accounts and hardware are unchanged.
 [Source evidence](evidence/worker-result-observation-source-summary.json).
+
+
+## Restricted setup DLL initialization candidate (2026-11-06)
+
+Native source `20dc066`, merge `3a8a68f1`, equal tree `a687be9f`, retains
+worker exit 3221225794 (0xC0000142) and zero stdout bytes. Guardian/worker/status
+QUERY mask 8 is verified, but the original owner remains 0/8. The specific failing
+DLL is not known. [Native receipt](evidence/setup-worker-native-summary.json).
+
+The candidate defers the setup executable's shell32/ole32 imports until their
+installation/elevation APIs are called. Metadata does not use those APIs.
+System32-only loading and all original permissions/assertions remain. Native
+preflight now parses the exact PE image and requires the two deferred imports,
+bounded import tables and absence of eager UI imports. Four isolated groups pass
+50 tests with all child/tree cleanup; Windows compilation/runtime acceptance is
+pending. No SDK, runtime, model, account or installed application changed locally.
+[Contract](windows-setup-metadata-startup.md), [source evidence](evidence/setup-deferred-imports-source-summary.json).

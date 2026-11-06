@@ -17,7 +17,7 @@ $build = Join-Path $output 'build-native-setup.cmd'
 @echo off
 call "$developer" -arch=x64 -host_arch=x64
 if errorlevel 1 exit /b 1
-cl.exe /nologo /O2 /EHsc /std:c++17 /MT /W4 /WX /guard:cf /sdl /DUNICODE /D_UNICODE /D_WIN32_WINNT=0x0A00 "$source" /Fe:"$image" /Fo:"$object" /link advapi32.lib bcrypt.lib shell32.lib ole32.lib uuid.lib /DYNAMICBASE /NXCOMPAT /HIGHENTROPYVA /DEPENDENTLOADFLAG:0x800 /guard:cf /Brepro
+cl.exe /nologo /O2 /EHsc /std:c++17 /MT /W4 /WX /guard:cf /sdl /DUNICODE /D_UNICODE /D_WIN32_WINNT=0x0A00 "$source" /Fe:"$image" /Fo:"$object" /link advapi32.lib bcrypt.lib shell32.lib ole32.lib uuid.lib delayimp.lib /DELAYLOAD:shell32.dll /DELAYLOAD:ole32.dll /DELAY:NOBIND /DYNAMICBASE /NXCOMPAT /HIGHENTROPYVA /DEPENDENTLOADFLAG:0x800 /guard:cf /Brepro
 exit /b %errorlevel%
 "@ | Set-Content -LiteralPath $build -Encoding ascii
 & $env:ComSpec /d /s /c "`"$build`""
