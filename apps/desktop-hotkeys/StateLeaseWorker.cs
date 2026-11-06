@@ -73,14 +73,20 @@ internal static class StateLeaseWorker
             var request = ParseRequest(ReadLine(input, 22000, tabs: true) ?? throw Invalid());
             trace.WriteLine("lease-input-read");
             if (!string.Equals(System.IO.Path.GetFullPath(request.Path), request.Path, StringComparison.OrdinalIgnoreCase)) throw Invalid();
-            if (request.Trace) trace.WriteLine("lease-request-read");
-            using var parent = Process.GetProcessById(request.ParentPid);
-            _ = parent.SafeHandle; // Keep the original kernel process handle, not a reusable PID lookup.
-            var birth = parent.StartTime;
-            void Current() { if (parent.HasExited || parent.StartTime != birth) throw Invalid(); }
+            trace.WriteLine("lease-request-read");
+            // Process.SafeHandle opens PROCESS_ALL_ACCESS for a PID-only Process.
+            // Pin the original process using only the rights needed to read its
+            // birth time and wait for exit. No process/token ACL is changed.
+            using var parent = OpenProcess(0x1000 | 0x00100000, false, request.ParentPid);
+            if (parent.IsInvalid || !GetProcessTimes(parent, out long birth, out _, out _, out _) || birth <= 0) throw Invalid();
+            void Current()
+            {
+                if (WaitForSingleObject(parent, 0) != 258 ||
+                    !GetProcessTimes(parent, out long observedBirth, out _, out _, out _) || observedBirth != birth) throw Invalid();
+            }
             Current();
             using var watcher = new ParentWatcher(Current);
-            if (request.Trace) trace.WriteLine("lease-owner-found");
+            trace.WriteLine("lease-owner-found");
             Identity expected;
             using (var observed = Open(request.Path, 0, 7)) expected = Inspect(observed);
             int sequence = 0;
@@ -120,6 +126,12 @@ internal static class StateLeaseWorker
     }
 
     private sealed record Identity(uint Volume, uint IndexHigh, uint IndexLow, int BirthHigh, int BirthLow);
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern SafeProcessHandle OpenProcess(uint access, [MarshalAs(UnmanagedType.Bool)] bool inherit, int pid);
+    [DllImport("kernel32.dll", SetLastError = true)] [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool GetProcessTimes(SafeProcessHandle process, out long creation, out long exit, out long kernel, out long user);
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern uint WaitForSingleObject(SafeProcessHandle process, uint milliseconds);
     [SupportedOSPlatform("windows")]
     private static SafeFileHandle Open(string path, uint access, uint sharing)
     {

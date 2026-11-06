@@ -39,14 +39,20 @@ verify cleanup; typecheck passes. Frontend, installed and native acceptance rema
 separate. [Contract](editor-workflow-observation.md),
 [evidence](evidence/editor-workflow-observation-summary.json).
 
-Windows candidate 8168d4e **failed** its copied-helper metadata check (exit 2),
-before the restricted-owner journey. Its digest-verified artifact is retained.
-The source still changed console code pages in six pipe-command entry points;
-these now use strict UTF-8 stream readers/writers. Both managed builds, 1,985
-portable checks and four isolated groups/42 checks pass with exact cleanup.
-The native receipt does not identify the throwing operation; Windows validation
-of this correction and the original owner journey remain unaccepted.
-[Failure and correction](evidence/windows-pipe-text-source-summary.json).
+Windows `1fc9d7f` clears copied-helper metadata and console initialization:
+both EOF probes now reach entry and retire exact owned trees. Ordinary owner
+checks (8), restricted metadata (13) and native exchange (31) pass. The original
+restricted owner still fails during lock initialization after reading input,
+with zero of eight checks. Both imported artifact digests verify.
+[Native result](evidence/windows-pipe-native-summary.json).
+
+The next source correction removes an unnecessary full-process-access request
+from the parent watcher. It pins one handle with only birth-query and exit-wait
+rights, retaining parent-loss cleanup and all original token restrictions.
+Two managed builds/1,985 portable checks and five groups/49 passes/one declared
+Windows-only skip pass. Native acceptance remains pending; the previous receipt
+does not establish the exact post-input failure cause.
+[Source evidence](evidence/windows-lease-parent-source-summary.json).
 
 The archived Windows release test tree now builds/stages its own exact-source
 state helper before verification. The previous 97a7727 run observed ENOENT;
@@ -142,9 +148,10 @@ the installed update or old live provider verifiers without a relevant new chang
    Verify source, phase, process exit, root identities, receipt and every owned
    alias/build/test parent. Never broaden cleanup or relax deadlines.
 
-2. Collect the native result for the current non-console helper candidate. It
-   addresses the observed console-mode difference while retaining ordinary Node
-   spawn and parent-loss containment. Do not accept it without the original
+2. Collect the native result for the limited-access parent-watch correction.
+   The non-console helper and pipe correction now reach entry, but the original
+   owner still fails after lock input. Ordinary Node spawn and parent-loss
+   containment remain. Do not accept the correction without the original
    restricted owner and lease cleanup checks. Detached EOF entry
    is a diagnostic, not acceptance of a lease or the original eight-check owner.
    No broader token rights, default-DACL/privilege/SID/account/runtime fallback
