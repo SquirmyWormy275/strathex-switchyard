@@ -31,6 +31,18 @@ evidence, not instructions to reset. Publish regular commits. Do not merge or re
 
 ## Current implementation and evidence
 
+Windows `4faa8a1` clears restricted private-state initialization and mode update.
+Its version 2 native lease tests pass **24 checks / one declared skip**, including
+EOF, contention, partial input, non-pipe input refusal and parent-loss cleanup.
+The restricted owner now fails later at the read-only storage probe, still zero
+of eight complete owner checks. [Native result](evidence/windows-lease-pipe-native-summary.json).
+
+Shield now supports exact declared license-and-exception pairs in signed policy.
+Seven groups / 59 tests plus a 26-test engine follow-up, typecheck and exact
+cleanup pass. Actual Linux scans and Windows guest doubles keep base-only and
+different-exception permissions distinct; no legal or publisher verification is
+claimed. [Evidence](evidence/license-exception-declaration-summary.json).
+
 Windows `da28b5c` identifies the restricted failure as **Access Denied opening the
 parent process**. The next source protocol binds worker lifetime to its private
 inherited input pipe instead of that lookup. It checks EOF while idle, reading
@@ -193,16 +205,16 @@ the installed update or old live provider verifiers without a relevant new chang
    root identities, receipt and every owned alias/build/test parent. Never
    broaden cleanup or relax deadlines.
 
-2. Collect the native result for the version 2 inherited-pipe lease protocol.
-   `da28b5c` proves parent OpenProcess fails with Access Denied; original owner
-   remains zero of eight checks. Source now supervises EOF through the private
-   inherited pipe, with one nonblocking observation/read loop and no PID lookup.
-   File identity, exclusive sharing, original normal spawn/Job and all original
-   owner assertions remain. Native EOF/partial-frame/contended-lock/file-input,
-   crash, detached-owner and complete restricted-owner acceptance is required.
+2. Continue the native restricted-owner read-only storage probe failure.
+   `4faa8a1` clears protected state initialization/mode update through version 2
+   inherited pipe ownership. Both native lease groups pass 24 checks/one declared
+   skip, including EOF, partial input, contention, non-pipe input refusal and
+   parent loss. Original owner still fails later at `read-only-probe`, zero of
+   eight checks; do not accept the entire owner from the lease result.
+   [Current native result](evidence/windows-lease-pipe-native-summary.json).
+   Preserve original normal spawn/Job, file guards and all eight owner assertions.
    No token/DACL/privilege/SID, desktop, account, runtime or detached fallback
-   is permitted. [Failure and source evidence](evidence/windows-lease-pipe-owner-source-summary.json).
-   Complete release workflows remain separate; inspect their actual CI state.
+   is permitted. Complete release workflows remain separate.
 
 3. The protected editor journal, signed client/routes, restricted upstream and
    retained Terminal now compose through actual Linux carriers with controlled

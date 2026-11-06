@@ -7,7 +7,7 @@ import { fileURLToPath } from "node:url";
 
 export const shieldEngineVersion = "switchyard-baseline-scanner/1";
 
-/** Bounded AND/OR declaration syntax, not license-list or legal verification. */
+/** Bounded AND/OR/WITH declaration syntax, not license-list or legal verification. */
 export function npmLicenseDeclaration(value, allowedLicenses = []) {
   if (typeof value !== "string" || !value || value.length > 512 || /[^A-Za-z0-9.()+ \t-]/.test(value)) return null;
   const tokens = []; let offset = 0;
@@ -16,6 +16,7 @@ export function npmLicenseDeclaration(value, allowedLicenses = []) {
     const match = /^(?:[A-Za-z0-9][A-Za-z0-9.-]{0,79}\+?|[()])/.exec(value.slice(offset));
     if (!match || tokens.length >= 128) return null;
     if (["AND", "OR"].includes(match[0]) && (offset > 0 && !/[ \t()]/.test(value[offset - 1]) || offset + match[0].length < value.length && !/[ \t()]/.test(value[offset + match[0].length]))) return null;
+    if (match[0] === "WITH" && (offset === 0 || !/[ \t]/.test(value[offset - 1]) || !/[ \t]/.test(value[offset + match[0].length] ?? ""))) return null;
     tokens.push(match[0]); offset += match[0].length;
   }
   let cursor = 0, atoms = 0, choice = false;
@@ -24,6 +25,13 @@ export function npmLicenseDeclaration(value, allowedLicenses = []) {
     const token = tokens[cursor++];
     if (token === "(") { const result = disjunction(depth + 1); if (tokens[cursor++] !== ")") throw Error("Unclosed license expression."); return result; }
     if (!token || ["AND", "OR", "WITH", "(", ")", "NONE", "NOASSERTION"].includes(token) || /^(?:LicenseRef-|DocumentRef-)/i.test(token) || ++atoms > 64) throw Error("Unsupported license declaration.");
+    if (tokens[cursor] === "WITH") {
+      cursor++; const exception = tokens[cursor++];
+      if (!exception || !/^[A-Za-z0-9][A-Za-z0-9.-]{0,79}$/.test(exception)
+          || ["AND", "OR", "WITH", "NONE", "NOASSERTION"].includes(exception)
+          || /^(?:LicenseRef-|DocumentRef-)/i.test(exception) || ++atoms > 64) throw Error("Unsupported license exception declaration.");
+      return { atom: `${token} WITH ${exception}` };
+    }
     return { atom: token };
   };
   const conjunction = depth => { let result = atom(depth); while (tokens[cursor] === "AND") { cursor++; result = { op: "AND", left: result, right: atom(depth) }; } return result; };
@@ -307,7 +315,7 @@ function parseRules(bytes) {
   const v = json(bytes); exact(v, ["schema", "version", "engine", "rules", "allowedLicenses"]);
   if (v.schema !== "switchyard-shield-rules/v1" || v.version !== 1 || v.engine !== shieldEngineVersion) throw Error("Unsupported scanner rule feed.");
   const selected = array(v.rules, 32); if (!selected.length || new Set(selected).size !== selected.length || selected.some(id => !Object.hasOwn(rules, id))) throw Error("Unsupported or duplicate scanner rule.");
-  const allowedLicenses = array(v.allowedLicenses, 128); if (allowedLicenses.some(s => typeof s !== "string" || !/^[A-Za-z0-9.-]{1,80}\+?$/.test(s) || npmLicenseDeclaration(s)?.expression !== s) || new Set(allowedLicenses.map(s => s.toLowerCase())).size !== allowedLicenses.length) throw Error("Unsupported license policy.");
+  const allowedLicenses = array(v.allowedLicenses, 128); if (allowedLicenses.some(s => typeof s !== "string" || !/^[A-Za-z0-9][A-Za-z0-9.-]{0,79}\+?(?: WITH [A-Za-z0-9][A-Za-z0-9.-]{0,79})?$/.test(s) || npmLicenseDeclaration(s)?.expression !== s) || new Set(allowedLicenses.map(s => s.toLowerCase())).size !== allowedLicenses.length) throw Error("Unsupported license policy.");
   return { selected, allowedLicenses };
 }
 const advisoryIdentityKey = ({ ecosystem, name, version }) => `${ecosystem}:${name}@${ecosystem === "PyPI" ? pypiVersionKey(version) : version}`;

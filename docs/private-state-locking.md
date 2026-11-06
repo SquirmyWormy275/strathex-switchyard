@@ -19,8 +19,11 @@ The lock file's volume, index and creation time stay pinned. Each transaction
 reopens that exact ordinary single-link file with exclusive sharing and reparse
 refusal. The idle worker retains no file handle, compartment data or key.
 Sequencing, pool limits and the acquisition deadline remain unchanged.
-This source correction follows a native Access Denied result for the earlier
-parent handle lookup. Its native acceptance is pending.
+This correction follows a native Access Denied result for the earlier parent
+handle lookup. At `4faa8a1`, ordinary native leases pass 24 checks/one declared
+skip and restricted state initialization/mode update complete. The original
+restricted owner still fails later at its read-only probe.
+[Native result](evidence/windows-lease-pipe-native-summary.json).
 [Source and retained failure](evidence/windows-lease-pipe-owner-source-summary.json).
 
 Windows source runs now require the same helper at

@@ -85,7 +85,7 @@ try {
   }
   if(licenseExpressions){
     content.set("app.js",Buffer.from("const ordinary = 1;\n"));
-    content.set("package-lock.json",Buffer.from(JSON.stringify({lockfileVersion:3,packages:{"node_modules/synthetic":{version:"1.0.0",license:"MIT AND GPL-3.0-only"},"node_modules/choice":{version:"1.0.0",license:"MIT OR GPL-3.0-only"},"node_modules/unsupported":{version:"1.0.0",license:"GPL-2.0-only WITH Classpath-exception-2.0"}}})));
+    content.set("package-lock.json",Buffer.from(JSON.stringify({lockfileVersion:3,packages:{"node_modules/synthetic":{version:"1.0.0",license:"MIT AND GPL-3.0-only"},"node_modules/choice":{version:"1.0.0",license:"MIT OR GPL-3.0-only"},"node_modules/unsupported":{version:"1.0.0",license:"LicenseRef-private"}}})));
     content.set("advisory.json",Buffer.from(JSON.stringify({schema:"switchyard-shield-advisories/v1",version:1,engine:"switchyard-baseline-scanner/1",packages:[...["synthetic","choice","unsupported"].map(name=>({ecosystem:"npm",name,version:"1.0.0",advisories:[]})),{ecosystem:"npm",name:"synthetic",version:"1.0.1",advisories:[]}]})));
   }
   if(ignoredSecret){content.set(".env",Buffer.from("-----BEGIN PRIVATE KEY-----\nsynthetic explicitly reviewed ignored secret\n"));content.set("app.js",Buffer.from("const ordinary = 1;\n"));}

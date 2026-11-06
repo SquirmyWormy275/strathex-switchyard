@@ -11,6 +11,42 @@ const sha = b => createHash("sha256").update(b).digest("hex");
 import { parseShieldScannerReport } from "./repository-shield.mjs";
 import {scannerFixture} from "./test-support/shield-scanner-fixture.mjs";
 
+test("license exceptions are exact atomic policy entries with precedence above AND and OR", () => {
+  const pair = "GPL-2.0-only WITH Classpath-exception-2.0";
+  assert.deepEqual(npmLicenseDeclaration("(GPL-2.0-only\tWITH  Classpath-exception-2.0)", [pair]), { expression: pair, allowed: true, choice: false });
+  assert.equal(npmLicenseDeclaration(pair, ["GPL-2.0-only", "Classpath-exception-2.0"]).allowed, false);
+  assert.equal(npmLicenseDeclaration("GPL-2.0-only", [pair]).allowed, false);
+  assert.equal(npmLicenseDeclaration("GPL-2.0-only WITH Bison-exception-2.2", [pair]).allowed, false);
+  assert.equal(npmLicenseDeclaration(pair, [pair.toLowerCase().replace(" with ", " WITH ")]).allowed, true);
+  assert.equal(npmLicenseDeclaration("GPL-2.0+ WITH Classpath-exception-2.0", [pair]).allowed, false);
+  assert.deepEqual(npmLicenseDeclaration(`${pair} AND Apache-2.0 OR MIT`, [pair, "Apache-2.0"]), { expression: `${pair} AND Apache-2.0 OR MIT`, allowed: true, choice: true });
+  assert.equal(npmLicenseDeclaration(`${pair} AND (Apache-2.0 OR MIT)`, [pair]).allowed, false);
+  assert.equal(npmLicenseDeclaration(`MIT OR ${pair}`, ["MIT"]).choice, true);
+  const bound = Array(32).fill("A WITH B").join(" OR "); assert.equal(npmLicenseDeclaration(bound, ["A WITH B"]).expression, bound);
+  assert.equal(npmLicenseDeclaration(Array(33).fill("A WITH B").join(" OR ")), null);
+});
+
+test("malformed exception syntax cannot borrow an allowed base license or alternative", () => {
+  for (const expression of ["MIT WITH", "MIT with Unknown", "MIT WITH(Unknown)", "(MIT) WITH Unknown", "MIT WITH Unknown+", "MIT WITH OR", "MIT WITH NONE", "MIT WITH NOASSERTION", "MIT WITH LicenseRef-private", "MIT WITH DocumentRef-private", "MIT WITH A WITH B", "MIT WITH A.B+", "MIT WITH " + "x".repeat(81)]) {
+    assert.equal(npmLicenseDeclaration(expression, ["MIT"]), null, expression);
+    assert.equal(npmLicenseDeclaration("MIT OR " + expression, ["MIT"]), null, expression);
+  }
+});
+
+test("signed rule policy can explicitly permit a complete exception pair without permitting its base", async () => {
+  const pair = "GPL-2.0-only WITH Classpath-exception-2.0";
+  const f = scannerFixture({ action: "shield_supply_chain", allowedLicenses: [pair], files: { "package-lock.json": JSON.stringify({ lockfileVersion: 3, packages: {
+    "node_modules/with-exception": { version: "1.0.0", license: pair },
+    "node_modules/base-only": { version: "1.0.0", license: "GPL-2.0-only" }
+  } }) } });
+  const report = await f.scan();
+  assert.equal(report.findings.filter(f => f.ruleId === "license.disallowed").length, 1);
+  assert.deepEqual(report.sbom.components.map(c => c.license), [pair, "GPL-2.0-only"]);
+  assert.equal(report.gaps.includes("license_metadata"), false); assert.equal(report.completeness, "incomplete");
+  const shield = { engine: shieldEngineVersion, request: f.request, requestSha256: sha(JSON.stringify(f.request)) };
+  assert.equal(parseShieldScannerReport(JSON.stringify(report), shield, f.request.action).cycloneDx.components[0].licenses[0].license.name, pair);
+});
+
 test("license declaration AND/OR precedence, grouping and case-insensitive policy preserve required obligations without choosing a branch", () => {
   for (const [value, allowed, expression, choice] of [
     ["MIT", true, "MIT", false], ["mit", true, "mit", false], ["( MIT OR GPL-3.0-only )", true, "MIT OR GPL-3.0-only", true],
@@ -25,17 +61,17 @@ test("license declaration AND/OR precedence, grouping and case-insensitive polic
   const long = Array(64).fill("MIT").join(" OR "); assert.equal(npmLicenseDeclaration(long, ["MIT"]).expression, long);
 });
 test("unsupported or malicious license syntax cannot obtain a partial permitted branch", () => {
-  for (const value of [null, {}, ["MIT"], "", "NONE", "NOASSERTION", "MIT WITH Classpath-exception-2.0", "MIT OR GPL-2.0-only WITH Classpath-exception-2.0", "LicenseRef-private", "MIT OR LicenseRef-private", "DocumentRef-other:LicenseRef-private", "SEE LICENSE IN LICENSE", "MIT or Apache-2.0", "MIT AND", "OR MIT", "MIT MIT", "()", "(MIT", "MIT)", "MIT+OR Apache-2.0", "MIT\nOR Apache-2.0", "MIT\0", "MIT;globalThis.NEVER_EXECUTE=1", "(".repeat(17) + "MIT" + ")".repeat(17), "x".repeat(81), Array(65).fill("MIT").join(" OR ")]) assert.equal(npmLicenseDeclaration(value, ["MIT"]), null, String(value));
+  for (const value of [null, {}, ["MIT"], "", "NONE", "NOASSERTION", "(MIT) WITH Classpath-exception-2.0", "MIT OR GPL-2.0-only WITH LicenseRef-private", "LicenseRef-private", "MIT OR LicenseRef-private", "DocumentRef-other:LicenseRef-private", "SEE LICENSE IN LICENSE", "MIT or Apache-2.0", "MIT AND", "OR MIT", "MIT MIT", "()", "(MIT", "MIT)", "MIT+OR Apache-2.0", "MIT\nOR Apache-2.0", "MIT\0", "MIT;globalThis.NEVER_EXECUTE=1", "(".repeat(17) + "MIT" + ")".repeat(17), "x".repeat(81), Array(65).fill("MIT").join(" OR ")]) assert.equal(npmLicenseDeclaration(value, ["MIT"]), null, String(value));
 });
-test("license policy remains a unique literal-identifier allowlist instead of accepting expressions, exception semantics or case aliases", async () => {
-  for (const allowedLicenses of [["MIT", "mit"], ["MIT OR GPL-3.0-only"], ["MIT WITH Unknown"], ["GPL+arbitrary"], ["NONE"], ["LicenseRef-private"]]) {
+test("license policy remains a unique literal-identifier allowlist including exact exception pairs without accepting compound policies or case aliases", async () => {
+  for (const allowedLicenses of [["MIT", "mit"], ["MIT OR GPL-3.0-only"], ["MIT WITH (Unknown)"], ["MIT with Unknown"], ["MIT WITH Unknown", "mit WITH unknown"], ["MIT  WITH Unknown"], ["MIT WITH Unknown OR Apache-2.0"], ["GPL+arbitrary"], ["NONE"], ["LicenseRef-private"]]) {
     const f = scannerFixture({ action: "shield_supply_chain" }); f.policy.allowedLicenses = allowedLicenses;
     const bytes = Buffer.from(JSON.stringify(f.policy)); f.content.set(f.request.scanner.path, bytes); f.request.scanner.sha256 = sha(bytes);
     await assert.rejects(f.scan(), /license policy/);
   }
 });
-test("actual npm lock scans distinguish a permitted alternative, required disallowed license and unsupported exception with exact BOM/report binding", async () => {
-  const licenses = { choice: "(MIT OR GPL-3.0-only)", required: "MIT AND GPL-3.0-only", unsupported: "MIT OR GPL-2.0-only WITH Classpath-exception-2.0", precedence: "MIT OR Apache-2.0 AND GPL-3.0-only" };
+test("actual npm lock scans distinguish a permitted alternative, required disallowed license and unsupported reference with exact BOM/report binding", async () => {
+  const licenses = { choice: "(MIT OR GPL-3.0-only)", required: "MIT AND GPL-3.0-only", unsupported: "MIT OR LicenseRef-private", precedence: "MIT OR Apache-2.0 AND GPL-3.0-only" };
   const lock = JSON.stringify({ lockfileVersion: 3, packages: Object.fromEntries(Object.entries(licenses).map(([name, license]) => ["node_modules/" + name, { version: "1.0.0", license }])) });
   const f = scannerFixture({ action: "shield_supply_chain", files: { "package-lock.json": lock } }), report = await f.scan();
   assert.equal(report.outcome, "failed"); assert.equal(report.completeness, "incomplete"); assert.equal(report.findings.filter(f => f.ruleId === "license.disallowed").length, 1);

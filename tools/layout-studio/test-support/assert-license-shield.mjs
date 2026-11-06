@@ -9,8 +9,8 @@ export async function assertLicenseShield(f, { windows = false } = {}) {
   const result = await f.execution.apply("personal", input);
   assert.equal(result.status, "failed", JSON.stringify(result)); assert.ok(result.receiptId);
   const report = result.data.shieldReport;
-  assert.deepEqual(report.findings.map(row => [row.ruleId, row.dimension, row.severity]), [["license.disallowed", "licenses", "high"]]);
-  assert.deepEqual(report.sbom.components.map(c => c.license), ["MIT OR GPL-3.0-only", "MIT AND GPL-3.0-only", null, "MIT OR Apache-2.0 AND GPL-3.0-only"]);
+  assert.deepEqual(report.findings.map(row => [row.ruleId, row.dimension, row.severity]), Array.from({ length: 3 }, () => ["license.disallowed", "licenses", "high"]));
+  assert.deepEqual(report.sbom.components.map(c => c.license), ["MIT OR GPL-3.0-only", "MIT AND GPL-3.0-only", null, "MIT OR Apache-2.0 AND GPL-3.0-only", "GPL-2.0-only WITH Classpath-exception-2.0", "GPL-2.0-only", "GPL-2.0-only WITH Bison-exception-2.2", "MIT OR GPL-2.0-only WITH Bison-exception-2.2"]);
   for (const gap of ["license_choice_not_selected", "license_metadata", "publisher_provenance_not_verified"]) assert.ok(report.gaps.includes(gap), gap);
   assert.equal(report.cycloneDx.components[0].licenses[0].license.name, "MIT OR GPL-3.0-only"); assert.equal(report.cycloneDx.compositions[0].aggregate, "unknown");
   assert.equal(report.completeness, "incomplete"); assert.equal(result.data.receiptEvidenceEnvelope.outcome, "incomplete");

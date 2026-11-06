@@ -1,14 +1,14 @@
 # Declared npm license obligations and alternatives
 
 Supply Chain and Release Shield now understand a bounded declaration syntax
-with `AND`, `OR` and parentheses. `MIT AND GPL-3.0-only` fails an allowlist
+with `AND`, `OR`, `WITH` and parentheses. `MIT AND GPL-3.0-only` fails an allowlist
 containing only MIT and Apache-2.0. `MIT OR GPL-3.0-only` has a permitted
 alternative, but reports `license_choice_not_selected`; Switchyard does not
 choose a license or claim legal compliance. Every result still has incomplete
 coverage.
 
 This follows the operator precedence in [SPDX 2.3.1 Annex D](https://spdx.github.io/spdx-spec/v2.3.1/SPDX-license-expressions/):
-AND binds more tightly than OR, grouping changes obligations, operators are
+WITH binds a simple license and exception before AND and OR; grouping changes obligations, operators are
 case sensitive, and identifier comparison is case insensitive.
 [npm documents expressions for multiple-license declarations](https://docs.npmjs.com/cli/v11/configuring-npm/package-json/#license).
 The scanner checks syntax and an explicitly signed literal-identifier allowlist.
@@ -20,17 +20,17 @@ The self-contained pinned engine accepts at most 512 ASCII characters, 128
 tokens, 64 identifiers and sixteen nested groups. It normalizes spaces and
 redundant grouping without changing precedence. It never evaluates source
 code, expands a file reference, loads a dependency or makes a network request.
-Unsupported WITH exceptions, LicenseRef/DocumentRef references, NONE/NOASSERTION,
+Unsupported LicenseRef/DocumentRef references, NONE/NOASSERTION,
 malformed input and excess bounds remain `license_metadata` gaps. An apparently
-permitted prefix cannot salvage an unsupported expression. Policy entries remain
-unique literal identifiers; expression-shaped policies and case aliases refuse.
+permitted prefix cannot salvage an unsupported expression. Policy entries are unique canonical identifiers or complete `license WITH exception`
+pairs. Compound AND/OR policies, redundant groups/spacing and case aliases refuse.
 
 The typed inventory and CycloneDX 1.6 output retain normalized declared text
 under `license.name`, not an asserted SPDX expression or a selected legal license.
 Host admission requires canonical syntax and exact inventory/BOM equality.
 Missing publisher, source, artifact and repository coverage remain incomplete.
 
-Both Supply Chain and Release pass actual Linux namespace execution and the
+The earlier AND/OR checkpoint passed actual Linux namespace execution and the
 Windows software path with guest execution doubled: exact signed feeds, one
 license finding, alternatives/unsupported metadata gaps, authenticated failed/
 incomplete evidence, duplicate receipt, original index/HEAD/lockfile preservation
@@ -63,3 +63,23 @@ exception gaps, authenticated incomplete coverage, signed-feed retirement and
 original state/frozen Home restoration. All owned source/signing/packages/
 staging/bundle/checkout are removed; zero prompts or keyboard access.
 [Source-bound installed evidence](evidence/installed-license-summary.json).
+
+
+## Explicit exception pairs
+
+A signed entry such as `GPL-2.0-only WITH Classpath-exception-2.0` permits only
+that declared pair. It does not permit bare `GPL-2.0-only` or a different exception.
+Allowing the base and exception as separate entries does not permit their pair.
+The exception has one identifier without a `+` suffix. WITH requires surrounding
+whitespace and a simple left operand; a parenthesized group cannot take an exception.
+The existing bounded parser normalizes declarations and preserves unselected choices.
+These are syntax and literal-policy decisions, not verified SPDX membership or
+legal approval.
+
+Seven isolated groups/59 tests pass, including actual Linux Supply Chain/Release
+execution and Windows guest doubles, signed feeds, eight declared components,
+exact BOM/report equality, receipt replay, unchanged original files/index/HEAD
+and independent process/scratch cleanup. A subsequent 26-test engine pass
+strengthens identifier/operator case checks. Typecheck passes. The installed
+verifier's unsupported fixture now uses LicenseRef; no installed scanner was run.
+[Source and evidence](evidence/license-exception-declaration-summary.json).

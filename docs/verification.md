@@ -1,5 +1,17 @@
 # What has actually been verified
 
+Windows `4faa8a1` clears restricted private-state initialization and mode update.
+Its version 2 native lease tests pass **24 checks / one declared skip**, including
+EOF, contention, partial input, non-pipe input refusal and parent-loss cleanup.
+The restricted owner now fails later at the read-only storage probe, still zero
+of eight complete owner checks. [Native result](evidence/windows-lease-pipe-native-summary.json).
+
+Shield now supports exact declared license-and-exception pairs in signed policy.
+Seven groups / 59 tests plus a 26-test engine follow-up, typecheck and exact
+cleanup pass. Actual Linux scans and Windows guest doubles keep base-only and
+different-exception permissions distinct; no legal or publisher verification is
+claimed. [Evidence](evidence/license-exception-declaration-summary.json).
+
 Windows `da28b5c` identifies the restricted failure as **Access Denied opening the
 parent process**. The next source protocol binds worker lifetime to its private
 inherited input pipe instead of that lookup. It checks EOF while idle, reading

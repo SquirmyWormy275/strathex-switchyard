@@ -1,5 +1,10 @@
 # Windows helper startup candidate
 
+At `4faa8a1`, version 2 native leases pass 24 checks/one declared skip with
+cleanup. The restricted owner clears protected state initialization and mode
+update, then fails later at its read-only storage probe. The complete owner is
+still unaccepted. [Native result](evidence/windows-lease-pipe-native-summary.json).
+
 Windows `da28b5c` identifies the restricted failure as **Access Denied opening the
 parent process**. The next source protocol binds worker lifetime to its private
 inherited input pipe instead of that lookup. It checks EOF while idle, reading
