@@ -74,12 +74,20 @@ were removed after exit verification. No broad cleanup or quota change occurred.
 Use a fresh explicitly owned temporary root on available storage for the next
 complete run. [Failed receipt](evidence/linux-a9c-quota-failure-summary.json).
 
+Normal Studio now composes the owner/load service through authenticated routes
+with exact request fields and active-workspace checks. Selection, keyboard-only
+mode, individual stop and application close retire original owners and join loads.
+Private owner/load records are omitted from generic snapshots. Six files pass
+91 tests; the final HTTP/privacy cohort passes forty, with cleanup and typecheck.
+The provider is controlled; real loading, installed acceptance, frontend wiring
+and authenticated IDE/terminal handoff remain open. [Routed evidence](evidence/routed-task-load-summary.json).
+
 Reviewed loading on the original owned task connection is now implemented as an
 explicit backend operation. One-use policy-bound review, durable no-replay
 reservation, idle-state checks, repeated effect boundaries and joined shutdown
 pass 62 tests across five files. An actual Unix listener/bridge loads a synthetic
 task with a controlled provider; no real task or model turn is requested.
-Production routing, installed acceptance and IDE attachment remain unfinished.
+The separate owner/load routes are now connected; installed acceptance and IDE attachment remain unfinished.
 [Load contract](coding-task-owners.md), [evidence](evidence/reviewed-owned-task-load-summary.json).
 
 The explicit `createCodingTaskOwners` service now persists original owner stages
@@ -87,8 +95,8 @@ and task/account/repository binding under real private leases. Five files pass 7
 tests; final eight registry and five packaging checks pass with exact cleanup and
 typecheck. Actual Unix listener/bridge composition uses a controlled provider double.
 The manifest has 242 Linux groups; its latest complete run failed as recorded above.
-Production still uses stdio; explicit reviewed loading has separate evidence above
-and grants no IDE attachment. [Contract](coding-task-owners.md).
+Existing creation/text APIs still use stdio; the separate owner/load routes have
+composition evidence above and grant no IDE attachment. [Contract](coding-task-owners.md).
 
 The subsequent Codex creator boundary verifies its own account and the original
 repository/reservation before thread creation and marker injection, including
@@ -111,7 +119,7 @@ workspace/focus and retires owned processes/socket/cache.
    child acceptance, and repair the actual initialization failure without broadening
    token/desktop/service authority. Continue other work while CI runs.
 2. Connect the reviewed task-loading service to supported
-   IDE/terminal attachment and normal Studio routing. Recheck compartment, account, repository
+   authenticated IDE/terminal attachment and the eventual frontend controls. Recheck compartment, account, repository
    and original native owner before every effect. Process ancestry alone cannot
    identify an IDE terminal tab. Use provider doubles for task/model operations
    unless their native execution is separately authorized.

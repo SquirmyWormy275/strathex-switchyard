@@ -16,6 +16,7 @@ import { createCustomAgents, agentIntents } from "./custom-agents.mjs";
 import { runtimeEnvironment } from "./runtime-setup.mjs";
 import { resolveRuntimePaths } from "./runtime-storage.mjs";
 import { createCodingSessions } from "./coding-sessions.mjs";
+import { createCodingTaskOwners } from "./coding-task-owners.mjs";
 import { createCodexSubmissions } from "./codex-submissions.mjs";
 import { createClaudeSubmissions } from "./claude-submissions.mjs";
 import { stopOwnedChild } from "./owned-process.mjs";
@@ -42,7 +43,7 @@ import { clientRecipe } from "../../integrations/client-recipes.mjs";
 import { linuxProcess } from "./native-process.mjs";
 
 const kinds = ["interruption", "resume", "switch", "handoff", "status", "review", "approval", "failure", "recovery", "other"];
-export function createSuite({ store = createSuiteStore(), platform = process.platform, agents, voice = localVoice(), hypr = runHypr, nativeProcess = linuxProcess, devices, copilot, copilotFactory = createCopilot, coding, codexSubmissions, claudeCoding, claudeSubmissions, keyboardIndicators = createKeyboardIndicators(), taskAuthority, taskAuthorityFactory = createTaskAuthority, repositoryRecovery, repositoryCommits, repositoryExecution, storageSetup, fixtureAdministration, shieldExceptions, clientLaunch, spawnExample = spawn, foreground, scheduleForeground = setInterval, clearForeground = clearInterval } = {}) {
+export function createSuite({ store = createSuiteStore(), platform = process.platform, agents, voice = localVoice(), hypr = runHypr, nativeProcess = linuxProcess, devices, copilot, copilotFactory = createCopilot, coding, codingTaskOwners, codingTaskOwnersFactory = createCodingTaskOwners, codexSubmissions, claudeCoding, claudeSubmissions, keyboardIndicators = createKeyboardIndicators(), taskAuthority, taskAuthorityFactory = createTaskAuthority, repositoryRecovery, repositoryCommits, repositoryExecution, storageSetup, fixtureAdministration, shieldExceptions, clientLaunch, spawnExample = spawn, foreground, scheduleForeground = setInterval, clearForeground = clearInterval } = {}) {
   agents ??= createAgentService({ store, runtimeRoot: join(process.env.XDG_RUNTIME_DIR || process.env.LOCALAPPDATA || join(homedir(), ".local/state"), "switchyard-design") });
   devices ??= createDeviceService({ store });
   coding ??= createCodingSessions({ store });
@@ -61,6 +62,7 @@ export function createSuite({ store = createSuiteStore(), platform = process.pla
   let selectionLoading;
   let closed = false;
   const copilotTransitions = new Map();
+  codingTaskOwners ??= codingTaskOwnersFactory({ store, platform, isActive: async c => { await loadSelection(); return !closed && !copilotTransitions.has(c) && c === activeCompartment && await store.selection() === c; } });
   copilot ??= copilotFactory({ store, isActive: async c => { await loadSelection(); return !closed && !copilotTransitions.has(c) && c === activeCompartment && await store.selection() === c; } });
   const matrixDiagnostics = createMatrixDiagnostics({ store, devices, isActive: async (c) => { await loadSelection(); return c === activeCompartment; } });
   taskAuthority ??= taskAuthorityFactory({ store, localCommitExecutionImplemented: true, executionActions: connectedExecutionActions(platform), isActive: async c => { await loadSelection(); return c === activeCompartment; }, checkNative: (c, task) => task.provider === "codex" ? coding.status(c, task.id) : claudeCoding.status(c, task.id) });
@@ -182,6 +184,8 @@ export function createSuite({ store = createSuiteStore(), platform = process.pla
         if (activeCompartment !== compartment) {
           await copilot.stopCompartment?.(activeCompartment);
           await matrixDiagnostics.stopCompartment(activeCompartment);
+          const codingOwnerStop = await codingTaskOwners.stopCompartment(activeCompartment);
+          if (codingOwnerStop?.stopped !== true) throw new Error("The original coding task owner has not verified exit; workspace selection was preserved.");
           const executionStop = await repositoryExecution.stopCompartment(activeCompartment), commitStop = await repositoryCommits.stopCompartment(activeCompartment), recoveryStop = await repositoryRecovery.stopCompartment(activeCompartment), clientStop = await clientLaunch.stopCompartment(activeCompartment), authorityStop = await taskAuthority.stopCompartment(activeCompartment), storageStop=await storageSetup.stopCompartment(activeCompartment), fixturesStop=await fixtureAdministration.stopCompartment(activeCompartment), exceptionsStop=await shieldExceptions.stopCompartment(activeCompartment);
           if (executionStop?.stopped === false || commitStop?.stopped === false || recoveryStop?.stopped === false || clientStop?.stopped === false || authorityStop?.stopped === false || storageStop?.stopped===false || fixturesStop?.stopped===false || exceptionsStop?.stopped===false) throw new Error("An owned repository, client or host-setup guardian has not verified exit; workspace selection was preserved.");
           pauseMonitor(activeCompartment); await foreground.stopCompartment?.(activeCompartment);
@@ -208,7 +212,7 @@ export function createSuite({ store = createSuiteStore(), platform = process.pla
           // Stop the exact print continuation before reconciling the original
           // background inventory, which can briefly report the same session.
           const claudeTextStop = await claudeSubmissions.stopCompartment(compartment).catch(() => ({ stopped: false }));
-          const stopped = await Promise.all([executionStop, commitStop, recoveryStop, clientStop, authorityStop, storageStop, fixturesStop, exceptionsStop, foreground.stopCompartment?.(compartment), agents.stopCompartment?.(compartment), coding.stopCompartment?.(compartment), codexSubmissions.stopCompartment(compartment), claudeTextStop, voiceQueue.stopCompartment(compartment), claudeCoding.stopCompartment?.(compartment), ...["custom", "langchain"].map((kind) => stopExample(compartment, kind))]);
+          const stopped = await Promise.all([executionStop, commitStop, recoveryStop, clientStop, authorityStop, storageStop, fixturesStop, exceptionsStop, codingTaskOwners.stopCompartment(compartment), foreground.stopCompartment?.(compartment), agents.stopCompartment?.(compartment), coding.stopCompartment?.(compartment), codexSubmissions.stopCompartment(compartment), claudeTextStop, voiceQueue.stopCompartment(compartment), claudeCoding.stopCompartment?.(compartment), ...["custom", "langchain"].map((kind) => stopExample(compartment, kind))]);
           result.ownedProcessesStopped = stopped.every((r) => !r || r.stopped !== false && r.status !== "stop-unconfirmed");
           if (!result.ownedProcessesStopped) throw new Error("Keyboard-only mode was saved, but an owned process stop is unconfirmed. No new provider or recording operation is permitted.");
         }
@@ -279,6 +283,21 @@ export function createSuite({ store = createSuiteStore(), platform = process.pla
       if (path === "/api/suite/coding/authority/list") return taskAuthority.list(compartment);
       if (path === "/api/suite/coding/authority/revalidate") return taskAuthority.revalidate(compartment, body.id);
       if (path === "/api/suite/coding/authority/revoke") return taskAuthority.revoke(compartment, body.id);
+      if (path.startsWith("/api/suite/coding/codex/owners/")) {
+        await loadSelection();
+        if (closed || copilotTransitions.has(compartment) || activeCompartment !== compartment || await store.selection() !== compartment) throw new Error("Select the original task workspace before using its owned connection.");
+        const action = path.slice("/api/suite/coding/codex/owners/".length);
+        const fields = { list: [], open: ["requestId", "taskId"], read: ["ownerRequestId"], "review-load": ["ownerRequestId"], load: ["ownerRequestId", "requestId", "token"], loads: [], stop: ["ownerRequestId"], recover: ["ownerRequestId"] };
+        if (!Object.hasOwn(fields, action) || Object.keys(body).some(key => !["compartment", "workspaceBaseUrl", ...fields[action]].includes(key))) throw new Error("Choose one exact task-owner operation without unrelated fields.");
+        if (action === "list") return codingTaskOwners.list(compartment);
+        if (action === "open") return codingTaskOwners.open(compartment, { requestId: body.requestId, taskId: body.taskId });
+        if (action === "read") return codingTaskOwners.read(compartment, body.ownerRequestId);
+        if (action === "review-load") return codingTaskOwners.reviewLoad(compartment, body.ownerRequestId);
+        if (action === "load") return codingTaskOwners.load(compartment, { ownerRequestId: body.ownerRequestId, requestId: body.requestId, token: body.token });
+        if (action === "loads") return codingTaskOwners.listLoads(compartment);
+        if (action === "stop") return codingTaskOwners.stop(compartment, body.ownerRequestId);
+        if (action === "recover") return codingTaskOwners.recover(compartment, body.ownerRequestId);
+      }
       if (path === "/api/suite/coding/codex/discovery") return coding.discovery(compartment);
       if (path === "/api/suite/coding/codex/list") return coding.list(compartment);
       if (path === "/api/suite/coding/codex/bind") return coding.bind(compartment, body);
@@ -392,7 +411,7 @@ export function createSuite({ store = createSuiteStore(), platform = process.pla
         const s = await store.snapshot(compartment);
         // Recovery packets include original index bytes and private ownership
         // records. Explicit recovery routes expose observations, never backups.
-        const { repositoryEffectJournal, repositoryRecoveryJournal, repositoryEffectCheckpoints, repositoryEffects, repositoryCommitReviews, clientLaunches, repositoryExecutions, repositoryExecutionJournal, repositoryExecutionReviews, repositoryExecutionStaging, repositoryExecutionStops, repositoryExecutionStopJournal, repositoryWindowsInputs, repositoryWindowsGuests, repositoryWindowsGuestCommands, repositoryWindowsTools, repositoryWindowsImages, repositoryWindowsBrokerExchanges, repositoryWindowsRuns, windowsStorageNative,windowsStorageReviews,windowsStorageJournal,scannerFixtureReviews,scannerFixtureJournal,shieldExceptionJournal,shieldExceptionReviews,copilotRequests,copilotRequestTombstones,...snapshot } = s;
+        const { repositoryEffectJournal, repositoryRecoveryJournal, repositoryEffectCheckpoints, repositoryEffects, repositoryCommitReviews, clientLaunches, repositoryExecutions, repositoryExecutionJournal, repositoryExecutionReviews, repositoryExecutionStaging, repositoryExecutionStops, repositoryExecutionStopJournal, repositoryWindowsInputs, repositoryWindowsGuests, repositoryWindowsGuestCommands, repositoryWindowsTools, repositoryWindowsImages, repositoryWindowsBrokerExchanges, repositoryWindowsRuns, windowsStorageNative,windowsStorageReviews,windowsStorageJournal,scannerFixtureReviews,scannerFixtureJournal,shieldExceptionJournal,shieldExceptionReviews,copilotRequests,copilotRequestTombstones,codingTaskOwners,codingTaskLoads,...snapshot } = s;
         return { ...snapshot, voice: s.voice.map((v) => ({ ...v, chunks: v.chunks.map(({ audio, ...c }) => ({ ...c, pendingAudio: Boolean(audio) })) })), observationSummaries: s.observations.map(observationSummary) };
       }
       if (path === "/api/suite/profile/save") return store.saveProfile(compartment, body.profile);
@@ -508,6 +527,6 @@ export function createSuite({ store = createSuiteStore(), platform = process.pla
       if (binding.targetKind === "client-surface") return { available: true, implementation: connection.implementation, provider: binding.provider, roleId: binding.roleId, intent: binding.intent, capability: "launch-only", recipeId: binding.targetId, sessionIdentified: false, evidence: "exact fixed homepage launch request; no account, window focus, resume or conversation identity verified" };
       return { available: true, implementation: connection.implementation, provider: binding.provider, roleId: binding.roleId, intent: binding.intent, evidence: binding.targetKind === "coding-task" ? "exact coding-task identity; runtime status or owned read-only daemon resume, without window focus, completion or mediated-control authority" : "exact owned configuration conversation or authenticated adapter session; not general coding-task control" };
     },
-    async close() { closed = true; const boundaryStops = await Promise.allSettled([copilot.close?.(), matrixDiagnostics.close(), repositoryExecution.close(), repositoryCommits.close(), repositoryRecovery.close(), clientLaunch.close(), taskAuthority.close(), storageSetup.close(), fixtureAdministration.close(), shieldExceptions.close()]); readoutProfiles.close(); for (const timer of monitors.values()) clearForeground(timer); monitors.clear(); for (const key of new Set([...examples.keys(), ...exampleStarts.keys()])) exampleGenerations.set(key, (exampleGenerations.get(key) ?? 0) + 1); await Promise.allSettled(exampleStarts.values()); let claudeStopError; try { await claudeSubmissions.close(); } catch (error) { claudeStopError = error; } await Promise.all([foreground.close?.(), agents.close(), coding.close?.(), codexSubmissions.close(), voiceQueue.close(), claudeCoding.close?.(), keyboardIndicators.close().then(result => { if (result.stopped !== true) throw new Error("Owned indicator probe exit is unconfirmed."); }), ...[...examples.values()].map((child) => stopOwnedChild(child))]); if (claudeStopError) throw claudeStopError; const failedBoundary = boundaryStops.find(r => r.status === "rejected"); if (failedBoundary) throw failedBoundary.reason; }
+    async close() { closed = true; const boundaryStops = await Promise.allSettled([codingTaskOwners.close().then(results => { if (!Array.isArray(results) || results.some(r => r?.stopped !== true)) throw new Error("Original coding task owner exit is unconfirmed."); }), copilot.close?.(), matrixDiagnostics.close(), repositoryExecution.close(), repositoryCommits.close(), repositoryRecovery.close(), clientLaunch.close(), taskAuthority.close(), storageSetup.close(), fixtureAdministration.close(), shieldExceptions.close()]); readoutProfiles.close(); for (const timer of monitors.values()) clearForeground(timer); monitors.clear(); for (const key of new Set([...examples.keys(), ...exampleStarts.keys()])) exampleGenerations.set(key, (exampleGenerations.get(key) ?? 0) + 1); await Promise.allSettled(exampleStarts.values()); let claudeStopError; try { await claudeSubmissions.close(); } catch (error) { claudeStopError = error; } await Promise.all([foreground.close?.(), agents.close(), coding.close?.(), codexSubmissions.close(), voiceQueue.close(), claudeCoding.close?.(), keyboardIndicators.close().then(result => { if (result.stopped !== true) throw new Error("Owned indicator probe exit is unconfirmed."); }), ...[...examples.values()].map((child) => stopOwnedChild(child))]); if (claudeStopError) throw claudeStopError; const failedBoundary = boundaryStops.find(r => r.status === "rejected"); if (failedBoundary) throw failedBoundary.reason; }
   };
 }

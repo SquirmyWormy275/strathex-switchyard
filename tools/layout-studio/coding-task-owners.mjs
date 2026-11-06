@@ -12,16 +12,17 @@ function binding(task) {
   return { taskId: task.id, sessionId: task.sessionId, accountFingerprint: task.accountFingerprint, repositoryRoot: task.repositoryRoot, repositoryIdentity: structuredClone(task.repositoryIdentity), taskSchema: task.schema ?? null, launchPolicy: task.launchPolicy ?? null, nativeTransport: task.nativeTransport ?? null };
 }
 const view = row => ({ requestId: row.requestId, taskId: row.taskId, status: row.status, stoppedVerified: row.stoppedVerified, metadataObserved: row.status === "bound", nativeTaskLoaded: false, ideAttached: false, completionVerified: false });
-export function createCodingTaskOwners({ store, root, runtimeRoot, resolveCli, resolveMcp, driverFactory = createCodexUnixTasks, retire = retireStoppedCodexListener, platform = process.platform, now = Date.now } = {}) {
+export function createCodingTaskOwners({ store, root, runtimeRoot, resolveCli, resolveMcp, driverFactory = createCodexUnixTasks, retire = retireStoppedCodexListener, platform = process.platform, now = Date.now, isActive = async () => true } = {}) {
   const live = new Map(), pending = new Map(), generations = new Map(); let closed = false;
   const key = (c, id) => `${c}:${id}`;
   const generation = c => generations.get(c) ?? 0;
   const current = (c, g) => { if (closed || generation(c) !== g) throw Error("This task owner admission has stopped."); };
   async function exact(c, original, g) {
-    current(c, g); await store.authorize(c, { provider: "codex" }); current(c, g);
+    current(c, g); if (!(await isActive(c))) throw Error("The original task workspace is no longer active.");
+    await store.authorize(c, { provider: "codex" }); current(c, g);
     const task = (await store.snapshot(c)).codingSessions?.find(t => t.id === original.taskId);
     if (digest(binding(task)) !== digest(original)) throw Error("The original task, native account or repository binding changed.");
-    await verifyRepositoryIdentity(original); current(c, g);
+    await verifyRepositoryIdentity(original); current(c, g); if (!(await isActive(c))) throw Error("The original task workspace is no longer active.");
   }
   async function update(c, id, action, fn, provider = false) {
     return store.update(c, action, s => { const row = s.codingTaskOwners?.find(r => r.requestId === id); if (!row) throw Error("The original task owner reservation is unavailable."); return fn(row, s); }, provider ? { provider: "codex" } : {});
@@ -67,6 +68,7 @@ export function createCodingTaskOwners({ store, root, runtimeRoot, resolveCli, r
 
   return {
     async list(c) { await store.authorize(c, { provider: "codex" }); return ((await store.snapshot(c)).codingTaskOwners ?? []).map(view); },
+    async listLoads(c) { await store.authorize(c, { provider: "codex" }); return ((await store.snapshot(c)).codingTaskLoads ?? []).map(row => loadView(row)); },
     async open(c, { requestId, taskId }) {
       if (platform !== "linux") throw Error("Persistent task metadata owners currently require Linux.");
       if (!uuid(requestId) || !uuid(taskId)) throw Error("Choose exact task and owner request UUIDs.");
@@ -189,8 +191,9 @@ export function createCodingTaskOwners({ store, root, runtimeRoot, resolveCli, r
           await stopRecord(c, ownerRequestId, resource).catch(() => {}); throw error;
         }
       });
+      resource.loads ??= new Set(); resource.loads.add(operation);
       pending.set(operationKey, operation);
-      try { return await operation; } finally { if (pending.get(operationKey) === operation) pending.delete(operationKey); }
+      try { return await operation; } finally { resource.loads.delete(operation); if (pending.get(operationKey) === operation) pending.delete(operationKey); }
     },
     async recover(c, requestId) {
       if (!uuid(requestId)) throw Error("Choose an exact owner request UUID."); await store.authorize(c, { provider: "codex" });
@@ -205,6 +208,11 @@ export function createCodingTaskOwners({ store, root, runtimeRoot, resolveCli, r
         await update(c, requestId, "coding-owner-recovered-retirement", currentRow => { if (digest(currentRow) !== digest(row)) throw Error("Owner recovery changed before retirement persistence."); currentRow.status = "stopped"; currentRow.stoppedVerified = true; currentRow.updatedAt = now(); });
         return { stopped: true };
       });
+    },
+    async stop(c, requestId) {
+      if (!uuid(requestId)) throw Error("Choose an exact owner request UUID."); await store.authorize(c);
+      const resource = live.get(key(c, requestId)); if (!resource) throw Error("This host does not own that live connection. Use exact saved retirement recovery instead.");
+      const result = await stopRecord(c, requestId, resource); await Promise.allSettled([...(resource.loads ?? [])]); return result;
     },
     async stopCompartment(c) {
       generations.set(c, generation(c) + 1);

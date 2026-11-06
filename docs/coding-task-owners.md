@@ -6,7 +6,8 @@ thread, account fingerprint, repository directory and native listener. It does
 not create a thread, submit a prompt, attach an IDE, or grant task authority.
 Opening and reading observe metadata only. Loading an existing idle task requires
 a separate exact review and one-use confirmation.
-Production Studio routes still use stdio; connecting this service is unfinished.
+Studio now exposes separate owned-connection routes. Existing task creation and
+reviewed-text APIs retain their stdio behavior; frontend and IDE handoff are unfinished.
 
 A request first reserves its UUID under a per-task kernel lease. The listener
 then records its private directory before startup, guardian before provider start,
@@ -64,3 +65,24 @@ The fifteen registry cases and related adapter/session/confirmation cohort pass
 loads one synthetic task through a provider double, with zero thread creation,
 injection or model turns. Real provider loading, production Studio routing and
 IDE attachment remain unaccepted or unfinished. [Exact evidence](evidence/reviewed-owned-task-load-summary.json).
+
+## Authenticated Studio routes
+
+The `/api/suite/coding/codex/owners/` routes are `list`, `open`, `read`,
+`review-load`, `load`, `loads`, `stop` and `recover`. They accept only each
+operation's exact fields and require the original selected workspace. Generic
+snapshots omit protected owner and load records; `list` and `loads` expose safe
+local IDs, statuses and capability limits.
+
+Workspace switching waits for original owned connections to retire and preserves
+selection if exit is uncertain. Keyboard-only mode first saves the permission
+fence, then joins shutdown. The effect boundary also checks the actual saved
+selection, so an external selection change cannot redirect pending loading. App
+close and individual stop join in-flight loads; failed retirement remains explicit.
+
+The authenticated HTTP demonstration uses real encrypted state, kernel leases
+and confirmations with a controlled provider. It loads exactly one synthetic
+task and refuses replay, unauthenticated requests and unexpected prompt fields.
+Six files pass 91 tests; the final privacy/route cohort passes forty with cleanup
+and typecheck. This establishes backend composition, not live account or IDE
+acceptance. [Evidence](evidence/routed-task-load-summary.json).

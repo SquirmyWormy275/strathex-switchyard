@@ -4,19 +4,22 @@ import { mkdtemp, mkdir, rm, rename, readFile, readdir, copyFile, writeFile } fr
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
+import { once } from "node:events";
 import { createSuiteStore } from "./suite-store.mjs";
 import { repositoryIdentity } from "./coding-task-identity.mjs";
 import { createCodexUnixTasks } from "./codex-unix-tasks.mjs";
 import { openOwnedCodexListener, retireStoppedCodexListener } from "./codex-owned-listener.mjs";
 import { codexDesignConfig } from "./agents.mjs";
 import { createCodingTaskOwners } from "./coding-task-owners.mjs";
+import { createSuite } from "./suite.mjs";
+import { createStudioServer } from "./serve.mjs";
 async function fixture(t) {
   const root = await mkdtemp(join(tmpdir(), "sy-owner-")), repositoryRoot = join(root, "repo"), keys = new Map(); await mkdir(repositoryRoot);
   const store = createSuiteStore({ root: join(root, "state"), secrets: { get: async (c,p) => keys.get(c+":"+p), set: async (c,p,v) => keys.set(c+":"+p,v) } });
   await store.initialize("personal"); await store.update("personal", "fixture", s => { s.mode = "personal-companion"; });
   const task = { schema: "switchyard-coding-session/v1", launchPolicy: "read-only/on-request", nativeTransport: "owned-stdio", id: randomUUID(), provider: "codex", status: "registered", sessionId: "synthetic-private-native-thread", accountFingerprint: "a".repeat(64), repositoryRoot, repositoryIdentity: await repositoryIdentity(repositoryRoot) };
   await store.update("personal", "fixture-task", s => { s.codingSessions = [task]; });
-  const controls = { login: task.accountFingerprint, stopped: true, fail: null, afterRead: async () => {}, allowResume: false, beforeResume: async () => {}, afterResume: async () => {}, observation: "idle" }, calls = [], owners = [], services = [];
+  const controls = { login: task.accountFingerprint, stopped: true, fail: null, afterRead: async () => {}, allowResume: false, beforeResume: async () => {}, afterResume: async () => {}, observation: "idle" }, calls = [], owners = [], services = [], cleanup = [];
   function driverFactory(options) {
     calls.push("factory"); let started = false, closed = false;
     const owner = { scope: null, binding: null, accountFingerprint: null, privateOwnership: { root: join(root, "synthetic-listener-"+owners.length), rootIdentity: { device:"1",inode:"2",uid:1000,mode:448 } }, async stop() { closed = true; return { stopped: controls.stopped }; } }; owners.push(owner);
@@ -45,8 +48,8 @@ async function fixture(t) {
     };
   }
   function service(extra = {}) { const result = createCodingTaskOwners({ store, platform:"linux", driverFactory, retire:async(scope,ownership) => { calls.push("recover"); assert.ok(owners.some(o => o.scope?.id === scope.id && o.privateOwnership.root === ownership.root)); return { stopped:controls.stopped }; }, ...extra }); services.push(result); return result; }
-  t.after(async () => { controls.stopped = true; for (const s of services) assert.ok((await s.close()).every(r => r.stopped)); await rm(root,{recursive:true}); });
-  return { root,store,task,controls,calls,owners,service,request:()=>({requestId:randomUUID(),taskId:task.id}) };
+  t.after(async () => { controls.stopped = true; for (const close of cleanup.toReversed()) await close(); for (const s of services) assert.ok((await s.close()).every(r => r.stopped)); await rm(root,{recursive:true}); });
+  return { root,store,task,controls,calls,owners,service,beforeCleanup:close=>cleanup.push(close),request:()=>({requestId:randomUUID(),taskId:task.id}) };
 }
 test("persistent metadata ownership binds one original task/account/repository without task creation or IDE authority",async t=>{
   const f=await fixture(t),service=f.service(),request=f.request();
@@ -183,4 +186,48 @@ test("shutdown joins an in-flight load and prevents its late native effect",asyn
   let release,entered;const gate=new Promise(r=>release=r),ready=new Promise(r=>entered=r);f.controls.beforeResume=async()=>{entered();await gate;};
   const loading=service.load("personal",{ownerRequestId:owner.requestId,requestId:randomUUID(),token:review.confirmation.token});const rejection=assert.rejects(loading,/stopped|owner changed/);await ready;
   let exited=false;const closing=service.stopCompartment("personal").then(result=>{exited=true;return result;});await new Promise(r=>setImmediate(r));assert.equal(exited,false);release();await rejection;assert.equal((await closing).stopped,true);assert.equal(f.calls.includes("resume"),false);assert.equal((await f.store.snapshot("personal")).codingTaskLoads[0].status,"outcome-unconfirmed");
+});
+
+async function routedFixture(t) {
+  const f=await fixture(t);f.controls.allowResume=true;
+  const suite=createSuite({store:f.store,platform:"linux",codingTaskOwnersFactory:options=>f.service(options),agents:{discovery:async()=>[],close:async()=>{}},voice:{discovery:async()=>({available:false})}});
+  f.beforeCleanup(()=>suite.close());await suite.handle("/api/suite/bootstrap");
+  const api=(action,body={})=>suite.handle("/api/suite/coding/codex/owners/"+action,{compartment:"personal",...body});
+  return {...f,suite,api};
+}
+
+test("authenticated Studio routes compose real protected review/load state without accepting prompts or granting IDE authority",async t=>{
+  const f=await routedFixture(t),token="s".repeat(43),server=createStudioServer({suite:f.suite,token,bridge:{close(){}}});server.listen(0,"127.0.0.1");await once(server,"listening");
+  f.beforeCleanup(async()=>{await new Promise((resolve,reject)=>server.close(error=>error?reject(error):resolve()));await server.cleanup();});const origin=`http://127.0.0.1:${server.address().port}`;
+  const api=async(action,body={},auth=true)=>{const response=await fetch(origin+"/api/suite/coding/codex/owners/"+action,{method:"POST",headers:{"Content-Type":"application/json",Origin:origin,...(auth?{Authorization:`Bearer ${token}`}:{})},body:JSON.stringify({compartment:"personal",...body})});return {status:response.status,body:await response.json()};};
+  const owner=f.request();assert.equal((await api("open",owner,false)).status,401);assert.equal(f.owners.length,0);
+  assert.equal((await api("open",{...owner,prompt:"not allowed"})).status,409);assert.equal(f.owners.length,0);
+  assert.equal((await api("open",owner)).body.status,"bound");const scope={ownerRequestId:owner.requestId};
+  const review=await api("review-load",scope);assert.equal(review.status,200);assert.equal(f.calls.includes("resume"),false);
+  const request={...scope,requestId:randomUUID(),token:review.body.confirmation.token};const loaded=await api("load",request);assert.equal(loaded.status,200);assert.equal(loaded.body.nativeTaskLoaded,true);assert.equal(loaded.body.ideAttached,false);
+  assert.equal((await api("load",request)).body.duplicatePrevented,true);assert.equal((await api("loads")).body[0].nativeTaskLoaded,false);const snapshot=await f.suite.handle("/api/suite/snapshot",{compartment:"personal"});assert.equal(Object.hasOwn(snapshot,"codingTaskOwners"),false);assert.equal(Object.hasOwn(snapshot,"codingTaskLoads"),false);assert.equal(f.calls.filter(c=>c==="resume").length,1);
+  assert.equal((await api("stop",scope)).body.stopped,true);assert.equal((await api("list")).body[0].stoppedVerified,true);
+  assert.equal((await api("read",scope)).status,409);assert.equal((await api("recover",scope)).body.duplicatePrevented,true);
+});
+
+test("normal workspace selection retires exact owned connections and refuses inactive or externally selected task routes",async t=>{
+  const f=await routedFixture(t),owner=f.request();await f.api("open",owner);
+  await f.suite.handle("/api/suite/compartment/create",{compartment:"other",policy:"personal"});
+  f.controls.stopped=false;await assert.rejects(f.suite.handle("/api/suite/compartment/select",{compartment:"other"}),/not verified exit/);assert.equal(await f.store.selection(),"personal");
+  f.controls.stopped=true;await f.suite.handle("/api/suite/compartment/select",{compartment:"other"});assert.equal((await f.store.snapshot("personal")).codingTaskOwners[0].stoppedVerified,true);
+  await assert.rejects(f.api("read",{ownerRequestId:owner.requestId}),/original task workspace/);
+  await f.suite.handle("/api/suite/compartment/select",{compartment:"personal"});const next=f.request();await f.api("open",next);
+  await f.store.selection("other");await assert.rejects(f.api("review-load",{ownerRequestId:next.requestId}),/original task workspace/);assert.equal(f.calls.includes("resume"),false);await f.store.selection("personal");
+});
+
+test("keyboard-only mode joins task-owner shutdown and preserves failed retirement without enabling new starts",async t=>{
+  const f=await routedFixture(t),owner=f.request();await f.api("open",owner);f.controls.stopped=false;
+  await assert.rejects(f.suite.handle("/api/suite/mode",{compartment:"personal",mode:"keyboard-only"}),/stop is unconfirmed/);assert.equal((await f.store.snapshot("personal")).mode,"keyboard-only");
+  await assert.rejects(f.api("open",f.request()),/keyboard-only/i);await assert.rejects(f.suite.close(),/owner exit is unconfirmed/);f.controls.stopped=true;
+});
+
+test("an external workspace change during native project setup refuses the late task effect",async t=>{
+  const f=await routedFixture(t),owner=f.request();await f.suite.handle("/api/suite/compartment/create",{compartment:"other",policy:"personal"});await f.api("open",owner);
+  const review=await f.api("review-load",{ownerRequestId:owner.requestId});f.controls.beforeResume=()=>f.store.selection("other");
+  await assert.rejects(f.api("load",{ownerRequestId:owner.requestId,requestId:randomUUID(),token:review.confirmation.token}),/no longer active/);assert.equal(f.calls.includes("resume"),false);assert.equal((await f.store.snapshot("personal")).codingTaskLoads[0].status,"outcome-unconfirmed");await f.store.selection("personal");
 });

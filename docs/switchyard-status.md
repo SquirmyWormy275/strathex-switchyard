@@ -50,19 +50,27 @@ were removed after exit verification. No broad cleanup or quota change occurred.
 Use a fresh explicitly owned temporary root on available storage for the next
 complete run. [Failed receipt](evidence/linux-a9c-quota-failure-summary.json).
 
+Normal Studio now composes the owner/load service through authenticated routes
+with exact request fields and active-workspace checks. Selection, keyboard-only
+mode, individual stop and application close retire original owners and join loads.
+Private owner/load records are omitted from generic snapshots. Six files pass
+91 tests; the final HTTP/privacy cohort passes forty, with cleanup and typecheck.
+The provider is controlled; real loading, installed acceptance, frontend wiring
+and authenticated IDE/terminal handoff remain open. [Routed evidence](evidence/routed-task-load-summary.json).
+
 Reviewed loading on the original owned task connection is now implemented as an
 explicit backend operation. One-use policy-bound review, durable no-replay
 reservation, idle-state checks, repeated effect boundaries and joined shutdown
 pass 62 tests across five files. An actual Unix listener/bridge loads a synthetic
 task with a controlled provider; no real task or model turn is requested.
-Production routing, installed acceptance and IDE attachment remain unfinished.
+The separate owner/load routes are now connected; installed acceptance and IDE attachment remain unfinished.
 [Load contract](coding-task-owners.md), [evidence](evidence/reviewed-owned-task-load-summary.json).
 
 The explicit protected task-owner service now persists original task/account/
 repository/listener identities and refuses duplicate or foreign-host adoption.
 Five related files pass 76 tests; final eight registry/five package checks pass
 with exact cleanup and typecheck. An actual Unix listener/bridge composes with a
-controlled provider double. The newer 242-group run failed as recorded above. Production routing and IDE attachment remain unfinished; the explicit reviewed loading operation has separate focused evidence.
+controlled provider double. The newer 242-group run failed as recorded above. The owner/load routes have separate composition evidence above; frontend and IDE attachment remain unfinished.
 [Owner contract](coding-task-owners.md), [evidence](evidence/coding-task-owner-summary.json).
 
 The task creator now verifies its own native account, original repository and
