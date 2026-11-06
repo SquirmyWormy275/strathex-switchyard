@@ -1,5 +1,16 @@
 # What has actually been verified
 
+Custom-agent SDKs now complete sequence persistence before transmission. Node
+awaits asynchronous saves; Python accepts a synchronous persistence hook, rejects
+awaitables/nested sends and keeps its validated enrollment immutable. A failed
+save sends nothing and consumes its local counter; restart resumes above saved
+state. Two regressions reproduce before correction. Four focused groups pass
+66 distinct checks, and a final 15-check integration pass includes two actual
+Python processes against controlled loopback servers. Typecheck, original
+package bounds and exact cleanup pass. Installed/live-agent and native Windows
+acceptance remain separate.
+[SDK contract](../integrations/README.md), [source evidence](evidence/sdk-persistence-source-summary.json).
+
 Complete Linux `68bcc76` passes **310/310 groups, 1,875 tests, sixteen declared
 skips and zero failures**. It includes stopped-agent recovery, foreground-helper
 ownership, compact provenance and measured Windows scheduling; later shortcut

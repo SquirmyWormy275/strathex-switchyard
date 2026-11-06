@@ -19,8 +19,18 @@ command ID. An acknowledgement is the adapter's report; it does not independentl
 prove that a coding task finished or authorize a consequential tool action.
 
 Never commit enrollment credentials. Persist the sequence privately before
-sending (the Node SDK exposes `onSequence`) if reusing a credential across process
-restarts. The bundled supervisor restores the saved server sequence. Independent
+sending if reusing a credential across process restarts. The Node SDK awaits
+`onSequence(sequence)`; Python accepts the synchronous keyword callback
+`SwitchyardAgent(enrollment, on_sequence=persist_sequence)`. Load the saved counter
+into `initialSequence` on restart. Each callback must complete its own durable
+save before returning; a resolved callback is not independent storage evidence.
+If saving throws or rejects, the SDK sends nothing and consumes that local counter
+because the write may already have committed. Later requests use a greater value.
+Callbacks only save counters: they must not call back into the same SDK. Python
+rejects asynchronous hooks, returned awaitables and nested sends. Python also
+retains an immutable copy of its validated enrollment, so modifying the caller's
+dictionary cannot redirect a later request or substitute its credential/scope.
+The bundled supervisor restores the saved server sequence. Independent
 processes must coordinate that one enrollment's sequence, or use distinct enrolled
 identities. Do not retry a claimed command after a timeout: inspect its uncertain
 outcome. Claims are delivered once and are never automatically replayed.

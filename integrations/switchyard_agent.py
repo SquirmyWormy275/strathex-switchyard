@@ -5,13 +5,22 @@ import json
 import time
 import threading
 import re
+import inspect
 import urllib.request
 from urllib.parse import urlparse
+from types import MappingProxyType
 
 
 class SwitchyardAgent:
-    def __init__(self, enrollment):
+    def __init__(self, enrollment, *, on_sequence=None):
+        if on_sequence is not None and (not callable(on_sequence) or inspect.iscoroutinefunction(on_sequence)):
+            raise ValueError("Use a synchronous sequence persistence callback")
+        # Sending always uses the enrollment validated here, even if the caller
+        # subsequently changes its original dictionary.
+        enrollment = MappingProxyType(dict(enrollment))
         self.enrollment = enrollment
+        self._on_sequence = on_sequence
+        self._persisting = False
         parsed = urlparse(enrollment["baseUrl"])
         if parsed.scheme != "http" or parsed.hostname not in ("localhost", "127.0.0.1") or parsed.username or parsed.password or parsed.path != "/" or parsed.query or parsed.fragment:
             raise ValueError("Use an enrolled loopback workspace")
@@ -24,11 +33,25 @@ class SwitchyardAgent:
 
     def send(self, path, session_id, **fields):
         with self.lock:
+            if self._persisting:
+                raise ValueError("The persistence callback cannot send SDK requests")
             if not isinstance(session_id, str) or not re.fullmatch(r"[A-Za-z0-9_.:-]{1,128}", session_id) or self.sequence + 1 >= 2 ** 53:
                 raise ValueError("Publish an exact ready session before polling or acknowledging")
             if path == "/agent/v2/poll" and len(self.claims) >= 64:
                 raise ValueError("Resolve existing exact claims before polling more commands")
             self.sequence += 1
+            # Consume the counter even if saving raises: storage may have
+            # committed before reporting failure. No HTTP request is sent then.
+            if self._on_sequence is not None:
+                self._persisting = True
+                try:
+                    saved = self._on_sequence(self.sequence)
+                    if inspect.isawaitable(saved):
+                        if inspect.iscoroutine(saved):
+                            saved.close()
+                        raise ValueError("Use a synchronous sequence persistence callback")
+                finally:
+                    self._persisting = False
             body = {"schema": "switchyard-agent-message/v2", "compartment": self.enrollment["compartment"], "agentId": self.enrollment["agentId"], "sessionId": session_id, "sequence": self.sequence, "at": int(time.time() * 1000), **fields}
             data = json.dumps(body, separators=(",", ":"), ensure_ascii=False).encode()
             key = self.enrollment["token"].encode()

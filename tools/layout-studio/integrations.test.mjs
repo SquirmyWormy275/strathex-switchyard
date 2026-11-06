@@ -3,6 +3,9 @@ import test from "node:test";
 import { createServer } from "node:http";
 import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
+import { mkdtemp, readFile, writeFile, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { stopOwnedChild } from "./owned-process.mjs";
 import { createCustomAgents } from "./custom-agents.mjs";
 import { createCopilot } from "./copilot.mjs";
@@ -198,6 +201,71 @@ test("the Node SDK rejects unsigned, replayed and wrong-session responses before
   fault = "wrong-session"; await assert.rejects(sdk.publish("exact", "ready"), /scope/);
   fault = "valid"; assert.equal((await sdk.publish("exact", "ready")).accepted, true);
   await assert.rejects(sdk.poll(), /command.*contract/);
+});
+
+async function sequenceServer(t, token, readSequence = async () => null) {
+  const received = [], server = createServer(async (req, res) => {
+    try {
+      let raw = ""; for await (const chunk of req) raw += chunk;
+      const body = JSON.parse(raw), persisted = await readSequence();
+      received.push({ sequence: body.sequence, persisted, compartment: body.compartment, agentId: body.agentId, authenticated: sameMac(req.headers["x-switchyard-signature"], requestMac(token, req.url, raw)) });
+      const text = JSON.stringify({ schema: agentResponseSchema, requestSequence: body.sequence, sessionId: body.sessionId, result: { accepted: true } });
+      res.setHeader("X-Switchyard-Response-Signature", responseMac(token, req.url, 200, text)); res.end(text);
+    } catch { res.writeHead(500); res.end(); }
+  });
+  return { baseUrl: await listening(server, t), received };
+}
+
+test("Node SDK waits for private sequence persistence before serialized sends and resumes above the saved counter", async (t) => {
+  const root = await mkdtemp(join(tmpdir(), "switchyard-sdk-sequence-")), path = join(root, "sequence"), token = "x".repeat(43);
+  const saves = []; t.after(async () => { await Promise.allSettled(saves); await rm(root, { recursive: true, force: true }); });
+  const saved = async () => Number(await readFile(path, "utf8").catch(() => "0")), { baseUrl, received } = await sequenceServer(t, token, saved);
+  const enrollment = { baseUrl, token, compartment: "personal", agentId: "test" }, persisted = [];
+  const sdk = switchyardAgent({ ...enrollment, onSequence: sequence => { const save = (async () => { await new Promise(resolve => setTimeout(resolve, 40)); await writeFile(path, String(sequence), { mode: 0o600 }); persisted.push(sequence); })(); saves.push(save); return save; } });
+  await Promise.all([sdk.publish("one", "ready"), sdk.publish("two", "ready")]);
+  assert.deepEqual(received.map(r => [r.sequence, r.persisted, r.authenticated]), [[1, 1, true], [2, 2, true]]);
+  assert.deepEqual(persisted, [1, 2]);
+  const restarted = switchyardAgent({ ...enrollment, initialSequence: await saved(), onSequence: sequence => writeFile(path, String(sequence), { mode: 0o600 }) });
+  await restarted.publish("three", "ready"); assert.equal(received[2].sequence, 3); assert.equal(received[2].persisted, 3);
+});
+
+test("Node SDK persistence rejection sends nothing and cannot reuse the consumed sequence", async (t) => {
+  const token = "x".repeat(43), { baseUrl, received } = await sequenceServer(t, token), saved = [];
+  const enrollment = { baseUrl, token, compartment: "personal", agentId: "test" };
+  assert.throws(() => switchyardAgent({ ...enrollment, onSequence: "not-a-callback" }), /persistence|callback/);
+  const sdk = switchyardAgent({ ...enrollment, onSequence: async sequence => { if (sequence === 1) throw Error("Synthetic persistence failure"); saved.push(sequence); } });
+  await assert.rejects(sdk.publish("one", "ready"), /Synthetic persistence failure/); assert.equal(received.length, 0);
+  await sdk.publish("two", "ready"); assert.deepEqual(saved, [2]); assert.deepEqual(received.map(r => r.sequence), [2]);
+});
+
+async function pythonSdk(program, enrollment) {
+  const module = fileURLToPath(new URL("../../integrations", import.meta.url));
+  const child = spawn(process.platform === "win32" ? "python.exe" : "/usr/bin/python3", ["-I", "-B", "-c", "import sys,json\nsys.path.insert(0,sys.argv[1])\nfrom switchyard_agent import SwitchyardAgent\nenrollment=json.load(sys.stdin)\n" + program, module], { stdio: ["pipe", "pipe", "pipe"], windowsHide: true });
+  let stdout = "", stderr = "", overflow = false;
+  child.stdout.on("data", bytes => { stdout += bytes; if (stdout.length > 16384) { overflow = true; child.kill(); } });
+  child.stderr.on("data", bytes => { stderr += bytes; if (stderr.length > 16384) { overflow = true; child.kill(); } });
+  const exited = new Promise((resolve, reject) => { child.once("error", reject); child.once("close", (code, signal) => resolve({ code, signal })); });
+  child.stdin.on("error", () => {}); child.stdin.end(JSON.stringify(enrollment));
+  let timer;
+  try {
+    const result = await Promise.race([exited, new Promise((_, reject) => { timer = setTimeout(() => reject(Error("Synthetic Python SDK check exceeded its bound.")), 10000); })]);
+    assert.equal(overflow, false); assert.equal(result.signal, null); assert.equal(result.code, 0, stderr); return JSON.parse(stdout);
+  } finally { clearTimeout(timer); assert.equal((await stopOwnedChild(child)).stopped, true); }
+}
+
+test("Python SDK pins its enrolled endpoint and scope against caller dictionary mutation", async (t) => {
+  const token = "x".repeat(43), original = await sequenceServer(t, token), substitute = await sequenceServer(t, "y".repeat(43));
+  const result = await pythonSdk(`sdk=SwitchyardAgent(enrollment)\nenrollment.update(baseUrl=enrollment['substitute'],token='y'*43,compartment='work',agentId='other')\nsdk.publish('exact','ready')\nprint(json.dumps({'sequence':sdk.sequence}))`, { baseUrl: original.baseUrl, substitute: substitute.baseUrl, token, compartment: "personal", agentId: "test" });
+  assert.equal(result.sequence, 1); assert.equal(substitute.received.length, 0);
+  assert.deepEqual(original.received.map(r => [r.compartment, r.agentId, r.authenticated]), [["personal", "test", true]]);
+});
+
+test("Python SDK persists before sending, refuses failed or asynchronous hooks and resumes above saved state", async (t) => {
+  const root = await mkdtemp(join(tmpdir(), "switchyard-python-sequence-")), path = join(root, "sequence"), token = "x".repeat(43);
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const { baseUrl, received } = await sequenceServer(t, token, async () => Number(await readFile(path, "utf8").catch(() => "0")));
+  const result = await pythonSdk(`from pathlib import Path\np=Path(enrollment['sequencePath'])\ndef persist(sequence):\n    if sequence==1: raise RuntimeError('Synthetic persistence failure')\n    p.write_text(str(sequence))\nsdk=SwitchyardAgent(enrollment,on_sequence=persist)\ntry: sdk.publish('one','ready')\nexcept RuntimeError: pass\nelse: raise AssertionError('Failed save sent a request')\nsdk.publish('two','ready')\nrestarted=SwitchyardAgent({**enrollment,'initialSequence':int(p.read_text())},on_sequence=persist)\nrestarted.publish('three','ready')\nasync def unsupported(sequence): pass\ntry: SwitchyardAgent(enrollment,on_sequence=unsupported).publish('async','ready')\nexcept ValueError: pass\nelse: raise AssertionError('An asynchronous hook was accepted')\ntry: SwitchyardAgent(enrollment,on_sequence=lambda _:unsupported(1)).publish('awaitable','ready')\nexcept ValueError: pass\nelse: raise AssertionError('A returned awaitable was accepted')\nrecursive=SwitchyardAgent(enrollment,on_sequence=lambda _:recursive.publish('nested','ready'))\ntry: recursive.publish('outer','ready')\nexcept ValueError: pass\nelse: raise AssertionError('A persistence hook sent a nested request')\nassert recursive.sequence==1\ntry: SwitchyardAgent(enrollment,on_sequence=7)\nexcept ValueError: pass\nelse: raise AssertionError('Invalid hook was accepted')\nprint(json.dumps({'saved':int(p.read_text())}))`, { baseUrl, token, compartment: "personal", agentId: "test", sequencePath: path });
+  assert.equal(result.saved, 3); assert.deepEqual(received.map(r => [r.sequence, r.persisted, r.authenticated]), [[2, 2, true], [3, 3, true]]);
 });
 
 test("a real bundled Node example exits after abrupt loss of its owning parent", { timeout: 12000 }, async (t) => {
