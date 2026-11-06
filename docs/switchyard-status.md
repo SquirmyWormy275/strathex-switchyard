@@ -18,6 +18,16 @@ there is no merge or public release acceptance.
 
 ## Current evidence
 
+A CI-only candidate now applies the existing QUERY-only token allowance to
+exact descendants of the original restricted owner. Job membership, process
+birth, pinned image, original restrictions and exact mask-8 readback are required.
+The original two cold/Node observations, eight owner checks and ninety-second
+deadline remain. Nine focused groups pass **88 tests / four declared Windows-only
+skips**, a final 45-test follow-up passes, and two managed builds verify **2,101
+portable checks** (30 new parser cases). Typecheck and owned cleanup pass.
+Native acceptance is pending; the original owner remains **0/8**.
+[Contract](windows-descendant-query.md), [source receipt](evidence/windows-descendant-query-source-summary.json).
+
 The complete Linux run at `d551ccf` is **failed**: 278 groups, 1,767
 passed tests, eleven declared skips and one crash-fixture failure. EOF cleanup
 could remove the socket before the fixture substituted it. The corrected fixture

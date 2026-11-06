@@ -38,7 +38,7 @@ internal static partial class NativeRestrictedHostProof
     }
     private static void ApplyOwnTokenQuery(SafeFileHandle child, string user, string scope, Action<SelfQueryEvidence> reserve)
     {
-        Require(scope is "cold-probe" or "node-owner" or "lease-no-window" or "lease-detached");
+        Require(scope is "cold-probe" or "node-owner" or "lease-no-window" or "lease-detached" or "descendant-guardian" or "descendant-worker" or "descendant-status");
         var evidence = new SelfQueryEvidence(scope); reserve(evidence);
         byte[] beforeBuffer = new byte[16384], afterBuffer = new byte[16384], changedBuffer = Array.Empty<byte>(), originalAcl = Array.Empty<byte>(), expectedAcl = Array.Empty<byte>(), observedAcl = Array.Empty<byte>();
         SafeAccessTokenHandle? control = null;

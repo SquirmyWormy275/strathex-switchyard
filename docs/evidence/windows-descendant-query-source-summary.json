@@ -1,0 +1,91 @@
+{
+  "schema": "switchyard-descendant-self-query-source/v1",
+  "basis": "dbbcce84ad397e90a10b7ea3e1f5a9884f6b2ffe",
+  "sourceSha256": {
+    "deployment/windows/test-support/storage-broker-protocol/NativeRestrictedHostProof.cs": "919f2d99dfbd4f5367ddf67521bd3d46a53ef964a91f75ac6d3e2d4bb078a277",
+    "deployment/windows/test-support/storage-broker-protocol/Program.cs": "d045126f6ee1ad2f3b673475efb4534004485d943cdfd215a5dfeb604af69f5d",
+    "deployment/windows/test-support/storage-broker-protocol/RestrictedSelfTokenQuery.cs": "82d3bfa26f63c692a8984a515cc8f313df39656d5b164b7efc7efb738b868c15",
+    "deployment/windows/test-support/storage-broker-protocol/DescendantQueryProtocol.cs": "6474a1b977992fe3f2f856968c6230097ba8417fbf73887acbf3fd751a60b1f6",
+    "deployment/windows/test-support/storage-broker-protocol/DescendantQueryProtocolProof.cs": "67bcc5b7c77405d54b61e463815e442af62d6a3b45ad9850d947ec1ff8ceb2bb",
+    "deployment/windows/test-support/storage-broker-protocol/DescendantSelfTokenQuery.cs": "c9f8cc3c22cca0dc7fdd5b461f8662c7fb22fa04762037a9bdac1584f2af5434",
+    "scripts/run-isolated-tests.mjs": "b487b1c7ec1ddc285b9ad7ae498be21a42ad0ad638148e8f2ba3f0fd3956eb06",
+    "scripts/windows-broker-owner-proof.mjs": "881e3409cfd9d48ab6589c5d7307bfdca2d2fdbf56e70048ba94e06a8b7bd3b4",
+    "scripts/windows-broker-restricted-owner.mjs": "4266d2fc64f461616151713c4682bb1e1aca9bcc0bbc3136e5c94ac02d960329",
+    "scripts/windows-restricted-owner-report.mjs": "feaacefd4ca666b2845c4fd6223934d16268377dcfd761283ac76eadfb26d3d4",
+    "scripts/windows-restricted-owner-report.test.mjs": "95063463607a02244be0a92d545ec341c04d896f17942d56acbe244f9c8ff190",
+    "scripts/windows-descendant-query.mjs": "6dab0a5c18f3dde55a267b57ebbedac1c89b4d73eca37b7e013db1b93c6e9dc8",
+    "scripts/windows-descendant-query.test.mjs": "b6bd9422833c187976fe989524d26b78acf56f1e7fede7a391c72be1998cd728"
+  },
+  "focused": [
+    {
+      "receipt": "isolated-test-4650a107-e6dd-4fe5-ac01-6b374143f7ff.json",
+      "totals": {
+        "required": 9,
+        "passed": 9,
+        "failed": 0,
+        "tests": 92,
+        "passedTests": 88,
+        "failedTests": 0,
+        "skippedTests": 4,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "allChildAndTreeCleanupVerified": true
+    },
+    {
+      "receipt": "isolated-test-cb767d03-9e03-4e50-9031-d8bbaef2ec12.json",
+      "totals": {
+        "required": 3,
+        "passed": 3,
+        "failed": 0,
+        "tests": 45,
+        "passedTests": 45,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "allChildAndTreeCleanupVerified": true
+    }
+  ],
+  "managed": {
+    "receipt": "descendant-query-managed-1793983081290.json",
+    "builds": [
+      {
+        "name": "helper",
+        "warnings": 0,
+        "errors": 0,
+        "managedAssemblySha256": "92048550d65e5471bd00b759f34d6f87026dc56915a6521482a852c9c31f9985",
+        "managedPeSubsystem": 2
+      },
+      {
+        "name": "proof",
+        "warnings": 0,
+        "errors": 0,
+        "managedAssemblySha256": "0f59fc56ce950f94fa1cb0fb19d2bb069f433f8fb62a897e1b07b4d99b8e63c4",
+        "managedPeSubsystem": 3
+      }
+    ],
+    "existingPortableChecks": 2071,
+    "newDescendantProtocolChecks": 30,
+    "totalPortableChecks": 2101,
+    "cleanup": {
+      "files": 127,
+      "bytes": 3302522,
+      "removed": true
+    }
+  },
+  "typecheckPassed": true,
+  "scope": "Disposable CI original-owner descendants only; token object DACL adds or verifies the existing current-user QUERY mask 8.",
+  "originalColdAndNodeEvidenceCount": 2,
+  "originalOwnerRequiredChecks": 8,
+  "originalOwnerPassedChecks": 0,
+  "queryMask": 8,
+  "newProcessAclOrDefaultDaclOrPrivileges": false,
+  "originalOwnerDeadlineMs": 90000,
+  "maxDescendantRequests": 64,
+  "clientRequestDeadlineMs": 5000,
+  "nativeAcceptance": false,
+  "installedChanged": false,
+  "downloads": false
+}

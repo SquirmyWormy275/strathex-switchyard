@@ -12,12 +12,13 @@ import { runtimeGuardianStopped, runRuntimeCommand } from "../tools/layout-studi
 import { stateLockFailureEvidence } from "../tools/layout-studio/keyless-lease-pool.mjs";
 import { createWindowsOwnerProbeObservation } from "./windows-owner-probe-observation.mjs";
 
-export async function verifyWindowsBrokerOwner({ helper, installationId, serviceImageSha256 }) {
+export async function verifyWindowsBrokerOwner({ helper, installationId, serviceImageSha256, nativeControl }) {
   if (process.platform !== "win32" || process.env.GITHUB_ACTIONS !== "true" || process.env.RUNNER_OS !== "Windows") throw Error("The actual broker-owner proof requires the explicit disposable Windows worker.");
   const root = await mkdtemp(join(process.env.RUNNER_TEMP || tmpdir(), "sxbo-")), original = await directoryIdentity(root), keys = new Map(), checks = [];
   const store = createSuiteStore({ root, secrets: { get: async (c,p) => keys.get(c+p), set: async (c,p,v) => { keys.set(c+p,v); } } });
   const observation = createWindowsOwnerProbeObservation();
-  const native = observation.native(createWindowsStorageNative({ store, helperPath: helper, setupPath: join(dirname(helper), "Switchyard.Setup.exe"), command: observation.command(runRuntimeCommand) }));
+  const guardianStopped = nativeControl?.guardianStopped ?? (frame => runtimeGuardianStopped(frame, { windowsHelper: helper }));
+  const native = observation.native(createWindowsStorageNative({ store, helperPath: helper, setupPath: join(dirname(helper), "Switchyard.Setup.exe"), command: observation.command(nativeControl?.command ?? runRuntimeCommand), guardianStopped }));
   let consumerExited = true, phase = "private-state-initialize";
   const service = createWindowsBrokerExchanges({ store, native, consumerStopped: async () => consumerExited }), context = { operationId: randomUUID(), scopeDigest: "a".repeat(64), provider: "codex" }, inputs = { inputManifestSha256: "e".repeat(64) }, authorize = async () => {};
   try {
@@ -51,7 +52,7 @@ export async function verifyWindowsBrokerOwner({ helper, installationId, service
     phase = "native-exit-and-fixture-retirement";
     const owners = (await store.snapshot("personal")).windowsStorageNative;
     assert.ok(owners.length > 0);
-    for (const owner of owners) { assert.equal(owner.stoppedVerified, true); assert.equal(await runtimeGuardianStopped(owner.ownedRuntime, { windowsHelper: helper }), true); }
+    for (const owner of owners) { assert.equal(owner.stoppedVerified, true); assert.equal(await guardianStopped(owner.ownedRuntime), true); }
     await service.close(); const current = await directoryIdentity(root); assert.equal(current.dev, original.dev); assert.equal(current.ino, original.ino);
     await rm(root, { recursive: true }); checks.push("every retained native Job guardian independently exited and only the exact synthetic private fixture was removed");
     assert.equal(checks.length, 8);

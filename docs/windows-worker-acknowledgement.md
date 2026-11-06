@@ -48,7 +48,8 @@ Existing Linux/default behavior tests remain separate from that acceptance.
 
 The original restricted owner remains zero of eight checks at named Job creation.
 Applying the already bounded QUERY-only allowance to additional exact descendants
-is separate, unfinished CI work. No broader ACL, privilege, account, default-DACL,
+is now implemented as a [CI-only candidate](windows-descendant-query.md), with
+native acceptance pending. No broader ACL, privilege, account, default-DACL,
 process-access or runtime fallback is introduced here.
 
 Microsoft documents the underlying [creation-time observation](https://learn.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-getprocesstimes)

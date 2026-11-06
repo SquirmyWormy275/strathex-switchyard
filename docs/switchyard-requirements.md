@@ -74,3 +74,13 @@ Linux crash-fixture correction passes 42 tests; four-way Windows backend
 scheduling and explicit Python selection pass 39 tests with one Windows-only
 skip. Corrected complete/native scheduling acceptance remains pending.
 [Correction evidence](evidence/release-scheduling-recovery-summary.json).
+
+A CI-only candidate now applies the existing QUERY-only token allowance to
+exact descendants of the original restricted owner. Job membership, process
+birth, pinned image, original restrictions and exact mask-8 readback are required.
+The original two cold/Node observations, eight owner checks and ninety-second
+deadline remain. Nine focused groups pass **88 tests / four declared Windows-only
+skips**, a final 45-test follow-up passes, and two managed builds verify **2,101
+portable checks** (30 new parser cases). Typecheck and owned cleanup pass.
+Native acceptance is pending; the original owner remains **0/8**.
+[Contract](windows-descendant-query.md), [source receipt](evidence/windows-descendant-query-source-summary.json).

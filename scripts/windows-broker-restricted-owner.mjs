@@ -4,6 +4,7 @@ import { dirname, join, resolve, win32 } from "node:path";
 import { fileURLToPath } from "node:url";
 import { privateWrite } from "../tools/layout-studio/private-fs.mjs";
 import { verifyWindowsBrokerOwner } from "./windows-broker-owner-proof.mjs";
+import { createWindowsDescendantQuery } from "./windows-descendant-query.mjs";
 
 export function validateRestrictedHostContext(value) {
   const keys = ["schema", "helper", "installationId", "serviceImageSha256", "node", "nodeSha256", "nonce", "coldRandom", "coldRandomSha256"];
@@ -22,7 +23,7 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   const context = validateRestrictedHostContext(JSON.parse(bytes.toString("utf8")));
   if (context.node.toLowerCase() !== process.execPath.toLowerCase() || context.installationId !== process.env.SWITCHYARD_TEST_BROKER_INSTALLATION_ID || contextPath !== process.env.SWITCHYARD_TEST_RESTRICTED_HOST_CONTEXT) throw Error("The original restricted-host process binding changed.");
   let owner, failure;
-  try { owner = await verifyWindowsBrokerOwner(context); }
+  try { owner = await verifyWindowsBrokerOwner({ ...context, nativeControl: createWindowsDescendantQuery(context, contextPath) }); }
   catch (error) { failure = error; owner = error.hostExchangeProof ?? { success: false }; }
   const current = await lstat(contextPath);
   if (current.dev !== stat.dev || current.ino !== stat.ino || !(await readFile(contextPath)).equals(bytes)) throw Error("The original restricted-host context changed before reporting.");

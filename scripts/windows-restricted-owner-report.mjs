@@ -14,6 +14,14 @@ function validSelfQueryAcl(value, complete = false, scopes = ["cold-probe", "nod
       && r.changeRequested === (r.beforeAclSha256 !== r.afterAclSha256)));
 }
 const rngImports = { BCryptGenRandom: "bcrypt.dll", CryptAcquireContextW: "advapi32.dll", CryptGenRandom: "advapi32.dll", CryptReleaseContext: "advapi32.dll" };
+function validDescendantQueries(value, complete = false) {
+  const flags = ["originalJobVerified", "liveBirthVerified", "pinnedImageVerified", "processHandleClosedVerified"];
+  return Array.isArray(value) && value.length <= 64 && (!complete || value.length > 0) && value.every((row, index) => object(row)
+    && Object.keys(row).sort().join() === ["sequence", "role", "status", "query", ...flags].sort().join()
+    && row.sequence === index + 1 && ["guardian", "worker", "status"].includes(row.role) && ["reserved", "verified"].includes(row.status)
+    && flags.every(key => typeof row[key] === "boolean") && (row.query === null ? !complete && row.status === "reserved" : validSelfQueryAcl([row.query], complete, ["descendant-" + row.role]))
+    && (!complete || row.status === "verified" && flags.every(key => row[key])));
+}
 /** Static imports are observations, not proof of the runtime OpenSSL branch. */
 export function parseNodeRngImports(text, nodeSha256) {
   assert.equal(typeof text, "string"); assert.ok(Buffer.byteLength(text) > 0 && Buffer.byteLength(text) <= 1048576);
@@ -50,6 +58,7 @@ export function storageBrokerFailureEvidence(value) {
   const fields = ["schema", "success", "errorCategory", "nativeCode", "errorHResult", "nativeExchangeChecks", "failedCheckPhase", "restrictedHostPhase", "restrictedHostCreatorPrivileges", "restrictedHostHistoricalFilterFlags", "restrictedHostHistoricalFilterBytes", "restrictedHostTokenRead"];
   const result = Object.fromEntries(fields.filter(key => Object.hasOwn(value, key)).map(key => [key, structuredClone(value[key])]));
   if (validSelfQueryAcl(value.restrictedHostSelfTokenQueryAcl)) result.restrictedHostSelfTokenQueryAcl = structuredClone(value.restrictedHostSelfTokenQueryAcl);
+  if (validDescendantQueries(value.restrictedHostDescendantSelfQueryAcl)) result.restrictedHostDescendantSelfQueryAcl = structuredClone(value.restrictedHostDescendantSelfQueryAcl);
   const consoles = value.restrictedHostLeaseConsoles;
   const flags = ["entryObserved", "primaryTokenVerified", "tokenRecheckedAfterExit", "treeExitVerified", "processHandlesClosedVerified", "creatorQuotaRestoredVerified"];
   const uintOrNull = x => x === null || Number.isSafeInteger(x) && x >= 0 && x <= 0xffffffff;
@@ -123,11 +132,12 @@ const verified = ["selfTokenQueryAccessVerified", "privateDesktopClosedVerified"
 export function verifyRestrictedOwnerReport(result) {
   assert.equal(result?.success, true); const proof = result.nativeRestrictedHostProof;
   assert.ok(object(proof));
-  const fields = ["schema", ...verified, "selfTokenQueryAcl", "processCreationApi", "consoleCreationMode", "standardIo", "startupDesktop", "interactiveDesktopInherited", "creatorPrivileges", "restrictingSidCount", "historicalFilteredFlags", "historicalFilterBytes", "hostOwnerChecks", "hostOwner", "ordinaryUserAccountAccepted", "guestLaunched", "accountCreated"];
+  const fields = ["schema", ...verified, "selfTokenQueryAcl", "descendantSelfQueryAcl", "processCreationApi", "consoleCreationMode", "standardIo", "startupDesktop", "interactiveDesktopInherited", "creatorPrivileges", "restrictingSidCount", "historicalFilteredFlags", "historicalFilterBytes", "hostOwnerChecks", "hostOwner", "ordinaryUserAccountAccepted", "guestLaunched", "accountCreated"];
   assert.deepEqual(Object.keys(proof).sort(), fields.sort());
   assert.equal(proof.schema, "switchyard-restricted-host-process-proof/v1");
   for (const key of verified) assert.equal(proof[key], true);
   assert.ok(validSelfQueryAcl(proof.selfTokenQueryAcl, true));
+  assert.ok(validDescendantQueries(proof.descendantSelfQueryAcl, true));
   assert.ok(validStdio(proof.standardIo)); assert.equal(proof.standardIo.outputBounded, true);
   assert.equal(proof.processCreationApi, "CreateProcessAsUserW"); assert.equal(proof.consoleCreationMode, "detached-process"); assert.equal(proof.startupDesktop, "owned-noninteractive"); assert.equal(proof.interactiveDesktopInherited, false); assert.equal(proof.restrictingSidCount, 4); assert.equal(proof.hostOwnerChecks, 8);
   for (const key of ["ordinaryUserAccountAccepted", "guestLaunched", "accountCreated"]) assert.equal(proof[key], false);
