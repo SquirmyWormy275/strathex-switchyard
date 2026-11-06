@@ -39,13 +39,14 @@ verify cleanup; typecheck passes. Frontend, installed and native acceptance rema
 separate. [Contract](editor-workflow-observation.md),
 [evidence](evidence/editor-workflow-observation-summary.json).
 
-The Windows helper now has a non-console executable candidate that preserves
-ordinary Node spawn and parent-loss containment. Both managed targets compile;
-1,975 portable protocol checks and four isolated groups / 42 checks pass with
-typecheck and exact cleanup. The native proof requires the digest-pinned PE's
-Windows GUI subsystem. Restricted startup and the original eight owner checks
-remain unaccepted pending Windows CI. [Candidate](windows-helper-startup.md),
-[source evidence](evidence/windows-winexe-source-summary.json).
+Windows candidate 8168d4e **failed** its copied-helper metadata check (exit 2),
+before the restricted-owner journey. Its digest-verified artifact is retained.
+The source still changed console code pages in six pipe-command entry points;
+these now use strict UTF-8 stream readers/writers. Both managed builds, 1,985
+portable checks and four isolated groups/42 checks pass with exact cleanup.
+The native receipt does not identify the throwing operation; Windows validation
+of this correction and the original owner journey remain unaccepted.
+[Failure and correction](evidence/windows-pipe-text-source-summary.json).
 
 The archived Windows release test tree now builds/stages its own exact-source
 state helper before verification. The previous 97a7727 run observed ENOENT;

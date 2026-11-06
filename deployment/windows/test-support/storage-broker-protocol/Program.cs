@@ -20,6 +20,7 @@ internal static class Program
             {"schema":"switchyard-windows-storage-prerequisites/v1","privilegeAssigned":true,"privilegeEnabled":false,"privilegeStateUnchanged":true,"requiresPrivilegedSetup":false,"brokerImplemented":false,"effectStarted":false,"sandboxEnforced":false}
             """);
             byte[] reply = WindowsStorageBrokerProtocol.Reply(binding, request, storage.RootElement, key), publicKey = key.ExportSubjectPublicKeyInfo();
+            int pipeTextProtocolChecks = PipeTextProtocolProof.Run();
             int serviceHeaderChecks = ServiceHeaderProof.Run();
             int restrictedChildEventChecks = RestrictedChildApplicationEventsProof.Run();
             int stateLeaseProtocolChecks = StateLeaseProtocolProof.Run();
@@ -66,7 +67,7 @@ internal static class Program
                 else if(args[0]=="--native-host-owner")nativeRestrictedHostProof=NativeRestrictedHostProof.Run();
                 else throw new InvalidOperationException("The native proof flag is not recognized.");
             }
-            Console.WriteLine(JsonSerializer.Serialize(new {schema="switchyard-storage-broker-protocol-proof/v1",success=true,checks,serviceHeaderChecks,restrictedChildEventChecks,stateLeaseProtocolChecks,restrictedChildStderrChecks,coldRandomParserChecks, stateLockFailureChecks,exchangeProtocolChecks,exchangeJournalChecks,exchangeFactsChecks,indexInputChecks,historyInputChecks,protectedFilesChecks,nativeServiceChecks,nativeExchangeChecks,nativeRestrictedHostProof,serviceInstalled=false,volumeOpened=nativeExchangeChecks>0||nativeRestrictedHostProof!=null,guestLaunched=false}));
+            Console.WriteLine(JsonSerializer.Serialize(new {schema="switchyard-storage-broker-protocol-proof/v1",success=true,checks,pipeTextProtocolChecks,serviceHeaderChecks,restrictedChildEventChecks,stateLeaseProtocolChecks,restrictedChildStderrChecks,coldRandomParserChecks, stateLockFailureChecks,exchangeProtocolChecks,exchangeJournalChecks,exchangeFactsChecks,indexInputChecks,historyInputChecks,protectedFilesChecks,nativeServiceChecks,nativeExchangeChecks,nativeRestrictedHostProof,serviceInstalled=false,volumeOpened=nativeExchangeChecks>0||nativeRestrictedHostProof!=null,guestLaunched=false}));
             return 0;
         }
         catch(Exception error)

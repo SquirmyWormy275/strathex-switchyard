@@ -123,7 +123,7 @@ internal static class WindowsSandboxCli
     private static void Write(object value) => Console.WriteLine(JsonSerializer.Serialize(value));
     private static async Task<int> Execute()
     {
-        Console.InputEncoding = new UTF8Encoding(false, true); Console.OutputEncoding = new UTF8Encoding(false);
+        PipeTextProtocol.Configure();
         var chars = new char[MaximumInput + 1]; int count = 0;
         while (count < chars.Length) { int read = await Console.In.ReadAsync(chars.AsMemory(count)); if (read == 0) break; count += read; }
         if (count > MaximumInput) throw Invalid(); using var document = JsonDocument.Parse(new string(chars, 0, count)); var request = document.RootElement;

@@ -29,6 +29,22 @@ with typecheck and exact owned build/test cleanup. A first local build attempt
 included pre-existing generated attributes; the corrected build uses an owned
 copy of tracked source and leaves those original files untouched.
 
-**Native Windows startup, the eight-check owner journey and complete release
-acceptance remain pending.** The separate archived-release helper staging fix is
-also awaiting native verification. [Source evidence and limits](evidence/windows-winexe-source-summary.json).
+The first native candidate, 8168d4e, failed the copied-helper metadata check with
+exit 2 before any restricted-owner proof. Its imported artifact digest verifies.
+This is a regression, not accepted native startup. The receipt does not identify
+the exact throwing operation.
+
+Inspection found six pipe-command entry points still setting console encodings.
+The [.NET 8 implementation](https://github.com/dotnet/runtime/blob/v8.0.24/src/libraries/System.Console/src/System/ConsolePal.Windows.cs)
+calls console code-page APIs and throws on failure; those APIs act on an
+[associated console](https://learn.microsoft.com/en-us/windows/console/setconsolecp).
+The correction installs strict UTF-8 readers and writers over inherited streams,
+without code-page changes or console allocation/attachment. Ten managed checks
+cover Unicode, EOF, byte-exact output without BOM, malformed input, malformed
+output and ownership of underlying streams. Both targets compile and all 1,985
+portable checks pass; four isolated JS groups/42 checks and typecheck pass.
+
+**Native metadata startup, the original eight-check owner journey and complete
+release acceptance remain unaccepted.** The separate archived-release staging fix
+also awaits native acceptance. [Failed native artifact and stream correction](evidence/windows-pipe-text-source-summary.json),
+[earlier candidate source evidence](evidence/windows-winexe-source-summary.json).

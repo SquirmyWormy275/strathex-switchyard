@@ -156,8 +156,7 @@ internal static partial class ReviewedInputStager
         ReviewedHistoryInputs.Packet? historyPacket = null;
         try
         {
-            Console.InputEncoding = new UTF8Encoding(false, true);
-            Console.OutputEncoding = new UTF8Encoding(false, true);
+            PipeTextProtocol.Configure();
             var text = new StringBuilder(); int character;
             while ((character = Console.In.Read()) != -1 && character != '\n') { if (character == '\r' || text.Length >= 524288) throw Invalid(); text.Append((char)character); }
             if (Encoding.UTF8.GetByteCount(text.ToString()) > 524288) throw Invalid();
@@ -228,7 +227,7 @@ internal static partial class ReviewedInputStager
         var handles = new List<SafeFileHandle>(); var streams = new List<FileStream>(); string phase = "request";
         try
         {
-            Console.InputEncoding = new UTF8Encoding(false, true); Console.OutputEncoding = new UTF8Encoding(false);
+            PipeTextProtocol.Configure();
             var text = new StringBuilder(); int character;
             while ((character = Console.In.Read()) != -1 && character != '\n') { if (character == '\r' || text.Length >= 8192) throw Invalid(); text.Append((char)character); }
             using var document = JsonDocument.Parse(text.ToString()); var request = document.RootElement;
@@ -295,7 +294,7 @@ internal static partial class ReviewedInputStager
         var handles = new List<SafeFileHandle>(); string phase = "request";
         try
         {
-            Console.InputEncoding = new UTF8Encoding(false, true); Console.OutputEncoding = new UTF8Encoding(false);
+            PipeTextProtocol.Configure();
             var text = new StringBuilder(); int character;
             while ((character = Console.In.Read()) != -1 && character != '\n') { if (character == '\r' || text.Length >= 8192) throw Invalid(); text.Append((char)character); }
             using var document = JsonDocument.Parse(text.ToString()); var request = document.RootElement;

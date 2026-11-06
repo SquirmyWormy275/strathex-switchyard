@@ -24,7 +24,7 @@ internal static class WindowsStorageBroker
         string action="",effectPhase="request";bool attempted=false;
         try
         {
-            Console.InputEncoding=new UTF8Encoding(false,true);Console.OutputEncoding=new UTF8Encoding(false);
+            PipeTextProtocol.Configure();
             char[] chars=new char[8193];int count=0;while(count<chars.Length){int read=Console.In.Read(chars,count,chars.Length-count);if(read==0)break;count+=read;}
             if(count>8192)throw Invalid();using var document=JsonDocument.Parse(new string(chars,0,count),new JsonDocumentOptions{MaxDepth=4});var request=document.RootElement;
             action=request.GetProperty("action").GetString()??"";

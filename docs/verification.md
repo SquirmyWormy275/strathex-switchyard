@@ -1,5 +1,14 @@
 # What has actually been verified
 
+Windows candidate 8168d4e **failed** its copied-helper metadata check (exit 2),
+before the restricted-owner journey. Its digest-verified artifact is retained.
+The source still changed console code pages in six pipe-command entry points;
+these now use strict UTF-8 stream readers/writers. Both managed builds, 1,985
+portable checks and four isolated groups/42 checks pass with exact cleanup.
+The native receipt does not identify the throwing operation; Windows validation
+of this correction and the original owner journey remain unaccepted.
+[Failure and correction](evidence/windows-pipe-text-source-summary.json).
+
 Editor workflow history now passes **seven groups / 84 tests**. Explicit Personal
 consent records four lifecycle states in the same encrypted journal transaction,
 with private correlation, pause/exclusion fences and no live attachment or

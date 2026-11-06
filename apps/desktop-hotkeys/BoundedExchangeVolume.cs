@@ -263,7 +263,7 @@ internal static partial class ReviewedInputStager
         string phase = "request";
         try
         {
-            Console.InputEncoding = new UTF8Encoding(false, true); Console.OutputEncoding = new UTF8Encoding(false);
+            PipeTextProtocol.Configure();
             var text = new StringBuilder(); int character; while ((character = Console.In.Read()) != -1 && character != '\n') { if (character == '\r' || text.Length >= 8192) throw Invalid(); text.Append((char)character); }
             using var document = JsonDocument.Parse(text.ToString()); Console.WriteLine(BoundedVolume(document.RootElement, ref phase).GetRawText()); return 0;
         }
