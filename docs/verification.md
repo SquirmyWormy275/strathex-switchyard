@@ -1366,3 +1366,25 @@ original state; repeated stop reports do not duplicate observation metadata.
 The initial three failing regressions remain recorded. Installed and native
 Windows acceptance of this later correction remain separate.
 [Source receipt](evidence/agent-stop-retirement-source-summary.json).
+
+
+## Complete Linux recovery and installed stop correction — 2026-11-06
+
+Immutable `cadbccd` passes all 310 groups: 1,861 tests, sixteen declared skips
+and no failures, cancellations or todo tests. This covers agent revocation,
+uncertain-outcome recovery and compact packaging. All child/tree exits verify.
+The exact checkout, nine aliases, 782 generated files (11,766,823 bytes), empty
+test parent and marker are removed; all three other worktrees remain intact.
+The later stopped-agent correction retains separate focused acceptance.
+[Complete Linux receipt](evidence/linux-cadbccd-complete-summary.json).
+
+Normal installed `7ea2997`, release `4a9a66f`, passes thirty checks: thirteen
+owner, seven journal and ten synthetic agent checks. The reproducible verifier
+checks seven source-tested hashes and now covers stopped-session retirement,
+refused resurrection and late acknowledgement without restored readiness.
+All 54 workspace semantic snapshots and selection remain intact; 53 sealed files
+are byte-identical and one changes only audit metadata. The pending keyboard-only
+conversation remains. Dated backup/readback, frozen frontend and current plus one
+rollback verify. The 535-file, 5,231,798-byte prepared bundle is removed.
+No live agent, credential, provider, recording, model, Microsoft account or hardware
+operation is performed. [Installed evidence](evidence/installed-agent-stop-summary.json).

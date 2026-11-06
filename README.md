@@ -68,12 +68,12 @@ execution, offline repository scans and recoverable installation. The Home and
 Model F catalog provide the starting experience; complete task/IDE attachment,
 role/device controls and full scanner coverage remain unfinished.
 
-The accepted complete Linux checkpoint `8786f83` passes **309 groups / 1,847
+The accepted complete Linux checkpoint `cadbccd` passes **310 groups / 1,861
 tests**, with sixteen declared skips and verified owned cleanup. The restricted
 Windows storage journey now passes all eight original checks, including exact
 exit and fixture/service retirement. Complete Windows source `9f35961` passes
 **414 test/build groups / 2,398 tests**, with 202 declared skips and exact cleanup.
-Later agent-security changes have separate focused and installed evidence; a
+The latest stopped-agent correction has separate focused and installed evidence; a
 recurring first-install shortcut timeout remains under investigation. Source,
 installed, interactive, hardware and account acceptance remain separate.
 [Current status and exact evidence](docs/switchyard-status.md).

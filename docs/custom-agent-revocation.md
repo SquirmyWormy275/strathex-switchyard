@@ -109,11 +109,12 @@ mise exec node@24.14.0 -- node --experimental-transform-types scripts/verify-age
 ```
 
 The verifier checks installed bundle integrity and the exact source-tested module
-hashes before running in-memory doubles. It writes a private receipt containing
+hashes before running ten current in-memory checks. It writes a private receipt containing
 its own source hash. It neither reads user credentials nor executes an agent,
 provider or native child. Missing, duplicate or broader flags refuse before
-installed-state access. Three focused groups pass 28 checks; the installed proof
-passes all nine. This verifies the named modules, not later unreviewed versions.
+installed-state access. Three focused groups pass 28 checks; the current installed
+proof additionally verifies stopped-session retirement. This verifies the named
+modules, not later unreviewed versions.
 [Reproducible verification](evidence/installed-agent-security-verifier-summary.json).
 
 ## An adapter that reports stopped
@@ -133,5 +134,8 @@ failed persistence preserves commands, sequence and observations together.
 Three encrypted-state regressions fail on the previous implementation and pass
 after correction. Eight focused groups pass 94 tests, including the existing
 authenticated HTTP and bundled Node lifecycle demonstrations. Typecheck, original
-package bounds and owned cleanup pass. Installed/native Windows acceptance of
-this correction remains separate. [Evidence](evidence/agent-stop-retirement-source-summary.json).
+package bounds and owned cleanup pass. Normal installed `7ea2997` also passes
+ten pure agent checks within its 30-check metadata update; all 54 workspace
+snapshots are preserved. Live installed agent operation and native Windows remain
+separate. [Source](evidence/agent-stop-retirement-source-summary.json),
+[installed proof](evidence/installed-agent-stop-summary.json).

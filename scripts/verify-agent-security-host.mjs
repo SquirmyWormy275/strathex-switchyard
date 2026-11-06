@@ -19,7 +19,7 @@ const { verifySuiteRelease } = await import("../deployment/suite/release.mjs");
 const root = join(installationRoot(), "versions", app.build), m = await verifySuiteRelease(root, { expectedId: app.build, platform: "linux", checkRuntime: true }), checks = [], moduleDigests = {};
 assert.equal(m.development, false);
 const built = { source: m.sourceCommit, id: m.id };
-for (const [evidence, names] of [["credential-process-source-summary.json", ["tools/layout-studio/credential-process.mjs", "tools/layout-studio/suite-store.mjs"]], ["custom-agent-outcome-source-summary.json", ["tools/layout-studio/custom-agents.mjs", "tools/layout-studio/agent-observation.mjs", "tools/layout-studio/suite.mjs", "packages/control-plane/src/confirmations.ts"]], ["compact-release-manifest-summary.json", ["deployment/suite/release.mjs"]]]) {
+for (const [evidence, names] of [["credential-process-source-summary.json", ["tools/layout-studio/credential-process.mjs", "tools/layout-studio/suite-store.mjs"]], ["agent-stop-retirement-source-summary.json", ["tools/layout-studio/custom-agents.mjs"]], ["custom-agent-outcome-source-summary.json", ["tools/layout-studio/agent-observation.mjs", "tools/layout-studio/suite.mjs", "packages/control-plane/src/confirmations.ts"]], ["compact-release-manifest-summary.json", ["deployment/suite/release.mjs"]]]) {
     const e = JSON.parse(await readFile(new URL("../docs/evidence/" + evidence, import.meta.url), "utf8"));
     for (const name of names) {
         const digest = createHash("sha256").update(await readFile(join(root, name))).digest("hex");
@@ -110,6 +110,21 @@ for (const secret of [old.token, next.token, review.confirmation.token])
 state.mode = "keyboard-only";
 await assert.rejects(agents.reviewRevoke("synthetic", "example"), /keyboard-only/);
 checks.push("review-replay-privacy-and-policy-fences");
+state.mode = "personal-companion";
+const stopClaim = await agents.dispatch("synthetic", { agentId: "example", sessionId: "same-session", intent: "review" });
+await send(next.token, 2, agentRoutes.poll, {});
+const stopQueued = await agents.dispatch("synthetic", { agentId: "example", sessionId: "same-session", intent: "status" });
+await send(next.token, 3, agentRoutes.event, { event: { status: "stopped" } });
+assert.equal(state.agents[0].commands.find(command => command.id === stopClaim.commandId).status, "uncertain-session-ended");
+assert.equal(state.agents[0].commands.find(command => command.id === stopQueued.commandId).status, "cancelled-before-claim");
+await assert.rejects(send(next.token, 4), /fresh session identity/);
+await assert.rejects(send(next.token, 4, agentRoutes.poll, {}), /no longer owns/);
+const stoppedSeen = state.agents[0].lastSeen;
+await send(next.token, 4, agentRoutes.ack, { commandId: stopClaim.commandId, outcome: "completed" });
+assert.equal(state.agents[0].reportedStatus, "stopped");
+assert.equal(state.agents[0].lastSeen, stoppedSeen);
+assert.equal(state.agents[0].commands.find(command => command.id === stopClaim.commandId).status, "completed");
+checks.push("stopped-session-retires-pending-work-without-restoring-readiness");
 const evidence = { schema: "switchyard-installed-agent-security-metadata/v2", at: new Date().toISOString(), moduleDigests, verifierSourceSha256: createHash("sha256").update(await readFile(new URL(import.meta.url))).digest("hex"), sourceCommit: built.source, applicationRelease: built.id, checks, success: true, pureInMemoryOnly: true, liveUserCredentialsUsed: false, liveAgentsRevoked: 0, nativeProcessesStarted: 0, providerOrModelRequests: 0, hardwareOperations: 0 };
 const { privateDirectory } = await import("../tools/layout-studio/private-fs.mjs");
 const outputRoot = join(process.env.XDG_STATE_HOME || join(homedir(), ".local/state"), "strathex-switchyard/runtime-verification");

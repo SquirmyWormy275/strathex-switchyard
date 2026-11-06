@@ -34,8 +34,9 @@ evidence, not instructions to reset. Publish regular commits. Do not merge or re
 The latest source correction retires commands when an adapter publishes stopped,
 preserves uncertain claims and rejects active status under the same stopped
 identity. Three regressions fail before the fix and pass within eight groups/94
-checks afterward. Typecheck/package bounds and owned cleanup pass; installed and
-native Windows acceptance of this correction remain separate.
+checks afterward. Typecheck/package bounds and owned cleanup pass. Installed
+pure stop/recovery checks now pass; live agent operation and native Windows
+acceptance of this correction remain separate.
 [Evidence](evidence/agent-stop-retirement-source-summary.json).
 
 Custom-agent uncertain claims now support separately reviewed local recovery.
@@ -66,28 +67,30 @@ checks, native Windows results, focused source checks and installed acceptance.
 The [verification record](verification.md) retains historical receipts and failed
 attempts; do not infer current status from an older passing checkpoint.
 
-The latest complete Linux run is `8786f83`: 309 groups, 1,847 passing tests,
+The latest complete Linux run is `cadbccd`: 310 groups, 1,861 passing tests,
 sixteen declared skips and zero failures. All child/tree cleanup verifies, and
 its exact checkout, nine aliases, 782 generated files, temporary parent and marker
-are removed. All three other worktrees remain. Newer revocation/compact-package
-changes retain separate focused and installed checks; they are not included in
-that complete run. [Receipt](evidence/linux-8786f83-complete-summary.json).
+are removed. All three other worktrees remain. Revocation, uncertain-outcome
+recovery and compact packaging are included. The later stopped-agent correction
+has separate focused and installed checks.
+[Receipt](evidence/linux-cadbccd-complete-summary.json).
 
-The installed baseline is `cadbccd31277d41405a18f4a8f690a515ef03785`,
-release `cfa9dbad62d3c7d9bceceab9f381fb237c0419eb69504ea56dd2e724f50c308e`.
+The installed baseline is `7ea2997062af93078ef63bf19f932bb240d17dd1`,
+release `4a9a66f2edba67d1212dd2da3ae8b4cb64adb4619f569034f2577e146610cc17`.
 Preserve all 54 original workspace identities, the pending keyboard-only Codex
 workspace, private connection information and the frozen Home bytes. The normal
-versioned update passes 20 owner/journal metadata checks plus nine pure in-memory
-credential/revocation/outcome checks. Seven exact tested module hashes verify. It starts no
+versioned update passes 20 owner/journal metadata checks plus ten pure in-memory
+credential/revocation/outcome/stop checks. Seven exact tested module hashes verify. It starts no
 bundled example, recording or provider and revokes no live agent. All 54 semantic snapshots match; 53 sealed files
 are byte-identical and one changed only audit metadata. Keep the current release
-and its one rollback. The 535-file, 5,230,818-byte prepared bundle was verified and
+and its one rollback. The 535-file, 5,231,798-byte prepared bundle was verified and
 removed. Compact manifest JSON keeps the complete package below the original
 5 MiB limit; all sixteen installation scenarios pass after that change.
-[Receipt](evidence/installed-agent-outcome-summary.json).
+[Receipt](evidence/installed-agent-stop-summary.json).
 The repeatable `scripts/verify-agent-security-host.mjs --read-only-metadata`
 proof verifies exact installed hashes and uses only synthetic in-memory state;
-its nine checks and 28 focused guard/package checks pass.
+its ten current installed checks pass. The unchanged flags retain their earlier
+28-check focused guard/package acceptance.
 [Verifier evidence](evidence/installed-agent-security-verifier-summary.json).
 Earlier installed `4b2daed` and `5a8d159` retain separate lifecycle/archive/extras evidence.
 
