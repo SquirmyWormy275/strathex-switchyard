@@ -16,8 +16,9 @@ registers an actual worker through the verified
 [suspended-worker acknowledgement](windows-worker-acknowledgement.md). The command
 does not execute before that worker's registration completes.
 
-The original native coordinator serves at most 64 sequential requests inside the
-same ninety-second owner deadline. Each request carries its original context
+The native coordinator serves at most 68 sequential requests inside the
+same ninety-second owner deadline. Requests 65–68 are reserved for status helpers;
+no guardian or worker can use them. Each request carries its original context
 nonce, sequence, role, PID and executable hash. Suspended workers also carry the
 creation time observed through the guardian's retained process handle.
 
@@ -79,3 +80,26 @@ eight checks. [Native receipt](evidence/guardian-self-birth-native-summary.json)
 
 Primary references: [current-process pseudo handle](https://learn.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-getcurrentprocess)
 and [process creation and exit times](https://learn.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-getprocesstimes).
+
+## Final retirement registration
+
+Native `c9a858a` clears setup startup and completes seven of the eight original
+owner checks, including actual create, mount/read/write, consumer exclusion,
+detach, retirement and replay refusal. The remaining assertion fails during
+independent final guardian status checks after all 64 permitted registrations.
+The fixture is preserved; complete owner acceptance is not claimed.
+[Native receipt](evidence/setup-gui-native-summary.json).
+
+The existing journey performs 17 commands, each requiring guardian, suspended
+worker and initial status registration (51). It independently rechecks all 17
+retained guardians at retirement, requiring 68 in total. The correction adds
+exactly four status-only slots. Both protocol readers and the public report
+validator reject a worker/guardian in these slots and reject registration 69.
+The deadline, per-request byte bound, original eight assertions, identity,
+restricted token and exact QUERY mask 8 remain unchanged.
+
+Both managed targets compile with zero warnings/errors; 2,114 portable checks
+pass, including the original parser cases and 13 final-slot checks. Four isolated
+groups pass 50 tests with exact cleanup. Native CI must still verify all eight
+original owner checks and final fixture retirement.
+[Source evidence](evidence/descendant-retirement-source-summary.json).

@@ -17,6 +17,14 @@ test("CI descendant registration admits only a closed bounded role and exact pro
   for (const key of Object.keys(request())) { const value = request(); delete value[key]; assert.throws(() => descendantQueryRequest(value)); }
   assert.equal(descendantQueryRequest(request({ sequence: 64, pid: 0xffffffff })).sequence, 64);
 });
+test("the original journey has four additional final-status slots with no worker or guardian allowance", () => {
+  for (let sequence = 65; sequence <= 68; sequence++) {
+    const value = request({ sequence, role: "status" });
+    assert.deepEqual(descendantQueryReply(reply(value), descendantQueryRequest(value)), reply(value));
+    for (const role of ["guardian", "worker"]) assert.throws(() => descendantQueryRequest(request({ sequence, role, birth: role === "worker" ? "638000000000000000" : null })));
+  }
+  for (const sequence of [69, 100, 0xffffffff]) assert.throws(() => descendantQueryRequest(request({ sequence, role: "status" })));
+});
 test("CI descendant replies cannot substitute a different request, worker birth, mask or incomplete result", () => {
   for (const role of ["guardian", "worker", "status"]) {
     const input = request({ role, birth: role === "worker" ? "638000000000000000" : null }), output = reply(input);

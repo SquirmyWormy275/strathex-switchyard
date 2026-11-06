@@ -6,7 +6,8 @@ a partial implementation.** The F77 is the pilot device; it does not limit scope
 
 The Linux backend has a passing complete test checkpoint, and a versioned
 application is installed. The source has since gained additional tested changes.
-Windows restricted-owner startup is an active software failure. Hardware,
+The Windows restricted owner now reaches its final retirement check, which
+still fails under the CI registration bound. Hardware,
 account and visual acceptance remain separate from those implementation results.
 
 Use the [requirement ledger](switchyard-requirements.md) for the complete scope,
@@ -22,7 +23,7 @@ there is no merge or public release acceptance.
 | --- | --- | --- |
 | Complete Linux source | `a5520be`: **306 groups, 1,782 passing tests, sixteen declared skips, zero failures.** All owned children, checkout, dependency aliases and generated files were removed. [Receipt](evidence/linux-a552-complete-summary.json). | Provider/guest doubles remain explicit. This includes the SPDX catalog and all independently scheduled task-owner cases. Later Windows-only diagnostics have focused evidence. |
 | Windows backend batches | `dbbcce8`: 170 of 171 groups accepted, 971 passing tests and 135 declared skips. The native lease group passes. [Receipts](evidence/windows-backend-dbbc-native-summary.json). | One task-owner file timed out without a complete plan. All 26 original cases now run independently under the same 45-second child bound; all pass locally. Native `9fde0a3` now completes all 26 independent cases: 24 pass, two declared Linux-only skips, original 45-second bounds and verified cleanup. [Native receipt](evidence/task-owner-native-summary.json). [Correction](evidence/task-owner-scenarios-source-summary.json), [independent job](evidence/pipe-buffer-and-task-source-summary.json). |
-| Restricted Windows owner | `2202720` passes all **36 native pipe checks** and six setup preflight checks. Guardian, worker and status processes verify QUERY mask 8. [Receipt](evidence/private-pipe-native-summary.json). | **0/8 original owner checks accepted.** The worker is now created, but native `20dc066` reports DLL initialization failure (0xC0000142), zero output. Native `56d115e` passes ordinary setup/import checks but reproduces the same restricted failure. The next candidate removes setup console-subsystem initialization while retaining the normal CRT entrypoint; native acceptance remains pending and the specific DLL unproven. [Failure and correction](windows-setup-metadata-startup.md), [pipe contract](windows-private-command-pipes.md). |
+| Restricted Windows owner | `c9a858a` verifies native GUI setup and completes **7/8 original owner checks**, including actual disk lifecycle and replay refusal. All 64 observed descendants verify exact QUERY mask 8. [Receipt](evidence/setup-gui-native-summary.json). | Final independent exit/fixture retirement fails when registration 65 exceeds the old CI bound. Four additional status-only slots are implemented and source-tested; complete native owner acceptance remains pending. [Correction](windows-descendant-query.md#final-retirement-registration). |
 | Installation and runtime | All sixteen original Windows installation/recovery cases pass at `b600a6d`; its independent fresh runtime installs 49 packages and loads/rechecks the offline CPU model, then removes its temporary runtime. [Installation](evidence/installation-scenarios-native-summary.json), [runtime](evidence/windows-runtime-b600-native-summary.json). | These independent passes do not accept the failed complete Windows release or ordinary-user/guest journeys. |
 | Latest diagnostic source | Seven focused groups pass 69 tests with five Windows-only skips. Two managed builds, 2,101 portable checks, typecheck and exact owned cleanup pass. [Receipt](evidence/worker-start-observation-source-summary.json). | Actual Windows `d15285b` passes all eight acknowledgement/refusal tests without skips. [Native receipt](evidence/worker-start-refusal-native-summary.json). The original owner journey remains open. |
 | Installed app | Linux source `5a2c324` has installed metadata/owner/editor/severity checks and preserves all 54 original workspace identities. [Receipt](evidence/installed-cvss4-summary.json). | Later source checks do not establish installed acceptance; frontend and extension activation remain frozen. |
@@ -40,15 +41,15 @@ Rev2 scope independently of these checkpoints.
 | Protected workspaces | Compartment-scoped encrypted state, fresh policy checks, bounded OS locks, exact approvals and durable replay refusal. [State locks](private-state-locking.md), [receipt authority](receipt-authority-commit.md). |
 | Reviewed execution | Linux Run and pipelines bind reviewed task inputs to native guardians and disposable build workspaces. [Execution](reviewed-task-execution.md), [bounded builds](bounded-build-workspace.md). |
 | Repository review | Read-only inspection, worktree/index/history witnesses and explicitly selected scanner inputs. [Inspector](inspect-cli.md), [staged inputs](staged-shield-inputs.md), [history](historical-shield-inputs.md). |
-| Shield and supply chain | Pinned offline scans, signed advisory/rule feeds, scoped exceptions, CycloneDX inventories, npm/Python/Rust declarations and CVSS 2/3/4 scoring. [Scanner](shield-baseline-scanner.md), [Python](python-supply-chain.md), [Rust](cargo-supply-chain.md), [severity](cvss-severity.md). |
+| Shield and supply chain | Pinned offline scans, signed advisory/rule feeds with inclusive last-affected and whole-range limits, scoped exceptions, CycloneDX inventories, npm/Python/Rust declarations and CVSS 2/3/4 scoring. [Scanner](shield-baseline-scanner.md), [Python](python-supply-chain.md), [Rust](cargo-supply-chain.md), [severity](cvss-severity.md). |
 | Coding tools and editor connection | Distinct Codex/Claude task APIs, reviewed text, signed editor requests, one-use launch permits, protected lifecycle history and joined cleanup. [Native tasks](native-coding-tasks.md), [Terminal demonstration](evidence/editor-terminal-connection-summary.json), [retirement](evidence/editor-retired-stop-summary.json). |
 | Observation and navigation | Native VS Code/ChatGPT focus plus separately consented deliberate, category, agent, host-action and editor metadata. [Focus](native-client-focus.md), [recording](workflow-capture.md), [editor history](editor-workflow-observation.md). |
 | Installation and recovery | Versioned bundles, integrity checks, installation/update/rollback and interrupted-install recovery. [Installation](suite-installation.md), [recovery](suite-release-recovery.md). |
 
 ## Unfinished implementation
 
-- Windows restricted-owner worker startup and the rest of its original owner
-  journey; corrected complete Windows release verification remains pending.
+- Final Windows restricted-owner exit/fixture retirement acceptance; corrected
+  complete Windows release verification remains pending.
 - Production editor command activation and remaining guided role/device wiring.
   Frontend and command activation are deliberately frozen for owner review.
 - Broader Shield coverage and dependency syntax/resolution, publisher provenance,

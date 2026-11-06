@@ -32,8 +32,13 @@ numbers and build metadata. Range precedence ignores builds while literal
 queries and explicit affected-version lists retain exact build identity.
 PyPI accepts the [bounded PEP 440 version scheme](python-supply-chain.md) and
 `ECOSYSTEM` intervals, with trailing zero components compared equivalently.
-Only ordered `introduced`/`fixed` boundaries are supported. Unsupported versions,
-other ecosystems and unsupported range boundaries fail collection;
+Ordered intervals now support exclusive `fixed` and inclusive `last_affected`
+endpoints. A range cannot mix those endpoint kinds. Independent `limit` events
+apply to the whole range: any strictly higher limit permits consideration, and
+exact `"*"` means no upper limit. Limits do not open or close individual intervals.
+The collector retains its ordered, non-overlapping interval subset; an inclusive
+end cannot also start the next interval. Unsupported versions, wildcard forms
+other than exact `"*"`, other ecosystems and unsupported boundaries fail collection;
 they are not converted into an empty advisory list.
 
 All pages must complete. Repeated pagination, duplicate IDs, unsupported records,
@@ -46,7 +51,7 @@ settles the collection without producing a partial success artifact.
 The [OSV schema](https://ossf.github.io/osv-schema/) exposes quantitative severity
 vectors. GitHub also publishes database-specific annotations, but
 [documents those fields as unstable](https://github.com/github/advisory-database#database_specific-values).
-Collector version 8 retains the existing calculation of supported complete CVSS 2.0, 3.0/3.1 and 4.0 base vectors
+Collector version 9 retains the existing calculation of supported complete CVSS 2.0, 3.0/3.1 and 4.0 base vectors
 using independently verified scoring and package-specific scope. Optional source
 context remains separate and cannot lower the retained base rating. It does not
 rely on unstable labels. [Severity calculation and limits](cvss-severity.md)
@@ -114,3 +119,22 @@ publisher provenance and ordinary UI source management remain unfinished. A
 successful query with no returned records describes that selected identity at
 that observation time; it does not verify publication, source bytes or complete
 vulnerability coverage. All baseline clean results remain incomplete.
+
+## Closing-boundary acceptance
+
+The boundary implementation follows the
+[OSV evaluation algorithm](https://ossf.github.io/osv-schema/#evaluation).
+A cohort of 1,944 independent integer-membership comparisons checks exclusive
+fixed endpoints, inclusive last-affected endpoints and union limits across npm,
+PyPI and crates.io. Additional tests cover prereleases, build precedence, Cargo
+u64 endpoints, PEP 440 epochs/post/local versions, single-version intervals,
+disjoint intervals, malformed later events and failure on a later response page.
+
+Six isolated groups pass **77 tests**, including actual Linux Supply Chain and
+Release execution plus Windows guest doubles. The original fixed-range scenarios
+remain, with new last-affected/limit scenarios preserving signed feeds, failed
+incomplete findings, original lock/index/HEAD bytes, replay refusal, exact native
+exit and cleanup. Typecheck and package checks pass. No public requests, installed
+update, model task or account action occurred. Native Windows host acceptance for
+this extension is separate.
+[Source evidence](evidence/osv-range-boundaries-source-summary.json).

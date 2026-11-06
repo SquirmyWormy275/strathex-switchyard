@@ -7,9 +7,10 @@ import { readFile, access } from "node:fs/promises";
 import { join } from "node:path";
 import { runtimeGuardianStopped } from "./runtime-command.mjs";
 
-async function verifyNpmPrerelease(t, factory, action, windows) {
+async function verifyNpmPrerelease(t, factory, action, windows, boundedLast = false) {
   const query = { ecosystem: "npm", name: "synthetic", version: "1.0.0-rc.2+reviewed.01" };
   const source = { id: "GHSA-synthetic-prerelease", modified: new Date().toISOString(), affected: [{ package: { ecosystem: query.ecosystem, name: query.name }, ranges: [{ type: "SEMVER", events: [{ introduced: "1.0.0-rc.1" }, { fixed: "1.0.0" }] }] }] };
+  if (boundedLast) source.affected[0].ranges[0].events = [{ limit: "1.0.0-rc.2" }, { introduced: "1.0.0-rc.1" }, { last_affected: "1.0.0-rc.2+upstream" }, { limit: "1.0.0" }];
   const collected = await collectOsvAdvisories([query], { fetchImpl: async (_url, options) => {
     assert.equal(JSON.parse(options.body).version, query.version);
     return new Response(JSON.stringify({ vulns: [source] }), { headers: { "content-type": "application/json" } });
@@ -33,6 +34,8 @@ async function verifyNpmPrerelease(t, factory, action, windows) {
 for (const action of ["shield_supply_chain", "release_shield"]) {
   test(`Linux actual ${action} joins exact prerelease collection, signed scans, protected receipts and cleanup`, { skip: process.platform !== "linux" }, t => verifyNpmPrerelease(t, repositoryShieldFixture, action, false));
   test(`Windows guest-double ${action} preserves the complete prerelease build identity and original receipt`, t => verifyNpmPrerelease(t, windowsExecutionFixture, action, true));
+  test(`Linux actual ${action} retains inclusive last-affected and union-limit findings through signed execution`, { skip: process.platform !== "linux" }, t => verifyNpmPrerelease(t, repositoryShieldFixture, action, false, true));
+  test(`Windows guest-double ${action} retains inclusive last-affected and union-limit findings through signed execution`, t => verifyNpmPrerelease(t, windowsExecutionFixture, action, true, true));
 }
 
 async function verifyCalculated(t, factory, action, mixed, v4 = false) {

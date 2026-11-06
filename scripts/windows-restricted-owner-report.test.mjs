@@ -190,6 +190,22 @@ test("descendant QUERY evidence preserves the original two scopes and refuses mi
     assert.equal(storageBrokerFailureEvidence({ ...failure, restrictedHostDescendantSelfQueryAcl: [{ ...rows[0], ...change }] }).restrictedHostDescendantSelfQueryAcl, undefined);
   }
 });
+test("the native report preserves all final status observations and refuses an extra worker or a 69th registration", () => {
+  const value = sample(), template = value.nativeRestrictedHostProof.descendantSelfQueryAcl[0];
+  const rows = Array.from({ length: 68 }, (_, index) => ({ ...structuredClone(template), sequence: index + 1, role: "status", query: { ...template.query, scope: "descendant-status" } }));
+  value.nativeRestrictedHostProof.descendantSelfQueryAcl = rows;
+  assert.equal(verifyRestrictedOwnerReport(value).descendantSelfQueryAcl.length, 68);
+  const failure = { schema: "switchyard-storage-broker-protocol-proof/v1", success: false, restrictedHostDescendantSelfQueryAcl: rows };
+  assert.equal(storageBrokerFailureEvidence(failure).restrictedHostDescendantSelfQueryAcl.length, 68);
+  for (let index = 64; index < 68; index++) for (const role of ["worker", "guardian"]) {
+    const changed = structuredClone(value); changed.nativeRestrictedHostProof.descendantSelfQueryAcl[index].role = role;
+    changed.nativeRestrictedHostProof.descendantSelfQueryAcl[index].query.scope = "descendant-" + role;
+    assert.throws(() => verifyRestrictedOwnerReport(changed));
+    assert.equal(storageBrokerFailureEvidence({ ...failure, restrictedHostDescendantSelfQueryAcl: changed.nativeRestrictedHostProof.descendantSelfQueryAcl }).restrictedHostDescendantSelfQueryAcl, undefined);
+  }
+  rows.push({ ...structuredClone(rows[0]), sequence: 69 });
+  assert.throws(() => verifyRestrictedOwnerReport(value)); assert.equal(storageBrokerFailureEvidence(failure).restrictedHostDescendantSelfQueryAcl, undefined);
+});
 test("a self-query ACL correction cannot accept broader access, missing original restrictions, replayed hashes or incomplete mutation evidence", () => {
   assert.equal(verifyRestrictedOwnerReport(sample()).selfTokenQueryAccessVerified, true);
   for (const mutate of [p => { p.selfTokenQueryAccessVerified = false; }, p => { delete p.selfTokenQueryAcl; }, p => { p.selfTokenQueryAcl.pop(); }, p => { p.selfTokenQueryAcl[1].scope = "cold-probe"; }, p => { p.selfTokenQueryAcl[0].grantedMask = 10; }, p => { p.selfTokenQueryAcl[0].status = "apply-requested"; }, p => { p.selfTokenQueryAcl[0].beforeAclSha256 = null; }, p => { p.selfTokenQueryAcl[0].afterAclSha256 = "a".repeat(64); }, p => { p.selfTokenQueryAcl[0].changeRequested = false; }, p => { p.selfTokenQueryAcl[0].sid = "NEVER_RETAIN"; }, ...["originalAcesPreserved", "exactQueryEntryVerified", "tokenRestrictionsRechecked", "handlesClosedVerified", "buffersClearedVerified"].map(k => p => { p.selfTokenQueryAcl[0][k] = false; })]) {

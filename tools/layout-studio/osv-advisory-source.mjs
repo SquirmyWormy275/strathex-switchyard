@@ -37,24 +37,35 @@ function timestamp(value) {
 }
 function rangeContains(range, version, ecosystem) {
   if (!object(range) || range.type !== (ecosystem==="PyPI"?"ECOSYSTEM":"SEMVER") || !Array.isArray(range.events) || !range.events.length || range.events.length > 128) throw Error("OSV affected-version evidence uses an unsupported range.");
-  const query = sourceVersion(version,ecosystem); let open, lastFixed, matched = false;
+  const query = sourceVersion(version,ecosystem);
+  let open, previousEnd, closingKind, introduced = false, matched = false, hasLimit = false, beforeLimit = false;
   for (const event of range.events) {
     if (!object(event) || Object.keys(event).length !== 1) throw Error("OSV range events are ambiguous.");
-    if (Object.hasOwn(event, "introduced")) {
+    if (Object.hasOwn(event, "limit")) {
+      // OSV limits apply to the whole range, independently of interval events.
+      // Multiple limits form a union; they are not successive fixed boundaries.
+      hasLimit = true;
+      const limit = event.limit === "*" ? null : sourceVersion(event.limit, ecosystem);
+      beforeLimit = limit === null || compare(query, limit) < 0 || beforeLimit;
+    } else if (Object.hasOwn(event, "introduced")) {
       if (open !== undefined) throw Error("OSV range introduces an overlapping interval.");
       const start = event.introduced === "0" ? null : sourceVersion(event.introduced,ecosystem);
-      if (lastFixed && (start === null || compare(start, lastFixed) < 0)) throw Error("OSV range intervals are not ordered.");
-      open = { start };
-    } else if (Object.hasOwn(event, "fixed")) {
+      if (previousEnd && (start === null || compare(start, previousEnd.version) < (previousEnd.inclusive ? 1 : 0))) throw Error("OSV range intervals are not ordered or overlap.");
+      open = { start }; introduced = true;
+    } else if (Object.hasOwn(event, "fixed") || Object.hasOwn(event, "last_affected")) {
       if (!open) throw Error("OSV range closes no introduced interval.");
-      const fixed = sourceVersion(event.fixed,ecosystem);
-      if (open.start && compare(fixed, open.start) <= 0) throw Error("OSV range has an invalid fixed boundary.");
-      matched ||= (!open.start || compare(query, open.start) >= 0) && compare(query, fixed) < 0;
-      lastFixed = fixed; open = undefined;
+      const kind = Object.hasOwn(event, "fixed") ? "fixed" : "last_affected", inclusive = kind === "last_affected";
+      if (closingKind && closingKind !== kind) throw Error("OSV ranges cannot mix fixed and last_affected events.");
+      closingKind = kind;
+      const end = sourceVersion(event[kind],ecosystem);
+      if (open.start && compare(end, open.start) < (inclusive ? 0 : 1)) throw Error("OSV range has an invalid closing boundary.");
+      matched ||= (!open.start || compare(query, open.start) >= 0) && compare(query, end) < (inclusive ? 1 : 0);
+      previousEnd = { version: end, inclusive }; open = undefined;
     } else throw Error("OSV range boundary is unsupported; no complete feed was produced.");
   }
+  if (!introduced) throw Error("OSV ranges require an introduced event.");
   if (open) matched ||= !open.start || compare(query, open.start) >= 0;
-  return matched;
+  return matched && (!hasLimit || beforeLimit);
 }
 function severityAssessment(record, matched) {
   const unknown = reason => ({ severity: "unknown", severityAssessment: "not-performed", severityReason: reason });
@@ -178,5 +189,5 @@ export async function collectOsvAdvisories(input, { fetchImpl = globalThis.fetch
   const finished = now();
   if (performance.now() > deadline || !Number.isFinite(finished) || finished < started || finished - started > totalTimeoutMs + 5000) throw Error("OSV collection clock or total deadline changed; no complete feed was produced.");
   const feed = { schema: "switchyard-shield-advisories/v1", version: 1, engine: shieldEngineVersion, packages };
-  return { feed, provenance: { schema: "switchyard-osv-collection/v1", collector: "switchyard-osv-collector/8", normalizedFeedSha256: sha(JSON.stringify(feed)), source: endpoint, startedAt, finishedAt: new Date(finished).toISOString(), unsigned: true, upstreamSignatureVerified: false, authorityGranted: false, completeRepositoryCoverage: false, severityAssessment: "cvss-v2-v3-v4-base-when-supported", packages: observations } };
+  return { feed, provenance: { schema: "switchyard-osv-collection/v1", collector: "switchyard-osv-collector/9", normalizedFeedSha256: sha(JSON.stringify(feed)), source: endpoint, startedAt, finishedAt: new Date(finished).toISOString(), unsigned: true, upstreamSignatureVerified: false, authorityGranted: false, completeRepositoryCoverage: false, severityAssessment: "cvss-v2-v3-v4-base-when-supported", packages: observations } };
 }

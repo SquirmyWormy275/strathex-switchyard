@@ -25,6 +25,19 @@ internal static class DescendantQueryProtocolProof
         foreach (string invalidBirth in new[] { "0", "01", "-1", new string('1', 20) }) { var value = Good(); value["role"] = "worker"; value["birth"] = invalidBirth; Reject(JsonSerializer.SerializeToUtf8Bytes(value)); }
         string text = JsonSerializer.Serialize(Good()); Reject(Encoding.UTF8.GetBytes(text[..^1] + ",\"pid\":123}")); Reject(new byte[2049]);
         Reject(JsonSerializer.SerializeToUtf8Bytes(Good()), sequence: 65); Reject(JsonSerializer.SerializeToUtf8Bytes(Good()), expectedNonce: "invalid");
+        for (int sequence = 65; sequence <= 68; sequence++)
+        {
+            var value = Good(); value["sequence"] = sequence; value["role"] = "status";
+            var read = DescendantQueryProtocol.Read(JsonSerializer.SerializeToUtf8Bytes(value), nonce, sequence);
+            if (read.Sequence != sequence || read.Role != "status") throw new InvalidOperationException("Final status registration changed."); checks++;
+            foreach (string role in new[] { "guardian", "worker" })
+            {
+                value["role"] = role; value["birth"] = role == "worker" ? "638000000000000000" : null;
+                Reject(JsonSerializer.SerializeToUtf8Bytes(value), sequence: sequence);
+            }
+        }
+        var excess = Good(); excess["sequence"] = 69; excess["role"] = "status";
+        Reject(JsonSerializer.SerializeToUtf8Bytes(excess), sequence: 69);
         return checks;
     }
 }

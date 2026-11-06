@@ -12,7 +12,8 @@ const birth = value => typeof value === "string" && /^[1-9][0-9]{0,18}$/.test(va
 export function descendantQueryRequest(value) {
   require(object(value) && Object.keys(value).sort().join() === "birth,executableSha256,nonce,pid,role,schema,sequence");
   require(value.schema === schema && typeof value.nonce === "string" && /^[a-f0-9]{32}$/.test(value.nonce)
-    && Number.isInteger(value.sequence) && value.sequence >= 1 && value.sequence <= 64
+    && Number.isInteger(value.sequence) && value.sequence >= 1 && value.sequence <= 68
+    && (value.sequence <= 64 || value.role === "status")
     && ["guardian", "worker", "status"].includes(value.role) && Number.isSafeInteger(value.pid) && value.pid > 0 && value.pid <= 0xffffffff
     && hash(value.executableSha256) && (value.role === "worker" ? birth(value.birth) : value.birth === null));
   return { ...value };

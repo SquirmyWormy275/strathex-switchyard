@@ -6,6 +6,66 @@ import { parseShieldScannerReport } from "./repository-shield.mjs";
 const now = () => Date.parse("2026-11-05T12:00:00.000Z"), query = { ecosystem: "npm", name: "example", version: "1.2.3" };
 const record = (id = "OSV-synthetic-one") => ({ schema_version: "1.9.2", id, modified: "2026-10-01T12:00:00.123456789Z", affected: [{ package: { ecosystem: "npm", name: "example" }, ranges: [{ type: "SEMVER", events: [{ introduced: "0" }, { fixed: "2.0.0" }] }] }], details: "NEVER_COPY_UNTRUSTED_ADVISORY_TEXT", database_specific: { severity: "CRITICAL", executable: "NEVER_EXECUTE" } });
 const response = (document, options = {}) => new Response(JSON.stringify(document), { status: 200, headers: { "Content-Type": "application/json" }, ...options });
+function intervalRecord(ecosystem, events) {
+  const source = record(); source.affected[0].package.ecosystem = ecosystem;
+  source.affected[0].ranges = [{ type: ecosystem === "PyPI" ? "ECOSYSTEM" : "SEMVER", events }]; return source;
+}
+test("OSV closing events and whole-range limits match independent integer interval membership in all three ecosystems", () => {
+  let comparisons = 0;
+  for (const ecosystem of ["npm", "PyPI", "crates.io"]) for (const kind of ["fixed", "last_affected"]) {
+    for (let start = 0; start < 3; start++) for (let end = start + 1; end < 5; end++) {
+      for (const limits of [[], [2], [2, 4], [4, 2], [0], ["*"]]) for (let value = 0; value <= 5; value++) {
+        const source = intervalRecord(ecosystem, [
+          ...limits.slice(0, 1).map(v => ({ limit: v === "*" ? "*" : `1.0.${v}` })),
+          { introduced: `1.0.${start}` }, { [kind]: `1.0.${end}` },
+          ...limits.slice(1).map(v => ({ limit: `1.0.${v}` }))
+        ]);
+        const expected = value >= start && (kind === "fixed" ? value < end : value <= end) && (!limits.length || limits.some(limit => limit === "*" || value < limit));
+        const selected = { ...query, ecosystem, version: `1.0.${value}` };
+        if (expected) assert.equal(normalizeOsvRecord(source, selected, now()).advisory.id, source.id);
+        else assert.throws(() => normalizeOsvRecord(source, selected, now()), /did not independently establish/);
+        comparisons++;
+      }
+    }
+  }
+  assert.equal(comparisons, 1944);
+});
+test("last_affected includes equivalent precedence endpoints without bridging excluded gaps", () => {
+  for (const [ecosystem, start, end, inside, outside] of [
+    ["npm", "1.0.0-rc.1", "1.0.0-rc.2+upstream", ["1.0.0-rc.1", "1.0.0-rc.2+reviewed"], ["1.0.0-rc.0", "1.0.0-rc.3", "1.0.0"]],
+    ["crates.io", "18446744073709551614.0.0", "18446744073709551615.0.0+upstream", ["18446744073709551614.0.0", "18446744073709551615.0.0+reviewed"], ["18446744073709551613.0.0", "18446744073709551615.0.1"]],
+    ["PyPI", "1!1.0rc1", "1!1.0.post1", ["1!1.0rc1", "1!1.0+local", "1!1.0.0.post1"], ["1!1.0rc0", "1!1.0.post1+local", "1!1.0.post2"]]
+  ]) {
+    const source = intervalRecord(ecosystem, [{ introduced: start }, { last_affected: end }]);
+    for (const version of inside) assert.equal(normalizeOsvRecord(source, { ...query, ecosystem, version }, now()).advisory.id, source.id);
+    for (const version of outside) assert.throws(() => normalizeOsvRecord(source, { ...query, ecosystem, version }, now()));
+  }
+  for (const ecosystem of ["npm", "PyPI", "crates.io"]) {
+    const source = intervalRecord(ecosystem, [{ introduced: "1.0.0" }, { last_affected: "1.0.0" }, { introduced: "2.0.0" }, { last_affected: "2.1.0" }]);
+    for (const version of ["1.0.0", "2.0.0", "2.1.0"]) assert.equal(normalizeOsvRecord(source, { ...query, ecosystem, version }, now()).advisory.id, source.id);
+    for (const version of ["0.9.0", "1.0.1", "1.9.0", "2.1.1"]) assert.throws(() => normalizeOsvRecord(source, { ...query, ecosystem, version }, now()));
+  }
+});
+test("limits never bypass malformed closing events or create an affected interval by themselves", async () => {
+  const invalid = [
+    [{ limit: "*" }], [{ introduced: "0" }, { last_affected: "1.2.3" }, { introduced: "2.0.0" }, { fixed: "3.0.0" }],
+    [{ introduced: "0" }, { fixed: "1.0.0" }, { introduced: "2.0.0" }, { last_affected: "3.0.0" }],
+    [{ introduced: "0" }, { last_affected: "1.2.3" }, { introduced: "1.2.3" }],
+    [{ introduced: "0" }, { last_affected: "1.2.3" }, { introduced: "1.2.2" }],
+    [{ introduced: "2.0.0" }, { last_affected: "1.2.3" }], [{ introduced: "0" }, { limit: "*", fixed: "2.0.0" }],
+    [{ introduced: "0" }, { limit: "*" }, { limit: "1.*" }], [{ introduced: "0" }, { limit: "*" }, { limit: "" }],
+    [{ introduced: "0" }, { limit: "*" }, { limit: 4 }], [{ introduced: "0" }, { last_affected: "1.2.3" }, { future: "NEVER_RETAIN" }]
+  ];
+  for (const ecosystem of ["npm", "PyPI", "crates.io"]) for (const events of invalid) {
+    const selected = { ...query, ecosystem }, source = intervalRecord(ecosystem, events);
+    assert.throws(() => normalizeOsvRecord(source, selected, now()));
+    await assert.rejects(collectOsvAdvisories([selected], { now, fetchImpl: async () => response({ vulns: [source] }) }));
+  }
+  const source = intervalRecord("npm", [{ introduced: "0" }, { last_affected: "1.2.3" }, { limit: "2.0.0" }]);
+  let requests = 0;
+  await assert.rejects(collectOsvAdvisories([query], { now, fetchImpl: async () => ++requests === 1 ? response({ vulns: [source], next_page_token: "next" }) : response({ vulns: [intervalRecord("npm", invalid[0])] }) }));
+  assert.equal(requests, 2, "An accepted first page cannot hide a malformed later range.");
+});
 test("npm prerelease collection uses SemVer boundaries while literal builds remain distinct", async () => {
   const selected = { ...query, version: "1.2.3-rc.2+reviewed.01" }, source = record();
   source.affected[0].ranges[0].events = [{ introduced: "1.2.3-rc.1" }, { fixed: "1.2.3" }];
@@ -19,7 +79,7 @@ test("npm prerelease collection uses SemVer boundaries while literal builds rema
   const calls = [], collected = await collectOsvAdvisories(builds, { now, fetchImpl: async (_url, options) => { calls.push(JSON.parse(options.body)); return response({ vulns: [source] }); } });
   assert.deepEqual(calls.map(c => c.version).sort(), builds.map(c => c.version).sort());
   assert.equal(new Set(collected.provenance.packages.map(p => p.querySha256)).size, 2);
-  assert.equal(collected.provenance.collector, "switchyard-osv-collector/8");
+  assert.equal(collected.provenance.collector, "switchyard-osv-collector/9");
   for (const version of ["1.2.3-01", "1.2.3-a..b", "9007199254740992.0.0", "1.0.0-9007199254740992", "1.2.3+", "1.2.3 "]) assert.throws(() => osvPackageQueries([{ ...query, version }]));
   const long = "1.2.3+" + "x".repeat(250); literal.affected[0].versions = [long];
   assert.equal(normalizeOsvRecord(literal, { ...query, version: long }, now()).evidence.affectedVersionEvidence, "literal-version");
@@ -29,7 +89,7 @@ test("OSV queries are exact bounded literal npm identities and independently rej
   assert.deepEqual(osvPackageQueries([query]), [query]);
   for (const input of [[], [query, query], [{ ...query, url: "https://untrusted.invalid" }], [{ ...query, ecosystem: "Maven" }], [{ ...query, name: "https://untrusted.invalid" }], [{ ...query, version: "1.2" }], [{ ...query, version: "v1.2.3" }], [{ ...query, version: "01.2.3" }], [{ ...query, version: "1.2.3-beta.01" }], [{ ...query, version: "1.2.3+build..other" }]]) assert.throws(() => osvPackageQueries(input));
   const actual = normalizeOsvRecord(record(), query, now()); assert.equal(actual.advisory.severity, "unknown"); assert.equal(actual.evidence.affectedVersionEvidence, "npm-semver-range"); assert.equal(JSON.stringify(actual).includes("NEVER_"), false);
-  for (const change of [r => r.affected[0].package.name = "another", r => r.affected[0].package.ecosystem = "PyPI", r => r.affected[0].ranges[0].events = [{ introduced: "0" }, { fixed: "1.2.3" }], r => r.affected[0].ranges[0].events = [{ introduced: "2.0.0" }], r => r.affected[0].ranges[0].events = [{ fixed: "2.0.0" }], r => r.affected[0].ranges[0].events = [{ introduced: "1.2.3" }, { fixed: "1.2.3" }], r => r.affected[0].ranges[0].events = [{ introduced: "0" }, { last_affected: "1.2.3" }], r => r.withdrawn = "2026-10-02T00:00:00Z", r => r.schema_version = "2.0.0", r => r.modified = "not-a-time", r => r.modified = "2026-02-30T00:00:00Z", r => r.id = "../bad"]) { const r = record(); change(r); assert.throws(() => normalizeOsvRecord(r, query, now())); }
+  for (const change of [r => r.affected[0].package.name = "another", r => r.affected[0].package.ecosystem = "PyPI", r => r.affected[0].ranges[0].events = [{ introduced: "0" }, { fixed: "1.2.3" }], r => r.affected[0].ranges[0].events = [{ introduced: "2.0.0" }], r => r.affected[0].ranges[0].events = [{ fixed: "2.0.0" }], r => r.affected[0].ranges[0].events = [{ introduced: "1.2.3" }, { fixed: "1.2.3" }], r => r.affected[0].ranges[0].events = [{ introduced: "0" }, { last_affected: "1.2.2" }], r => r.withdrawn = "2026-10-02T00:00:00Z", r => r.schema_version = "2.0.0", r => r.modified = "not-a-time", r => r.modified = "2026-02-30T00:00:00Z", r => r.id = "../bad"]) { const r = record(); change(r); assert.throws(() => normalizeOsvRecord(r, query, now())); }
   const literal = record(); literal.affected[0].versions = ["1.2.3"]; literal.affected[0].ranges = []; assert.equal(normalizeOsvRecord(literal, query, now()).evidence.affectedVersionEvidence, "literal-version");
   const multiple = record(); multiple.affected[0].ranges[0].events = [{ introduced: "1.0.0" }, { fixed: "1.2.0" }, { introduced: "1.2.3" }, { fixed: "1.3.0" }]; assert.equal(normalizeOsvRecord(multiple, query, now()).advisory.id, multiple.id);
 });
@@ -127,7 +187,7 @@ test("V2 package scope, source-method mismatch, zero impact and mixed unsupporte
 test("OSV calculates quantitative base severity only from complete supported vectors and preserves every source/algorithm hash", async () => {
   const source = record(); source.severity = [...severity(lowVector), ...severity(highVector)];
   const result = normalizeOsvRecord(source, query, now()); assert.equal(result.advisory.severity, "critical"); assert.equal(result.evidence.severityAssessment, "cvss-v3-base-calculated"); assert.equal(result.evidence.cvssV3Base.maximumScore, 9.8); assert.equal(result.evidence.cvssV3Base.scope, "record"); assert.equal(result.evidence.cvssV3Base.vectors.length, 2); assert.ok(result.evidence.cvssV3Base.vectors.every(row => /^[a-f0-9]{64}$/.test(row.vectorSha256))); assert.equal(JSON.stringify(result).includes("CVSS:3."), false);
-  const collected = await collectOsvAdvisories([query], { now, fetchImpl: async () => response({ vulns: [source] }) }); assert.equal(collected.provenance.collector, "switchyard-osv-collector/8");
+  const collected = await collectOsvAdvisories([query], { now, fetchImpl: async () => response({ vulns: [source] }) }); assert.equal(collected.provenance.collector, "switchyard-osv-collector/9");
   const f = scannerFixture({ action: "shield_supply_chain", files: { "package-lock.json": JSON.stringify({ lockfileVersion: 3, packages: { "node_modules/example": { version: "1.2.3", license: "MIT" } } }) }, advisory: collected.feed.packages }), report = await f.scan();
   assert.equal(report.outcome, "failed"); assert.equal(report.completeness, "incomplete"); assert.equal(report.findings[0].severity, "critical"); assert.equal(report.gaps.includes("advisory_severity_unassessed"), false); assert.deepEqual(parseShieldScannerReport(JSON.stringify(report), { engine: report.engine, requestSha256: report.requestSha256, request: f.request }, f.request.action), report);
 });
@@ -202,7 +262,7 @@ test("Cargo advisory ranges compare prereleases and u64 versions exactly while b
  assert.equal(normalizeOsvRecord(record,query,at).evidence.affectedVersionEvidence,'literal-version');
  assert.throws(()=>normalizeOsvRecord(record,{...query,version:'1.2.3-rc.2+002'},at));
  const collected=await collectOsvAdvisories([query],{now:()=>at,fetchImpl:async(url,options)=>{assert.equal(JSON.parse(options.body).version,query.version);return response({vulns:[record]});}});
- assert.equal(collected.feed.packages[0].version,query.version);assert.equal(collected.provenance.collector,'switchyard-osv-collector/8');
+ assert.equal(collected.feed.packages[0].version,query.version);assert.equal(collected.provenance.collector,'switchyard-osv-collector/9');
  const fixture=scannerFixture({action:'shield_supply_chain',files:{'Cargo.lock':'version = 4\n[[package]]\nname = "example"\nversion = "'+query.version+'"\nsource = "registry+https://github.com/rust-lang/crates.io-index"\nchecksum = "'+'a'.repeat(64)+'"\n'},advisory:collected.feed.packages});
  const report=await fixture.scan();assert.equal(report.outcome,'failed');assert.equal(report.findings[0].ruleId,record.id);
  assert.deepEqual(parseShieldScannerReport(JSON.stringify(report),{engine:report.engine,requestSha256:report.requestSha256,request:fixture.request},fixture.request.action),report);

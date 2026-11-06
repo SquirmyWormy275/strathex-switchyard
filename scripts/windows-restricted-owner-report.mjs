@@ -16,9 +16,9 @@ function validSelfQueryAcl(value, complete = false, scopes = ["cold-probe", "nod
 const rngImports = { BCryptGenRandom: "bcrypt.dll", CryptAcquireContextW: "advapi32.dll", CryptGenRandom: "advapi32.dll", CryptReleaseContext: "advapi32.dll" };
 function validDescendantQueries(value, complete = false) {
   const flags = ["originalJobVerified", "liveBirthVerified", "pinnedImageVerified", "processHandleClosedVerified"];
-  return Array.isArray(value) && value.length <= 64 && (!complete || value.length > 0) && value.every((row, index) => object(row)
+  return Array.isArray(value) && value.length <= 68 && (!complete || value.length > 0) && value.every((row, index) => object(row)
     && Object.keys(row).sort().join() === ["sequence", "role", "status", "query", ...flags].sort().join()
-    && row.sequence === index + 1 && ["guardian", "worker", "status"].includes(row.role) && ["reserved", "verified"].includes(row.status)
+    && row.sequence === index + 1 && ["guardian", "worker", "status"].includes(row.role) && (row.sequence <= 64 || row.role === "status") && ["reserved", "verified"].includes(row.status)
     && flags.every(key => typeof row[key] === "boolean") && (row.query === null ? !complete && row.status === "reserved" : validSelfQueryAcl([row.query], complete, ["descendant-" + row.role]))
     && (!complete || row.status === "verified" && flags.every(key => row[key])));
 }

@@ -67,3 +67,18 @@ candidate in CI. Source checks do not establish Windows startup acceptance.
 Four focused groups pass **50 tests, zero skips**, including console/unknown
 subsystem refusal, original native transport and packaging checks. Child/tree
 cleanup verifies. [Source receipt](evidence/setup-gui-source-summary.json).
+
+## GUI subsystem native follow-up
+
+Native `c9a858a` verifies the actual GUI image and passes all six ordinary setup
+checks. Restricted identity startup now completes, and the unchanged original
+owner reaches **seven of eight checks**. The remaining failure is final
+exit/fixture retirement after the CI descendant-registration limit is reached;
+setup startup is no longer the failing phase.
+[Native receipt](evidence/setup-gui-native-summary.json),
+[final-registration correction](windows-descendant-query.md#final-retirement-registration).
+
+This narrows the observed startup failure to a console-subsystem dependency
+under this restricted native environment. It still does not identify a specific
+failing DLL, accept an ordinary user account or establish an interactive UAC/guest
+journey.

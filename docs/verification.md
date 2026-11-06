@@ -866,3 +866,29 @@ It is based on the earlier native console-mode comparison, without asserting a
 specific failing DLL. The native PE parser rejects console and unknown subsystem
 images; the six preflight and eight restricted-owner assertions remain required.
 [Candidate rationale](windows-setup-metadata-startup.md).
+
+### Restricted owner advances to final retirement; bounded CI registration correction
+
+Native `c9a858a` passes six native GUI setup checks and reaches 7/8 original
+restricted-owner checks. All 64 registered descendants verify exact QUERY mask 8;
+the final independent guardian status loop exceeds that old registration bound.
+The original fixture is preserved. Both source/merge tree and bounded artifact
+digests verify. [Native receipt](evidence/setup-gui-native-summary.json).
+
+The correction admits only status helpers in slots 65–68, sufficient for 17
+commands with three registrations each plus 17 independent final status checks.
+Registration 69 and extra workers/guardians remain refused. Both managed targets
+compile without warnings/errors; 2,114 portable checks and four groups/50 tests
+pass. Exact managed staging cleanup removes 149 files / 3,387,035 bytes.
+[Source receipt](evidence/descendant-retirement-source-summary.json).
+
+### OSV inclusive endpoints and whole-range limits
+
+Six groups pass 77 tests, including 1,944 independent membership comparisons
+across npm/PyPI/crates.io, plus actual Linux Supply Chain/Release and Windows
+guest-double execution. Fixed-range assertions remain; new inclusive last-affected
+and union-limit cases preserve failed/incomplete signed findings, receipt replay
+refusal, original lock/index/HEAD and exact cleanup. Typecheck and the unchanged
+application/release packaging limits pass. No public query, installed update,
+model task or account change occurred.
+[Source receipt](evidence/osv-range-boundaries-source-summary.json).

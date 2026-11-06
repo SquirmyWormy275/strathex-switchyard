@@ -51,21 +51,18 @@ source-only changes have not updated or restarted this installed application.
    Do not repeat a complete run without relevant changes or unresolved concerns.
    Future runs use an exact owned home-directory temporary root; this machine's
    `/tmp` user quota was exhausted. Do not alter mounts or delete unrelated data.
-2. Native `2202720` accepts all 36 private-pipe checks and six ordinary setup
-   preflight checks. The restricted owner now creates its worker with exact
-   guardian/worker/status QUERY mask 8 verification, then fails at
-   `probe-identity-return-structured-result`. The original owner remains **0/8**.
-   [Native receipt](evidence/private-pipe-native-summary.json).
-   Native `20dc066` reports worker DLL initialization failure, exit 3221225794
-   and zero output bytes. Native `56d115e` verifies deferred shell32/ole32 imports
-   and all six ordinary setup checks, but reproduces the restricted failure.
-   The next candidate selects the GUI subsystem with the ordinary wmain CRT
-   entrypoint to avoid console initialization. Inspect its native result next;
-   the specific failing DLL remains unproven.
-   [Failure and correction](windows-setup-metadata-startup.md).
+2. Native `c9a858a` verifies GUI setup and completes seven of eight original
+   restricted-owner checks. The final independent guardian-exit/fixture-retirement
+   assertion fails after all 64 CI descendant registrations; 17 commands and
+   17 final exit checks require 68. Four additional status-only registrations
+   are implemented, with two clean managed builds / 2,114 portable checks and
+   four isolated groups / 50 tests. Inspect the next native candidate.
+   [Native result](evidence/setup-gui-native-summary.json),
+   [correction](windows-descendant-query.md#final-retirement-registration).
    Preserve all eight owner checks, the ninety-second deadline and exact QUERY
    mask 8. No broader token/process/default-DACL/SID/privilege/account rights or
-   runtime fallback. [Pipe contract](windows-private-command-pipes.md).
+   runtime fallback. The installed app and original production command creation
+   remain unchanged. [Setup startup](windows-setup-metadata-startup.md).
 3. Verify the corrected Windows backend scheduling and full release separately.
    All 26 task-owner cases now have independent children with the original
    45-second bound; the original test assertions and two Linux-only skips remain.

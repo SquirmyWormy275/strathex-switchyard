@@ -1,0 +1,37 @@
+{
+  "schema": "switchyard-osv-range-boundaries-source/v1",
+  "basis": "c9a858a68e074ff8ebc83eb7cadc8a77e8ae7bef",
+  "sourceSha256": {
+    "tools/layout-studio/osv-advisory-source.mjs": "a0b3828b1e1846dde6563b2d36f1896c7de1eea6dd1a88a2339973ebfb08033c",
+    "tools/layout-studio/osv-advisory-source.test.mjs": "154c316a232e981eef5c27134a58078ce77479a63a85e97c184dcdc4c32be1da",
+    "tools/layout-studio/repository-shield-osv-source.test.mjs": "01318307fcf4e2ff561f90ac8c63c020a813ef8a7945168333335c071089ed44",
+    "scripts/run-isolated-tests.mjs": "08554cf3c9a0be338a96f228f09069e5e092c5ffd49b3632462e0def1a5abbc0"
+  },
+  "focused": {
+    "receipt": "isolated-test-35a0fcf2-6a1e-4a8e-8d06-429b0d7e8c9d.json",
+    "totals": {
+      "required": 6,
+      "passed": 6,
+      "failed": 0,
+      "tests": 77,
+      "passedTests": 77,
+      "failedTests": 0,
+      "skippedTests": 0,
+      "cancelledTests": 0,
+      "todoTests": 0
+    },
+    "allChildAndTreeCleanupVerified": true
+  },
+  "installedChanged": false,
+  "independentIntervalComparisons": 1944,
+  "ecosystems": [
+    "npm",
+    "PyPI",
+    "crates.io"
+  ],
+  "upstreamSignatureVerified": false,
+  "operatorAuthorityGranted": false,
+  "realLinuxScannerExecution": true,
+  "windowsGuestExecutionDoubled": true,
+  "publicQueriesPerformed": 0
+}

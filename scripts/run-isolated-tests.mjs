@@ -227,7 +227,7 @@ export const requiredGroups = [
   { file: "tools/layout-studio/cvss-v3-metrics.test.mjs" },
   { file: "tools/layout-studio/cvss-v4-metrics.test.mjs" },
   { file: "tools/layout-studio/osv-advisory-source.test.mjs" },
-  { file: "tools/layout-studio/repository-shield-osv-source.test.mjs", ...nativeTestOverrides("tools/layout-studio/repository-shield-osv-source.test.mjs"), expectedSkipped: process.platform === "linux" ? 0 : 6 },
+  { file: "tools/layout-studio/repository-shield-osv-source.test.mjs", ...nativeTestOverrides("tools/layout-studio/repository-shield-osv-source.test.mjs"), expectedSkipped: process.platform === "linux" ? 0 : 8 },
   { file: "tools/layout-studio/repository-shield-pypi.test.mjs", ...nativeTestOverrides("tools/layout-studio/repository-shield-pypi.test.mjs"), expectedSkipped: process.platform === "linux" ? 0 : 2 },
   { file: "tools/layout-studio/repository-windows-shield-pypi.test.mjs", ...nativeTestOverrides("tools/layout-studio/repository-windows-shield-pypi.test.mjs") },
   { file: "tools/layout-studio/repository-shield-licenses.test.mjs", ...nativeTestOverrides("tools/layout-studio/repository-shield-licenses.test.mjs"), expectedSkipped: process.platform === "linux" ? 0 : 2 },
