@@ -38,6 +38,18 @@ internal static class WindowsStorageBrokerBootstrap
         "service-absence-configuration-tag" => 126,
         "service-absence-environment" => 127,
         "service-absence-query-configuration-size" => 128,
+        "service-absence-configuration-header-type" => 130,
+        "service-absence-configuration-header-start-boot" => 131,
+        "service-absence-configuration-header-start-system" => 132,
+        "service-absence-configuration-header-start-demand" => 133,
+        "service-absence-configuration-header-start-disabled" => 134,
+        "service-absence-configuration-header-start-unexpected" => 135,
+        "service-absence-configuration-header-error-ignore" => 136,
+        "service-absence-configuration-header-error-severe" => 137,
+        "service-absence-configuration-header-error-critical" => 138,
+        "service-absence-configuration-header-error-unexpected" => 139,
+        "service-absence-configuration-header-start-auto" => 140,
+        "service-absence-configuration-header-error-normal" => 141,
         _ when phase.StartsWith("service-absence-configuration-",StringComparison.Ordinal) => 129,
         _ => 199
     };

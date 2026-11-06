@@ -73,8 +73,7 @@ It loads the normal installed collector, binds the exact calculation provenance
 to the signed advisory feed version, and checks that the real isolated scanner
 retains the critical base finding despite lower supplied context scores. The
 clean comparison remains incomplete. It submits no model prompt or public
-advisory query and uses its own proof workspace. Native acceptance must be
-recorded after this journey runs.
+advisory query and uses its own proof workspace. Normal installed source `c5d2d28` now passes six update/seven metadata and both native journeys: 15 checks each for Supply Chain and Release, four independent scanner exits, zero model prompts or public advisory queries. Both owned proof workspaces are reversibly archived with encrypted identities/OS credentials preserved; all original 54 workspaces, selection, private link and frozen Home are restored after verified app stop/restart. Reference sources and successful staging are retired. [Installed evidence](evidence/installed-cvss-context-summary.json).
 
 ## Independent numeric verification
 

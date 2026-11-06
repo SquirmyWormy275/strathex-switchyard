@@ -66,8 +66,7 @@ internal static class WindowsStorageBrokerControl
             }
             // These are fixed phase labels only. Never publish service paths,
             // account strings, environment values or native buffer contents.
-            phase?.Invoke("service-absence-configuration-header");
-            if(config.Type!=16||config.Start!=2||config.Error!=1)throw Invalid();
+            WindowsStorageBrokerServiceHeader.Verify(config.Type,config.Start,config.Error,phase);
             if(Text(config.Binary,"binary")!=settings.ServiceCommand)throw Invalid();
             if(!Text(config.Account,"account").Equals("LocalSystem",StringComparison.OrdinalIgnoreCase))throw Invalid();
             if(Text(config.Display,"display")!="Switchyard scoped storage (metadata bootstrap)")throw Invalid();

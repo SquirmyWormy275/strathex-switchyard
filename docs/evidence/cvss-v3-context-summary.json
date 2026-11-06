@@ -41,10 +41,11 @@
   "baseSeverityReduced": false,
   "localEnvironmentVerified": false,
   "newNetworkQueriesFromCollectorSupport": 0,
-  "installedNativeAcceptance": false,
+  "installedNativeAcceptance": true,
   "remaining": [
     "CVSS2 and CVSS4 methods",
     "verification of advisory-supplied metrics against local environment",
     "broader vulnerability and publisher coverage"
-  ]
+  ],
+  "installedFollowup": "installed-cvss-context-summary.json"
 }

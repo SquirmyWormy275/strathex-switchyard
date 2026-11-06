@@ -1,0 +1,25 @@
+{
+  "schema": "switchyard-linux-d412-complete-summary/v1",
+  "sourceCommit": "d4128e62eecb1f7f3defca738bfc2a832a6c62cb",
+  "receipt": "isolated-test-44fb3135-5c32-415d-a88d-ca636195b50a.json",
+  "success": true,
+  "totals": {
+    "required": 238,
+    "passed": 238,
+    "failed": 0,
+    "tests": 1481,
+    "passedTests": 1471,
+    "failedTests": 0,
+    "skippedTests": 10,
+    "cancelledTests": 0,
+    "todoTests": 0
+  },
+  "allChildCleanup": true,
+  "allProcessTreeTerminationComplete": true,
+  "ownedWorktreeFixturesAliasesRemoved": true,
+  "newSdkInstalled": false,
+  "cvssContextImplementationIncluded": true,
+  "windowsPrivateDesktopSourceIncluded": true,
+  "nativeWindowsUserObjectAcceptance": false,
+  "laterServiceHeaderDiagnosticCoveredSeparately": true
+}

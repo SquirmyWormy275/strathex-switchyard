@@ -77,6 +77,16 @@ existing SDK; 223 portable checks and three focused groups/28 checks pass, with
 cleanup. Native execution and the separate service-removal failure remain open.
 [Source evidence](evidence/windows-private-desktop-source-summary.json).
 
+The removal diagnostic now distinguishes the original service type, start mode
+and error-control checks using fixed labels. All three guards remain exactly
+`16 / 2 / 1`; no disabled, changed or otherwise non-original header is accepted.
+The shared guard passes 769 pure numeric cases, including every one-byte
+alternative and maximum DWORD. Both targets compile; all 992 portable checks and
+five focused groups/52 checks pass. Native proof and coordinator entry points
+require that guard inventory. This identifies the failing invariant on the next
+native run; it does not accept service removal or establish its root cause.
+[Diagnostic evidence](evidence/windows-service-header-diagnostic-summary.json).
+
 ## Prior component evidence
 
 PR head `bd77ec4`, merge execution `b5295a6`, passes the actual Windows native
