@@ -16,19 +16,31 @@ let identityPromise;
 function identity() { return identityPromise ??= (async () => { const text = await readFile(`/proc/${process.pid}/stat`, 'utf8'); return {kind:'peer',pid:process.pid,birth:text.slice(text.lastIndexOf(') ')+2).split(' ')[19],executable:await readlink(`/proc/${process.pid}/exe`),executableSha256:createHash('sha256').update(await readFile(process.execPath)).digest('hex')}; })(); }
 async function until(fn) { const deadline=Date.now()+5000; while(Date.now()<deadline){const x=await fn();if(x)return x;await new Promise(r=>setTimeout(r,10));}throw Error('Owned ingress checkpoint did not settle'); }
 function frame(data,{opcode=1,final=true,masked=true}={}) { const p=Buffer.isBuffer(data)?data:Buffer.from(JSON.stringify(data));const h=Buffer.alloc(p.length<126?2:p.length<65536?4:10);h[0]=(final?128:0)|opcode;h[1]=(masked?128:0)|(p.length<126?p.length:p.length<65536?126:127);if(h.length===4)h.writeUInt16BE(p.length,2);if(h.length===10)h.writeBigUInt64BE(BigInt(p.length),2);const mask=Buffer.from([11,29,37,53]);return Buffer.concat(masked?[h,mask,Buffer.from(p.map((b,i)=>b^mask[i%4]))]:[h,p]); }
-async function fixture(t, change={}) {
+async function fixture(t, change={}, options={}) {
  const root=await mkdtemp(join(tmpdir(),'sxe-')),path=join(root,'s'),d=await lstat(root,{bigint:true}),sockets=[],messages=[];
- const child=spawn('/usr/bin/setpriv',['--no-new-privs','--pdeathsig','KILL','--','/usr/bin/python3','-I','-B',script],{stdio:['pipe','pipe','pipe']});
+ const injected = `import os,signal,sys,runpy
+original=signal.alarm
+zeros=0
+def alarm(seconds):
+ global zeros
+ if seconds==0:
+  zeros+=1
+  if zeros==2:os.kill(os.getpid(),signal.SIGTERM)
+ return original(seconds)
+signal.alarm=alarm
+sys.argv=[sys.argv[1]]
+runpy.run_path(sys.argv[0],run_name='__main__')`;
+ const child=spawn('/usr/bin/setpriv',['--no-new-privs','--pdeathsig','KILL','--','/usr/bin/python3','-I','-B',...(options.cleanupSignal?['-c',injected,script]:[script])],{stdio:['pipe','pipe','pipe']});
  let output='',stderr='',exit;const closed=new Promise(r=>child.once('close',(code,signal)=>{exit={code,signal};r(exit);}));child.stdin.on('error',()=>{});child.stdout.setEncoding('utf8');child.stderr.setEncoding('utf8');child.stderr.on('data',x=>stderr+=x);child.stdout.on('data',x=>{output+=x;let end;while((end=output.indexOf('\n'))>=0){messages.push(JSON.parse(output.slice(0,end)));output=output.slice(end+1);}});
  child.stdin.write(JSON.stringify({schema:'switchyard-editor-ingress/v1',parentPid:process.pid,socketPath:path,directoryDevice:String(d.dev),directoryInode:String(d.ino),...change})+'\n');
  t.after(async()=>{for(const s of sockets)s.destroy();child.stdin.end();if(!exit)await stopOwnedChild(child);await closed;assert.equal(stderr,'');await assert.rejects(lstat(path),{code:'ENOENT'});await rmdir(root);});
  const send=value=>child.stdin.write(JSON.stringify(value)+'\n');
- async function connect(peerChange={},headersChange=''){
+ async function connect(peerChange={},headersChange='',partial=false){
   await until(()=>messages.find(x=>x.kind==='ready')||exit);assert.equal(exit,undefined);
   const named=await lstat(path,{bigint:true}),ready=messages[0];assert.equal(ready.socketDevice,String(named.dev));assert.equal(ready.socketInode,String(named.ino));assert.equal(Number(named.mode)&0o077,0);
   const socket=createConnection(path);sockets.push(socket);socket.on('error',()=>{});let wire=Buffer.alloc(0),handshake;
   socket.on('data',chunk=>wire=Buffer.concat([wire,chunk]));await new Promise((resolve,reject)=>{socket.once('connect',resolve);socket.once('error',reject);});
-  const key=randomBytes(16).toString('base64');socket.write(`GET / HTTP/1.1\r\nHost: localhost\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Version: 13\r\nSec-WebSocket-Key: ${key}\r\n${headersChange}\r\n`);
+  const key=randomBytes(16).toString('base64');socket.write(partial?'GET / HTTP/1.1\r\n':`GET / HTTP/1.1\r\nHost: localhost\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Version: 13\r\nSec-WebSocket-Key: ${key}\r\n${headersChange}\r\n`);
   send({...await identity(),...peerChange});
   async function upgrade(){await until(()=>wire.includes('\r\n\r\n')||exit);assert.equal(exit,undefined);const end=wire.indexOf('\r\n\r\n');handshake=wire.subarray(0,end).toString();wire=wire.subarray(end+4);assert.ok(handshake.startsWith('HTTP/1.1 101'));assert.ok(handshake.includes(createHash('sha1').update(key+'258EAFA5-E914-47DA-95CA-C5AB0DC85B11').digest('base64')));await until(()=>messages.some(x=>x.kind==='peer-verified'));}
   async function nextFrame(){return until(()=>{if(wire.length<2)return false;assert.equal(wire[1]&128,0);let n=wire[1]&127,offset=2;if(n===126){if(wire.length<4)return false;n=wire.readUInt16BE(2);offset=4;}if(n===127){if(wire.length<10)return false;n=Number(wire.readBigUInt64BE(2));offset=10;}if(wire.length<offset+n)return false;const f={opcode:wire[0]&15,data:wire.subarray(offset,offset+n)};wire=wire.subarray(offset+n);return f;});}
@@ -100,4 +112,17 @@ test('peer-bound synthetic account and task frames feed the protocol witness wit
  await exchange({id:2,method:'thread/resume',params:{threadId:sessionId,cwd:repositoryRoot,sandbox:'read-only',approvalPolicy:'on-request'}},{thread:{id:sessionId,cwd:repositoryRoot,status:{type:'idle'}},cwd:repositoryRoot,sandbox:{type:'readOnly'},approvalPolicy:'on-request',modelProvider:'openai'});
  assert.equal(witness.observation().protocolAcknowledged,false);await exchange({id:3,method:'account/read',params:{refreshToken:false}},{account});assert.equal(witness.observation().protocolAcknowledged,true);assert.equal(witness.observation().ideAttached,false);assert.equal(witness.observation().authorityGranted,false);
  assert.equal(witness.server({method:'account/updated',params:{authMode:'chatgpt'}}),false);assert.equal(witness.observation().protocolAcknowledged,false);witness.close();
+});
+
+test('a deterministic SIGTERM during final cleanup cannot interrupt exact socket retirement',native,async t=>{
+ const f=await fixture(t,{}, {cleanupSignal:true}),c=await f.connect();await c.upgrade();f.child.stdin.end();assert.equal((await f.closed).code,0);await assert.rejects(lstat(f.path),{code:'ENOENT'});
+});
+
+test('stop interrupts peer identity, accept and partial HTTP waits without relying on input EOF or the eight-second deadline',native,async t=>{
+ for(const stage of ['identity','accept','http']){
+  const f=await fixture(t);await until(()=>f.messages.some(m=>m.kind==='ready'));
+  if(stage==='accept')f.send(await identity());
+  if(stage==='http')await f.connect({},'',true);
+  const started=Date.now();f.child.kill('SIGTERM');assert.equal((await f.closed).code,2);assert.ok(Date.now()-started<2000);await assert.rejects(lstat(f.path),{code:'ENOENT'});
+ }
 });

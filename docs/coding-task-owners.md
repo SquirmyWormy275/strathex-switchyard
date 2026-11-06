@@ -365,3 +365,33 @@ lifecycle, retained Terminal launch, upstream original-owner transport and nativ
 TUI compatibility remain unfinished. The carrier selects no account or task,
 sends no provider prompt and grants no forwarding or completion authority.
 [Evidence, including the corrected shutdown failure](evidence/editor-ingress-summary.json).
+
+
+## Join the carrier's parent lifecycle
+
+`openCodexEditorIngress` requires callbacks for current selection, ownership
+recording and bounded messages. It records intent before spawn, the original
+child PID/birth before bind, and the socket identity before exposing readiness.
+The caller owns the private directory. A peer attempt is spent once, including
+failure or cancellation. Each send copies its bytes before asynchronous checks;
+aggregate queued bytes and operations are bounded.
+
+`close()` withdraws live readiness and closes input. `stop()` joins the exact
+child, pending operations and consumer/ownership callbacks before checking the
+original socket name. Process exit and socket cleanup are separate observations.
+A replaced name is preserved and retirement stays rejected. No private state or
+provider authority is inferred from these lifecycle facts.
+
+Eight parent-lifecycle cases and five package checks pass, including cancellation
+during ownership persistence and a connected socket replacement before send.
+Production journal and signed editor route composition remain unfinished; those
+callbacks use doubles in this cohort. [Evidence](evidence/editor-ingress-owner-summary.json).
+
+
+The complete `7772cb3` run exposed a teardown race missed by the first focused
+cohort. Signal handlers now set a stop flag; bounded I/O polling leaves final
+socket retirement uninterrupted. A deterministic signal injected during cleanup,
+stop during each startup wait, the carrier/parent lifecycle and package checks
+pass together (26 tests). The eight-second startup deadline is unchanged. The
+failed full receipt remains failed pending a new full run.
+[Correction evidence](evidence/linux-777-complete-failure-summary.json).

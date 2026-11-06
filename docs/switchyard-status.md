@@ -1,5 +1,12 @@
 # Switchyard implementation and acceptance
 
+Latest complete Linux `7772cb3` **failed**: 249/250 groups, 1,622 passed tests,
+one failure and eleven declared skips. An editor socket remained after child
+exit during teardown. Exact staging and every child/tree cleanup are verified.
+Signal-safe cleanup and parent lifecycle pass 26 focused checks; a new complete
+run is required. `d900499` remains the last accepted full Linux checkpoint.
+[Failure and correction](evidence/linux-777-complete-failure-summary.json).
+
 Switchyard gives a Model F keyboard stable controls for returning to tasks,
 reviewing work and handing context between tools. It is a **partial implementation
 of the October 29 Rev2 suite**. The F77 is the pilot device, not the scope limit.
@@ -92,8 +99,11 @@ authority. [Evidence](evidence/editor-protocol-summary.json).
 The internal Linux editor ingress now checks one exact terminal peer before
 WebSocket upgrade and carries bounded JSON frames. Eleven lifecycle/wire tests,
 five package checks and typecheck pass, including a synthetic account/task
-witness. Parent/launcher/upstream composition remains unfinished; no real IDE
-attachment is claimed. [Evidence](evidence/editor-ingress-summary.json).
+witness. The parent lifecycle also passes eight behavior cases and five package checks,
+with cancellation/cleanup joined and uncertainty retained. Production ownership
+journal, signed launcher and upstream composition remain unfinished; no real IDE
+attachment is claimed. [Carrier](evidence/editor-ingress-summary.json),
+[parent lifecycle](evidence/editor-ingress-owner-summary.json).
 
 ## Implemented backend capabilities
 

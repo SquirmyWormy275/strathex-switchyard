@@ -1,5 +1,12 @@
 # What has actually been verified
 
+Latest complete Linux `7772cb3` **failed**: 249/250 groups, 1,622 passed tests,
+one failure and eleven declared skips. An editor socket remained after child
+exit during teardown. Exact staging and every child/tree cleanup are verified.
+Signal-safe cleanup and parent lifecycle pass 26 focused checks; a new complete
+run is required. `d900499` remains the last accepted full Linux checkpoint.
+[Failure and correction](evidence/linux-777-complete-failure-summary.json).
+
 Native Windows `a061be0` clears the original random-startup abort with query-only
 access to the owned child token. Original ACL entries/restrictions and denied
 duplicate/impersonation checks verify. The same Node image reaches JavaScript,

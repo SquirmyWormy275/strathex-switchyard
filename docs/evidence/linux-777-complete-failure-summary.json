@@ -1,0 +1,27 @@
+{
+  "schema": "switchyard-linux-complete-failure-summary/v1",
+  "sourceCommit": "7772cb3b70b237cb28f1c1927dd1e24d347a9f95",
+  "sourceTree": "081cbf2b87cad0f2bd71ac2e4be2fc4c7490bfbf",
+  "receipt": "isolated-test-29b207c2-1b8a-4a08-8d44-fe100f6aa431.json",
+  "groups": 250,
+  "passedGroups": 249,
+  "totalTests": 1634,
+  "passedTests": 1622,
+  "failedTests": 1,
+  "declaredSkips": 11,
+  "accepted": false,
+  "failedGroup": "tools/layout-studio/codex-editor-ingress.test.mjs",
+  "failure": "The synthetic protocol-witness test teardown observed the original socket still present after the child exited. A signal handler could raise while finally was retiring that socket.",
+  "cleanupReceipt": "linux-7772cb3-cleanup-1793959293207.json",
+  "allChildTreeAndExactStagingCleanupVerified": true,
+  "correction": "SIGTERM and the fixed deadline now set a stop flag. Bounded polling observes it in identity-input, accept, handshake and stream waits; signal delivery cannot raise through final socket cleanup. The deadline remains eight seconds. A deterministic second SIGTERM injected at final cleanup and all startup-wait stop cases pass.",
+  "focusedCorrectionReceipt": "isolated-test-8d28274f-e8e7-491c-bb7b-21805a655d85.json",
+  "focusedCorrectionGroups": 3,
+  "focusedCorrectionPassed": 26,
+  "typecheckPassed": true,
+  "limits": [
+    "The immutable 7772cb3 complete run remains failed. Focused correction checks do not retroactively accept it; a new complete run is required.",
+    "The last accepted full Linux checkpoint remains d900499 (248 groups, 1600 passes, eleven declared skips).",
+    "No deadline increase, broad cleanup, test removal or acceptance relaxation was used."
+  ]
+}

@@ -1,0 +1,34 @@
+{
+  "schema": "switchyard-editor-ingress-owner-summary/v1",
+  "basis": "7772cb3b70b237cb28f1c1927dd1e24d347a9f95",
+  "sourceSha256": {
+    "tools/layout-studio/codex-editor-ingress.mjs": "2ee13e940681eee8ae1cc5dfe44bbbb677b8a52ad04b51050f283a680b89a963",
+    "tools/layout-studio/codex-editor-ingress-owner.test.mjs": "cd81510c9dec104421bbc9c5a485fc43be293a19fa1a8e1636a47aaa25961773",
+    "deployment/suite/release.test.mjs": "0fc3378c7b66a60dbd19012512d748fa5974a35b1191bad90b86db76094084a6",
+    "scripts/run-isolated-tests.mjs": "0c87e55b8ca93155554946f9039410c053723f2d019839a15cda88c3844609ca",
+    "tools/layout-studio/codex-editor-ingress.py": "98c19693c4a7312ececf517f77e4c4aa1ccc84c4a4dd63f7399f709e16f69e3e"
+  },
+  "scope": "Internal parent lifecycle with required current-selection, ownership-record and message callbacks. No launcher/upstream activation.",
+  "behavior": [
+    "Reserve exact socket intent before spawning; record child PID/birth before binding and kernel socket identity before exposing readiness. The caller retains the existing private directory.",
+    "Spend one peer-binding attempt synchronously; repeated, cancelled or lost acknowledgements never retry. Exact directory/socket identities and current-selection callbacks precede every send/message.",
+    "Snapshot outgoing objects before awaits, bound each message to 1 MiB, queued bytes to 2 MiB and in-flight operations to 64. Sequential backpressured parsing joins async consumers.",
+    "Cancellation withdraws peer readiness, closes input and joins outstanding admission, ownership and consumer callbacks. Stop verifies the direct child exit and exact socket cleanup independently.",
+    "A replaced or unacknowledged socket identity cannot be removed or reported cleaned. Rejected retirement stays rejected; no search, adoption or broad cleanup."
+  ],
+  "validation": {
+    "receipt": "isolated-test-8d28274f-e8e7-491c-bb7b-21805a655d85.json",
+    "groups": 3,
+    "passed": 26,
+    "ownerCases": 8,
+    "carrierCases": 13,
+    "packageCases": 5,
+    "typecheckPassed": true,
+    "childTreeAndTemporaryCleanupVerified": true
+  },
+  "limits": [
+    "The caller callbacks use doubles in this cohort; no production durable ownership journal or signed editor route is wired by this primitive.",
+    "The carrier and its parent do not authorize forwarding. Original upstream binding, scoped account/task protocol composition, retained Terminal launch wiring and native TUI compatibility remain unfinished.",
+    "No frontend, installed state, device, native provider task or account effects."
+  ]
+}

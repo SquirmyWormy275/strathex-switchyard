@@ -40,9 +40,12 @@ def encode(value):
     return data
 
 
-def initial_line():
+def initial_line(stopped):
     data = bytearray()
     while True:
+        require(not stopped())
+        if not select.select([0], [], [], 0.1)[0]:
+            continue
         char = os.read(0, 1)
         require(char and len(data) < 16384)
         if char == b"\n":
@@ -67,7 +70,7 @@ def process_identity(pid):
     return os.stat(root).st_uid, fields[19].decode("ascii"), os.readlink(root + "/exe")
 
 
-def verify_peer(connection, request):
+def verify_peer(connection, request, stopped):
     require(set(request) == {"kind", "pid", "birth", "executable", "executableSha256"} and request["kind"] == "peer")
     pid, path = request["pid"], request["executable"]
     require(type(pid) is int and 0 < pid <= 2147483647 and isinstance(request["birth"], str) and re.fullmatch(r"[1-9][0-9]{0,19}", request["birth"]))
@@ -81,6 +84,7 @@ def verify_peer(connection, request):
         info = os.fstat(source.fileno())
         require(stat.S_ISREG(info.st_mode) and info.st_uid in (0, os.getuid()) and info.st_mode & 0o6022 == 0 and info.st_size <= 512 * 1024 * 1024)
         while chunk := source.read(1048576):
+            require(not stopped())
             digest.update(chunk)
         after = os.fstat(source.fileno())
         require((info.st_dev, info.st_ino, info.st_size, info.st_mtime_ns, info.st_ctime_ns) == (after.st_dev, after.st_ino, after.st_size, after.st_mtime_ns, after.st_ctime_ns))
@@ -88,10 +92,14 @@ def verify_peer(connection, request):
     return pid, expected
 
 
-def handshake(connection):
+def handshake(connection, stopped):
     incoming = bytearray()
     while b"\r\n\r\n" not in incoming:
-        chunk = connection.recv(4096)
+        require(not stopped())
+        try:
+            chunk = connection.recv(4096)
+        except socket.timeout:
+            continue
         require(chunk and len(incoming) + len(chunk) <= 16384)
         incoming.extend(chunk)
     raw, rest = bytes(incoming).split(b"\r\n\r\n", 1)
@@ -114,14 +122,16 @@ def handshake(connection):
 
 def run():
     require(sys.platform == "linux" and len(sys.argv) == 1)
+    stopping = False
     def expired(_signal, _frame):
-        if _signal == signal.SIGTERM:
-            raise SystemExit(2)
-        raise TimeoutError("Editor transport deadline")
+        # Do not raise from a signal handler: a signal arriving while finally
+        # retires the socket must not interrupt that exact cleanup.
+        nonlocal stopping
+        stopping = True
     signal.signal(signal.SIGALRM, expired)
     signal.signal(signal.SIGTERM, expired)
     signal.alarm(8)
-    request = initial_line()
+    request = initial_line(lambda: stopping)
     require(set(request) == {"schema", "parentPid", "socketPath", "directoryDevice", "directoryInode"} and request["schema"] == "switchyard-editor-ingress/v1")
     parent = request["parentPid"]
     require(type(parent) is int and parent > 0 and os.getppid() == parent)
@@ -136,7 +146,7 @@ def run():
         require(stat.S_ISDIR(initial.st_mode) and initial.st_uid == os.getuid() and initial.st_mode & 0o077 == 0)
         require(str(initial.st_dev) == request["directoryDevice"] and str(initial.st_ino) == request["directoryInode"])
         def current():
-            require(os.getppid() == parent)
+            require(not stopping and os.getppid() == parent)
             actual = os.lstat(directory)
             require((actual.st_dev, actual.st_ino, actual.st_uid, actual.st_mode) == (initial.st_dev, initial.st_ino, initial.st_uid, initial.st_mode))
             if owned:
@@ -153,14 +163,21 @@ def run():
             listener.listen(1)
             sys.stdout.buffer.write(encode({"kind": "ready", "socketDevice": str(info.st_dev), "socketInode": str(info.st_ino)}) + b"\n")
             sys.stdout.buffer.flush()
-            peer_request = initial_line()
-            connection, _ = listener.accept()
+            peer_request = initial_line(lambda: stopping)
+            listener.settimeout(0.1)
+            while True:
+                current()
+                try:
+                    connection, _ = listener.accept()
+                    break
+                except socket.timeout:
+                    continue
             listener.close()  # Exactly one accepted peer; no reconnect or search.
             with connection:
-                connection.settimeout(8)
-                pid, expected = verify_peer(connection, peer_request)
+                connection.settimeout(0.1)
+                pid, expected = verify_peer(connection, peer_request, lambda: stopping)
                 current()
-                incoming = handshake(connection)
+                incoming = handshake(connection, lambda: stopping)
                 require(process_identity(pid) == expected)
                 output = bytearray(encode({"kind": "peer-verified"}) + b"\n")
                 outgoing, stdin, fragment = bytearray(), bytearray(), None
@@ -227,7 +244,7 @@ def run():
                         outgoing.extend(frame(1, encode(command["message"])))
                     read = ([] if output or closing else [connection]) + ([] if outgoing or closing else [0])
                     write = ([connection] if outgoing else []) + ([1] if output else [])
-                    readable, writable, _ = select.select(read, write, [], 1)
+                    readable, writable, _ = select.select(read, write, [], 0.25)
                     if connection in writable:
                         count = connection.send(outgoing); require(count > 0); del outgoing[:count]
                     if 1 in writable:
@@ -244,7 +261,6 @@ def run():
                         stdin.extend(chunk); require(len(stdin) <= LIMIT)
     finally:
         signal.alarm(0)
-        signal.signal(signal.SIGTERM, signal.SIG_IGN)
         if owned:
             try:
                 last = os.stat(name, dir_fd=directory_fd, follow_symlinks=False)

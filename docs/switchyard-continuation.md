@@ -77,8 +77,13 @@ the installed update or old live provider verifiers without a relevant new chang
 
 ## Continue independently
 
-1. Complete Linux `d900499` and its exact cleanup are accepted; do not rerun it
-   merely to repeat success. For a future coherent checkpoint inspect
+1. Complete Linux `7772cb3` failed one editor socket teardown case: 249/250 groups,
+   1,622 passes, one failure, eleven skips. Every child/tree and exact worktree,
+   alias/build/temp-parent cleanup verifies; the marker is removed. Signal-safe
+   cleanup plus parent lifecycle pass 26 focused checks, including deterministic
+   signal delivery during final cleanup. Run a new full checkpoint; do not
+   retroactively accept `7772cb3`. [Failure](evidence/linux-777-complete-failure-summary.json).
+   Last accepted full source remains `d900499`. Before starting another run inspect
    `/tmp/switchyard-full-linux-path.json` first. Verify source, phase, process exit,
    root identities, receipt and dependency aliases before cleanup. Use an owned
    home temporary parent because `/tmp` has per-user quotas. Never broaden cleanup
@@ -110,8 +115,12 @@ the installed update or old live provider verifiers without a relevant new chang
    and bridges bounded masked WebSocket/JSONL frames. Eleven native synthetic
    tests plus five package checks and typecheck pass, including parent loss,
    deadline, substituted-name preservation and protocol-witness composition.
-   Complete the parent lifecycle/launcher/upstream relay next; the carrier alone
-   grants no task/IDE acknowledgement. [Evidence](evidence/editor-ingress-summary.json).
+   The parent lifecycle now passes eight behavioral cases and five package checks,
+   including joined cancellation and exact uncertain cleanup. It requires caller
+   ownership callbacks, which remain doubled in this cohort. Wire the production
+   journal, signed editor routes, retained Terminal and original upstream next;
+   no task/IDE acknowledgement is granted. [Carrier](evidence/editor-ingress-summary.json),
+   [parent lifecycle](evidence/editor-ingress-owner-summary.json).
 4. Continue other ledger requirements, including remaining Shield coverage,
    ecosystems, publisher provenance, verified local vulnerability context and workflow observation. These are
    unfinished software, separate from hardware/account acceptance.
