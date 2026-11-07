@@ -1,5 +1,15 @@
 # What has actually been verified
 
+Installed `6ab9b1e` verifies scan-draft assembly within **76 metadata/in-memory
+checks and 30 exact module hashes**. All 54 semantic workspaces, selection,
+pending keyboard-only conversation and frozen frontend are preserved; 53 sealed
+files are byte-identical and one changes only audit metadata. All four profiles
+and 57 workflows remain compatible. Dated backup and launcher readback verify;
+current plus one rollback remain. The exact 533-file, 5,213,310-byte prepared
+bundle is removed. No installed draft, scanner, native provider task, account/model
+request or hardware operation was invoked.
+[Installed evidence](evidence/installed-scanner-recipe-draft-summary.json).
+
 Scanner setup now has an authenticated draft route that assembles the exact
 engine, signed feed content, request and recipe without repository writes or
 approval. It rechecks task/account/workspace, source hashes, feed trust/revocation
