@@ -30,6 +30,17 @@ platform skips. [Regression and correction](evidence/editor-journal-publication-
 
 ## Current evidence
 
+The journal correction at `ecbb8cb` still fails the complete Windows client lane:
+24 of 25 groups pass, with 229 passing tests and four failed acknowledgement
+assertions. The failed group now exits naturally with cleanup and a complete TAP
+summary. A follow-up preserves every mutation kernel lease while serializing
+reads and durable publication through the original handle's local queue; reads
+still check fresh protected state and the original target. Eight focused groups
+pass 69 tests with two platform skips. Corrected Windows acceptance remains
+pending; the native failure is not declared repaired.
+[Failure](evidence/editor-journal-native-failure-summary.json),
+[correction](evidence/editor-journal-read-queue-summary.json).
+
 Each result belongs to its exact source revision. Test totals from different
 checkpoints are not cumulative acceptance of the latest suite.
 

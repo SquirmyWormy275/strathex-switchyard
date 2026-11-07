@@ -114,20 +114,25 @@ export function createCodingEditorJournal({ store, authorizations, now=Date.now,
         require(hash(persisted)===hash(saved));
         if(!inserted)return {...view(saved),duplicatePrevented:true};
         require(!leases.has(ownershipKey));const lease={row:structuredClone(saved)};leases.set(ownershipKey,lease);
+        // Serialize this handle's reads with publication of its writes. Each
+        // write still takes the original cross-process kernel lease. A read
+        // checks fresh protected bytes without opening another mutation lease.
+        let publication=Promise.resolve();
+        const serialized=fn=>{const work=publication.catch(()=>{}).then(fn);publication=work;return track(()=>work);};
         const matches=state=>{require(leases.get(ownershipKey)===lease && hash(rowFor(state,s))===hash(lease.row));};
         const handle=Object.freeze({
           observation:()=>view(lease.row),
           // A checkpoint publishes protected bytes before replacing lease.row.
-          // Observe both under its original lease so concurrent socket traffic
+          // Observe both under its original queue so concurrent socket traffic
           // cannot mistake that in-flight publication for foreign replacement.
-          assertCurrent:()=>track(()=>store.withResourceLock('client-launch',ownershipKey,async owned=>{
+          assertCurrent:()=>serialized(async()=>{
             require(!['stopped','uncertain'].includes(lease.row.status));await current(c,s,original);
-            owned.assert();matches(await store.snapshot(c));owned.assert();
-          })),
+            matches(await store.snapshot(c));
+          }),
           recordQuery(event) {
             let copy;try{require(windows && exact(event,['kind','ownership']) && ['query-intent','query-ready','query-retired','query-not-started'].includes(event.kind));copy={kind:event.kind,ownership:['query-intent','query-not-started'].includes(event.kind)?windowsQueryIntent(event.ownership):windowsQueryOwnership(event.ownership)};}catch(error){return Promise.reject(error);}
             const retiring=['query-retired','query-not-started'].includes(copy.kind);
-            return track(()=>store.withResourceLock('client-launch',ownershipKey,async owned=>{
+            return serialized(()=>store.withResourceLock('client-launch',ownershipKey,async owned=>{
               // Query admission is already inside the caller's target check.
               // Do not recursively launch another native inspection from this
               // helper checkpoint. Retirement remains possible after revocation.
@@ -160,7 +165,7 @@ export function createCodingEditorJournal({ store, authorizations, now=Date.now,
           },
           record(event) {
             let copy;try {require(object(event) && Buffer.byteLength(JSON.stringify(event))<=16384);copy=structuredClone(event);if(!windows && copy.kind==='ingress' && object(copy.ownership))copy.ownership.socketIdentity??=null;}catch(error){return Promise.reject(error);}
-            return track(()=>store.withResourceLock('client-launch',ownershipKey,async owned=>{
+            return serialized(()=>store.withResourceLock('client-launch',ownershipKey,async owned=>{
               await current(c,s,original);owned.assert();matches(await store.snapshot(c));const next=structuredClone(lease.row);change(next,copy,original.target);next.revision++;next.updatedAt=now();
               await store.update(c,'coding-editor-connection-checkpoint',state=>{require(!closed && policy(state)===original.policyDigest);owned.assert();matches(state);const row=rowFor(state,s);Object.assign(row,next);appendEditorObservation(state,row);},{provider:'codex'});
               lease.row=next;await current(c,s,original);owned.assert();return view(next);
@@ -170,7 +175,7 @@ export function createCodingEditorJournal({ store, authorizations, now=Date.now,
             let copy;try{require(exact(facts,retirementFields) && Object.values(facts).every(v=>typeof v==='boolean'));copy={...facts};}catch(error){return Promise.reject(error);}
             // Retirement remains available after policy/workspace cancellation.
             // It grants no provider admission and can only update this live handle.
-            return track(()=>store.withResourceLock('client-launch',ownershipKey,async owned=>{
+            return serialized(()=>store.withResourceLock('client-launch',ownershipKey,async owned=>{
               await store.authorize(c);const state=await store.snapshot(c);matches(state);owned.assert();
               if(lease.row.status==='stopped')return {...view(lease.row),duplicatePrevented:true};
               if(windows && copy.queryHelpersExitVerified)require(!lease.row.queryIntent && (!lease.row.queryOwner || lease.row.queryOwner.stopped===true));

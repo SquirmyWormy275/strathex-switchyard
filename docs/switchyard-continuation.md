@@ -68,14 +68,25 @@ The latest fully accepted native client checkpoint is `485b7c6`: twenty groups,
 205 passing tests and no skips. Newer subset passes do not replace that
 whole-lane result. [Native client evidence](evidence/windows-editor-client-native-summary.json).
 
+The published `ecbb8cb` journal correction still fails four acknowledgement
+assertions in the same Windows lifecycle group. The full lane has 229 passes,
+four failures and no skips; fixture cleanup and natural exit now complete.
+The next correction replaces the additional read-side kernel lease with an
+original-handle publication queue. Writes retain every cross-process kernel
+lease; reads retain fresh protected-row/target checks. Eight focused groups pass
+69 tests with two skips, including held publication, replacement refusal and
+failed-write outcomes. Do not declare native repair until the next lane passes.
+[Failure](evidence/editor-journal-native-failure-summary.json),
+[correction](evidence/editor-journal-read-queue-summary.json).
+
 ## Outstanding verification and implementation
 
 1. Finish the complete Linux run for exact source `961ecb3`; audit its original
    manifest, commands, bounds, skips and child retirement. Remove only its
    recorded temporary checkout, dependency aliases, generated files and empty
    test parent. This run predates the journal race correction.
-2. Publish the journal correction with its failing regression and passing
-   follow-up, then audit the resulting Windows client job. Preserve the original
+2. Publish the journal read/publication queue correction with its failing
+   regression and passing follow-up, then audit the resulting Windows client job. Preserve the original
    failure if another independent defect appears; do not change deadlines or
    assertions to obtain a pass.
 3. Continue task-specific Windows IDE/project integration and remaining backend

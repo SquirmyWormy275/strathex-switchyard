@@ -126,14 +126,21 @@ test('a Windows startup intent remains explicit until its original scope retires
   await handle.recordQuery({kind:'query-retired',ownership:second});await handle.retire(clean);assert.equal(handle.observation().stoppedVerified,true);
 });
 
+test('a current journal observation reads protected state without acquiring a mutation kernel lease',async t=>{
+  const f=await fixture(t);await f.consume();const {handle}=await f.api.reserve('personal',f.selected,{host:f.host});
+  const originalLock=f.store.withResourceLock;let acquired=0;
+  f.store.withResourceLock=(...args)=>{if(args[0]==='client-launch' && args[1]==='editor:personal:'+f.selected.requestId)acquired++;return originalLock(...args);};
+  await handle.assertCurrent();await handle.assertCurrent();assert.equal(acquired,0);
+  await f.store.update('personal','fixture-external-replacement',s=>{s.codingEditorConnections[0].revision=99;});
+  await assert.rejects(handle.assertCurrent());assert.equal(acquired,0);
+});
+
 test('a concurrent observation waits for durable checkpoint publication and still refuses a retired or substituted journal',async t=>{
   for(const phase of ['query','retirement']){
     const f=await fixture(t);await f.consume();const {handle}=await f.api.reserve('personal',f.selected,{host:f.host});
     const gate=()=>{let resolve;const promise=new Promise(r=>resolve=r);return{promise,resolve};};
-    const persisted=gate(),publish=gate(),readLeaseRequested=gate(),originalUpdate=f.store.update,originalLock=f.store.withResourceLock;
-    let held=false;
-    f.store.update=async(...args)=>{const result=await originalUpdate(...args);if(args[1]===(phase==='query'?'coding-editor-query-reserve':'coding-editor-connection-retire')){held=true;persisted.resolve();await publish.promise;}return result;};
-    f.store.withResourceLock=(kind,identity,fn)=>{if(held && kind==='client-launch')readLeaseRequested.resolve('waiting');return originalLock(kind,identity,fn);};
+    const persisted=gate(),publish=gate(),originalUpdate=f.store.update;
+    f.store.update=async(...args)=>{const result=await originalUpdate(...args);if(args[1]===(phase==='query'?'coding-editor-query-reserve':'coding-editor-connection-retire')){persisted.resolve();await publish.promise;}return result;};
     const writing=phase==='query'?handle.recordQuery({kind:'query-intent',ownership:queryIntentForOwner(queryOwner())}):handle.retire(clean);
     let reading;
     try{
@@ -142,11 +149,28 @@ test('a concurrent observation waits for durable checkpoint publication and stil
       // deliberately held before publication. This is one transaction in flight.
       assert.equal((await f.store.snapshot('personal')).codingEditorConnections[0].revision,1);
       reading=handle.assertCurrent();void reading.catch(()=>{});
-      assert.equal(await Promise.race([readLeaseRequested.promise,reading.then(()=> 'accepted',()=> 'rejected')]),'waiting');
+      assert.equal(await Promise.race([new Promise(r=>setTimeout(()=>r('waiting'),50)),reading.then(()=> 'accepted',()=> 'rejected')]),'waiting');
     }finally{publish.resolve();await writing;}
     if(phase==='retirement')await assert.rejects(reading);else{
       await reading;await f.store.update('personal','fixture-external-replacement',s=>{s.codingEditorConnections[0].revision=99;});
       await assert.rejects(handle.assertCurrent());
     }
+  }
+});
+
+test('a failed queued checkpoint cannot publish an uncommitted row or conceal a committed unknown outcome',async t=>{
+  for(const committed of [false,true]){
+    const f=await fixture(t);await f.consume();const {handle}=await f.api.reserve('personal',f.selected,{host:f.host});
+    const update=f.store.update;
+    f.store.update=async(...args)=>{
+      if(args[1]!=='coding-editor-query-reserve')return update(...args);
+      if(committed)await update(...args);
+      throw Error('synthetic publication failure');
+    };
+    const writing=handle.recordQuery({kind:'query-intent',ownership:queryIntentForOwner(queryOwner())});
+    const rejected=assert.rejects(writing,/synthetic publication failure/);
+    const reading=handle.assertCurrent();void reading.catch(()=>{});await rejected;
+    if(committed)await assert.rejects(reading);else await reading;
+    assert.equal((await f.store.snapshot('personal')).codingEditorConnections[0].revision,committed?1:0);
   }
 });

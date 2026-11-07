@@ -22,6 +22,13 @@ acceptance and the separate restricted-storage retirement cause remain open.
 
 ## Requirement status
 
+Latest follow-up: `ecbb8cb` passes 24 of 25 Windows client groups, with 229
+passing tests and four acknowledgement failures; original cleanup completes
+without a group timeout. The read/publication queue correction passes eight
+focused groups, 69 tests and two declared platform skips. Native validation is
+still pending. [Retained failure](evidence/editor-journal-native-failure-summary.json),
+[source correction](evidence/editor-journal-read-queue-summary.json).
+
 | Requirement | Implementation | Validation | Actual paths | UI entry | Tests | Remaining implementation / exact blocked validation |
 | --- | --- | --- | --- | --- | --- | --- |
 | Product shell and UX | in progress | software-tested | tools/layout-studio/{home,catalog,app,shell,keyboard-view}.mjs; index.html; style.css | Home → Keep my place; Customize | catalog/model/configuration tests | Value-first Home implemented; manual browser refresh/visual acceptance pending. Guided setup still exposes unfinished role wiring. |

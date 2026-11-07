@@ -379,3 +379,16 @@ was terminated and cleaned by the test harness. Fixture teardown now attempts
 every original cleanup without suppressing failures.
 [Source evidence](evidence/editor-journal-publication-summary.json),
 [retained Windows failure](evidence/windows-editor-launch-native-failure-summary.json).
+
+The first publication correction (`ecbb8cb`) adds a kernel lease to every read;
+its Windows run reaches four acknowledgement failures, though original cleanup
+now finishes naturally. Reads and writes now serialize through the original
+handle's local publication queue. Every mutation still acquires its original
+cross-process kernel lease, and observations still compare fresh protected bytes
+and the current target. External replacement and a write that commits but fails
+before publication remain refusals; an uncommitted failed write does not poison
+later observations. This removes the extra read-side lease without extending
+deadlines or weakening permissions. Eight focused groups pass 69 tests with two
+platform skips; corrected native acceptance remains pending.
+[Source evidence](evidence/editor-journal-read-queue-summary.json),
+[native failure](evidence/editor-journal-native-failure-summary.json).
