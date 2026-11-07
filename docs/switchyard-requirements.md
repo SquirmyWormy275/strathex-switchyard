@@ -8,6 +8,17 @@ Implementation: not started / in progress / implemented / unsupported by verifie
 Validation: not run / software-tested / host-tested / hardware-tested.
 Tests use synthetic data unless explicitly labelled host/hardware evidence.
 
+Windows native-focus dispatch now enforces the persisted selected workspace
+policy before validating a request UUID or entering platform-specific dispatch.
+The original native client run at `02cc6ba` failed one of 93 tests; the same
+failure was reproduced locally. Both Linux and Windows paths now refuse Work
+requests with missing, malformed or valid UUIDs, including attempts to name a
+Personal compartment. All final effect-boundary checks remain. Twenty-eight
+focused groups pass 165 tests with one declared Linux skip; typecheck, original
+bounds and child/tree cleanup verify. Actual Windows follow-up acceptance remains
+pending. [Native failure](evidence/windows-client-02cc6ba-failed-summary.json),
+[correction evidence](evidence/windows-focus-policy-source-summary.json).
+
 The Windows Suite now supports separately reviewed ChatGPT and stable VS Code
 executables, encrypted configuration, authenticated focus dispatch and durable
 helper recovery. Exact PID/birth ownership is persisted before requests; uncertain

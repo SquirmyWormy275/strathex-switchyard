@@ -22,6 +22,11 @@ The existing authenticated, same-origin Suite API provides these routes:
 | `POST /api/suite/intent` | The implementation and a request UUID; dispatches only within the actual selected workspace. No executable path or command is accepted here. |
 | `POST /api/suite/native-focus/recover` | No operation selectors; observes original helper retirement without repeating focus. This works in keyboard-only mode. |
 
+Physical dispatch first checks the persisted selected workspace and its policy,
+before validating a request UUID. A caller-supplied compartment cannot redirect
+that selection. The policy is checked again at the existing effect boundaries.
+[Native failure and regression correction](evidence/windows-focus-policy-source-summary.json).
+
 Review and configuration require the active Personal companion workspace. Work
 policy, keyboard-only mode, selection changes and account-policy changes refuse.
 Review is local and expires after five minutes; at most 32 reviews are retained.

@@ -491,6 +491,7 @@ export function createSuite({ store = createSuiteStore(), platform = process.pla
             if (closed || copilotTransitions.has(selected) || selected !== activeCompartment || await store.selection() !== selected) throw new Error("The selected native client workspace changed; no alternate target was selected.");
             await store.authorize(selected, { provider: native.provider });
           };
+          await assertCurrent();
           if (platform === "win32") return windowsNativeFocus.focus(selected, body.implementation, { requestId: body.requestId, assertCurrent });
           await this.authorizeConnection(selected, { implementation: body.implementation });
           return native.focus(hypr, { readProcess: nativeProcess, assertCurrent });

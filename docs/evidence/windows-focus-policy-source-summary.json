@@ -1,0 +1,92 @@
+{
+  "schema": "switchyard-windows-focus-policy-source/v1",
+  "at": "2026-11-07T03:57:46.503873+00:00",
+  "baseSource": "0f033f85d07fd5d4c5143594f691a1ddba8f1867",
+  "sourceFiles": {
+    "apps/windows-companion/test/repository-runtime.test.ts": "4c125fe93dc0e683986958196b44ba89cd5ce33a34243790d6104b2120694bb4",
+    "deployment/suite/application.test.mjs": "bfff39c8699b6d578edd54a80e1e26fd9d346c708b1707ac27e332e934d4b83b",
+    "deployment/suite/connection-restoration.test.mjs": "f6d3a0a56de1e3d1eb325a285bf2ade1513fe40513c6eeb996f9159ed45de217",
+    "deployment/suite/installation.test.mjs": "9d9f10b0591817d1c23abaf87efacf79b695d14934a5b4e09537a1a4aa36779f",
+    "deployment/suite/release.test.mjs": "a3b3cf50a9f2f12cd92f609202f58bffdd3c21f63606cbdeabd2ee12a8d9a7de",
+    "scripts/run-isolated-tests.mjs": "0a601b6d5a10bfbcd78213491db8b99341e49e4907c1a665ed9b5cbea2e64f37",
+    "scripts/run-isolated-tests.test.mjs": "e957fda947d20040b21cfcb02b595427458b70df842702d56eccc7f8c9a2b8e8",
+    "scripts/verify-agent-security-host.mjs": "b6295da3fdfecf6a40f283e8d1e92d309b483ae4b520bed02d666b25428d1808",
+    "scripts/verify-client-platform.mjs": "d0165c13072b27dd37fefd4b537ddd7d154b9691be651f69f0ee7f79bc5778ba",
+    "scripts/verify-copilot-journal-host.test.mjs": "14fc59b301374a79a3417458583eb9abebaf590232eca963e6811b3aee1ed57e",
+    "tools/layout-studio/client-launch.test.mjs": "01068e6f52540e59744658849597d5446e31d0a53fe19d67a95236a93474c9cf",
+    "tools/layout-studio/integrations.test.mjs": "5a4764158f0c64b44e126a35b1f7fabb8c6e7d1875ba8a925144223fd2871589",
+    "tools/layout-studio/native-focus-gateway.test.mjs": "f902036c18680e47da7f4ff3733d118970b8af5bede8d10c6b420cae28a5248c",
+    "tools/layout-studio/physical-intent.test.mjs": "c3c207c403001fde44a647c8ef7ca5e395d31c36a1acf6151aefb7358f5b4b2e",
+    "tools/layout-studio/suite-store.mjs": "6d7f2065670eb1c79528d79fdb0dd83071dded9574c10cf694272a98dd0ce2e4",
+    "tools/layout-studio/suite.mjs": "3253042d652a13ee2988eedd562d4ed7fadd2624433a4d9572c7b2b7bfdc765f",
+    "tools/layout-studio/suite.test.mjs": "18d65cf5a39999ae18be36a9eb2662f29823e9710aef941e2f31f6ab76972521",
+    "tools/layout-studio/windows-native-focus.mjs": "72ac55cfb28e2b956294940283fa5ec1dd559015d3acf50c8102a690aa6d36b5",
+    "tools/layout-studio/windows-native-focus.test.mjs": "c7fbbe02c98e77ec52d379a040472139f28657f699db6e53d44830153a933c36"
+  },
+  "receipts": [
+    {
+      "name": "isolated-test-03d2788e-cddd-45bf-841b-cc980739bcda.json",
+      "sha256": "b342ec4a8327f6a6204412a184f9a1643c3bffff52a886176a69d8fc4b9bbb7e",
+      "success": false,
+      "totals": {
+        "required": 1,
+        "passed": 0,
+        "failed": 1,
+        "tests": 7,
+        "passedTests": 6,
+        "failedTests": 1,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "name": "isolated-test-03a320d6-298e-4896-a0d3-709ca71657fc.json",
+      "sha256": "3604ef6db1db5a281e655e0199263c27418134adf1414bb07fedde93d062a330",
+      "success": true,
+      "totals": {
+        "required": 28,
+        "passed": 28,
+        "failed": 0,
+        "tests": 166,
+        "passedTests": 165,
+        "failedTests": 0,
+        "skippedTests": 1,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    }
+  ],
+  "focusedGroups": 28,
+  "focusedPasses": 165,
+  "declaredSkips": 1,
+  "originalCommandsBoundsAndSkipsVerified": true,
+  "typecheck": "passed",
+  "originalPackageBounds": "passed",
+  "nativeFailureEvidence": "windows-client-02cc6ba-failed-summary.json",
+  "scope": "Selected workspace policy is enforced before Windows native-focus dispatch validates UUID/configuration. Final current-policy/effect checks remain. Both platform paths refuse missing, malformed and valid request IDs in Work mode, even if the caller names Personal.",
+  "failureNotes": [
+    "The local explicit win32 regression reproduced the exact native failure before correction.",
+    "An initial focused selection used linuxGroups, which deliberately excludes the Windows repository-runtime file; the manifest guard refused before tests. The corrected selection uses unchanged requiredGroups entries."
+  ],
+  "effects": {
+    "liveFocus": 0,
+    "providerRequests": 0,
+    "accountChanges": 0,
+    "hardwareOperations": 0,
+    "newDependencyDownloads": 0
+  },
+  "limitations": [
+    "Windows platform paths in this focused run use controlled doubles on Linux. Actual Windows client rerun and interactive desktop acceptance remain pending.",
+    "No frontend controls, native application launch, project selection or task-specific IDE attachment is added."
+  ],
+  "cleanup": {
+    "everyChildVerified": true,
+    "everyTreeVerified": true,
+    "emptyOwnedRootRemoved": true
+  },
+  "privateReceipt": {
+    "name": "windows-focus-policy-source.json",
+    "sha256": "e9de4dbe00c7bbc84653bee51bb8d97d6de09b6050f8e9fc95fab3a4c57700dd"
+  }
+}

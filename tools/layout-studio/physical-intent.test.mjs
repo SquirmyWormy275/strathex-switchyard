@@ -123,16 +123,18 @@ test("physical gateway uses only its private active endpoint and closed intent; 
   } finally { server.closeAllConnections(); await new Promise((resolve) => server.close(resolve)); await rm(root, { recursive: true, force: true }); }
 });
 
-test("cold-start physical intent honors persisted Work selection before any UI bootstrap; caller compartment cannot redirect it", async () => {
+for (const platform of ["linux", "win32"]) test(`cold-start ${platform} physical intent honors persisted Work selection before any UI bootstrap; caller compartment cannot redirect it`, async () => {
   const root = await mkdtemp(join(tmpdir(), "switchyard-active-policy-")), credentials = new Map(); let effects = 0;
   const store = createSuiteStore({ root, secrets: { get: async (id, key) => credentials.get(`${id}:${key}`), set: async (id, key, value) => { credentials.set(`${id}:${key}`, value); } } });
   await store.initialize("personal"); await store.initialize("company", "work"); await store.selection("company");
-  const suite = createSuite({ store, agents: { discovery: async () => [], close() {}, resume: async () => { effects++; } }, voice: { discovery: async () => ({ available: false }) }, hypr: async () => { effects++; throw new Error("No compositor effect expected"); } });
+  const suite = createSuite({ store, platform, agents: { discovery: async () => [], close() {}, resume: async () => { effects++; } }, voice: { discovery: async () => ({ available: false }) }, hypr: async () => { effects++; throw new Error("No compositor effect expected"); } });
   try {
     for (const implementation of ["native-chatgpt.focus/v1", "native-vscode.focus/v1"]) {
       assert.deepEqual(closedIntent({ implementation }), { implementation });
       await assert.rejects(suite.authorizeConnection(undefined, { implementation }), /prohibited/);
-      await assert.rejects(suite.handle("/api/suite/intent", { implementation, compartment: "personal" }), /prohibited/);
+      for (const requestId of [undefined, "malformed", randomUUID()]) {
+        await assert.rejects(suite.handle("/api/suite/intent", { implementation, compartment: "personal", ...(requestId === undefined ? {} : { requestId }) }), /prohibited/);
+      }
     }
     assert.equal(effects, 0);
     assert.equal((await suite.handle("/api/suite/bootstrap")).activeCompartment, "company");
