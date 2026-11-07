@@ -9,6 +9,14 @@ export const cargoQuotedMetadata = `[package.metadata.'build.system']
 'labels' = ['quoted', "", 'quoted']
 [target.'cfg(target_arch = "wasm32")'.dependencies.thing]
 version = '1'
+[[bin]]
+name = 'first'
+path = 'src/first.rs'
+[[bin]]
+name = 'second'
+path = 'src/second.rs'
+[[example]]
+name = 'demo'
 `;
 export const crate = (text = cargoManifest, entries = [], directory = cargoRoot) => gzipSync(ustarFixture([{ path: directory + "/Cargo.toml", content: text }, ...entries]));
 export function cargoArchiveFixture({ action = "shield_supply_chain", text = cargoManifest, entries = [], directory = cargoRoot, artifactStatus = "matched", archiveStatus } = {}) {

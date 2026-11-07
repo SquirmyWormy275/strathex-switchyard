@@ -7,16 +7,19 @@ but declares a different package name or version, the scan fails with an
 integrity: matching a declaration does not prove the declaration describes the
 expected package.
 
-Quoted target tables and single-line literal/basic strings now pass 58 independent
-Python TOML/USTAR/gzip cases. Ten focused groups pass 96 tests, including six actual
-Linux Cargo scanner journeys and six Windows guest doubles. Original package
-bounds, typecheck, unchanged input/Git state and exact child/tree cleanup pass;
-the owned test root is removed. The previous rejection remains recorded.
-Installed `9eec9cd` passes all 58 reference cases in ten Cargo metadata checks
-inside the 71-check update. It preserves all 54 semantic workspaces and the frozen
-frontend; no live installed scan occurs. Native Windows guest acceptance remains
-separate. [Installed receipt](evidence/installed-cargo-quoted-manifest-summary.json).
-[Current source evidence](evidence/cargo-quoted-manifest-source-summary.json).
+Cargo archives with multiple `[[bin]]`, `[[example]]` and nested array tables
+now pass 84 independent Python reference cases. Ten focused groups pass 96 tests,
+including six actual Linux scanner journeys and six Windows guest doubles.
+Duplicate fields, scalar/table conflicts and invalid package identities still
+refuse admission. Original package bounds, typecheck and exact child/tree cleanup
+pass. Installed acceptance is pending for this source; `9eec9cd` remains the
+previous 71-check installed checkpoint. Dependency resolution and broader
+manifest/license coverage remain unfinished. [Contract](cargo-archive-identity.md),
+[source evidence](evidence/cargo-array-manifest-source-summary.json).
+
+Previous installed `9eec9cd` passes 58 reference cases in ten Cargo metadata
+checks inside its 71-check update, preserving all 54 semantic workspaces and the
+frozen frontend. [Previous installed receipt](evidence/installed-cargo-quoted-manifest-summary.json).
 
 Use the existing [Cargo artifact selection](cargo-artifact-integrity.md). No new
 authority or selection format is required. Both the lockfile and archive must be
@@ -39,6 +42,8 @@ The entire manifest must fit a closed TOML subset:
 
 - Ordinary tables with bare or single-line quoted keys, including nested tables
   and quoted platform conditions such as `target.'cfg(unix)'.dependencies`.
+- Array tables such as `[[bin]]` and `[[example]]`, with nested ordinary/array
+  tables attached to the most recent element. Each element has its own fields.
 - Single-line basic/literal strings, string arrays, booleans and signed 64-bit
   decimal integers, with comments and LF or CRLF line endings.
 - One explicit `[package]` with string `name` and `version`, validated by the
@@ -51,11 +56,16 @@ Quoted field keys, empty strings and repeated string-array values are accepted.
 Quoted and bare spellings of the same key are aliases; a dot inside a quoted key
 is literal. A Map tree preserves those distinctions and rejects duplicate or
 scalar/table collisions without treating keys as JavaScript object properties.
-Multiline strings, inline tables, array tables, dotted field keys, inherited
+Multiline strings, inline tables, dotted field keys, inherited
 identity, eight-digit Unicode escapes and other TOML forms retain an explicit
 coverage gap. This is not a general TOML implementation or a promise to inspect
 every crate produced by Cargo. Cargo's [manifest reference](https://doc.rust-lang.org/cargo/reference/manifest.html)
 describes the broader format.
+
+Arrays cannot replace ordinary tables or append to static arrays; duplicate
+subtables within one element remain invalid. An array named `package` cannot
+supply the required ordinary package identity. This follows the
+[TOML 1.0 array-of-tables rules](https://toml.io/en/v1.0.0#array-of-tables).
 
 The quoted-key behavior follows [TOML 1.0 key and table rules](https://toml.io/en/v1.0.0#keys).
 Parsing a platform condition preserves its syntax as a key; it does not evaluate
@@ -88,7 +98,7 @@ scripts are not returned. License inspection, dependency/feature/target
 resolution, publisher verification and code safety remain unfinished. Existing
 coverage gaps and the 512-finding ceiling continue to apply.
 
-## Verification
+## Earlier verification
 
 The reference generator uses the existing Python standard library's `tomllib`,
 `tarfile` and `gzip` to produce 26 synthetic cases. It runs no Cargo command,

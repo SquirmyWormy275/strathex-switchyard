@@ -9,13 +9,15 @@ identity and observation design changes at that source. Later quoted Cargo
 manifests and Windows provider birth checks have separate focused evidence.
 [Complete receipt](evidence/linux-a6a6618-complete-summary.json).
 
-Quoted Cargo manifest keys/tables and literal strings pass **58 independent
-Python reference cases** and **ten focused groups/96 tests**, including six
-actual Linux scanner journeys and six Windows guest doubles. Original package
-bounds, typecheck, unchanged inputs/Git state and exact child/tree cleanup pass.
-The original unsupported result is retained. Installed/native acceptance and
-dependency resolution remain separate.
-[Source evidence](evidence/cargo-quoted-manifest-source-summary.json).
+Cargo archives with multiple `[[bin]]`, `[[example]]` and nested array tables
+now pass 84 independent Python reference cases. Ten focused groups pass 96 tests,
+including six actual Linux scanner journeys and six Windows guest doubles.
+Duplicate fields, scalar/table conflicts and invalid package identities still
+refuse admission. Original package bounds, typecheck and exact child/tree cleanup
+pass. Installed acceptance is pending for this source; `9eec9cd` remains the
+previous 71-check installed checkpoint. Dependency resolution and broader
+manifest/license coverage remain unfinished. [Contract](cargo-archive-identity.md),
+[source evidence](evidence/cargo-array-manifest-source-summary.json).
 
 The Windows provider desktop protocol now binds process creation identity from
 discovery through authorized focus and requires foreground readback. Six isolated

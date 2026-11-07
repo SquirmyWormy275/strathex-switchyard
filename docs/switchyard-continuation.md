@@ -40,14 +40,15 @@ instructions. Do not merge or release.
 
 ## Current installed and source checkpoint
 
-Cargo archive quoted keys/tables and single-line literal strings now pass 58
-independent Python references and ten focused groups/96 tests, including six
-actual Linux scans and six Windows guest doubles. Typecheck, original package
-bounds and exact owned cleanup pass. Current Python/Cargo metadata verifiers pin
-`cargo-quoted-manifest-source-summary.json` and pass against installed `9eec9cd`.
-Its 71-check read-only/in-memory update verifies all 54 workspaces and the frozen
-frontend. No installed scanner, task, account action or model request occurred. [Contract](cargo-archive-identity.md),
-[source evidence](evidence/cargo-quoted-manifest-source-summary.json).
+Cargo archives with multiple `[[bin]]`, `[[example]]` and nested array tables
+now pass 84 independent Python reference cases. Ten focused groups pass 96 tests,
+including six actual Linux scanner journeys and six Windows guest doubles.
+Duplicate fields, scalar/table conflicts and invalid package identities still
+refuse admission. Original package bounds, typecheck and exact child/tree cleanup
+pass. Installed acceptance is pending for this source; `9eec9cd` remains the
+previous 71-check installed checkpoint. Dependency resolution and broader
+manifest/license coverage remain unfinished. [Contract](cargo-archive-identity.md),
+[source evidence](evidence/cargo-array-manifest-source-summary.json).
 
 The commissioned Windows provider adapter now carries exact process creation
 identity across discovery/focus, checks current-user/session with TOKEN_QUERY 8,

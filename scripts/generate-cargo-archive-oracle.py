@@ -25,7 +25,7 @@ cases = [
     ("literal-string", base + "description = 'literal'\n", True),
     ("empty-string", base + 'description = ""\n', True),
     ("inline-table", base + '[dependencies]\nthing = { version = "1" }\n', False),
-    ("array-table", base + '[[bin]]\nname = "example"\n', False),
+    ("array-table", base + '[[bin]]\nname = "example"\n', True),
     ("quoted-table", base + '[target."cfg(unix)".dependencies]\n', True),
     ("duplicate-array", base + 'authors = ["One", "One"]\n', True),
     ("multiline-string", base + 'description = """hello\nworld"""\n', False),
@@ -66,9 +66,35 @@ cases = [
     ("adjacent-quoted-keys", base + '[package."metadata""tool"]\n', False),
     ("multiline-literal", base + "description = '''hello\nworld'''\n", False),
     ("dotted-field-still-unsupported", base + "metadata.'tool' = 'value'\n", False),
-    ("array-table-still-unsupported", base + "[['bin']]\nname = 'example'\n", False),
+    ("quoted-array-table", base + "[['bin']]\nname = 'example'\n", True),
     ("inline-table-still-unsupported", base + "[dependencies]\nthing = { version = '1' }\n", False),
     ("unicode-eight-digit-still-unsupported", base + 'description = "\\U0001F600"\n', False),
+    ("multiple-binaries", base + '[[bin]]\nname = "one"\npath = "src/one.rs"\n[[bin]]\nname = "two"\npath = "src/two.rs"\n', True),
+    ("mixed-targets", base + '[[bin]]\nname = "cli"\n[[example]]\nname = "demo"\n[[test]]\nname = "integration"\n[[bench]]\nname = "speed"\nharness = false\n', True),
+    ("empty-array-element", base + '[[bin]]\n[[bin]]\nname = "last"\n', True),
+    ("array-key-aliases", base + '[[bin]]\nname = "one"\n[["bin"]]\nname = "two"\n', True),
+    ("nested-array-tables", base + '[[package.metadata.rows]]\nname = "one"\n[[package.metadata.rows.parts]]\nname = "first"\n[[package.metadata.rows.parts]]\nname = "second"\n[[package.metadata.rows]]\nname = "two"\n[[package.metadata.rows.parts]]\nname = "third"\n', True),
+    ("array-child-scopes", base + '[[bin]]\n[bin.metadata]\nlabel = "one"\n[[bin]]\n[bin.metadata]\nlabel = "two"\n', True),
+    ("array-latest-scalar-scope", base + '[[bin]]\nmetadata = "one"\n[[bin]]\n[bin.metadata]\nlabel = "two"\n', True),
+    ("array-implicit-parent", base + '[[package.metadata.rows]]\nname = "one"\n[package.metadata]\nlabel = "parent"\n', True),
+    ("literal-dot-array-distinct", base + '[["bin.metadata"]]\nname = "one"\n[[bin.metadata]]\nname = "two"\n', True),
+    ("array-prototype-names", base + '[[package.metadata.__proto__]]\nconstructor = "inert"\n[[package.metadata.__proto__]]\nconstructor = "still inert"\n', True),
+    ("root-array-before-package", '[[bin]]\nname = "cli"\n' + base, True),
+    ("array-header-comments", base + "[[ 'bin' ]] # target\nname = 'one'\n[[bin]]\nname = 'two'\n", True),
+    ("array-package-not-identity", base.replace('[package]', '[[package]]'), False),
+    ("array-package-then-table", base.replace('[package]', '[[package]]') + '[package]\n', False),
+    ("ordinary-table-then-array", base + '[bin]\nname = "one"\n[[bin]]\n', False),
+    ("implicit-table-then-array", base + '[bin.metadata]\nlabel = "one"\n[[bin]]\n', False),
+    ("array-then-ordinary-table", base + '[[bin]]\nname = "one"\n[bin]\n', False),
+    ("scalar-then-array", 'bin = "scalar"\n' + base + '[[bin]]\n', False),
+    ("static-array-then-array", 'bin = []\n' + base + '[[bin]]\n', False),
+    ("array-duplicate-field-alias", base + '[[bin]]\nname = "one"\n"name" = "two"\n', False),
+    ("array-duplicate-child", base + '[[bin]]\n[bin.metadata]\nlabel = "one"\n[bin.metadata]\n', False),
+    ("array-latest-scalar-conflict", base + '[[bin]]\n[bin.metadata]\nlabel = "one"\n[[bin]]\nmetadata = "two"\n[bin.metadata]\n', False),
+    ("nested-array-table-conflict", base + '[[bin]]\n[[bin.metadata]]\nlabel = "one"\n[bin.metadata]\n', False),
+    ("array-missing-close", base + '[[bin]\nname = "one"\n', False),
+    ("array-extra-close", base + '[[bin]]]\nname = "one"\n', False),
+    ("array-empty-header", base + '[[]]\n', False),
 ]
 rows = []
 for label, text, supported in cases:
@@ -76,7 +102,7 @@ for label, text, supported in cases:
     try:
         parsed = tomllib.loads(text)
         package = parsed.get('package', {})
-        facts = {'parsed': True, 'name': package.get('name'), 'version': package.get('version')}
+        facts = {'parsed': True, 'name': package.get('name') if isinstance(package, dict) else None, 'version': package.get('version') if isinstance(package, dict) else None}
     except tomllib.TOMLDecodeError:
         facts = {'parsed': False}
     directory = (facts.get('name') or 'example') + '-' + (facts.get('version') or '1.2.3-rc.1+build.7')

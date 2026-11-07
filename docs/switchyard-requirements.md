@@ -8,12 +8,15 @@ Implementation: not started / in progress / implemented / unsupported by verifie
 Validation: not run / software-tested / host-tested / hardware-tested.
 Tests use synthetic data unless explicitly labelled host/hardware evidence.
 
-Cargo archive quoted table/field keys and literal strings now pass 58 independent
-Python references and ten focused groups/96 tests. Actual Linux scanner execution,
-Windows guest doubles, original package limits and cleanup pass. Ten installed Cargo metadata checks now pass inside the 71-check update.
-Native guest and live scanner acceptance remain separate; broader TOML/dependency/license coverage
-is unfinished. [Contract](cargo-archive-identity.md),
-[source evidence](evidence/cargo-quoted-manifest-source-summary.json).
+Cargo archives with multiple `[[bin]]`, `[[example]]` and nested array tables
+now pass 84 independent Python reference cases. Ten focused groups pass 96 tests,
+including six actual Linux scanner journeys and six Windows guest doubles.
+Duplicate fields, scalar/table conflicts and invalid package identities still
+refuse admission. Original package bounds, typecheck and exact child/tree cleanup
+pass. Installed acceptance is pending for this source; `9eec9cd` remains the
+previous 71-check installed checkpoint. Dependency resolution and broader
+manifest/license coverage remain unfinished. [Contract](cargo-archive-identity.md),
+[source evidence](evidence/cargo-array-manifest-source-summary.json).
 
 The commissioned Windows provider desktop adapter now binds process birth across
 discovery and focus, checks the current-user/session with QUERY-only tokens and

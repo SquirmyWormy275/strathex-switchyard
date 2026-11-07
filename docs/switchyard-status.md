@@ -12,15 +12,15 @@ No merge or public release has been accepted.
 
 ## Current checkpoints
 
-Cargo archive identity now accepts quoted platform tables, quoted field keys and
-single-line literal strings while detecting duplicate aliases and scalar/table
-conflicts. Fifty-eight independent reference cases and ten groups/96 tests pass,
-including actual Linux scans and Windows guest doubles. Package bounds and exact
-cleanup pass. Ten installed Cargo checks pass in the 71-check metadata update;
-dependency resolution and
-broader archive/license inspection remain unfinished.
-[Contract](cargo-archive-identity.md),
-[source evidence](evidence/cargo-quoted-manifest-source-summary.json).
+Cargo archives with multiple `[[bin]]`, `[[example]]` and nested array tables
+now pass 84 independent Python reference cases. Ten focused groups pass 96 tests,
+including six actual Linux scanner journeys and six Windows guest doubles.
+Duplicate fields, scalar/table conflicts and invalid package identities still
+refuse admission. Original package bounds, typecheck and exact child/tree cleanup
+pass. Installed acceptance is pending for this source; `9eec9cd` remains the
+previous 71-check installed checkpoint. Dependency resolution and broader
+manifest/license coverage remain unfinished. [Contract](cargo-archive-identity.md),
+[source evidence](evidence/cargo-array-manifest-source-summary.json).
 
 The commissioned Windows provider adapter now rejects process-ID reuse across
 discovery/focus and requires current-user/session checks plus exact foreground

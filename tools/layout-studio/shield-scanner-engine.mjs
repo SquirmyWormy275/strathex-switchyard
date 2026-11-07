@@ -523,7 +523,7 @@ function cargoManifestList(value) {
   return items;
 }
 /** Closed TOML subset: single-line basic/literal strings, string arrays,
- * booleans, decimal integers, quoted/bare keys and ordinary tables. Unsupported
+ * booleans, decimal integers, quoted/bare keys, ordinary and array tables. Unsupported
  * syntax refuses the entire manifest, including metadata after its identity.
  * A Map tree preserves literal dots and key aliases without prototype effects. */
 function cargoArchiveManifest(bytes) {
@@ -548,11 +548,19 @@ function cargoArchiveManifest(bytes) {
       const line = cargoManifestUncomment(raw); if (!line) continue;
       if (pending) { cargoRequire(pending.length + line.length <= 65536); pending += " " + line; if (line.endsWith("]")) { store(key, pending); pending = ""; } continue; }
       if (line.startsWith("[")) {
-        cargoRequire(line.endsWith("]") && !line.startsWith("[["));
-        table = cargoManifestTable(line.slice(1, -1)); current = root;
-        for (const part of table) {
-          if (!current.children.has(part)) current.children.set(part, node());
-          current = current.children.get(part); cargoRequire(current.kind === "table");
+        const array = line.startsWith("[["), width = array ? 2 : 1;
+        cargoRequire(line.endsWith(array ? "]]" : "]"));
+        table = cargoManifestTable(line.slice(width, -width)); current = root;
+        for (let i = 0; i < table.length; i++) {
+          const part = table[i], last = i === table.length - 1;
+          if (!current.children.has(part)) current.children.set(part, last && array ? { kind: "array-table", items: [] } : node());
+          const child = current.children.get(part);
+          if (last && array) {
+            cargoRequire(child.kind === "array-table"); current = node(); child.items.push(current);
+          } else {
+            current = !last && child.kind === "array-table" ? child.items.at(-1) : child;
+            cargoRequire(current?.kind === "table");
+          }
         }
         cargoRequire(!current.explicit); current.explicit = true; continue;
       }
