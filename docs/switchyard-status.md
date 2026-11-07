@@ -17,7 +17,7 @@ checkpoints are not cumulative acceptance of the latest suite.
 
 | Checkpoint | Verified result | Limit |
 | --- | --- | --- |
-| Installed Linux `5ec16fe` | **76 metadata/in-memory checks; 35 exact module hashes.** All 54 semantic workspaces and frozen frontend preserved. [Receipt](evidence/installed-windows-scanner-recipe-save-summary.json). | No live scanner, provider task, account/model request, native focus or hardware operation. |
+| Installed Linux `edb76de` | **76 metadata/in-memory checks; 42 exact module hashes.** All 54 semantic workspaces and frozen frontend preserved. [Receipt](evidence/installed-mixed-scanner-input-summary.json). | No live scanner, provider task, account/model request, native focus or hardware operation. |
 | Native Windows client `4f56477` | **Seven groups; 94 passing tests; no skips.** Source/merge tree, artifact digest, commands, bounds and child/tree cleanup verified. [Receipt](evidence/windows-client-4f56477-passed-summary.json). | Client contracts only; interactive focus and complete Windows release acceptance are separate. |
 | Complete Linux `b320506` | **328 groups; 2,049 passing tests; sixteen declared skips.** Original inventory, commands, bounds and owned cleanup verified. [Receipt](evidence/linux-b320506-complete-summary.json). | Includes scanner drafting and Linux saving; predates Windows saving. |
 | Complete Windows `dc755901` | **417 groups; 2,478 passing tests; 207 declared skips.** All six jobs and overall workflow passed with verified packet/source/cleanup. [Receipt](evidence/windows-complete-dc755901-summary.json). | Predates newer archive, scheduling, profile/workflow and observation corrections. |
@@ -34,8 +34,8 @@ Cargo archives and npm archives. All four saved profiles and 57 workflows remain
 compatible. Selection and the pending keyboard-only conversation are preserved;
 53 sealed workspace files are byte-identical and one changes only audit metadata.
 Dated backup and launcher readback verify. Only current plus one rollback remain;
-the exact 537-file, 4,692,422-byte prepared bundle was removed. Lossless template
-storage reduces the package payload to 4,595,591 bytes without changing exports.
+the exact 538-file, 4,696,455-byte prepared bundle was removed. Lossless template
+storage reduces the package payload to 4,599,483 bytes without changing exports.
 
 ## Recent backend changes
 

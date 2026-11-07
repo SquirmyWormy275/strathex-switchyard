@@ -40,6 +40,16 @@ instructions. Do not merge or release.
 
 ## Current installed and source checkpoint
 
+Installed Linux `edb76de` passes **76 metadata/in-memory checks and 42 exact module
+hashes** for combined scanner support. All 54 semantic workspaces, four profiles,
+57 workflows, selection, pending keyboard-only conversation and frozen frontend
+are preserved. Fifty-three sealed files are byte-identical; one changes audit
+metadata only. Dated backup and launcher readback verify. Current plus one
+rollback remain; the 538-file, 4,696,455-byte prepared bundle is removed. No live
+installed scan, provider task, model/account request or hardware operation ran.
+[Installed evidence](evidence/installed-mixed-scanner-input-summary.json).
+
+
 Combined current, staged and historical scanner inputs are implemented. The
 latest accepted results across **56 focused groups pass 348 tests with five
 declared skips**, including a real Linux mixed scan, replay refusal, original
@@ -331,8 +341,8 @@ native Windows profile correction acceptance remains separate.
 [Installed evidence](evidence/installed-profile-identity-summary.json).
 [Source evidence](evidence/profile-identity-source-summary.json).
 
-1. Install combined current/index/history support through the normal update path
-   and verify metadata and all original workspace semantics. Linux and Windows
+1. Combined current/index/history support is published and installed. Continue
+   exact native acceptance and remaining ledger gaps. Linux and Windows
    reviewed saving are implemented; Windows saving has native acceptance.
    Mixed NTFS staging still needs its exact native receipt. Diagnose the retained
    restricted-storage final retirement assertion without changing permissions.

@@ -1,5 +1,14 @@
 # What has actually been verified
 
+Installed Linux `edb76de` passes **76 metadata/in-memory checks and 42 exact module
+hashes** for combined scanner support. All 54 semantic workspaces, four profiles,
+57 workflows, selection, pending keyboard-only conversation and frozen frontend
+are preserved. Fifty-three sealed files are byte-identical; one changes audit
+metadata only. Dated backup and launcher readback verify. Current plus one
+rollback remain; the 538-file, 4,696,455-byte prepared bundle is removed. No live
+installed scan, provider task, model/account request or hardware operation ran.
+[Installed evidence](evidence/installed-mixed-scanner-input-summary.json).
+
 Combined current, staged and historical scanner inputs are implemented. The
 latest accepted results across **56 focused groups pass 348 tests with five
 declared skips**, including a real Linux mixed scan, replay refusal, original
