@@ -23,7 +23,7 @@ import type {
 
 const requestSchema = "sxsy-b122.provider-desktop-request" as const;
 const responseSchema = "sxsy-b122.provider-desktop-response" as const;
-const helperArguments = ["--stdio-v1"] as const;
+const helperArguments = ["--stdio-v2"] as const;
 const digestPattern = /^[a-f0-9]{64}$/;
 const surfacePattern = /^hwnd:[a-f0-9]{1,16}$/;
 const maximumProtocolBytes = 64 * 1024;
@@ -180,7 +180,7 @@ export class WindowsProviderDesktopProcessPort implements ProviderDesktopProcess
     return this.withSession(signal, async (session, requestId) => {
       await session.write(encodeRequest({
         schema: requestSchema,
-        version: 1,
+        version: 2,
         requestId,
         action: "list",
         provider,
@@ -190,6 +190,7 @@ export class WindowsProviderDesktopProcessPort implements ProviderDesktopProcess
       const observations = parseObservations(response.observations);
       return observations.map((observation) => ({
         processId: observation.processId,
+        processStartTime: observation.processStartTime,
         windowId: observation.surfaceId,
         isForeground: observation.isForeground,
         identity
@@ -203,31 +204,35 @@ export class WindowsProviderDesktopProcessPort implements ProviderDesktopProcess
       throw new Error("The expected provider surface identity is invalid.");
     }
     if (!sameNativeIdentity(request.identity, request.process.identity)) throw new Error("The expected provider process identity changed before native focus.");
+    const expectedStartTime = processBirthIdentity(request.process.processStartTime);
     return this.withSession(request.signal, async (session, requestId) => {
       await session.write(encodeRequest({
         schema: requestSchema,
-        version: 1,
+        version: 2,
         requestId,
         action: "focus",
         provider: request.provider,
         identity: nativeIdentity(request.identity),
         expectedProcessId: request.process.processId,
+        expectedProcessStartTime: expectedStartTime,
         expectedSurfaceId: request.process.windowId
       }));
       const ready = parseResponse(await session.read(), requestId, "ready");
       const token = authorizationToken(ready.authorizationToken);
       const processId = processIdentity(ready.processId);
       const surfaceId = surfaceIdentity(ready.surfaceId);
-      if (processId !== request.process.processId || surfaceId !== request.process.windowId) {
+      const processStartTime = processBirthIdentity(ready.processStartTime);
+      if (processId !== request.process.processId || surfaceId !== request.process.windowId || processStartTime !== expectedStartTime) {
         throw new Error("The exact provider process or surface changed before the final focus barrier.");
       }
       await request.beforeEffect();
       assertNotAborted(request.signal);
       await session.write(authorization(requestId, token));
       const result = parseResponse(await session.read(), requestId, "result");
-      if (processIdentity(result.processId) !== processId || surfaceIdentity(result.surfaceId) !== surfaceId) {
+      if (processIdentity(result.processId) !== processId || surfaceIdentity(result.surfaceId) !== surfaceId || processBirthIdentity(result.processStartTime) !== processStartTime) {
         throw new Error("The provider helper returned a changed focus surface.");
       }
+      if (result.windowFocusVerified !== true) throw new Error("The provider helper did not verify native foreground readback.");
       return { processId };
     });
   }
@@ -242,7 +247,7 @@ export class WindowsProviderDesktopProcessPort implements ProviderDesktopProcess
     return this.withSession(request.signal, async (session, requestId) => {
       await session.write(encodeRequest({
         schema: requestSchema,
-        version: 1,
+        version: 2,
         requestId,
         action: "launch",
         provider: request.provider,
@@ -385,14 +390,14 @@ function encodeRequest(value: Record<string, unknown>): string {
 }
 
 function authorization(requestId: string, token: string): string {
-  return encodeRequest({ schema: requestSchema, version: 1, requestId, kind: "authorize", authorizationToken: token });
+  return encodeRequest({ schema: requestSchema, version: 2, requestId, kind: "authorize", authorizationToken: token });
 }
 
 function parseResponse(line: string, requestId: string, expectedKind: "ready" | "result"): Record<string, unknown> {
   if (typeof line !== "string" || Buffer.byteLength(line, "utf8") > maximumProtocolBytes) throw new Error("The provider helper emitted an oversized response.");
   let value: unknown;
   try { value = JSON.parse(line); } catch { throw new Error("The provider helper emitted an invalid response."); }
-  if (!record(value) || value.schema !== responseSchema || value.version !== 1 || value.requestId !== requestId) {
+  if (!record(value) || value.schema !== responseSchema || value.version !== 2 || value.requestId !== requestId) {
     throw new Error("The provider helper response was not bound to the exact request.");
   }
   if (value.kind === "error") {
@@ -403,17 +408,18 @@ function parseResponse(line: string, requestId: string, expectedKind: "ready" | 
   return value;
 }
 
-function parseObservations(value: unknown): readonly { readonly processId: number; readonly surfaceId: string; readonly isForeground: boolean }[] {
+function parseObservations(value: unknown): readonly { readonly processId: number; readonly processStartTime: string; readonly surfaceId: string; readonly isForeground: boolean }[] {
   if (!Array.isArray(value) || value.length > maximumObservations) throw new Error("The provider helper returned an invalid or ambiguous observation set.");
   const seen = new Set<string>();
   return value.map((observation) => {
     if (!record(observation)) throw new Error("The provider helper returned an invalid observation.");
     const processId = processIdentity(observation.processId);
+    const processStartTime = processBirthIdentity(observation.processStartTime);
     const surfaceId = surfaceIdentity(observation.surfaceId);
     if (typeof observation.isForeground !== "boolean") throw new Error("The provider helper returned an invalid foreground observation.");
     if (seen.has(surfaceId)) throw new Error("The provider helper returned duplicate surface identities.");
     seen.add(surfaceId);
-    return { processId, surfaceId, isForeground: observation.isForeground };
+    return { processId, processStartTime, surfaceId, isForeground: observation.isForeground };
   });
 }
 
@@ -431,6 +437,11 @@ function processIdentity(value: unknown): number {
 
 function surfaceIdentity(value: unknown): string {
   if (typeof value !== "string" || !surfacePattern.test(value)) throw new Error("The provider helper returned an invalid surface identity.");
+  return value;
+}
+
+function processBirthIdentity(value: unknown): string {
+  if (typeof value !== "string" || !/^[1-9][0-9]{0,19}$/.test(value) || BigInt(value) > 0xffff_ffff_ffff_ffffn) throw new Error("The provider helper returned an invalid process birth identity.");
   return value;
 }
 

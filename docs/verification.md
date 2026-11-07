@@ -1,5 +1,15 @@
 # What has actually been verified
 
+The Windows provider desktop protocol now binds process creation identity from
+discovery through authorized focus and requires foreground readback. Six isolated
+groups pass **56 tests**, with exact child/tree cleanup; typecheck and the managed
+build pass. Native current-user/session checks use only TOKEN_QUERY 8 and remain
+unperformed locally. The Windows portable smoke now requires native self-process
+readback. Three reproduced regressions, two invalid harness attempts and two
+cross-platform fixture failures remain recorded. The exact 25-file, 417,149-byte
+owned staging is removed. Real Windows windows and Suite focus wiring remain
+separate. [Source evidence](evidence/provider-process-birth-source-summary.json).
+
 Installed `1cbe7a3` passes **71 metadata/in-memory checks** and verifies 21 exact
 module hashes. The observation preview/confirmation checks use synthetic state
 only. All 54 semantic workspaces, selection, the pending keyboard-only

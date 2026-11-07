@@ -320,6 +320,8 @@ export class AttestedProviderDesktopRegistry {
 
 export interface ProviderDesktopProcessObservation {
   readonly processId: number;
+  /** Exact unsigned Windows FILETIME creation identity, never a floating point timestamp. */
+  readonly processStartTime: string;
   readonly windowId: string;
   /** True only when the native helper observed this exact top-level surface as the foreground window. */
   readonly isForeground: boolean;
@@ -472,6 +474,7 @@ export class InstalledProviderDesktopLifecycle {
         shell: false,
         beforeEffect: () => this.finalBarrier(provider, operationId, "focus", installation, input.control)
       }));
+      if (focused.processId !== process.processId) throw new ProviderLifecycleError("failed", "The provider focus returned a different process identity.");
       return {
         status: "completed",
         summary: foregroundIndexes.length === 1 && observations.length > 1
@@ -768,6 +771,8 @@ function approvedOperator(value: Awaited<ReturnType<WindowsUserPresenceRunner["v
 
 function safeObservation(value: ProviderDesktopProcessObservation): boolean {
   return Number.isSafeInteger(value.processId) && value.processId > 0
+    && typeof value.processStartTime === "string" && /^[1-9][0-9]{0,19}$/.test(value.processStartTime)
+    && BigInt(value.processStartTime) <= 0xffff_ffff_ffff_ffffn
     && typeof value.windowId === "string" && /^[A-Za-z0-9:._-]{1,160}$/.test(value.windowId)
     && typeof value.isForeground === "boolean";
 }

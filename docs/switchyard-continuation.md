@@ -40,6 +40,16 @@ instructions. Do not merge or release.
 
 ## Current installed and source checkpoint
 
+The commissioned Windows provider adapter now carries exact process creation
+identity across discovery/focus, checks current-user/session with TOKEN_QUERY 8,
+and requires native foreground readback. Desktop helper protocol is v2; managed
+terminal descriptors remain v1. Six focused groups/56 checks, typecheck and the
+existing managed SDK build pass. Three reproduced regressions and two fixture
+path failures are retained. The exact owned 25-file build/test staging is removed.
+Actual Windows native checks remain pending; Suite Windows focus wiring is still
+unfinished. [Contract](../apps/windows-companion/provider-desktop-helper/README.md),
+[evidence](evidence/provider-process-birth-source-summary.json).
+
 Installed `1cbe7a3` passes **71 metadata/in-memory checks** and verifies 21 exact
 module hashes. The observation preview/confirmation checks use synthetic state
 only. All 54 semantic workspaces, selection, the pending keyboard-only
@@ -88,6 +98,16 @@ changes and predates Cargo archive identity and the workflow-ID correction.
 [Complete receipt](evidence/linux-aafb476-complete-summary.json).
 
 No full Linux test service or temporary marker remains from that run.
+
+A newer full **321-group** Linux run is active from immutable published
+`a6a6618ab22bb51d6d19d40d3676208c7fa75092` (tree
+`99e6a98f196d759057639a16b190787cbeac5273`). Its unit is
+`switchyard-verification-a6a6618-1794013677.service`; exact checkout, dependency
+aliases and temporary-parent identities are in
+`~/.cache/switchyard-full-linux-path.json`. Preserve that marker and its owned
+paths until final exit and exact inventory/cleanup verification. It uses the
+original command, timeout and skip manifest and existing toolchains. New Windows
+provider changes have separate focused evidence and are outside this source.
 
 Workflow editing now rejects non-string role/step IDs and repeated dependency
 edges before persistence. Two regressions reproduce the previous acceptance of

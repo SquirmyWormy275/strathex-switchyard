@@ -12,6 +12,17 @@ No merge or public release has been accepted.
 
 ## Current checkpoints
 
+The commissioned Windows provider adapter now rejects process-ID reuse across
+discovery/focus and requires current-user/session checks plus exact foreground
+readback. Six focused groups pass 56 checks; the managed build and type checking
+pass. Native Windows and real provider-window acceptance remain pending, and
+Suite Windows focus wiring remains unfinished.
+[Contract](../apps/windows-companion/provider-desktop-helper/README.md),
+[evidence](evidence/provider-process-birth-source-summary.json).
+
+A full 321-group Linux run from published `a6a6618` is active; no result is
+claimed until its final receipt and cleanup verify.
+
 | Checkpoint | Completed result | What it does not establish |
 | --- | --- | --- |
 | Complete Linux `aafb476` | **317 groups, 1,923 passing tests, sixteen declared skips**; exact original inventory, commands, bounds, child/tree and owned staging cleanup. [Receipt](evidence/linux-aafb476-complete-summary.json). | Later Cargo archive identity and workflow-ID corrections have separate focused evidence. |

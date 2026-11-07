@@ -8,6 +8,14 @@ Implementation: not started / in progress / implemented / unsupported by verifie
 Validation: not run / software-tested / host-tested / hardware-tested.
 Tests use synthetic data unless explicitly labelled host/hardware evidence.
 
+The commissioned Windows provider desktop adapter now binds process birth across
+discovery and focus, checks the current-user/session with QUERY-only tokens and
+requires native foreground readback. Six focused groups/56 checks and the managed
+build pass. Native Windows provider acceptance is pending; the Suite's Windows
+focus connection is still unfinished implementation.
+[Contract](../apps/windows-companion/provider-desktop-helper/README.md),
+[source evidence](evidence/provider-process-birth-source-summary.json).
+
 | Requirement | Implementation | Validation | Actual paths | UI entry | Tests | Remaining implementation / exact blocked validation |
 | --- | --- | --- | --- | --- | --- | --- |
 | Product shell and UX | in progress | software-tested | tools/layout-studio/{home,catalog,app,shell,keyboard-view}.mjs; index.html; style.css | Home → Keep my place; Customize | catalog/model/configuration tests | Value-first Home implemented; manual browser refresh/visual acceptance pending. Guided setup still exposes unfinished role wiring. |

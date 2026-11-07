@@ -94,7 +94,7 @@ function port(helperPath: string, helperSha256: string, transport: FakeTransport
 }
 
 function envelope(request: Record<string, unknown>, kind: "ready" | "result" | "error", body: Record<string, unknown>): string {
-  return JSON.stringify({ schema: responseSchema, version: 1, requestId: request.requestId, kind, ...body });
+  return JSON.stringify({ schema: responseSchema, version: 2, requestId: request.requestId, kind, ...body });
 }
 
 test("list uses only the exact hash-bound helper and a sanitized fixed protocol", async (context) => {
@@ -102,7 +102,7 @@ test("list uses only the exact hash-bound helper and a sanitized fixed protocol"
   const transport = new FakeTransport();
   transport.configure = (session) => {
     session.onWrite = (request) => session.responses.push(envelope(request, "result", {
-      observations: [{ processId: 4100, surfaceId: "hwnd:100f", isForeground: true }]
+      observations: [{ processId: 4100, processStartTime: "133000000000000001", surfaceId: "hwnd:100f", isForeground: true }]
     }));
   };
   const processPort = port(setup.helperPath, digest("fixed native helper"), transport);
@@ -111,9 +111,10 @@ test("list uses only the exact hash-bound helper and a sanitized fixed protocol"
 
   assert.equal(observations.length, 1);
   assert.equal(observations[0]?.windowId, "hwnd:100f");
+  assert.equal(observations[0]?.processStartTime, "133000000000000001");
   assert.equal(observations[0]?.isForeground, true);
   assert.deepEqual(observations[0]?.identity, setup.identity);
-  assert.deepEqual(transport.invocations[0]?.arguments, ["--stdio-v1"]);
+  assert.deepEqual(transport.invocations[0]?.arguments, ["--stdio-v2"]);
   assert.deepEqual(transport.invocations[0]?.environment, { SystemRoot: "C:\\Windows", WINDIR: "C:\\Windows" });
   const request = JSON.parse(transport.sessions[0]!.writes[0]!) as Record<string, unknown>;
   assert.equal(request.action, "list");
@@ -131,19 +132,19 @@ test("focus authorizes only after the host barrier while the helper holds the ex
     session.onWrite = (request) => {
       if (request.kind === "authorize") {
         ordering.push("authorize");
-        session.responses.push(envelope(request, "result", { processId: 4100, surfaceId: "hwnd:100f" }));
+        session.responses.push(envelope(request, "result", { processId: 4100, processStartTime: "133000000000000001", surfaceId: "hwnd:100f", windowFocusVerified: true }));
       } else {
         ordering.push("prepare");
-        session.responses.push(envelope(request, "ready", { authorizationToken: "a".repeat(64), processId: 4100, surfaceId: "hwnd:100f" }));
+        session.responses.push(envelope(request, "ready", { authorizationToken: "a".repeat(64), processId: 4100, processStartTime: "133000000000000001", surfaceId: "hwnd:100f", windowFocusVerified: true }));
       }
     };
   };
   const processPort = port(setup.helperPath, digest("fixed native helper"), transport);
-  const request: ProviderProcessEffectRequest & { readonly process: { readonly processId: number; readonly windowId: string; readonly isForeground: boolean; readonly identity: ProviderExecutableIdentity } } = {
+  const request: ProviderProcessEffectRequest & { readonly process: { readonly processId: number; readonly processStartTime: string; readonly windowId: string; readonly isForeground: boolean; readonly identity: ProviderExecutableIdentity } } = {
     provider: "claude_desktop",
     operationId: "focus-operation",
     identity: setup.identity,
-    process: { processId: 4100, windowId: "hwnd:100f", isForeground: true, identity: setup.identity },
+    process: { processId: 4100, processStartTime: "133000000000000001", windowId: "hwnd:100f", isForeground: true, identity: setup.identity },
     signal: new AbortController().signal,
     shell: false,
     async beforeEffect() { ordering.push("barrier"); }
@@ -151,6 +152,7 @@ test("focus authorizes only after the host barrier while the helper holds the ex
 
   assert.deepEqual(await processPort.focusExisting(request), { processId: 4100 });
   assert.deepEqual(ordering, ["prepare", "barrier", "authorize"]);
+  assert.equal(JSON.parse(transport.sessions[0]!.writes[0]!).expectedProcessStartTime, "133000000000000001");
   const authorization = JSON.parse(transport.sessions[0]!.writes[1]!) as Record<string, unknown>;
   assert.equal(authorization.kind, "authorize");
   assert.equal(authorization.authorizationToken, "a".repeat(64));
@@ -161,7 +163,7 @@ test("focus never authorizes an ambiguous, changed, or cancelled surface", async
   const transport = new FakeTransport();
   transport.configure = (session) => {
     session.onWrite = (request) => session.responses.push(envelope(request, "ready", {
-      authorizationToken: "b".repeat(64), processId: 9999, surfaceId: "hwnd:changed"
+      authorizationToken: "b".repeat(64), processId: 9999, processStartTime: "133000000000000001", surfaceId: "hwnd:changed"
     }));
   };
   const processPort = port(setup.helperPath, digest("fixed native helper"), transport);
@@ -170,7 +172,7 @@ test("focus never authorizes an ambiguous, changed, or cancelled surface", async
     provider: "claude_desktop",
     operationId: "changed-focus",
     identity: setup.identity,
-    process: { processId: 4100, windowId: "hwnd:100f", isForeground: true, identity: setup.identity },
+    process: { processId: 4100, processStartTime: "133000000000000001", windowId: "hwnd:100f", isForeground: true, identity: setup.identity },
     signal: new AbortController().signal,
     shell: false,
     async beforeEffect() { barrierCalled = true; }
@@ -182,7 +184,7 @@ test("focus never authorizes an ambiguous, changed, or cancelled surface", async
   const cancelledTransport = new FakeTransport();
   cancelledTransport.configure = (session) => {
     session.onWrite = (request) => session.responses.push(envelope(request, "ready", {
-      authorizationToken: "c".repeat(64), processId: 4100, surfaceId: "hwnd:100f"
+      authorizationToken: "c".repeat(64), processId: 4100, processStartTime: "133000000000000001", surfaceId: "hwnd:100f"
     }));
   };
   const controller = new AbortController();
@@ -190,13 +192,76 @@ test("focus never authorizes an ambiguous, changed, or cancelled surface", async
     provider: "claude_desktop",
     operationId: "cancelled-focus",
     identity: setup.identity,
-    process: { processId: 4100, windowId: "hwnd:100f", isForeground: true, identity: setup.identity },
+    process: { processId: 4100, processStartTime: "133000000000000001", windowId: "hwnd:100f", isForeground: true, identity: setup.identity },
     signal: controller.signal,
     shell: false,
     async beforeEffect() { controller.abort(new Error("cancelled")); }
   }), /cancel/i);
   assert.equal(cancelledTransport.sessions[0]?.writes.length, 1);
   assert.equal(cancelledTransport.sessions[0]?.terminated, true);
+});
+
+test("focus refuses a recycled PID even when the executable and window handle match", async (context) => {
+  const setup = await fixture(context), transport = new FakeTransport();
+  let barrierCalls = 0;
+  transport.configure = session => { session.onWrite = request => session.responses.push(envelope(request,
+    request.kind === "authorize" ? "result" : "ready", {
+      authorizationToken: "d".repeat(64), processId: 4100, surfaceId: "hwnd:100f",
+      processStartTime: "133000000000000002", windowFocusVerified: true
+    })); };
+  const process = { processId: 4100, windowId: "hwnd:100f", isForeground: false,
+    processStartTime: "133000000000000001", identity: setup.identity };
+  await assert.rejects(port(setup.helperPath, digest("fixed native helper"), transport).focusExisting({
+    provider: "claude_desktop", operationId: "recycled-pid", identity: setup.identity, process,
+    signal: new AbortController().signal, shell: false, async beforeEffect() { barrierCalls++; }
+  }), /birth|start|changed/i);
+  assert.equal(barrierCalls, 0);
+  assert.equal(transport.sessions[0]?.writes.length, 1);
+  assert.equal(transport.sessions[0]?.terminated, true);
+});
+
+test("focus requires unchanged process birth and native foreground readback after authorization", async (context) => {
+  const setup = await fixture(context);
+  for (const changed of ["birth", "missing-birth", "readback", "missing-readback"]) {
+    const transport = new FakeTransport(); let barrierCalls = 0;
+    transport.configure = session => { session.onWrite = request => {
+      const authorized = request.kind === "authorize";
+      session.responses.push(envelope(request, authorized ? "result" : "ready", {
+        authorizationToken: "e".repeat(64), processId: 4100, surfaceId: "hwnd:100f",
+        processStartTime: authorized && changed === "missing-birth" ? undefined : authorized && changed === "birth" ? "133000000000000002" : "133000000000000001",
+        windowFocusVerified: authorized && changed === "missing-readback" ? undefined : !(authorized && changed === "readback")
+      }));
+    }; };
+    const process = { processId: 4100, windowId: "hwnd:100f", isForeground: false,
+      processStartTime: "133000000000000001", identity: setup.identity };
+    await assert.rejects(port(setup.helperPath, digest("fixed native helper"), transport).focusExisting({
+      provider: "claude_desktop", operationId: "readback-" + changed, identity: setup.identity, process,
+      signal: new AbortController().signal, shell: false, async beforeEffect() { barrierCalls++; }
+    }), /birth|start|changed|readback|foreground/i);
+    assert.equal(barrierCalls, 1); assert.equal(transport.sessions[0]?.writes.length, 2);
+    assert.equal(transport.sessions[0]?.terminated, true);
+  }
+});
+
+test("list refuses missing or lossy process birth identities", async (context) => {
+  const setup = await fixture(context);
+  for (const processStartTime of [undefined, 133000000000000001, "0", "01", "-1", "18446744073709551616"]) {
+    const transport = new FakeTransport();
+    transport.configure = session => { session.onWrite = request => session.responses.push(envelope(request, "result", {
+      observations: [{ processId: 4100, surfaceId: "hwnd:100f", isForeground: false, processStartTime }]
+    })); };
+    await assert.rejects(port(setup.helperPath, digest("fixed native helper"), transport).listRunning(setup.identity, new AbortController().signal), /birth|start/i);
+    assert.equal(transport.sessions[0]?.terminated, true);
+  }
+});
+
+test("old helper protocol cannot substitute for witnessed process discovery", async (context) => {
+  const setup = await fixture(context), transport = new FakeTransport();
+  transport.configure = session => { session.onWrite = request => session.responses.push(envelope(request, "result", { version: 1,
+    observations: [{ processId: 4100, processStartTime: "133000000000000001", surfaceId: "hwnd:100f", isForeground: false }]
+  })); };
+  await assert.rejects(port(setup.helperPath, digest("fixed native helper"), transport).listRunning(setup.identity, new AbortController().signal), /bound to the exact request/i);
+  assert.equal(transport.sessions[0]?.terminated, true);
 });
 
 test("fresh launch binds fixed arguments and proves a new distinct surface", async (context) => {
