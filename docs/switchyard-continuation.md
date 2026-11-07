@@ -221,6 +221,16 @@ now registered in the existing 120-second Linux/300-second Windows class.
 
 ## Complete verification checkpoints
 
+Complete Linux `d09645a` passes **326 groups, 2,013 tests and sixteen declared
+skips**, with zero failures or cancellations. The exact original inventory,
+commands, deadlines, output bounds and child/tree exits verify. Its owned clean
+checkout, nine dependency aliases, 788 generated files (11,803,414 bytes), empty
+temporary parent and ownership marker are removed; other worktrees are preserved.
+This checkpoint includes wheel-license, staged/historical preparation and the
+read-only index correction. Later scanner-draft assembly has separate focused
+and installed evidence.
+[Complete receipt](evidence/linux-d09645a-complete-summary.json).
+
 Complete Windows `dc755901` now passes **417 groups, 2,478 tests and 207
 declared skips**. The overall workflow and all six jobs succeed. Exact source/merge
 trees, packet digest, original group inventory, command arguments, bounds and
@@ -303,13 +313,7 @@ native Windows profile correction acceptance remains separate.
 [Installed evidence](evidence/installed-profile-identity-summary.json).
 [Source evidence](evidence/profile-identity-source-summary.json).
 
-1. Finish the complete Linux run at `d09645a`, started from an immutable clean
-   checkout after installed history verification. Its private ownership marker is
-   `linux-full-d09645a-active.json`. Audit the exact 326-group manifest, original
-   commands/bounds/skips and all child/tree exits before accepting it. Remove only
-   the recorded owned checkout, dependency aliases, generated files and test root.
-   Retain any failure and fix it without widening test allowances.
-2. Complete reviewed scanner draft saving/installation. The authenticated
+1. Complete reviewed scanner draft saving/installation. The authenticated
    scanner-draft route now assembles engine/request/feed/recipe files and exact
    proposed authority scope. It returns generated control text, no repository
    source content, approval token or effect. Preserve its fresh trust/expiry and
@@ -317,16 +321,16 @@ native Windows profile correction acceptance remains separate.
    approval, durable interrupted-save recovery and a fresh target review after
    materialization. Frontend controls remain frozen. Mixed index/history
    execution is still unsupported.
-3. Continue Windows project and task-specific IDE integration, broader external
+2. Continue Windows project and task-specific IDE integration, broader external
    observation streams and the remaining ledger gaps. Inspect available native
    receipts separately: workflow completion alone is insufficient without exact
    source, packet, command, original bounds and cleanup verification. Native focus
    alone does not establish a project, task, account or foreground binding.
-4. Keep remaining guided role/device wiring and editor activation explicit as
+3. Keep remaining guided role/device wiring and editor activation explicit as
    unfinished implementation while frontend review is frozen. The composed
    editor proof uses real encrypted state and Linux carriers with provider and
    terminal doubles. It does not accept native TUI/account/IDE behavior.
-5. Investigate new failures using exact receipts. Windows shortcut startup and a
+4. Investigate new failures using exact receipts. Windows shortcut startup and a
    fixture Python startup timeout have passing follow-ups but unresolved causes.
    Do not extend deadlines or change accounts/permissions to make tests pass.
 

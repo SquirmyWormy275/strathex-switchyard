@@ -1,5 +1,15 @@
 # Switchyard authoritative requirement ledger
 
+Complete Linux `d09645a` passes **326 groups, 2,013 tests and sixteen declared
+skips**, with zero failures or cancellations. The exact original inventory,
+commands, deadlines, output bounds and child/tree exits verify. Its owned clean
+checkout, nine dependency aliases, 788 generated files (11,803,414 bytes), empty
+temporary parent and ownership marker are removed; other worktrees are preserved.
+This checkpoint includes wheel-license, staged/historical preparation and the
+read-only index correction. Later scanner-draft assembly has separate focused
+and installed evidence.
+[Complete receipt](evidence/linux-d09645a-complete-summary.json).
+
 Installed `6ab9b1e` verifies scan-draft assembly within **76 metadata/in-memory
 checks and 30 exact module hashes**. All 54 semantic workspaces, selection,
 pending keyboard-only conversation and frozen frontend are preserved; 53 sealed
