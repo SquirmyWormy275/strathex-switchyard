@@ -3,6 +3,46 @@ import assert from "node:assert/strict";
 import { verifyRestrictedOwnerReport, storageBrokerFailureEvidence, parseNodeRngImports, verifyNodeRngImports } from "./windows-restricted-owner-report.mjs";
 import { createWindowsOwnerProbeObservation } from "./windows-owner-probe-observation.mjs";
 import { verifyNativeSetupImage } from "./windows-setup-image.mjs";
+import { verifyWindowsBrokerOwnerRetirement } from "./windows-broker-owner-proof.mjs";
+
+test("final retirement checks each original owner and independent exit without changing its journal", async () => {
+  const owners = Array.from({ length: 64 }, (_, i) => ({ stoppedVerified: true, ownedRuntime: { privateId: "NEVER_RETAIN-" + i } }));
+  const before = structuredClone(owners), calls = [], phases = [];
+  await verifyWindowsBrokerOwnerRetirement(owners, async frame => { calls.push(frame); return true; }, value => phases.push(value));
+  assert.deepEqual(owners, before); assert.equal(calls.length, 64);
+  for (let i = 0; i < calls.length; i++) assert.equal(calls[i], owners[i].ownedRuntime);
+  assert.equal(phases[0], "native-exit-owner-inventory");
+  assert.equal(phases.at(-1), "native-exit-owner-64-guardian");
+  assert.ok(phases.every(value => /^[A-Za-z0-9-]{1,80}$/.test(value)));
+  assert.equal(JSON.stringify(phases).includes("NEVER_RETAIN"), false);
+});
+
+test("a missing recorded stop or failed exact guardian preserves the first failing owner phase", async () => {
+  for (const failure of ["recorded", "guardian", "throws"]) {
+    const owners = [{ stoppedVerified: true, ownedRuntime: {} }, { stoppedVerified: failure !== "recorded", ownedRuntime: { privateId: "NEVER_RETAIN" } }, { stoppedVerified: true, ownedRuntime: {} }];
+    const before = structuredClone(owners), original = Error("NEVER_RETAIN"), calls = []; let phase;
+    await assert.rejects(verifyWindowsBrokerOwnerRetirement(owners, async frame => {
+      calls.push(frame);
+      if (frame === owners[1].ownedRuntime) { if (failure === "throws") throw original; return false; }
+      return true;
+    }, value => { phase = value; }), error => failure === "throws" ? error === original : error.name === "AssertionError");
+    assert.deepEqual(owners, before); assert.equal(calls.length, failure === "recorded" ? 1 : 2);
+    assert.equal(phase, "native-exit-owner-2-" + (failure === "recorded" ? "recorded" : "guardian"));
+    const child = { waitResult: 0, resultAvailable: true, exitCode: 2, completedChecks: 7, failedPhase: phase, failureCategory: failure === "throws" ? "Error" : "AssertionError" };
+    const evidence = storageBrokerFailureEvidence({ schema: "switchyard-storage-broker-protocol-proof/v1", success: false, restrictedHostChildExit: child });
+    assert.deepEqual(evidence.restrictedHostChildExit, child);
+    assert.equal(JSON.stringify(evidence).includes("NEVER_RETAIN"), false);
+    assert.throws(() => verifyRestrictedOwnerReport(evidence));
+  }
+});
+
+test("final retirement refuses a missing or oversized original inventory before querying any guardian", async () => {
+  for (const owners of [undefined, null, {}, [], Array(65).fill({ stoppedVerified: true, ownedRuntime: {} })]) {
+    let calls = 0, phase;
+    await assert.rejects(verifyWindowsBrokerOwnerRetirement(owners, async () => { calls++; return true; }, value => { phase = value; }));
+    assert.equal(calls, 0); assert.equal(phase, "native-exit-owner-inventory");
+  }
+});
 
 function setupImage() {
   const bytes = Buffer.alloc(4096), u16 = (offset, value) => bytes.writeUInt16LE(value, offset), u32 = (offset, value) => bytes.writeUInt32LE(value, offset);

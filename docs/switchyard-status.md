@@ -137,6 +137,11 @@ is not yet identified; original ownership and fixture data are preserved. Native
 scanner saving passed in that workflow. This is an unresolved software/native CI
 failure, not unavailable hardware or an account blocker.
 [Retained failure](evidence/windows-restricted-storage-retirement-failure-summary.json).
+The next native run now reports the exact owner ordinal and recorded-stop,
+guardian-exit or directory-retirement step. Five source groups pass 80 tests;
+all original acceptance checks and permission boundaries remain. This is a
+diagnostic improvement, not a verified native repair.
+[Diagnostic evidence](evidence/native-retirement-phase-source-summary.json).
 
 The earlier complete Linux [49a5053 failure](evidence/linux-49a5053-failed-summary.json)
 and [39db1fe scheduling failure](evidence/linux-39db1fe-scheduling-failed-summary.json)

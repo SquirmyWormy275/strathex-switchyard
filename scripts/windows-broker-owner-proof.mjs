@@ -12,6 +12,18 @@ import { runtimeGuardianStopped, runRuntimeCommand } from "../tools/layout-studi
 import { stateLockFailureEvidence } from "../tools/layout-studio/keyless-lease-pool.mjs";
 import { createWindowsOwnerProbeObservation } from "./windows-owner-probe-observation.mjs";
 
+/** Keep original exit assertions; report only a bounded ordinal and fixed phase. */
+export async function verifyWindowsBrokerOwnerRetirement(owners, guardianStopped, setPhase) {
+  setPhase("native-exit-owner-inventory");
+  assert.ok(Array.isArray(owners) && owners.length > 0 && owners.length <= 64);
+  for (const [index, owner] of owners.entries()) {
+    setPhase(`native-exit-owner-${index + 1}-recorded`);
+    assert.equal(owner.stoppedVerified, true);
+    setPhase(`native-exit-owner-${index + 1}-guardian`);
+    assert.equal(await guardianStopped(owner.ownedRuntime), true);
+  }
+}
+
 export async function verifyWindowsBrokerOwner({ helper, installationId, serviceImageSha256, nativeControl }) {
   if (process.platform !== "win32" || process.env.GITHUB_ACTIONS !== "true" || process.env.RUNNER_OS !== "Windows") throw Error("The actual broker-owner proof requires the explicit disposable Windows worker.");
   const root = await mkdtemp(join(process.env.RUNNER_TEMP || tmpdir(), "sxbo-")), original = await directoryIdentity(root), keys = new Map(), checks = [];
@@ -51,10 +63,14 @@ export async function verifyWindowsBrokerOwner({ helper, installationId, service
     assert.equal((await store.snapshot("personal")).repositoryWindowsBrokerExchanges.length, 1); checks.push("retired operation cannot create or transfer another image");
     phase = "native-exit-and-fixture-retirement";
     const owners = (await store.snapshot("personal")).windowsStorageNative;
-    assert.ok(owners.length > 0);
-    for (const owner of owners) { assert.equal(owner.stoppedVerified, true); assert.equal(await guardianStopped(owner.ownedRuntime), true); }
-    await service.close(); const current = await directoryIdentity(root); assert.equal(current.dev, original.dev); assert.equal(current.ino, original.ino);
+    await verifyWindowsBrokerOwnerRetirement(owners, guardianStopped, value => { phase = value; });
+    phase = "native-exit-service-close"; await service.close();
+    phase = "native-exit-directory-observe"; const current = await directoryIdentity(root);
+    phase = "native-exit-directory-device"; assert.equal(current.dev, original.dev);
+    phase = "native-exit-directory-inode"; assert.equal(current.ino, original.ino);
+    phase = "native-exit-fixture-remove";
     await rm(root, { recursive: true }); checks.push("every retained native Job guardian independently exited and only the exact synthetic private fixture was removed");
+    phase = "native-exit-check-inventory";
     assert.equal(checks.length, 8);
     return { schema: "switchyard-native-broker-owner-proof/v1", success: true, checks, nativeExitVerified: true, fixtureRemoved: true, guestLaunched: false, setupRequested: false, accountCreated: false, ordinaryUserToken: false };
   } catch (error) {

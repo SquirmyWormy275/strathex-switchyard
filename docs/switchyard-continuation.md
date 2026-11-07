@@ -345,7 +345,9 @@ native Windows profile correction acceptance remains separate.
    exact native acceptance and remaining ledger gaps. Linux and Windows
    reviewed saving are implemented; Windows saving has native acceptance.
    Mixed NTFS staging still needs its exact native receipt. Diagnose the retained
-   restricted-storage final retirement assertion without changing permissions.
+   restricted-storage final retirement assertion without changing permissions. The
+   diagnostic follow-up passes five groups/80 tests and records a fixed phase and
+   owner ordinal; it has not yet identified or repaired the native cause.
 2. Continue Windows project and task-specific IDE integration, broader external
    observation streams and the remaining ledger gaps. Inspect available native
    receipts separately: workflow completion alone is insufficient without exact
