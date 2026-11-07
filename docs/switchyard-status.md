@@ -14,15 +14,19 @@ No merge or public release has been accepted.
 
 | Checkpoint | Completed result | What it does not establish |
 | --- | --- | --- |
-| Complete Linux `68bcc76` | 310 groups, 1,875 passing tests, sixteen declared skips; exact child/tree and owned staging cleanup. [Receipt](evidence/linux-68bcc76-complete-summary.json). | Later helper, SDK, scanner-input, Python and Cargo changes are outside this checkpoint. |
+| Complete Linux `aafb476` | **317 groups, 1,923 passing tests, sixteen declared skips**; exact original inventory, commands, bounds, child/tree and owned staging cleanup. [Receipt](evidence/linux-aafb476-complete-summary.json). | Later Cargo archive identity and workflow-ID corrections have separate focused evidence. |
 | Complete Windows `cadbccd` | 416 groups, 2,443 passing tests and 204 declared skips; packet hashes, source/merge trees, inventory, deadlines and cleanup verify. [Receipt](evidence/windows-complete-cadbccd-summary.json). | The overall workflow failed because preliminary backend shard 3 was cancelled without a final receipt. Later changes are outside this checkpoint. |
 | Installed Linux `12b3c87` | 56 metadata/in-memory checks and fourteen exact installed module hashes. All 54 semantic workspace snapshots, selection, pending keyboard-only conversation and frozen frontend are preserved. [Receipt](evidence/installed-cargo-archive-summary.json). | These checks start no scanner process, Cargo process, live task, agent, account action, model request or hardware operation. |
 | Complete Linux `39db1fe` | **Failed:** 313/314 groups, 1,910 passing tests, sixteen declared skips and one failed scheduling-budget assertion. Exact owned cleanup verifies. [Receipt](evidence/linux-39db1fe-scheduling-failed-summary.json). | A nearly passing run is not complete acceptance. |
 
-An immutable **317-group Linux run on aafb476 is active**. It uses the existing
-pinned Node binary, a short owned temporary parent and the original bounds.
-Progress is not a final result. Later Cargo archive work has its own focused
-checks and is outside this immutable run.
+Complete Linux aafb476 passes **317 groups, 1,923 tests and sixteen declared
+skips**, with zero failures/cancellations. The exact original manifest, commands,
+deadlines and skip inventory verify, along with every child/tree retirement.
+The owned checkout, nine dependency aliases, 782 generated files (11,766,823
+bytes), empty temporary parent and marker are removed; all other worktrees
+remain. This checkpoint includes wheel RECORD and five-shard scheduling
+changes and predates Cargo archive identity and the workflow-ID correction.
+[Complete receipt](evidence/linux-aafb476-complete-summary.json).
 
 The installed update verifies a dated backup and launcher readback. It retains
 current plus one rollback and removes the exact 528-file, 5,229,972-byte prepared
@@ -45,6 +49,15 @@ overlay, saved artwork and workstation guard.
 | Installation and recovery | Versioned private bundles, integrity checks, installation/update/rollback and interrupted-install recovery. [Installation](suite-installation.md), [recovery](suite-release-recovery.md). |
 
 ## Latest changes and limits
+
+Workflow editing now rejects non-string role/step IDs and repeated dependency
+edges before persistence. Two regressions reproduce the previous acceptance of
+malformed JSON identities; four focused groups/72 checks now pass, including
+unchanged encrypted profile, bindings and history after refusal. Read-only
+compatibility checks accept all 57 saved workflows across 54 workspaces and
+preserve all 54 sealed files byte-for-byte. Typecheck, original package bounds
+and exact cleanup pass. Installed correction and native Windows acceptance
+remain pending. [Source and compatibility evidence](evidence/workflow-identity-source-summary.json).
 
 Python wheels now receive bounded ZIP/metadata identity checks and supported
 SHA-256/384/512 RECORD member comparisons without extraction or execution.

@@ -1,0 +1,97 @@
+{
+  "schema": "switchyard-workflow-identity-validation/v1",
+  "at": "2026-11-07T00:32:34.894466+00:00",
+  "baseSource": "7ddac79af27c5310caa4c6e092876b3e4166eaf5",
+  "sourceFiles": {
+    "tools/layout-studio/workflow.mjs": "21305677d67b99e401050c705c40535f059cc15cb7ccf7de696b65ef4be9c7b4",
+    "tools/layout-studio/suite.test.mjs": "bd0ba123638955415b0e0868b581342e464ad21d22114f2b29c0bf51f86cfe56"
+  },
+  "receipts": [
+    {
+      "name": "isolated-test-50f8d774-23af-4597-83c0-3d8bac296f4b.json",
+      "sha256": "1138c80354dabb266ae93866c83f5e529159b5778a3dfc8e31984138372b5c0f",
+      "success": false,
+      "totals": {
+        "required": 1,
+        "passed": 0,
+        "failed": 1,
+        "tests": 1,
+        "passedTests": 1,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "name": "isolated-test-88b3985b-610c-4a8d-aaa2-774247890263.json",
+      "sha256": "47a0186a6d5e5fea07b079476a792527a0ab2d3a3f029ad6ff647a064b375516",
+      "success": false,
+      "totals": {
+        "required": 2,
+        "passed": 0,
+        "failed": 2,
+        "tests": 2,
+        "passedTests": 0,
+        "failedTests": 2,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "name": "isolated-test-11bc9e23-d459-4170-acb2-00964f9804ff.json",
+      "sha256": "e01c49a1cdd559b77f12445b0491a56b0e836d94dcd3c9dc7cf33beecc105614",
+      "success": true,
+      "totals": {
+        "required": 2,
+        "passed": 2,
+        "failed": 0,
+        "tests": 2,
+        "passedTests": 2,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "name": "isolated-test-64566198-26a5-4784-924c-1b95365f3ff6.json",
+      "sha256": "7274d00c5b1db6bbd4885ea0564b8a0fa6ea145e7f171a7107169b156257d448",
+      "success": true,
+      "totals": {
+        "required": 4,
+        "passed": 4,
+        "failed": 0,
+        "tests": 72,
+        "passedTests": 72,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    }
+  ],
+  "reproducedRegressions": 2,
+  "acceptedDistinctGroups": 4,
+  "acceptedDistinctTests": 72,
+  "encryptedProfileBindingsAndHistoryPreservedOnRefusal": true,
+  "compatibility": {
+    "receipt": "workflow-identity-compatibility-1794011435407.json",
+    "sha256": "7d342b610f96e755ea30706339e52e5573e617d9df862eb79c7cb43c880b594e",
+    "workspaces": 54,
+    "workflows": 57,
+    "unchangedSealedFiles": 54,
+    "metadataOnly": true
+  },
+  "initialSelectionFailure": "Literal exact-name selector was given a regex alternative. Runner refused the empty test plan; zero accepted checks. Corrected to two exact names.",
+  "initialGroupSelectionFailure": "Requested nonexistent workspace.test.mjs; manifest-count assertion stopped before children. Corrected to the existing configuration.test.mjs.",
+  "typecheck": true,
+  "originalPackageBudgetPassed": true,
+  "allChildAndTreeCleanupVerified": true,
+  "exactOwnedRootRemoved": true,
+  "liveTaskOrAccountAction": false,
+  "frontendChanged": false,
+  "installedCorrectionAcceptance": false,
+  "nativeWindowsCorrectionAcceptance": false
+}

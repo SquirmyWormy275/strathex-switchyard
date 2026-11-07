@@ -437,6 +437,31 @@ test("workflow edits validate role bindings, step relationships and cycles", () 
   assert.throws(() => parseWorkflow({ ...workflow, schema: "switchyard-workflow/v99" }), /version is unsupported/);
 });
 
+test("workflow identities and relationships refuse JSON type coercion and duplicate edges", () => {
+  const valid = { name: "Review", roles: [{ id: "builder", label: "Builder" }], steps: [{ id: "build", label: "Build", roleId: "builder", after: [] }, { id: "review", label: "Review", after: ["build"] }] };
+  for (const value of [undefined, null, 1, true, ["builder"], {}, "", "bad id"]) {
+    assert.throws(() => parseWorkflow({ ...valid, roles: [{ id: value, label: "Builder" }], steps: [] }), /role identity/);
+    assert.throws(() => parseWorkflow({ ...valid, steps: [{ id: value, label: "Build", after: [] }] }), /relationship/);
+  }
+  for (const after of [["build", "build"], [1], [null], [["build"]]]) assert.throws(() => parseWorkflow({ ...valid, steps: [valid.steps[0], { ...valid.steps[1], after }] }), /relationship/);
+  assert.deepEqual(parseWorkflow(valid).steps[1].after, ["build"]);
+});
+
+test("invalid workflow edits preserve the encrypted profile, role bindings and revision history", () => fixture(async ({ store, root }) => {
+  await store.initialize("personal");
+  const workflow = parseWorkflow({ name: "Review", roles: [{ id: "builder", label: "Builder" }], steps: ["Build", "Review"] });
+  await store.saveProfile("personal", portableProfile(samplePlan(), "desk", "Desk", workflow));
+  const before = await store.snapshot("personal"), bytes = await readFile(join(root, "personal.sealed.json"));
+  for (const edit of [
+    { ...workflow, roles: [{ id: 1, label: "Builder" }], steps: [] },
+    { ...workflow, steps: [{ id: null, label: "Build", after: [] }] },
+    { ...workflow, steps: [workflow.steps[0], { ...workflow.steps[1], after: [workflow.steps[0].id, workflow.steps[0].id] }] }
+  ]) {
+    await assert.rejects(store.saveWorkflow("personal", edit), /role identity|relationship/);
+    assert.deepEqual(await store.snapshot("personal"), before); assert.deepEqual(await readFile(join(root, "personal.sealed.json")), bytes);
+  }
+}));
+
 test("workflow reordering preserves role meaning, while renaming cannot silently inherit a bound role", () => {
   const previous = parseWorkflow({ name: "Loop", roles: [{ id: "builder", label: "Builder" }, { id: "reviewer", label: "Reviewer" }], steps: [{ id: "build", label: "Build", roleId: "builder", after: [] }, { id: "review", label: "Review", roleId: "reviewer", after: ["build"] }] });
   const reordered = reconcileWorkflow({ name: "Loop", roles: ["Reviewer", "Builder"], steps: ["Review", "Build"] }, previous);

@@ -1,5 +1,23 @@
 # What has actually been verified
 
+Complete Linux aafb476 passes **317 groups, 1,923 tests and sixteen declared
+skips**, with zero failures/cancellations. The exact original manifest, commands,
+deadlines and skip inventory verify, along with every child/tree retirement.
+The owned checkout, nine dependency aliases, 782 generated files (11,766,823
+bytes), empty temporary parent and marker are removed; all other worktrees
+remain. This checkpoint includes wheel RECORD and five-shard scheduling
+changes and predates Cargo archive identity and the workflow-ID correction.
+[Complete receipt](evidence/linux-aafb476-complete-summary.json).
+
+Workflow editing now rejects non-string role/step IDs and repeated dependency
+edges before persistence. Two regressions reproduce the previous acceptance of
+malformed JSON identities; four focused groups/72 checks now pass, including
+unchanged encrypted profile, bindings and history after refusal. Read-only
+compatibility checks accept all 57 saved workflows across 54 workspaces and
+preserve all 54 sealed files byte-for-byte. Typecheck, original package bounds
+and exact cleanup pass. Installed correction and native Windows acceptance
+remain pending. [Source and compatibility evidence](evidence/workflow-identity-source-summary.json).
+
 Installed 12b3c87 passes **56 metadata/in-memory checks**: thirteen task-owner,
 seven Copilot-journal, fourteen agent/helper/SDK, twelve Python and ten Cargo.
 Fourteen exact installed module hashes verify. The Cargo verifier includes all

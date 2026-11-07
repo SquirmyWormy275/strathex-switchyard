@@ -70,29 +70,32 @@ now registered in the existing 120-second Linux/300-second Windows class.
 [Contract](cargo-archive-identity.md),
 [source evidence](evidence/cargo-archive-source-summary.json).
 
-## Complete verification still running
+## Complete verification checkpoints
 
-An immutable **317-group Linux run on aafb476** is active under the transient
-user service `switchyard-verification-aafb476-1794009853.service`. Its marker is
-`~/.cache/switchyard-full-linux-path.json`. Read the marker for the exact owned
-checkout, temporary parent, process identity, dependency aliases and progress.
-Do not modify or remove an active checkout, and do not count progress as a final
-receipt. This source predates the later Cargo archive implementation.
+Complete Linux aafb476 passes **317 groups, 1,923 tests and sixteen declared
+skips**, with zero failures/cancellations. The exact original manifest, commands,
+deadlines and skip inventory verify, along with every child/tree retirement.
+The owned checkout, nine dependency aliases, 782 generated files (11,766,823
+bytes), empty temporary parent and marker are removed; all other worktrees
+remain. This checkpoint includes wheel RECORD and five-shard scheduling
+changes and predates Cargo archive identity and the workflow-ID correction.
+[Complete receipt](evidence/linux-aafb476-complete-summary.json).
 
-When the final receipt exists, verify its source/tree, full required inventory,
-original bounds, test/skip totals and every child/tree cleanup result. Only after
-the exact runner has exited, inspect and remove its owned generated build output,
-nine dependency aliases, empty test parent, worktree/root and marker. Preserve
-all unrelated worktrees. Record the actual cleanup, including failure or
-interruption; never force-remove an unfamiliar checkout.
+No full Linux test service or temporary marker remains from that run.
 
-The last complete accepted Linux checkpoint is `68bcc76`: 310 groups,
-1,875 passes, sixteen declared skips. The later `39db1fe` run fails one historical
-scheduling-budget assertion: 313/314 groups, 1,910 passes, sixteen skips. Its owned
-checkout and generated files are removed. Five native backend jobs now replace
-four, preserving all original group objects, measurements, child bounds,
-twenty-minute job limits and the 950-second estimate ceiling.
-[Failed complete run](evidence/linux-39db1fe-scheduling-failed-summary.json),
+Workflow editing now rejects non-string role/step IDs and repeated dependency
+edges before persistence. Two regressions reproduce the previous acceptance of
+malformed JSON identities; four focused groups/72 checks now pass, including
+unchanged encrypted profile, bindings and history after refusal. Read-only
+compatibility checks accept all 57 saved workflows across 54 workspaces and
+preserve all 54 sealed files byte-for-byte. Typecheck, original package bounds
+and exact cleanup pass. Installed correction and native Windows acceptance
+remain pending. [Source and compatibility evidence](evidence/workflow-identity-source-summary.json).
+
+The earlier 39db1fe full failure remains recorded. Five native backend jobs
+preserve original group objects, measurements, child bounds, twenty-minute job
+limits and the 950-second estimated-workload ceiling.
+[Failed full run](evidence/linux-39db1fe-scheduling-failed-summary.json),
 [scheduling correction](evidence/windows-five-shards-source-summary.json).
 
 The last complete Windows packet `cadbccd` passes 416 groups, 2,443 tests and
@@ -110,9 +113,11 @@ receipts; remove downloaded archives.
 
 ## Continue independent implementation
 
-1. Finish the active complete Linux run's evidence and exact owned cleanup.
-   Keep later Cargo archive acceptance separate. A new complete run must use a
-   clean, published immutable source and a short owned test parent.
+1. Publish the workflow identity correction and adopt it through the normal
+   versioned update with read-only installed checks and snapshot preservation.
+   Keep later Cargo/workflow focused evidence separate from complete aafb476.
+   A new full run must use clean, published immutable source and a short owned
+   temporary parent; verify exact final inventory/exit before removing its files.
 2. Inspect available native Windows receipts. The new five-shard schedule and
    later helper, SDK, Python/Cargo work require their own final results.
    Retain original failures and distinguish guest doubles from actual guests.
