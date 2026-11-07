@@ -56,6 +56,7 @@ export interface ProviderDesktopHelperInvocation {
 }
 
 export interface ProviderDesktopHelperSession {
+  readonly processId?: number;
   write(line: string): Promise<void>;
   read(): Promise<string>;
   terminate(): Promise<void>;
@@ -69,6 +70,18 @@ export interface ProviderDesktopHelperExit {
   readonly unreadResponses?: number;
 }
 
+export interface ProviderDesktopHelperOwner {
+  readonly processId: number;
+  readonly processStartTime: string;
+}
+
+interface OwnedHelper {
+  readonly session: ProviderDesktopHelperSession;
+  identity?: ProviderDesktopHelperOwner;
+  recording?: Promise<void>;
+  stoppingRecord?: Promise<void>;
+}
+
 export interface ProviderDesktopHelperTransport {
   start(invocation: ProviderDesktopHelperInvocation): Promise<ProviderDesktopHelperSession>;
 }
@@ -79,6 +92,8 @@ export interface WindowsProviderDesktopProcessPortOptions {
   readonly transport?: ProviderDesktopHelperTransport;
   /** Closed Suite mode: native discovery/focus only, never provider launch. */
   readonly focusOnly?: boolean;
+  readonly onHelperOwned?: (owner: ProviderDesktopHelperOwner) => Promise<void>;
+  readonly onHelperStopped?: (owner: ProviderDesktopHelperOwner) => Promise<void>;
   /** Injectable only so non-Windows protocol tests can prove ambient values are removed. */
   readonly hostEnvironment?: NodeJS.ProcessEnv;
 }
@@ -152,6 +167,7 @@ export class NodeProviderDesktopHelperTransport implements ProviderDesktopHelper
     });
 
     return {
+      processId: child.pid,
       write: async (line) => {
         if (exited || terminalError || child.stdin.destroyed) throw terminalError ?? new Error("The provider helper protocol is closed.");
         if (/\r|\n/.test(line) || Buffer.byteLength(line, "utf8") > maximumRequestBytes) throw new Error("The provider helper request is invalid or oversized.");
@@ -180,12 +196,17 @@ export class WindowsProviderDesktopProcessPort implements ProviderDesktopProcess
   private readonly transport: ProviderDesktopHelperTransport;
   private readonly environment: Readonly<Record<string, string>>;
   private readonly focusOnly: boolean;
+  private readonly onHelperOwned?: WindowsProviderDesktopProcessPortOptions["onHelperOwned"];
+  private readonly onHelperStopped?: WindowsProviderDesktopProcessPortOptions["onHelperStopped"];
   private busy = false;
-  private owner?: ProviderDesktopHelperSession;
+  private owner?: OwnedHelper;
 
   constructor(options: WindowsProviderDesktopProcessPortOptions) {
     if (options.focusOnly !== undefined && typeof options.focusOnly !== "boolean") throw new Error("The provider helper mode must be a literal boolean.");
     this.focusOnly = options.focusOnly === true;
+    if (this.focusOnly && (typeof options.onHelperOwned !== "function" || typeof options.onHelperStopped !== "function")) throw new Error("Focus-only helpers require exact owner and retirement persistence callbacks.");
+    this.onHelperOwned = options.onHelperOwned;
+    this.onHelperStopped = options.onHelperStopped;
     if (!isAbsolute(options.helperPath) || !/\.exe$/i.test(options.helperPath) || !digestPattern.test(options.helperSha256)) {
       throw new Error("The provider process port requires an exact absolute helper path and SHA-256 digest.");
     }
@@ -307,19 +328,34 @@ export class WindowsProviderDesktopProcessPort implements ProviderDesktopProcess
     } finally { this.busy = false; }
   }
 
-  private async retire(session: ProviderDesktopHelperSession): Promise<ProviderDesktopHelperExit> {
-    const unconfirmed = () => Object.assign(new Error("The original provider helper exit is unconfirmed. No replacement was started."), { code: "PROVIDER_HELPER_EXIT_UNCONFIRMED" });
+  private async retire(owner: OwnedHelper): Promise<ProviderDesktopHelperExit> {
+    const session = owner.session;
+    let phase = "exit";
+    const unconfirmed = () => Object.assign(new Error(phase === "exit" ? "The original provider helper exit is unconfirmed. No replacement was started." : "The original provider helper retirement record is unconfirmed. No replacement was started."), { code: phase === "exit" ? "PROVIDER_HELPER_EXIT_UNCONFIRMED" : "PROVIDER_HELPER_RETIREMENT_UNCONFIRMED" });
     let timer: ReturnType<typeof setTimeout> | undefined;
+    const deadline = new Promise<never>((_resolve, reject) => { timer = setTimeout(() => reject(unconfirmed()), helperRetirementMs); });
     // Termination errors cannot erase ownership. An independent close event may
     // still prove that this exact child has already exited.
     void Promise.resolve().then(() => session.terminate()).catch(() => undefined);
     try {
       const exit = await Promise.race([
         Promise.resolve().then(() => session.wait()),
-        new Promise<never>((_resolve, reject) => { timer = setTimeout(() => reject(unconfirmed()), helperRetirementMs); })
+        deadline
       ]);
       if (!exit || !Number.isSafeInteger(exit.code) || exit.code < -1 || exit.code > 0xffffffff || !(exit.signal === null || typeof exit.signal === "string")) throw unconfirmed();
-      if (this.owner === session) this.owner = undefined;
+      phase = "record";
+      if (owner.identity) {
+        // Join even a failed/in-flight owner write before recording retirement.
+        // A timed-out retirement write is reused, never raced by a replacement.
+        await Promise.race([owner.recording?.catch(() => undefined), deadline]);
+        if (!owner.stoppingRecord) {
+          const recording = Promise.resolve().then(() => this.onHelperStopped!(owner.identity!));
+          owner.stoppingRecord = recording;
+          void recording.catch(() => { if (owner.stoppingRecord === recording) owner.stoppingRecord = undefined; });
+        }
+        await Promise.race([owner.stoppingRecord, deadline]);
+      }
+      if (this.owner === owner) this.owner = undefined;
       return exit;
     } catch { throw unconfirmed(); }
     finally { clearTimeout(timer); }
@@ -332,10 +368,10 @@ export class WindowsProviderDesktopProcessPort implements ProviderDesktopProcess
     const session = await this.transport.start({
       helperPath: canonicalHelperPath,
       helperSha256: this.helperSha256,
-      arguments: this.focusOnly ? ["--native-desktop-focus-v2"] : helperArguments,
+      arguments: this.focusOnly ? ["--native-desktop-focus-v3"] : helperArguments,
       environment: this.environment
     });
-    this.owner = session;
+    const owner: OwnedHelper = { session }; this.owner = owner;
     let rejectAbort!: (error: Error) => void;
     const aborted = new Promise<never>((_resolve, reject) => { rejectAbort = reject; });
     const abort = () => {
@@ -347,12 +383,22 @@ export class WindowsProviderDesktopProcessPort implements ProviderDesktopProcess
         abort();
         return await aborted;
       }
-      const operation = run(session, randomBytes(24).toString("hex"));
+      const operation = (async () => {
+        if (this.focusOnly) {
+          const identity = parseHelperOwner(await session.read(), session.processId);
+          assertNotAborted(signal);
+          owner.identity = identity;
+          owner.recording = Promise.resolve().then(() => this.onHelperOwned!(identity));
+          await owner.recording;
+          assertNotAborted(signal);
+        }
+        return run(session, randomBytes(24).toString("hex"));
+      })();
       operation.catch(() => undefined);
       return await Promise.race([operation, aborted]);
     } finally {
       signal.removeEventListener("abort", abort);
-      const exit = await this.retire(session);
+      const exit = await this.retire(owner);
       if (exit.protocolFailed === true || exit.unreadResponses !== undefined && exit.unreadResponses !== 0)
         throw new Error("The provider helper closed with failed or unconsumed protocol output. Its earlier result was not accepted.");
     }
@@ -444,6 +490,16 @@ function encodeRequest(value: Record<string, unknown>): string {
 
 function authorization(requestId: string, token: string): string {
   return encodeRequest({ schema: requestSchema, version: 2, requestId, kind: "authorize", authorizationToken: token });
+}
+
+function parseHelperOwner(line: string, childProcessId: number | undefined): ProviderDesktopHelperOwner {
+  if (typeof line !== "string" || Buffer.byteLength(line, "utf8") > 512) throw new Error("The native focus helper owner identity is oversized or invalid.");
+  let value: unknown;
+  try { value = JSON.parse(line); } catch { throw new Error("The native focus helper owner identity is malformed."); }
+  if (!record(value) || Object.keys(value).sort().join() !== "processId,processStartTime,schema" || value.schema !== "switchyard-native-focus-owner/v1") throw new Error("The native focus helper owner identity is missing or substituted.");
+  const processId = processIdentity(value.processId), processStartTime = processBirthIdentity(value.processStartTime);
+  if (processId > 0x7fffffff || processId !== childProcessId) throw new Error("The native focus helper owner is not the exact started child.");
+  return Object.freeze({ processId, processStartTime });
 }
 
 function parseResponse(line: string, requestId: string, expectedKind: "ready" | "result"): Record<string, unknown> {

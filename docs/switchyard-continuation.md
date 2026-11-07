@@ -40,24 +40,16 @@ instructions. Do not merge or release.
 
 ## Current installed and source checkpoint
 
-The Windows Suite helper now embeds the existing native desktop implementation
-behind a focus-only entrypoint. JavaScript and native boundaries reject launch
-requests; the Suite executable refuses the broader desktop and managed-terminal
-entrypoints. Six focused groups pass 65 checks; the existing SDK build has zero
-warnings/errors, and portable policy plus both entrypoint refusals pass. The
-66-file, 1,852,457-byte staging is removed. Suite configuration/dispatch wiring,
-VS Code-specific Windows focus and interactive Windows acceptance remain pending.
-[Source evidence](evidence/windows-focus-only-source-summary.json).
-
-The Windows provider process port now retains its original helper until exact
-child closure verifies; a stop request alone cannot permit replacement. Startup
-is serialized, and queued/trailing protocol failures cannot become successful
-results. Cancellation-state read failure during a native operation now remains
-durably ambiguous. Six focused groups pass 64 checks, including six reproduced
-regressions, two owned Node child cases and both focus/launch journal scenarios.
-Typecheck and exact owned cleanup pass. The native helper source is unchanged;
-Suite Windows focus wiring and real Windows acceptance remain unfinished.
-[Source evidence](evidence/provider-helper-retirement-source-summary.json).
+Windows native focus now has a focus-only v3 helper protocol with exact
+PID/creation-time ownership recorded before any request. Child closure and
+retirement persistence must verify before replacement; cancellation joins pending
+owner writes. A separate read-only owner query supports recovery without killing
+processes or widening TOKEN_QUERY 8. Six focused groups pass 69 tests; the combined
+helper builds with zero warnings/errors. Its 66-file, 1,869,485-byte staging is
+removed. Native Windows owner/window checks remain pending. Suite configuration,
+durable owner journal/dispatch wiring and VS Code-specific focus remain unfinished.
+[Contract](../apps/windows-companion/provider-desktop-helper/README.md),
+[source evidence](evidence/windows-focus-owner-source-summary.json).
 
 Cargo archives with multiple `[[bin]]`, `[[example]]` and nested array tables
 now pass 84 independent Python reference cases. Ten focused groups pass 96 tests,
@@ -69,16 +61,6 @@ update, preserving every semantic workspace and the frozen frontend. Dependency
 resolution and broader
 manifest/license coverage remain unfinished. [Contract](cargo-archive-identity.md),
 [source evidence](evidence/cargo-array-manifest-source-summary.json).
-
-The commissioned Windows provider adapter now carries exact process creation
-identity across discovery/focus, checks current-user/session with TOKEN_QUERY 8,
-and requires native foreground readback. Desktop helper protocol is v2; managed
-terminal descriptors remain v1. Six focused groups/56 checks, typecheck and the
-existing managed SDK build pass. Three reproduced regressions and two fixture
-path failures are retained. The exact owned 25-file build/test staging is removed.
-Actual Windows native checks remain pending; Suite Windows focus wiring is still
-unfinished. [Contract](../apps/windows-companion/provider-desktop-helper/README.md),
-[evidence](evidence/provider-process-birth-source-summary.json).
 
 Installed `c50a00c` passes **71 metadata/in-memory checks** and verifies 21 exact
 module hashes, including all 84 Cargo manifest reference cases. All 54 semantic
@@ -201,10 +183,12 @@ native Windows profile correction acceptance remains separate.
 2. Inspect available native Windows receipts. The new five-shard schedule and
    later helper, SDK, Python/Cargo work require their own final results.
    Retain original failures and distinguish guest doubles from actual guests.
-3. Continue Suite Windows native focus wiring using the exact helper lifecycle;
-   do not weaken process birth, current-user/session or foreground proof. The
-   helper ownership/cancellation corrections have source acceptance, not native
-   Windows or installed Linux acceptance. Also continue broader Shield syntax/coverage and dependency
+3. Wire the Windows focus-only v3 callbacks into authenticated Suite owner
+   records, then add explicit executable/signer review and physical-intent
+   dispatch. Reconcile uncertain original PID/birth via the read-only owner query;
+   do not weaken process birth, current-user/session or foreground proof. Native
+   Windows owner/window acceptance and VS Code support remain separate. Also
+   continue broader Shield syntax/coverage and dependency
    resolution, complete archive/license inspection, publisher provenance,
    verified local vulnerability context and external observation streams.
    The current Cargo manifest parser is deliberately a closed TOML subset;

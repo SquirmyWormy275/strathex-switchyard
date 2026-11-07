@@ -1,82 +1,91 @@
-# SXSY-B122 provider desktop helper
+# SXSY-B122 native desktop boundary
 
-This Windows-only helper is the native effect boundary used by the companion's
-`WindowsProviderDesktopProcessPort`. It is intended to be published as a
-self-contained `win-x64` executable and pinned by absolute path and SHA-256 in
-the host bootstrap configuration.
+This Windows helper provides exact native process/window operations for reviewed
+desktop executables. The commissioned companion can focus or launch through its
+attested catalog. The Suite embeds the same implementation behind a separate
+focus-only boundary.
 
-Desktop operations accept `--stdio-v2` (one bounded request) and `--self-test`.
-`--native-desktop-focus-v2` is the separate discovery/focus-only mode. It
-rejects launch requests before opening a provider image or authorizing any
-effect. The Suite's existing `Switchyard.Hotkeys.exe` links this implementation
-and exposes only that focus entrypoint plus `--native-desktop-self-test`;
-it does not expose the broader desktop or managed-terminal entrypoints.
-The JavaScript port must be constructed with `focusOnly: true` for Suite use.
+**Suite configuration and physical-intent wiring remain unfinished.** The source
+boundary has 69 focused checks and a successful managed build; interactive
+Windows provider/window acceptance is still pending.
+[Current evidence](../../../docs/evidence/windows-focus-owner-source-summary.json).
 
-The combined helper builds with the existing .NET SDK, with no added package
-feeds, warnings or errors. Six focused groups pass 65 tests; the portable
-self-test and two compiled entrypoint refusals pass. Windows copied-helper
-verification now requires native current-user QUERY-only readback and a launch
-refusal before provider identity access. That native Windows check is pending,
-as are Suite configuration/dispatch wiring and VS Code-specific focus.
-[Focus-only evidence](../../../docs/evidence/windows-focus-only-source-summary.json).
+## Closed entry points
 
-The separate managed-terminal descriptor remains version 1. The desktop stdio
-protocol never accepts a command, working directory, URL, PATH lookup, or
-arbitrary process-control request. Focus and launch pause after native identity
-handles are held; the companion must complete its final policy barrier and
-return the helper's one-time token before the effect occurs.
+| Entry point | Contract |
+| --- | --- |
+| `--stdio-v2` | Commissioned companion discovery, focus and fixed-profile launch. |
+| `--native-desktop-focus-v3` | Owner witness first, then discovery/focus only. Launch is refused. |
+| `--native-desktop-owner-v1` | Read-only observation of an original PID/creation-time identity. |
+| `--self-test` | Portable grammar/policy checks and native self-process checks when on Windows. |
+| `--managed-terminal-v1` | Separate reviewed managed-terminal descriptor; unchanged version 1. |
 
-Discovery now returns the exact process creation FILETIME as a decimal string.
-Focus binds that value together with the approved executable, process ID and
-window handle through preparation, authorization and the final response. A reused
-PID or an older helper response cannot substitute for the observed process.
-The held process must have the helper's current-user SID and session, using only
-TOKEN_QUERY (8). A denied query refuses the operation. After SetForegroundWindow,
-the retained process/window must still verify and GetForegroundWindow must report
-that exact window. Windows foreground restrictions remain in force.
+The Suite's `Switchyard.Hotkeys.exe` exposes the focus-only and owner-query
+entries, plus `--native-desktop-self-test`. It refuses the broader desktop
+stdio, earlier focus-only v2 and managed-terminal entries. It links this source
+through its project file; no second native implementation is copied.
 
-The process port also joins the exact helper's close event before accepting an
-owned-session result. It retains an unconfirmed session after the two-second
-retirement bound and refuses replacement until that original session exits.
-Concurrent admission refuses; it cannot displace an active helper. Terminal
-stream errors discard queued responses, and leftover/failed protocol output
-cannot promote an earlier result. A cancellation-state read failure during an
-operation remains ambiguous in the authenticated journal, requiring reconciliation.
+Construct the Suite process port with `focusOnly: true` and both
+`onHelperOwned` and `onHelperStopped` persistence callbacks. The owner frame
+contains only its schema, exact started-child PID and creation FILETIME string.
+The port checks that PID against the child it started and requires a successful
+owner write before sending any request. Startup is serialized.
 
-Six focused groups pass 64 source checks, with six reproduced regressions, two
-actual owned Node child cases and focus/launch journal scenarios. The native
-helper source is unchanged; no live provider/window/account effect occurred.
-[Retirement evidence](../../../docs/evidence/provider-helper-retirement-source-summary.json).
+Exact child closure and retirement persistence must complete within the existing
+two-second retirement bound before replacement. A failed or pending owner write
+is joined before retirement is recorded. An uncertain close or retirement write
+retains the original session. Terminal stream errors discard queued responses;
+failed or leftover protocol output cannot promote an earlier result.
 
-This uses documented [creation-time readback](https://learn.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-getprocesstimes),
+The read-only owner query accepts `switchyard-native-focus-owner-query/v1` with
+`processId` and `processStartTime`. It reports whether that original identity
+has exited. A documented absent-process result proves absence; a live process
+requires limited process access, current-user/session verification and exact
+creation-time comparison. Denied or failed queries remain unknown. It cannot
+terminate a process, focus a window or choose another identity.
+[Process lookup contract](https://learn.microsoft.com/en-us/dotnet/api/system.diagnostics.process.getprocessbyid?view=netframework-4.7.2).
+
+## Native effect checks
+
+The helper holds the reviewed executable and process handles. Focus binds the
+approved image, PID, creation FILETIME and window handle across preparation,
+one-time authorization and the final response. It requires the current-user SID
+and session using TOKEN_QUERY **8**. After SetForegroundWindow, the original
+process/window must still verify and GetForegroundWindow must report that exact
+window. Foreground restrictions remain in force.
+
+No window title, account lookup, injected input or alternate application supplies
+identity. The protocol accepts no arbitrary shell, URL, working directory or PATH
+lookup. A cancellation-state read failure during an operation remains ambiguous
+in the authenticated effect ledger; it cannot become a refusal before effect or
+permission to replay.
+
+These checks use documented
+[creation-time readback](https://learn.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-getprocesstimes),
 [token queries](https://learn.microsoft.com/en-us/windows/win32/api/securitybaseapi/nf-securitybaseapi-gettokeninformation)
 and [foreground readback](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-getforegroundwindow).
-No window title, account name, injected input or alternative application identifies
-the target. This commissioned companion boundary is separate from the Suite's
-unfinished native Windows focus connection.
 
-Example release build:
+## Build and verification
 
-```powershell
-dotnet publish .\Sxsy.B122.ProviderDesktopHelper.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true
-```
+The commissioned release build packages a self-contained `win-x64` executable,
+binds its SHA-256 into the checksum/SBOM inventory and runs its typed self-test.
+The Suite reuses its existing self-contained hotkey helper. Packaging does not
+establish installed provider, account or native window acceptance.
 
-`deployment/windows/Build-B122Release.ps1` builds this helper by default, runs
-its typed self-test, places it under the companion's `provider-desktop`
-directory, and binds its SHA-256 into the release checksum/SBOM inventory and
-`release.json`. A prebuilt helper is accepted only with an explicit reviewed
-SHA-256. Packaging is not evidence that Claude Desktop or ChatGPT Desktop is
-installed, signed in, reachable, or independently accepted on a target host.
+The existing SDK builds the combined source with zero warnings/errors and cleared
+package feeds. Six focused groups pass 69 tests, including ownership persistence,
+cancellation ordering, malformed/substituted owner frames, exact child closure and
+ambiguous focus/launch journal cases. The local managed self-test reports native
+owner/current-user checks as unperformed. All 66 temporary source/build files are
+removed after verified exit.
 
-The earlier process-birth checkpoint passes six isolated groups/56 checks, including three reproduced regressions and
-older-protocol refusal. Type checking and the managed build pass with the existing
-SDK and cleared package sources. The Linux self-test reports native current-user
-readback as unperformed; the Windows portable smoke now requires that native
-readback and exact QUERY mask. Real provider-window acceptance remains pending.
-The exact owned 25-file, 417,149-byte build/test staging is removed.
-[Source evidence and retained failures](../../../docs/evidence/provider-process-birth-source-summary.json).
+Windows automation now requires native self-owner checks, focus-only launch
+refusal and an independent read-only observation that the original helper exited.
+Those Windows results are pending.
 
-The helper uses a kill-on-close Job Object until a newly launched process has
-produced a new, exact-identity top-level window. If the helper is cancelled or
-terminated before that proof, Windows kills only that task-owned launch tree.
+Earlier source checkpoints retain
+[process-birth evidence](../../../docs/evidence/provider-process-birth-source-summary.json),
+[retirement regressions](../../../docs/evidence/provider-helper-retirement-source-summary.json)
+and [focus-only packaging evidence](../../../docs/evidence/windows-focus-only-source-summary.json).
+Broader companion launches retain their kill-on-close Job Object until an exact
+new surface verifies; this launch capability is absent from Suite focus mode.

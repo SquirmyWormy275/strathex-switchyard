@@ -1,23 +1,15 @@
 # What has actually been verified
 
-The Windows Suite helper now embeds the existing native desktop implementation
-behind a focus-only entrypoint. JavaScript and native boundaries reject launch
-requests; the Suite executable refuses the broader desktop and managed-terminal
-entrypoints. Six focused groups pass 65 checks; the existing SDK build has zero
-warnings/errors, and portable policy plus both entrypoint refusals pass. The
-66-file, 1,852,457-byte staging is removed. Suite configuration/dispatch wiring,
-VS Code-specific Windows focus and interactive Windows acceptance remain pending.
-[Source evidence](evidence/windows-focus-only-source-summary.json).
-
-The Windows provider process port now retains its original helper until exact
-child closure verifies; a stop request alone cannot permit replacement. Startup
-is serialized, and queued/trailing protocol failures cannot become successful
-results. Cancellation-state read failure during a native operation now remains
-durably ambiguous. Six focused groups pass 64 checks, including six reproduced
-regressions, two owned Node child cases and both focus/launch journal scenarios.
-Typecheck and exact owned cleanup pass. The native helper source is unchanged;
-Suite Windows focus wiring and real Windows acceptance remain unfinished.
-[Source evidence](evidence/provider-helper-retirement-source-summary.json).
+Windows native focus now has a focus-only v3 helper protocol with exact
+PID/creation-time ownership recorded before any request. Child closure and
+retirement persistence must verify before replacement; cancellation joins pending
+owner writes. A separate read-only owner query supports recovery without killing
+processes or widening TOKEN_QUERY 8. Six focused groups pass 69 tests; the combined
+helper builds with zero warnings/errors. Its 66-file, 1,869,485-byte staging is
+removed. Native Windows owner/window checks remain pending. Suite configuration,
+durable owner journal/dispatch wiring and VS Code-specific focus remain unfinished.
+[Contract](../apps/windows-companion/provider-desktop-helper/README.md),
+[source evidence](evidence/windows-focus-owner-source-summary.json).
 
 Complete Linux `a6a6618` passes **321 groups, 1,949 tests and sixteen declared
 skips**, with zero failures/cancellations. Exact original commands, bounds, skip
@@ -38,16 +30,6 @@ update, preserving every semantic workspace and the frozen frontend. Dependency
 resolution and broader
 manifest/license coverage remain unfinished. [Contract](cargo-archive-identity.md),
 [source evidence](evidence/cargo-array-manifest-source-summary.json).
-
-The Windows provider desktop protocol now binds process creation identity from
-discovery through authorized focus and requires foreground readback. Six isolated
-groups pass **56 tests**, with exact child/tree cleanup; typecheck and the managed
-build pass. Native current-user/session checks use only TOKEN_QUERY 8 and remain
-unperformed locally. The Windows portable smoke now requires native self-process
-readback. Three reproduced regressions, two invalid harness attempts and two
-cross-platform fixture failures remain recorded. The exact 25-file, 417,149-byte
-owned staging is removed. Real Windows windows and Suite focus wiring remain
-separate. [Source evidence](evidence/provider-process-birth-source-summary.json).
 
 Installed `c50a00c` passes **71 metadata/in-memory checks** and verifies 21 exact
 module hashes, including all 84 Cargo manifest reference cases. All 54 semantic

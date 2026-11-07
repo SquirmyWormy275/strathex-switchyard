@@ -55,6 +55,7 @@ internal static class Program
     public static int Main(string[] args)
     {
         if (args.Length == 1 && args[0] == "--self-test") return SelfTest();
+        if (args.Length == 1 && args[0] == "--native-desktop-owner-v1") return ObserveFocusOwner();
         if (args.Length == 2 && args[0] == "--managed-terminal-v1")
         {
             try
@@ -73,12 +74,18 @@ internal static class Program
                 return 70;
             }
         }
-        bool focusOnly = args.Length == 1 && args[0] == "--native-desktop-focus-v2";
+        bool focusOnly = args.Length == 1 && args[0] == "--native-desktop-focus-v3";
         if (!focusOnly && (args.Length != 1 || args[0] != "--stdio-v2")) return 64;
         string requestId = "unknown";
         try
         {
             if (!OperatingSystem.IsWindows()) throw new ProtocolException("windows_required");
+            if (focusOnly)
+            {
+                using var current = new SafeFileHandle(GetCurrentProcess(), ownsHandle: false);
+                AssertCurrentUserSession(current);
+                Write(new { schema = "switchyard-native-focus-owner/v1", processId = Environment.ProcessId, processStartTime = ProcessStartTime(current) });
+            }
             string line = ReadBoundedLine(Console.In, MaximumRequestChars);
             Request request = ParseRequest(line);
             requestId = request.RequestId;
@@ -105,6 +112,48 @@ internal static class Program
 
     private static bool IsFocusAction(string action) => action is "list" or "focus";
 
+    private static int ObserveFocusOwner()
+    {
+        try
+        {
+            if (!OperatingSystem.IsWindows()) throw new ProtocolException("windows_required");
+            using JsonDocument document = ParseJson(ReadBoundedLine(Console.In, MaximumRequestChars));
+            JsonElement value = document.RootElement;
+            RequireProperties(value, "schema", "processId", "processStartTime");
+            if (Text(value, "schema") != "switchyard-native-focus-owner-query/v1") throw new ProtocolException("invalid_owner_schema");
+            int processId = Integer(value, "processId");
+            string birth = Text(value, "processStartTime");
+            if (processId < 1 || !ValidProcessStartTime(birth)) throw new ProtocolException("invalid_owner_identity");
+            bool exited = FocusOwnerExited(processId, birth);
+            Write(new { schema = "switchyard-native-focus-owner-result/v1", processId, processStartTime = birth,
+                state = exited ? "exited" : "running", exited, processAccessMask = ProcessQueryLimitedInformation | Synchronize,
+                tokenAccessMask = TokenQuery, processTerminated = false, windowFocused = false });
+            return 0;
+        }
+        catch (ProtocolException exception) { Write(new { schema = "switchyard-native-focus-owner-error/v1", code = exception.Code }); return 65; }
+        catch { Write(new { schema = "switchyard-native-focus-owner-error/v1", code = "native_failure" }); return 70; }
+    }
+
+    private static bool FocusOwnerExited(int processId, string birth)
+    {
+        // GetProcessById's documented absent-process exception proves absence.
+        // Denied or failed native queries remain unknown; no alternate identity
+        // or broader access is attempted after either lookup fails.
+        Process selected;
+        try { selected = Process.GetProcessById(processId); }
+        catch (ArgumentException) { return true; }
+        using (selected)
+        using (SafeFileHandle process = OpenProcess(ProcessQueryLimitedInformation | Synchronize, false, (uint)processId))
+        {
+            if (process.IsInvalid) throw NativeFailure("owner_process_unavailable");
+            uint state = WaitForSingleObject(process, 0);
+            if (state == 0) return true;
+            if (state != WaitTimeout) throw NativeFailure("owner_process_wait_failed");
+            AssertCurrentUserSession(process);
+            return ProcessStartTime(process) != birth;
+        }
+    }
+
     private static int SelfTest()
     {
         bool products = Products.Count == 4
@@ -119,17 +168,22 @@ internal static class Program
         bool births = ValidProcessStartTime("133000000000000001") && ValidProcessStartTime("18446744073709551615")
             && !new[] { "", "0", "01", "-1", "1.0", "18446744073709551616" }.Any(ValidProcessStartTime);
         bool? currentProcessVerified = null;
+        bool? ownerQueryVerified = null;
+        string? processStartTime = null;
         if (OperatingSystem.IsWindows())
         {
             using var current = new SafeFileHandle(GetCurrentProcess(), ownsHandle: false);
             string birth = ProcessStartTime(current);
+            processStartTime = birth;
             AssertCurrentUserSession(current);
             currentProcessVerified = birth == ProcessStartTime(current);
+            ownerQueryVerified = !FocusOwnerExited(Environment.ProcessId, birth)
+                && FocusOwnerExited(Environment.ProcessId, birth == "1" ? "2" : "1");
         }
         bool focusOnlyPolicyVerified = IsFocusAction("list") && IsFocusAction("focus")
             && !new[] { "launch", "managed_terminal", "authorize", "", "Focus" }.Any(IsFocusAction);
-        bool ok = products && quoting && surfaces && births && focusOnlyPolicyVerified && currentProcessVerified != false;
-        Write(new { schema = "sxsy-b122.provider-desktop-self-test", version = 1, status = ok ? "ok" : "failed", desktopProtocolVersion = 2, processBirthGrammarVerified = births, focusOnlyPolicyVerified, currentProcessVerified, tokenAccessMask = TokenQuery, windowFocused = false });
+        bool ok = products && quoting && surfaces && births && focusOnlyPolicyVerified && currentProcessVerified != false && ownerQueryVerified != false;
+        Write(new { schema = "sxsy-b122.provider-desktop-self-test", version = 1, status = ok ? "ok" : "failed", desktopProtocolVersion = 2, processBirthGrammarVerified = births, focusOnlyPolicyVerified, currentProcessVerified, ownerQueryVerified, processId = Environment.ProcessId, processStartTime, tokenAccessMask = TokenQuery, windowFocused = false });
         return ok ? 0 : 1;
     }
 

@@ -14,13 +14,15 @@ import {
   WindowsProviderDesktopProcessPort,
   type ProviderDesktopHelperInvocation,
   type ProviderDesktopHelperSession,
-  type ProviderDesktopHelperTransport
+  type ProviderDesktopHelperTransport,
+  type WindowsProviderDesktopProcessPortOptions
 } from "../src/windows-provider-process.ts";
 
 const digest = (value: string | Buffer): string => createHash("sha256").update(value).digest("hex");
 const responseSchema = "sxsy-b122.provider-desktop-response";
 
 class FakeSession implements ProviderDesktopHelperSession {
+  readonly processId = 7111;
   readonly writes: string[] = [];
   readonly responses: string[] = [];
   terminated = false;
@@ -85,12 +87,14 @@ async function fixture(context: test.TestContext) {
   return { root, helperPath, executablePath, identity };
 }
 
-function port(helperPath: string, helperSha256: string, transport: FakeTransport, focusOnly = false) {
+function port(helperPath: string, helperSha256: string, transport: FakeTransport, focusOnly = false, callbacks: Partial<Pick<WindowsProviderDesktopProcessPortOptions, "onHelperOwned" | "onHelperStopped">> = {}) {
   return new WindowsProviderDesktopProcessPort({
     helperPath,
     helperSha256,
     transport,
     focusOnly,
+    ...(focusOnly ? { onHelperOwned: async () => {}, onHelperStopped: async () => {} } : {}),
+    ...callbacks,
     hostEnvironment: { SystemRoot: "C:\\Windows", WINDIR: "C:\\Windows", PATH: "must-not-leak", SECRET_TOKEN: "must-not-leak" }
   });
 }
@@ -98,6 +102,64 @@ function port(helperPath: string, helperSha256: string, transport: FakeTransport
 function envelope(request: Record<string, unknown>, kind: "ready" | "result" | "error", body: Record<string, unknown>): string {
   return JSON.stringify({ schema: responseSchema, version: 2, requestId: request.requestId, kind, ...body });
 }
+const helperOwner = Object.freeze({ processId: 7111, processStartTime: "133000000000000001" });
+const ownerHello = (changes = {}) => JSON.stringify({ schema: "switchyard-native-focus-owner/v1", ...helperOwner, ...changes });
+
+test("focus helper ownership is recorded before requests and cleared only after exact child closure", async context => {
+  const setup = await fixture(context), transport = new FakeTransport(), events: string[] = [];
+  transport.configure = session => {
+    session.responses.push(ownerHello());
+    session.onWrite = request => { events.push("request"); session.responses.push(envelope(request, "result", { observations: [] })); };
+    session.wait = async () => { events.push("exit"); return { code: 0, signal: null }; };
+  };
+  const processPort = port(setup.helperPath, digest("fixed native helper"), transport, true, {
+    async onHelperOwned(owner) { assert.deepEqual(owner, helperOwner); assert.equal(Object.isFrozen(owner), true); events.push("owned"); },
+    async onHelperStopped(owner) { assert.deepEqual(owner, helperOwner); events.push("stopped"); }
+  });
+  assert.deepEqual(await processPort.listRunning(setup.identity, new AbortController().signal), []);
+  assert.deepEqual(events, ["owned", "request", "exit", "stopped"]);
+});
+
+test("focus helper refuses missing, substituted or lossy owner identity before writing requests", async context => {
+  const setup = await fixture(context);
+  for (const changes of [{ processId: 7112 }, { processId: undefined }, { processStartTime: 133000000000000001 }, { processStartTime: "0" }, { processStartTime: "1".repeat(513) }, { extra: "untrusted" }, { schema: "older-owner/v0" }]) {
+    const transport = new FakeTransport(); let owned = 0;
+    transport.configure = session => { session.responses.push(ownerHello(changes)); };
+    await assert.rejects(port(setup.helperPath, digest("fixed native helper"), transport, true, { async onHelperOwned() { owned++; } }).listRunning(setup.identity, new AbortController().signal), /owner|birth|identity/i);
+    assert.equal(owned, 0); assert.equal(transport.sessions[0]!.writes.length, 0); assert.equal(transport.sessions[0]!.terminated, true);
+  }
+});
+
+test("failed owner persistence cannot send a request and failed retirement persistence blocks replacement", async context => {
+  const setup = await fixture(context), transport = new FakeTransport(); let owned = 0, allowRetirement = false;
+  transport.configure = session => { session.responses.push(ownerHello()); session.onWrite = request => session.responses.push(envelope(request, "result", { observations: [] })); };
+  const processPort = port(setup.helperPath, digest("fixed native helper"), transport, true, {
+    async onHelperOwned() { if (++owned === 1) throw Error("synthetic owner write failure"); },
+    async onHelperStopped() { if (!allowRetirement) throw Error("synthetic retirement write failure"); }
+  });
+  await assert.rejects(processPort.listRunning(setup.identity, new AbortController().signal), /retirement.*unconfirmed/i);
+  assert.equal(transport.sessions[0]!.writes.length, 0);
+  await assert.rejects(processPort.listRunning(setup.identity, new AbortController().signal), /retirement.*unconfirmed/i);
+  assert.equal(transport.invocations.length, 1);
+  allowRetirement = true;
+  assert.deepEqual(await processPort.listRunning(setup.identity, new AbortController().signal), []); assert.equal(transport.invocations.length, 2);
+});
+
+test("cancellation joins pending owner persistence before recording helper retirement", async context => {
+  const setup = await fixture(context), transport = new FakeTransport(), controller = new AbortController(), events: string[] = [];
+  let started!: () => void, release!: () => void;
+  const recording = new Promise<void>(resolve => { started = resolve; }), gate = new Promise<void>(resolve => { release = resolve; });
+  transport.configure = session => { session.responses.push(ownerHello()); };
+  const processPort = port(setup.helperPath, digest("fixed native helper"), transport, true, {
+    async onHelperOwned() { started(); await gate; events.push("owned"); },
+    async onHelperStopped() { events.push("stopped"); }
+  });
+  const pending = processPort.listRunning(setup.identity, controller.signal); void pending.catch(() => {});
+  await recording; controller.abort();
+  try { await new Promise(resolve => setImmediate(resolve)); assert.deepEqual(events, []); assert.equal(transport.sessions[0]!.writes.length, 0); }
+  finally { release(); }
+  await assert.rejects(pending, /cancel/i); assert.deepEqual(events, ["owned", "stopped"]); assert.equal(transport.sessions[0]!.writes.length, 0);
+});
 
 test("list uses only the exact hash-bound helper and a sanitized fixed protocol", async (context) => {
   const setup = await fixture(context);
@@ -128,10 +190,10 @@ test("list uses only the exact hash-bound helper and a sanitized fixed protocol"
 
 test("focus-only helper mode cannot launch a provider or silently use the broader helper entrypoint", async (context) => {
   const setup = await fixture(context), transport = new FakeTransport();
-  transport.configure = session => { session.onWrite = request => session.responses.push(envelope(request, "result", { observations: [] })); };
+  transport.configure = session => { session.responses.push(ownerHello()); session.onWrite = request => session.responses.push(envelope(request, "result", { observations: [] })); };
   const processPort = port(setup.helperPath, digest("fixed native helper"), transport, true);
   assert.deepEqual(await processPort.listRunning(setup.identity, new AbortController().signal), []);
-  assert.deepEqual(transport.invocations[0]!.arguments, ["--native-desktop-focus-v2"]);
+  assert.deepEqual(transport.invocations[0]!.arguments, ["--native-desktop-focus-v3"]);
   let barriers = 0;
   for (const requireDistinctSurface of [false, true]) await assert.rejects(processPort.launch({
     provider: "claude_desktop", operationId: "forbidden-suite-launch", identity: setup.identity,
