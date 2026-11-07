@@ -1,5 +1,14 @@
 # What has actually been verified
 
+The Windows Suite helper now embeds the existing native desktop implementation
+behind a focus-only entrypoint. JavaScript and native boundaries reject launch
+requests; the Suite executable refuses the broader desktop and managed-terminal
+entrypoints. Six focused groups pass 65 checks; the existing SDK build has zero
+warnings/errors, and portable policy plus both entrypoint refusals pass. The
+66-file, 1,852,457-byte staging is removed. Suite configuration/dispatch wiring,
+VS Code-specific Windows focus and interactive Windows acceptance remain pending.
+[Source evidence](evidence/windows-focus-only-source-summary.json).
+
 The Windows provider process port now retains its original helper until exact
 child closure verifies; a stop request alone cannot permit replacement. Startup
 is serialized, and queued/trailing protocol failures cannot become successful

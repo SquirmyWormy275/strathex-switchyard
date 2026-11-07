@@ -14,5 +14,6 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="../windows-companion/sandbox-helper/Program.cs" Link="SandboxGuestWorker.cs" />
+    <Compile Include="../windows-companion/provider-desktop-helper/Program.cs" Link="NativeDesktopFocus.cs" />
   </ItemGroup>
 </Project>

@@ -77,6 +77,8 @@ export interface WindowsProviderDesktopProcessPortOptions {
   readonly helperPath: string;
   readonly helperSha256: string;
   readonly transport?: ProviderDesktopHelperTransport;
+  /** Closed Suite mode: native discovery/focus only, never provider launch. */
+  readonly focusOnly?: boolean;
   /** Injectable only so non-Windows protocol tests can prove ambient values are removed. */
   readonly hostEnvironment?: NodeJS.ProcessEnv;
 }
@@ -177,10 +179,13 @@ export class WindowsProviderDesktopProcessPort implements ProviderDesktopProcess
   private readonly helperSha256: string;
   private readonly transport: ProviderDesktopHelperTransport;
   private readonly environment: Readonly<Record<string, string>>;
+  private readonly focusOnly: boolean;
   private busy = false;
   private owner?: ProviderDesktopHelperSession;
 
   constructor(options: WindowsProviderDesktopProcessPortOptions) {
+    if (options.focusOnly !== undefined && typeof options.focusOnly !== "boolean") throw new Error("The provider helper mode must be a literal boolean.");
+    this.focusOnly = options.focusOnly === true;
     if (!isAbsolute(options.helperPath) || !/\.exe$/i.test(options.helperPath) || !digestPattern.test(options.helperSha256)) {
       throw new Error("The provider process port requires an exact absolute helper path and SHA-256 digest.");
     }
@@ -257,6 +262,7 @@ export class WindowsProviderDesktopProcessPort implements ProviderDesktopProcess
     surfaceId: string;
     distinctSurface: boolean;
   }>> {
+    if (this.focusOnly) throw new Error("The focus-only provider helper cannot launch an application or a fresh surface.");
     validateEffectRequest(request);
     validateFixedLaunchProfile(request.provider, request.args, request.requireDistinctSurface);
     return this.withSession(request.signal, async (session, requestId) => {
@@ -326,7 +332,7 @@ export class WindowsProviderDesktopProcessPort implements ProviderDesktopProcess
     const session = await this.transport.start({
       helperPath: canonicalHelperPath,
       helperSha256: this.helperSha256,
-      arguments: helperArguments,
+      arguments: this.focusOnly ? ["--native-desktop-focus-v2"] : helperArguments,
       environment: this.environment
     });
     this.owner = session;

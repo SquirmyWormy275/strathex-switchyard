@@ -85,11 +85,12 @@ async function fixture(context: test.TestContext) {
   return { root, helperPath, executablePath, identity };
 }
 
-function port(helperPath: string, helperSha256: string, transport: FakeTransport) {
+function port(helperPath: string, helperSha256: string, transport: FakeTransport, focusOnly = false) {
   return new WindowsProviderDesktopProcessPort({
     helperPath,
     helperSha256,
     transport,
+    focusOnly,
     hostEnvironment: { SystemRoot: "C:\\Windows", WINDIR: "C:\\Windows", PATH: "must-not-leak", SECRET_TOKEN: "must-not-leak" }
   });
 }
@@ -123,6 +124,21 @@ test("list uses only the exact hash-bound helper and a sanitized fixed protocol"
   assert.equal("cwd" in request, false);
   assert.equal("command" in request, false);
   assert.equal(JSON.stringify(request).includes("must-not-leak"), false);
+});
+
+test("focus-only helper mode cannot launch a provider or silently use the broader helper entrypoint", async (context) => {
+  const setup = await fixture(context), transport = new FakeTransport();
+  transport.configure = session => { session.onWrite = request => session.responses.push(envelope(request, "result", { observations: [] })); };
+  const processPort = port(setup.helperPath, digest("fixed native helper"), transport, true);
+  assert.deepEqual(await processPort.listRunning(setup.identity, new AbortController().signal), []);
+  assert.deepEqual(transport.invocations[0]!.arguments, ["--native-desktop-focus-v2"]);
+  let barriers = 0;
+  for (const requireDistinctSurface of [false, true]) await assert.rejects(processPort.launch({
+    provider: "claude_desktop", operationId: "forbidden-suite-launch", identity: setup.identity,
+    args: requireDistinctSurface ? ["--new-window"] : [], requireDistinctSurface,
+    signal: new AbortController().signal, shell: false, async beforeEffect() { barriers++; }
+  }), /focus-only.*cannot launch/i);
+  assert.equal(transport.invocations.length, 1); assert.equal(barriers, 0);
 });
 
 test("focus authorizes only after the host barrier while the helper holds the exact one-surface identity", async (context) => {

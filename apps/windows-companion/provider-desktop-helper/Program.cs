@@ -73,7 +73,8 @@ internal static class Program
                 return 70;
             }
         }
-        if (args.Length != 1 || args[0] != "--stdio-v2") return 64;
+        bool focusOnly = args.Length == 1 && args[0] == "--native-desktop-focus-v2";
+        if (!focusOnly && (args.Length != 1 || args[0] != "--stdio-v2")) return 64;
         string requestId = "unknown";
         try
         {
@@ -81,6 +82,7 @@ internal static class Program
             string line = ReadBoundedLine(Console.In, MaximumRequestChars);
             Request request = ParseRequest(line);
             requestId = request.RequestId;
+            if (focusOnly && !IsFocusAction(request.Action)) throw new ProtocolException("focus_only_action_required");
             return request.Action switch
             {
                 "list" => List(request),
@@ -100,6 +102,8 @@ internal static class Program
             return 70;
         }
     }
+
+    private static bool IsFocusAction(string action) => action is "list" or "focus";
 
     private static int SelfTest()
     {
@@ -122,8 +126,10 @@ internal static class Program
             AssertCurrentUserSession(current);
             currentProcessVerified = birth == ProcessStartTime(current);
         }
-        bool ok = products && quoting && surfaces && births && currentProcessVerified != false;
-        Write(new { schema = "sxsy-b122.provider-desktop-self-test", version = 1, status = ok ? "ok" : "failed", desktopProtocolVersion = 2, processBirthGrammarVerified = births, currentProcessVerified, tokenAccessMask = TokenQuery, windowFocused = false });
+        bool focusOnlyPolicyVerified = IsFocusAction("list") && IsFocusAction("focus")
+            && !new[] { "launch", "managed_terminal", "authorize", "", "Focus" }.Any(IsFocusAction);
+        bool ok = products && quoting && surfaces && births && focusOnlyPolicyVerified && currentProcessVerified != false;
+        Write(new { schema = "sxsy-b122.provider-desktop-self-test", version = 1, status = ok ? "ok" : "failed", desktopProtocolVersion = 2, processBirthGrammarVerified = births, focusOnlyPolicyVerified, currentProcessVerified, tokenAccessMask = TokenQuery, windowFocused = false });
         return ok ? 0 : 1;
     }
 

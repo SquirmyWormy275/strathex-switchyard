@@ -6,6 +6,21 @@ self-contained `win-x64` executable and pinned by absolute path and SHA-256 in
 the host bootstrap configuration.
 
 Desktop operations accept `--stdio-v2` (one bounded request) and `--self-test`.
+`--native-desktop-focus-v2` is the separate discovery/focus-only mode. It
+rejects launch requests before opening a provider image or authorizing any
+effect. The Suite's existing `Switchyard.Hotkeys.exe` links this implementation
+and exposes only that focus entrypoint plus `--native-desktop-self-test`;
+it does not expose the broader desktop or managed-terminal entrypoints.
+The JavaScript port must be constructed with `focusOnly: true` for Suite use.
+
+The combined helper builds with the existing .NET SDK, with no added package
+feeds, warnings or errors. Six focused groups pass 65 tests; the portable
+self-test and two compiled entrypoint refusals pass. Windows copied-helper
+verification now requires native current-user QUERY-only readback and a launch
+refusal before provider identity access. That native Windows check is pending,
+as are Suite configuration/dispatch wiring and VS Code-specific focus.
+[Focus-only evidence](../../../docs/evidence/windows-focus-only-source-summary.json).
+
 The separate managed-terminal descriptor remains version 1. The desktop stdio
 protocol never accepts a command, working directory, URL, PATH lookup, or
 arbitrary process-control request. Focus and launch pause after native identity

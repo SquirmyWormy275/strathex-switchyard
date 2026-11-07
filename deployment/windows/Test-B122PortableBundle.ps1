@@ -256,6 +256,7 @@ $providerDesktopSelfTestRaw = $providerDesktopCommand.stdout
 $providerDesktopSelfTest = $providerDesktopSelfTestRaw | ConvertFrom-Json
 if ($providerDesktopSelfTest.schema -cne 'sxsy-b122.provider-desktop-self-test' -or $providerDesktopSelfTest.version -ne 1 -or $providerDesktopSelfTest.status -cne 'ok' -or
   $providerDesktopSelfTest.desktopProtocolVersion -ne 2 -or $providerDesktopSelfTest.processBirthGrammarVerified -ne $true -or
+  $providerDesktopSelfTest.focusOnlyPolicyVerified -ne $true -or
   $providerDesktopSelfTest.currentProcessVerified -ne $true -or $providerDesktopSelfTest.tokenAccessMask -ne 8 -or $providerDesktopSelfTest.windowFocused -ne $false
 ) { throw 'The portable provider-desktop helper returned an invalid process birth/current-user QUERY-only self-test receipt.' }
 $voiceCommand = Invoke-B122PortableBoundedProcess -Executable $voiceHelper -ArgumentValues @('--self-test') -TimeoutSeconds 30 -Label 'The portable voice helper self-test'
