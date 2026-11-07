@@ -20,10 +20,10 @@ async function fixture(fn) {
   const task = { schema: "switchyard-coding-session/v1", id: randomUUID(), provider: "codex", status: "registered", nativeTransport: "owned-stdio", label: "Synthetic task", repositoryRoot, repositoryIdentity: await repositoryIdentity(repositoryRoot), accountFingerprint: "a".repeat(64), sessionId: randomUUID(), launchPolicy: "read-only/on-request" };
   for (const c of ["personal", "other"]) { await store.initialize(c); await store.update(c, "synthetic-task", (s) => { s.mode = "personal-companion"; s.codingSessions = [{ ...task, sessionId: c === "personal" ? task.sessionId : randomUUID() }]; }); }
   await store.initialize("company", "work");
-  const settings = { fingerprint: task.accountFingerprint, stopped: true, config: codexDesignConfig(), nativeState: "idle", wrongPermissions: false, onTurn: null, afterReply: () => {} };
+  const settings = { fingerprint: task.accountFingerprint, nativeVersion: "0.166.0", stopped: true, config: codexDesignConfig(), nativeState: "idle", wrongPermissions: false, onTurn: null, afterReply: () => {} };
   const options = { store, resolveCli: async () => "/synthetic/codex", resolveMcp: async () => [], now: () => clock, stopChild: async () => ({ stopped: settings.stopped }), clientFactory: (_, cwd, names) => {
     const client = new EventEmitter(); clients.push(client);
-    Object.assign(client, { child: {}, closed: false, serverNames: names, nativeVersion: "0.166.0", restrictionsVerified: true, accountFingerprint: settings.fingerprint, initialize: async () => {}, recheckAccount: async () => { if (client.accountFingerprint !== settings.fingerprint) throw Error("Synthetic native account changed"); }, close() { if (!this.closed) { this.closed = true; this.emit("disconnected"); } },
+    Object.assign(client, { child: {}, closed: false, serverNames: names, nativeVersion: settings.nativeVersion, restrictionsVerified: true, accountFingerprint: settings.fingerprint, initialize: async () => {}, recheckAccount: async () => { if (client.accountFingerprint !== settings.fingerprint) throw Error("Synthetic native account changed"); }, close() { if (!this.closed) { this.closed = true; this.emit("disconnected"); } },
       request: async (method, params) => {
         calls.push({ method, params, cwd });
         if (method === "config/read") return { config: settings.config };
@@ -46,6 +46,13 @@ async function fixture(fn) {
   try { await fn({ root, repositoryRoot, store, task, settings, clients, calls, service, options, input, approve, submit, advance: (ms) => { clock += ms; } }); }
   finally { settings.stopped = true; await service.close(); await rm(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 50 }); }
 }
+test("the observed Codex revision is bound into text review and a changed version requires a new review",()=>fixture(async({settings,approve,submit,calls,store})=>{
+  const old=await approve();assert.equal(old.scope.nativeVersion,'0.166.0');
+  settings.nativeVersion='0.167.0';await assert.rejects(submit(old));assert.equal(calls.some(c=>c.method==='turn/start'),false);
+  const current=await approve();assert.equal(current.scope.nativeVersion,'0.167.0');
+  assert.equal((await submit(current)).status,'provider-turn-completed');
+  assert.equal((await store.snapshot('personal')).codingTurns.at(-1).nativeVersion,'0.167.0');
+}));
 test("reviewed text uses one exact owned restricted turn, retains its acknowledgement and prevents durable duplicate submission", () => fixture(async ({ root, store, task, calls, clients, service, options, input, approve, submit }) => {
   await store.update("personal", "synthetic-observation", s => { s.observations = [{ id: "text-events", status: "recording", sources: ["agent-events"], exclusions: [], events: [], updatedAt: Date.now() }]; appendAgentObservation(s, { provider: "codex", subjectId: task.id, phase: "identity-bound", status: "idle", at: Date.now() }); });
   const review = await approve(); assert.equal(review.modelPromptSubmitted, false); assert.equal(calls.some((c) => c.method === "thread/resume" || c.method === "turn/start"), false);

@@ -1,5 +1,10 @@
 # Keep native Codex requests on their reviewed account
 
+The current source [version contract](codex-version-contract.md) admits exact
+0.166.0 and 0.167.0 revisions. It preserves all account fences below and binds the
+observed version into text review. The 0.167 native proof is account-free effective
+configuration only; the 0.166 host evidence below is historical.
+
 An owned Codex connection now treats documented account-change notifications as
 an irreversible boundary for that connection. `account/updated` or a successful
 or unconfirmed `account/login/completed` closes a pinned client, rejects its

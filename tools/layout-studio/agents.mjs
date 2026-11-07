@@ -3,7 +3,7 @@ import { spawn } from "node:child_process";
 import { appendAgentObservation } from "./agent-observation.mjs";
 import { reviewedDesignObservations } from "./design-observations.mjs";
 import { EventEmitter } from "node:events";
-import { codexAccountBoundary, deniedCodexServerRequest } from "./codex-requests.mjs";
+import { codexAccountBoundary, deniedCodexServerRequest, isReviewedCodexVersion } from "./codex-requests.mjs";
 import { assertCodexResultCurrent, runRestrictedCodexTurn } from "./codex-turn.mjs";
 import { readClaudeDesignLogin } from "./claude-account.mjs";
 import { runRuntimeCommand, runtimeGuardianStopped } from "./runtime-command.mjs";
@@ -56,6 +56,10 @@ export function validateDesignResponse(value, basePlan) {
 export function codexDesignConfig(serverNames = []) {
   if (!Array.isArray(serverNames) || serverNames.length > 128 || serverNames.some((n) => typeof n !== "string" || !/^[A-Za-z0-9_-]{1,80}$/.test(n))) throw new Error("Configured Codex MCP identities are unsupported. No design turn was submitted.");
   const disabled = ["shell_tool", "unified_exec", "shell_snapshot", "computer_use", "browser_use", "browser_use_external", "browser_use_full_cdp_access", "browser_annotation_api", "in_app_browser", "in_app_local_automation", "in_app_voice", "in_app_dictation", "code_mode", "code_mode_host", "hooks", "plugins", "plugin_discovery_prefetch", "remote_plugin", "apps", "memories", "multi_agent", "multi_agent_v2", "view_image", "image_generation", "sleep_tool", "tool_suggest", "workspace_dependencies", "skill_search", "skill_mcp_dependency_install", "auth_elicitation", "guardian_approval", "daemon_auto_start", "goals", "unbounded_connection_retries"];
+  // 0.167 adds seven flags and enables deferred tool-world state by default.
+  // Both reviewed versions retain unknown boolean overrides in config/read;
+  // one explicit restrictive profile is applied before version negotiation.
+  disabled.push("tui_extensions_statusline", "code_mode_host_output_truncation", "interrupt_on_cancel", "apps_early_resource_discovery", "suppress_model_change_announcements", "incremental_exec_tools", "gcp_setup_wizard", "deferred_tool_world_state");
   return { features: Object.fromEntries(disabled.map((name) => [name, false])), project_doc_max_bytes: 0, approvals_reviewer: "user", web_search: "disabled", mcp_servers: Object.fromEntries(serverNames.map((n) => [n, { enabled: false }])) };
 }
 export function assertCodexDesignConfig(config) {
@@ -86,7 +90,7 @@ export function reviewedCodexVersion(hello, name) {
   const agent = hello?.userAgent, prefix = `${name}/`;
   if (typeof agent !== "string" || agent.length > 512 || /[\0\r\n]/.test(agent) || !agent.startsWith(prefix)) throw new Error("Codex did not identify a verified native adapter version. Saved work was preserved.");
   const version = /^(\d+\.\d+\.\d+) \(/.exec(agent.slice(prefix.length))?.[1];
-  if (version !== "0.166.0") throw new Error("This Codex version is not verified by the restricted adapter (0.166.0). Saved work was preserved.");
+  if (!isReviewedCodexVersion(version)) throw new Error("This Codex version is not verified by the restricted adapter (0.166.0 or 0.167.0). Saved work was preserved.");
   return version;
 }
 /** Transport selection never adds a native tool, hook, model call or daemon fallback. */

@@ -138,11 +138,19 @@ test("repository-specific tools and feature changes cannot cross an owned task c
   }, { projectConfig });
 });
 test("unreviewed native versions or another peer identity cannot initialize tools, read accounts or create a task", async () => {
-  for (const peerUserAgent of ["switchyard_design/0.167.0 (synthetic fixture)", "another_peer/0.166.0 (synthetic fixture)", "", "switchyard_design/0.166.0\n(synthetic fixture)"]) await fixture(async ({ driver, frames }) => {
+  for (const peerUserAgent of ["switchyard_design/0.168.0 (synthetic fixture)", "switchyard_design/0.167.1 (synthetic fixture)", "another_peer/0.166.0 (synthetic fixture)", "", "switchyard_design/0.166.0\n(synthetic fixture)"]) await fixture(async ({ driver, frames }) => {
     await assert.rejects(driver.account("personal"), /verified.*version|version.*verified/);
     assert.equal(frames.some((m) => m.method !== "initialize"), false);
   }, { peerUserAgent });
 });
+test("reviewed 0.167 metadata and synthetic task creation keep the complete restricted profile",()=>fixture(async({driver,frames,repositoryRoot})=>{
+  assert.equal((await driver.account('personal')).type,'chatgpt');
+  await driver.start(repositoryRoot,'switchyard-restricted','personal');
+  const created=frames.find(m=>m.method==='thread/start');assert(created);
+  assert.equal(created.params.config.features.deferred_tool_world_state,false);
+  assert.equal(created.params.config.features.incremental_exec_tools,false);
+  assert.equal(frames.some(m=>m.method==='turn/start'),false);
+},{peerUserAgent:'switchyard_design/0.167.0 (synthetic fixture)'}));
 test("a changed project configuration after native creation preserves its returned identity without injecting or submitting content", () => fixture(async ({ repositoryRoot, driver, frames }) => {
   await assert.rejects(driver.start(repositoryRoot, "switchyard-restricted", "personal"), (e) => e.createdThreadId === "synthetic-created" && /restricted/.test(e.message));
   assert.equal(frames.filter((m) => m.method === "thread/start").length, 1);

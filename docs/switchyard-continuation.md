@@ -102,14 +102,13 @@ queued mutation, and never caches a settled outcome. Eight focused groups pass
    work in the requirement ledger. Editor command activation and frontend
    exposure remain frozen; completed backend components do not imply a completed
    user journey.
-4. Keep native provider compatibility separate. Codex 0.167.0 is installed, but
-   admission remains 0.166.0. The empty-home, network-isolated config probe now
-   verifies 42 feature exclusions using only initialize/initialized/config-read.
-   All original descendants and 66 generated files are retired; its marker is
-   removed. Seven new feature flags default false; deferred_tool_world_state
-   changes from false to true. Integrate a version-specific restriction contract
-   before changing admission; native TUI/account/task acceptance remains separate.
-   [Readback evidence](evidence/codex-0167-isolated-config-summary.json).
+4. Codex source admission now covers exact 0.166.0 and 0.167.0 with 42 explicit
+   exclusions and version-bound text review. Twelve groups pass 152 tests and
+   two skips. The production argument builder and validators pass the actual
+   0.167 empty-home/network-isolated initialize/config-read probe. Its original
+   descendants, 66 generated files and marker are retired. Installed Switchyard
+   still uses the earlier source; native TUI/account/task/model acceptance remains
+   separate. [Version contract](codex-version-contract.md).
 5. Maintain current software-versus-external-check distinctions. No missing
    hardware/account check can excuse an unimplemented module.
 

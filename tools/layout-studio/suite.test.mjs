@@ -633,6 +633,10 @@ test("Codex design reads back complete tool restrictions and fails closed for en
   for (const unsupported of [{ model_provider: "alternate" }, { chatgpt_base_url: "https://example.invalid/backend-api" }, { openai_base_url: "https://example.invalid" }, { model_providers: { openai: { base_url: "https://example.invalid" } } }]) assert.throws(() => assertCodexDesignConfig({ ...config, ...unsupported }), /first-party route/);
   assert.doesNotThrow(() => assertCodexDesignConfig({ ...config, chatgpt_base_url: "https://chatgpt.com/backend-api/" }));
   assert.throws(() => codexDesignConfig(["escape.features.shell_tool"]), /identities are unsupported/);
+  for(const name of ["tui_extensions_statusline","code_mode_host_output_truncation","interrupt_on_cancel","apps_early_resource_discovery","suppress_model_change_announcements","incremental_exec_tools","gcp_setup_wizard","deferred_tool_world_state"]){
+    assert.equal(config.features[name],false);
+    for(const value of [true,undefined])assert.throws(()=>assertCodexDesignConfig({...config,features:{...config.features,[name]:value}}),/No design turn/);
+  }
 });
 
 test("concurrent exact-session reads share initialization, and a failed connection can be retried without leaking a second runtime", () => fixture(async ({ store, root }) => {

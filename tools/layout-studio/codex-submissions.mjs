@@ -23,6 +23,7 @@ export function createCodexSubmissions({ store, resolveCli = trustedCli, resolve
       const metadata = await client.request("thread/read", { threadId: task.sessionId, includeTurns: false }), thread = metadata.thread;
       if (thread?.id !== task.sessionId || thread.cwd !== task.repositoryRoot || !["idle", "notLoaded"].includes(thread.status?.type) || thread.turns !== undefined && (!Array.isArray(thread.turns) || thread.turns.length)) throw new Error("The exact metadata-only task is not verified idle. Running or waiting tasks were preserved.");
       return {
+        version: client.nativeVersion,
         async prepareTurn() {
           await checkRoot();
           const resumed = await client.request("thread/resume", { threadId: task.sessionId, excludeTurns: true, cwd: task.repositoryRoot, sandbox: "read-only", approvalPolicy: "never", approvalsReviewer: "user", config: codexDesignConfig(client.serverNames), baseInstructions: "Answer the supplied text in this exact conversation. Do not call tools, execute commands, browse, inspect files or claim independently verified task completion." });

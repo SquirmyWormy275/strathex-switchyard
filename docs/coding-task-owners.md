@@ -50,7 +50,7 @@ The Windows adapter uses one original Job-backed stdio connection and the shared
 encrypted registry, task leases and reviewed-load rules. A separate configuration
 probe is retained before startup, rechecks permission and must retire before the
 task owner starts. It uses the existing restricted Codex arguments and reviewed
-0.166.0 protocol gate; a project instruction directory cannot become startup cwd.
+exact reviewed [version gate](codex-version-contract.md); a project instruction directory cannot become startup cwd.
 
 Guardian identity is saved before worker creation. Later records add the exact
 worker and authenticated account; absent earlier fields are not treated as a
@@ -447,8 +447,9 @@ pending callbacks are covered by seven groups / 79 tests.
 
 Production journal/routes and retained Terminal activation remain unfinished.
 The test retention callback is not the protected production journal. Native TUI
-message/capability compatibility is unverified, and the installed 0.167.0 CLI
-remains outside the adapter's reviewed 0.166.0 version. No actual task attachment
+message/capability compatibility is unverified. The later source
+[version contract](codex-version-contract.md) admits 0.167.0 after isolated
+effective-configuration proof; live TUI compatibility remains open. No actual task attachment
 or model request is claimed by this demonstration.
 
 ## Retain editor ownership before effects

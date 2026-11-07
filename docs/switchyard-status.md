@@ -40,13 +40,14 @@ corrected native acceptance remains pending.
 [Latest failure](evidence/editor-journal-read-queue-native-failure-summary.json),
 [source correction](evidence/editor-journal-shared-observation-summary.json).
 
-Codex 0.167 now has isolated effective-configuration evidence: all 42 explicit
-feature exclusions read back correctly in an empty owned home with network
-isolation. Only initialize/initialized/config-read were sent; no account, thread
-or model request was made. The original process tree exited and all 66 generated
-files (3,053,441 bytes) were removed. Runtime admission remains 0.166 pending
-integration of the reviewed version contract.
-[Isolated readback](evidence/codex-0167-isolated-config-summary.json).
+The Codex source adapter now admits exact 0.166.0 and 0.167.0 revisions with 42
+explicit feature exclusions and version-bound text review. Twelve focused groups
+pass 152 tests with two skips. Production argument construction and validators
+pass against the actual 0.167 binary in an empty network-isolated home, using
+only initialize/initialized/config-read. The original tree exits and all 66
+generated files (3,053,593 bytes) are removed. Installed Switchyard, live account/
+task/model acceptance and native TUI handoff remain separate.
+[Version contract and evidence](codex-version-contract.md).
 
 The journal correction at `ecbb8cb` still fails the complete Windows client lane:
 24 of 25 groups pass, with 229 passing tests and four failed acknowledgement

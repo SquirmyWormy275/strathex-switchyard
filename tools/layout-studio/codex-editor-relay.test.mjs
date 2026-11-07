@@ -47,7 +47,7 @@ test('unreviewed requests, effects, foreign task IDs and expanded permissions ne
   }
 });
 test('unreviewed versions and experimental initialization are refused before any task request', async t => {
-  const f = fixture(t, { reply: async (m,r) => { if (m.method === 'initialize') r.userAgent = 'codex_tui/0.167.0 (unverified)'; } });
+  const f = fixture(t, { reply: async (m,r) => { if (m.method === 'initialize') r.userAgent = 'codex_tui/0.168.0 (unverified)'; } });
   await assert.rejects(f.relay.receive(initialize)); assert.deepEqual(f.calls.map(c => c.method), ['initialize']);
   for (const capabilities of [{ experimentalApi: true }, { optOutNotificationMethods: ['account/updated'] }, null]) {
     const x = fixture(t); await assert.rejects(x.relay.receive({ ...initialize, params: { ...initialize.params, capabilities } })); assert.deepEqual(x.calls, []);

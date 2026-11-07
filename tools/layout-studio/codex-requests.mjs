@@ -1,4 +1,7 @@
 /** Protocol-specific refusal for the restricted native client; no approval grants. */
+/** Exact reviewed protocol revisions; no range or future-version admission. */
+export function isReviewedCodexVersion(value) { return value === "0.166.0" || value === "0.167.0"; }
+
 export function codexAccountBoundary(message) {
   return message?.id === undefined && (message?.method === "account/updated" || message?.method === "account/login/completed" && message.params?.success !== false);
 }

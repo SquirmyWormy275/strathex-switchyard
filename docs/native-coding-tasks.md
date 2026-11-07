@@ -6,8 +6,11 @@ its repository. Selecting a window or observing an idle process does not prove
 that work resumed or completed.
 
 The current Codex backend supports a deliberately reviewed text turn on an exact
-registered read-only task created by Switchyard. It uses installed Codex 0.166.0
-and its existing first-party login. It does not configure an API key or choose a
+registered read-only task created by Switchyard. The source adapter admits exact
+Codex 0.166.0 and 0.167.0 revisions with the existing first-party login. The newer
+version has isolated configuration proof; live task/model acceptance remains
+separate. [Version contract](codex-version-contract.md).
+It does not configure an API key or choose a
 fallback account. File changes and command execution are outside this route.
 Saved native conversation context can be used by the model.
 
