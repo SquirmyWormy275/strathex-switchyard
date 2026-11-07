@@ -328,6 +328,16 @@ export class WindowsProviderDesktopProcessPort implements ProviderDesktopProcess
     } finally { this.busy = false; }
   }
 
+  /** Retry retirement of this instance's original child without a new request. */
+  async retireOwned(): Promise<Readonly<{ stopped: boolean }>> {
+    if (this.busy) return { stopped: false };
+    if (!this.owner) return { stopped: true };
+    this.busy = true;
+    try { await this.retire(this.owner); return { stopped: true }; }
+    catch { return { stopped: false }; }
+    finally { this.busy = false; }
+  }
+
   private async retire(owner: OwnedHelper): Promise<ProviderDesktopHelperExit> {
     const session = owner.session;
     let phase = "exit";

@@ -8,6 +8,8 @@ export const sourceRoot = await realpath(fileURLToPath(new URL("../../../", impo
 // Release verification also runs from an exported source tree with no .git.
 const sourceFiles = ["packages/protocol/src/b122.ts", "apps/windows-companion/src/mediated-git.ts", "apps/windows-companion/src/git-content-stager.ts", "apps/windows-companion/src/git-index-lease.ts", "apps/vscode-extension/src/codex-daemon-status.cjs", "scripts/setup-switchyard-runtime.mjs", "scripts/workflow-monitor.mjs", "scripts/workflow-capture.mjs", "ATTRIBUTION.md", "apps/desktop-hotkeys/Program.cs", "apps/desktop-hotkeys/RuntimeCommandRunner.cs", "apps/desktop-hotkeys/Switchyard.Hotkeys.csproj", "deployment/windows/licenses/DOTNET-RUNTIME-LICENSE.txt", "deployment/windows/licenses/DOTNET-RUNTIME-THIRD-PARTY-NOTICES.txt"];
 sourceFiles.push("apps/windows-setup/Setup.cpp","deployment/windows/Build-SwitchyardSetup.ps1");
+sourceFiles.push("apps/windows-companion/src/provider-desktop.ts", "apps/windows-companion/src/windows-provider-process.ts");
+sourceFiles.push("apps/windows-companion/provider-desktop-helper/Program.cs");
 sourceFiles.push("apps/windows-companion/src/repository-runtime.ts", "apps/windows-companion/src/repository-runtime-broker.ts", "apps/windows-companion/src/repository-inputs.ts", "apps/linux-companion/src/linux-repository-runtime.ts", "apps/linux-companion/src/linux-repository-inputs.ts");
 sourceFiles.push("apps/windows-companion/src/scanner-fixtures.ts", "apps/windows-companion/src/scanner-fixture-files.ts", "apps/windows-companion/src/receipt-evidence.ts", "apps/desktop-hotkeys/WindowsStoragePrerequisites.cs");
 sourceFiles.push("apps/desktop-hotkeys/WindowsStorageBrokerProtocol.cs");

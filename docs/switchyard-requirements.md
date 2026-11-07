@@ -8,16 +8,18 @@ Implementation: not started / in progress / implemented / unsupported by verifie
 Validation: not run / software-tested / host-tested / hardware-tested.
 Tests use synthetic data unless explicitly labelled host/hardware evidence.
 
-Windows native focus now has a focus-only v3 helper protocol with exact
-PID/creation-time ownership recorded before any request. Child closure and
-retirement persistence must verify before replacement; cancellation joins pending
-owner writes. A separate read-only owner query supports recovery without killing
-processes or widening TOKEN_QUERY 8. Six focused groups pass 69 tests; the combined
-helper builds with zero warnings/errors. Its 66-file, 1,869,485-byte staging is
-removed. Native Windows owner/window checks remain pending. Suite configuration,
-durable owner journal/dispatch wiring and VS Code-specific focus remain unfinished.
-[Contract](../apps/windows-companion/provider-desktop-helper/README.md),
-[source evidence](evidence/windows-focus-owner-source-summary.json).
+The Windows ChatGPT Suite backend now connects explicit executable review,
+encrypted configuration, authenticated focus dispatch and durable helper recovery.
+Exact PID/birth ownership is persisted before requests; uncertain effects cannot
+be replayed, and routine before-effect refusals do not exhaust the unresolved
+history limit. Workspace/mode/shutdown paths join original helpers. Thirty-five
+focused groups pass 232 tests with no skips, including sixteen service/gateway
+cases; type checking and original package bounds pass. Linux excludes the
+Windows-only modules; the Windows bundle includes its complete linked helper
+source. Owned test staging is removed. Actual Windows desktop acceptance,
+frontend configuration controls and Windows VS Code focus remain unfinished.
+[Contract](windows-native-focus.md),
+[source evidence](evidence/windows-native-focus-source-summary.json).
 
 Cargo archives with multiple `[[bin]]`, `[[example]]` and nested array tables
 now pass 84 independent Python reference cases. Ten focused groups pass 96 tests,

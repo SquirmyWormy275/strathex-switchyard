@@ -18,6 +18,9 @@ test("suite bundles contain the actual offline backend, frozen frontend and lice
   const manifest = await verifySuiteRelease(bundle.directory, { expectedId: bundle.id, platform: "linux", checkRuntime: true });
   const { reviewDesignObservations } = await import(pathToFileURL(join(bundle.directory, "tools/layout-studio/design-observations.mjs")).href);
   assert.equal(typeof reviewDesignObservations, "function");
+  const { createWindowsNativeFocus } = await import(pathToFileURL(join(bundle.directory, "tools/layout-studio/windows-native-focus.mjs")).href);
+  assert.equal(typeof createWindowsNativeFocus, "function");
+  for (const name of ["provider-desktop", "windows-provider-process"]) assert.equal(manifest.files.some(file => file.path === `apps/windows-companion/src/${name}.ts`), false, "Windows-only focus implementations must not inflate the Linux package.");
   for (const name of ["index.html", "style.css", "app.mjs", "home.mjs", "shell.mjs", "keyboard-view.mjs", "suite-ui.mjs", "device-ui.mjs", "model-f-catalog.json", "connection.mjs", "sample-info.json", "sample-keymap.json", "sample-study-report.json"]) {
     assert.equal(manifest.files.some(file => file.path === `tools/layout-studio/${name}`), false, "Browser-only modules and static assets must ship once in the frozen frontend.");
     assert.ok(manifest.files.some(file => file.path === `frontend/${name}`));
@@ -75,8 +78,19 @@ test("release verification rejects changed, missing, additional and mis-scoped c
   const extra = join(bundle.directory, "unmanifested.txt"); await writeFile(extra, "unexpected"); await assert.rejects(verifySuiteRelease(bundle.directory), /unmanifested/); await rm(extra);
   await rm(path); await assert.rejects(verifySuiteRelease(bundle.directory), /missing/);
 }));
-test("the Windows bundle includes broker/bootstrap sources and the linked guest worker needed to rebuild its helper",()=>fixture(async({bundle})=>{
+test("the Windows bundle includes broker/bootstrap sources and the linked guest worker needed to rebuild its helper",()=>fixture(async({bundle,options})=>{
   const manifest=await verifySuiteRelease(bundle.directory,{expectedId:bundle.id,platform:"win32"});
+  const { createWindowsNativeFocus } = await import(pathToFileURL(join(bundle.directory,"tools/layout-studio/windows-native-focus.mjs")).href);
+  assert.equal(typeof createWindowsNativeFocus, "function");
+  for (const name of ["src/provider-desktop.ts", "src/windows-provider-process.ts", "provider-desktop-helper/Program.cs"]) {
+    const path = "apps/windows-companion/" + name;
+    assert.ok(manifest.files.some(file => file.path === path));
+    assert.deepEqual(await readFile(join(bundle.directory,path)), await readFile(join(sourceRoot,path)));
+    await assert.rejects(buildSuiteRelease({ ...options, sourceFiles: options.sourceFiles.filter(file => file !== path) }), /native focus dependency is missing/);
+  }
+  await import(pathToFileURL(join(bundle.directory,"apps/windows-companion/src/provider-desktop.ts")).href);
+  await import(pathToFileURL(join(bundle.directory,"apps/windows-companion/src/windows-provider-process.ts")).href);
+  assert.match(await readFile(join(bundle.directory,"apps/desktop-hotkeys/Switchyard.Hotkeys.csproj"),"utf8"),/\.\.\/windows-companion\/provider-desktop-helper\/Program.cs/);
   for(const name of ["WindowsStorageBroker.cs","WindowsStorageBrokerBootstrap.cs","WindowsStorageBrokerService.cs","WindowsStorageBrokerControl.cs","WindowsStorageBrokerPipe.cs","WindowsStorageBrokerRuntime.cs","WindowsStorageBrokerDiagnostic.cs","RuntimePackageMetadata.cs"]){
     assert.ok(manifest.files.some(file=>file.path===`apps/desktop-hotkeys/${name}`),`The shipped helper cannot be rebuilt without ${name}.`);
   }

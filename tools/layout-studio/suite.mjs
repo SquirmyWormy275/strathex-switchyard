@@ -7,6 +7,7 @@ import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { join } from "node:path";
 import { createSuiteStore } from "./suite-store.mjs";
+import { createWindowsNativeFocus } from "./windows-native-focus.mjs";
 import { createAgentService } from "./agents.mjs";
 import { localVoice } from "./voice.mjs";
 import { parseWorkflow, observationSummary } from "./workflow.mjs";
@@ -46,7 +47,7 @@ import { clientRecipe } from "../../integrations/client-recipes.mjs";
 import { linuxProcess } from "./native-process.mjs";
 
 const kinds = ["interruption", "resume", "switch", "handoff", "status", "review", "approval", "failure", "recovery", "other"];
-export function createSuite({ store = createSuiteStore(), platform = process.platform, agents, voice = localVoice(), hypr = runHypr, nativeProcess = linuxProcess, devices, copilot, copilotFactory = createCopilot, coding, codingTaskOwners, codingTaskOwnersFactory = createCodingTaskOwners, codingEditorConnections, codingEditorConnectionsFactory = createCodingEditorConnections, editorRuntimeRoot = process.env.XDG_RUNTIME_DIR, codexSubmissions, claudeCoding, claudeSubmissions, keyboardIndicators = createKeyboardIndicators(), taskAuthority, taskAuthorityFactory = createTaskAuthority, repositoryRecovery, repositoryCommits, repositoryExecution, storageSetup, fixtureAdministration, shieldExceptions, clientLaunch, spawnExample = spawn, stopExampleChild = stopOwnedChild, foreground, scheduleForeground = setInterval, clearForeground = clearInterval } = {}) {
+export function createSuite({ store = createSuiteStore(), platform = process.platform, agents, voice = localVoice(), hypr = runHypr, nativeProcess = linuxProcess, windowsNativeFocus, windowsNativeFocusFactory = createWindowsNativeFocus, devices, copilot, copilotFactory = createCopilot, coding, codingTaskOwners, codingTaskOwnersFactory = createCodingTaskOwners, codingEditorConnections, codingEditorConnectionsFactory = createCodingEditorConnections, editorRuntimeRoot = process.env.XDG_RUNTIME_DIR, codexSubmissions, claudeCoding, claudeSubmissions, keyboardIndicators = createKeyboardIndicators(), taskAuthority, taskAuthorityFactory = createTaskAuthority, repositoryRecovery, repositoryCommits, repositoryExecution, storageSetup, fixtureAdministration, shieldExceptions, clientLaunch, spawnExample = spawn, stopExampleChild = stopOwnedChild, foreground, scheduleForeground = setInterval, clearForeground = clearInterval } = {}) {
   agents ??= createAgentService({ store, runtimeRoot: join(process.env.XDG_RUNTIME_DIR || process.env.LOCALAPPDATA || join(homedir(), ".local/state"), "switchyard-design") });
   devices ??= createDeviceService({ store });
   coding ??= createCodingSessions({ store });
@@ -66,6 +67,7 @@ export function createSuite({ store = createSuiteStore(), platform = process.pla
   let selectionLoading;
   let closed = false;
   const copilotTransitions = new Map();
+  windowsNativeFocus ??= windowsNativeFocusFactory({ store, platform, isActive: async c => { await loadSelection(); return !closed && !copilotTransitions.has(c) && c === activeCompartment && await store.selection() === c; } });
   codingTaskOwners ??= codingTaskOwnersFactory({ store, platform, isActive: async c => { await loadSelection(); return !closed && !copilotTransitions.has(c) && c === activeCompartment && await store.selection() === c; } });
   const codingEditorAuthorizations = createCodingEditorAuthorizations({ store, owners: codingTaskOwners, isActive: async c => { await loadSelection(); return !closed && !copilotTransitions.has(c) && c === activeCompartment && await store.selection() === c; } });
   const editorConnections = () => {
@@ -215,6 +217,7 @@ export function createSuite({ store = createSuiteStore(), platform = process.pla
         if (activeCompartment !== compartment) {
           await copilot.stopCompartment?.(activeCompartment);
           await matrixDiagnostics.stopCompartment(activeCompartment);
+          if ((await windowsNativeFocus.stopCompartment(activeCompartment)).stopped !== true) throw Error("The original native focus helper has not verified retirement; workspace selection was preserved.");
           await stopEditorConnections(activeCompartment);
           const codingOwnerStop = await codingTaskOwners.stopCompartment(activeCompartment);
           if (codingOwnerStop?.stopped !== true) throw new Error("The original coding task owner has not verified exit; workspace selection was preserved.");
@@ -245,7 +248,7 @@ export function createSuite({ store = createSuiteStore(), platform = process.pla
           // background inventory, which can briefly report the same session.
           const claudeTextStop = await claudeSubmissions.stopCompartment(compartment).catch(() => ({ stopped: false }));
           const editorStop = await stopEditorConnections(compartment).catch(() => ({ stopped: false }));
-          const stopped = await Promise.all([editorStop, executionStop, commitStop, recoveryStop, clientStop, authorityStop, storageStop, fixturesStop, exceptionsStop, codingTaskOwners.stopCompartment(compartment), foreground.stopCompartment?.(compartment), agents.stopCompartment?.(compartment), coding.stopCompartment?.(compartment), codexSubmissions.stopCompartment(compartment), claudeTextStop, voiceQueue.stopCompartment(compartment), claudeCoding.stopCompartment?.(compartment), ...["custom", "langchain"].map((kind) => stopExample(compartment, kind))]);
+          const stopped = await Promise.all([windowsNativeFocus.stopCompartment(compartment), editorStop, executionStop, commitStop, recoveryStop, clientStop, authorityStop, storageStop, fixturesStop, exceptionsStop, codingTaskOwners.stopCompartment(compartment), foreground.stopCompartment?.(compartment), agents.stopCompartment?.(compartment), coding.stopCompartment?.(compartment), codexSubmissions.stopCompartment(compartment), claudeTextStop, voiceQueue.stopCompartment(compartment), claudeCoding.stopCompartment?.(compartment), ...["custom", "langchain"].map((kind) => stopExample(compartment, kind))]);
           result.ownedProcessesStopped = stopped.every((r) => !r || r.stopped !== false && r.status !== "stop-unconfirmed");
           if (!result.ownedProcessesStopped) throw new Error("Keyboard-only mode was saved, but an owned process stop is unconfirmed. No new provider or recording operation is permitted.");
         }
@@ -471,16 +474,26 @@ export function createSuite({ store = createSuiteStore(), platform = process.pla
         if (Object.keys(body).some(k => !["compartment", "roleId", "intent", "content", "requestId", "workspaceBaseUrl"].includes(k))) throw new Error("Role dispatch accepts only a bound role, intent, request identity and supported content.");
         return this.dispatchRole(compartment, body.roleId, body.intent, body.content, body.requestId);
       }
+      if (path === "/api/suite/native-focus/recover") {
+        if (Object.keys(body).some(key => !["compartment", "workspaceBaseUrl"].includes(key))) throw Error("Native focus recovery observes only original helper retirement.");
+        return windowsNativeFocus.recover(compartment);
+      }
+      if (path === "/api/suite/native-focus/review" || path === "/api/suite/native-focus/configure") {
+        const { compartment: _compartment, workspaceBaseUrl: _baseUrl, ...input } = body;
+        return path.endsWith("/review") ? windowsNativeFocus.review(compartment, input) : windowsNativeFocus.configure(compartment, input);
+      }
       if (path === "/api/suite/intent") {
         if (Object.keys(body).some(k => !["compartment", "implementation", "roleId", "intent", "requestId", "workspaceBaseUrl"].includes(k))) throw new Error("Physical dispatch is outside the closed intent contract.");
         await loadSelection();
         if (Object.hasOwn(nativeFocusImplementations, body.implementation)) {
           const native = nativeFocusImplementations[body.implementation], selected = activeCompartment;
-          await this.authorizeConnection(selected, { implementation: body.implementation });
-          return native.focus(hypr, { readProcess: nativeProcess, assertCurrent: async () => {
-            if (closed || selected !== activeCompartment || await store.selection() !== selected) throw new Error("The selected native client workspace changed; no alternate target was selected.");
+          const assertCurrent = async () => {
+            if (closed || copilotTransitions.has(selected) || selected !== activeCompartment || await store.selection() !== selected) throw new Error("The selected native client workspace changed; no alternate target was selected.");
             await store.authorize(selected, { provider: native.provider });
-          } });
+          };
+          if (platform === "win32") return windowsNativeFocus.focus(selected, body.implementation, { requestId: body.requestId, assertCurrent });
+          await this.authorizeConnection(selected, { implementation: body.implementation });
+          return native.focus(hypr, { readProcess: nativeProcess, assertCurrent });
         }
         if (body.implementation === "switchyard.role/v1") return this.dispatchRole(activeCompartment, body.roleId, body.intent, undefined, body.requestId);
         throw new Error("The physical intent is outside the closed implementation map.");
@@ -489,7 +502,7 @@ export function createSuite({ store = createSuiteStore(), platform = process.pla
         const s = await store.snapshot(compartment);
         // Recovery packets include original index bytes and private ownership
         // records. Explicit recovery routes expose observations, never backups.
-        const { repositoryEffectJournal, repositoryRecoveryJournal, repositoryEffectCheckpoints, repositoryEffects, repositoryCommitReviews, clientLaunches, repositoryExecutions, repositoryExecutionJournal, repositoryExecutionReviews, repositoryExecutionStaging, repositoryExecutionStops, repositoryExecutionStopJournal, repositoryWindowsInputs, repositoryWindowsGuests, repositoryWindowsGuestCommands, repositoryWindowsTools, repositoryWindowsImages, repositoryWindowsBrokerExchanges, repositoryWindowsRuns, windowsStorageNative,windowsStorageReviews,windowsStorageJournal,scannerFixtureReviews,scannerFixtureJournal,shieldExceptionJournal,shieldExceptionReviews,copilotRequests,copilotRequestTombstones,codingTaskOwners,codingTaskLoads,codingEditorAuthorizations,codingEditorConnections,...snapshot } = s;
+        const { repositoryEffectJournal, repositoryRecoveryJournal, repositoryEffectCheckpoints, repositoryEffects, repositoryCommitReviews, clientLaunches, repositoryExecutions, repositoryExecutionJournal, repositoryExecutionReviews, repositoryExecutionStaging, repositoryExecutionStops, repositoryExecutionStopJournal, repositoryWindowsInputs, repositoryWindowsGuests, repositoryWindowsGuestCommands, repositoryWindowsTools, repositoryWindowsImages, repositoryWindowsBrokerExchanges, repositoryWindowsRuns, windowsStorageNative,windowsStorageReviews,windowsStorageJournal,scannerFixtureReviews,scannerFixtureJournal,shieldExceptionJournal,shieldExceptionReviews,copilotRequests,copilotRequestTombstones,codingTaskOwners,codingTaskLoads,codingEditorAuthorizations,codingEditorConnections,nativeFocusOperations,...snapshot } = s;
         return { ...snapshot, voice: s.voice.map((v) => ({ ...v, chunks: v.chunks.map(({ audio, ...c }) => ({ ...c, pendingAudio: Boolean(audio) })) })), observationSummaries: s.observations.map(observationSummary) };
       }
       if (path === "/api/suite/profile/save") return store.saveProfile(compartment, body.profile);
@@ -602,7 +615,7 @@ export function createSuite({ store = createSuiteStore(), platform = process.pla
     async authorizeConnection(compartment, connection = { implementation: "native-chatgpt.focus/v1" }) {
       await loadSelection(); compartment ??= activeCompartment;
       if (compartment !== activeCompartment) throw new Error("Select this workspace before reviewing a physical shortcut. The active workspace policy controls every invocation.");
-      if (Object.hasOwn(nativeFocusImplementations, connection.implementation)) { const native = nativeFocusImplementations[connection.implementation]; await store.authorize(compartment, { provider: native.provider }); if (platform !== "linux") throw new Error("Verified native client window focus is not implemented on this platform. Bind a supported agent role instead."); return native.inspect(hypr, nativeProcess); }
+      if (Object.hasOwn(nativeFocusImplementations, connection.implementation)) { const native = nativeFocusImplementations[connection.implementation]; await store.authorize(compartment, { provider: native.provider }); if (platform === "win32") return windowsNativeFocus.inspect(compartment, connection.implementation); if (platform !== "linux") throw new Error("Verified native client window focus is not implemented on this platform. Bind a supported agent role instead."); return native.inspect(hypr, nativeProcess); }
       if (connection.implementation !== "switchyard.role/v1") throw new Error("This physical connection is outside the closed action map.");
       const state = await store.snapshot(compartment), binding = roleTarget(state, connection.roleId, connection.intent);
       await store.authorize(compartment, { provider: binding.provider });
@@ -616,6 +629,6 @@ export function createSuite({ store = createSuiteStore(), platform = process.pla
         const results = await codingTaskOwners.close();
         if (!Array.isArray(results) || results.some(r => r?.stopped !== true)) throw new Error("Original coding task owner exit is unconfirmed.");
         if (editorError) throw editorError;
-      })(), copilot.close?.(), matrixDiagnostics.close(), repositoryExecution.close(), repositoryCommits.close(), repositoryRecovery.close(), clientLaunch.close(), taskAuthority.close(), storageSetup.close(), fixtureAdministration.close(), shieldExceptions.close()]); readoutProfiles.close(); for (const timer of monitors.values()) clearForeground(timer); monitors.clear(); for (const key of new Set([...examples.keys(), ...exampleStarts.keys()])) exampleGenerations.set(key, (exampleGenerations.get(key) ?? 0) + 1); await Promise.allSettled(exampleStarts.values()); let claudeStopError; try { await claudeSubmissions.close(); } catch (error) { claudeStopError = error; } const providerStops = await Promise.allSettled([foreground.close?.(), agents.close(), coding.close?.(), codexSubmissions.close(), voiceQueue.close(), claudeCoding.close?.(), keyboardIndicators.close().then(result => { if (result.stopped !== true) throw new Error("Owned indicator probe exit is unconfirmed."); }), ...exampleStops.values(), ...[...examples].map(async ([key, child]) => { if (!(await retireExample(key, child)).stopped) throw new Error("Owned bundled example exit is unconfirmed."); })]); if (claudeStopError) throw claudeStopError; const failedProvider = providerStops.find(r => r.status === "rejected"); if (failedProvider) throw failedProvider.reason; const failedBoundary = boundaryStops.find(r => r.status === "rejected"); if (failedBoundary) throw failedBoundary.reason; }
+      })(), windowsNativeFocus.close(), copilot.close?.(), matrixDiagnostics.close(), repositoryExecution.close(), repositoryCommits.close(), repositoryRecovery.close(), clientLaunch.close(), taskAuthority.close(), storageSetup.close(), fixtureAdministration.close(), shieldExceptions.close()]); readoutProfiles.close(); for (const timer of monitors.values()) clearForeground(timer); monitors.clear(); for (const key of new Set([...examples.keys(), ...exampleStarts.keys()])) exampleGenerations.set(key, (exampleGenerations.get(key) ?? 0) + 1); await Promise.allSettled(exampleStarts.values()); let claudeStopError; try { await claudeSubmissions.close(); } catch (error) { claudeStopError = error; } const providerStops = await Promise.allSettled([foreground.close?.(), agents.close(), coding.close?.(), codexSubmissions.close(), voiceQueue.close(), claudeCoding.close?.(), keyboardIndicators.close().then(result => { if (result.stopped !== true) throw new Error("Owned indicator probe exit is unconfirmed."); }), ...exampleStops.values(), ...[...examples].map(async ([key, child]) => { if (!(await retireExample(key, child)).stopped) throw new Error("Owned bundled example exit is unconfirmed."); })]); if (claudeStopError) throw claudeStopError; const failedProvider = providerStops.find(r => r.status === "rejected"); if (failedProvider) throw failedProvider.reason; const failedBoundary = boundaryStops.find(r => r.status === "rejected"); if (failedBoundary) throw failedBoundary.reason; }
   };
 }

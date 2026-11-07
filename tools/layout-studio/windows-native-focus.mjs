@@ -1,0 +1,268 @@
+/** Reviewed Windows ChatGPT focus. No provider launch, typing or account control. */
+import { createHash, randomUUID } from "node:crypto";
+import { dirname, join, win32 } from "node:path";
+import { fileURLToPath } from "node:url";
+import { verifySuiteRelease } from "../../deployment/suite/release.mjs";
+import { runRuntimeCommand } from "./runtime-command.mjs";
+import { desktopEnvironment } from "./process-environment.mjs";
+
+const implementation = "native-chatgpt.focus/v1", provider = "native-chatgpt";
+const hash = value => createHash("sha256").update(JSON.stringify(value)).digest("hex");
+const scope = state => hash([state.policy, state.mode, state.modeSelectedAt ?? null, state.accounts, state.taskAuthorityEpoch ?? 0, state.nativeWindowsChatgpt ?? null]);
+const uuid = value => typeof value === "string" && /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/.test(value);
+const exact = (value, keys) => value && typeof value === "object" && !Array.isArray(value) && Object.keys(value).sort().join() === keys.slice().sort().join();
+const validOwner = value => exact(value, ["processId", "processStartTime"]) && Number.isSafeInteger(value.processId) && value.processId > 0 && value.processId <= 0x7fffffff && typeof value.processStartTime === "string" && /^[1-9][0-9]{0,19}$/.test(value.processStartTime) && BigInt(value.processStartTime) <= 0xffffffffffffffffn;
+const same = (a, b) => hash(a) === hash(b);
+// Windows implementations are loaded only after the platform/policy boundary.
+// Linux packages keep their existing native compositor implementation.
+const providerModule = () => import("../../apps/windows-companion/src/provider-desktop.ts");
+const entryFor = async (path, signature) => (await providerModule()).createFixedProviderDesktopCatalog({ chatgpt_desktop: { path, ...signature } }).get("chatgpt_desktop");
+const signatureFor = identity => ({ signerSubject: identity.signerSubject, signerThumbprint: identity.signerThumbprint });
+function exactSignatureProbe() {
+  return { async inspect(path) {
+    const { WindowsAuthenticodeSignatureProbe } = await providerModule();
+    const root = process.env.SystemRoot;
+    if (typeof root !== "string" || !/^[A-Za-z]:[\\/]/.test(root) || !win32.isAbsolute(root) || /[\0\r\n]/.test(root) || root.split(/[\\/]/).some(part => part === "." || part === "..")) throw Error("The exact Windows system directory is unavailable; no alternate signature runtime was selected.");
+    return new WindowsAuthenticodeSignatureProbe().inspect(path);
+  } };
+}
+
+async function packagedHelper() {
+  const root = fileURLToPath(new URL("../../", import.meta.url));
+  const release = await verifySuiteRelease(root, { platform: "win32", checkRuntime: true });
+  if (release.development) throw Error("Native focus requires a verified packaged Windows Suite.");
+  const file = release.files.find(row => row.path === "runtime/hotkeys/Switchyard.Hotkeys.exe");
+  if (!file) throw Error("The exact packaged Windows helper is unavailable.");
+  return { path: join(root, file.path), sha256: file.sha256 };
+}
+
+export function validateNativeFocusOwnerExit(value, owner) {
+  if (!validOwner(owner) || !exact(value, ["schema", "processId", "processStartTime", "state", "exited", "processAccessMask", "tokenAccessMask", "processTerminated", "windowFocused"])
+    || value.schema !== "switchyard-native-focus-owner-result/v1" || value.processId !== owner.processId || value.processStartTime !== owner.processStartTime
+    || typeof value.exited !== "boolean" || value.state !== (value.exited ? "exited" : "running") || value.processAccessMask !== (0x1000 | 0x100000)
+    || value.tokenAccessMask !== 8 || value.processTerminated !== false || value.windowFocused !== false) throw Error("The original native focus helper exit observation did not verify.");
+  return value.exited;
+}
+
+async function observeHelperExit(helper, owner, signal) {
+  if (!validOwner(owner)) throw Error("The retained native focus helper identity is invalid.");
+  const result = await runRuntimeCommand(helper.path, ["--native-desktop-owner-v1"], {
+    windowsHelper: helper.path, cwd: dirname(helper.path), env: desktopEnvironment(), expectedExecutableSha256: helper.sha256,
+    inputText: JSON.stringify({ schema: "switchyard-native-focus-owner-query/v1", ...owner }) + "\n",
+    detailed: true, timeout: 10000, maxOutputBytes: 8192, signal
+  });
+  if (result.exitCode !== 0 || result.status !== "completed" || result.treeExitVerified !== true) throw Error("The original native focus helper exit remains unconfirmed.");
+  return validateNativeFocusOwnerExit(JSON.parse(result.stdout), owner);
+}
+
+export function createWindowsNativeFocus({
+  store, platform = process.platform, isActive = async () => true, now = Date.now,
+  signatureProbe = exactSignatureProbe(), identityProbe = { inspect: async entry => new (await providerModule()).NodeProviderExecutableIdentityProbe(signatureProbe).inspect(entry) },
+  helper = packagedHelper, observeExit = observeHelperExit,
+  processFactory = async options => new (await import("../../apps/windows-companion/src/windows-provider-process.ts")).WindowsProviderDesktopProcessPort(options)
+} = {}) {
+  const reviews = new Map(), pending = new Map(), ports = new Map(); let closed = false;
+  const requirePlatform = () => { if (platform !== "win32") throw Error("This native focus configuration requires Windows."); };
+  async function authorize(c) {
+    requirePlatform();
+    if (closed || !await isActive(c)) throw Error("Select the original native focus workspace before continuing.");
+    await store.authorize(c, { provider });
+    return store.snapshot(c);
+  }
+  async function current(c, expected, signal, assertion) {
+    if (signal?.aborted) throw Error("The native focus request was cancelled.");
+    const state = await authorize(c);
+    if (scope(state) !== expected) throw Error("The native focus workspace, account policy or reviewed application changed.");
+    await assertion?.();
+    return state;
+  }
+  const locked = fn => store.withResourceLock("native-focus", "current-user-desktop", fn);
+  async function updateOperation(c, id, fn) {
+    return store.update(c, "native-focus-operation", state => {
+      const record = state.nativeFocusOperations?.find(row => row.id === id);
+      if (!record) throw Error("The original native focus operation record is missing.");
+      return fn(record, state);
+    });
+  }
+  async function reconcile(native, c, id, signal) {
+    for (const [key, entry] of ports) {
+      if ((await entry.port.retireOwned()).stopped !== true) throw Error("The original native focus helper retirement remains unconfirmed. No replacement was started.");
+      ports.delete(key);
+    }
+    for (const workspace of await store.list()) {
+      for (const record of (await store.snapshot(workspace.id)).nativeFocusOperations ?? []) {
+        if (record.id === id && workspace.id !== c) throw Error("The original native focus request belongs to another workspace.");
+        for (const owned of record.helpers ?? []) {
+          if (owned.stopped === true) continue;
+          if (signal.aborted) throw Error("Native focus recovery was cancelled.");
+          if (typeof owned.helperSha256 !== "string" || !/^[a-f0-9]{64}$/.test(owned.helperSha256) || !validOwner(owned.identity)) throw Error("Preserve the original native focus helper record; its exact executable or identity is invalid.");
+          if (await observeExit(native, owned.identity, signal) !== true) throw Error("The original native focus helper has not verified exit. No replacement was started.");
+          await updateOperation(workspace.id, record.id, row => {
+            const item = row.helpers.find(value => same(value.identity, owned.identity));
+            if (!item || item.helperSha256 !== owned.helperSha256) throw Error("The original helper retirement record changed.");
+            item.stopped = true; item.stoppedAt = now();
+            if (row.status !== "completed") row.status = row.effectAuthorized === false ? "refused" : "outcome-unconfirmed";
+          });
+        }
+      }
+    }
+  }
+  async function perform(c, id, kind, assertion) {
+    if (!uuid(id)) throw Error("Native focus needs an exact request UUID.");
+    if (pending.has(c)) throw Error("Wait for this workspace's existing native focus request.");
+    const controller = new AbortController();
+    const deadline = setTimeout(() => controller.abort(), 20000);
+    const operation = Promise.resolve().then(() => locked(async lease => {
+      const before = await authorize(c), expected = scope(before), profile = before.nativeWindowsChatgpt;
+      if (!profile || profile.implementation !== implementation || !profile.identity) throw Error("Review and configure the exact Windows ChatGPT executable first.");
+      const native = await helper();
+      await reconcile(native, c, id, controller.signal);
+      const check = async () => { lease.assert(); return current(c, expected, controller.signal, assertion); };
+      await check();
+      const records = (await store.snapshot(c)).nativeFocusOperations ?? [], previous = records.find(row => row.id === id);
+      if (previous) {
+        if (previous.scope !== expected || previous.kind !== kind || previous.status !== "completed" || !previous.result) throw Error("The original native focus request cannot be replayed; its outcome or scope is uncertain.");
+        return { ...previous.result, replayed: true };
+      }
+      await store.update(c, "native-focus-reserve", state => {
+        if (scope(state) !== expected) throw Error("The native focus scope changed before reservation.");
+        const retained = (state.nativeFocusOperations ?? []).filter(row => !["completed", "refused"].includes(row.status) || row.helpers?.some(value => !value.stopped));
+        const settled = (state.nativeFocusOperations ?? []).filter(row => !retained.includes(row)).slice(-63);
+        if (retained.length >= 64) throw Error("Reconcile this workspace's unresolved native focus history first.");
+        state.nativeFocusOperations = [...retained, ...settled, { id, kind, scope: expected, status: "reserved", effectAuthorized: false, at: now(), helpers: [] }];
+      }, { provider });
+      try {
+        const processes = await processFactory({
+          helperPath: native.path, helperSha256: native.sha256, focusOnly: true,
+          onHelperOwned: async identity => {
+            await check();
+            if (!validOwner(identity)) throw Error("The native focus helper owner did not verify.");
+            await updateOperation(c, id, row => {
+              if (row.helpers.some(value => !value.stopped) || row.helpers.length >= 2) throw Error("An original native focus helper still owns this operation.");
+              row.helpers.push({ identity: structuredClone(identity), helperSha256: native.sha256, stopped: false }); row.status = "started";
+            });
+          },
+          onHelperStopped: identity => updateOperation(c, id, row => {
+            const item = row.helpers.find(value => same(value.identity, identity));
+            // A rejected owner write sent no request. Never alter another owner.
+            if (item) { item.stopped = true; item.stoppedAt = now(); }
+          })
+        });
+        ports.set(id, { c, port: processes });
+        const verifyImage = async () => {
+          await check();
+          const observed = await identityProbe.inspect(await entryFor(profile.identity.canonicalExecutablePath, signatureFor(profile.identity)));
+          if (!same(observed, profile.identity)) throw Error("The reviewed native executable, signer or file identity changed.");
+          await check();
+        };
+        await verifyImage();
+        const rows = await processes.listRunning(profile.identity, controller.signal);
+        if (rows.length !== 1) throw Error("Open exactly one verified native ChatGPT main window before using this connection.");
+        const target = rows[0];
+        let result = { available: true, implementation, provider, windowFocusVerified: false, accountVerified: false, taskResumptionVerified: false, modelPromptSubmitted: false };
+        if (kind === "focus") {
+          const focused = await processes.focusExisting({ provider: "chatgpt_desktop", operationId: id, identity: profile.identity, process: target, signal: controller.signal, shell: false, beforeEffect: async () => {
+            await verifyImage();
+            // Durable uncertainty begins before native focus authorization can
+            // be sent. Earlier refusals cannot have focused the application.
+            await updateOperation(c, id, row => { row.effectAuthorized = true; });
+            await check();
+          } });
+          if (focused.processId !== target.processId) throw Error("The exact native focus process changed.");
+          result = { ...result, status: "verified", windowFocusVerified: true, summary: "The exact reviewed Windows ChatGPT window was focused and read back. Account, conversation and task resumption are not established." };
+        }
+        await check();
+        await updateOperation(c, id, (row, state) => {
+          if (scope(state) !== expected) throw Error("The native focus scope changed before its result could be recorded.");
+          if (row.helpers.some(value => !value.stopped)) throw Error("The original native focus helper retirement remains unconfirmed.");
+          row.status = "completed"; row.result = result; row.finishedAt = now();
+        });
+        await check();
+        return result;
+      } catch (error) {
+        await updateOperation(c, id, row => { row.status = row.effectAuthorized === true ? "outcome-unconfirmed" : "refused"; row.finishedAt = now(); });
+        throw error;
+      }
+    }));
+    pending.set(c, { controller, operation });
+    try { return await operation; }
+    finally { clearTimeout(deadline); if (pending.get(c)?.operation === operation) pending.delete(c); }
+  }
+  return {
+    async review(c, input) {
+      if (!exact(input, ["implementation", "executablePath"]) || input.implementation !== implementation) throw Error("Review one supported native Windows application and its exact executable path.");
+      const state = await authorize(c), expected = scope(state);
+      const candidate = await entryFor(input.executablePath, { signerSubject: "CN=Unreviewed", signerThumbprint: "a".repeat(40) });
+      const signature = await signatureProbe.inspect(candidate.executablePath);
+      const identity = await identityProbe.inspect(await entryFor(candidate.executablePath, signature));
+      await current(c, expected);
+      for (const [id, row] of reviews) if (row.expiresAt <= now()) reviews.delete(id);
+      if (reviews.size >= 32) throw Error("Finish or let existing native application reviews expire first.");
+      const id = randomUUID(), confirmation = "Trust Windows ChatGPT " + hash(identity).slice(0, 12);
+      const row = { id, c, scope: expected, identity: structuredClone(identity), confirmation, expiresAt: now() + 300000 }; reviews.set(id, row);
+      return { status: "requires-confirmation", reviewId: id, implementation, identity: structuredClone(identity), confirmation, expiresAt: row.expiresAt, applicationLaunched: false, windowFocused: false };
+    },
+    async configure(c, input) {
+      if (!exact(input, ["reviewId", "confirmation"]) || !uuid(input.reviewId)) throw Error("Confirm one exact reviewed native application.");
+      const row = reviews.get(input.reviewId);
+      if (!row || row.c !== c || row.confirmation !== input.confirmation || row.expiresAt <= now()) throw Error("The exact native application review is missing, changed or expired.");
+      return locked(async lease => {
+        const exactReview = () => { if (reviews.get(row.id) !== row || row.expiresAt <= now()) throw Error("The original native application review expired or was retired."); };
+        exactReview();
+        await current(c, row.scope); lease.assert();
+        const observed = await identityProbe.inspect(await entryFor(row.identity.canonicalExecutablePath, signatureFor(row.identity)));
+        if (!same(observed, row.identity)) throw Error("The reviewed application changed before configuration.");
+        await current(c, row.scope); lease.assert(); exactReview(); reviews.delete(row.id);
+        await store.update(c, "native-focus-configure", state => {
+          if (scope(state) !== row.scope) throw Error("The native application review scope changed.");
+          state.nativeWindowsChatgpt = { implementation, identity: structuredClone(row.identity), configuredAt: now() };
+        }, { provider });
+        return { configured: true, implementation, executableSha256: row.identity.executableSha256, applicationLaunched: false, windowFocused: false };
+      });
+    },
+    inspect: (c, value) => {
+      if (value !== implementation) throw Error("Native Windows focus for this application remains unfinished.");
+      return perform(c, randomUUID(), "inspect");
+    },
+    focus: (c, value, { requestId, assertCurrent } = {}) => {
+      if (value !== implementation) throw Error("Native Windows focus for this application remains unfinished.");
+      return perform(c, requestId, "focus", assertCurrent);
+    },
+    async recover(c) {
+      requirePlatform();
+      if (pending.has(c)) throw Error("Wait for this workspace's existing native focus request.");
+      const controller = new AbortController(), deadline = setTimeout(() => controller.abort(), 20000);
+      const check = async () => { if (closed || controller.signal.aborted || !await isActive(c)) throw Error("Select the original workspace before observing native focus retirement."); };
+      const operation = Promise.resolve().then(() => locked(async lease => {
+          await check(); await store.snapshot(c); lease.assert();
+          await reconcile(await helper(), c, randomUUID(), controller.signal);
+          await check(); lease.assert();
+          return { helpersRetired: true, originalFocusOutcomeVerified: false, applicationClosed: false, windowFocused: false };
+      }));
+      pending.set(c, { controller, operation });
+      try { return await operation; }
+      finally { clearTimeout(deadline); if (pending.get(c)?.operation === operation) pending.delete(c); }
+    },
+    async stopCompartment(c) {
+      for (const [id, row] of reviews) if (row.c === c) reviews.delete(id);
+      const active = pending.get(c); active?.controller.abort();
+      await Promise.allSettled(active ? [active.operation] : []);
+      let stopped = true;
+      for (const [id, entry] of ports) if (entry.c === c) {
+        if ((await entry.port.retireOwned()).stopped === true) ports.delete(id);
+        else stopped = false;
+      }
+      return { stopped: stopped && ((await store.snapshot(c)).nativeFocusOperations ?? []).every(row => (row.helpers ?? []).every(owner => owner.stopped === true)), applicationClosed: false };
+    },
+    async close() {
+      closed = true; reviews.clear();
+      for (const active of pending.values()) active.controller.abort();
+      const ids = new Set([...pending.keys(), ...[...ports.values()].map(entry => entry.c)]);
+      if (platform === "win32") for (const workspace of await store.list()) {
+        if (((await store.snapshot(workspace.id)).nativeFocusOperations ?? []).some(row => row.helpers?.some(owner => owner.stopped !== true))) ids.add(workspace.id);
+      }
+      const results = await Promise.all([...ids].map(c => this.stopCompartment(c)));
+      if (results.some(result => !result.stopped)) throw Error("Original native focus helper retirement remains unconfirmed.");
+    }
+  };
+}

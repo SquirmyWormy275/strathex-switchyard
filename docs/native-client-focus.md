@@ -1,10 +1,13 @@
 # Exact native ChatGPT main-window focus
 
-The Linux Suite can focus the owner's repaired native ChatGPT main window. This
+The Linux Suite can focus the owner's repaired native ChatGPT main window and
+the exact VS Code window described below. This
 is one explicit navigation capability, separate from account identification,
-conversation control, task resumption, typing or model submission. Other desktop
-and IDE bindings remain unfinished in the Suite; commissioned companion surfaces
-retain their separate contracts.
+conversation control, task resumption, typing or model submission. The
+[Windows ChatGPT backend](windows-native-focus.md) now supports explicit executable
+review and durable focus ownership; its native desktop acceptance is pending.
+Windows VS Code focus remains unfinished. Commissioned companion surfaces retain
+their separate contracts.
 
 The fixed target is the user-local repaired executable maintained by the existing
 safe launcher. Discovery requires the current user's exact executable, a live

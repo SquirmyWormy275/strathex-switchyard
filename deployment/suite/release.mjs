@@ -101,6 +101,11 @@ export async function buildSuiteRelease({ sourceRoot, sourceFiles, outputRoot, f
   inputs.set("package.json", Buffer.from(JSON.stringify({ name: "strathex-switchyard-private-suite", type: "module", private: true, license: "UNLICENSED", engines: { node: nodeVersion }, catalogProvenance: "gzip-json/v1" }) + "\n"));
   for (const f of front.files) { portableName(f.file); if (f.file.includes("/")) throw new Error("The frontend review file contract changed."); const b = await bytes(join(frontendRoot, f.file)); if (hash(b) !== f.sha256) throw new Error("A frozen frontend asset changed."); inputs.set(`frontend/${f.file}`, b); }
   if (platform === "win32") {
+    for (const name of ["src/provider-desktop.ts", "src/windows-provider-process.ts", "provider-desktop-helper/Program.cs"]) {
+      const path = "apps/windows-companion/" + name;
+      if (!tracked.has(path)) throw Error("The Windows native focus dependency is missing from the source inventory: " + path);
+      await add(path);
+    }
     if (!windowsHotkeys) throw new Error("The Windows suite bundle requires the built native hotkey helper.");
     inputs.set("runtime/hotkeys/Switchyard.Hotkeys.exe", await bytes(await realpath(windowsHotkeys)));
     if(windowsSetup){

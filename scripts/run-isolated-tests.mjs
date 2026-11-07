@@ -280,6 +280,7 @@ export const requiredGroups = [
   { file: "tools/layout-studio/client-launch.test.mjs", ...(process.platform !== "win32" ? { expectedSkipped: 1 } : {}) },
   { file: "tools/layout-studio/physical-intent.test.mjs" },
   { file: "tools/layout-studio/native-focus-gateway.test.mjs" },
+  { file: "tools/layout-studio/windows-native-focus.test.mjs" },
   { file: "tools/layout-studio/instance.test.mjs" },
   { file: "tools/layout-studio/foreground.test.mjs" },
   { file: "tools/layout-studio/keyboard-indicators.test.mjs" },
