@@ -8,6 +8,16 @@ Implementation: not started / in progress / implemented / unsupported by verifie
 Validation: not run / software-tested / host-tested / hardware-tested.
 Tests use synthetic data unless explicitly labelled host/hardware evidence.
 
+The Windows provider process port now retains its original helper until exact
+child closure verifies; a stop request alone cannot permit replacement. Startup
+is serialized, and queued/trailing protocol failures cannot become successful
+results. Cancellation-state read failure during a native operation now remains
+durably ambiguous. Six focused groups pass 64 checks, including six reproduced
+regressions, two owned Node child cases and both focus/launch journal scenarios.
+Typecheck and exact owned cleanup pass. The native helper source is unchanged;
+Suite Windows focus wiring and real Windows acceptance remain unfinished.
+[Source evidence](evidence/provider-helper-retirement-source-summary.json).
+
 Cargo archives with multiple `[[bin]]`, `[[example]]` and nested array tables
 now pass 84 independent Python reference cases. Ten focused groups pass 96 tests,
 including six actual Linux scanner journeys and six Windows guest doubles.

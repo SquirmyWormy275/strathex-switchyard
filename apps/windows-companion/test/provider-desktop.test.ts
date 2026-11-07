@@ -4,6 +4,7 @@ import { mkdtemp, realpath, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
+import { DurableProviderDesktopEffectLedger } from "../src/provider-desktop-effects.ts";
 
 import { ProtectedJsonStore, type JournalAuthenticator } from "../../../packages/control-plane/src/store.ts";
 import {
@@ -265,6 +266,28 @@ test("final guard and final executable recheck happen inside the process side-ef
   const changed = await lifecycle.open({ provider: "claude_desktop", mode: "fresh", operationId: "late-identity", control: control() });
   assert.equal(changed.status, "unavailable");
   assert.deepEqual(port.effects, ["launch-requested:--new-window"]);
+});
+
+test("cancellation-read failure after native authorization remains durably ambiguous", async (context) => {
+  const setup = await fixture(context), installed = await setup.registry.install("claude_desktop"), ledger = new DurableProviderDesktopEffectLedger(setup.store);
+  for (const mode of ["normal", "fresh"] as const) {
+    const port = new FakeProcessPort(); let effected = false;
+    port.observations = [{ processId: 4242, processStartTime: "133000000000000001", windowId: "window:4242", isForeground: true, identity: installed.identity }];
+    const stallAfterEffect = async (request: ProviderProcessEffectRequest): Promise<never> => {
+      await request.beforeEffect(); effected = true;
+      return new Promise((_resolve, reject) => { request.signal.addEventListener("abort", () => reject(request.signal.reason), { once: true }); });
+    };
+    port.focusExisting = stallAfterEffect; port.launch = stallAfterEffect;
+    const lifecycle = new InstalledProviderDesktopLifecycle({ registry: setup.registry, processes: port, effectGuard: new RecordingGuard(), now: () => new Date(at) });
+    const binding = { operationId: "uncertain-native-" + mode, action: mode === "normal" ? "open_claude" : "fresh_claude", provider: "claude_desktop", mode } as const;
+    await ledger.begin(binding);
+    const result = await lifecycle.open({ ...binding, control: control({ async isCancellationRequested() { if (effected) throw Error("synthetic journal read failure"); return false; } }) });
+    assert.equal(effected, true); assert.equal(result.status, "failed");
+    await ledger.settle(binding, result);
+    const restarted = new DurableProviderDesktopEffectLedger(setup.store), observation = await restarted.observeOperation(binding.operationId, binding.action);
+    assert.equal(observation.outcome, "unresolved"); assert.equal(observation.details?.manualReconciliation, "required");
+    await assert.rejects(restarted.begin(binding), /settled.*cannot be replayed/);
+  }
 });
 
 test("deadline and cancellation fail before any desktop side effect", async (context) => {

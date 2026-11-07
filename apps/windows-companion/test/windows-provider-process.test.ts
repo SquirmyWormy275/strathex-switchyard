@@ -10,6 +10,7 @@ import type {
   ProviderProcessEffectRequest
 } from "../src/provider-desktop.ts";
 import {
+  NodeProviderDesktopHelperTransport,
   WindowsProviderDesktopProcessPort,
   type ProviderDesktopHelperInvocation,
   type ProviderDesktopHelperSession,
@@ -367,4 +368,92 @@ test("helper identity drift and malformed or oversized native output fail closed
   malformedTransport.configure = (session) => { session.onWrite = () => session.responses.push("x".repeat(70_000)); };
   await assert.rejects(port(setup.helperPath, digest("fixed native helper"), malformedTransport).listRunning(setup.identity, new AbortController().signal), /oversized|invalid|response/i);
   assert.equal(malformedTransport.sessions[0]?.terminated, true);
+});
+
+test("unconfirmed helper exit blocks results and replacement until the original session retires", async (context) => {
+  const setup = await fixture(context), transport = new FakeTransport();
+  let confirmed = false, waits = 0, terminations = 0;
+  transport.configure = session => {
+    session.onWrite = request => session.responses.push(envelope(request, "result", { observations: [] }));
+    session.terminate = async () => { terminations++; throw Error("synthetic kill failure"); };
+    session.wait = async () => { waits++; if (!confirmed) throw Error("synthetic unavailable exit"); return { code: 0, signal: null }; };
+  };
+  const processPort = port(setup.helperPath, digest("fixed native helper"), transport), signal = new AbortController().signal;
+  const unconfirmed = (error: unknown) => error instanceof Error && "code" in error && error.code === "PROVIDER_HELPER_EXIT_UNCONFIRMED";
+  await assert.rejects(processPort.listRunning(setup.identity, signal), unconfirmed);
+  await assert.rejects(processPort.listRunning(setup.identity, signal), unconfirmed);
+  assert.equal(transport.invocations.length, 1); assert.equal(waits, 2); assert.equal(terminations, 2);
+  confirmed = true;
+  assert.deepEqual(await processPort.listRunning(setup.identity, signal), []);
+  assert.equal(transport.invocations.length, 2); assert.equal(waits, 4);
+});
+
+test("a helper that never confirms exit reaches the fixed retirement bound and remains owned", async (context) => {
+  const setup = await fixture(context), transport = new FakeTransport();
+  transport.configure = session => {
+    session.onWrite = request => session.responses.push(envelope(request, "result", { observations: [] }));
+    session.wait = () => new Promise(() => {});
+  };
+  const processPort = port(setup.helperPath, digest("fixed native helper"), transport);
+  await assert.rejects(processPort.listRunning(setup.identity, new AbortController().signal), /original.*exit.*unconfirmed/i);
+  assert.equal(transport.sessions.length, 1); assert.equal(transport.sessions[0]!.terminated, true);
+  transport.sessions[0]!.wait = async () => ({ code: 0, signal: null });
+  transport.configure = session => { session.onWrite = request => session.responses.push(envelope(request, "result", { observations: [] })); };
+  assert.deepEqual(await processPort.listRunning(setup.identity, new AbortController().signal), []);
+});
+
+test("helper ownership is reserved before asynchronous startup and concurrent operations do not replace it", async (context) => {
+  const setup = await fixture(context), transport = new FakeTransport();
+  let started!: () => void, release!: () => void;
+  const starting = new Promise<void>(resolve => { started = resolve; }), gate = new Promise<void>(resolve => { release = resolve; });
+  const original = transport.start.bind(transport);
+  let starts = 0;
+  transport.start = async invocation => { starts++; started(); if (starts === 1) await gate; return original(invocation); };
+  transport.configure = session => { session.onWrite = request => session.responses.push(envelope(request, "result", { observations: [] })); };
+  const processPort = port(setup.helperPath, digest("fixed native helper"), transport), signal = new AbortController().signal;
+  const pending = processPort.listRunning(setup.identity, signal); void pending.catch(() => {});
+  await starting;
+  try { await assert.rejects(processPort.listRunning(setup.identity, signal), /already in progress/); }
+  finally { release(); }
+  assert.deepEqual(await pending, []); assert.equal(transport.invocations.length, 1);
+});
+
+test("cancellation waits for the exact helper exit and rejects unconfirmed retirement", async (context) => {
+  const setup = await fixture(context), transport = new FakeTransport(), controller = new AbortController();
+  let waited = false;
+  transport.configure = session => {
+    session.onWrite = () => controller.abort();
+    session.onRead = () => new Promise(() => {});
+    session.terminate = async () => { throw Error("synthetic termination failure"); };
+    session.wait = async () => { waited = true; throw Error("synthetic missing exit"); };
+  };
+  await assert.rejects(port(setup.helperPath, digest("fixed native helper"), transport).listRunning(setup.identity, controller.signal), /original.*exit.*unconfirmed/i);
+  assert.equal(waited, true); assert.equal(transport.invocations.length, 1);
+});
+
+test("native helper transport joins actual owned child closure after termination", async () => {
+  const session = await new NodeProviderDesktopHelperTransport().start({ helperPath: process.execPath, helperSha256: "a".repeat(64), arguments: ["--input-type=module", "-e", 'process.stdout.write("ready\\n");setInterval(()=>{},1000);'], environment: {} });
+  try { assert.equal(await session.read(), "ready"); }
+  finally { await session.terminate(); }
+  const exit = await session.wait(); assert.ok(Number.isInteger(exit.code)); assert.ok(exit.signal !== null || exit.code !== 0);
+});
+
+test("native helper transport never returns queued output after a terminal protocol error", async () => {
+  const session = await new NodeProviderDesktopHelperTransport().start({ helperPath: process.execPath, helperSha256: "a".repeat(64), arguments: ["--input-type=module", "-e", 'process.stdout.write("queued\\n",()=>process.stderr.write("x".repeat(4097)));setInterval(()=>{},1000);'], environment: {} });
+  try { await session.wait(); await assert.rejects(session.read(), /diagnostic output/); }
+  finally { await session.terminate(); await session.wait(); }
+});
+
+test("closed helper protocol failures cannot promote earlier results and do not retain exited ownership", async (context) => {
+  const setup = await fixture(context), transport = new FakeTransport();
+  for (const flags of [{ protocolFailed: true }, { unreadResponses: 1 }]) {
+    transport.configure = session => {
+      session.onWrite = request => session.responses.push(envelope(request, "result", { observations: [] }));
+      session.wait = async () => ({ code: 0, signal: null, ...flags });
+    };
+    const processPort = port(setup.helperPath, digest("fixed native helper"), transport);
+    await assert.rejects(processPort.listRunning(setup.identity, new AbortController().signal), /earlier result was not accepted/);
+    transport.configure = session => { session.onWrite = request => session.responses.push(envelope(request, "result", { observations: [] })); };
+    assert.deepEqual(await processPort.listRunning(setup.identity, new AbortController().signal), []);
+  }
 });

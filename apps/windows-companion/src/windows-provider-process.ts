@@ -30,6 +30,7 @@ const maximumProtocolBytes = 64 * 1024;
 const maximumRequestBytes = 16 * 1024;
 const maximumObservations = 64;
 const maximumHelperBytes = 256 * 1024 * 1024;
+const helperRetirementMs = 2_000;
 
 const desktopProducts: Readonly<Record<DesktopProviderId, ProviderProductIdentity>> = {
   claude_desktop: {
@@ -58,7 +59,14 @@ export interface ProviderDesktopHelperSession {
   write(line: string): Promise<void>;
   read(): Promise<string>;
   terminate(): Promise<void>;
-  wait(): Promise<{ readonly code: number; readonly signal: NodeJS.Signals | null }>;
+  wait(): Promise<ProviderDesktopHelperExit>;
+}
+
+export interface ProviderDesktopHelperExit {
+  readonly code: number;
+  readonly signal: NodeJS.Signals | null;
+  readonly protocolFailed?: boolean;
+  readonly unreadResponses?: number;
 }
 
 export interface ProviderDesktopHelperTransport {
@@ -100,8 +108,9 @@ export class NodeProviderDesktopHelperTransport implements ProviderDesktopHelper
     const exit = new Promise<{ readonly code: number; readonly signal: NodeJS.Signals | null }>((resolveExit) => { settleExit = resolveExit; });
     const fail = (error: Error): void => {
       if (!terminalError) terminalError = error;
+      queued.length = 0;
       while (readers.length) readers.shift()!.reject(terminalError);
-      if (!exited) child.kill();
+      try { if (!exited) child.kill(); } catch { /* Only the close event proves retirement. */ }
     };
     const emit = (line: string): void => {
       const bytes = Buffer.byteLength(line, "utf8");
@@ -115,6 +124,7 @@ export class NodeProviderDesktopHelperTransport implements ProviderDesktopHelper
 
     child.stdout.setEncoding("utf8");
     child.stdout.on("data", (chunk: string) => {
+      if (terminalError) return;
       buffer += chunk;
       if (Buffer.byteLength(buffer, "utf8") > maximumProtocolBytes) return fail(new Error("The provider helper emitted an oversized unterminated response."));
       for (let newline = buffer.indexOf("\n"); newline >= 0; newline = buffer.indexOf("\n")) {
@@ -128,6 +138,9 @@ export class NodeProviderDesktopHelperTransport implements ProviderDesktopHelper
       if (stderrBytes > 4_096) fail(new Error("The provider helper exceeded its bounded diagnostic output."));
     });
     child.once("error", () => fail(new Error("The fixed provider helper could not be started.")));
+    child.stdin.on("error", () => fail(new Error("The fixed provider helper request stream failed.")));
+    child.stdout.on("error", () => fail(new Error("The fixed provider helper response stream failed.")));
+    child.stderr.on("error", () => fail(new Error("The fixed provider helper diagnostic stream failed.")));
     child.once("close", (code, signal) => {
       exited = true;
       if (buffer.length > 0 && !terminalError) terminalError = new Error("The provider helper ended with an incomplete response.");
@@ -143,14 +156,14 @@ export class NodeProviderDesktopHelperTransport implements ProviderDesktopHelper
         await new Promise<void>((resolveWrite, rejectWrite) => child.stdin!.write(`${line}\n`, (error) => error ? rejectWrite(error) : resolveWrite()));
       },
       read: async () => {
+        if (terminalError) throw terminalError;
         const line = queued.shift();
         if (line !== undefined) return line;
-        if (terminalError) throw terminalError;
         if (exited) throw new Error("The provider helper exited before its response was complete.");
         return new Promise<string>((resolveRead, rejectRead) => readers.push({ resolve: resolveRead, reject: rejectRead }));
       },
       terminate: async () => { if (!exited) child.kill(); },
-      wait: async () => exit
+      wait: async () => ({ ...await exit, protocolFailed: terminalError !== undefined, unreadResponses: queued.length })
     };
   }
 }
@@ -164,6 +177,8 @@ export class WindowsProviderDesktopProcessPort implements ProviderDesktopProcess
   private readonly helperSha256: string;
   private readonly transport: ProviderDesktopHelperTransport;
   private readonly environment: Readonly<Record<string, string>>;
+  private busy = false;
+  private owner?: ProviderDesktopHelperSession;
 
   constructor(options: WindowsProviderDesktopProcessPortOptions) {
     if (!isAbsolute(options.helperPath) || !/\.exe$/i.test(options.helperPath) || !digestPattern.test(options.helperSha256)) {
@@ -276,6 +291,36 @@ export class WindowsProviderDesktopProcessPort implements ProviderDesktopProcess
 
   private async withSession<T>(signal: AbortSignal, run: (session: ProviderDesktopHelperSession, requestId: string) => Promise<T>): Promise<T> {
     assertNotAborted(signal);
+    if (this.busy) throw new Error("An exact provider helper operation is already in progress.");
+    this.busy = true;
+    try {
+      // A prior uncertain stop retains the original session. Never replace it
+      // merely because a signal was sent or the caller abandoned its request.
+      if (this.owner) await this.retire(this.owner);
+      return await this.runSession(signal, run);
+    } finally { this.busy = false; }
+  }
+
+  private async retire(session: ProviderDesktopHelperSession): Promise<ProviderDesktopHelperExit> {
+    const unconfirmed = () => Object.assign(new Error("The original provider helper exit is unconfirmed. No replacement was started."), { code: "PROVIDER_HELPER_EXIT_UNCONFIRMED" });
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    // Termination errors cannot erase ownership. An independent close event may
+    // still prove that this exact child has already exited.
+    void Promise.resolve().then(() => session.terminate()).catch(() => undefined);
+    try {
+      const exit = await Promise.race([
+        Promise.resolve().then(() => session.wait()),
+        new Promise<never>((_resolve, reject) => { timer = setTimeout(() => reject(unconfirmed()), helperRetirementMs); })
+      ]);
+      if (!exit || !Number.isSafeInteger(exit.code) || exit.code < -1 || exit.code > 0xffffffff || !(exit.signal === null || typeof exit.signal === "string")) throw unconfirmed();
+      if (this.owner === session) this.owner = undefined;
+      return exit;
+    } catch { throw unconfirmed(); }
+    finally { clearTimeout(timer); }
+  }
+
+  private async runSession<T>(signal: AbortSignal, run: (session: ProviderDesktopHelperSession, requestId: string) => Promise<T>): Promise<T> {
+    assertNotAborted(signal);
     const canonicalHelperPath = await this.assertHelperIdentity();
     assertNotAborted(signal);
     const session = await this.transport.start({
@@ -284,10 +329,10 @@ export class WindowsProviderDesktopProcessPort implements ProviderDesktopProcess
       arguments: helperArguments,
       environment: this.environment
     });
+    this.owner = session;
     let rejectAbort!: (error: Error) => void;
     const aborted = new Promise<never>((_resolve, reject) => { rejectAbort = reject; });
     const abort = () => {
-      void session.terminate();
       rejectAbort(new Error("The provider native operation was cancelled before its effect completed."));
     };
     signal.addEventListener("abort", abort, { once: true });
@@ -301,7 +346,9 @@ export class WindowsProviderDesktopProcessPort implements ProviderDesktopProcess
       return await Promise.race([operation, aborted]);
     } finally {
       signal.removeEventListener("abort", abort);
-      await session.terminate().catch(() => undefined);
+      const exit = await this.retire(session);
+      if (exit.protocolFailed === true || exit.unreadResponses !== undefined && exit.unreadResponses !== 0)
+        throw new Error("The provider helper closed with failed or unconsumed protocol output. Its earlier result was not accepted.");
     }
   }
 

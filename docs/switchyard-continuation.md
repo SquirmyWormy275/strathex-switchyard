@@ -40,6 +40,16 @@ instructions. Do not merge or release.
 
 ## Current installed and source checkpoint
 
+The Windows provider process port now retains its original helper until exact
+child closure verifies; a stop request alone cannot permit replacement. Startup
+is serialized, and queued/trailing protocol failures cannot become successful
+results. Cancellation-state read failure during a native operation now remains
+durably ambiguous. Six focused groups pass 64 checks, including six reproduced
+regressions, two owned Node child cases and both focus/launch journal scenarios.
+Typecheck and exact owned cleanup pass. The native helper source is unchanged;
+Suite Windows focus wiring and real Windows acceptance remain unfinished.
+[Source evidence](evidence/provider-helper-retirement-source-summary.json).
+
 Cargo archives with multiple `[[bin]]`, `[[example]]` and nested array tables
 now pass 84 independent Python reference cases. Ten focused groups pass 96 tests,
 including six actual Linux scanner journeys and six Windows guest doubles.
@@ -173,7 +183,7 @@ native Windows profile correction acceptance remains separate.
 [Installed evidence](evidence/installed-profile-identity-summary.json).
 [Source evidence](evidence/profile-identity-source-summary.json).
 
-1. Quoted Cargo manifest coverage is published and installed; full Linux
+1. Quoted/array Cargo manifest coverage is published and installed; full Linux
    `a6a6618` is accepted and its exact staging is removed. Continue independent
    ledger gaps. Keep the later quoted-manifest and Windows-provider corrections
    separate from that full checkpoint, and installed in-memory proof separate
@@ -182,7 +192,10 @@ native Windows profile correction acceptance remains separate.
 2. Inspect available native Windows receipts. The new five-shard schedule and
    later helper, SDK, Python/Cargo work require their own final results.
    Retain original failures and distinguish guest doubles from actual guests.
-3. Continue ledger gaps: broader Shield syntax/coverage and dependency
+3. Continue Suite Windows native focus wiring using the exact helper lifecycle;
+   do not weaken process birth, current-user/session or foreground proof. The
+   helper ownership/cancellation corrections have source acceptance, not native
+   Windows or installed Linux acceptance. Also continue broader Shield syntax/coverage and dependency
    resolution, complete archive/license inspection, publisher provenance,
    verified local vulnerability context and external observation streams.
    The current Cargo manifest parser is deliberately a closed TOML subset;

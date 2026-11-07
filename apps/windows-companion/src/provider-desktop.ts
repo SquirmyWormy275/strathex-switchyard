@@ -655,7 +655,9 @@ async function runControlled<T>(control: ProviderLifecycleControl, now: () => Da
         return;
       }
     } catch {
-      controller.abort(new ProviderLifecycleError("unavailable", "The durable provider cancellation state is unavailable."));
+      // This poll runs concurrently with the native operation. Its failure
+      // cannot prove that authorization or the desktop effect never happened.
+      controller.abort(new ProviderLifecycleError("failed", "The durable provider cancellation state became unavailable during an operation; desktop effect completion is uncertain."));
       return;
     }
     cancellationTimer = setTimeout(() => { void pollCancellation(); }, cancellationPollMs);

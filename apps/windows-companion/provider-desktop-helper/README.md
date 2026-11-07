@@ -21,6 +21,19 @@ TOKEN_QUERY (8). A denied query refuses the operation. After SetForegroundWindow
 the retained process/window must still verify and GetForegroundWindow must report
 that exact window. Windows foreground restrictions remain in force.
 
+The process port also joins the exact helper's close event before accepting an
+owned-session result. It retains an unconfirmed session after the two-second
+retirement bound and refuses replacement until that original session exits.
+Concurrent admission refuses; it cannot displace an active helper. Terminal
+stream errors discard queued responses, and leftover/failed protocol output
+cannot promote an earlier result. A cancellation-state read failure during an
+operation remains ambiguous in the authenticated journal, requiring reconciliation.
+
+Six focused groups pass 64 source checks, with six reproduced regressions, two
+actual owned Node child cases and focus/launch journal scenarios. The native
+helper source is unchanged; no live provider/window/account effect occurred.
+[Retirement evidence](../../../docs/evidence/provider-helper-retirement-source-summary.json).
+
 This uses documented [creation-time readback](https://learn.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-getprocesstimes),
 [token queries](https://learn.microsoft.com/en-us/windows/win32/api/securitybaseapi/nf-securitybaseapi-gettokeninformation)
 and [foreground readback](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-getforegroundwindow).
@@ -41,7 +54,7 @@ directory, and binds its SHA-256 into the release checksum/SBOM inventory and
 SHA-256. Packaging is not evidence that Claude Desktop or ChatGPT Desktop is
 installed, signed in, reachable, or independently accepted on a target host.
 
-Six isolated groups pass 56 checks, including three reproduced regressions and
+The earlier process-birth checkpoint passes six isolated groups/56 checks, including three reproduced regressions and
 older-protocol refusal. Type checking and the managed build pass with the existing
 SDK and cleared package sources. The Linux self-test reports native current-user
 readback as unperformed; the Windows portable smoke now requires that native

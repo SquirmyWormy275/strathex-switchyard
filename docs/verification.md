@@ -1,5 +1,15 @@
 # What has actually been verified
 
+The Windows provider process port now retains its original helper until exact
+child closure verifies; a stop request alone cannot permit replacement. Startup
+is serialized, and queued/trailing protocol failures cannot become successful
+results. Cancellation-state read failure during a native operation now remains
+durably ambiguous. Six focused groups pass 64 checks, including six reproduced
+regressions, two owned Node child cases and both focus/launch journal scenarios.
+Typecheck and exact owned cleanup pass. The native helper source is unchanged;
+Suite Windows focus wiring and real Windows acceptance remain unfinished.
+[Source evidence](evidence/provider-helper-retirement-source-summary.json).
+
 Complete Linux `a6a6618` passes **321 groups, 1,949 tests and sixteen declared
 skips**, with zero failures/cancellations. Exact original commands, bounds, skip
 inventory and every child/tree retirement verify. Its checkout, nine dependency
