@@ -31,6 +31,12 @@ the version that was actually reviewed.
 
 ## Evidence and limits
 
+Native Windows source `9c3bccf` passes all 25 client groups, 237 tests and no
+skips. The merge tree matches the source tree, and original commands, deadlines
+and child cleanup verify. This includes the version contract in the client lane;
+it does not establish authenticated native tasks or full Windows suite acceptance.
+[Native client receipt](evidence/windows-codex-0167-client-summary.json).
+
 Twelve focused groups pass **152 tests with two platform skips**, including
 synthetic 0.167 metadata/task creation, version changes during text review,
 missing/enabled feature refusals, account boundaries, editor carriers and package

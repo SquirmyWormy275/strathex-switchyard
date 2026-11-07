@@ -19,7 +19,7 @@ const { verifySuiteRelease } = await import("../deployment/suite/release.mjs");
 const root = join(installationRoot(), "versions", app.build), m = await verifySuiteRelease(root, { expectedId: app.build, platform: "linux", checkRuntime: true }), checks = [], moduleDigests = {};
 assert.equal(m.development, false);
 const built = { source: m.sourceCommit, id: m.id };
-for (const [evidence, names] of [["credential-process-source-summary.json", ["tools/layout-studio/credential-process.mjs"]], ["agent-stop-retirement-source-summary.json", ["tools/layout-studio/custom-agents.mjs"]], ["custom-agent-outcome-source-summary.json", ["tools/layout-studio/agent-observation.mjs"]], ["foreground-owner-source-summary.json", ["tools/layout-studio/foreground.mjs"]], ["hotkey-owner-source-summary.json", ["tools/layout-studio/windows-host.mjs"]], ["scanner-history-review-source-summary.json", ["tools/layout-studio/git-index-inputs.mjs", "tools/layout-studio/git-history-inputs.mjs", "tools/layout-studio/repository-inspection.mjs", "packages/control-plane/src/git-inspector.ts", "packages/control-plane/src/git-index-tree.ts"]], ["design-observations-source-summary.json", ["tools/layout-studio/agents.mjs", "tools/layout-studio/codex-turn.mjs", "tools/layout-studio/design-observations.mjs", "tools/layout-studio/catalog-source.mjs", "tools/layout-studio/haptic-capabilities.mjs"]], ["scanner-recipe-draft-source-summary.json", ["tools/layout-studio/scanner-fixtures.mjs", "apps/windows-companion/src/scanner-fixtures.ts"]], ["scanner-recipe-save-source-summary.json", ["tools/layout-studio/suite.mjs", "tools/layout-studio/scanner-recipe-draft.mjs", "tools/layout-studio/scanner-recipe-files.mjs", "packages/control-plane/src/confirmations.ts", "deployment/suite/release.mjs", "tools/layout-studio/legend-template.mjs", "tools/layout-studio/legend-export.mjs"]], ["windows-scanner-recipe-save-source-summary.json", ["tools/layout-studio/scanner-recipe-save.mjs", "tools/layout-studio/windows-scanner-recipe-files.mjs"]], ["windows-native-focus-source-summary.json", ["tools/layout-studio/suite-store.mjs"]], ["windows-vscode-focus-source-summary.json", ["tools/layout-studio/windows-native-focus.mjs"]], ["sdk-persistence-source-summary.json", ["integrations/agent-sdk.mjs", "integrations/switchyard_agent.py"]], ["scanner-mixed-input-source-summary.json", ["tools/layout-studio/task-authority.mjs", "tools/layout-studio/shield-git-inputs.mjs", "tools/layout-studio/repository-execution.mjs", "tools/layout-studio/repository-windows-execution.mjs", "tools/layout-studio/windows-reviewed-inputs.mjs", "tools/layout-studio/windows-reviewed-runner.mjs", "tools/layout-studio/windows-history-inputs.mjs", "apps/linux-companion/src/linux-repository-inputs.ts"]]]) {
+for (const [evidence, names] of [["credential-process-source-summary.json", ["tools/layout-studio/credential-process.mjs"]], ["agent-stop-retirement-source-summary.json", ["tools/layout-studio/custom-agents.mjs"]], ["custom-agent-outcome-source-summary.json", ["tools/layout-studio/agent-observation.mjs"]], ["foreground-owner-source-summary.json", ["tools/layout-studio/foreground.mjs"]], ["hotkey-owner-source-summary.json", ["tools/layout-studio/windows-host.mjs"]], ["scanner-history-review-source-summary.json", ["tools/layout-studio/git-index-inputs.mjs", "tools/layout-studio/git-history-inputs.mjs", "tools/layout-studio/repository-inspection.mjs", "packages/control-plane/src/git-inspector.ts", "packages/control-plane/src/git-index-tree.ts"]], ["codex-0167-contract-summary.json", ["tools/layout-studio/agents.mjs", "tools/layout-studio/codex-requests.mjs", "tools/layout-studio/codex-turn.mjs", "tools/layout-studio/codex-submissions.mjs"]], ["design-observations-source-summary.json", ["tools/layout-studio/design-observations.mjs", "tools/layout-studio/catalog-source.mjs", "tools/layout-studio/haptic-capabilities.mjs"]], ["scanner-recipe-draft-source-summary.json", ["tools/layout-studio/scanner-fixtures.mjs", "apps/windows-companion/src/scanner-fixtures.ts"]], ["scanner-recipe-save-source-summary.json", ["tools/layout-studio/suite.mjs", "tools/layout-studio/scanner-recipe-draft.mjs", "tools/layout-studio/scanner-recipe-files.mjs", "packages/control-plane/src/confirmations.ts", "deployment/suite/release.mjs", "tools/layout-studio/legend-template.mjs", "tools/layout-studio/legend-export.mjs"]], ["windows-scanner-recipe-save-source-summary.json", ["tools/layout-studio/scanner-recipe-save.mjs", "tools/layout-studio/windows-scanner-recipe-files.mjs"]], ["windows-native-focus-source-summary.json", ["tools/layout-studio/suite-store.mjs"]], ["windows-vscode-focus-source-summary.json", ["tools/layout-studio/windows-native-focus.mjs"]], ["sdk-persistence-source-summary.json", ["integrations/agent-sdk.mjs", "integrations/switchyard_agent.py"]], ["scanner-mixed-input-source-summary.json", ["tools/layout-studio/task-authority.mjs", "tools/layout-studio/shield-git-inputs.mjs", "tools/layout-studio/repository-execution.mjs", "tools/layout-studio/repository-windows-execution.mjs", "tools/layout-studio/windows-reviewed-inputs.mjs", "tools/layout-studio/windows-reviewed-runner.mjs", "tools/layout-studio/windows-history-inputs.mjs", "apps/linux-companion/src/linux-repository-inputs.ts"]]]) {
     const e = JSON.parse(await readFile(new URL("../docs/evidence/" + evidence, import.meta.url), "utf8"));
     for (const name of names) {
         const digest = createHash("sha256").update(await readFile(join(root, name))).digest("hex");
@@ -27,8 +27,38 @@ for (const [evidence, names] of [["credential-process-source-summary.json", ["to
         moduleDigests[name] = digest;
     }
 }
-checks.push("thirty-eight-exact-tested-installed-module-hashes");
+checks.push("exact-tested-installed-module-hashes");
 const load = name => import(pathToFileURL(join(root, name)).href), { createCredentialProcessRunner } = await load("tools/layout-studio/credential-process.mjs");
+const { isReviewedCodexVersion } = await load("tools/layout-studio/codex-requests.mjs");
+const { reviewedCodexVersion, codexDesignConfig, assertCodexDesignConfig, codexRestrictedProcessArguments } = await load("tools/layout-studio/agents.mjs");
+for (const version of ["0.166.0", "0.167.0"]) {
+    assert.equal(isReviewedCodexVersion(version), true);
+    assert.equal(reviewedCodexVersion({ userAgent: `switchyard/${version} (synthetic metadata)` }, "switchyard"), version);
+}
+for (const version of ["0.166.1", "0.167.1", "0.168.0", "0.167.0-preview", null]) {
+    assert.equal(isReviewedCodexVersion(version), false);
+    assert.throws(() => reviewedCodexVersion({ userAgent: `switchyard/${version} (synthetic metadata)` }, "switchyard"), /not verified/);
+}
+for (const userAgent of ["another/0.167.0 (synthetic)", "switchyard/0.167.0 (synthetic)\n", "switchyard/0.167.0"]) {
+    assert.throws(() => reviewedCodexVersion({ userAgent }, "switchyard"), /verified/);
+}
+checks.push("installed-codex-admits-only-exact-reviewed-versions-and-client-identity");
+const restricted = codexDesignConfig(["synthetic_mcp"]);
+assert.equal(Object.keys(restricted.features).length, 42);
+assert.ok(Object.values(restricted.features).every(value => value === false));
+assert.doesNotThrow(() => assertCodexDesignConfig(restricted));
+const restrictedArgs = codexRestrictedProcessArguments("/synthetic/codex", ["synthetic_mcp"]);
+for (const name of Object.keys(restricted.features)) {
+    assert.ok(restrictedArgs.includes(`features.${name}=false`));
+    for (const value of [true, undefined]) {
+        assert.throws(() => assertCodexDesignConfig({ ...restricted, features: { ...restricted.features, [name]: value } }), /No design turn/);
+    }
+}
+checks.push("installed-codex-all-forty-two-restrictions-applied-and-read-back");
+for (const changed of [{ model_provider: "alternate" }, { openai_base_url: "https://example.invalid" }, { mcp_servers: { synthetic_mcp: { enabled: true } } }]) {
+    assert.throws(() => assertCodexDesignConfig({ ...restricted, ...changed }), /No design turn/);
+}
+checks.push("installed-codex-restrictions-preserve-first-party-and-disabled-mcp-boundaries");
 const children = [], close = (c, code = 0, signal = null) => { c.exitCode = code; c.signalCode = signal; c.emit("close", code, signal); }, spawn = () => { const c = new EventEmitter(); Object.assign(c, { stdin: new PassThrough(), stdout: new PassThrough(), stderr: new PassThrough(), exitCode: null, signalCode: null, kill() { close(c, 1); return true; } }); children.push(c); return c; };
 const run = createCredentialProcessRunner({ spawnProcess: spawn });
 let pending = run("synthetic", [], "SYNTHETIC_INPUT");

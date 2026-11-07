@@ -64,15 +64,14 @@ foreign replacement and unknown committed outcomes still refuse admission.
 
 ## Outstanding verification and implementation
 
-1. Publish the accepted native Windows receipt and current documentation, then
-   audit the CI run for Codex source `9c3bccf`. A prior native pass does not accept
-   the later version contract automatically.
+1. Native Windows client `9c3bccf` is audited: exact merge tree, 25 groups,
+   237 tests, zero skips, original deadlines and verified cleanup.
 2. Prepare the normal installed backend update. The installed metadata verifier
-   still compares agents.mjs/codex-turn.mjs against an earlier design receipt;
-   update those exact references to the tested Codex contract and add pure
-   installed version/config checks before updating. Preserve dated launcher
-   backups, all 54 semantic workspaces, selection and pending conversation,
-   frozen frontend, current plus one rollback. No browser reload or live task.
+   now references the exact tested Codex contract and checks both admitted versions,
+   all 42 restrictions and first-party/MCP boundaries with in-memory metadata.
+   Preserve dated launcher backups, all 54 semantic workspaces, selection and
+   pending conversation, frozen frontend, current plus one rollback. No browser
+   reload or live task.
 3. Continue task-specific Windows IDE/project integration and the remaining
    backend requirements. Command activation and frontend exposure remain frozen.
 4. Native Codex TUI/account/task/model acceptance remains separate. The version

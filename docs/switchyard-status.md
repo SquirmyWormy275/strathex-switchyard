@@ -12,19 +12,19 @@ No merge or public release has been accepted.
 
 The reviewed Windows launcher completes the signed-client, protected-journal and
 real-carrier demonstration with an exact synthetic task acknowledgement. Native
-Windows client checkpoint `5033c18` passes all 25 groups: **237 tests, no skips**.
+Windows client checkpoint `9c3bccf` passes all 25 groups: **237 tests, no skips**.
 Original deadlines, permissions and cleanup remain intact. Native endpoint,
 file, process/Job and socket checks run separately from the explicit
 Terminal/provider doubles in the composed demonstration. Command/frontend
 activation and live TUI/account/task acceptance remain unfinished.
-[Accepted native client evidence](evidence/windows-editor-journal-accepted-summary.json).
+[Accepted native client evidence](evidence/windows-codex-0167-client-summary.json).
 
 Codex source checkpoint `9c3bccf` admits exact 0.166.0 and 0.167.0 revisions with
 42 explicit feature exclusions and version-bound text review. Twelve focused
 groups pass 152 tests with two skips. The actual 0.167 binary passes production
 argument construction and hello/config validators in an empty network-isolated
 home. No account, thread or model request is sent; its original tree and 66
-generated files are removed. Installed Switchyard remains on the earlier source.
+generated files are removed. The native Windows client lane also passes all 237 tests at this exact source. Installed Switchyard remains on the earlier source.
 [Version contract and evidence](codex-version-contract.md).
 
 ## Current evidence
@@ -35,7 +35,7 @@ checkpoints are not cumulative acceptance of the latest suite.
 | Checkpoint | Verified result | Limit |
 | --- | --- | --- |
 | Installed Linux `edb76de` | **76 metadata/in-memory checks; 42 exact module hashes.** All 54 semantic workspaces and frozen frontend preserved. [Receipt](evidence/installed-mixed-scanner-input-summary.json). | Predates current editor and Codex version work. No live scanner, provider task, account/model request, native focus or hardware operation. |
-| Native Windows client `5033c18` | **25 groups; 237 tests; no skips.** Original manifest, commands, bounds and cleanup verified. [Receipt](evidence/windows-editor-journal-accepted-summary.json). | Terminal/provider doubles remain explicit; not the complete Windows suite or later Codex-version acceptance. |
+| Native Windows client `9c3bccf` | **25 groups; 237 tests; no skips.** Original manifest, commands, bounds and cleanup verified. [Receipt](evidence/windows-codex-0167-client-summary.json). | Terminal/provider doubles remain explicit; not the complete Windows suite or actual authenticated Codex turns. |
 | Complete Linux `961ecb3` | **348 groups; 2,205 tests; 32 declared platform skips.** Original manifest and cleanup verified. [Receipt](evidence/linux-961ecb3-complete-summary.json). | Predates journal corrections and Codex 0.167 admission. |
 | Complete Windows `dc755901` | **417 groups; 2,478 tests; 207 declared skips.** All six jobs and overall workflow passed. [Receipt](evidence/windows-complete-dc755901-summary.json). | Predates newer archive, scheduling, profile/workflow and observation corrections. |
 
