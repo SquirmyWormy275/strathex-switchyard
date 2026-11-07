@@ -20,9 +20,9 @@ requires a fresh target/review/permit flow. The composed fixture passes 34 group
 
 Home/catalog and editor command activation remain frozen for review. Unfinished
 software and checks requiring hardware/accounts are listed separately below.
-Complete Linux `7f2a52a` now passes all 351 groups: 2,302 tests and 32
-declared skips. Its exact temporary checkout and 11.9 MB of generated output
-are removed. The newer guided role choices have separate focused evidence.
+Complete Linux `2c6497f` now passes all 351 groups: 2,312 tests and 32
+declared skips, including the installed guided-role and external-agent consent
+changes. Its exact temporary checkout and 11.9 MB of generated output are removed.
 
 Guided role setup now has backend choices with readable connection labels and
 a saved-state digest checked before binding. It reuses the existing provider,
@@ -39,7 +39,7 @@ acknowledgement reports from entering a resumed recording. Original report time
 and recording generation survive SDK and state-lease waits. Nine groups/141 tests
 pass, including real encrypted storage and authenticated HTTP. The installed
 update passes all 97 metadata/refusal checks. Native Windows acceptance remains
-pending; a complete Linux run at the installed source is now in progress.
+pending receipt audit; the complete Linux run at the installed source passes.
 [Consent evidence](evidence/external-agent-consent-source-summary.json).
 
 The native guided-role lane at `f74a380` reached its 45-second whole-file child
@@ -49,6 +49,15 @@ the shared fixture and original child limits. Six local groups/64 tests pass;
 native Windows acceptance of the split remains pending.
 [Evidence](evidence/role-contract-isolation-summary.json).
 
+A separate complete Windows source workflow now distributes the original manifest
+over 20 test workers and one ordered assembly worker. The final audit requires
+every group exactly once, with matching source/tool identities and original
+commands, limits, skips and cleanup. Five local groups/45 tests pass. Native
+execution remains pending; this does not replace package acceptance. The original
+90-minute release job remains unchanged after two interruptions without a final
+receipt. [Workflow evidence](evidence/complete-windows-source-lane-summary.json),
+[latest release interruption](evidence/windows-6727054-full-interruption-summary.json).
+
 Each result belongs to its exact source revision. Test totals from different
 checkpoints are not cumulative acceptance of the latest suite.
 
@@ -56,7 +65,7 @@ checkpoints are not cumulative acceptance of the latest suite.
 | --- | --- | --- |
 | Installed Linux `2c6497f` | **97 metadata/refusal checks; 57 exact module hashes.** All 54 semantic workspaces, four profiles, 57 workflows and frozen frontend preserved. [Receipt](evidence/installed-external-agent-consent-summary.json). | External-agent report consent, guided role choices, exact-project saved task choices, recording consent generations, persisted selection generation, consented runtime status capture, original-role/provider-effect guards, signed CLI dispatch and Codex version contract included; editor command activation remains pending; no live scanner, provider task, account/model request, native focus or hardware acceptance. |
 | Native Windows client `9d230ac` | **25 groups; 250 tests; no skips.** Original manifest, commands, bounds and cleanup verified. [Receipt](evidence/editor-task-choices-native-client-summary.json). | Terminal/provider doubles remain explicit; not the complete Windows suite, runtime-observation backend groups or live authenticated Codex turns. |
-| Complete Linux `7f2a52a` | **351 groups; 2,302 tests; 32 declared platform skips.** Original manifest, bounds and cleanup verified. [Receipt](evidence/linux-7f2a52a-complete-summary.json). | Covers installed runtime `9d230ac`, including consent/retirement corrections and signed project choices; the subsequent guided role choices and scheduling-data update have separate focused evidence. |
+| Complete Linux `2c6497f` | **351 groups; 2,312 tests; 32 declared platform skips.** Original manifest, bounds and cleanup verified. [Receipt](evidence/linux-2c6497f-complete-summary.json). | Covers the installed runtime, including guided role choices and external-agent report consent. Later test isolation and Windows scheduling have separate focused evidence. |
 | Complete Windows `dc755901` | **417 groups; 2,478 tests; 207 declared skips.** All six jobs and overall workflow passed. [Receipt](evidence/windows-complete-dc755901-summary.json). | Predates newer archive, scheduling, profile/workflow and observation corrections. |
 
 Complete Linux staging is removed: its exact checkout, nine dependency aliases,
@@ -73,7 +82,7 @@ metadata verifiers and failed; its sequential follow-up passed. The latest updat
 also retained a stale shared-gateway verifier pin failure before dispatch; after
 referencing the accepted gateway evidence, all eight signed-intent checks pass. Dated backup and launcher readback verify. Only current
 plus one rollback remain; the exact 555-file, 4,846,150-byte prepared bundle is
-removed. The installed payload is 4,731,342 bytes across 553 files.
+removed. The installed payload is 4,746,666 bytes across 554 files.
 
 Windows `e5a5781` passed all six preliminary backend shards and 27 native guardian
 checks, but complete bundle verification was cancelled at the 90-minute job

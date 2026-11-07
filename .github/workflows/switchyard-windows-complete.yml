@@ -1,0 +1,104 @@
+name: Switchyard complete Windows source verification
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  build-state-helper:
+    uses: ./.github/workflows/switchyard-windows-state-helper.yml
+
+  verify-complete:
+    needs: build-state-helper
+    concurrency:
+      group: switchyard-complete-source-${{ github.ref }}-${{ matrix.shard }}
+      cancel-in-progress: false
+    runs-on: windows-2022
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "17", "18", "19", "20", "assembly"]
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 24.14.0
+          cache: npm
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: 3.13.3
+      - name: Install locked source dependencies
+        shell: pwsh
+        run: npm.cmd ci --ignore-scripts
+      - uses: ./.github/actions/install-state-helper
+      - uses: ./.github/actions/prepare-complete-windows
+      - name: Run this complete-source shard with its original group bounds
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $python = (Get-Command python.exe -ErrorAction Stop).Source
+          $output = Join-Path $env:RUNNER_TEMP 'switchyard-complete-source'
+          & node scripts/windows-complete-shards.mjs --synthetic "--shard=${{ matrix.shard }}" "--python=$python" "--output=$output"
+          if ($LASTEXITCODE -ne 0) { throw 'A complete-source shard failed; its original receipt remains failed.' }
+      - name: Retain only the scoped original receipt
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: switchyard-complete-source-${{ matrix.shard }}-${{ github.sha }}
+          path: ${{ runner.temp }}/switchyard-complete-source/complete-shard-*.json
+          if-no-files-found: error
+          retention-days: 7
+
+  audit-complete:
+    needs: [build-state-helper, verify-complete]
+    if: always() && needs.build-state-helper.result == 'success'
+    runs-on: windows-2022
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 24.14.0
+          cache: npm
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: 3.13.3
+      - name: Install locked source dependencies
+        shell: pwsh
+        run: npm.cmd ci --ignore-scripts
+      - uses: ./.github/actions/install-state-helper
+      - uses: ./.github/actions/prepare-complete-windows
+      - name: Read only this run's exact-source shard artifacts
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
+        with:
+          pattern: switchyard-complete-source-*-${{ github.sha }}
+          merge-multiple: true
+          path: ${{ runner.temp }}/switchyard-complete-receipts
+      - name: Require every original manifest group exactly once
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          if ('${{ needs.verify-complete.result }}' -cne 'success') { throw 'Every source shard must pass; partial receipts are not completion.' }
+          $python = (Get-Command python.exe -ErrorAction Stop).Source
+          $inputPath = Join-Path $env:RUNNER_TEMP 'switchyard-complete-receipts'
+          $output = Join-Path $env:RUNNER_TEMP 'switchyard-complete-windows-summary.json'
+          & node scripts/windows-complete-shards.mjs --synthetic "--collect=$inputPath" "--python=$python" "--output=$output"
+          if ($LASTEXITCODE -ne 0) { throw 'The complete native manifest audit did not pass.' }
+      - name: Retain complete-source evidence separately from package acceptance
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: switchyard-complete-windows-summary-${{ github.sha }}
+          path: ${{ runner.temp }}/switchyard-complete-windows-summary.json
+          if-no-files-found: warn
+          retention-days: 7
+
