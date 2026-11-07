@@ -175,11 +175,12 @@
     "Installed proof exercises the exact reviewed Claude version rules and explicit terminal-attachment limits with in-memory command doubles; the unchanged account reader's earlier real native metadata check is referenced separately and was not repeated for this status-consent correction.",
     "Signed saved-project inventory returns the complete empty saved list in the selected workspace. Source/native contracts cover populated inventories; no real native task is loaded.",
     "No live account changes, model prompts, task create/resume, agent enrollment/commands, hardware or microphone operations occur. The frozen frontend and editor activation are unchanged.",
-    "Complete Linux cf3bb4c and complete Windows source 90fa879 predate the new status-consent corrections. The new source has 35 focused groups/151 tests plus read-only native metadata/help acceptance; broader native/package and live-model acceptance remain separate."
+    "Same-source complete Linux verification is accepted separately in linux-9266c12-complete-summary.json. Complete Windows source 90fa879 predates the latest status-consent corrections; native/package and live-model acceptance remain separate. Earlier real native metadata/help evidence is retained at its own source checkpoint."
   ],
   "previousNativeClaudeMetadataEvidence": "installed-claude-319-summary.json",
   "nativeMetadataReexecuted": false,
   "installedClaudeVersionChecks": 1,
   "installedClaudeAttachmentDiscoveryChecks": 1,
-  "installedClaudeTaskVersionRefusalChecks": 1
+  "installedClaudeTaskVersionRefusalChecks": 1,
+  "completeLinuxSourceEvidence": "linux-9266c12-complete-summary.json"
 }

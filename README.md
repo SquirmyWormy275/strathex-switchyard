@@ -76,11 +76,11 @@ role/device controls and full scanner coverage remain unfinished.
 The latest installed backend (`9266c12`) passes **102 metadata/refusal checks
 across 59 exact modules** and preserves all 54 saved workspaces. It includes signed saved-project discovery, verified Claude Code 2.1.319 admission and recording-consent fixes for both named task adapters. Role, device and editor controls still need their frontend integration. [Installed evidence](docs/evidence/installed-codex-status-consent-summary.json).
 
-Complete Linux `cf3bb4c` passes **356 groups / 2,326 tests**, with 32 declared
-skips. Complete Windows source `90fa879` passes **462 groups / 2,902 tests**,
-with 246 declared skips and a passing native collector. This includes saved-project
-discovery and predates the later Claude version update, which has 93 focused
-tests and real read-only metadata acceptance.
+Complete Linux `9266c12` passes **356 groups / 2,333 tests**, with 32 declared
+skips. It covers the installed source, including exact Claude version admission
+and recording-consent fixes for both task adapters. Complete Windows source
+`90fa879` passes **462 groups / 2,902 tests**, with 246 declared skips and a
+passing native collector; it predates these latest corrections.
 Latest Windows package acceptance remains pending. Earlier focus, storage and
 host-action settlement failures remain recorded; passing follow-ups do not prove
 their causes are resolved. [Current status and evidence](docs/switchyard-status.md).

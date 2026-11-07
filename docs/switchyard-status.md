@@ -53,7 +53,7 @@ checkpoints are not cumulative acceptance of the latest suite.
 | Scope | Verified result | What it does not establish |
 | --- | --- | --- |
 | Installed Linux `9266c12` | **102 metadata/refusal checks; 59 exact module hashes.** All 54 semantic workspaces, four profiles, 57 workflows, selection, pending keyboard-only conversation and frozen frontend preserved. [Evidence](evidence/installed-codex-status-consent-summary.json). | Live task/model/account operations, editor command activation, hardware or microphone acceptance. |
-| Complete Linux `cf3bb4c` | **356 groups; 2,326 passing tests; 32 declared skips.** Original manifest, commands, deadlines and cleanup audited. Covers project inventory, connected demo, guided roles, consent fences and paired-runner contracts. [Evidence](evidence/linux-cf3bb4c-complete-summary.json). | Installed `9266c12` has separate metadata/refusal checks; earlier native Claude metadata acceptance is retained. Native Windows, live accounts, interactive UI and physical devices remain separate. Later fixture diagnostics have their own focused evidence. |
+| Complete Linux `9266c12` | **356 groups; 2,333 passing tests; 32 declared skips.** Same source as the installed backend. Original manifest, commands, deadlines and cleanup audited; includes exact-version and both status-consent corrections. [Evidence](evidence/linux-9266c12-complete-summary.json). | Native Windows, live accounts/models, interactive UI and physical devices remain separate. Installed metadata/refusal acceptance is recorded independently. |
 | Complete Windows source `90fa879` | **462 groups; 2,902 passing tests; 246 declared skips.** All 21 original worker receipts and the native collector match; all 23 jobs succeed. Exact source/tree/tool identities, commands, bounds and cleanup verify. [Evidence](evidence/complete-windows-90fa879-summary.json). | Package, live-host and later Claude 2.1.319 admission. Earlier intermittent failures remain unresolved. |
 | Native Windows contracts `b38ff759` | **Role/dispatch: 24 tests across two complete files. External-agent consent: 51 tests across three files.** Exact source/merge trees, original bounds and cleanup verified. [Roles](evidence/role-choices-native-b38-summary.json), [consent](evidence/agent-consent-native-b38-summary.json). | Complete Windows suite/package acceptance or live provider behavior. |
 | Native Windows client `9d230ac` | **25 groups; 250 tests; zero skips.** Signed launcher composition plus native endpoint/process/socket contracts. [Evidence](evidence/editor-task-choices-native-client-summary.json). | Terminal/provider doubles do not establish interactive task handoff. |
@@ -64,7 +64,7 @@ readback verify; current plus one rollback remain. Its exact 555-file/4,849,605-
 bundle is removed. The complete Linux checkout, nine dependency aliases and
 803 generated files/11,907,805 bytes are also removed. The latest `cf3bb4c`
 checkout, nine aliases and 803 generated files/11,910,385 bytes are removed too;
-other worktrees remain.
+other worktrees remain. The latest `9266c12` checkout, nine aliases and 803 generated files/11,910,385 bytes are also removed after verified unit exit and exact ownership checks.
 
 ## Native status and version compatibility
 

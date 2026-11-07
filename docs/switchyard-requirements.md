@@ -31,10 +31,11 @@ its 15-test consumer group passes at `90fa879` without changing the original bou
 [Scoped follow-up](evidence/host-action-settlement-native-followup-summary.json).
 [Native inventory evidence](evidence/editor-project-choices-native-summary.json).
 
-Complete Linux `cf3bb4c` passes 356 groups/2,326 tests with 32 declared skips,
-including saved-project discovery, connected demo and scheduling contracts. Its
-exact checkout and 11,910,385 bytes of generated staging are removed.
-[Latest Linux evidence](evidence/linux-cf3bb4c-complete-summary.json).
+Complete Linux `9266c12` passes 356 groups/2,333 tests with 32 declared skips,
+covering the installed source, exact Claude version admission and both task-status
+consent corrections. Its exact checkout, nine dependency aliases and 11,910,385
+bytes of generated staging are removed.
+[Latest Linux evidence](evidence/linux-9266c12-complete-summary.json).
 
 The earlier installed-source Linux `2c6497f` passes 351 groups/2,312 tests with 32 declared skips.
 It covers the installed guided role choices and external-agent consent corrections.

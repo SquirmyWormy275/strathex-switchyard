@@ -139,7 +139,17 @@ Host-facing task-owner, Copilot-journal and signed-intent verifiers run sequenti
 
 ## Complete runs and native evidence
 
-A complete Linux verification is running for source `9266c1248af9a8f8c8bd355b5b0b150bcc957e0e` in the isolated checkout recorded privately by `linux-full-9266c12-run.json`. It uses the existing 356-group manifest and dependency aliases, with no new downloads. The temporary wrapper's original syntax failure happened before any test and is preserved; the corrected wrapper passed syntax checking before restart. Do not report partial progress as acceptance or rerun the start script. Audit the final receipt and exact cleanup before removing its owned checkout.
+Complete Linux source `9266c1248af9a8f8c8bd355b5b0b150bcc957e0e` is accepted:
+356 original groups, 2,333 passing tests and 32 declared skips. Receipt
+`e19a2513-00d0-4f53-b1b1-726f467955f4` retains the original manifest, commands,
+limits and verified child cleanup. The corrected unit exited zero. Its exact
+checkout, nine dependency aliases, 803 generated files/11,910,385 bytes, empty
+test parent and active marker are removed; other worktrees are preserved.
+The temporary wrapper's original syntax failure preceded every test and remains
+retained. No complete Linux run is active. Do not rerun executed start, audit or
+cleanup scripts. The reusable private template now uses whole-token placeholder
+replacement and syntax-checks the wrapper before starting it.
+[Latest complete Linux evidence](evidence/linux-9266c12-complete-summary.json).
 
 Complete Windows source `90fa879d776c0b7756f66d37180fb8c3049b3fc4` is accepted:
 462 original groups, 2,902 passes and 246 declared skips. All 23 jobs of run
