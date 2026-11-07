@@ -1,5 +1,13 @@
 # What has actually been verified
 
+Complete Linux `b320506` passes all **328 groups: 2,049 tests and sixteen declared
+skips**, with zero failures or cancellations. This source includes scanner drafting
+and reviewed Linux saving. Exact original inventory, commands, bounds, skips and
+child/tree cleanup verify. The owned checkout, nine dependency aliases, 788
+generated files (11,809,393 bytes), empty test parent and marker are removed;
+other worktrees remain. Windows saving is later source with separate evidence.
+[Complete Linux receipt](evidence/linux-b320506-complete-summary.json).
+
 ## Installed scanner save portability checkpoint
 
 Normal Linux installation of `5ec16fe` passes 76 metadata/in-memory checks and

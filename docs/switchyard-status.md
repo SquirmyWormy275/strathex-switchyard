@@ -19,14 +19,14 @@ checkpoints are not cumulative acceptance of the latest suite.
 | --- | --- | --- |
 | Installed Linux `5ec16fe` | **76 metadata/in-memory checks; 35 exact module hashes.** All 54 semantic workspaces and frozen frontend preserved. [Receipt](evidence/installed-windows-scanner-recipe-save-summary.json). | No live scanner, provider task, account/model request, native focus or hardware operation. |
 | Native Windows client `4f56477` | **Seven groups; 94 passing tests; no skips.** Source/merge tree, artifact digest, commands, bounds and child/tree cleanup verified. [Receipt](evidence/windows-client-4f56477-passed-summary.json). | Client contracts only; interactive focus and complete Windows release acceptance are separate. |
-| Complete Linux `d09645a` | **326 groups; 2,013 passing tests; sixteen declared skips.** Original inventory, commands, bounds and owned cleanup verified. [Receipt](evidence/linux-d09645a-complete-summary.json). | Includes wheel-license and staged/historical preparation; predates scanner-draft assembly. |
+| Complete Linux `b320506` | **328 groups; 2,049 passing tests; sixteen declared skips.** Original inventory, commands, bounds and owned cleanup verified. [Receipt](evidence/linux-b320506-complete-summary.json). | Includes scanner drafting and Linux saving; predates Windows saving. |
 | Complete Windows `dc755901` | **417 groups; 2,478 passing tests; 207 declared skips.** All six jobs and overall workflow passed with verified packet/source/cleanup. [Receipt](evidence/windows-complete-dc755901-summary.json). | Predates newer archive, scheduling, profile/workflow and observation corrections. |
 
-Complete Linux `d09645a` has zero failures or cancellations. Every original
+Complete Linux `b320506` has zero failures or cancellations. Every original
 command, deadline, declared skip and child/tree retirement verifies. The owned
-checkout, nine dependency aliases, 788 generated files (11,803,414 bytes), empty
-test parent and marker are removed; other worktrees remain. This includes the
-read-only index correction. Scanner draft/save functionality has later focused and installed evidence.
+checkout, nine dependency aliases, 788 generated files (11,809,393 bytes), empty
+test parent and marker are removed; other worktrees remain. Windows saving has
+later focused and installed evidence; actual Windows acceptance is pending.
 
 The latest installation includes 17 wheel license-header cases, 112 Cargo
 manifest reference cases, and eight in-memory policy reports for each of wheels,
