@@ -56,8 +56,19 @@ declared skips**, including a real Linux mixed scan, replay refusal, original
 repository preservation and native/staging retirement. Typecheck and all 34
 native sources compile offline with zero warnings/errors. Original bounds remain;
 the owned 33-file, 1,486,912-byte compiler output and empty test parent are removed.
-Mixed NTFS staging is implemented but native acceptance is pending.
+Mixed NTFS staging now passes at `edb76de`: two Windows groups, 20 passing
+tests and one declared Linux-only skip. Source/merge trees, artifact digests,
+original commands, bounds and cleanup verify. The restricted-storage follow-up
+passes all eight original owner checks; its earlier intermittent cause remains
+unresolved. [Native evidence](evidence/windows-mixed-scanner-native-summary.json).
 [Contract](mixed-scanner-inputs.md), [source evidence](evidence/scanner-mixed-input-source-summary.json).
+
+Windows terminal process verification now has a native read-only helper and a
+supervised adapter: **15 focused groups, 192 passes and two platform skips**.
+Typecheck and all 34 native sources compile offline; the owned compiler output
+is removed. Native Windows execution awaits CI. Suite/editor task attachment
+remains unfinished. [Contract](windows-terminal-process.md),
+[source evidence](evidence/windows-terminal-process-source-summary.json).
 
 Windows scanner saving passes **15 native tests, no skips**, at `5ec16fe`,
 including four actual NTFS cases. Source/merge tree, artifact, commands, bounds
@@ -109,9 +120,10 @@ Linux historical-only detection, a Windows guest double, independent SHA-1 and
 SHA-256 cold-index preservation, and all package/update/recovery scenarios.
 Typecheck, original commands/bounds/skips and every child/tree cleanup verify;
 both owned test parents are removed. Failed packaging and Unix-socket-path
-receipts remain retained with their corrected follow-ups. Automatic recipe/feed
-assembly, mixed index/history execution, native Windows acceptance and frozen
-frontend controls remain unfinished or separately unaccepted.
+receipts remain retained with their corrected follow-ups. Later checkpoints
+implement recipe/feed assembly, reviewed saving and combined index/history
+execution, including native NTFS staging. Frozen frontend controls and broader
+historical coverage remain unfinished.
 [Contract](scanner-input-inventory.md#include-bounded-history-in-the-review),
 [source evidence](evidence/scanner-history-review-source-summary.json).
 

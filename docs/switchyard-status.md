@@ -42,7 +42,9 @@ storage reduces the package payload to 4,599,483 bytes without changing exports.
 - **Combined scanner inputs:** current, staged and bounded historical versions can
   share one reviewed scan with separate provenance and authority checks. Fifty-six
   focused groups pass 348 tests with five declared skips. Actual Linux scanning
-  passes; mixed native NTFS acceptance remains pending.
+  passes; two native Windows groups pass 20 tests with one Linux-only skip,
+  including actual combined NTFS staging.
+  [Native evidence](evidence/windows-mixed-scanner-native-summary.json).
   [Contract](mixed-scanner-inputs.md), [evidence](evidence/scanner-mixed-input-source-summary.json).
 
 - **Reviewed scanner setup saving:** the authenticated Linux backend now reviews,
@@ -76,6 +78,11 @@ storage reduces the package payload to 4,599,483 bytes without changing exports.
   [Cargo](cargo-license-declarations.md), [Python wheels](python-wheel-license-declarations.md).
   Wheel coverage has 167 distinct passing tests across 20 focused groups; all six
   affected groups were rerun after a separately reproduced budget-refund defect.
+- **Windows terminal identity:** a read-only native helper now verifies exact
+  PID/birth, held executable bytes, current user and session. Fifteen focused
+  groups pass 192 tests with two platform skips; typecheck and 34-source C#
+  compilation pass. Actual Windows execution awaits CI. Suite/editor attachment
+  remains unfinished. [Contract](windows-terminal-process.md).
 - **Windows native focus:** reviewed ChatGPT and stable VS Code executables have
   separate protected configurations, exact helper ownership, one-use requests
   and uncertain-outcome recovery. Selected-workspace policy now precedes platform
@@ -125,7 +132,7 @@ storage reduces the package payload to 4,599,483 bytes without changing exports.
 | F77 physical behavior | Cached VIA 9/Vial 4 readout and pinned `wcass:f77` source checks pass. New typing, hotplug and writes remain unperformed. No new HID, unlock, reset, flash, bootloader, solenoid or electrical operation is authorized here. Preserve firmware Dvorak and US host input. |
 | B122 and cap fit | Hardware is unavailable; all 27 physical gates remain open. |
 | Microsoft work Copilot | No approved work tenant is available. Synthetic checks do not establish tenant, license or account acceptance. |
-| Windows ordinary-user/UAC/guest behavior | Headless CI and guest doubles do not accept interactive journeys. Earlier restricted storage passes remain scoped to their revisions. The latest restricted owner fails final retirement after seven checks with TOKEN_QUERY mask 8 unchanged. |
+| Windows ordinary-user/UAC/guest behavior | Headless CI and guest doubles do not accept interactive journeys. Earlier restricted storage passes remain scoped to their revisions. The `edb76de` restricted owner passes all eight checks and cleanup with TOKEN_QUERY mask 8 unchanged; the earlier intermittent retirement cause remains unresolved. |
 | Native provider/task/IDE interaction | No live login changes, model requests or new native task create/resume are authorized during backend checks. The Claude/tmux attempt stopped at trust and retired its processes. Installed Codex 0.167.0 remains outside the reviewed 0.166.0 gate. |
 | Home/catalog and microphone interaction | Frozen frontend and backend transcription evidence do not establish visual or live microphone acceptance. |
 
@@ -140,7 +147,11 @@ failure, not unavailable hardware or an account blocker.
 The next native run now reports the exact owner ordinal and recorded-stop,
 guardian-exit or directory-retirement step. Five source groups pass 80 tests;
 all original acceptance checks and permission boundaries remain. This is a
-diagnostic improvement, not a verified native repair.
+diagnostic improvement, not a verified native repair. The separate `edb76de`
+follow-up passes all eight owner checks, 68 exact QUERY-only descendant
+registrations and original fixture/service removal. It predates the diagnostic
+change and does not establish the intermittent cause.
+[Passing follow-up](evidence/windows-mixed-scanner-native-summary.json).
 [Diagnostic evidence](evidence/native-retirement-phase-source-summary.json).
 
 The earlier complete Linux [49a5053 failure](evidence/linux-49a5053-failed-summary.json)

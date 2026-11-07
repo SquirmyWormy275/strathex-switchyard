@@ -289,6 +289,7 @@ export const requiredGroups = [
   { file: "tools/layout-studio/physical-intent.test.mjs" },
   { file: "tools/layout-studio/native-focus-gateway.test.mjs" },
   { file: "tools/layout-studio/windows-native-focus.test.mjs" },
+  { file: "tools/layout-studio/windows-terminal-process.test.mjs", timeoutMs: process.platform === "win32" ? 120_000 : 45_000, expectedSkipped: process.platform === "win32" ? 0 : 1 },
   { file: "tools/layout-studio/instance.test.mjs" },
   { file: "tools/layout-studio/foreground.test.mjs" },
   { file: "tools/layout-studio/keyboard-indicators.test.mjs" },

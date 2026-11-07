@@ -1,0 +1,88 @@
+{
+  "schema": "switchyard-native-windows-mixed-scanner-summary/v1",
+  "sourceCommit": "edb76de69fdc919d81a6dbb7338a37707af816f6",
+  "mergeCommit": "164273b8e2212a97a4d2a0a7317d68be2ef57b2e",
+  "equalSourceAndMergeTree": "58eaf9bd7ad72c4cae63bc7578696540aebe5e3e",
+  "workflowRun": 42348630797,
+  "overallFilesystemWorkflowPassed": true,
+  "verifiedJobIds": [
+    128331772521,
+    128331940128,
+    128331940118,
+    128331940144,
+    128331941615,
+    128331941785
+  ],
+  "artifacts": [
+    {
+      "id": 13565021352,
+      "bytes": 995,
+      "sha256": "80b16e4018771d6f9086cfec5bb8101a4f22cf1c454db276e122aea9e65689fc"
+    },
+    {
+      "id": 13564797546,
+      "bytes": 4581,
+      "sha256": "8f26cf2ee85dc1b627df731eb87980c5765148d0ee446c621e660a262e7c741f"
+    },
+    {
+      "id": 13564618043,
+      "bytes": 988,
+      "sha256": "e52bb04fc66370884751ed5ee333a131d90b657df53c454c2b7223aca5ae7eda"
+    }
+  ],
+  "archivesReadInMemoryOnly": true,
+  "sourceFiles": {
+    "apps/desktop-hotkeys/ReviewedInputStager.cs": "9f94f5960f7eacdc01a221eb4032ef87e06a0b6266d74441d69394be999026fa",
+    "tools/layout-studio/windows-reviewed-inputs.mjs": "09d283c0b9266a78e094add6189afda30e3ded4c89471030ca6e0baea7467efc",
+    "tools/layout-studio/windows-history-staging.test.mjs": "e9ddafa740b14ff1824ed451a8324c3db7e69ee757c1514e412a68bb12481eee",
+    "tools/layout-studio/scanner-mixed-review.test.mjs": "0f724616da62d72d1cd3f73075a65f66061ddfbf5c61e74c932424398c4ba37a",
+    "tools/layout-studio/shield-git-inputs.mjs": "01a56867b1ce199ab77832ab912265682de3b84015ea51f78bf75393b6e5e993",
+    "scripts/verify-windows-storage-contracts.mjs": "dec25d0869112e31d8ec26ea7168bac889f75c9e4dd496d663e8e2100a4cc2e5",
+    ".github/workflows/switchyard-windows-filesystem.yml": "b9ebf0e58e99a6d981a614a05d306c41b4c8910a32cac9bf8227fd3604e9ff59"
+  },
+  "manifestSha256": "7c5a07d5fa5f70f7674c17a294f8d7f57106524f798237fdca26641f14d3fd90",
+  "receipts": [
+    {
+      "receipt": "isolated-test-a566801c-0363-43ca-9c71-32b264464942.json",
+      "sha256": "97055614ce04b6cc782f9e40be478d40a85e224192996e0b97893a103009349d",
+      "file": "tools/layout-studio/scanner-mixed-review.test.mjs",
+      "timeoutMs": 300000,
+      "passedTests": 6,
+      "skippedTests": 1
+    },
+    {
+      "receipt": "isolated-test-552113aa-c830-4d59-8f18-fb57f4c39437.json",
+      "sha256": "cfd42918a356e0961362ae6cffb09c91e274dba6724b65dffbf0d19dbec4a26b",
+      "file": "tools/layout-studio/windows-history-staging.test.mjs",
+      "timeoutMs": 120000,
+      "passedTests": 14,
+      "skippedTests": 0
+    }
+  ],
+  "groups": 2,
+  "passedTests": 20,
+  "skippedTests": 1,
+  "originalCommandsBoundsSkipsAndCleanupVerified": true,
+  "actualNtfsCombinedStagingAccepted": true,
+  "restrictedStorageFollowup": {
+    "receipt": "switchyard-storage-broker-exchange-verification.json",
+    "sha256": "26803504901aacfa94f15b8af79ffc42e53cc4b026165da30d734fd75c98182e",
+    "coordinatorChecks": 9,
+    "restrictedClientChecks": 13,
+    "restrictedExchangeChecks": 31,
+    "hostChecks": 8,
+    "restrictedHostChecks": 8,
+    "descendantQueriesVerified": 68,
+    "tokenQueryMask": 8,
+    "originalOwnerExitAndFixtureRemovalVerified": true,
+    "originalServiceAndFilesRemoved": true,
+    "earlierIntermittentRetirementCauseResolved": false
+  },
+  "limitations": [
+    "The mixed Windows scanner journey uses an explicit guest double; combined NTFS staging runs natively.",
+    "The declared skip is the Linux-only scanner execution.",
+    "The passing retirement follow-up does not identify or repair the earlier intermittent cause.",
+    "This accepts selected filesystem and storage contracts, not the full Windows suite, interactive ordinary-user setup, guest execution, hardware or live accounts."
+  ],
+  "success": true
+}

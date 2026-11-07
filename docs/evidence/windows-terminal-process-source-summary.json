@@ -1,0 +1,142 @@
+{
+  "schema": "switchyard-windows-terminal-process-source-summary/v1",
+  "at": "2026-11-07T07:12:14.567Z",
+  "baseCommit": "acbea5a3c9bff297c23b9c3b0728a0c30748074b",
+  "sourceFiles": {
+    "apps/desktop-hotkeys/BoundedExchangeImage.cs": "5cca580973f3688e8aef5e9c6ef3c5f504d8b3d327997db37bec70eb44e2ca80",
+    "apps/desktop-hotkeys/BoundedExchangeVolume.cs": "590f7e05811f0549e8657a76719cfbc024e9643ae0c44d6e980e696c676ec769",
+    "apps/desktop-hotkeys/BrokerExchangeImage.cs": "c8a1b87a74f161561f1d0cabe5f6a4a5ac21aeb7335f9f3c13c5d759b45aa5fb",
+    "apps/desktop-hotkeys/PipeTextProtocol.cs": "98c1cdb43f0c5993bfa7fad548178d5a469849c8d4b19b26e5ad5c29b655278d",
+    "apps/desktop-hotkeys/Program.cs": "4909de4c2d04289ed9aebd4a2f64ab2a31e21345fc3da7c28164a92fd42a09e1",
+    "apps/desktop-hotkeys/ReviewedHistoryInputs.cs": "8506693db5a27f66ea975c7394175d96a45774976cd69d6e38b88c7c1dfe396b",
+    "apps/desktop-hotkeys/ReviewedIndexInputs.cs": "372602863793a270b86b9abb74c34a861254dbd281a5f2f3dabb0b395ac763c2",
+    "apps/desktop-hotkeys/ReviewedInputStager.cs": "9f94f5960f7eacdc01a221eb4032ef87e06a0b6266d74441d69394be999026fa",
+    "apps/desktop-hotkeys/RuntimeCommandRunner.cs": "d272ba2b57d81a3954d3abdecd5cb1373648fce3c1cc8fed23c8fde68941123b",
+    "apps/desktop-hotkeys/RuntimePackageMetadata.cs": "df6f0d2e011471a8a3f65967f630ec8f2d94c388a4d5758d4e9a9e1d4bc9297c",
+    "apps/desktop-hotkeys/RuntimePrivatePipeSecurity.cs": "19b8bb02b7c41b7879223648e3f6edf54652e2b9e13ec5ed8618436390b771e4",
+    "apps/desktop-hotkeys/ScannerRecipeFiles.cs": "b77c96291c1c5bb31db8a44b3b1972aa29e1fecfbacb037f18c53ecf8dbd7b37",
+    "apps/desktop-hotkeys/StateLeaseWorker.cs": "617c6b404179a9289bb9992117807ecbe7beaf77a9da6b8028c621ad7873626a",
+    "apps/desktop-hotkeys/WindowsSandboxCli.cs": "8a8d428e0a4eadf56631b154edce9e95c0ea813e45d8bb8cf0522149046f1030",
+    "apps/desktop-hotkeys/WindowsStorageBroker.cs": "508e30ac285b1c029b39c8c2947aec7625d52e6fce8103c8e6a6f19381a386e4",
+    "apps/desktop-hotkeys/WindowsStorageBrokerBootstrap.cs": "6c2d612447084928a907cf7e3b3fc2837de141f5c21fc82ae0e068676a5866f2",
+    "apps/desktop-hotkeys/WindowsStorageBrokerControl.cs": "148afe8cdbf5ad96841d683e72be7273fcd27ebf730582a8cbe3bbf776148fd9",
+    "apps/desktop-hotkeys/WindowsStorageBrokerDiagnostic.cs": "56545d478055bccc73277ea83a94f3e9904230d38e8bf320ba4c402b6aef4d0d",
+    "apps/desktop-hotkeys/WindowsStorageBrokerExchangeEngine.cs": "e69c8911975ea1fb4e9b32ba999928078099699e3eac0e96afe231c7f21d4aeb",
+    "apps/desktop-hotkeys/WindowsStorageBrokerExchangeFacts.cs": "8dc35f2980e748c8ec08eda60f0e0fc0a764650cdaefe80b243efba5e903ef27",
+    "apps/desktop-hotkeys/WindowsStorageBrokerExchangeFiles.cs": "b0d27292d5cedf07a4e68093d1a67483e53305bee085eb321294f2c5cf04b902",
+    "apps/desktop-hotkeys/WindowsStorageBrokerExchangeJournal.cs": "7603a59e27a8ff6c009c2b0b0b9aab5d8e89f165feaacc15692c50c08aba2908",
+    "apps/desktop-hotkeys/WindowsStorageBrokerExchangeMapping.cs": "9c76c0cd5c41b9ec2525781e11ef7d2f327aa8d76401055c36a0acd2cafa5030",
+    "apps/desktop-hotkeys/WindowsStorageBrokerExchangeProtocol.cs": "e7787821ac2c36acc25ca4ef53ecadcd7c2c32d02e76339a5b7c0c1117e5ae15",
+    "apps/desktop-hotkeys/WindowsStorageBrokerFiles.cs": "05c38bb34ee8aef8a03b4e80b949dfdd2ed5764b7ea99e82baf9e02b6c28938d",
+    "apps/desktop-hotkeys/WindowsStorageBrokerInstallation.cs": "58525c47574e2dcd2d16db9037ebc748d837caae9ca8b38323347aeb1d9a668d",
+    "apps/desktop-hotkeys/WindowsStorageBrokerPipe.cs": "5bf0b6700e4169c6e4547be61a052b835fbd231bbdbfff4033586635d2112023",
+    "apps/desktop-hotkeys/WindowsStorageBrokerProtocol.cs": "cc58058bbb0e108ad7283dc4b37eb467dcf9874b89ef666fd0b956f9fa6dcb3a",
+    "apps/desktop-hotkeys/WindowsStorageBrokerRuntime.cs": "193d5711b021e2dbda39af47fb417eed5f742e6aaafbdb41441f24f8383279a7",
+    "apps/desktop-hotkeys/WindowsStorageBrokerService.cs": "8abc195a6416ef637e77fd37c0aff234ff1d646088ea728dcf7fdebb49e6bd2f",
+    "apps/desktop-hotkeys/WindowsStorageBrokerServiceHeader.cs": "b2ce888b17bdf5f960eef00c89f46fd355fb3368b56c2067fb422b8b9fb72ebf",
+    "apps/desktop-hotkeys/WindowsStoragePrerequisites.cs": "06fea31a24ae5c2dd05df0b8b1eb6c1220f8ca375dc3c19489d6a13c01ac83d3",
+    "apps/vscode-extension/test/studio-terminal-process.test.ts": "a5d16303c1ab04f623cfdf638e8e9b058af3c9b541d7c78481772b7be1102703",
+    "apps/windows-companion/provider-desktop-helper/Program.cs": "5199becd2a3d4c0fb43c72625acf9e777b1950a560b201e71e4edbf3e8fda205",
+    "apps/windows-companion/sandbox-helper/Program.cs": "445428afc42357c69a16e15679945cdb1a79b336dc0976c4e51d59a0520c4cbe",
+    "apps/windows-companion/test/repository-runtime.test.ts": "4c125fe93dc0e683986958196b44ba89cd5ce33a34243790d6104b2120694bb4",
+    "apps/windows-companion/test/windows-provider-process.test.ts": "220ec0a2479ee476706b193cb98053bc842b40290b639763ec27f5162fc10e64",
+    "deployment/suite/application.test.mjs": "bfff39c8699b6d578edd54a80e1e26fd9d346c708b1707ac27e332e934d4b83b",
+    "deployment/suite/release.test.mjs": "bfdce3a7644ef2be90619ee410e4941e3deacff5cf387ed6c8697d8f8f5863ef",
+    "scripts/run-isolated-tests.mjs": "436f466028801018f196b0ca92c53f96306f6d9e8e82c44125faa3bc0d5340c8",
+    "scripts/run-isolated-tests.test.mjs": "5310028fcdc3f55f228f679a2ba338aabafcd3784129078172f469ea937133df",
+    "scripts/verify-client-platform.mjs": "2eb48bd4d621377361d4274ce40dc1a6ff7b700bfc74dd04b4052f857a10a90f",
+    "scripts/windows-backend-shards.test.mjs": "efaaa961fd4fd3f64dd5e7019a841b9da86b385b7ad7b9cd4593468aef04e1c3",
+    "tools/layout-studio/client-launch.test.mjs": "01068e6f52540e59744658849597d5446e31d0a53fe19d67a95236a93474c9cf",
+    "tools/layout-studio/integrations.test.mjs": "5a4764158f0c64b44e126a35b1f7fabb8c6e7d1875ba8a925144223fd2871589",
+    "tools/layout-studio/native-focus-gateway.test.mjs": "f902036c18680e47da7f4ff3733d118970b8af5bede8d10c6b420cae28a5248c",
+    "tools/layout-studio/owned-native-command.mjs": "111ae7ad96adf1a461e3aaa8d73c0c7c698de95e9348ea6b0abc596c1d77261a",
+    "tools/layout-studio/physical-intent.test.mjs": "c3c207c403001fde44a647c8ef7ca5e395d31c36a1acf6151aefb7358f5b4b2e",
+    "tools/layout-studio/runtime-command.test.mjs": "284608a2595cb4b823a44afce2d45a244023a1f62ad36f3f4e85e3dfadea01d1",
+    "tools/layout-studio/suite.test.mjs": "18d65cf5a39999ae18be36a9eb2662f29823e9710aef941e2f31f6ab76972521",
+    "tools/layout-studio/windows-native-focus.test.mjs": "c7fbbe02c98e77ec52d379a040472139f28657f699db6e53d44830153a933c36",
+    "tools/layout-studio/windows-terminal-process.mjs": "068cd0dcf2f3ffec11329a06218948055e83cf29318a991c4ccc2c54402f4003",
+    "tools/layout-studio/windows-terminal-process.test.mjs": "54b8f6ab058d59848a4607aaaf7ce487c7c6b4cd62d15091005b5597b382d176"
+  },
+  "receipts": [
+    {
+      "name": "isolated-test-a9d6edca-52a6-4025-aaac-18b681ef1978.json",
+      "sha256": "6ce60d4b7b3b7681be5aab86e94070f37a636006db34bd6070ac5d95d8ba2dfc",
+      "totals": {
+        "required": 5,
+        "passed": 5,
+        "failed": 0,
+        "tests": 67,
+        "passedTests": 66,
+        "failedTests": 0,
+        "skippedTests": 1,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "name": "isolated-test-b787bf5b-81f4-4829-b351-2a65c97df1d4.json",
+      "sha256": "6c5495a8715b7b275c3f5fdaa503531caa655684cfd7062c7f8b1097dd0469c8",
+      "totals": {
+        "required": 11,
+        "passed": 11,
+        "failed": 0,
+        "tests": 133,
+        "passedTests": 131,
+        "failedTests": 0,
+        "skippedTests": 2,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    }
+  ],
+  "groups": 15,
+  "passedTests": 192,
+  "skippedTests": 2,
+  "originalCommandsBoundsSkipsAndCleanupVerified": true,
+  "typecheck": {
+    "command": "npm run typecheck",
+    "passed": true,
+    "node": "24.14.0"
+  },
+  "compile": {
+    "sourceFiles": 34,
+    "sdk": "8.0.424",
+    "referencePack": "8.0.30",
+    "warnings": 0,
+    "errors": 0,
+    "packageSources": [],
+    "exitCode": 0
+  },
+  "scope": {
+    "exactPidAndBirth": true,
+    "heldImageIdentityAndDigest": true,
+    "currentUserAndSession": true,
+    "processAccessMask": 1052672,
+    "tokenAccessMask": 8,
+    "noTargetProcessEffects": true,
+    "originalHelperOwnershipAndIndependentRetirement": true,
+    "staleContextRefused": true,
+    "noPidSearchOrAncestorFallback": true,
+    "closedRequestAndResponseSchemas": true
+  },
+  "bounds": {
+    "queryMs": 10000,
+    "outputBytes": 16384,
+    "stderrBytes": 0,
+    "nativeCiGroupMs": 120000,
+    "maximumImageBytes": 536870912
+  },
+  "limitations": [
+    "Native Windows process-query execution is implemented and registered in client CI but not accepted on this Linux host.",
+    "Suite routes, Windows editor terminal orchestration and authenticated WebSocket peer transport remain unfinished.",
+    "Process identity does not establish task attachment, account identity, native focus or provider completion.",
+    "Frozen frontend and editor command activation remain unchanged; no live task/model/account/hardware operation occurred."
+  ],
+  "cleanup": {
+    "ownedCompilerFiles": 33,
+    "ownedCompilerBytes": 1507256,
+    "sourceHashesVerified": true,
+    "exactInventoryRemoved": true
+  },
+  "success": true
+}

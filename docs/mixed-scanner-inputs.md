@@ -35,8 +35,11 @@ The latest results across **56 focused groups pass 348 tests**, with five declar
 platform skips. A real Linux scan detects synthetic secrets in staged and
 historical versions, preserves original worktree/index/HEAD, refuses replay and
 verifies native exit and staging removal. Windows transport and guest doubles
-verify combined proofs and late source drift. Actual mixed NTFS staging is
-implemented and registered; native acceptance remains pending.
+verify combined proofs and late source drift. Actual mixed NTFS staging now
+passes on Windows at `edb76de`: two groups, 20 passing tests and one Linux-only
+skip. Exact source/merge trees, artifact hashes, original commands, bounds and
+child/tree cleanup verify. The scanner guest remains doubled.
+[Native evidence](evidence/windows-mixed-scanner-native-summary.json).
 [Source evidence](evidence/scanner-mixed-input-source-summary.json).
 
 Typecheck and offline compilation of 34 native sources pass with zero warnings

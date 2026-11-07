@@ -61,6 +61,7 @@ internal static class Program
     {
         if (args.Length == 1 && args[0] == "--self-test") return SelfTest();
         if (args.Length == 1 && args[0] == "--native-desktop-owner-v1") return ObserveFocusOwner();
+        if (args.Length == 1 && args[0] == "--editor-terminal-process-v1") return ObserveEditorTerminalProcess();
         if (args.Length == 2 && args[0] == "--managed-terminal-v1")
         {
             try
@@ -117,6 +118,69 @@ internal static class Program
 
     private static bool IsFocusAction(string action) => action is "list" or "focus";
     private static bool SupportsEditorFocus(string action, bool focusOnly) => focusOnly && IsFocusAction(action);
+
+    private static int ObserveEditorTerminalProcess()
+    {
+        try
+        {
+            if (!OperatingSystem.IsWindows()) throw new ProtocolException("windows_required");
+            using JsonDocument document = ParseJson(ReadBoundedLine(Console.In, MaximumRequestChars));
+            JsonElement value = document.RootElement;
+            RequireProperties(value, "schema", "requestId", "processId", "expectedBirth", "image");
+            string requestId = Text(value, "requestId"); int processId = Integer(value, "processId");
+            if (Text(value, "schema") != "switchyard-editor-terminal-process-query/v1" || !Guid.TryParseExact(requestId, "D", out Guid requestGuid) || requestGuid == Guid.Empty || processId < 1) throw new ProtocolException("invalid_terminal_query");
+            string? expectedBirth = Property(value, "expectedBirth").ValueKind == JsonValueKind.Null ? null : Text(value, "expectedBirth");
+            if (expectedBirth is not null && !ValidProcessStartTime(expectedBirth)) throw new ProtocolException("invalid_process_birth");
+            JsonElement image = Property(value, "image");
+            RequireProperties(image, "path", "sha256", "device", "inode", "size");
+            string path = Text(image, "path"), expectedHash = Text(image, "sha256");
+            ulong Decimal(string name, bool zero = false)
+            {
+                string text = Text(image, name);
+                if (text.Length is < 1 or > 20 || text.Any(c => c is < '0' or > '9') || text.Length > 1 && text[0] == '0' || !ulong.TryParse(text, NumberStyles.None, CultureInfo.InvariantCulture, out ulong number) || !zero && number == 0) throw new ProtocolException("invalid_terminal_image_identity");
+                return number;
+            }
+            ulong device = Decimal("device", true), inode = Decimal("inode"), size = Decimal("size");
+            if (device > uint.MaxValue || size > 512UL * 1024 * 1024 || expectedHash.Length != 64 || !expectedHash.All(IsLowerHex)
+                || path.Length is < 4 or > 4096 || !char.IsAsciiLetter(path[0]) || path[1] != ':' || path[2] != '\\'
+                || path[3..].Any(c => c < 32 || c == 127 || "<>:\"/|?*".Contains(c)) || Path.GetFullPath(path) != path
+                || path[3..].Split('\\').Any(part => part.Length == 0 || part.EndsWith('.') || part.EndsWith(' '))) throw new ProtocolException("invalid_terminal_image_path");
+            using SafeFileHandle process = OpenProcess(ProcessQueryLimitedInformation | Synchronize, false, (uint)processId);
+            if (process.IsInvalid) throw NativeFailure("terminal_process_unavailable");
+            void CurrentProcess(string? birth)
+            {
+                if (WaitForSingleObject(process, 0) != WaitTimeout) throw new ProtocolException("terminal_process_exited");
+                AssertCurrentUserSession(process);
+                if (!SamePath(ProcessImagePath(process), path) || birth is not null && ProcessStartTime(process) != birth) throw new ProtocolException("terminal_process_changed");
+            }
+            CurrentProcess(expectedBirth); string observedBirth = ProcessStartTime(process);
+            using SafeFileHandle file = CreateFileW(path, GenericRead, FileShareRead, IntPtr.Zero, OpenExisting, 0, IntPtr.Zero);
+            if (file.IsInvalid) throw NativeFailure("terminal_image_unavailable");
+            void CurrentFile(SafeFileHandle handle)
+            {
+                if (!GetFileInformationByHandle(handle, out ByHandleFileInformation info)) throw NativeFailure("terminal_image_identity_unavailable");
+                if ((info.FileAttributes & (0x10 | 0x400)) != 0 || info.VolumeSerialNumber != device || (((ulong)info.FileIndexHigh << 32) | info.FileIndexLow) != inode || (ulong)info.FileSize != size || !SamePath(FinalPath(handle), path)) throw new ProtocolException("terminal_image_changed");
+            }
+            CurrentFile(file);
+            // Hash the held file itself. No pathname reopen can substitute bytes.
+            using (var borrowed = new SafeFileHandle(file.DangerousGetHandle(), ownsHandle: false))
+            using (var stream = new FileStream(borrowed, FileAccess.Read, 1024 * 1024, false))
+            {
+                string observedHash = Convert.ToHexString(SHA256.HashData(stream)).ToLowerInvariant();
+                if (!CryptographicOperations.FixedTimeEquals(Encoding.ASCII.GetBytes(observedHash), Encoding.ASCII.GetBytes(expectedHash))) throw new ProtocolException("terminal_image_digest_changed");
+            }
+            using SafeFileHandle named = CreateFileW(path, FileReadAttributes, FileShareRead, IntPtr.Zero, OpenExisting, 0, IntPtr.Zero);
+            if (named.IsInvalid) throw NativeFailure("terminal_image_name_unavailable");
+            CurrentFile(named); CurrentFile(file); CurrentProcess(observedBirth);
+            Write(new { schema = "switchyard-editor-terminal-process-result/v1", requestId, processId, birth = observedBirth,
+                image = new { path, sha256 = expectedHash, device = device.ToString(CultureInfo.InvariantCulture), inode = inode.ToString(CultureInfo.InvariantCulture), size = size.ToString(CultureInfo.InvariantCulture) },
+                currentUserVerified = true, currentSessionVerified = true, processAccessMask = ProcessQueryLimitedInformation | Synchronize, tokenAccessMask = TokenQuery,
+                processTerminated = false, windowFocused = false, taskAttached = false, accountVerified = false });
+            return 0;
+        }
+        catch (ProtocolException exception) { Write(new { schema = "switchyard-editor-terminal-process-error/v1", code = exception.Code }); return 65; }
+        catch { Write(new { schema = "switchyard-editor-terminal-process-error/v1", code = "native_failure" }); return 70; }
+    }
 
     private static int ObserveFocusOwner()
     {
