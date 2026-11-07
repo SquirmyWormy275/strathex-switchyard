@@ -66,6 +66,36 @@ exist only inside disposable staging. Execution independently re-witnesses the
 bytes. Automatic recipe/feed assembly, broader history and frontend controls
 remain unfinished; this preparation does not establish complete security coverage.
 
+## Include bounded history in the review
+
+For Codebase Audit or Release Shield, add `"historyDepth": 4` to prepare historical
+versions of the current tracked paths. Choose a depth from one to six. This uses
+the existing raw commit/tree/blob verifier; callers cannot import revisions,
+object IDs, paths or arbitrary Git commands. `includeIndex: true` cannot be combined
+with this option because mixed index/history execution remains unimplemented.
+
+The `bounded-current-and-history/v1` response adds `historyInputs` with the exact
+reserved paths and source descriptors for the [historical scanner](historical-shield-inputs.md).
+It also returns the observed HEAD, selected paths/depth, metadata digest, stopping
+boundary, shallow flag, absent versions and explicit coverage gaps. New staged
+paths absent from the selected commits stay absent; no source version is invented.
+Only names currently tracked are automatically selected. Historical paths removed
+from the current repository require the separate explicit reader and remain
+outside this automatic authority path.
+
+At most eight tracked paths and 48 historical versions fit this preparation.
+The reader retains its 256 KiB per-blob and 448 KiB aggregate unique-byte limits.
+Windows also counts repeated versions against its 320 KiB transport limit.
+Current paths plus historical descriptors must fit the 256-file execution limit;
+excess inputs are refused whole. A final target capture refuses intervening HEAD,
+index, worktree, task, account or selected-workspace changes before confirmation.
+
+This prepares metadata for a separately reviewed request and recipe. It neither
+assembles those control files nor starts a scanner. The history gaps still include
+other refs, non-first-parent branches, commit messages, renames and versions beyond
+the chosen depth or shallow boundary. Authority and security coverage remain
+ungranted/unverified until their separate steps; no complete passing gate is added.
+
 ## Preview names before choosing a scope
 
 The authenticated `coding/authority/scanner-inputs` API accepts one bound native
@@ -190,7 +220,9 @@ original worktree/index/HEAD and verify owned process/staging retirement.
 The missing-feature red receipt and an intermediate fixture failure are retained:
 the fixture originally captured index bytes before its own reference `write-tree`
 command refreshed Git's tree cache. Capturing the baseline after that reference
-command corrected the assertion; the API still preserves exact index bytes.
+command corrected that fixture, but did not cover a cold index. The new history
+review exposed a real cache mutation in protected target capture; the correction
+and independent cold-index/object-database checks are recorded below.
 Typecheck, installation recovery and the original 5 MiB package limit pass.
 Owned temporary test staging is removed. Live installed scanning, actual Windows
 guest behavior and frontend controls are not accepted by these source tests.
@@ -202,3 +234,25 @@ frontend bytes. The prepared bundle is removed after normal versioned update.
 This is installed source/compatibility verification; it starts no installed
 scanner or native provider task.
 [Installed evidence](evidence/installed-scanner-index-review-summary.json).
+
+### Historical preparation and read-only inspection verification
+
+The latest results across 58 focused groups pass 202 tests, with original
+commands, deadlines, skip counts and child/tree cleanup verified. Thirteen new
+history cases cover authenticated preparation, explicit absence/shallow bounds,
+drift refusal and separately reviewed historical-only detection in an actual
+Linux scanner and a Windows guest double. Independent Git SHA-1/SHA-256 fixtures
+verify that protected target capture preserves cold index bytes and the object
+database. [Read-only index contract](read-only-index-tree.md).
+
+The initial broad run failed packaging and a long Unix-socket fixture path.
+The short owned test root fixes the latter; adding the new tree module to the
+builder's explicit runtime closure fixes packaged startup. All seventeen package
+and installation groups pass after that change. Failed receipts remain retained;
+no timeout, package budget or product assertion was relaxed. Type checking
+passes and both empty owned test parents are removed.
+[Source evidence](evidence/scanner-history-review-source-summary.json).
+
+These are isolated source checks. The installed backend has not yet been updated
+to this checkpoint; native Windows history acceptance, recipe/feed assembly,
+mixed index/history execution and frozen frontend controls remain separate.

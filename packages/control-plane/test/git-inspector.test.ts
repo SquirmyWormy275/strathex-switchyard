@@ -2,11 +2,12 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { lstat, mkdtemp, mkdir, open, readFile, rename, rm, symlink, writeFile, type FileHandle } from "node:fs/promises";
+import { lstat, mkdtemp, mkdir, open, readFile, readdir, rename, rm, symlink, writeFile, type FileHandle } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, dirname } from "node:path";
 
 import { GitCliInspector, NodeGitCommandRunner, NodeFileDigestReader, type GitCommandResult, type GitCommandRunner, type FileDigestReader } from "../src/git-inspector.ts";
+import { gitIndexTreeFromListing, gitIndexTreeFromEntries } from "../src/git-index-tree.ts";
 
 class ScriptedRunner implements GitCommandRunner {
   readonly calls: string[] = [];
@@ -49,8 +50,8 @@ test("read-only Git inspector uses fixed argument vectors and classifies every u
     "branch --show-current": result("feature/safe\n"),
     "symbolic-ref --quiet --short refs/remotes/origin/HEAD": result("origin/main\n"),
     "rev-parse --abbrev-ref --symbolic-full-name @{upstream}": result("origin/feature/safe\n"),
-    "rev-parse HEAD": result("abc123\n"),
-    "write-tree": result("tree123\n"),
+    "rev-parse HEAD": result("a".repeat(40) + "\n"),
+    "ls-files --stage -z": result("100644 " + "b".repeat(40) + " 0\tsrc/a.ts\0" + "100644 " + "b".repeat(40) + " 0\tsrc/b.ts\0"),
     "ls-files -z": result("src/a.ts\0src/b.ts\0"),
     "ls-files --deleted -z": result(""),
     "ls-files --others --exclude-standard -z": result("scratch.txt\0"),
@@ -72,6 +73,46 @@ test("read-only Git inspector uses fixed argument vectors and classifies every u
   assert.deepEqual(inspection.ignoredFiles, [{ path: ".env.local", digest: "sha256:.env.local", classification: "excluded", source: "ignored" }]);
   assert.deepEqual(inspection.issues, []);
   assert.ok(runner.calls.every((call) => !/[;&|`$]/.test(call)));
+  assert.equal(runner.calls.includes("write-tree"), false);
+});
+
+test("read-only index trees match real Git while preserving cold index caches and object databases", async t => {
+  const parent = await mkdtemp(join(tmpdir(), "switchyard-readonly-tree-")); t.after(() => rm(parent, { recursive: true, force: true }));
+  const git = process.platform === "win32" ? "C:\\Program Files\\Git\\cmd\\git.exe" : "/usr/bin/git";
+  for (const format of ["sha1", "sha256"] as const) {
+    const root = join(parent, format); await mkdir(root);
+    const run = (...args: string[]) => execFileSync(git, args, { cwd: root, timeout: 10000, encoding: "utf8", env: { ...process.env, GIT_CONFIG_NOSYSTEM: "1", GIT_CONFIG_GLOBAL: process.platform === "win32" ? "NUL" : "/dev/null", GIT_TERMINAL_PROMPT: "0" } });
+    run("init", "-b", "main", "--object-format=" + format); run("config", "user.name", "Synthetic"); run("config", "user.email", "synthetic@example.invalid");
+    await writeFile(join(root, "base"), "base\n"); run("add", "base"); run("-c", "commit.gpgsign=false", "commit", "-m", "synthetic base");
+    for (const path of ["foo.bar", "foo/child", "foo0", "foo/sub/empty", "Zebra", "é/child", "Ω", "executable"]) { await mkdir(dirname(join(root, path)), { recursive: true }); await writeFile(join(root, path), path.endsWith("empty") ? "" : "exact " + path + "\n"); }
+    run("add", "--all"); run("update-index", "--chmod=+x", "executable");
+    // Mode-only metadata covers links without creating a live filesystem link.
+    run("update-index", "--add", "--cacheinfo", "120000," + run("rev-parse", "HEAD:base").trim() + ",link");
+    run("update-index", "--add", "--cacheinfo", "160000," + run("rev-parse", "HEAD").trim() + ",module");
+    async function objects() {
+      const rows: string[] = [];
+      const walk = async (directory: string, prefix = ""): Promise<void> => { for (const item of await readdir(directory, { withFileTypes: true })) { const name = prefix + item.name; if (item.isDirectory()) await walk(join(directory, item.name), name + "/"); else { assert.equal(item.isFile(), true); rows.push(name + ":" + createHash("sha256").update(await readFile(join(directory, item.name))).digest("hex")); } } };
+      await walk(join(root, ".git/objects")); return rows.sort();
+    }
+    for (const empty of [false, true]) {
+      if (empty) run("read-tree", "--empty");
+      const before = await readFile(join(root, ".git/index")), beforeObjects = await objects();
+      const inspected = await new GitCliInspector({ runner: new NodeGitCommandRunner([git]), digestReader: new FakeDigests() }).inspect(root);
+      assert.ok(inspected.indexTree); assert.deepEqual(await readFile(join(root, ".git/index")), before); assert.deepEqual(await objects(), beforeObjects);
+      assert.equal(inspected.indexTree, run("write-tree").trim());
+      assert.equal(inspected.indexTree, gitIndexTreeFromListing(run("ls-files", "--stage", "-z"), run("rev-parse", "HEAD").trim()));
+    }
+  }
+});
+
+test("read-only index metadata refuses unmerged, sparse, colliding, truncated and oversized trees", () => {
+  const head = "a".repeat(40), entry = (path: string) => ({ path, objectId: "b".repeat(40), mode: "100644" }), row = "100644 " + "b".repeat(40) + " 0\ta\0";
+  for (const listing of [row.slice(0, -1), row + row, row.replace(" 0\t", " 1\t"), row.replace("100644", "040000"), row.replace("b".repeat(40), "0".repeat(40)), row.replace("\ta", "\t../a"), row.repeat(4097), "x".repeat(262145)]) assert.throws(() => gitIndexTreeFromListing(listing, head));
+  for (const paths of [["a", "a/b"], ["a/b", "a"], ["a", "a"], ["bad\ud800"]]) assert.throws(() => gitIndexTreeFromEntries(paths.map(entry), "sha1"));
+  assert.throws(() => gitIndexTreeFromEntries([entry("A/one"), entry("a/two")], "sha1", true));
+  assert.throws(() => gitIndexTreeFromEntries([entry("a")], "sha256")); assert.throws(() => gitIndexTreeFromEntries(Array.from({ length: 4097 }, (_, i) => entry("p" + i)), "sha1"));
+  assert.throws(() => gitIndexTreeFromListing("", "unverified-format"));
+  assert.equal(gitIndexTreeFromListing("", head), "4b825dc642cb6eb9a060e54bf8d69288fbee4904");
 });
 
 test("read-only Git inspector degrades an unreadable or unclassified file to an incomplete snapshot input", async () => {
@@ -81,8 +122,8 @@ test("read-only Git inspector degrades an unreadable or unclassified file to an 
     "branch --show-current": result("feature/safe\n"),
     "symbolic-ref --quiet --short refs/remotes/origin/HEAD": result("origin/main\n"),
     "rev-parse --abbrev-ref --symbolic-full-name @{upstream}": result("origin/feature/safe\n"),
-    "rev-parse HEAD": result("abc123\n"),
-    "write-tree": result("tree123\n"),
+    "rev-parse HEAD": result("a".repeat(40) + "\n"),
+    "ls-files --stage -z": result("100644 " + "b".repeat(40) + " 0\tsrc/a.ts\0"),
     "ls-files -z": result("src/a.ts\0"),
     "ls-files --deleted -z": result(""),
     "ls-files --others --exclude-standard -z": result("unknown.bin\0"),
@@ -102,8 +143,8 @@ test("read-only Git inspector distinguishes a detached HEAD from an unavailable 
     "remote get-url origin": result("https://github.com/example/repo.git\n"),
     "branch --show-current": result("\n"),
     "symbolic-ref --quiet --short refs/remotes/origin/HEAD": result("origin/trunk\n"),
-    "rev-parse HEAD": result("abc123\n"),
-    "write-tree": result("tree123\n"),
+    "rev-parse HEAD": result("a".repeat(40) + "\n"),
+    "ls-files --stage -z": result(""),
     "ls-files -z": result(""),
     "ls-files --deleted -z": result(""),
     "ls-files --others --exclude-standard -z": result(""),
@@ -124,8 +165,8 @@ test("read-only Git inspector positively represents a tracked worktree deletion 
     "branch --show-current": result("feature/safe\n"),
     "symbolic-ref --quiet --short refs/remotes/origin/HEAD": result("origin/main\n"),
     "rev-parse --abbrev-ref --symbolic-full-name @{upstream}": result("origin/feature/safe\n"),
-    "rev-parse HEAD": result("abc123\n"),
-    "write-tree": result("tree123\n"),
+    "rev-parse HEAD": result("a".repeat(40) + "\n"),
+    "ls-files --stage -z": result("100644 " + "b".repeat(40) + " 0\tdeleted.txt\0" + "100644 " + "b".repeat(40) + " 0\tunknown.bin\0"),
     "ls-files -z": result("deleted.txt\0unknown.bin\0"),
     "ls-files --deleted -z": result("deleted.txt\0"),
     "ls-files --others --exclude-standard -z": result(""),

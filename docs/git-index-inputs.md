@@ -26,6 +26,10 @@ protocols are disabled. [Lazy object fetching](https://git-scm.com/docs/git) is
 disabled too; unavailable local objects do not trigger a network fallback.
 Repository configuration and object metadata are still consulted.
 
+The separate full-target capture now [reconstructs its index tree without
+writing Git's cache or object database](read-only-index-tree.md). Explicit blob
+readers and their narrower source bounds remain unchanged.
+
 The initial subset permits 1–64 literal paths, 4,096 index entries, 256 KiB per
 blob and 448 KiB of selected content. Metadata and native output have independent
 bounds. Queries retain ten-second deadlines inside the existing 45-second

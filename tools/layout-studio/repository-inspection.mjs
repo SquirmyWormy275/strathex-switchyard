@@ -17,7 +17,7 @@ const queries = new Set([
   ["rev-parse", "--show-toplevel"], ["remote", "get-url", "origin"], ["branch", "--show-current"],
   ["symbolic-ref", "--quiet", "--short", "refs/remotes/origin/HEAD"],
   ["rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{upstream}"], ["rev-parse", "HEAD"],
-  ["write-tree"], ["rev-parse", "HEAD^{tree}"], ["rev-parse", "--absolute-git-dir"], ["rev-parse", "--git-path", "index"], ["ls-files", "-z"], ["ls-files", "--deleted", "-z"],
+  ["rev-parse", "HEAD^{tree}"], ["rev-parse", "--absolute-git-dir"], ["rev-parse", "--git-path", "index"], ["ls-files", "-z"], ["ls-files", "--deleted", "-z"],
   ["ls-files", "--others", "--exclude-standard", "-z"],
   ["ls-files", "--others", "--ignored", "--exclude-standard", "-z"],
   ["submodule", "status", "--recursive"], ["rev-parse", "--is-shallow-repository"], gitIndexListingQuery, ...Object.values(shieldInventoryQueries)

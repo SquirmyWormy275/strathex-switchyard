@@ -1,5 +1,22 @@
 # Switchyard authoritative requirement ledger
 
+Historical scanner preparation now derives bounded versions of current tracked
+paths and returns exact source descriptors with explicit coverage gaps. It
+preserves separate authority and execution review. A cold-index regression also
+exposed that protected target capture could refresh Git's tree cache; it now
+computes the tree identity from metadata without writing index or object bytes.
+
+The latest results across **58 focused groups pass 202 tests**, including real
+Linux historical-only detection, a Windows guest double, independent SHA-1 and
+SHA-256 cold-index preservation, and all package/update/recovery scenarios.
+Typecheck, original commands/bounds/skips and every child/tree cleanup verify;
+both owned test parents are removed. Failed packaging and Unix-socket-path
+receipts remain retained with their corrected follow-ups. Automatic recipe/feed
+assembly, mixed index/history execution, native Windows acceptance and frozen
+frontend controls remain unfinished or separately unaccepted.
+[Contract](scanner-input-inventory.md#include-bounded-history-in-the-review),
+[source evidence](evidence/scanner-history-review-source-summary.json).
+
 Complete Linux `94a0135` passes **323 groups, 1,979 tests and sixteen declared
 skips**, with zero failures/cancellations. Original commands, bounds, skip
 inventory and every child/tree retirement verify. The owned checkout, nine

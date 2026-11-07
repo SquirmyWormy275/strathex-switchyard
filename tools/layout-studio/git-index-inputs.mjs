@@ -1,5 +1,6 @@
 /** Literal Git index blobs. Object hashes verify raw bytes; no filters or source excerpts. */
 import { createHash } from "node:crypto";
+import { gitIndexTreeFromEntries as deriveIndexTree } from "../../packages/control-plane/src/git-index-tree.ts";
 
 export const gitIndexLimits = Object.freeze({ paths: 64, entries: 4096, fileBytes: 256 * 1024, totalBytes: 448 * 1024, listingBytes: 256 * 1024, outputBytes: 512 * 1024 });
 // Base64 and the reviewed envelope must still fit the native 512 KiB request.
@@ -43,29 +44,7 @@ export function gitIndexBatchInput(entries) {
 /** Reconstruct the complete bounded regular-file index tree without native effects. */
 export function gitIndexTreeFromEntries(entries) {
   gitIndexBatchInput(entries);
-  const root = new Map(), algorithm = entries[0].objectId.length === 40 ? "sha1" : "sha256";
-  for (const entry of entries) {
-    let directory = root;
-    const parts = entry.path.split("/");
-    for (const [i, name] of parts.entries()) {
-      // Git can store these names; the portable scanner contract cannot.
-      if (Buffer.from(name).toString("utf8") !== name) throw Error("Index tree names must be exact UTF-8.");
-      const key = name.toLowerCase(), existing = directory.get(key), leaf = i === parts.length - 1;
-      if (existing && (existing.name !== name || leaf || !existing.children)) throw Error("Index tree paths collide as files, directories or platform aliases.");
-      if (leaf) directory.set(key, { name, mode: entry.mode, objectId: entry.objectId });
-      else {
-        if (!existing) directory.set(key, { name, children: new Map() });
-        directory = directory.get(key).children;
-      }
-    }
-  }
-  const tree = directory => {
-    const children = [...directory.values()].map(child => ({ ...child, order: Buffer.from(child.name + (child.children ? "/" : "")) }));
-    children.sort((a, b) => Buffer.compare(a.order, b.order));
-    const bytes = Buffer.concat(children.flatMap(child => [Buffer.from(`${child.children ? "40000" : child.mode} ${child.name}\0`), Buffer.from(child.children ? tree(child.children) : child.objectId, "hex")]));
-    return createHash(algorithm).update(`tree ${bytes.length}\0`).update(bytes).digest("hex");
-  };
-  return tree(root);
+  return deriveIndexTree(entries, entries[0].objectId.length === 40 ? "sha1" : "sha256", true);
 }
 /** Callback bytes are private and borrowed; callers must copy only when needed. */
 export async function witnessGitIndexBatch(output, entries, consume = async () => {}) {

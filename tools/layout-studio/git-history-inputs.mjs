@@ -2,6 +2,7 @@
 import { createHash } from "node:crypto";
 import { gitIndexPaths, gitIndexLimits } from "./git-index-inputs.mjs";
 export const gitHistoryLimits=Object.freeze({paths:8,depth:6,pathLength:384,pathComponents:28,commitBytes:32768,commitTotalBytes:131072,treeEntries:4096,treeListingBytes:262144,fileBytes:gitIndexLimits.fileBytes,totalBytes:gitIndexLimits.totalBytes});
+export const gitHistoryWindowsRawLimit=320*1024;
 const digest=bytes=>createHash("sha256").update(bytes).digest("hex"),oid=value=>typeof value==="string"&&/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(value)&&!/^0+$/.test(value);
 export function historySelection(paths,depth=4){
   const selected=gitIndexPaths(paths);

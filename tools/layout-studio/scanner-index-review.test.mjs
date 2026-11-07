@@ -16,14 +16,14 @@ const issueInput = r => Object.fromEntries(["taskId", "planRevision", "paths", "
 test("automatic index preparation derives exact staged metadata alongside current paths without source disclosure", async t => {
   const f = await authorityFixture(t, { executionActions: connectedExecutionActions("linux") });
   await mkdir(join(f.root, "nested")); await writeFile(join(f.root, "nested/source.txt"), "NEVER_RETURN_STAGED_TEXT\n"); await f.run("add", "nested/source.txt"); await writeFile(join(f.root, "nested/source.txt"), "different worktree\n");
-  const tree = (await f.run("write-tree")).trim(), original = await readFile(join(f.root, ".git/index"));
+  const original = await readFile(join(f.root, ".git/index"));
   const suite = createSuite({ store: f.store, taskAuthority: f.service, agents: { close: async () => {} }, coding: { close: async () => {} } }); f.onCleanup(() => suite.close());
   const token = "I".repeat(43), server = createStudioServer({ suite, token, discover: async () => ({}) });
   await new Promise(resolve => server.listen(0, "127.0.0.1", resolve)); f.onCleanup(() => new Promise(resolve => { server.closeAllConnections(); server.close(resolve); }));
   const origin = `http://127.0.0.1:${server.address().port}`, api = authenticated => fetch(origin + "/api/suite/coding/authority/scanner-review", { method: "POST", headers: { "Content-Type": "application/json", Origin: origin, ...(authenticated ? { Authorization: `Bearer ${token}` } : {}) }, body: JSON.stringify(input(f)) });
   assert.equal((await api(false)).status, 401); assert.equal(f.counters().calls, 0);
   const response = await api(true), review = await response.json(); assert.equal(response.status, 200, JSON.stringify(review));
-  assert.equal(review.preparation.policy, "bounded-current-and-index/v1"); assert.equal(review.preparation.indexTree, tree); assert.equal(review.preparation.indexTree, review.scope.targetSnapshot.indexTree);
+  assert.equal(review.preparation.policy, "bounded-current-and-index/v1"); assert.match(review.preparation.indexTree, /^[a-f0-9]{40}$/); assert.equal(review.preparation.indexTree, review.scope.targetSnapshot.indexTree);
   assert.equal(review.preparation.indexInputs.length, 3); assert.equal(review.preparation.scanPerformed, false); assert.equal(review.preparation.authorityGranted, false);
   assert.ok(review.scope.paths.every(path => !path.startsWith(".switchyard-index/"))); assert.deepEqual(review.scope.actions, ["shield_codebase_audit"]);
   const staged = review.preparation.indexInputs.find(f => f.source.path === "nested/source.txt");
@@ -31,6 +31,7 @@ test("automatic index preparation derives exact staged metadata alongside curren
   assert.equal(JSON.stringify(review).includes("NEVER_RETURN_STAGED_TEXT"), false); assert.deepEqual(await readFile(join(f.root, ".git/index")), original);
   const grant = await f.service.issue("personal", { ...issueInput(review), token: review.confirmation.token }); assert.ok(grant.id);
   const plain = await f.service.reviewScanner("personal", { ...input(f), includeIndex: false }); assert.equal(plain.preparation.policy, "bounded-current-files/v1"); assert.equal(Object.hasOwn(plain.preparation, "indexInputs"), false);
+  assert.deepEqual(await readFile(join(f.root, ".git/index")), original);
 });
 
 test("automatic index preparation rejects malformed flags before queries and oversized selections without approval", async t => {

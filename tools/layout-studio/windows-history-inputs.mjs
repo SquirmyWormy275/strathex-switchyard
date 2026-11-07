@@ -1,9 +1,9 @@
 /** Private historical bytes for native staging; never persist encoded source content. */
 import {createHash} from "node:crypto";
 import {validateRepositoryInputs} from "../../apps/windows-companion/src/repository-inputs.ts";
-import {historySelection,gitHistoryLimits} from "./git-history-inputs.mjs";
+import {historySelection,gitHistoryLimits,gitHistoryWindowsRawLimit} from "./git-history-inputs.mjs";
 import {shieldHistoryPrefix,shieldIndexPrefix,shieldReservedPath} from "./shield-scanner-engine.mjs";
-export const windowsHistoryRawLimit=320*1024,windowsHistoryRequestLimit=512*1024;
+export const windowsHistoryRawLimit=gitHistoryWindowsRawLimit,windowsHistoryRequestLimit=512*1024;
 const sha=bytes=>createHash("sha256").update(bytes).digest("hex"),oid=value=>typeof value==="string"&&/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(value)&&!/^0+$/.test(value),exact=(value,fields)=>value&&typeof value==="object"&&!Array.isArray(value)&&Object.keys(value).sort().join()===fields.slice().sort().join();
 export function buildWindowsHistoryPacket({action,historyWitness,historyBytes,inputFiles}){
  const files=validateRepositoryInputs(inputFiles),witness=historyWitness;

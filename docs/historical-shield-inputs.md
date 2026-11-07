@@ -6,6 +6,11 @@ Linux Codebase Audit and Release Shield now connect the bounded
 separate review/approval, private disposable inputs and authenticated receipts.
 This is a selected-path, first-parent subset with incomplete coverage.
 
+The task-bound [automatic review](scanner-input-inventory.md#include-bounded-history-in-the-review)
+can now derive historical descriptors for the current tracked names with an exact
+`historyDepth`. It returns absent versions and traversal limits explicitly.
+Request/recipe assembly and actual scanning remain separately reviewed steps.
+
 A reviewed request includes every witnessed regular version of each selected
 path within one depth, using a reserved disposable alias:
 
@@ -52,7 +57,7 @@ Reports preserve original historical source descriptors, redact values, and bind
 gate. Other refs, non-first-parent branches, messages, renames, unselected paths
 and versions beyond the bounded/shallow boundary remain uninspected. Deleted
 historical paths can be witnessed, but a path absent from the current grant cannot
-yet be scanned through this connection. Automatic scope assembly, broader history,
+yet be scanned through this connection. Complete recipe/feed assembly, broader history,
 full scanners and user-facing review remain unfinished software.
 
 Five focused cases pass, including an actual isolated scanner finding a synthetic

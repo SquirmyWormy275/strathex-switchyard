@@ -38,6 +38,12 @@ the exact 531-file, 5,196,099-byte prepared bundle was removed.
 
 ## Recent backend changes
 
+- **History preparation and read-only inspection:** bounded historical descriptors
+  now come from the exact bound task. Protected capture computes Git tree identity
+  without modifying cold index caches or object databases. The latest 58 focused
+  groups pass 202 tests; package startup and recovery pass after the explicit
+  runtime closure correction. [Contract](read-only-index-tree.md),
+  [evidence](evidence/scanner-history-review-source-summary.json).
 - **Staged-input preparation:** the authenticated review can derive all supported
   staged descriptors and bind their exact Git tree before confirmation. Thirty-three
   focused groups pass 129 tests with verified cleanup. Recipe/feed assembly,
@@ -87,7 +93,7 @@ the exact 531-file, 5,196,099-byte prepared bundle was removed.
   Home/catalog and editor activation remain frozen for owner review.
 - Windows project selection and task-specific IDE attachment; native application
   focus alone does not establish a task or account binding.
-- Broader Shield syntax, automatic/mixed-source history coverage, general
+- Broader Shield syntax, automatic recipe assembly/mixed-source history coverage, general
   exclusions, dependency/feature/target resolution, complete archive contents,
   license-text inspection, publisher provenance and verified local vulnerability
   context.

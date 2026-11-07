@@ -1,0 +1,507 @@
+{
+  "schema": "switchyard-scanner-history-review-source-summary/v1",
+  "at": "2026-11-07T05:01:11.025Z",
+  "baseCommit": "c68d83698d1081e67f6dca3bb8d696be077d6a81",
+  "sourceFiles": {
+    "apps/windows-companion/test/bootstrap.test.ts": "cfecbcc9bd7fbd6f8f6a1e70b6b323d5c691d2917be997bf8b9d4b4d4ef89e65",
+    "apps/windows-companion/test/git-review.test.ts": "239ddbe76d0683d6860f61f7aad1270ac302e4f11a39c608886e74e938fa5760",
+    "apps/windows-companion/test/mediated-git.test.ts": "bfbdbeda82ff0e79dd277a07f898946aa9feacf5603986ff07355e01abc7ce14",
+    "deployment/suite/installation.test.mjs": "9d9f10b0591817d1c23abaf87efacf79b695d14934a5b4e09537a1a4aa36779f",
+    "deployment/suite/release.mjs": "0af7eb92ed700aacf187c3b07be1d63d20ea62c4e219ff235035a8ad89e08f22",
+    "deployment/suite/release.test.mjs": "cc0beb00fc7bcf0121904a821700e3aaded4f20af961572889219dcc5df3e7bd",
+    "deployment/suite/test-support/fixture.mjs": "2689dd64366544cbe221645eca4858ea2780c0cd094e6069c231d99225cf3a0e",
+    "packages/control-plane/src/git-index-tree.ts": "13f4a69ecd8a3c51b4de98a41c90ecadc5c752301a4b3f76df7cf13dda1390d7",
+    "packages/control-plane/src/git-inspector.ts": "eac3faa787f0aec6ee9b62b971803aa948d9aec40bc14b8627f51f9d9a6a34a9",
+    "packages/control-plane/test/git-inspector.test.ts": "2b4c15781ada9f483a69ddf5320a1ac83d0db5d5ff487480fabbf88d7d8f33ec",
+    "scripts/run-isolated-tests.mjs": "0a320d4075d44f2bfcea5891ab837213d3195d5284232b341cde649b0cf0605f",
+    "scripts/run-isolated-tests.test.mjs": "b90bf504d977172f6683d069ea7461906fa34b6e279be70f64d0a459a3a5a5ae",
+    "scripts/verify-agent-security-host.mjs": "1bb0fc4ec4971cf96f8637dd14e933c690122c84e80ed73ea8f64b6b15a915df",
+    "scripts/windows-backend-shards.test.mjs": "2025ce872294426df0bab0c3b5fa367c9d2a18471568a3a4043109f55eae6234",
+    "scripts/windows-scenario-groups.test.mjs": "513550b7b199fb410c9ce3cffdb94b84dfa041cf3a4e7962162eb0e5a1ca3d9f",
+    "tools/layout-studio/git-history-inputs.mjs": "33865705014bb6b08fbb1e60f4113d6b23cb28e681c4197b56a0c6bdc7412e79",
+    "tools/layout-studio/git-history-inputs.test.mjs": "803026da7f8fe34c78d867bc05f22b448359368a3dd35b768aa85abda21574fd",
+    "tools/layout-studio/git-index-inputs.mjs": "acc33e03ece6e44b60d491da13524ae2f4cf81d5b17fb3eb54401e48f9251306",
+    "tools/layout-studio/git-index-inputs.test.mjs": "ec63dd4c159a5647cc54d5daa1c93a774f2628c49711ee37030373388ae775c1",
+    "tools/layout-studio/repository-inspection.mjs": "2c2e24d0e41ad4a18bdcd81736a964ac59be6ffa49b95773a166250f7d691ebd",
+    "tools/layout-studio/repository-shield-history.test.mjs": "5ba840d0098372db87fbdb131d90be49eb56ab11bd21f1151200a956beb56459",
+    "tools/layout-studio/repository-shield.mjs": "486d8432f3a6afd8e9a8b16ca12bf502945775ee53747bda4880ca2ebb60c3ca",
+    "tools/layout-studio/repository-windows-shield-history.test.mjs": "d3e34ec16ec4ca2c8e9e9c3577455af81e6305f60bb214645a5972bcb439438f",
+    "tools/layout-studio/scanner-history-review.test.mjs": "786503ed3b9eeab43f85fce35e9322713223f53f51587b4db39d4b17647fd704",
+    "tools/layout-studio/scanner-index-review.test.mjs": "22749b1d735fff5720a06c19bea00ba2279662cee828f542c1d284c54c403232",
+    "tools/layout-studio/scanner-review.test.mjs": "4e38267c6568dd6d9f57f96cb8b8fbb622dd1dd59828e09d8080e5a093bfc1af",
+    "tools/layout-studio/task-authority-ignored-inputs.test.mjs": "698731e6edfb5a404fd0b785f0428f517e93ff7f0fabdc59ec542dfc22ad80cf",
+    "tools/layout-studio/task-authority-ignored-trees.test.mjs": "33da04d08c6af41e0ac9a994cc30a1272dbb1f051b57cb8369fc8932b3477cba",
+    "tools/layout-studio/task-authority.mjs": "dfb80e966fa13e78ae884753e2c4efad39cbe7867116e36eddb1f6b9b5091d24",
+    "tools/layout-studio/task-authority.test.mjs": "97ac82bba826d37c3913ef3c4653c762577e241ff5620848602706d7697ff3ae",
+    "tools/layout-studio/task-history-inputs.test.mjs": "1f2f71d740f61e24138746ac40882522e5ae45fdb75a592e9e0b91206a38bd26",
+    "tools/layout-studio/task-index-inputs.test.mjs": "5ccd5eb51daa98c6abe5b9394470a2a9061f37974c6589c4600660d1ba7acd4b",
+    "tools/layout-studio/test-support/repository-shield-fixture.mjs": "e6be112389c80937b6f6bd4d04b41290326e63da9120f5b7dd5d3c30b2af6904",
+    "tools/layout-studio/test-support/task-authority-fixture.mjs": "6e951c3aa0da586268f4f3086dff752e15d1b7b9961f560f02cad0f2c0e35d23",
+    "tools/layout-studio/test-support/windows-execution-fixture.mjs": "3e31919070bdd774a87d4993977c20d0c5a1b524026f03b8f2bddafab2d160d0",
+    "tools/layout-studio/windows-history-inputs.mjs": "dcd8326c30b60df655bbb6c824945c05c3770818b3e8549e643332d52a02371d",
+    "tools/layout-studio/windows-history-inputs.test.mjs": "72cb91ac6e3f7525d44fc1e1dd273d9dac4fe7b52d72dae7bd8924fd5baf0ffb",
+    "tools/layout-studio/windows-history-staging.test.mjs": "6133bc84a75e9dd4b5575302e4981952caab7e49fbdb767e1baa48b7e1d58b5a"
+  },
+  "missingFeatureRed": {
+    "name": "isolated-test-7554fe97-d558-4ab8-9408-709588ddff7f.json",
+    "sha256": "6ccf4c557de7c0ec2e063afc6264eb7d55169cf39f80b752c8f386bdd25b96eb",
+    "success": false,
+    "totals": {
+      "required": 1,
+      "passed": 0,
+      "failed": 1,
+      "tests": 13,
+      "passedTests": 1,
+      "failedTests": 12,
+      "skippedTests": 0,
+      "cancelledTests": 0,
+      "todoTests": 0
+    }
+  },
+  "coldIndexMutationFailure": {
+    "name": "isolated-test-82f4b4b7-3bc9-4760-8077-7a8dcca7005e.json",
+    "sha256": "aac24bbef4e54b5b8c68b4ef07c1598431c4cf82f7d42d3d2d79116bd107c65f",
+    "success": false,
+    "totals": {
+      "required": 1,
+      "passed": 0,
+      "failed": 1,
+      "tests": 13,
+      "passedTests": 12,
+      "failedTests": 1,
+      "skippedTests": 0,
+      "cancelledTests": 0,
+      "todoTests": 0
+    }
+  },
+  "initialFocused": {
+    "name": "isolated-test-a0dc135d-70a4-45d3-a055-104ea57fa372.json",
+    "sha256": "f03f5eb4290c85de8ea16132ddee57b910d300359fac5d049bce0c4616ca18dc",
+    "success": true,
+    "totals": {
+      "required": 4,
+      "passed": 4,
+      "failed": 0,
+      "tests": 45,
+      "passedTests": 45,
+      "failedTests": 0,
+      "skippedTests": 0,
+      "cancelledTests": 0,
+      "todoTests": 0
+    }
+  },
+  "broadWithFailures": {
+    "name": "isolated-test-a6c6c1b9-1a7c-4063-9982-b0605ebe0fc3.json",
+    "sha256": "702e9a81295a52ca58546f14d2ca9fb19ff7b1facdfa66fa7e1edb35bb066231",
+    "success": false,
+    "totals": {
+      "required": 58,
+      "passed": 55,
+      "failed": 3,
+      "tests": 202,
+      "passedTests": 199,
+      "failedTests": 3,
+      "skippedTests": 0,
+      "cancelledTests": 0,
+      "todoTests": 0
+    }
+  },
+  "shortRootFollowupWithPackagingFailures": {
+    "name": "isolated-test-25f98c62-40b9-461c-899b-96f802853cee.json",
+    "sha256": "7d80027c67b85fe0e8176ed156e7eb71f4cb2ddf19cc473698d257f138b130ad",
+    "success": false,
+    "totals": {
+      "required": 18,
+      "passed": 16,
+      "failed": 2,
+      "tests": 33,
+      "passedTests": 31,
+      "failedTests": 2,
+      "skippedTests": 0,
+      "cancelledTests": 0,
+      "todoTests": 0
+    }
+  },
+  "correctedPackaging": {
+    "name": "isolated-test-86d833f5-adb6-46a4-9bbc-67717bb35914.json",
+    "sha256": "92957e1ea21f37124b168eb5ed91fad402a30bdb3c28f8ac2e10a9603e2e1f6f",
+    "success": true,
+    "totals": {
+      "required": 17,
+      "passed": 17,
+      "failed": 0,
+      "tests": 21,
+      "passedTests": 21,
+      "failedTests": 0,
+      "skippedTests": 0,
+      "cancelledTests": 0,
+      "todoTests": 0
+    }
+  },
+  "finalDistinctGroups": 58,
+  "finalDistinctTests": 202,
+  "acceptedGroupSources": [
+    {
+      "receipt": "isolated-test-a6c6c1b9-1a7c-4063-9982-b0605ebe0fc3.json",
+      "file": "scripts/windows-backend-shards.test.mjs"
+    },
+    {
+      "receipt": "isolated-test-a6c6c1b9-1a7c-4063-9982-b0605ebe0fc3.json",
+      "file": "scripts/run-isolated-tests.test.mjs"
+    },
+    {
+      "receipt": "isolated-test-a6c6c1b9-1a7c-4063-9982-b0605ebe0fc3.json",
+      "file": "scripts/windows-scenario-groups.test.mjs"
+    },
+    {
+      "receipt": "isolated-test-86d833f5-adb6-46a4-9bbc-67717bb35914.json",
+      "file": "deployment/suite/release.test.mjs"
+    },
+    {
+      "receipt": "isolated-test-86d833f5-adb6-46a4-9bbc-67717bb35914.json",
+      "file": "deployment/suite/installation.test.mjs",
+      "pattern": "installation keeps current and one rollback version, records dated backups, preserves data and removes only owned entries",
+      "timeoutMs": 120000
+    },
+    {
+      "receipt": "isolated-test-86d833f5-adb6-46a4-9bbc-67717bb35914.json",
+      "file": "deployment/suite/installation.test.mjs",
+      "pattern": "unowned or edited desktop entries and corrupted new releases preserve the current application",
+      "timeoutMs": 120000
+    },
+    {
+      "receipt": "isolated-test-86d833f5-adb6-46a4-9bbc-67717bb35914.json",
+      "file": "deployment/suite/installation.test.mjs",
+      "pattern": "a failed persistent write restores every earlier launcher and the exact previous installation record",
+      "timeoutMs": 120000
+    },
+    {
+      "receipt": "isolated-test-86d833f5-adb6-46a4-9bbc-67717bb35914.json",
+      "file": "deployment/suite/installation.test.mjs",
+      "pattern": "forced owner exit leaves a durable journal; another installer restores the exact before state without touching unrelated files",
+      "timeoutMs": 120000
+    },
+    {
+      "receipt": "isolated-test-86d833f5-adb6-46a4-9bbc-67717bb35914.json",
+      "file": "deployment/suite/installation.test.mjs",
+      "pattern": "recovery preflights all edits before writing, and respects a committed update whose pending marker survived",
+      "timeoutMs": 120000
+    },
+    {
+      "receipt": "isolated-test-86d833f5-adb6-46a4-9bbc-67717bb35914.json",
+      "file": "deployment/suite/installation.test.mjs",
+      "pattern": "active host connections block uninstall before any application stop or persistent mutation",
+      "timeoutMs": 120000
+    },
+    {
+      "receipt": "isolated-test-86d833f5-adb6-46a4-9bbc-67717bb35914.json",
+      "file": "deployment/suite/installation.test.mjs",
+      "pattern": "uninstall verifies exact owner exit and restores host connections before removing persistent program entries",
+      "timeoutMs": 120000
+    },
+    {
+      "receipt": "isolated-test-86d833f5-adb6-46a4-9bbc-67717bb35914.json",
+      "file": "deployment/suite/installation.test.mjs",
+      "pattern": "a restoration conflict retains all program entries and resumes the previous running application",
+      "timeoutMs": 120000
+    },
+    {
+      "receipt": "isolated-test-86d833f5-adb6-46a4-9bbc-67717bb35914.json",
+      "file": "deployment/suite/installation.test.mjs",
+      "pattern": "a second registered instance blocks uninstall without stopping either owner",
+      "timeoutMs": 120000
+    },
+    {
+      "receipt": "isolated-test-86d833f5-adb6-46a4-9bbc-67717bb35914.json",
+      "file": "deployment/suite/installation.test.mjs",
+      "pattern": "unconfirmed owner exit leaves a durable removal journal and blocks restoration until recovery",
+      "timeoutMs": 120000
+    },
+    {
+      "receipt": "isolated-test-86d833f5-adb6-46a4-9bbc-67717bb35914.json",
+      "file": "deployment/suite/installation.test.mjs",
+      "pattern": "a failed uninstall write restores the owned program and keeps restart recovery durable",
+      "timeoutMs": 120000
+    },
+    {
+      "receipt": "isolated-test-86d833f5-adb6-46a4-9bbc-67717bb35914.json",
+      "file": "deployment/suite/installation.test.mjs",
+      "pattern": "a dated verified recovery entry restores an interrupted uninstall even after the main loader was removed",
+      "timeoutMs": 120000
+    },
+    {
+      "receipt": "isolated-test-86d833f5-adb6-46a4-9bbc-67717bb35914.json",
+      "file": "deployment/suite/installation.test.mjs",
+      "pattern": "an explicit no-start update stops the previous generation without restarting the new one",
+      "timeoutMs": 120000
+    },
+    {
+      "receipt": "isolated-test-86d833f5-adb6-46a4-9bbc-67717bb35914.json",
+      "file": "deployment/suite/installation.test.mjs",
+      "pattern": "the stable installed loader verifies and addresses the actual application across update and rollback",
+      "timeoutMs": 120000
+    },
+    {
+      "receipt": "isolated-test-86d833f5-adb6-46a4-9bbc-67717bb35914.json",
+      "file": "deployment/suite/installation.test.mjs",
+      "pattern": "pre-promotion owner loss recovers only verified staging copies and exact incomplete source prefixes",
+      "timeoutMs": 120000
+    },
+    {
+      "receipt": "isolated-test-86d833f5-adb6-46a4-9bbc-67717bb35914.json",
+      "file": "deployment/suite/installation.test.mjs",
+      "pattern": "interrupted installation recovery accepts the full release file ceiling plus its manifest and preserves unrelated edits",
+      "timeoutMs": 120000
+    },
+    {
+      "receipt": "isolated-test-a6c6c1b9-1a7c-4063-9982-b0605ebe0fc3.json",
+      "file": "tools/layout-studio/repository-shield-history.test.mjs",
+      "timeoutMs": 120000,
+      "expectedSkipped": 0
+    },
+    {
+      "receipt": "isolated-test-a6c6c1b9-1a7c-4063-9982-b0605ebe0fc3.json",
+      "file": "tools/layout-studio/scanner-review.test.mjs",
+      "timeoutMs": 120000,
+      "expectedSkipped": 0
+    },
+    {
+      "receipt": "isolated-test-a6c6c1b9-1a7c-4063-9982-b0605ebe0fc3.json",
+      "file": "tools/layout-studio/scanner-index-review.test.mjs",
+      "timeoutMs": 120000,
+      "expectedSkipped": 0
+    },
+    {
+      "receipt": "isolated-test-a6c6c1b9-1a7c-4063-9982-b0605ebe0fc3.json",
+      "file": "tools/layout-studio/scanner-history-review.test.mjs",
+      "timeoutMs": 120000,
+      "expectedSkipped": 0
+    },
+    {
+      "receipt": "isolated-test-a6c6c1b9-1a7c-4063-9982-b0605ebe0fc3.json",
+      "file": "tools/layout-studio/git-index-inputs.test.mjs"
+    },
+    {
+      "receipt": "isolated-test-a6c6c1b9-1a7c-4063-9982-b0605ebe0fc3.json",
+      "file": "tools/layout-studio/git-history-inputs.test.mjs"
+    },
+    {
+      "receipt": "isolated-test-a6c6c1b9-1a7c-4063-9982-b0605ebe0fc3.json",
+      "file": "tools/layout-studio/task-history-inputs.test.mjs",
+      "timeoutMs": 120000,
+      "expectedSkipped": 0
+    },
+    {
+      "receipt": "isolated-test-a6c6c1b9-1a7c-4063-9982-b0605ebe0fc3.json",
+      "file": "tools/layout-studio/windows-history-inputs.test.mjs"
+    },
+    {
+      "receipt": "isolated-test-a6c6c1b9-1a7c-4063-9982-b0605ebe0fc3.json",
+      "file": "tools/layout-studio/windows-history-staging.test.mjs"
+    },
+    {
+      "receipt": "isolated-test-a6c6c1b9-1a7c-4063-9982-b0605ebe0fc3.json",
+      "file": "tools/layout-studio/repository-windows-shield-history.test.mjs",
+      "timeoutMs": 120000
+    },
+    {
+      "receipt": "isolated-test-a6c6c1b9-1a7c-4063-9982-b0605ebe0fc3.json",
+      "file": "tools/layout-studio/task-index-inputs.test.mjs",
+      "timeoutMs": 120000,
+      "expectedSkipped": 0
+    },
+    {
+      "receipt": "isolated-test-a6c6c1b9-1a7c-4063-9982-b0605ebe0fc3.json",
+      "file": "tools/layout-studio/task-authority-ignored-trees.test.mjs",
+      "timeoutMs": 120000
+    },
+    {
+      "receipt": "isolated-test-a6c6c1b9-1a7c-4063-9982-b0605ebe0fc3.json",
+      "file": "tools/layout-studio/task-authority-ignored-inputs.test.mjs"
+    },
+    {
+      "receipt": "isolated-test-a6c6c1b9-1a7c-4063-9982-b0605ebe0fc3.json",
+      "file": "tools/layout-studio/task-authority.test.mjs"
+    },
+    {
+      "receipt": "isolated-test-a6c6c1b9-1a7c-4063-9982-b0605ebe0fc3.json",
+      "file": "packages/control-plane/test/git-inspector.test.ts"
+    },
+    {
+      "receipt": "isolated-test-25f98c62-40b9-461c-899b-96f802853cee.json",
+      "file": "apps/windows-companion/test/bootstrap.test.ts",
+      "currentUserProfile": false
+    },
+    {
+      "receipt": "isolated-test-a6c6c1b9-1a7c-4063-9982-b0605ebe0fc3.json",
+      "file": "apps/windows-companion/test/git-review.test.ts",
+      "currentUserProfile": false
+    },
+    {
+      "receipt": "isolated-test-a6c6c1b9-1a7c-4063-9982-b0605ebe0fc3.json",
+      "file": "apps/windows-companion/test/mediated-git.test.ts",
+      "pattern": "mediated local commit uses an exact task-owned private index and reconciles the shared index to its committed tree"
+    },
+    {
+      "receipt": "isolated-test-a6c6c1b9-1a7c-4063-9982-b0605ebe0fc3.json",
+      "file": "apps/windows-companion/test/mediated-git.test.ts",
+      "pattern": "default-branch review creates a hook-disabled feature branch and requires a fresh target before committing"
+    },
+    {
+      "receipt": "isolated-test-a6c6c1b9-1a7c-4063-9982-b0605ebe0fc3.json",
+      "file": "apps/windows-companion/test/mediated-git.test.ts",
+      "pattern": "detached-HEAD review creates an exact feature branch before any commit and requires a fresh target"
+    },
+    {
+      "receipt": "isolated-test-a6c6c1b9-1a7c-4063-9982-b0605ebe0fc3.json",
+      "file": "apps/windows-companion/test/mediated-git.test.ts",
+      "pattern": "mediated local commit rejects unowned paths, a dirty shared index, containment, and a final target change"
+    },
+    {
+      "receipt": "isolated-test-a6c6c1b9-1a7c-4063-9982-b0605ebe0fc3.json",
+      "file": "apps/windows-companion/test/mediated-git.test.ts",
+      "pattern": "raw commit mediation bypasses repository clean/process/diff/textconv/fsmonitor commands and hooks"
+    },
+    {
+      "receipt": "isolated-test-a6c6c1b9-1a7c-4063-9982-b0605ebe0fc3.json",
+      "file": "apps/windows-companion/test/mediated-git.test.ts",
+      "pattern": "new binary files cross the private blob pipe unchanged and remain non-executable"
+    },
+    {
+      "receipt": "isolated-test-a6c6c1b9-1a7c-4063-9982-b0605ebe0fc3.json",
+      "file": "apps/windows-companion/test/mediated-git.test.ts",
+      "pattern": "a file changed between its manifest witness and private byte read cannot be committed"
+    },
+    {
+      "receipt": "isolated-test-a6c6c1b9-1a7c-4063-9982-b0605ebe0fc3.json",
+      "file": "apps/windows-companion/test/mediated-git.test.ts",
+      "pattern": "a competing branch update wins its own CAS and is never overwritten by a reviewed local commit"
+    },
+    {
+      "receipt": "isolated-test-a6c6c1b9-1a7c-4063-9982-b0605ebe0fc3.json",
+      "file": "apps/windows-companion/test/mediated-git.test.ts",
+      "pattern": "feature-branch creation uses an expected-HEAD transaction without checkout filters"
+    },
+    {
+      "receipt": "isolated-test-a6c6c1b9-1a7c-4063-9982-b0605ebe0fc3.json",
+      "file": "apps/windows-companion/test/mediated-git.test.ts",
+      "pattern": "an unconfirmed native Git exit retains its exact indices and shared lock for recovery"
+    },
+    {
+      "receipt": "isolated-test-a6c6c1b9-1a7c-4063-9982-b0605ebe0fc3.json",
+      "file": "apps/windows-companion/test/mediated-git.test.ts",
+      "pattern": "a readback failure after a verified reference update retains exact transaction recovery files"
+    },
+    {
+      "receipt": "isolated-test-a6c6c1b9-1a7c-4063-9982-b0605ebe0fc3.json",
+      "file": "apps/windows-companion/test/mediated-git.test.ts",
+      "pattern": "exact preserved index and private leases can be reopened for separately reviewed reconciliation without another commit"
+    },
+    {
+      "receipt": "isolated-test-a6c6c1b9-1a7c-4063-9982-b0605ebe0fc3.json",
+      "file": "apps/windows-companion/test/mediated-git.test.ts",
+      "pattern": "reopening a preserved lease refuses in-place lock changes and changed original index bytes"
+    },
+    {
+      "receipt": "isolated-test-a6c6c1b9-1a7c-4063-9982-b0605ebe0fc3.json",
+      "file": "apps/windows-companion/test/mediated-git.test.ts",
+      "pattern": "the Windows replacement sequence closes its destination and preserves a competing replacement after that close"
+    },
+    {
+      "receipt": "isolated-test-a6c6c1b9-1a7c-4063-9982-b0605ebe0fc3.json",
+      "file": "apps/windows-companion/test/mediated-git.test.ts",
+      "pattern": "reviewed private index bytes and artifact identity must still match before replacement or cleanup"
+    },
+    {
+      "receipt": "isolated-test-a6c6c1b9-1a7c-4063-9982-b0605ebe0fc3.json",
+      "file": "apps/windows-companion/test/mediated-git.test.ts",
+      "pattern": "a replacement shared index lock is preserved after the exact reviewed commit advances HEAD"
+    },
+    {
+      "receipt": "isolated-test-a6c6c1b9-1a7c-4063-9982-b0605ebe0fc3.json",
+      "file": "apps/windows-companion/test/mediated-git.test.ts",
+      "pattern": "a replacement original index is never overwritten during shared-index reconciliation"
+    },
+    {
+      "receipt": "isolated-test-a6c6c1b9-1a7c-4063-9982-b0605ebe0fc3.json",
+      "file": "apps/windows-companion/test/mediated-git.test.ts",
+      "pattern": "the previous worktree owner cannot delete a replacement private lock during cleanup"
+    },
+    {
+      "receipt": "isolated-test-a6c6c1b9-1a7c-4063-9982-b0605ebe0fc3.json",
+      "file": "apps/windows-companion/test/mediated-git.test.ts",
+      "pattern": "host preservation records exact index and lock identities before any reference update"
+    },
+    {
+      "receipt": "isolated-test-a6c6c1b9-1a7c-4063-9982-b0605ebe0fc3.json",
+      "file": "apps/windows-companion/test/mediated-git.test.ts",
+      "pattern": "shared lock content changed in place is preserved rather than overwritten"
+    },
+    {
+      "receipt": "isolated-test-a6c6c1b9-1a7c-4063-9982-b0605ebe0fc3.json",
+      "file": "apps/windows-companion/test/mediated-git.test.ts",
+      "pattern": "private lock content changed in place remains untouched during cleanup"
+    }
+  ],
+  "originalCommandsBoundsSkipsAndCleanupVerified": true,
+  "typecheck": {
+    "command": "npm run typecheck",
+    "node": "24.14.0",
+    "passed": true,
+    "initialFailure": "TS7006 corrected by explicit string[] path-component annotation"
+  },
+  "corrections": [
+    "History test exposed actual index cache mutation from write-tree; protected inspection now computes tree identity without writes.",
+    "Short owned Unix-socket test root corrected bootstrap EINVAL without product or deadline changes.",
+    "Staging the new module did not repair packaging: the builder's explicit core runtime closure also needed git-index-tree. Both failed package receipts remain retained.",
+    "A follow-up reporting wrapper read the receipt envelope incorrectly after all tests and atomic receipt write completed; the persisted receipt is audited directly."
+  ],
+  "scope": {
+    "authenticatedHttp": true,
+    "boundedHistoryDescriptors": true,
+    "noSourceBytesReturned": true,
+    "changedIndexHeadWorktreeAccountSelectionRefused": true,
+    "separateAuthorityAndExecutionReviews": true,
+    "realLinuxHistoricalOnlySecretScan": true,
+    "windowsGuestDoubleHistoricalOnlySecretScan": true,
+    "coldIndexAndObjectDatabasePreserved": true,
+    "independentRealGitObjectFormats": [
+      "sha1",
+      "sha256"
+    ],
+    "originalPackageBudgetPassed": true,
+    "packagedServerStartupAndUpdateRollback": true
+  },
+  "bounds": {
+    "historyPaths": 8,
+    "historyDepth": 6,
+    "historyVersions": 48,
+    "perHistoryBlobBytes": 262144,
+    "uniqueHistoryBytes": 458752,
+    "windowsRepeatedHistoryBytes": 327680,
+    "currentAndHistoryFiles": 256,
+    "indexTreeEntries": 4096,
+    "indexTreeListingBytes": 262144
+  },
+  "limitations": [
+    "Automatic scanner recipe/feed assembly and mixed index/history execution remain unfinished.",
+    "Frontend remains frozen; preparation controls are not activated.",
+    "Windows native host/guest acceptance of this change remains separate.",
+    "Automatic history selects current tracked names only; other refs, renames, removed paths and broader security coverage remain unverified.",
+    "Legacy companion snapshot and approved Git mutation implementations remain separate from the corrected protected inspector."
+  ],
+  "effects": {
+    "modelPrompts": 0,
+    "installedNativeTasks": 0,
+    "accountChanges": 0,
+    "hidOpened": false,
+    "frontendChanged": false,
+    "liveInstalledScanner": false,
+    "newRuntimeDownloads": false
+  },
+  "cleanup": {
+    "emptyOwnedParentsVerified": 2,
+    "removed": true
+  },
+  "success": true
+}

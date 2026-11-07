@@ -5,6 +5,7 @@ import { basename, dirname, isAbsolute, relative, resolve, sep } from "node:path
 import { spawn } from "node:child_process";
 
 import { trackedMissingFileDigest, type GitInspection, type GitInspector, type ManifestFile } from "./snapshot.ts";
+import { gitIndexTreeFromListing } from "./git-index-tree.ts";
 
 export interface GitCommandResult {
   readonly exitCode: number;
@@ -39,7 +40,7 @@ export interface GitCliInspectorOptions {
 /**
  * Uses `spawn` with a fixed Git executable and literal argv vectors. It never
  * invokes a shell, accepts command text from a key press, or performs a Git
- * mutation. The only write-tree query creates no ref or worktree change.
+ * mutation. Index tree identities are reconstructed without Git cache/object writes.
  */
 export class NodeGitCommandRunner implements GitCommandRunner {
   private readonly candidates: readonly string[];
@@ -237,7 +238,10 @@ export class GitCliInspector implements GitInspector {
     if (remoteDefault && !defaultBranch) issues.push("Git default branch reference is not bound to origin.");
     const upstream = await this.optional(["rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{upstream}"], repositoryRoot, "upstream", issues, false);
     const head = await this.optional(["rev-parse", "HEAD"], repositoryRoot, "HEAD", issues);
-    const indexTree = await this.optional(["write-tree"], repositoryRoot, "index tree", issues);
+    const indexListing = await this.runner.run(["ls-files", "--stage", "-z"], repositoryRoot);
+    let indexTree: string | undefined;
+    if (indexListing.exitCode !== 0) issues.push(shortFailure("index tree", indexListing));
+    else { try { indexTree = gitIndexTreeFromListing(indexListing.stdout, head ?? ""); } catch { issues.push("Git index tree metadata is unavailable, unmerged or outside supported bounds."); } }
     const tracked = await this.paths(["ls-files", "-z"], repositoryRoot, "tracked file list", issues);
     const deleted = await this.paths(["ls-files", "--deleted", "-z"], repositoryRoot, "tracked deletion list", issues);
     const trackedSet = new Set(tracked);

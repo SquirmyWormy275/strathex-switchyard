@@ -7,7 +7,7 @@ import { createRepositoryInspection } from "./repository-inspection.mjs";
 import { connectedExecutionActions, linuxShieldActions } from "./repository-execution-actions.mjs";
 import { ignoredTreeRoots } from "./ignored-tree-policy.mjs";
 import { gitIndexPaths, gitIndexTreeFromEntries, gitIndexWindowsRawLimit } from "./git-index-inputs.mjs";
-import { historySelection } from "./git-history-inputs.mjs";
+import { historySelection, gitHistoryWindowsRawLimit } from "./git-history-inputs.mjs";
 const uuid = v => typeof v === "string" && /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/.test(v);
 const taskDigest = t => scopeHash([t.id, t.provider, t.sessionId, t.repositoryRoot, t.repositoryIdentity, t.accountFingerprint, t.status, t.nativeTransport, t.nativeIdentityVerified, t.launchPolicy]);
 const workspaceDigest = s => scopeHash([s.id, s.policy, s.mode, s.modeSelectedAt ?? null, s.accounts, s.taskAuthorityEpoch ?? 0]);
@@ -117,7 +117,11 @@ export function createTaskAuthority({ store, checkNative, isActive = async () =>
   }
   return {
     async reviewScanner(c, input) { return exclusive(c, async generation => {
-      if (!input || Object.keys(input).some(key => !["taskId", "compartment", "action", "planRevision", "lifetimeMinutes", "includeIndex"].includes(key)) || input.compartment !== undefined && input.compartment !== c || Object.hasOwn(input, "includeIndex") && typeof input.includeIndex !== "boolean" || !linuxShieldActions.includes(input.action)) throw Error("Prepare only one connected Shield action for one exact task; includeIndex must be a boolean, and custom paths, exclusions and imported approvals require their separate review.");
+      if (!input || Object.keys(input).some(key => !["taskId", "compartment", "action", "planRevision", "lifetimeMinutes", "includeIndex", "historyDepth"].includes(key)) || input.compartment !== undefined && input.compartment !== c || Object.hasOwn(input, "includeIndex") && typeof input.includeIndex !== "boolean" || !linuxShieldActions.includes(input.action)) throw Error("Prepare only one connected Shield action for one exact task; includeIndex must be a boolean, and custom paths, exclusions and imported approvals require their separate review.");
+      if (Object.hasOwn(input, "historyDepth")) {
+        if (typeof input.historyDepth !== "number" || input.includeIndex === true || !["shield_codebase_audit", "release_shield"].includes(input.action)) throw Error("Historical preparation requires an exact bounded depth and Codebase Audit or Release Shield; combined index/history execution is not connected.");
+        historySelection(["placeholder"], input.historyDepth);
+      }
       // Validate action/revision/lifetime before any native query; real paths
       // replace this validation-only placeholder after the bounded inventory.
       const base = proposal({ ...input, paths: ["placeholder"], actions: [input.action] }, executionActions);
@@ -150,6 +154,25 @@ export function createTaskAuthority({ store, checkNative, isActive = async () =>
         if (refreshed.snapshot.id !== result.snapshot.id || refreshed.binding !== result.binding || refreshed.workspace !== result.workspace) throw Error("The scanner target changed after index witnessing. Review again.");
         Object.assign(preparation, { policy: "bounded-current-and-index/v1", indexTree: result.snapshot.indexTree, indexMetadataSha256: witnessed.indexMetadataSha256,
           indexInputs: witnessed.rows.map(row => ({ path: ".switchyard-index/" + row.path, sha256: row.sha256, size: row.size, source: { kind: "git-index", path: row.path, objectId: row.objectId, mode: row.mode } })) });
+      }
+      if (Object.hasOwn(input, "historyDepth")) {
+        const selected = historySelection(result.files.tracked.map(file => file.path), input.historyDepth);
+        if (typeof inspection.historyInputs !== "function") throw Error("The native history input verifier is unavailable.");
+        const authorize = async () => {
+          const fresh = await access(c, result.task.id, generation, result.task.provider);
+          if (taskDigest(fresh.task) !== result.binding || workspaceDigest(fresh.state) !== result.workspace) throw Error("The exact task, account or workspace changed during automatic history preparation.");
+        };
+        await checkNative(c, result.task); await authorize();
+        const witnessed = await inspection.historyInputs(c, result.task, selected.paths, selected.depth, authorize);
+        await authorize(); await checkNative(c, result.task); await authorize();
+        if (witnessed.head !== result.snapshot.head || JSON.stringify(witnessed.paths) !== JSON.stringify(selected.paths) || witnessed.requestedDepth !== selected.depth) throw Error("The witnessed historical target changed from the exact reviewed task. Review again.");
+        if (proposed.paths.length + witnessed.versions.length > 256) throw Error("The combined current and historical scanner inputs exceed the 256-file bound.");
+        if (process.platform === "win32" && witnessed.versions.reduce((sum, row) => sum + row.size, 0) > gitHistoryWindowsRawLimit) throw Error("The historical scanner inputs exceed the Windows 320 KiB transport subset.");
+        const refreshed = await capture(c, proposed, generation);
+        if (refreshed.snapshot.id !== result.snapshot.id || refreshed.binding !== result.binding || refreshed.workspace !== result.workspace) throw Error("The scanner target changed after historical witnessing. Review again.");
+        Object.assign(preparation, { policy: "bounded-current-and-history/v1", historyHead: witnessed.head, historyPaths: selected.paths, historyDepth: selected.depth,
+          historyMetadataSha256: witnessed.historyMetadataSha256, historyStopping: witnessed.stopping, historyShallow: witnessed.shallow, historyAbsent: witnessed.absent, historyGaps: witnessed.gaps,
+          historyInputs: witnessed.versions.map(row => ({ path: ".switchyard-history/" + row.commit + "/" + row.path, sha256: row.sha256, size: row.size, source: { kind: "git-history", path: row.path, commit: row.commit, objectId: row.objectId, mode: row.mode, depth: selected.depth } })) });
       }
       return { ...await reviewCaptured(c, result, generation), preparation };
     }); },
