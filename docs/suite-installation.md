@@ -172,13 +172,13 @@ from outside the checkout after the primary loader was removed. Linux shortcut
 batch tests use a synthetic compositor with actual subprocess/kernel-lease loss;
 they do not establish physical key or live-desktop removal acceptance.
 
-The pilot normal installation is source **90fa879**, with 554 files/4,749,012 bytes.
-Its normal update passes **99 metadata/refusal checks across 58 exact modules**.
+The pilot normal installation is source **1bee5a5**, with 554 files/4,749,428 bytes.
+Its normal update passes **101 metadata/refusal checks across 59 exact modules**.
 All 54 semantic workspaces, four profiles, 57 workflows, selected compartment,
 pending keyboard-only conversation, private review link and frozen frontend are
 preserved. Dated launcher backups and persistent-file readback verify; only the
 current version and one rollback remain. The exact temporary bundle is removed.
-[Installed update evidence](evidence/installed-project-discovery-summary.json).
+[Installed update evidence](evidence/installed-claude-319-summary.json).
 
 The existing optional runtime is reused. Earlier adoption verified 48 exact
 dependencies, offline CPU model load, synthetic CPU/HTTP voice and owned worker

@@ -52,15 +52,15 @@ checkpoints are not cumulative acceptance of the latest suite.
 
 | Scope | Verified result | What it does not establish |
 | --- | --- | --- |
-| Installed Linux `90fa879` | **99 metadata/refusal checks; 58 exact module hashes.** All 54 semantic workspaces, four profiles, 57 workflows, selection, pending keyboard-only conversation and frozen frontend preserved. [Evidence](evidence/installed-project-discovery-summary.json). | Live task/model/account operations, editor command activation, hardware or microphone acceptance. |
-| Complete Linux `cf3bb4c` | **356 groups; 2,326 passing tests; 32 declared skips.** Original manifest, commands, deadlines and cleanup audited. Covers project inventory, connected demo, guided roles, consent fences and paired-runner contracts. [Evidence](evidence/linux-cf3bb4c-complete-summary.json). | Installed `90fa879` has separate metadata/refusal acceptance. Native Windows, live accounts, interactive UI and physical devices remain separate. Later fixture diagnostics have their own focused evidence. |
-| Complete Windows source `45c34e5` | **460 groups; 2,899 passing tests; 246 declared skips.** All 21 original worker receipts and the native collector pass; all 23 jobs succeed. Source/tree/tool identities, commands, bounds and cleanup are independently audited. [Evidence](evidence/complete-windows-45c34e5-summary.json). | Package, live-host and later project-inventory acceptance. Earlier intermittent retirement failures remain unresolved. |
+| Installed Linux `1bee5a5` | **101 metadata/refusal checks; 59 exact module hashes.** All 54 semantic workspaces, four profiles, 57 workflows, selection, pending keyboard-only conversation and frozen frontend preserved. [Evidence](evidence/installed-claude-319-summary.json). | Live task/model/account operations, editor command activation, hardware or microphone acceptance. |
+| Complete Linux `cf3bb4c` | **356 groups; 2,326 passing tests; 32 declared skips.** Original manifest, commands, deadlines and cleanup audited. Covers project inventory, connected demo, guided roles, consent fences and paired-runner contracts. [Evidence](evidence/linux-cf3bb4c-complete-summary.json). | Installed `1bee5a5` has separate metadata/refusal and native Claude metadata acceptance. Native Windows, live accounts, interactive UI and physical devices remain separate. Later fixture diagnostics have their own focused evidence. |
+| Complete Windows source `90fa879` | **462 groups; 2,902 passing tests; 246 declared skips.** All 21 original worker receipts and the native collector match; all 23 jobs succeed. Exact source/tree/tool identities, commands, bounds and cleanup verify. [Evidence](evidence/complete-windows-90fa879-summary.json). | Package, live-host and later Claude 2.1.319 admission. Earlier intermittent failures remain unresolved. |
 | Native Windows contracts `b38ff759` | **Role/dispatch: 24 tests across two complete files. External-agent consent: 51 tests across three files.** Exact source/merge trees, original bounds and cleanup verified. [Roles](evidence/role-choices-native-b38-summary.json), [consent](evidence/agent-consent-native-b38-summary.json). | Complete Windows suite/package acceptance or live provider behavior. |
 | Native Windows client `9d230ac` | **25 groups; 250 tests; zero skips.** Signed launcher composition plus native endpoint/process/socket contracts. [Evidence](evidence/editor-task-choices-native-client-summary.json). | Terminal/provider doubles do not establish interactive task handoff. |
 | Earlier complete Windows `dc755901` | **417 groups; 2,478 tests; 207 declared skips.** All workflow jobs passed. [Evidence](evidence/windows-complete-dc755901-summary.json). | This revision predates later backend changes. |
 
-The installed payload contains 554 files/4,749,012 bytes. Dated backup and launcher
-readback verify; current plus one rollback remain. Its exact 555-file/4,848,496-byte prepared
+The installed payload contains 554 files/4,749,428 bytes. Dated backup and launcher
+readback verify; current plus one rollback remain. Its exact 555-file/4,848,912-byte prepared
 bundle is removed. The complete Linux checkout, nine dependency aliases and
 803 generated files/11,907,805 bytes are also removed. The latest `cf3bb4c`
 checkout, nine aliases and 803 generated files/11,910,385 bytes are removed too;
@@ -74,7 +74,10 @@ exact revision alongside 2.1.308/2.1.317. Six groups/93 tests pass with zero ski
 including fresh approval after version changes and refusal of late designer
 replies. Real read-only version/account/inventory/help checks confirm the local
 contract and all twelve owned guardian exits. No model prompt or task operation
-ran. Normal installation of this later source is still pending.
+ran. Normal installed `1bee5a5` passes 101 metadata/refusal checks across 59 exact
+modules; its own version/account reader accepts the real 2.1.319 CLI and verifies
+both command guardians stopped. All saved state and frozen frontend are preserved.
+[Installed compatibility](evidence/installed-claude-319-summary.json).
 [Source and native metadata evidence](evidence/claude-319-source-summary.json).
 
 Claude discovery now explicitly reports that the unfinished terminal attachment
@@ -136,6 +139,13 @@ This accepts the scoped follow-up, not a root-cause repair or the full cohort.
 [Native project checks](evidence/editor-project-choices-native-summary.json),
 [retained settlement failure](evidence/host-action-settlement-diagnostic-summary.json),
 [native follow-up](evidence/host-action-settlement-native-followup-summary.json).
+
+The complete `90fa879` source workflow now passes all 462 groups, 2,902 tests
+and 246 declared skips. All 21 original receipts match the independently audited
+manifest and native collector; all 23 jobs succeeded. This includes project
+discovery and the fixture diagnostics, and predates Claude 2.1.319 admission.
+The separate Windows package job is still in progress.
+[Latest complete native evidence](evidence/complete-windows-90fa879-summary.json).
 
 ## Unfinished implementation
 

@@ -45,8 +45,8 @@ version refusal is retained. The source now admits exactly 2.1.308, 2.1.317 and
 2.1.319; unknown versions and changes across approval/response still refuse.
 Six original groups/93 tests and typecheck pass. Actual read-only metadata/help
 checks verify twelve guardian exits in total, with no prompts, task creation,
-resume or login changes. The current installed package is still 90fa879 until
-the next normal update. [Evidence](evidence/claude-319-source-summary.json).
+resume or login changes. Normal installed source `1bee5a5` now accepts the real native version/account
+through its own module; both command guardians verify stopped. [Evidence](evidence/claude-319-source-summary.json).
 
 Claude native attach can restart a stopped session and exposes no verified
 live-only flag. Discovery now states that the attachment launcher remains
@@ -111,36 +111,40 @@ a replacement. Eight groups/124 tests and installed metadata checks cover them.
 
 ## Installed checkpoint
 
-- Source: `90fa879d776c0b7756f66d37180fb8c3049b3fc4`.
-- Release: `fcbd26b5c6703d3d5b0296211ca0b31234d862a759396a6e85ee7f53f8d4c696`.
-- Rollback: `ce4da39419d1bdc55565a39c8650a98ca01d45569df8585568349616bb23e83c`.
+- Source: `1bee5a54635c6c48233f8f97d383fc6caa3b440d`.
+- Release: `9e23b735e708ab5694cfcd0dc7f5ad0a920ceb3bdf356dca267f7b8db9bdce48`.
+- Rollback: `fcbd26b5c6703d3d5b0296211ca0b31234d862a759396a6e85ee7f53f8d4c696`.
 - Frozen frontend: `24100ef601b810efb0cda95e4fe0842d2944560734b02c4cf482c25e19150543`.
-- 99 metadata/refusal checks, 58 exact module hashes; all 54 semantic workspaces,
+- 101 metadata/refusal checks, 59 exact module hashes; all 54 semantic workspaces,
   four profiles, 57 workflows, selection and one pending keyboard-only conversation
   preserved. 53 sealed files are byte-identical; one changes audit metadata only.
+- The installed native Claude version/account reader accepts 2.1.319 with both
+  owned guardians independently stopped; no prompt/task/login operation occurred.
 - Dated backup and launcher readback verify. Current plus one rollback remain.
-  Installed payload: 554 files/4,749,012 bytes. The exact temporary package,
-  555 files/4,848,496 bytes, is removed.
+  Installed payload: 554 files/4,749,428 bytes. The exact temporary package,
+  555 files/4,848,912 bytes, is removed.
   Do not repeat executed installation or cleanup scripts.
 
 The selected personal workspace returns a complete empty project inventory without
 native observation or task authority. Unauthenticated and malformed requests
-refuse. Source and native contracts cover populated inventory separately. No
-provider/task/model, live agent, hardware or microphone operation ran. Verifier
-gateway/Suite pins now use the accepted project-inventory source evidence.
-Host-facing task-owner, Copilot-journal and signed-intent verifiers run sequentially;
-earlier parallel initialization failures remain in historical evidence.
-[Installed receipt](evidence/installed-project-discovery-summary.json).
+refuse. Source and native contracts cover populated inventory separately.
+Host-facing task-owner, Copilot-journal and signed-intent verifiers run sequentially.
+[Installed receipt](evidence/installed-claude-319-summary.json).
 
 ## Complete runs and native evidence
 
-Complete Windows source `45c34e555a16c8946e07176df30c2a0ea4971767` is accepted:
-460 original groups, 2,899 passes, 246 declared skips; all 23 workflow jobs pass.
-All 21 original receipts were downloaded in memory, independently audited and
-matched to the native collector. Only bounded JSON evidence remains locally.
-Package acceptance, later `cf3bb4c` project discovery and the original intermittent
-focus/restricted-storage failures remain separate.
-[Evidence](evidence/complete-windows-45c34e5-summary.json).
+Complete Windows source `90fa879d776c0b7756f66d37180fb8c3049b3fc4` is accepted:
+462 original groups, 2,902 passes and 246 declared skips. All 23 jobs of run
+42397684980 passed. All 21 raw receipts were independently audited and matched
+exactly to the native collector (job 128484849308; artifact 13584933078).
+Only bounded JSON remains locally; 86,995 bytes of worker ZIPs plus the 2,607-byte
+collector ZIP were read in memory. No archives are retained. This includes project
+discovery and settlement-fixture diagnostics; later Claude 2.1.319 admission and
+the separate Windows package remain outside that checkpoint. Original intermittent
+focus, storage and settlement failures remain unresolved.
+[Complete native evidence](evidence/complete-windows-90fa879-summary.json).
+The earlier `45c34e5` result remains in its
+[historical evidence](evidence/complete-windows-45c34e5-summary.json).
 
 Complete Linux `cf3bb4c` now passes 356 original groups, 2,326 tests and 32 declared
 skips. Receipt `2121c57b-7a65-4b1a-b0a8-33f24666ce70` retains original commands,

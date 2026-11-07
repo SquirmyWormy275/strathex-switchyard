@@ -13,7 +13,10 @@ exact executable digest. The earlier version refusal is retained. Six source
 groups/93 tests pass, including approval/version-change refusal and rejected
 late designer replies. Native model replies use explicit synthetic processes;
 a real 2.1.319 model turn remains unaccepted.
-[Version evidence](evidence/claude-319-source-summary.json). Windows uses the same argument-based process path;
+[Version evidence](evidence/claude-319-source-summary.json). The normal installed
+update now passes 101 metadata/refusal checks and real installed-module
+version/account admission without a model prompt.
+[Installed evidence](evidence/installed-claude-319-summary.json). Windows uses the same argument-based process path;
 native Windows CLI/account acceptance remains pending. The frozen morning
 frontend does not expose this task panel yet.
 

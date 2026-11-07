@@ -9,11 +9,11 @@ entry point, evidence and remaining work. A hardware/account check does not excu
 unfinished independent software. Read [current status](switchyard-status.md) for
 accepted checkpoints and [verification](verification.md) for reproducible checks.
 
-Installed Linux source `90fa879` passes **99 metadata/refusal checks across 58
+Installed Linux source `1bee5a5` passes **101 metadata/refusal checks across 59
 exact modules**, preserving all 54 semantic workspaces, four profiles, 57 workflows,
 selection and the pending keyboard-only conversation. The temporary package is
 removed; current plus one rollback remain.
-[Installed evidence](evidence/installed-project-discovery-summary.json).
+[Installed evidence](evidence/installed-claude-319-summary.json).
 
 The latest backend feature lists eligible saved projects and distinct task counts
 through signed Linux/Windows clients, followed by existing exact-project task
@@ -42,10 +42,11 @@ The frontend picker remains frozen. Native Windows client `9d230ac` passes
 250 tests with no skips. Complete Windows releases `e5a5781` and `6727054`
 were interrupted without final receipts. A separate complete-source workflow
 now preserves every original group across bounded workers and requires a final
-receipt audit. Complete Windows source `45c34e5` now passes all 460 groups,
-2,899 tests and 246 declared skips. The later `cf3bb4c` cohort fails a separate
-host-action settlement observation; latest native package acceptance remains
-pending. [Complete source evidence](evidence/complete-windows-45c34e5-summary.json).
+receipt audit. Complete Windows source `90fa879` now passes all 462 groups,
+2,902 tests and 246 declared skips, with all 23 jobs and the native collector
+passing. The earlier `cf3bb4c` settlement failure remains unresolved despite the
+passing follow-up; latest native package acceptance remains pending.
+[Complete source evidence](evidence/complete-windows-90fa879-summary.json).
 These checkpoints do not establish live provider/task, interactive UI or
 physical-device acceptance.
 [Linux evidence](evidence/linux-2c6497f-complete-summary.json),

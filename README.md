@@ -73,15 +73,16 @@ execution, offline repository scans and recoverable installation. The Home and
 Model F catalog provide the starting experience; complete task/IDE attachment,
 role/device controls and full scanner coverage remain unfinished.
 
-The latest installed backend (`90fa879`) passes **99 metadata/refusal checks
-across 58 exact modules** and preserves all 54 saved workspaces. It adds signed
-saved-project discovery; role, device and editor controls still need their
-frontend integration. [Installed evidence](docs/evidence/installed-project-discovery-summary.json).
+The latest installed backend (`1bee5a5`) passes **101 metadata/refusal checks
+across 59 exact modules** and preserves all 54 saved workspaces. It adds signed
+saved-project discovery and verified Claude Code 2.1.319 admission; role, device and editor controls still need their
+frontend integration. [Installed evidence](docs/evidence/installed-claude-319-summary.json).
 
 Complete Linux `cf3bb4c` passes **356 groups / 2,326 tests**, with 32 declared
-skips. Complete Windows source `45c34e5` passes **460 groups / 2,899 tests**,
-with 246 declared skips. These are exact-revision results: the Windows checkpoint
-predates saved-project discovery, whose three native groups pass separately.
+skips. Complete Windows source `90fa879` passes **462 groups / 2,902 tests**,
+with 246 declared skips and a passing native collector. This includes saved-project
+discovery and predates the later Claude version update, which has 93 focused
+tests and real read-only metadata acceptance.
 Latest Windows package acceptance remains pending. Earlier focus, storage and
 host-action settlement failures remain recorded; passing follow-ups do not prove
 their causes are resolved. [Current status and evidence](docs/switchyard-status.md).
