@@ -8,18 +8,18 @@ Implementation: not started / in progress / implemented / unsupported by verifie
 Validation: not run / software-tested / host-tested / hardware-tested.
 Tests use synthetic data unless explicitly labelled host/hardware evidence.
 
-The Windows ChatGPT Suite backend now connects explicit executable review,
-encrypted configuration, authenticated focus dispatch and durable helper recovery.
-Exact PID/birth ownership is persisted before requests; uncertain effects cannot
-be replayed, and routine before-effect refusals do not exhaust the unresolved
-history limit. Workspace/mode/shutdown paths join original helpers. Thirty-five
-focused groups pass 232 tests with no skips, including sixteen service/gateway
-cases; type checking and original package bounds pass. Linux excludes the
-Windows-only modules; the Windows bundle includes its complete linked helper
-source. Owned test staging is removed. Actual Windows desktop acceptance,
-frontend configuration controls and Windows VS Code focus remain unfinished.
+The Windows Suite now supports separately reviewed ChatGPT and stable VS Code
+executables, encrypted configuration, authenticated focus dispatch and durable
+helper recovery. Exact PID/birth ownership is persisted before requests; uncertain
+effects cannot be replayed. VS Code is available only through the focus-only
+entrypoint, leaving the companion's four provider/launch profiles unchanged.
+Thirty-five focused groups pass 234 tests with no skips, including seventeen
+service/gateway cases. Type checking, original package bounds and the combined
+helper build pass with zero warnings/errors. Owned test/build staging is removed.
+Actual Windows desktop acceptance, frozen frontend controls, project selection
+and task-specific IDE attachment remain unfinished.
 [Contract](windows-native-focus.md),
-[source evidence](evidence/windows-native-focus-source-summary.json).
+[source evidence](evidence/windows-vscode-focus-source-summary.json).
 
 Installed `21f7ddc` passes **71 metadata/in-memory checks** and verifies 22 exact
 module hashes, including the Windows focus service source and all

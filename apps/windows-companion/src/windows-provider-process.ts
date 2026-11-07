@@ -11,6 +11,7 @@ import { createHash, randomBytes } from "node:crypto";
 import { createReadStream } from "node:fs";
 import { lstat, realpath, stat } from "node:fs/promises";
 import { dirname, isAbsolute, resolve } from "node:path";
+import { windowsEditorProductIdentity } from "./provider-desktop.ts";
 
 import type {
   DesktopProviderId,
@@ -31,6 +32,8 @@ const maximumRequestBytes = 16 * 1024;
 const maximumObservations = 64;
 const maximumHelperBytes = 256 * 1024 * 1024;
 const helperRetirementMs = 2_000;
+type NativeFocusProviderId = DesktopProviderId | "vscode";
+type NativeFocusEffectRequest = Omit<ProviderProcessEffectRequest, "provider"> & { readonly provider: NativeFocusProviderId };
 
 const desktopProducts: Readonly<Record<DesktopProviderId, ProviderProductIdentity>> = {
   claude_desktop: {
@@ -217,7 +220,7 @@ export class WindowsProviderDesktopProcessPort implements ProviderDesktopProcess
   }
 
   async listRunning(identity: ProviderExecutableIdentity, signal: AbortSignal): Promise<readonly ProviderDesktopProcessObservation[]> {
-    const provider = providerForIdentity(identity);
+    const provider = providerForIdentity(identity, this.focusOnly);
     return this.withSession(signal, async (session, requestId) => {
       await session.write(encodeRequest({
         schema: requestSchema,
@@ -239,8 +242,8 @@ export class WindowsProviderDesktopProcessPort implements ProviderDesktopProcess
     });
   }
 
-  async focusExisting(request: ProviderProcessEffectRequest & { readonly process: ProviderDesktopProcessObservation }): Promise<Readonly<{ processId: number }>> {
-    validateEffectRequest(request);
+  async focusExisting(request: NativeFocusEffectRequest & { readonly process: ProviderDesktopProcessObservation }): Promise<Readonly<{ processId: number }>> {
+    validateEffectRequest(request, this.focusOnly);
     if (request.process.processId <= 0 || !Number.isSafeInteger(request.process.processId) || !surfacePattern.test(request.process.windowId)) {
       throw new Error("The expected provider surface identity is invalid.");
     }
@@ -436,17 +439,18 @@ function strictHelperEnvironment(source: NodeJS.ProcessEnv): Readonly<Record<str
   return { SystemRoot: systemRoot, WINDIR: windir };
 }
 
-function validateEffectRequest(request: ProviderProcessEffectRequest): void {
+function validateEffectRequest(request: NativeFocusEffectRequest, focusOnly = false): void {
   if (request.shell !== false) throw new Error("The provider process port never permits a shell.");
   if (!/^[A-Za-z0-9:._-]{1,256}$/.test(request.operationId)) throw new Error("The provider operation identity is invalid.");
-  const expected = desktopProducts[request.provider];
-  if (!sameProduct(expected, request.identity.productIdentity)) throw new Error("The provider product identity is not the fixed desktop catalog identity.");
+  const expected = request.provider === "vscode" ? (focusOnly ? windowsEditorProductIdentity : undefined) : desktopProducts[request.provider];
+  if (!expected || !sameProduct(expected, request.identity.productIdentity)) throw new Error("The provider product identity is not allowed in this fixed helper mode.");
   nativeIdentity(request.identity);
   assertNotAborted(request.signal);
 }
 
-function providerForIdentity(identity: ProviderExecutableIdentity): DesktopProviderId {
+function providerForIdentity(identity: ProviderExecutableIdentity, focusOnly = false): NativeFocusProviderId {
   nativeIdentity(identity);
+  if (focusOnly && sameProduct(windowsEditorProductIdentity, identity.productIdentity)) return "vscode";
   for (const provider of Object.keys(desktopProducts) as DesktopProviderId[]) {
     if (sameProduct(desktopProducts[provider], identity.productIdentity)) return provider;
   }

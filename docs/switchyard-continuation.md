@@ -40,18 +40,18 @@ instructions. Do not merge or release.
 
 ## Current installed and source checkpoint
 
-The Windows ChatGPT Suite backend now connects explicit executable review,
-encrypted configuration, authenticated focus dispatch and durable helper recovery.
-Exact PID/birth ownership is persisted before requests; uncertain effects cannot
-be replayed, and routine before-effect refusals do not exhaust the unresolved
-history limit. Workspace/mode/shutdown paths join original helpers. Thirty-five
-focused groups pass 232 tests with no skips, including sixteen service/gateway
-cases; type checking and original package bounds pass. Linux excludes the
-Windows-only modules; the Windows bundle includes its complete linked helper
-source. Owned test staging is removed. Actual Windows desktop acceptance,
-frontend configuration controls and Windows VS Code focus remain unfinished.
+The Windows Suite now supports separately reviewed ChatGPT and stable VS Code
+executables, encrypted configuration, authenticated focus dispatch and durable
+helper recovery. Exact PID/birth ownership is persisted before requests; uncertain
+effects cannot be replayed. VS Code is available only through the focus-only
+entrypoint, leaving the companion's four provider/launch profiles unchanged.
+Thirty-five focused groups pass 234 tests with no skips, including seventeen
+service/gateway cases. Type checking, original package bounds and the combined
+helper build pass with zero warnings/errors. Owned test/build staging is removed.
+Actual Windows desktop acceptance, frozen frontend controls, project selection
+and task-specific IDE attachment remain unfinished.
 [Contract](windows-native-focus.md),
-[source evidence](evidence/windows-native-focus-source-summary.json).
+[source evidence](evidence/windows-vscode-focus-source-summary.json).
 
 Cargo archives with multiple `[[bin]]`, `[[example]]` and nested array tables
 now pass 84 independent Python reference cases. Ten focused groups pass 96 tests,
@@ -113,6 +113,13 @@ changes and predates Cargo archive identity and the workflow-ID correction.
 [Complete receipt](evidence/linux-aafb476-complete-summary.json).
 
 No full Linux test service or temporary marker remains from that run.
+
+A new complete Linux run is executing immutable published `97ef7d6`. Its
+private `linux-full-97ef7d6-active.json` marker records the owned checkout,
+dependency aliases, process unit and cleanup identities. Partial progress is not
+acceptance. Preserve the first temporary-wrapper syntax failure, which occurred
+before any test; the corrected wrapper passed syntax validation before startup.
+This run predates the later VS Code focus extension.
 
 Complete Linux `a6a6618` passes **321 groups, 1,949 tests and sixteen declared
 skips**, with zero failures/cancellations. Exact original commands, bounds, skip
@@ -187,10 +194,11 @@ native Windows profile correction acceptance remains separate.
    later helper, SDK, Python/Cargo work require their own final results.
    Retain original failures and distinguish guest doubles from actual guests.
 3. Windows ChatGPT review, owner records, dispatch and read-only recovery are
-   published and installed as source at `21f7ddc`. Keep native Windows owner/
-   window acceptance separate. Continue Windows VS Code support without weakening
-   process birth, current-user/session or foreground proof; frontend controls
-   remain frozen. Also continue broader Shield syntax/coverage and dependency
+   installed as source at `21f7ddc`; VS Code now has separate source proof.
+   Keep native Windows owner/window acceptance separate. Continue project and
+   task-specific IDE integration without weakening identity/foreground proof;
+   frontend controls remain frozen. Also continue broader Shield syntax/coverage
+   and dependency
    resolution, complete archive/license inspection, publisher provenance,
    verified local vulnerability context and external observation streams.
    The current Cargo manifest parser is deliberately a closed TOML subset;

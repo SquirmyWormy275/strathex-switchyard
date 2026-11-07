@@ -52,6 +52,11 @@ internal static class Program
             ["codex"] = new("openai.codex", "Codex", "OpenAI, L.L.C.", "codex-windows-sandbox", "")
         };
 
+    // This target is available only to the Suite focus-only entrypoint. Keep
+    // the companion's four provider enrollments and launch profiles unchanged.
+    private static readonly ProductDefinition NativeEditorProduct = new(
+        "microsoft.visual-studio-code", "VS Code", "Microsoft Corporation", "Visual Studio Code", "Microsoft Corporation");
+
     public static int Main(string[] args)
     {
         if (args.Length == 1 && args[0] == "--self-test") return SelfTest();
@@ -87,7 +92,7 @@ internal static class Program
                 Write(new { schema = "switchyard-native-focus-owner/v1", processId = Environment.ProcessId, processStartTime = ProcessStartTime(current) });
             }
             string line = ReadBoundedLine(Console.In, MaximumRequestChars);
-            Request request = ParseRequest(line);
+            Request request = ParseRequest(line, focusOnly);
             requestId = request.RequestId;
             if (focusOnly && !IsFocusAction(request.Action)) throw new ProtocolException("focus_only_action_required");
             return request.Action switch
@@ -111,6 +116,7 @@ internal static class Program
     }
 
     private static bool IsFocusAction(string action) => action is "list" or "focus";
+    private static bool SupportsEditorFocus(string action, bool focusOnly) => focusOnly && IsFocusAction(action);
 
     private static int ObserveFocusOwner()
     {
@@ -182,8 +188,12 @@ internal static class Program
         }
         bool focusOnlyPolicyVerified = IsFocusAction("list") && IsFocusAction("focus")
             && !new[] { "launch", "managed_terminal", "authorize", "", "Focus" }.Any(IsFocusAction);
-        bool ok = products && quoting && surfaces && births && focusOnlyPolicyVerified && currentProcessVerified != false && ownerQueryVerified != false;
-        Write(new { schema = "sxsy-b122.provider-desktop-self-test", version = 1, status = ok ? "ok" : "failed", desktopProtocolVersion = 2, processBirthGrammarVerified = births, focusOnlyPolicyVerified, currentProcessVerified, ownerQueryVerified, processId = Environment.ProcessId, processStartTime, tokenAccessMask = TokenQuery, windowFocused = false });
+        bool nativeEditorPolicyVerified = SupportsEditorFocus("list", true) && SupportsEditorFocus("focus", true)
+            && !new[] { "list", "focus", "launch", "managed_terminal" }.Any(action => SupportsEditorFocus(action, false))
+            && !new[] { "launch", "managed_terminal", "authorize", "", "Focus" }.Any(action => SupportsEditorFocus(action, true))
+            && NativeEditorProduct.ProductId == "microsoft.visual-studio-code";
+        bool ok = products && quoting && surfaces && births && focusOnlyPolicyVerified && nativeEditorPolicyVerified && currentProcessVerified != false && ownerQueryVerified != false;
+        Write(new { schema = "sxsy-b122.provider-desktop-self-test", version = 1, status = ok ? "ok" : "failed", desktopProtocolVersion = 2, processBirthGrammarVerified = births, focusOnlyPolicyVerified, nativeEditorPolicyVerified, currentProcessVerified, ownerQueryVerified, processId = Environment.ProcessId, processStartTime, tokenAccessMask = TokenQuery, windowFocused = false });
         return ok ? 0 : 1;
     }
 
@@ -494,7 +504,7 @@ internal static class Program
             throw new ProtocolException("authorization_rejected");
     }
 
-    private static Request ParseRequest(string line)
+    private static Request ParseRequest(string line, bool focusOnly = false)
     {
         using JsonDocument document = ParseJson(line);
         JsonElement root = document.RootElement;
@@ -511,8 +521,10 @@ internal static class Program
         string requestId = Text(root, "requestId");
         if (requestId.Length != 48 || !requestId.All(IsLowerHex)) throw new ProtocolException("invalid_request_id");
         string provider = Text(root, "provider");
-        if (!Products.TryGetValue(provider, out ProductDefinition? product) || product is null) throw new ProtocolException("invalid_provider");
-        if (provider is not ("claude_desktop" or "chatgpt_desktop")) throw new ProtocolException("invalid_provider");
+        ProductDefinition product;
+        if (provider == "vscode" && SupportsEditorFocus(action, focusOnly)) product = NativeEditorProduct;
+        else if (provider is "claude_desktop" or "chatgpt_desktop") product = Products[provider];
+        else throw new ProtocolException("invalid_provider");
         ExecutableIdentity identity = ParseIdentity(Property(root, "identity"), product, "desktop");
         uint? processId = action == "focus" ? UnsignedInteger(root, "expectedProcessId") : null;
         string? surfaceId = action == "focus" ? Text(root, "expectedSurfaceId") : null;

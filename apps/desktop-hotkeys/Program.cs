@@ -64,7 +64,7 @@ internal static class Program
                     var body = request.GetProperty("body");
                     if (keyId < 1 || keyId > 1024 || Bindings.ContainsKey(keyId) || (modifiers & 8) == 0 || (modifiers & 7) == 0 || (modifiers & ~15U) != 0 || !(virtualKey is >= 48 and <= 57 or >= 65 and <= 90 or >= 112 and <= 135)) throw new InvalidOperationException("Unsupported bounded hotkey");
                     var implementation = body.GetProperty("implementation").GetString();
-                    if (implementation != "switchyard.role/v1" && implementation != "native-chatgpt.focus/v1") throw new InvalidOperationException("Unsupported action");
+                    if (implementation != "switchyard.role/v1" && implementation != "native-chatgpt.focus/v1" && implementation != "native-vscode.focus/v1") throw new InvalidOperationException("Unsupported action");
                     if (implementation == "switchyard.role/v1" && (!Regex.IsMatch(body.GetProperty("roleId").GetString() ?? "", "^[A-Za-z0-9_.:-]{1,64}$") || !Intents.Contains(body.GetProperty("intent").GetString() ?? ""))) throw new InvalidOperationException("Invalid exact role intent");
                     var allowedFields = implementation == "switchyard.role/v1" ? new[] { "implementation", "roleId", "intent" } : new[] { "implementation" };
                     if (body.EnumerateObject().Any(property => !allowedFields.Contains(property.Name)) || body.EnumerateObject().Count() != allowedFields.Length) throw new InvalidOperationException("Hotkeys accept only the closed intent fields");

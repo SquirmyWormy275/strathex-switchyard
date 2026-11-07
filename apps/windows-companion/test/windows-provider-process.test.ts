@@ -9,6 +9,7 @@ import type {
   ProviderExecutableIdentity,
   ProviderProcessEffectRequest
 } from "../src/provider-desktop.ts";
+import { providerIds, windowsEditorProductIdentity } from "../src/provider-desktop.ts";
 import {
   NodeProviderDesktopHelperTransport,
   WindowsProviderDesktopProcessPort,
@@ -104,6 +105,29 @@ function envelope(request: Record<string, unknown>, kind: "ready" | "result" | "
 }
 const helperOwner = Object.freeze({ processId: 7111, processStartTime: "133000000000000001" });
 const ownerHello = (changes = {}) => JSON.stringify({ schema: "switchyard-native-focus-owner/v1", ...helperOwner, ...changes });
+
+test("VS Code is focus-only and cannot enter the companion provider or application-launch catalog", async context => {
+  const setup = await fixture(context), identity = { ...setup.identity, productIdentity: windowsEditorProductIdentity }, transport = new FakeTransport();
+  assert.deepEqual(providerIds, ["claude_desktop", "chatgpt_desktop", "claude_code", "codex"]);
+  const observed = { processId: 4100, processStartTime: "133000000000000001", surfaceId: "hwnd:100f", isForeground: false };
+  transport.configure = session => {
+    session.responses.push(ownerHello());
+    session.onWrite = request => {
+      if (request.action === "list") { assert.equal(request.provider, "vscode"); session.responses.push(envelope(request, "result", { observations: [observed] })); }
+      else if (request.action === "focus") { assert.equal(request.provider, "vscode"); session.responses.push(envelope(request, "ready", { ...observed, authorizationToken: "a".repeat(64) })); }
+      else session.responses.push(envelope(request, "result", { ...observed, windowFocusVerified: true }));
+    };
+  };
+  const focus = port(setup.helperPath, digest("fixed native helper"), transport, true), legacy = port(setup.helperPath, digest("fixed native helper"), transport);
+  await assert.rejects(legacy.listRunning(identity, new AbortController().signal), /fixed desktop provider/); assert.equal(transport.invocations.length, 0);
+  const [process] = await focus.listRunning(identity, new AbortController().signal); assert.ok(process);
+  let barriers = 0;
+  const request = { provider: "vscode" as const, operationId: "editor-focus", identity, process, signal: new AbortController().signal, shell: false as const, async beforeEffect() { barriers++; } };
+  await assert.rejects(legacy.focusExisting(request), /not allowed/); assert.equal(barriers, 0);
+  assert.deepEqual(await focus.focusExisting(request), { processId: 4100 }); assert.equal(barriers, 1); assert.equal(transport.invocations.length, 2);
+  await assert.rejects(focus.listRunning({ ...identity, productIdentity: { ...windowsEditorProductIdentity, displayName: "VS Code Insiders" } }, new AbortController().signal), /fixed desktop provider/);
+  assert.equal(transport.invocations.length, 2);
+});
 
 test("focus helper ownership is recorded before requests and cleared only after exact child closure", async context => {
   const setup = await fixture(context), transport = new FakeTransport(), events: string[] = [];

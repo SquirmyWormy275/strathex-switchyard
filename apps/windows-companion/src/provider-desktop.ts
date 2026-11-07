@@ -114,6 +114,20 @@ export function createFixedProviderDesktopCatalog(paths: FixedProviderDesktopPat
   return new FixedProviderDesktopCatalog(paths);
 }
 
+/** The Suite editor target grants focus only; it is not a B122 provider enrollment. */
+export const windowsEditorProductIdentity: Readonly<ProviderProductIdentity> = Object.freeze({
+  productId: "microsoft.visual-studio-code", displayName: "VS Code", publisher: "Microsoft Corporation", role: "desktop"
+});
+export type ExecutableIdentityTarget = Pick<ProviderCatalogEntry, "executablePath" | "signerSubject" | "signerThumbprint" | "productIdentity">;
+export function createWindowsEditorFocusTarget(configuration: FixedProviderExecutableConfiguration): ExecutableIdentityTarget {
+  return {
+    executablePath: fixedExecutablePath(configuration.path, "vscode"),
+    signerSubject: fixedSignerSubject(configuration.signerSubject, "vscode"),
+    signerThumbprint: fixedSignerThumbprint(configuration.signerThumbprint, "vscode"),
+    productIdentity: windowsEditorProductIdentity
+  };
+}
+
 export interface ProviderExecutableIdentity {
   readonly canonicalExecutablePath: string;
   readonly executableSha256: string;
@@ -151,7 +165,7 @@ export class WindowsAuthenticodeSignatureProbe implements ProviderExecutableSign
 export class NodeProviderExecutableIdentityProbe implements ProviderExecutableIdentityProbe {
   private readonly signatures: ProviderExecutableSignatureProbe;
   constructor(signatures: ProviderExecutableSignatureProbe = new WindowsAuthenticodeSignatureProbe()) { this.signatures = signatures; }
-  async inspect(entry: ProviderCatalogEntry): Promise<ProviderExecutableIdentity> {
+  async inspect(entry: ExecutableIdentityTarget): Promise<ProviderExecutableIdentity> {
     const configured = resolve(entry.executablePath);
     const linkMetadata = await lstat(configured).catch(() => { throw new Error("The fixed provider executable is unavailable."); });
     if (linkMetadata.isSymbolicLink()) throw new Error("The fixed provider executable cannot be a symbolic link or redirect.");
@@ -791,7 +805,7 @@ function sameIdentity(left: ProviderExecutableIdentity, right: ProviderExecutabl
     && left.inode === right.inode;
 }
 
-function fixedExecutablePath(value: string, provider: ProviderId): string {
+function fixedExecutablePath(value: string, provider: ProviderId | "vscode"): string {
   if (typeof value !== "string" || !localExecutablePath(value)) {
     throw new Error(`The fixed ${provider} executable must be a bounded local absolute host path.`);
   }
@@ -800,13 +814,13 @@ function fixedExecutablePath(value: string, provider: ProviderId): string {
   return path;
 }
 
-function fixedSignerSubject(value: string, provider: ProviderId | "provider"): string {
+function fixedSignerSubject(value: string, provider: ProviderId | "provider" | "vscode"): string {
   const subject = typeof value === "string" ? value.trim() : "";
   if (!safeSignerSubject(subject)) throw new Error(`The fixed ${provider} signer subject is invalid.`);
   return subject;
 }
 
-function fixedSignerThumbprint(value: string, provider: ProviderId | "provider"): string {
+function fixedSignerThumbprint(value: string, provider: ProviderId | "provider" | "vscode"): string {
   const thumbprint = typeof value === "string" ? value.replaceAll(" ", "").toLowerCase() : "";
   if (!/^[a-f0-9]{40,128}$/.test(thumbprint)) throw new Error(`The fixed ${provider} signer thumbprint is invalid.`);
   return thumbprint;

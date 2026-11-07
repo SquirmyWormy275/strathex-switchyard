@@ -57,7 +57,7 @@ async function fixture(t) {
     } })
   };
   f.service = createWindowsNativeFocus(f.options);
-  f.configure = async () => { const review = await f.service.review("personal", { implementation, executablePath }); await f.service.configure("personal", { reviewId: review.reviewId, confirmation: review.confirmation }); return review; };
+  f.configure = async (target = implementation, path = executablePath) => { const review = await f.service.review("personal", { implementation: target, executablePath: path }); await f.service.configure("personal", { reviewId: review.reviewId, confirmation: review.confirmation }); return review; };
   t.after(async () => {
     f.exitUnknown = false;
     if (f.server) { f.server.closeAllConnections(); await new Promise(resolve => f.server.close(resolve)); }
@@ -82,7 +82,7 @@ test("native application review is local, one-use and bound to encrypted exact e
 
 test("review confirmation refuses changed bytes, account scope, selection, expiry and extra fields", async t => {
   const f = await fixture(t);
-  for (const input of [{ implementation, executablePath: f.executablePath, launch: true }, { implementation: "native-vscode.focus/v1", executablePath: f.executablePath }]) await assert.rejects(f.service.review("personal", input));
+  for (const input of [{ implementation, executablePath: f.executablePath, launch: true }, { implementation: "native-vscode.launch/v1", executablePath: f.executablePath }]) await assert.rejects(f.service.review("personal", input));
   for (const mutation of ["bytes", "accounts", "selection", "expiry", "retired-review"]) {
     f.active = "personal";
     const review = await f.service.review("personal", { implementation, executablePath: f.executablePath });
@@ -105,6 +105,21 @@ test("configured focus records exact helpers before requests and replays a compl
   assert.equal(record.status, "completed"); assert.equal(record.helpers.length, 2); assert(record.helpers.every(h => h.stopped));
   assert.equal((await f.service.focus("personal", implementation, { requestId })).replayed, true); assert.equal(f.effects, 1); assert.equal(f.sessions.length, 2);
   const inspection = await f.service.inspect("personal", implementation); assert.equal(inspection.windowFocusVerified, false); assert.equal(f.effects, 1); assert.equal(f.sessions.length, 3);
+});
+
+test("Windows VS Code focus has its own reviewed identity and cannot replay a ChatGPT request", async t => {
+  const f = await fixture(t), editor = "native-vscode.focus/v1", codePath = join(f.root, "Code.exe");
+  await writeFile(codePath, "synthetic reviewed editor"); await f.configure();
+  const review = await f.configure(editor, codePath); assert.match(review.confirmation, /^Trust Windows VS Code /);
+  const state = await f.store.snapshot("personal");
+  assert.equal(state.nativeWindowsVscode.identity.productIdentity.productId, "microsoft.visual-studio-code");
+  assert.equal(state.nativeWindowsChatgpt.identity.executableSha256, digest("synthetic reviewed application"));
+  const requestId = randomUUID(); await f.service.focus("personal", implementation, { requestId });
+  await assert.rejects(f.service.focus("personal", editor, { requestId }), /cannot be replayed/);
+  const result = await f.service.focus("personal", editor, { requestId: randomUUID() });
+  assert.equal(result.provider, "native-vscode"); assert.equal(result.windowFocusVerified, true); assert.equal(result.projectVerified, false); assert.equal(result.taskResumptionVerified, false);
+  assert.deepEqual(f.requests.filter(value => value.action === "focus").map(value => value.provider), ["chatgpt_desktop", "vscode"]); assert.equal(f.effects, 2);
+  assert((await f.store.snapshot("personal")).nativeFocusOperations.every(row => row.helpers.every(owner => owner.stopped)));
 });
 
 test("missing, duplicate or changed application targets refuse without a focus authorization", async t => {
@@ -137,7 +152,7 @@ test("stop cancels and joins a pending focus helper without focusing or closing 
   const f = await fixture(t); await f.configure(); const entered = deferred(), gate = deferred();
   f.beforeReady = async () => { entered.resolve(); await gate.promise; };
   const request = f.service.focus("personal", implementation, { requestId: randomUUID() }); void request.catch(() => {});
-  await entered.promise;
+  await Promise.race([entered.promise, request.then(() => assert.fail("The request completed before entering its pending focus barrier."))]);
   await assert.rejects(f.service.focus("personal", implementation, { requestId: randomUUID() }), /existing native focus/);
   assert.deepEqual(await f.service.stopCompartment("personal"), { stopped: true, applicationClosed: false });
   gate.resolve(); await assert.rejects(request, /cancel/); assert.equal(f.effects, 0); assert(f.sessions.every(s => s.terminated));
@@ -171,7 +186,7 @@ test("unsupported platform, Work policy and keyboard-only mode refuse before hel
   const linux = createWindowsNativeFocus({ ...f.options, platform: "linux" });
   await assert.rejects(linux.focus("personal", implementation, { requestId: randomUUID() }), /requires Windows/); await linux.close();
   await assert.rejects(f.service.focus("personal", implementation, { requestId: "not-a-uuid" }));
-  assert.throws(() => f.service.inspect("personal", "native-vscode.focus/v1"), /unfinished/);
+  assert.throws(() => f.service.inspect("personal", "native-cursor.focus/v1"), /unfinished/);
   f.active = "work"; await f.store.update("work", "synthetic-mode", s => { s.mode = "managed-companion"; });
   await assert.rejects(f.service.focus("work", implementation, { requestId: randomUUID() }), /prohibited/);
   f.active = "personal"; await f.store.update("personal", "synthetic-mode", s => { s.mode = "keyboard-only"; });
@@ -253,9 +268,13 @@ test("authenticated Suite routes review and configure exact Windows focus, dispa
   const replay = await api("intent", { implementation, requestId }); assert.equal(replay.body.replayed, true); assert.equal(f.effects, 1);
   const snapshot = await api("snapshot", {}); assert.equal(Object.hasOwn(snapshot.body, "nativeFocusOperations"), false);
   assert.equal((await f.suite.authorizeConnection("personal", { implementation })).available, true);
-  await assert.rejects(f.suite.authorizeConnection("personal", { implementation: "native-vscode.focus/v1" }), /unfinished/);
+  await assert.rejects(f.suite.authorizeConnection("personal", { implementation: "native-vscode.focus/v1" }), /Review and configure/);
+  const codePath = join(f.root, "Code.exe"); await writeFile(codePath, "synthetic gateway editor");
+  const editorReview = await api("native-focus/review", { implementation: "native-vscode.focus/v1", executablePath: codePath }); assert.equal(editorReview.status, 200);
+  assert.equal((await api("native-focus/configure", { reviewId: editorReview.body.reviewId, confirmation: editorReview.body.confirmation })).status, 200);
+  const editorFocus = await api("intent", { implementation: "native-vscode.focus/v1", requestId: randomUUID() }); assert.equal(editorFocus.status, 200); assert.equal(editorFocus.body.provider, "native-vscode"); assert.equal(editorFocus.body.projectVerified, false);
   assert.equal((await api("compartment/select", { compartment: "work" })).status, 200);
-  assert.equal((await api("intent", { implementation, requestId: randomUUID(), compartment: "personal" })).status, 409); assert.equal(f.effects, 1);
+  assert.equal((await api("intent", { implementation, requestId: randomUUID(), compartment: "personal" })).status, 409); assert.equal(f.effects, 2);
 });
 
 test("Suite preserves selection on an uncertain original focus helper and saves keyboard-only without claiming stop", async t => {

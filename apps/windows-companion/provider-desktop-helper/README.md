@@ -5,17 +5,19 @@ desktop executables. The commissioned companion can focus or launch through its
 attested catalog. The Suite embeds the same implementation behind a separate
 focus-only boundary.
 
-**Suite configuration and physical-intent wiring remain unfinished.** The source
-boundary has 69 focused checks and a successful managed build; interactive
-Windows provider/window acceptance is still pending.
-[Current evidence](../../../docs/evidence/windows-focus-owner-source-summary.json).
+The Suite now connects explicit executable review, protected configuration,
+physical-intent dispatch and original-owner recovery for ChatGPT and stable
+Microsoft VS Code. The source boundary has 234 focused checks and a successful
+managed build; frontend controls and interactive Windows provider/window
+acceptance are still pending.
+[Current evidence](../../../docs/evidence/windows-vscode-focus-source-summary.json).
 
 ## Closed entry points
 
 | Entry point | Contract |
 | --- | --- |
 | `--stdio-v2` | Commissioned companion discovery, focus and fixed-profile launch. |
-| `--native-desktop-focus-v3` | Owner witness first, then discovery/focus only. Launch is refused. |
+| `--native-desktop-focus-v3` | Owner witness first, then discovery/focus only, including the separate VS Code target. Launch is refused. |
 | `--native-desktop-owner-v1` | Read-only observation of an original PID/creation-time identity. |
 | `--self-test` | Portable grammar/policy checks and native self-process checks when on Windows. |
 | `--managed-terminal-v1` | Separate reviewed managed-terminal descriptor; unchanged version 1. |
@@ -24,6 +26,11 @@ The Suite's `Switchyard.Hotkeys.exe` exposes the focus-only and owner-query
 entries, plus `--native-desktop-self-test`. It refuses the broader desktop
 stdio, earlier focus-only v2 and managed-terminal entries. It links this source
 through its project file; no second native implementation is copied.
+
+VS Code is accepted only by the focus-only entrypoint. The companion's four
+provider enrollments and launch profiles remain unchanged. The typed self-test
+checks this distinction as `nativeEditorPolicyVerified`; it does not establish
+that an actual installed editor image or foreground window has verified.
 
 Construct the Suite process port with `focusOnly: true` and both
 `onHelperOwned` and `onHelperStopped` persistence callbacks. The owner frame
@@ -73,11 +80,11 @@ The Suite reuses its existing self-contained hotkey helper. Packaging does not
 establish installed provider, account or native window acceptance.
 
 The existing SDK builds the combined source with zero warnings/errors and cleared
-package feeds. Six focused groups pass 69 tests, including ownership persistence,
+package feeds. Thirty-five focused groups pass 234 tests, including ownership persistence,
 cancellation ordering, malformed/substituted owner frames, exact child closure and
 ambiguous focus/launch journal cases. The local managed self-test reports native
-owner/current-user checks as unperformed. All 66 temporary source/build files are
-removed after verified exit.
+owner/current-user checks as unperformed. Temporary source/build files are
+removed after verified exit; exact counts are retained with the source evidence.
 
 Windows automation now requires native self-owner checks, focus-only launch
 refusal and an independent read-only observation that the original helper exited.

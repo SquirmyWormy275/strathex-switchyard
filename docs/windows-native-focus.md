@@ -1,6 +1,6 @@
-# Reviewed Windows ChatGPT focus
+# Reviewed Windows ChatGPT and VS Code focus
 
-The Suite backend can review an exact local ChatGPT executable, save its identity
+The Suite backend can review an exact local ChatGPT or stable Microsoft VS Code executable, save its identity
 in the selected encrypted workspace, and focus its one verified existing window.
 This is navigation only: it does not establish the signed-in account, identify a
 conversation, resume a task, launch an application or submit a prompt.
@@ -9,7 +9,7 @@ The service and authenticated gateway are implemented and exercised with the rea
 encrypted store, executable hashing and native protocol parser. Windows process,
 Authenticode and window responses are synthetic in those checks. Actual Windows
 desktop acceptance remains pending. The frozen frontend has no new configuration
-controls; Windows VS Code focus remains unfinished.
+controls. Project selection and task-specific IDE attachment remain unfinished.
 
 ## Explicit configuration
 
@@ -17,7 +17,7 @@ The existing authenticated, same-origin Suite API provides these routes:
 
 | Route | Input and result |
 | --- | --- |
-| `POST /api/suite/native-focus/review` | `implementation: "native-chatgpt.focus/v1"` and an exact `executablePath`; returns the observed identity, one-use `reviewId` and required confirmation text. |
+| `POST /api/suite/native-focus/review` | `implementation: "native-chatgpt.focus/v1"` or `"native-vscode.focus/v1"`, and an exact `executablePath`; returns the observed identity, one-use `reviewId` and required confirmation text. |
 | `POST /api/suite/native-focus/configure` | The exact `reviewId` and `confirmation`; revalidates the application before saving the configuration. |
 | `POST /api/suite/intent` | The implementation and a request UUID; dispatches only within the actual selected workspace. No executable path or command is accepted here. |
 | `POST /api/suite/native-focus/recover` | No operation selectors; observes original helper retirement without repeating focus. This works in keyboard-only mode. |
@@ -35,6 +35,15 @@ The Windows package contains the exact helper, its linked native source, and
 the executable-identity and process implementations. Linux loads its existing
 compositor implementation and does not carry the Windows-only TypeScript files.
 The original full Linux package limit remains five MiB, including the manifest.
+
+VS Code has its own protected configuration and request identity. A ChatGPT
+request cannot be replayed against the editor. The helper accepts the editor only
+through its focus-only entrypoint; the companion's four provider enrollments and
+launch profiles are unchanged. Stable VS Code is bound to its compiled product
+identity and Windows version metadata; Insiders and Code - OSS are not alternate
+targets. Microsoft's [Windows build metadata](https://github.com/microsoft/vscode/blob/main/build/gulpfile.vscode.ts)
+sets the company and product-name fields used by the native image check. Actual
+installed Windows image acceptance is still required.
 
 ## One focus attempt and its recovery
 
@@ -69,6 +78,7 @@ claim all processes stopped until retirement verifies. Protected owner records
 are omitted from the ordinary Suite snapshot. The external application is never
 closed by these operations.
 
-[Source verification and retained receipt hashes](evidence/windows-native-focus-source-summary.json).
+[ChatGPT service checkpoint](evidence/windows-native-focus-source-summary.json) and
+[VS Code extension with retained receipt hashes](evidence/windows-vscode-focus-source-summary.json).
 The [helper protocol](../apps/windows-companion/provider-desktop-helper/README.md)
 documents the native messages and access constraints.
