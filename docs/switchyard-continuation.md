@@ -64,15 +64,15 @@ resolution and broader
 manifest/license coverage remain unfinished. [Contract](cargo-archive-identity.md),
 [source evidence](evidence/cargo-array-manifest-source-summary.json).
 
-Installed `21f7ddc` passes **71 metadata/in-memory checks** and verifies 22 exact
+Installed `02cc6ba` passes **71 metadata/in-memory checks** and verifies 22 exact
 module hashes, including the Windows focus service source and all
 84 Cargo manifest reference cases. All 54 semantic workspaces, selection, pending
 keyboard-only conversation and frozen frontend are preserved; 53 sealed files are
 byte-identical and one changes only audit metadata. All four profiles and 57
 workflows remain compatible. Dated backup and launcher readback verify; current
-plus one rollback remain. The exact 531-file, 5,177,330-byte prepared bundle is
+plus one rollback remain. The exact 531-file, 5,178,427-byte prepared bundle is
 removed. This Linux update does not establish native Windows focus acceptance.
-[Installed evidence](evidence/installed-windows-native-focus-summary.json).
+[Installed evidence](evidence/installed-windows-vscode-focus-summary.json).
 
 Run only the current repeatable metadata verifiers, each with
 `--read-only-metadata`: `verify-task-owner-host.mjs`,
@@ -194,7 +194,7 @@ native Windows profile correction acceptance remains separate.
    later helper, SDK, Python/Cargo work require their own final results.
    Retain original failures and distinguish guest doubles from actual guests.
 3. Windows ChatGPT review, owner records, dispatch and read-only recovery are
-   installed as source at `21f7ddc`; VS Code now has separate source proof.
+   installed as source at `02cc6ba`, including separately reviewed VS Code.
    Keep native Windows owner/window acceptance separate. Continue project and
    task-specific IDE integration without weakening identity/foreground proof;
    frontend controls remain frozen. Also continue broader Shield syntax/coverage

@@ -1,4 +1,4 @@
-# Exact native ChatGPT main-window focus
+# Exact native client window focus
 
 The Linux Suite can focus the owner's repaired native ChatGPT main window and
 the exact VS Code window described below. This

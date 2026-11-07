@@ -39,15 +39,15 @@ resolution and broader
 manifest/license coverage remain unfinished. [Contract](cargo-archive-identity.md),
 [source evidence](evidence/cargo-array-manifest-source-summary.json).
 
-Installed `21f7ddc` passes **71 metadata/in-memory checks** and verifies 22 exact
+Installed `02cc6ba` passes **71 metadata/in-memory checks** and verifies 22 exact
 module hashes, including the Windows focus service source and all
 84 Cargo manifest reference cases. All 54 semantic workspaces, selection, pending
 keyboard-only conversation and frozen frontend are preserved; 53 sealed files are
 byte-identical and one changes only audit metadata. All four profiles and 57
 workflows remain compatible. Dated backup and launcher readback verify; current
-plus one rollback remain. The exact 531-file, 5,177,330-byte prepared bundle is
+plus one rollback remain. The exact 531-file, 5,178,427-byte prepared bundle is
 removed. This Linux update does not establish native Windows focus acceptance.
-[Installed evidence](evidence/installed-windows-native-focus-summary.json).
+[Installed evidence](evidence/installed-windows-vscode-focus-summary.json).
 
 Complete Windows `dc755901` now passes **417 groups, 2,478 tests and 207
 declared skips**. The overall workflow and all six jobs succeed. Exact source/merge
