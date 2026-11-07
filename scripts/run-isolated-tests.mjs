@@ -322,6 +322,7 @@ export const requiredGroups = [
   { file: "tools/layout-studio/codex-unix-tasks.test.mjs", ...(process.platform !== "linux" ? { expectedSkipped: 6 } : {}) },
   { file: "tools/layout-studio/codex-editor-protocol.test.mjs" },
   { file: "tools/layout-studio/codex-editor-relay.test.mjs" },
+  { file: "tools/layout-studio/codex-retained-editor-client.test.mjs" },
   { file: "tools/layout-studio/codex-editor-ingress.test.mjs", ...(process.platform !== "linux" ? { expectedSkipped: 13 } : {}) },
   { file: "tools/layout-studio/codex-editor-ingress-owner.test.mjs", ...(process.platform !== "linux" ? { expectedSkipped: 9 } : {}) },
   { file: "tools/layout-studio/codex-unix-transport.test.mjs", ...(process.platform !== "linux" ? { expectedSkipped: 6 } : {}) },

@@ -63,12 +63,16 @@ typecheck. Tests cover protected registry routing, exact one-use load, replay
 refusal, permission withdrawal during a held probe, account drift and failed
 post-start persistence. Local provider/transport doubles are explicit. An actual
 Windows Job plus synthetic app-server RPC and saved-identity recovery case is
-registered in CI and pending acceptance. The underlying native Job layer already
-passes at `45fe70e`: thirteen groups, 139 tests and no skips.
+now passes at `0078893`: fourteen native client groups, 147 tests and no skips.
+Source/merge tree, artifact digest, original commands, bounds and cleanup verify.
+[Native task evidence](evidence/windows-codex-owners-native-summary.json).
 
-Windows editor-target preparation deliberately refuses: logical editor channels,
-durable editor journals/recovery and Suite/VS Code editor integration remain
-unfinished implementation, separate from live-account acceptance.
+The owner can now retain one [logical editor channel](windows-editor-transport.md)
+on its original stdio stream. It joins pending registration on shutdown and does
+not confuse channel retirement with native process exit. Windows editor-target
+preparation still deliberately refuses: durable editor journals/recovery and
+Suite/VS Code editor integration remain unfinished implementation, separate from
+live-account acceptance.
 [Source evidence](evidence/windows-codex-owners-source-summary.json),
 [native Job evidence](evidence/windows-owned-stdio-native-summary.json).
 

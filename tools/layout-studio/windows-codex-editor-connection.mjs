@@ -12,6 +12,8 @@ export async function openWindowsCodexEditorConnection({ requestId, target, clie
   require(platform === 'win32' && typeof requestId === 'string' && /^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/.test(requestId));
   require([assertCurrent, onOwnership, onAcknowledged, retireClient].every(fn => typeof fn === 'function') && signal instanceof AbortSignal);
   require(client && !client.closed && ['request','send','on','off','close'].every(k => typeof client[k] === 'function'));
+  const logicalClient = client.retirementKind === 'logical-channel';
+  require(client.retirementKind === undefined || logicalClient);
   createCodexEditorProtocol(target, { platform }).close();
   const selected = Object.freeze({ ...target }), controller = new AbortController();
   let ingress, relay, closed = false, stopping, failure, startupFinished;
@@ -46,11 +48,15 @@ export async function openWindowsCodexEditorConnection({ requestId, target, clie
         // A caller can cancel while listener creation or retention is awaiting.
         // Join startup before deciding which original resources need retirement.
         await started;
-        const facts = { relayJoined: false, carrierExitVerified: false, upstreamExitVerified: false };
+        const facts = { relayJoined: false, carrierExitVerified: false, clientConnectionRetired: false, upstreamExitVerified: false };
         try { if (relay) await relay.stop(); facts.relayJoined = true; } catch {}
         try { if (ingress) facts.carrierExitVerified = (await ingress.stop()).stopped === true; else facts.carrierExitVerified = !failure?.retirementUnconfirmed; } catch {}
-        try { facts.upstreamExitVerified = (await retireClient(client)).stopped === true; } catch {}
-        require(Object.values(facts).every(value => value === true));
+        try {
+          const result = await retireClient(client);
+          facts.clientConnectionRetired = result?.stopped === true && (!logicalClient || result.logicalClientRetired === true && result.nativeProcessTerminated === false);
+          facts.upstreamExitVerified = !logicalClient && facts.clientConnectionRetired;
+        } catch {}
+        require(facts.relayJoined && facts.carrierExitVerified && facts.clientConnectionRetired && (logicalClient || facts.upstreamExitVerified));
         const result = Object.freeze({ stopped: true, ...facts, terminalProcessTerminated: false });
         await onOwnership({ kind: 'retired', requestId, ...result }); return result;
       })(); return stopping;

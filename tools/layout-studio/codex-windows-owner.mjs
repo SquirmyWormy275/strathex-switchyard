@@ -6,6 +6,7 @@ import { join } from 'node:path';
 import { CodexClient, codexRestrictedProcessArguments } from './agents.mjs';
 import { directoryIdentity } from './private-fs.mjs';
 import { openWindowsOwnedStdio, retireStoppedWindowsStdio } from './windows-owned-stdio.mjs';
+import { createRetainedCodexEditorClient } from './codex-retained-editor-client.mjs';
 
 const require = value => { if (!value) throw Error('The original Windows Codex owner is unavailable.'); };
 
@@ -13,6 +14,7 @@ export async function openWindowsCodexOwner({ executable, cwd, serverNames = [],
   platform = process.platform, openStdio = openWindowsOwnedStdio, createClient = (exe, directory, names, options) => new CodexClient(exe, directory, names, options) } = {}) {
   require(platform === 'win32' && [authorize,onOwner,onReady,openStdio,createClient].every(fn => typeof fn === 'function'));
   const controller = new AbortController(); let transport, client, closed = false, connecting, configuring, stopping, accountFingerprint;
+  const editors = new Set(), editorOpenings = new Set();
   const current = () => require(!closed && !transport?.closed && !client?.closed);
   const admission = async () => { current(); await authorize(); current(); };
   await admission(); await directoryIdentity(cwd);
@@ -57,8 +59,26 @@ export async function openWindowsCodexOwner({ executable, cwd, serverNames = [],
         client.on('disconnected', () => owner.close()); const result = await client.handshake(); await admission(); return result;
       })().catch(error => { owner.close(); throw error; }); return configuring;
     },
-    close() { if (closed) return; closed = true; controller.abort(); client?.close(); transport?.close(); },
-    stop() { if (!stopping) { owner.close(); stopping = (async () => { await Promise.allSettled([connecting,configuring].filter(Boolean)); return transport ? transport.stop() : { stopped: true }; })(); } return stopping; }
+    openEditorClient({ target, onClient, assertCurrent = admission } = {}) {
+      require(typeof onClient === 'function' && typeof assertCurrent === 'function' && !editorOpenings.size);
+      const operation = Promise.resolve().then(async () => {
+        await admission(); require(owner.binding && target?.accountFingerprint === accountFingerprint);
+        for (const editor of editors) if (editor.closed) { require((await editor.stop()).logicalClientRetired); editors.delete(editor); }
+        require(!editors.size);
+        const editor = createRetainedCodexEditorClient({ client, target, assertCurrent: async () => { await admission(); await assertCurrent(); await admission(); }, platform });
+        editors.add(editor);
+        try { await onClient(editor); await admission(); await client.recheckAccount(); await admission(); require(!editor.closed); return editor; }
+        catch (error) { editor.close(); await editor.stop(); editors.delete(editor); throw error; }
+      });
+      editorOpenings.add(operation); void operation.then(() => editorOpenings.delete(operation), () => editorOpenings.delete(operation)); return operation;
+    },
+    close() { if (closed) return; closed = true; controller.abort(); for (const editor of editors) editor.close(); client?.close(); transport?.close(); },
+    stop() { if (!stopping) { owner.close(); stopping = (async () => {
+      await Promise.allSettled([connecting,configuring,...editorOpenings].filter(Boolean));
+      const exits = await Promise.allSettled([...editors].map(editor => editor.stop()));
+      const result = transport ? await transport.stop() : { stopped: true };
+      require(exits.every(exit => exit.status === 'fulfilled' && exit.value.logicalClientRetired)); editors.clear(); return result;
+    })(); } return stopping; }
   });
   try {
     transport = await openStdio({ executable, args, cwd, expectedExecutableSha256: executableSha256, assertCurrent: admission, signal: controller.signal, platform,

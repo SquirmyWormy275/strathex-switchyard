@@ -41,6 +41,7 @@ async function fixture(t, hooks = {}) {
       client.close = () => { if (client.closed) return; client.closed = true; client.emit('disconnected'); };
       client.handshake = async () => { calls.push('configuration'); await hooks.configuration?.(); return controls.config; };
       client.initialize = async () => { calls.push('initialize'); await hooks.initialize?.(); client.restrictionsVerified = true; client.accountFingerprint = controls.fingerprint; };
+      Object.defineProperty(client,'initializationEvidence',{get:()=>client.restrictionsVerified && !client.closed ? {clientName:'switchyard_tasks',result:{userAgent:'switchyard_tasks/0.166.0 (synthetic fixture)'}} : null});
       client.recheckAccount = async () => { if (client.closed || client.accountFingerprint !== controls.fingerprint) { client.close(); throw Error('account changed'); } return client.accountFingerprint; };
       client.request = async (method,params) => {
         calls.push(method); assert.equal(client.closed,false); await hooks.request?.(method,params);
@@ -96,6 +97,15 @@ test('provider startup refuses an adopted repository or project configuration in
   assert.equal(retained,false); assert.equal(f.transports.length,0);
 });
 
+test('the original Windows task owner retains one logical editor and joins registration during shutdown', async t => {
+  const f=await fixture(t);await f.driver.account('personal');const owner=f.owners[1],entered=gate(),release=gate();let editor;
+  const target={sessionId:'11111111-1111-4111-8111-111111111111',repositoryRoot:'C:\\Reviewed\\repo',accountFingerprint:fingerprint};
+  const opening=owner.openEditorClient({target,onClient:async value=>{editor=value;entered.resolve();await release.promise;}}),refused=assert.rejects(opening);
+  await entered.promise;assert.throws(()=>owner.openEditorClient({target,onClient:async()=>{}}));let stopped=false;const stopping=owner.stop().then(()=>{stopped=true;});
+  await new Promise(r=>setImmediate(r));assert.equal(stopped,false);assert.equal(editor.closed,true);release.resolve();await refused;await stopping;
+  assert.equal(f.owners.length,2);assert.equal(f.calls.filter(v=>v==='initialize').length,1);assert.equal((await editor.stop()).logicalClientRetired,true);
+});
+
 test('the protected Windows registry requires the original one-use load review and preserves metadata-only observations', async t => {
   const f = await fixture(t), task = { schema:'switchyard-coding-session/v1',launchPolicy:'read-only/on-request',nativeTransport:'owned-stdio',id:randomUUID(),provider:'codex',status:'registered',sessionId:'11111111-1111-4111-8111-111111111111',accountFingerprint:fingerprint,repositoryRoot:f.repositoryRoot,repositoryIdentity:await repositoryIdentity(f.repositoryRoot) };
   await f.store.update('personal','fixture-task',s=>{s.codingSessions=[task];});
@@ -133,6 +143,10 @@ test('actual Windows Jobs carry restricted task RPC and recover original retirem
   assert.equal((await driver.account('personal')).fingerprint,fingerprint);assert.equal(owners.length,2);assert.equal(owners[0].closed,true);
   assert.equal((await driver.read(sessionId,repositoryRoot,'personal')).id,sessionId);assert.equal((await driver.resume(sessionId,repositoryRoot,'personal')).modelPromptSubmitted,false);
   const original=owners[1],scope=original.scope,ownership=original.privateOwnership;assert.equal(scope.containment,'windows-job');assert.equal(original.binding.peerBirth,ownership.worker.birth);
+  let retained;const editor=await original.openEditorClient({target:{sessionId,repositoryRoot,accountFingerprint:fingerprint},onClient:async value=>{retained=value;}});assert.equal(editor,retained);
+  const hello=await editor.request('initialize',{clientInfo:{name:'codex_tui',version:'0.166.0'}});assert.match(hello.userAgent,/^switchyard_tasks\/0\.166\.0 /);editor.send({method:'initialized',params:{}});
+  assert.equal((await editor.request('thread/read',{threadId:sessionId,includeTurns:false})).thread.id,sessionId);assert.equal((await editor.stop()).nativeProcessTerminated,false);assert.equal(original.closed,false);
+  assert.equal((await driver.read(sessionId,repositoryRoot,'personal')).id,sessionId);
   assert.equal((await driver.stopCompartment('personal')).stopped,true);assert.equal((await retireStoppedWindowsCodexOwner(scope,ownership)).guardianExitVerified,true);
   const calls=(await readFile(join(root,'tasks/personal/calls'),'utf8')).trim().split('\n');assert.equal(calls.filter(v=>v==='initialize').length,2);assert.equal(calls.filter(v=>v==='thread/resume').length,1);assert.equal(calls.includes('turn/start'),false);
 });

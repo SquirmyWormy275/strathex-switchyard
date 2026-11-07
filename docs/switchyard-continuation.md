@@ -40,18 +40,26 @@ instructions. Do not merge or release.
 
 ## Current installed and source checkpoint
 
-Windows Codex task ownership now uses the original persistent Job for metadata
-and a separately reviewed, one-use load. Configuration discovery runs in its own
-supervised Job and must retire before task startup. Protected registry recovery
-verifies the saved helper digest and original Job scope without adopting a process.
-**Fifty focused groups pass 279 tests with twelve declared platform skips**;
-typecheck passes. Local provider/transport doubles are explicit. An actual Windows
-Job with a synthetic app-server RPC and saved-identity recovery case is registered
-in CI; its acceptance is pending. Windows editor targets, logical editor channels,
-durable editor journal/recovery, Suite editor routes and VS Code launching remain
-unfinished. No live account, model, hardware or installed application was changed.
-[Task ownership contract](coding-task-owners.md),
-[source evidence](evidence/windows-codex-owners-source-summary.json).
+A retained Windows editor channel now shares the original authenticated native
+stdio client. It returns that owner's exact initialization response, sends no
+second native handshake and keeps request IDs on the original stream. Closing
+the logical channel joins its pending requests without killing the provider or
+claiming native process exit. A single editor is retained before registration;
+account changes revoke it synchronously. **Thirty-eight focused groups pass
+163 tests with one declared platform skip**; typecheck passes. Real CodexClient
+and socket checks use explicit synthetic providers/native-peer doubles.
+[Channel contract](windows-editor-transport.md),
+[source evidence](evidence/retained-editor-client-source-summary.json).
+
+The earlier Windows task adapter passes native client CI at `0078893`:
+**fourteen groups, 147 tests and no skips**, including actual Job-backed
+configuration/task RPC and saved-identity retirement with a synthetic app server.
+Exact source/merge tree, artifact, commands, bounds and cleanup verify. The newer
+logical channel still awaits native acceptance. Windows editor targets, durable
+editor journal/recovery, Suite editor routes and VS Code launching remain
+unfinished implementation.
+[Native task evidence](evidence/windows-codex-owners-native-summary.json),
+[task ownership](coding-task-owners.md).
 
 The underlying persistent process layer passes Windows client CI at `45fe70e`:
 **thirteen groups, 139 tests and no skips**, including all three actual native Job

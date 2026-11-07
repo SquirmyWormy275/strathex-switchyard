@@ -102,6 +102,10 @@ export function codexRestrictedProcessArguments(executable, serverNames = [], { 
 }
 
 export class CodexClient extends EventEmitter {
+  #initialization;
+  get initializationEvidence() {
+    return !this.closed && this.restrictionsVerified && this.#initialization ? structuredClone(this.#initialization) : null;
+  }
   constructor(executable, cwd, serverNames = [], { spawnProcess = spawn, clientInfo = { name: "switchyard_design", title: "Switchyard design", version: "0.2.0" } } = {}) {
     super(); this.sequence = 0; this.pending = new Map(); this.buffer = ""; this.closed = false; this.accountEpoch = 0;
     this.clientInfo = clientInfo;
@@ -146,7 +150,7 @@ export class CodexClient extends EventEmitter {
       try { this.send({ id, method, params }); } catch (e) { this.pending.delete(id); clearTimeout(timer); reject(e); }
     });
   }
-  async handshake() { const hello = await this.request("initialize", { clientInfo: this.clientInfo }); try { this.nativeVersion = reviewedCodexVersion(hello, this.clientInfo.name); } catch (error) { this.close(); throw error; } this.send({ method: "initialized", params: {} }); const { config } = await this.request("config/read", { includeLayers: false }); return config; }
+  async handshake() { const hello = await this.request("initialize", { clientInfo: this.clientInfo }); try { this.nativeVersion = reviewedCodexVersion(hello, this.clientInfo.name); this.#initialization = { clientName: this.clientInfo.name, result: structuredClone(hello) }; } catch (error) { this.close(); throw error; } this.send({ method: "initialized", params: {} }); const { config } = await this.request("config/read", { includeLayers: false }); return config; }
   async initialize() {
     assertCodexDesignConfig(await this.handshake());
     // Only initial read-only metadata may settle once after a startup auth event.

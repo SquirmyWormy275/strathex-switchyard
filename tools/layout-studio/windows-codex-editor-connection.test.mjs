@@ -6,6 +6,7 @@ import { EventEmitter, once } from 'node:events';
 import { codexAccountFingerprint, codexDesignConfig } from './agents.mjs';
 import { editorServerFrame } from './editor-websocket-frames.mjs';
 import { openWindowsCodexEditorConnection } from './windows-codex-editor-connection.mjs';
+import { createRetainedCodexEditorClient } from './codex-retained-editor-client.mjs';
 
 const gate = () => { let resolve; const promise = new Promise(r => { resolve = r; }); return { promise, resolve }; };
 const account = { type: 'chatgpt', email: 'synthetic-editor@example.invalid' };
@@ -51,10 +52,16 @@ async function fixture(t, options = {}) {
     checks++; await context.assertCurrent(); await options.peerCheck?.();
     return { schema: 'switchyard-editor-terminal-peer-result/v1', requestId: randomUUID(), processId: selected.processId, birth: selected.expectedBirth, image: { ...selected.image }, connection: { ...selected.connection }, connectionVerified: true, currentUserVerified: true, currentSessionVerified: true, processAccessMask: 0x101000, tokenAccessMask: 8, processTerminated: false, windowFocused: false, taskAttached: false, accountVerified: false };
   } };
-  const owner = await openWindowsCodexEditorConnection({ requestId: randomUUID(), target, client, platform: 'win32', signal: abort.signal, probeFactory: () => probe,
+  let connectionClient = client;
+  if (options.retained) {
+    client.accountFingerprint = target.accountFingerprint; client.restrictionsVerified = true; client.accountEpoch = 0;
+    client.initializationEvidence = { clientName: 'switchyard_tasks', result: { userAgent: 'switchyard_tasks/0.166.0 (synthetic retained owner)' } };
+    connectionClient = createRetainedCodexEditorClient({ client, target, assertCurrent: async () => {} });
+  }
+  const owner = await openWindowsCodexEditorConnection({ requestId: randomUUID(), target, client: connectionClient, platform: 'win32', signal: abort.signal, probeFactory: () => probe,
     assertCurrent: options.assertCurrent ?? (async () => {}), onOwnership: async value => { records.push(value); await options.onOwnership?.(value); },
     onAcknowledged: async (value, signal) => { acknowledged.push(value); await options.onAcknowledged?.(value, signal); },
-    retireClient: async original => { assert.equal(original, client); retired.push(original); await options.retire?.(); return { stopped: options.upstreamStopped !== false }; } });
+    retireClient: async original => { assert.equal(original, connectionClient); retired.push(original); await options.retire?.(); return options.retained ? connectionClient.stop() : { stopped: options.upstreamStopped !== false }; } });
   t.after(async () => { if (options.upstreamStopped === false || options.helperStopped === false || options.retirementRefused) await assert.rejects(owner.stop()); else await owner.stop(); });
   return { owner, client, calls, records, acknowledged, abort, retired, checks: () => checks, async connected() {
     const pin = owner.pinPeer(peer), connection = await terminal(t, owner); await pin; return connection;
@@ -71,6 +78,13 @@ test('Windows transport and exact-task protocol complete one real socket exchang
   assert.equal(JSON.stringify(f.records).includes(token), false);
   for (const key of ['nativeTaskLoaded','terminalLaunched','ideAttached','authorityGranted','completionVerified']) assert.equal(f.owner.observation()[key], false);
   assert.equal((await f.owner.stop()).stopped, true); assert.equal(f.retired.length, 1); assert.equal(f.owner.observation().protocolAcknowledged, false);
+});
+
+test('an authenticated Windows socket can retire its logical editor channel while the original task owner stays live', async t => {
+  const f = await fixture(t, { retained: true }), c = await f.ready(); c.send(resume()); assert.equal((await c.receive()).result.thread.id,target.sessionId);
+  assert.equal(f.owner.observation().protocolAcknowledged,true);assert.equal(f.calls.some(m=>['initialize','initialized'].includes(m.method)),false);
+  const result=await f.owner.stop();await c.ended;assert.equal(result.clientConnectionRetired,true);assert.equal(result.upstreamExitVerified,false);assert.equal(result.carrierExitVerified,true);
+  assert.equal(f.client.closed,false);assert.equal(f.retired.length,1);assert.equal(f.records.filter(r=>r.kind==='retired')[0].upstreamExitVerified,false);
 });
 
 test('foreign task, login, model and permission requests never reach the retained provider', async t => {

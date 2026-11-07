@@ -54,7 +54,12 @@ export function createCodexEditorRelay({ target, client, assertCurrent, send, on
       const info = m.params.clientInfo, caps = m.params.capabilities;
       require(exact(info, ['name','title','version']) && typeof info.name === 'string' && /^[A-Za-z0-9_-]{1,64}$/.test(info.name) && label(info.version) && (info.title === undefined || label(info.title)));
       require(caps === undefined || exact(caps, ['experimentalApi']) && (caps.experimentalApi === undefined || caps.experimentalApi === false));
-      const result = await request('initialize', m.params); client.nativeVersion = reviewedCodexVersion(result, info.name);
+      const result = await request('initialize', m.params);
+      // A logical stdio channel returns its retained owner's exact native hello;
+      // it never sends a second initialize or substitutes the terminal's name.
+      const retained = client.initializationOrigin === 'retained-owner';
+      require(!retained || client.retirementKind === 'logical-channel' && typeof client.initializationClientName === 'string');
+      client.nativeVersion = reviewedCodexVersion(result, retained ? client.initializationClientName : info.name);
       phase = 'initialized'; await deliver({ id: m.id, result }); return;
     }
     if (phase === 'initialized') {

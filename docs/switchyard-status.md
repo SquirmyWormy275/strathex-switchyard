@@ -18,7 +18,7 @@ checkpoints are not cumulative acceptance of the latest suite.
 | Checkpoint | Verified result | Limit |
 | --- | --- | --- |
 | Installed Linux `edb76de` | **76 metadata/in-memory checks; 42 exact module hashes.** All 54 semantic workspaces and frozen frontend preserved. [Receipt](evidence/installed-mixed-scanner-input-summary.json). | No live scanner, provider task, account/model request, native focus or hardware operation. |
-| Native Windows client `45fe70e` | **Thirteen groups; 139 passing tests; no skips.** All three persistent Job cases pass; source/merge tree, artifact, commands, bounds and cleanup verify. [Receipt](evidence/windows-owned-stdio-native-summary.json). | Synthetic workers; predates Windows Codex task adapter integration. |
+| Native Windows client `0078893` | **Fourteen groups; 147 passing tests; no skips.** Actual Job-backed synthetic app-server RPC and saved-identity recovery pass. Source/merge tree, artifact, commands, bounds and cleanup verify. [Receipt](evidence/windows-codex-owners-native-summary.json). | Synthetic providers; predates retained logical editor channel. |
 | Complete Linux `edb76de` | **330 groups; 2,074 passing tests; 21 declared platform skips.** Original inventory, commands, bounds and owned cleanup verified. [Receipt](evidence/linux-edb76de-complete-summary.json). | Includes combined inputs and Windows saving source; predates terminal/peer probes. |
 | Complete Windows `dc755901` | **417 groups; 2,478 passing tests; 207 declared skips.** All six jobs and overall workflow passed with verified packet/source/cleanup. [Receipt](evidence/windows-complete-dc755901-summary.json). | Predates newer archive, scheduling, profile/workflow and observation corrections. |
 
@@ -38,14 +38,19 @@ storage reduces the package payload to 4,599,483 bytes without changing exports.
 
 ## Recent backend changes
 
-- **Windows Codex task ownership:** protected metadata and one-use reviewed load
-  now use the original persistent Job. Configuration discovery has its own
-  supervised Job and must retire first. Fifty focused groups pass 279 tests with
-  twelve platform skips; typecheck passes. Local provider/transport doubles are
-  explicit; the actual Windows synthetic app-server case awaits CI. Windows editor
-  targets, logical channels, durable journal/recovery and Suite/VS Code editor
-  integration remain unfinished. [Contract](coding-task-owners.md),
-  [source evidence](evidence/windows-codex-owners-source-summary.json).
+- **Retained Windows editor channel:** shares the original native initialization
+  and request stream; joined logical retirement leaves the provider alive and
+  does not claim process exit. Thirty-eight groups pass 163 tests with one
+  platform skip; typecheck passes. Real CodexClient/socket tests use explicit
+  synthetic provider/peer doubles; the updated native case awaits CI.
+  [Contract](windows-editor-transport.md),
+  [source evidence](evidence/retained-editor-client-source-summary.json).
+- **Windows Codex task ownership:** native client CI now passes fourteen groups,
+  147 tests and no skips at `0078893`, including actual Job-backed synthetic
+  configuration/task RPC and saved-identity retirement. Windows editor targets,
+  durable journal/recovery and Suite/VS Code editor integration remain unfinished.
+  [Contract](coding-task-owners.md),
+  [native evidence](evidence/windows-codex-owners-native-summary.json).
 - **Persistent Windows process layer:** all three actual native Job cases pass at
   `45fe70e` within thirteen client groups: 139 tests, no skips. The earlier
   35-source offline compile passed; its exact compiler output is removed.

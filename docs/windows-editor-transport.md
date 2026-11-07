@@ -2,8 +2,8 @@
 
 The new internal carrier exchanges bounded JSON objects with one exact local
 terminal process. It now composes with the exact-task protocol through a retained
-provider client. Suite routing, durable task ownership and VS Code activation
-remain unfinished.
+provider client. Persistent Windows task ownership is implemented; durable editor
+journal/recovery, Suite editor routing and VS Code activation remain unfinished.
 
 `openWindowsEditorIngress()` creates an ephemeral listener on `127.0.0.1` and a
 random 256-bit capability. The private endpoint getter supplies the URL and bearer
@@ -49,8 +49,8 @@ account, keyboard or frontend operation was used for this implementation.
 
 ## Connect the exact task protocol
 
-`openWindowsCodexEditorConnection()` accepts an already retained, dedicated
-provider client and composes the carrier with the restricted editor relay. The
+`openWindowsCodexEditorConnection()` accepts an already retained provider client
+or a logical channel on the original authenticated stdio owner and composes the carrier with the restricted editor relay. The
 caller supplies current-owner checks, durable ownership/acknowledgement callbacks
 and independent retirement of that original provider client. This composition
 does not start or adopt a provider, issue task-loading permission, or substitute
@@ -66,9 +66,10 @@ matching account reads around the exact resume. The terminal receives the task
 reply only after the caller retains the acknowledgement. Model turns, login,
 foreign tasks, extra configuration and expanded permissions remain refused.
 Peer loss or an account boundary withdraws acknowledgement and closes the original
-connection. Stop joins startup and pending acknowledgement before retiring both
-carrier and provider. Any unconfirmed exit or retention failure prevents an
-accepted retirement record.
+connection. Stop joins startup and pending acknowledgement before retiring the
+carrier and original editor client. A dedicated client requires native exit; a
+logical channel requires joined channel retirement and leaves native exit false.
+Any unconfirmed retirement or retention failure prevents an accepted record.
 
 Fourteen focused groups pass **127 tests with three platform skips**; typecheck
 passes. Tests use real sockets with explicit provider/native-peer doubles,
@@ -81,5 +82,45 @@ This evidence does not establish durable Windows task ownership, journal recover
 VS Code launching or a live installed-account task.
 [Composition evidence](evidence/windows-editor-connection-source-summary.json).
 
-The next [persistent process layer](windows-owned-stdio.md) is implemented with
-separate source tests. Its actual Windows Job cases await CI acceptance.
+The [persistent process layer](windows-owned-stdio.md) passes native client CI at
+`45fe70e`: thirteen groups, 139 tests and no skips. The Windows task adapter then
+passes at `0078893`: fourteen groups, 147 tests and no skips. These use synthetic
+workers/app-server RPC, never a live account or task.
+[Native task evidence](evidence/windows-codex-owners-native-summary.json).
+
+
+## Share the original Windows task connection
+
+`createRetainedCodexEditorClient()` creates a logical channel on the already
+authenticated stdio client. The Windows owner retains it before calling the
+registration callback and permits one live editor at a time. It starts no
+process or native handshake. The terminal receives the exact original native
+initialization response, including its original client name; the relay verifies
+that retained provenance against the unchanged 0.166.0 gate.
+
+Metadata and editor requests share the native client's request-ID allocator.
+The logical channel allows only restricted configuration/account reads and the
+exact task's read or one read-only/on-request resume. The relay still checks
+account before and after the resume and waits for durable acknowledgement.
+Foreign-task notifications are not delivered. Account boundary events revoke
+admission synchronously, and a conflicting account reply closes the original
+provider. Requests remain bounded to 1 MiB each, 2 MiB aggregate and 64 pending.
+
+Closing detaches the channel and suppresses late replies; retirement joins all
+admitted requests. It does not terminate the task owner. The composed Windows
+connection records `clientConnectionRetired: true` and
+`upstreamExitVerified: false` for this case. Whole-owner shutdown independently
+joins editor registration/requests and verifies the original Job.
+
+Thirty-eight focused groups pass **163 tests with one platform skip**, including
+actual CodexClient parsing/request multiplexing with synthetic streams, a real
+authenticated WebSocket exchange using peer/provider doubles, late reply
+suppression, account drift, forbidden effects and joined owner registration.
+Typecheck passes. The actual Windows Job fixture now also exercises the channel
+and subsequent task metadata; that newer native check awaits CI. No new compiler,
+bundle or dependency staging was created.
+[Source evidence](evidence/retained-editor-client-source-summary.json).
+
+This channel is a backend component. Windows target preparation, durable editor
+journals and recovery, Suite routes and VS Code launching still need integration;
+no terminal command or frontend control was enabled.
