@@ -24,7 +24,7 @@ cases = [
     ("other-build", base.replace('build.7', 'build.8'), True),
     ("literal-string", base + "description = 'literal'\n", True),
     ("empty-string", base + 'description = ""\n', True),
-    ("inline-table", base + '[dependencies]\nthing = { version = "1" }\n', False),
+    ("inline-table", base + '[dependencies]\nthing = { version = "1" }\n', True),
     ("array-table", base + '[[bin]]\nname = "example"\n', True),
     ("quoted-table", base + '[target."cfg(unix)".dependencies]\n', True),
     ("duplicate-array", base + 'authors = ["One", "One"]\n', True),
@@ -67,7 +67,7 @@ cases = [
     ("multiline-literal", base + "description = '''hello\nworld'''\n", False),
     ("dotted-field-still-unsupported", base + "metadata.'tool' = 'value'\n", False),
     ("quoted-array-table", base + "[['bin']]\nname = 'example'\n", True),
-    ("inline-table-still-unsupported", base + "[dependencies]\nthing = { version = '1' }\n", False),
+    ("inline-table-literal", base + "[dependencies]\nthing = { version = '1' }\n", True),
     ("unicode-eight-digit-still-unsupported", base + 'description = "\\U0001F600"\n', False),
     ("multiple-binaries", base + '[[bin]]\nname = "one"\npath = "src/one.rs"\n[[bin]]\nname = "two"\npath = "src/two.rs"\n', True),
     ("mixed-targets", base + '[[bin]]\nname = "cli"\n[[example]]\nname = "demo"\n[[test]]\nname = "integration"\n[[bench]]\nname = "speed"\nharness = false\n', True),
@@ -95,6 +95,34 @@ cases = [
     ("array-missing-close", base + '[[bin]\nname = "one"\n', False),
     ("array-extra-close", base + '[[bin]]]\nname = "one"\n', False),
     ("array-empty-header", base + '[[]]\n', False),
+    ("inline-empty", base + 'metadata = {}\n', True),
+    ("inline-mixed", base + '[dependencies]\nthing = { version = "1", features = ["a", "b",], optional = true, priority = -2 }\n', True),
+    ("inline-nested", base + 'metadata = { tool = { name = "nested", enabled = false }, count = 3 }\n', True),
+    ("inline-quoted-keys", base + 'metadata = { "name" = "one", \'dotted.key\' = "literal", "" = \'empty\' }\n', True),
+    ("inline-markers", base + 'metadata = { a = "{},[]#=", b = \'# {} , [] =\' } # outside\n', True),
+    ("inline-prototype-keys", base + 'metadata = { __proto__ = { constructor = "inert" }, toString = "data" }\n', True),
+    ("inline-integer-bounds", base + 'metadata = { low = -9223372036854775808, high = 9223372036854775807, zero = +0 }\n', True),
+    ("inline-empty-arrays", base + 'metadata = { values = [ ], repeated = ["a", "a"] }\n', True),
+    ("inline-array-table-element", base + '[[bin]]\nmetadata = { name = "first" }\n[[bin]]\nmetadata = { name = "second" }\n', True),
+    ("inline-depth-16", base + 'metadata = ' + '{ a = ' * 16 + 'true' + ' }' * 16 + '\n', True),
+    ("inline-depth-17", base + 'metadata = ' + '{ a = ' * 17 + 'true' + ' }' * 17 + '\n', False),
+    ("inline-duplicate-alias", base + 'metadata = { a = "one", "a" = "two" }\n', False),
+    ("inline-escaped-alias", base + 'metadata = { a = "one", "\\u0061" = "two" }\n', False),
+    ("inline-nested-duplicate", base + 'metadata = { x = { a = "one", a = "two" } }\n', False),
+    ("inline-trailing-comma", base + 'metadata = { a = "one", }\n', False),
+    ("inline-double-comma", base + 'metadata = { a = "one",, b = "two" }\n', False),
+    ("inline-missing-comma", base + 'metadata = { a = "one" b = "two" }\n', False),
+    ("inline-missing-close", base + 'metadata = { a = "one"\n', False),
+    ("inline-extra-close", base + 'metadata = { a = "one" }}\n', False),
+    ("inline-missing-equals", base + 'metadata = { a "one" }\n', False),
+    ("inline-missing-value", base + 'metadata = { a = }\n', False),
+    ("inline-integer-overflow", base + 'metadata = { a = 9223372036854775808 }\n', False),
+    ("inline-dotted-key-unsupported", base + 'metadata = { a.b = "one" }\n', False),
+    ("inline-reopen-table", base + 'metadata = { a = "one" }\n[package.metadata]\nb = "two"\n', False),
+    ("inline-reopen-array-table", base + 'metadata = { a = "one" }\n[[package.metadata]]\nb = "two"\n', False),
+    ("inline-root-package-not-identity", 'package = { name = "example", version = "1.2.3-rc.1+build.7" }\n', False),
+    ("inline-name-not-identity", base.replace('name = "example"', 'name = { value = "example" }'), False),
+    ("inline-multiline-unsupported", base + 'metadata = {\na = "one"\n}\n', False),
 ]
 rows = []
 for label, text, supported in cases:
@@ -105,7 +133,7 @@ for label, text, supported in cases:
         facts = {'parsed': True, 'name': package.get('name') if isinstance(package, dict) else None, 'version': package.get('version') if isinstance(package, dict) else None}
     except tomllib.TOMLDecodeError:
         facts = {'parsed': False}
-    directory = (facts.get('name') or 'example') + '-' + (facts.get('version') or '1.2.3-rc.1+build.7')
+    directory = (facts['name'] if isinstance(facts.get('name'), str) else 'example') + '-' + (facts['version'] if isinstance(facts.get('version'), str) else '1.2.3-rc.1+build.7')
     stream = io.BytesIO()
     with tarfile.open(fileobj=stream, mode='w', format=tarfile.USTAR_FORMAT) as archive:
         for path, data in [(directory + '/Cargo.toml', raw), (directory + '/src/lib.rs', b'// NEVER_EXECUTE_REFERENCE_SOURCE\n')]:

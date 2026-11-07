@@ -7,16 +7,16 @@ but declares a different package name or version, the scan fails with an
 integrity: matching a declaration does not prove the declaration describes the
 expected package.
 
-Cargo archives with multiple `[[bin]]`, `[[example]]` and nested array tables
-now pass 84 independent Python reference cases. Ten focused groups pass 96 tests,
-including six actual Linux scanner journeys and six Windows guest doubles.
-Duplicate fields, scalar/table conflicts and invalid package identities still
-refuse admission. Original package bounds, typecheck and exact child/tree cleanup
-pass. Installed `c50a00c` passes all 84 references in its 71-check metadata
-update, preserving every semantic workspace and the frozen frontend. Dependency
-resolution and broader
-manifest/license coverage remain unfinished. [Contract](cargo-archive-identity.md),
-[source evidence](evidence/cargo-array-manifest-source-summary.json).
+Cargo archive inspection now accepts bounded inline dependency tables such as
+`serde = { version = "1", features = ["derive"] }`, nested metadata and array
+tables. All 112 independent Python reference cases and ten focused groups / 96
+tests pass, including six actual Linux scanner journeys and six Windows guest
+doubles. Duplicate aliases, invalid delimiters, table reopening and nesting beyond
+sixteen inline tables refuse admission. Original package bounds, typecheck and
+child/tree cleanup verify; owned staging is removed. Dependency resolution and
+broader manifest/license coverage remain unfinished.
+[Contract](cargo-archive-identity.md),
+[source evidence](evidence/cargo-inline-manifest-source-summary.json).
 
 Previous installed `9eec9cd` passes 58 reference cases in ten Cargo metadata
 checks inside its 71-check update, preserving all 54 semantic workspaces and the
@@ -45,6 +45,8 @@ The entire manifest must fit a closed TOML subset:
   and quoted platform conditions such as `target.'cfg(unix)'.dependencies`.
 - Array tables such as `[[bin]]` and `[[example]]`, with nested ordinary/array
   tables attached to the most recent element. Each element has its own fields.
+- Single-line inline tables with bare/quoted fields, nested inline tables up to
+  sixteen levels, and the same bounded scalar and string-array values.
 - Single-line basic/literal strings, string arrays, booleans and signed 64-bit
   decimal integers, with comments and LF or CRLF line endings.
 - One explicit `[package]` with string `name` and `version`, validated by the
@@ -57,7 +59,7 @@ Quoted field keys, empty strings and repeated string-array values are accepted.
 Quoted and bare spellings of the same key are aliases; a dot inside a quoted key
 is literal. A Map tree preserves those distinctions and rejects duplicate or
 scalar/table collisions without treating keys as JavaScript object properties.
-Multiline strings, inline tables, dotted field keys, inherited
+Multiline strings, arrays of inline tables, mixed arrays, floats, dotted field keys, inherited
 identity, eight-digit Unicode escapes and other TOML forms retain an explicit
 coverage gap. This is not a general TOML implementation or a promise to inspect
 every crate produced by Cargo. Cargo's [manifest reference](https://doc.rust-lang.org/cargo/reference/manifest.html)
@@ -67,6 +69,12 @@ Arrays cannot replace ordinary tables or append to static arrays; duplicate
 subtables within one element remain invalid. An array named `package` cannot
 supply the required ordinary package identity. This follows the
 [TOML 1.0 array-of-tables rules](https://toml.io/en/v1.0.0#array-of-tables).
+
+Inline tables are self-contained: trailing commas, duplicate decoded keys and
+reopening their fields through later table headers are refused. An inline root
+`package` does not replace the required explicit `[package]` identity. The syntax
+follows the [TOML 1.0 inline-table rules](https://toml.io/en/v1.0.0#inline-table)
+within the closed subset described above.
 
 The quoted-key behavior follows [TOML 1.0 key and table rules](https://toml.io/en/v1.0.0#keys).
 Parsing a platform condition preserves its syntax as a key; it does not evaluate

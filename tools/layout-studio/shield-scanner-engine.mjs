@@ -513,17 +513,40 @@ function cargoManifestTable(value) {
   }
   cargoRequire(parts.length); return parts;
 }
-function cargoManifestList(value) {
-  cargoRequire(value[0] === "[" && value.at(-1) === "]"); let rest = value.slice(1, -1).trim(); const items = [];
-  while (rest) {
-    const token = (rest[0] === "'" ? cargoLiteral : cargoQuoted).exec(rest); cargoRequire(token && items.length < 4096);
-    items.push(cargoManifestString(token[0])); rest = rest.slice(token[0].length).trim();
-    if (!rest) break; cargoRequire(rest[0] === ","); rest = rest.slice(1).trim();
+function cargoManifestValue(input, depth = 0) {
+  let rest = input.trim(), value;
+  if (["'", '"'].includes(rest[0])) {
+    const token = (rest[0] === "'" ? cargoLiteral : cargoQuoted).exec(rest); cargoRequire(token);
+    value = cargoManifestString(token[0]); rest = rest.slice(token[0].length).trim();
+  } else if (rest[0] === "[") {
+    value = []; rest = rest.slice(1).trim();
+    while (rest[0] !== "]") {
+      const token = (rest[0] === "'" ? cargoLiteral : cargoQuoted).exec(rest); cargoRequire(token && value.length < 4096);
+      value.push(cargoManifestString(token[0])); rest = rest.slice(token[0].length).trim();
+      if (rest[0] === "]") break;
+      cargoRequire(rest[0] === ","); rest = rest.slice(1).trim();
+    }
+    rest = rest.slice(1).trim();
+  } else if (rest[0] === "{") {
+    cargoRequire(depth < 16); value = new Map(); rest = rest.slice(1).trim();
+    while (rest[0] !== "}") {
+      const key = cargoManifestKey(rest); cargoRequire(!value.has(key.name) && key.rest[0] === "=");
+      const item = cargoManifestValue(key.rest.slice(1), depth + 1);
+      value.set(key.name, item.value); rest = item.rest;
+      if (rest[0] === "}") break;
+      cargoRequire(rest[0] === ","); rest = rest.slice(1).trim(); cargoRequire(rest[0] !== "}");
+    }
+    rest = rest.slice(1).trim();
+  } else {
+    const token = /^[^,\]}\s]+/.exec(rest); cargoRequire(token); const scalar = token[0];
+    if (["true", "false"].includes(scalar)) value = scalar === "true";
+    else { cargoRequire(/^[+-]?(?:0|[1-9][0-9]{0,18})$/.test(scalar)); value = BigInt(scalar); cargoRequire(value >= -9223372036854775808n && value <= 9223372036854775807n); }
+    rest = rest.slice(scalar.length).trim();
   }
-  return items;
+  return { value, rest };
 }
 /** Closed TOML subset: single-line basic/literal strings, string arrays,
- * booleans, decimal integers, quoted/bare keys, ordinary and array tables. Unsupported
+ * booleans, decimal integers, quoted/bare keys, ordinary, array and inline tables. Unsupported
  * syntax refuses the entire manifest, including metadata after its identity.
  * A Map tree preserves literal dots and key aliases without prototype effects. */
 function cargoArchiveManifest(bytes) {
@@ -536,13 +559,9 @@ function cargoArchiveManifest(bytes) {
     let table = [], current = root, pending = "", key;
     const store = (name, value) => {
       cargoRequire(!current.children.has(name));
-      let parsed;
-      if (["'", '"'].includes(value[0])) parsed = cargoManifestString(value);
-      else if (value.startsWith("[")) parsed = cargoManifestList(value);
-      else if (["true", "false"].includes(value)) parsed = value === "true";
-      else { cargoRequire(/^[+-]?(?:0|[1-9][0-9]{0,18})$/.test(value)); const n = BigInt(value); cargoRequire(n >= -9223372036854775808n && n <= 9223372036854775807n); }
+      const parsed = cargoManifestValue(value); cargoRequire(!parsed.rest);
       current.children.set(name, { kind: "scalar" });
-      if (table.length === 1 && table[0] === "package" && ["name", "version"].includes(name)) { cargoRequire(typeof parsed === "string"); identity[name] = parsed; }
+      if (table.length === 1 && table[0] === "package" && ["name", "version"].includes(name)) { cargoRequire(typeof parsed.value === "string"); identity[name] = parsed.value; }
     };
     for (const raw of lines) {
       const line = cargoManifestUncomment(raw); if (!line) continue;

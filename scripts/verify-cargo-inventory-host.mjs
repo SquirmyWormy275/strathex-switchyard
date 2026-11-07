@@ -14,7 +14,7 @@ if (process.platform !== "linux" || flags.length !== 1 || flags[0] !== "--read-o
   throw Error("Usage on the pilot: node scripts/verify-cargo-inventory-host.mjs --read-only-metadata");
 const sha = b => createHash("sha256").update(b).digest("hex"), app = await applicationStatus(); assert.equal(app.status, "ready");
 const root = join(installationRoot(), "versions", app.build), manifest = await verifySuiteRelease(root, { expectedId: app.build, platform: "linux", checkRuntime: true }); assert.equal(manifest.development, false);
-const source = JSON.parse(await readFile(new URL("../docs/evidence/cargo-array-manifest-source-summary.json", import.meta.url))), moduleDigests = {}, checks = [];
+const source = JSON.parse(await readFile(new URL("../docs/evidence/cargo-inline-manifest-source-summary.json", import.meta.url))), moduleDigests = {}, checks = [];
 for (const path of ["tools/layout-studio/shield-scanner-engine.mjs", "tools/layout-studio/repository-shield.mjs"]) {
   const digest = sha(await readFile(join(root, path))); assert.equal(digest, source.sourceFiles[path]); moduleDigests[path] = digest;
 }
@@ -70,13 +70,13 @@ for (const mutate of [r => { r.sbom.components[0].artifact.status = "matched"; }
 }
 checks.push("forged-cargo-byte-and-failure-observations-refuse-admission");
 const archiveOraclePath = "scripts/fixtures/cargo-archive-oracle.json", archiveOracleBytes = await readFile(new URL("../" + archiveOraclePath, import.meta.url)), archiveOracle = JSON.parse(archiveOracleBytes);
-assert.equal(sha(archiveOracleBytes), source.sourceFiles[archiveOraclePath]); assert.equal(archiveOracle.cases.length, 84);
+assert.equal(sha(archiveOracleBytes), source.sourceFiles[archiveOraclePath]); assert.equal(archiveOracle.cases.length, 112);
 for (const row of archiveOracle.cases) {
   const bytes = Buffer.from(row.bytesBase64, "base64"); assert.equal(sha(bytes), row.sha256);
   const a = inspectCargoArchive(bytes); assert.equal(a.status, row.supported ? "inspected" : "unsupported");
   if (row.supported) { assert.equal(row.toml.parsed, true); assert.equal(a.name, row.toml.name); assert.equal(a.version, row.toml.version); assert.equal(a.manifestSha256, row.manifestSha256); assert.equal(a.expandedBytes, row.expandedBytes); }
 }
-checks.push("eighty-four-independent-toml-ustar-gzip-facts-without-extraction");
+checks.push("one-hundred-twelve-independent-toml-ustar-gzip-facts-without-extraction");
 for (const path of ["tools/layout-studio/test-support/cargo-archive-fixture.mjs", "tools/layout-studio/test-support/npm-archive-fixture.mjs"]) assert.equal(sha(await readFile(new URL("../" + path, import.meta.url))), source.sourceFiles[path]);
 const { cargoArchiveFixture } = await import("../tools/layout-studio/test-support/cargo-archive-fixture.mjs");
 for (const action of ["shield_supply_chain", "release_shield"]) for (const archiveStatus of ["matched", "mismatched", "unsupported"]) {

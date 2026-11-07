@@ -25,29 +25,30 @@ and task-specific IDE attachment remain unfinished.
 [Contract](windows-native-focus.md),
 [source evidence](evidence/windows-vscode-focus-source-summary.json).
 
-Cargo archives with multiple `[[bin]]`, `[[example]]` and nested array tables
-now pass 84 independent Python reference cases. Ten focused groups pass 96 tests,
-including six actual Linux scanner journeys and six Windows guest doubles.
-Duplicate fields, scalar/table conflicts and invalid package identities still
-refuse admission. Original package bounds, typecheck and exact child/tree cleanup
-pass. Installed `c50a00c` passes all 84 references in its 71-check metadata
-update, preserving every semantic workspace and the frozen frontend. Dependency
-resolution and broader
-manifest/license coverage remain unfinished. [Contract](cargo-archive-identity.md),
-[source evidence](evidence/cargo-array-manifest-source-summary.json).
+Cargo archive inspection now accepts bounded inline dependency tables such as
+`serde = { version = "1", features = ["derive"] }`, nested metadata and array
+tables. All 112 independent Python reference cases and ten focused groups / 96
+tests pass, including six actual Linux scanner journeys and six Windows guest
+doubles. Duplicate aliases, invalid delimiters, table reopening and nesting beyond
+sixteen inline tables refuse admission. Original package bounds, typecheck and
+child/tree cleanup verify; owned staging is removed. Dependency resolution and
+broader manifest/license coverage remain unfinished.
+[Contract](cargo-archive-identity.md),
+[source evidence](evidence/cargo-inline-manifest-source-summary.json).
 
-Complete Linux `a6a6618` passes **321 groups, 1,949 tests and sixteen declared
-skips**, with zero failures/cancellations. Exact original commands, bounds, skip
-inventory and every child/tree retirement verify. Its checkout, nine dependency
-aliases, 782 generated files (11,766,823 bytes), empty temporary parent and marker
-are removed; other worktrees remain. This accepts Cargo archive, workflow/profile
-identity and observation design changes at that source. Later quoted Cargo
-manifests and Windows provider birth checks have separate focused evidence.
-[Complete receipt](evidence/linux-a6a6618-complete-summary.json).
+Complete Linux `97ef7d6` passes **322 groups, 1,965 tests and sixteen declared
+skips**, with zero failures/cancellations. Original commands, bounds, skip
+inventory and every child/tree retirement verify. The owned checkout, nine
+dependency aliases, 782 generated files (11,785,816 bytes), empty temporary parent
+and marker are removed; other worktrees remain. This includes Cargo array tables
+and the Windows ChatGPT service tested through doubles. Later VS Code focus and
+Cargo inline tables have separate focused evidence. A temporary wrapper syntax
+failure occurred before any test and is retained in the record.
+[Complete receipt](evidence/linux-97ef7d6-complete-summary.json).
 
 | Checkpoint | Completed result | What it does not establish |
 | --- | --- | --- |
-| Complete Linux `a6a6618` | **321 groups, 1,949 passing tests, sixteen declared skips**; exact original inventory, commands, bounds and cleanup. [Receipt](evidence/linux-a6a6618-complete-summary.json). | Later quoted Cargo manifests and Windows provider identity checks have separate focused evidence. |
+| Complete Linux `97ef7d6` | **322 groups, 1,965 passing tests, sixteen declared skips**; exact original inventory, commands, bounds and cleanup. [Receipt](evidence/linux-97ef7d6-complete-summary.json). | Later VS Code focus and Cargo inline tables have separate focused evidence. |
 | Complete Windows `dc755901` | **417 groups, 2,478 passing tests and 207 declared skips**; all six jobs and the overall workflow succeed, with exact packet/source/merge inventory, bounds and cleanup. [Receipt](evidence/windows-complete-dc755901-summary.json). | Predates wheel RECORD, five-job scheduling, Cargo archive and workflow/profile/observation corrections. Interactive Windows acceptance remains separate. |
 | Installed Linux `02cc6ba` | 71 metadata/in-memory checks and 22 exact module hashes, including 84 Cargo manifest reference cases. All 54 semantic workspaces, selection, pending conversation and frozen frontend are preserved. [Receipt](evidence/installed-windows-vscode-focus-summary.json). | No live scanner, provider task, agent command, account action, model request or hardware operation is performed. |
 | Complete Linux `39db1fe` | **Failed:** 313/314 groups, 1,910 passing tests, sixteen declared skips and one failed scheduling-budget assertion. Exact owned cleanup verifies. [Receipt](evidence/linux-39db1fe-scheduling-failed-summary.json). | A nearly passing run is not complete acceptance. |

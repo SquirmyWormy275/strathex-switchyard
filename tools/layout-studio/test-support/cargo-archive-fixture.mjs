@@ -7,6 +7,9 @@ export const cargoManifest = '[package]\nname = "example"\nversion = "1.2.3-rc.1
 export const cargoRoot = "example-1.2.3-rc.1+build.7";
 export const cargoQuotedMetadata = `[package.metadata.'build.system']
 'labels' = ['quoted', "", 'quoted']
+settings = { nested = { enabled = true }, labels = ['{},[]#=', 'literal'], priority = -2 }
+[dependencies]
+serde = { version = '1', features = ['derive'], optional = true }
 [target.'cfg(target_arch = "wasm32")'.dependencies.thing]
 version = '1'
 [[bin]]
@@ -21,7 +24,7 @@ name = 'demo'
 export const crate = (text = cargoManifest, entries = [], directory = cargoRoot) => gzipSync(ustarFixture([{ path: directory + "/Cargo.toml", content: text }, ...entries]));
 export function cargoArchiveFixture({ action = "shield_supply_chain", text = cargoManifest, entries = [], directory = cargoRoot, artifactStatus = "matched", archiveStatus } = {}) {
   if (archiveStatus === "mismatched") { text = cargoManifest.replace("build.7", "build.8"); directory = cargoRoot.replace("build.7", "build.8"); }
-  if (archiveStatus === "unsupported") text = cargoManifest + '[dependencies]\nthing = { version = "1" }\n';
+  if (archiveStatus === "unsupported") text = cargoManifest + '[dependencies]\nthing = { version = "1", }\n';
   if (["matched", "mismatched"].includes(archiveStatus)) text += cargoQuotedMetadata;
   const f = cargoArtifactFixture({ action, artifactStatus }), bytes = crate(text, entries, directory), original = f.content.get("Cargo.lock").toString();
   const lock = Buffer.from(original.replace(/checksum = "[a-f0-9]{64}"/, 'checksum = "' + (artifactStatus === "matched" ? sha(bytes) : "b".repeat(64)) + '"'));

@@ -8,7 +8,7 @@ const sha = b => createHash("sha256").update(b).digest("hex");
 import { cargoArchiveFixture, crate, cargoManifest as manifest, cargoRoot as root } from "./test-support/cargo-archive-fixture.mjs";
 const admit = (r, f) => parseShieldScannerReport(JSON.stringify(r), { engine: r.engine, requestSha256: r.requestSha256, request: f.request }, f.request.action);
 test("independent Python TOML, USTAR and gzip facts bind the closed manifest subset", () => {
-  assert.equal(oracle.cases.length, 84);
+  assert.equal(oracle.cases.length, 112);
   for (const row of oracle.cases) {
     const bytes = Buffer.from(row.bytesBase64, "base64"); assert.equal(sha(bytes), row.sha256);
     const observed = engine.inspectCargoArchive(bytes); assert.equal(observed.status, row.supported ? "inspected" : "unsupported", row.id);
@@ -31,7 +31,7 @@ test("Cargo archive identity retains literal builds, bounded metadata and no exe
   }
 });
 test("ambiguous Cargo manifests and unsafe tar members remain explicitly unsupported", () => {
-  for (const text of [manifest + 'name = "shadow"\n', manifest + '[package]\n', manifest + 'version.workspace = true\n', manifest + '[package.version]\nx = "bad"\n', manifest + '[dependencies]\na = { version = "1" }\n', manifest + 'description = """multiline"""\n', manifest + '[lib]\npath = "unterminated\n', manifest + '[lib]\nflag = maybe\n']) assert.equal(engine.inspectCargoArchive(crate(text)).status, "unsupported", text);
+  for (const text of [manifest + 'name = "shadow"\n', manifest + '[package]\n', manifest + 'version.workspace = true\n', manifest + '[package.version]\nx = "bad"\n', manifest + '[dependencies]\na = { version = "1", }\n', manifest + 'description = """multiline"""\n', manifest + '[lib]\npath = "unterminated\n', manifest + '[lib]\nflag = maybe\n']) assert.equal(engine.inspectCargoArchive(crate(text)).status, "unsupported", text);
   for (const entry of [{ path: "../Cargo.toml" }, { path: root + "/cargo.toml" }, { path: root + "/src", type: "2" }, { path: root + "/src", content: "parent" }, { path: "another-1.0.0/extra" }]) {
     const entries = [entry, ...(entry.content ? [{ path: root + "/src/lib.rs", content: "child" }] : [])];
     assert.equal(engine.inspectCargoArchive(crate(manifest, entries)).status, "unsupported");
