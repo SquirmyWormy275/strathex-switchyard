@@ -12,18 +12,21 @@ export function codexRuntimeStatus(value) {
 }
 
 const eligible = (session, at) => session.status === "recording" && session.sources?.includes("agent-events")
-  && !session.exclusions?.includes("codex") && Array.isArray(session.events) && observationAcceptsEventAt(session, at);
+  && !session.exclusions?.includes("codex") && Array.isArray(session.events) && observationAcceptsEventAt(session, at)
+  // A queued native event sharing the consent timestamp cannot establish which
+  // came first. Legacy recordings retain their existing boundary semantics.
+  && (session.recordingGeneration === undefined || at > session.recordingSince);
 export async function recordCodexRuntimeStatus({ store, compartment, subjectId, status, at, assertCurrentState }) {
   if (!["not-observed", "idle", "error", "active", "waiting-on-approval"].includes(status) || !Number.isSafeInteger(at) || at < 0) throw Error("Invalid closed runtime observation.");
   const before = await store.snapshot(compartment, { provider: "codex" }); assertCurrentState(before);
   if (before.policy !== "personal" || before.mode !== "personal-companion") return 0;
   const sessions = new Map((before.observations ?? []).filter(session => eligible(session, at))
-    .map(session => [session.id, JSON.stringify([session.createdAt, session.recordingSince])]));
+    .map(session => [session.id, JSON.stringify([session.createdAt, session.recordingSince, session.recordingGeneration])]));
   if (!sessions.size) return 0;
   return store.update(compartment, "codex-runtime-observation", state => {
     assertCurrentState(state);
     // A newly created/resumed recording cannot inherit an older queued event.
-    const observations = (state.observations ?? []).filter(session => sessions.get(session.id) === JSON.stringify([session.createdAt, session.recordingSince]));
+    const observations = (state.observations ?? []).filter(session => sessions.get(session.id) === JSON.stringify([session.createdAt, session.recordingSince, session.recordingGeneration]));
     return appendAgentObservation({ ...state, observations }, { provider: "codex", subjectId, phase: "runtime-status-observed", status, at });
   }, { provider: "codex" });
 }

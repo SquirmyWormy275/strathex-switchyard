@@ -32,6 +32,19 @@ test("queued runtime metadata cannot enter a resumed or newly added recording", 
   assert.equal(await f.record(), 0); assert(f.value.observations.every(row => row.events.length === 0));
   const paused = runtimeFixture(); paused.beforeWrite(value => { value.observations[0].status = "paused"; }); assert.equal(await paused.record(), 0); assert.equal(paused.value.observations[0].events.length, 0);
 });
+test("queued runtime metadata cannot inherit a different consent interval with identical timestamps", async () => {
+  for (const initial of [undefined, "old-interval"]) {
+    const f = runtimeFixture({ observations: [session({ createdAt: 10, recordingSince: 10, recordingGeneration: initial })] });
+    f.beforeWrite(value => { value.observations[0].recordingGeneration = "new-interval"; });
+    assert.equal(await f.record(), 0);
+    assert.equal(f.value.observations[0].events.length, 0);
+  }
+});
+test("runtime metadata at the exact renewed-consent timestamp remains ambiguous", async () => {
+  const f = runtimeFixture({ observations: [session({ createdAt: 10, recordingSince: 20, recordingGeneration: "new-interval" })] });
+  assert.equal(await f.record(), 0); assert.equal(f.writes, 0);
+  assert.equal(await f.record({ at: 21 }), 1);
+});
 test("runtime binding change under the encrypted mutation refuses before storing metadata", async () => {
   const f = runtimeFixture(); f.beforeWrite(() => f.invalidate()); await assert.rejects(f.record(), /Original binding changed/); assert.equal(f.writes, 0); assert.equal(f.value.observations[0].events.length, 0);
 });

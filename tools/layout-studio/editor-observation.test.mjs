@@ -7,6 +7,7 @@ import { tmpdir } from "node:os";
 import { appendEditorObservation } from "./editor-observation.mjs";
 import { createSuiteStore } from "./suite-store.mjs";
 import { createSuite } from "./suite.mjs";
+import { recordCodexRuntimeStatus } from "./codex-runtime-observation.mjs";
 
 const observation = patch => ({ status: "recording", sources: ["editor-events"], exclusions: [], events: [], createdAt: 0, updatedAt: 0, ...patch });
 const row = patch => ({ schema: "switchyard-editor-connection/v1", requestId: randomUUID(), editorId: randomUUID(), status: "reserved", createdAt: 10, privatePath: "/PRIVATE_PATH", taskId: "PRIVATE_TASK", ...patch });
@@ -41,6 +42,28 @@ test("normal observation API persists a monotonic resume boundary and duplicate 
   await transition("paused"); at = base + 5; await transition("recording");
   assert.equal((await store.snapshot("personal")).observations[0].recordingSince, base + 20);
   await transition("stopped"); await assert.rejects(transition("recording"), /transition/);
+});
+
+test("same-clock pause and resume cannot admit a queued native observation into renewed consent", async t => {
+  const root = await mkdtemp(join(tmpdir(), "switchyard-recording-generation-")), keys = new Map();
+  const store = createSuiteStore({ root, secrets: { get: async (id, purpose) => keys.get(`${id}:${purpose}`), set: async (id, purpose, value) => keys.set(`${id}:${purpose}`, value) } });
+  const suite = createSuite({ store, agents: { discovery: async () => [], close() {} }, voice: { discovery: async () => ({ available: false }) } });
+  t.after(async () => { await suite.close(); await rm(root, { recursive: true, force: true }); });
+  const base = Date.now(); let at = base; t.mock.method(Date, "now", () => at);
+  await suite.handle("/api/suite/bootstrap"); await suite.handle("/api/suite/mode", { mode: "personal-companion" });
+  const o = await suite.handle("/api/suite/observation/start", { sources: ["agent-events"], exclusions: [], consent: true });
+  at = base + 1;
+  const transition = status => suite.handle("/api/suite/observation/state", { id: o.id, status });
+  const delayed = { snapshot: (...args) => store.snapshot(...args), async update(...args) { await transition("paused"); await transition("recording"); return store.update(...args); } };
+  const input = { store: delayed, compartment: "personal", subjectId: "synthetic-owned-turn", status: "active", at, assertCurrentState() {} };
+  assert.equal(await recordCodexRuntimeStatus(input), 0);
+  const resumed = (await store.snapshot("personal")).observations[0];
+  assert.deepEqual(resumed.events, []); assert.equal(resumed.recordingSince, at);
+  assert.notEqual(resumed.recordingGeneration, o.recordingGeneration);
+  await transition("recording");
+  assert.equal((await store.snapshot("personal")).observations[0].recordingGeneration, resumed.recordingGeneration);
+  assert.equal(await recordCodexRuntimeStatus({ ...input, store }), 0);
+  assert.equal(await recordCodexRuntimeStatus({ ...input, store, at: at + 1 }), 1);
 });
 
 test("editor metadata keeps correlation private and its historical provenance cannot claim live attachment", () => {

@@ -372,3 +372,10 @@ workstation guard remain preserved. [Continuation notes](switchyard-continuation
 record operating constraints and the next work. Older details remain in the
 [verification record](verification.md), [history index](switchyard-status-history-8.md)
 and [preceding status checkpoint](https://github.com/SquirmyWormy275/strathex-switchyard/blob/9626b556aadf1e6c3f2b99f242c58789911bf0d3/docs/switchyard-status.md).
+
+The later consent-generation correction gives each explicit observation start or
+resume a new identity, preserves duplicate recording requests, and refuses delayed
+native metadata across same-clock renewals. Two original failures are retained;
+eight groups pass 120 tests with no skips and an actual encrypted-state API
+scenario. This source correction postdates installed `57af859` and the running
+complete Linux `0c025df` check. [Evidence](evidence/consent-generation-source-summary.json).

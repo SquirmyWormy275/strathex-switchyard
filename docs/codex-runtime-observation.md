@@ -51,3 +51,17 @@ conversation remain intact. The dated launcher backup/readback verify; the
 The first workflow verifier correctly refused an old source-evidence pin; the
 corrected verifier passes without changing saved workflows.
 [Installed evidence](evidence/installed-runtime-observation-summary.json).
+
+Each explicitly started or resumed recording now has a private generation. The
+writer rechecks that identity inside encrypted persistence, so pause/resume cannot
+reuse an earlier event merely because the wall clock did not advance. A duplicate
+recording-status request preserves the current interval. Events sharing the exact
+start/resume timestamp are ambiguous and omitted; later metadata remains eligible.
+Legacy recordings retain their timestamp behavior until the next explicit resume.
+
+Two original regressions reproduced acceptance across renewed consent. Eight
+focused groups now pass 120 tests with no skips, including the encrypted Suite
+API, runtime notifications, foreground sampling, role dispatch and design-context
+review. This is source-only evidence after installed `57af859` and complete Linux
+checkpoint `0c025df`; it invokes no live provider or hardware.
+[Consent-generation evidence](evidence/consent-generation-source-summary.json).

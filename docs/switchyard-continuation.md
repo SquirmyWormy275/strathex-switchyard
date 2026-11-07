@@ -244,3 +244,10 @@ verifiers and failed. The original failed receipt is retained; the unchanged
 verifier then passes all eight checks sequentially. Run host-facing metadata
 verifiers sequentially when they share lazy initialization. The final all-workspace
 readback confirms every semantic snapshot and selection is preserved.
+
+The later consent-generation correction gives each explicit observation start or
+resume a new identity, preserves duplicate recording requests, and refuses delayed
+native metadata across same-clock renewals. Two original failures are retained;
+eight groups pass 120 tests with no skips and an actual encrypted-state API
+scenario. This source correction postdates installed `57af859` and the running
+complete Linux `0c025df` check. [Evidence](evidence/consent-generation-source-summary.json).
