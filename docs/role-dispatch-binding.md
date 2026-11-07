@@ -47,7 +47,6 @@ change. Ten focused groups pass 141 tests and one declared platform skip, plus
 both TypeScript checks. Process, provider, window and tmux observations are
 explicit doubles. [Claude focus evidence](evidence/claude-focus-role-boundary-source-summary.json).
 
-These are source-level corrections; the installed application remains `738c1f7`.
 Legacy owned Codex coding-task resume now checks the same role/workspace guard
 after observing the exact task and again after transport initialization, just
 before sending the command. An authorization check that settles after the
@@ -84,3 +83,12 @@ commands, uncertain delivery records and owned-process cleanup stay intact.
 Windows task-window focus remains unsupported. No live account, model, installed
 agent, keyboard or frontend operation was used for this verification. The full
 suite and real provider/tenant/hardware acceptance remain separate.
+
+Normal installed Linux `08fa7ea` includes these corrections. It passes 86
+metadata/refusal checks against 54 exact module hashes, including in-memory
+original-workspace and leased-role refusal followed by a valid synthetic enqueue.
+All 54 semantic workspaces, four profiles, 57 workflows, selection and the pending
+keyboard-only conversation are preserved. The dated launcher backup and readback
+verify; the 553-file temporary package is removed, leaving current plus one
+rollback. This installed check makes no live provider, model, native focus or
+keyboard request. [Installed evidence](evidence/installed-role-boundaries-summary.json).

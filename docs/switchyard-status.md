@@ -25,8 +25,8 @@ groups pass 152 tests with two skips. The actual 0.167 binary passes production
 argument construction and hello/config validators in an empty network-isolated
 home. No account, thread or model request is sent; its original tree and 66
 generated files are removed. The native Windows client lane also passes all 237
-tests at this exact source. Installed Linux `738c1f7` includes this contract and
-passes 84 metadata/refusal checks while preserving all 54 workspace snapshots.
+tests at this exact source. Installed Linux `08fa7ea` includes this contract and
+passes 86 metadata/refusal checks while preserving all 54 workspace snapshots.
 [Version contract and evidence](codex-version-contract.md).
 
 Windows project reviews now bind the original local workspace folder and
@@ -92,8 +92,8 @@ Configuration-conversation resume, cancellation and Codex/Claude/Microsoft desig
 submission now carry the guard to their effect boundaries and encrypted reply
 writes. Eighteen focused groups pass 226 tests with one skip; eleven final cases
 also verify preserved Microsoft delivery uncertainty. All provider responses are
-synthetic. These corrections are not installed yet; full-suite and live-provider
-acceptance remain separate.
+synthetic. Normal installed `08fa7ea` now verifies these exact modules and two
+in-memory role guard cases; full-suite and live-provider acceptance remain separate.
 [Role dispatch evidence and limitations](role-dispatch-binding.md).
 
 ## Current evidence
@@ -103,7 +103,7 @@ checkpoints are not cumulative acceptance of the latest suite.
 
 | Checkpoint | Verified result | Limit |
 | --- | --- | --- |
-| Installed Linux `738c1f7` | **84 metadata/refusal checks; 48 exact module hashes.** All 54 semantic workspaces, four profiles, 57 workflows and frozen frontend preserved. [Receipt](evidence/installed-signed-physical-intent-summary.json). | Signed CLI dispatch and Codex version contract included; editor command activation remains pending; no live scanner, provider task, account/model request, native focus or hardware acceptance. |
+| Installed Linux `08fa7ea` | **86 metadata/refusal checks; 54 exact module hashes.** All 54 semantic workspaces, four profiles, 57 workflows and frozen frontend preserved. [Receipt](evidence/installed-role-boundaries-summary.json). | Original-role/provider-effect guards, signed CLI dispatch and Codex version contract included; editor command activation remains pending; no live scanner, provider task, account/model request, native focus or hardware acceptance. |
 | Native Windows client `c359cdf` | **25 groups; 243 tests; no skips.** Original manifest, commands, bounds and cleanup verified. [Receipt](evidence/windows-editor-project-context-native-summary.json). | Terminal/provider doubles remain explicit; not the complete Windows suite, later storage diagnostics or authenticated Codex turns. |
 | Complete Linux `c359cdf` | **348 groups; 2,218 tests; 32 declared platform skips.** Original manifest, bounds and cleanup verified. [Receipt](evidence/linux-c359cdf-complete-summary.json). | Includes journal, Codex 0.167 and workspace lifecycle corrections; predates later status-query diagnostics. |
 | Complete Windows `dc755901` | **417 groups; 2,478 tests; 207 declared skips.** All six jobs and overall workflow passed. [Receipt](evidence/windows-complete-dc755901-summary.json). | Predates newer archive, scheduling, profile/workflow and observation corrections. |

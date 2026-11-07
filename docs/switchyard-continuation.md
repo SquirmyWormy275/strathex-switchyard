@@ -67,8 +67,9 @@ guardian readiness and Microsoft fetch/response checks. Reply writes also check
 the binding under the encrypted lease. Five conversation and three Microsoft
 regressions are retained separately from fixture corrections. Eighteen groups
 pass 226 tests with one skip and both TypeScript checks; eleven final cases
-verify retained Microsoft uncertainty. These corrections are source-only; full
-suite and real provider/tenant acceptance remain separate. The in-memory
+verify retained Microsoft uncertainty. Normal installed `08fa7ea` now verifies
+these modules and two in-memory role guards; full suite and real provider/tenant
+acceptance remain separate. The in-memory
 generation cannot observe external selection round trips entirely between reads.
 [Role dispatch contract](role-dispatch-binding.md).
 
@@ -124,12 +125,12 @@ native helper/runtime bundle was downloaded locally.
    and restricted-storage owner checks also pass. The later `e5a5781` explicit
    native-helper guardian step passes the invalid-status-request case; its final
    complete bundle acceptance remains pending.
-2. Installed Linux now runs `738c1f7`, release `4cda61afefac`, with `edf66107db84`
+2. Installed Linux now runs `08fa7ea`, release `2e9fbd4ff5b8`, with `4cda61afefac`
    retained as rollback. All 54 semantic workspaces, selection, one pending
-   keyboard-only conversation and frozen frontend verify. The 84 metadata/
-   refusal checks cover 48 exact modules, four profiles and 57 workflows.
+   keyboard-only conversation and frozen frontend verify. The 86 metadata/
+   refusal checks cover 54 exact modules, four profiles and 57 workflows.
    Dated launcher backup and readback verify; the exact prepared 553-file,
-   4,819,454-byte bundle is removed. Signed requests reject absent roles, wrong
+   4,823,649-byte bundle is removed. Signed requests reject absent roles, wrong
    PID/build, stale requests and caller-selected compartments without an effect.
    No browser reload, native focus, live provider/task or hardware use occurred.
    Do not repeat this update or remove its already-removed staging again.
@@ -156,7 +157,7 @@ native helper/runtime bundle was downloaded locally.
    protected-Suite demonstration verifies both peer exit and workspace departure
    with real Linux carriers and a provider double. Original terminal/provider
    preservation, uncertain retirement refusal and owned cleanup verify.
-   This source is not installed and postdates complete Linux `c359cdf`.
+   This source is included in installed `08fa7ea` and postdates complete Linux `c359cdf`.
    Command activation and frozen frontend remain unchanged.
 8. Physical CLI dispatch now uses the signed instance gateway, never the browser
    bearer token. Two regressions reproduce unsigned-listener and saved-PID faults;
@@ -177,11 +178,11 @@ process-query change has been made.
 
 ## Installed application and complete-suite baseline
 
-Installed Linux is `738c1f7`: 84 metadata/refusal checks, 48 module hashes,
+Installed Linux is `08fa7ea`: 86 metadata/refusal checks, 54 module hashes,
 all 54 semantic workspaces, four profiles, 57 workflows, selected state, pending
 keyboard-only conversation and frozen frontend preserved. The current release
 and one rollback remain; its exact prepared bundle has been removed.
-[Installed evidence](evidence/installed-signed-physical-intent-summary.json).
+[Installed evidence](evidence/installed-role-boundaries-summary.json).
 
 The accepted complete Linux run is `c359cdf`: 348 groups, 2,218 passes
 and 32 declared platform skips. Its exact checkout, nine dependency aliases,

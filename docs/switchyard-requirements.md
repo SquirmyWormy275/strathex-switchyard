@@ -11,7 +11,9 @@ Terminal/provider doubles remain explicit; interactive acceptance is separate.
 Source `0c7d918` adds role/workspace checks at custom-agent enqueue, native focus,
 Codex task resume and configuration-conversation effects/reply writes. Eighteen
 focused groups pass 226 tests with one skip, and both TypeScript checks pass.
-Its complete Linux run is active; the installed application remains `738c1f7`.
+Its complete Linux run is active. Normal installed `08fa7ea` verifies 86 metadata/
+refusal checks, 54 exact modules and all original workspaces.
+[Installed receipt](evidence/installed-role-boundaries-summary.json).
 [Role boundaries and evidence](role-dispatch-binding.md).
 
 Windows `e5a5781` passes all six preliminary backend shards: 232 groups, 1,356
@@ -27,7 +29,7 @@ correction have separate focused evidence. [Complete receipt](evidence/linux-c35
 Codex source `9c3bccf` admits exact 0.166.0/0.167.0 with 42 feature exclusions
 and version-bound text review. Twelve groups pass 152 tests with two skips;
 actual 0.167 production initialization/config-read passes in an empty
-network-isolated home. Installed Linux `738c1f7` passes 84 metadata/refusal
+network-isolated home. Installed Linux `08fa7ea` passes 86 metadata/refusal
 checks and preserves every workspace. Live account/task/model/TUI acceptance
 remains separate. [Contract](codex-version-contract.md).
 
