@@ -48,13 +48,13 @@ checkpoints are not cumulative acceptance of the latest suite.
 | --- | --- | --- |
 | Installed Linux `edb76de` | **76 metadata/in-memory checks; 42 exact module hashes.** All 54 semantic workspaces and frozen frontend preserved. [Receipt](evidence/installed-mixed-scanner-input-summary.json). | No live scanner, provider task, account/model request, native focus or hardware operation. |
 | Native Windows client `485b7c6` | **Twenty groups; 205 passing tests; no skips.** Windows TypeScript client, signed Suite routes, lifecycle and prior native cases pass. [Receipt](evidence/windows-editor-client-native-summary.json). | Endpoint reader and provider/terminal-peer doubles are explicit in the composed client case. Predates the native endpoint reader; restricted-storage failure remains unresolved. |
-| Complete Linux `edb76de` | **330 groups; 2,074 passing tests; 21 declared platform skips.** Original inventory, commands, bounds and owned cleanup verified. [Receipt](evidence/linux-edb76de-complete-summary.json). | Includes combined inputs and Windows saving source; predates terminal/peer probes. |
+| Complete Linux `961ecb3` | **348 groups; 2,205 passing tests; 32 declared platform skips.** Original inventory, commands, bounds and owned cleanup verified. [Receipt](evidence/linux-961ecb3-complete-summary.json). | Includes the reviewed Windows launcher source; predates the two journal corrections. |
 | Complete Windows `dc755901` | **417 groups; 2,478 passing tests; 207 declared skips.** All six jobs and overall workflow passed with verified packet/source/cleanup. [Receipt](evidence/windows-complete-dc755901-summary.json). | Predates newer archive, scheduling, profile/workflow and observation corrections. |
 
-Complete Linux `edb76de` has zero failures or cancellations. Its isolated checkout,
-nine dependency aliases, 788 generated files (11,809,374 bytes), empty test parent
-and active marker are removed. Other worktrees remain. Newer terminal and peer
-changes have separate focused evidence.
+Complete Linux `961ecb3` has zero failures or cancellations. Its isolated checkout,
+nine dependency aliases, 802 generated files (11,900,104 bytes), empty test parent
+and active marker are removed. Other worktrees remain. The journal corrections
+have separate focused and native evidence.
 
 The latest installation includes 17 wheel license-header cases, 112 Cargo
 manifest reference cases, and eight in-memory policy reports for each of wheels,

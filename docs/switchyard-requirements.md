@@ -22,6 +22,11 @@ acceptance and the separate restricted-storage retirement cause remain open.
 
 ## Requirement status
 
+Complete Linux source `961ecb3` passes 348 groups, 2,205 tests and 32 declared
+platform skips. Original manifest, commands, bounds, child retirement and exact
+temporary-checkout cleanup verify. This predates both journal corrections.
+[Complete receipt](evidence/linux-961ecb3-complete-summary.json).
+
 Latest follow-up: `ecbb8cb` passes 24 of 25 Windows client groups, with 229
 passing tests and four acknowledgement failures; original cleanup completes
 without a group timeout. The read/publication queue correction passes eight

@@ -81,12 +81,11 @@ failed-write outcomes. Do not declare native repair until the next lane passes.
 
 ## Outstanding verification and implementation
 
-1. Finish the complete Linux run for exact source `961ecb3`; audit its original
-   manifest, commands, bounds, skips and child retirement. Remove only its
-   recorded temporary checkout, dependency aliases, generated files and empty
-   test parent. This run predates the journal race correction.
-2. Publish the journal read/publication queue correction with its failing
-   regression and passing follow-up, then audit the resulting Windows client job. Preserve the original
+1. Complete Linux `961ecb3` is accepted: 348 groups, 2,205 passing tests and
+   32 declared skips. Its receipt is audited and exact staging removed. Do not
+   restart that completed run or use it as acceptance of later journal changes.
+2. The journal read/publication queue correction is published as `0594c8d`.
+   Audit client workflow `42365874853`, job `128383860203`. Preserve the original
    failure if another independent defect appears; do not change deadlines or
    assertions to obtain a pass.
 3. Continue task-specific Windows IDE/project integration and remaining backend
@@ -115,11 +114,12 @@ keyboard-only conversation and frozen frontend preserved. Current plus one
 rollback remain. No installed update is part of the journal correction.
 [Installed evidence](evidence/installed-mixed-scanner-input-summary.json).
 
-The preceding accepted complete Linux run is `edb76de`: 330 groups, 2,074 passes
-and 21 declared platform skips. Its exact generated checkout and staging were
-removed. The preceding accepted complete Windows run is `dc755901`: 417 groups,
+The accepted complete Linux run is `961ecb3`: 348 groups, 2,205 passes
+and 32 declared platform skips. Its exact checkout, nine dependency aliases,
+802 generated files (11,900,104 bytes), empty test parent and marker are removed.
+The preceding accepted complete Windows run is `dc755901`: 417 groups,
 2,478 passes and 207 declared skips. These revisions predate current editor work.
-[Linux evidence](evidence/linux-edb76de-complete-summary.json),
+[Linux evidence](evidence/linux-961ecb3-complete-summary.json),
 [Windows evidence](evidence/windows-complete-dc755901-summary.json).
 
 Combined current/index/history scanner inputs, exact reviewed recipe saving,

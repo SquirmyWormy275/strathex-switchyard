@@ -1,5 +1,28 @@
 # What has actually been verified
 
+The [current status](switchyard-status.md) is the entry point for present
+implementation. The checkpoint records below preserve historical outcomes;
+their earlier “unfinished” notes are not the current requirement ledger.
+
+Complete Linux source `961ecb3` passes **348 groups, 2,205 tests and 32 declared
+platform skips**, with no failures or cancellations. The original manifest,
+commands, deadlines, skip counts and every child retirement verify. Its original
+systemd unit has exited successfully. The exact temporary checkout, nine
+dependency aliases, 802 generated files (11,900,104 bytes), empty test parent and
+active marker are removed; all other worktrees remain. This run predates the
+`ecbb8cb` and `0594c8d` journal corrections.
+[Complete source receipt](evidence/linux-961ecb3-complete-summary.json).
+
+The `ecbb8cb` Windows client lane still fails four acknowledgement assertions:
+24 of 25 groups pass, 229 tests pass, and cleanup now finishes naturally within
+the original bound. The `0594c8d` publication queue passes eight focused groups,
+69 tests and two skips; its native check is pending. A passing Linux run does not
+resolve that Windows failure.
+[Retained failure](evidence/editor-journal-native-failure-summary.json),
+[source correction](evidence/editor-journal-read-queue-summary.json).
+
+## Earlier checkpoint records
+
 Windows editor query helpers now expose their original guardian, helper digest,
 request identity and role before worker acknowledgement. The carrier forwards
 those checkpoints to the protected journal, which refuses replacement until

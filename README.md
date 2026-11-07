@@ -68,16 +68,16 @@ execution, offline repository scans and recoverable installation. The Home and
 Model F catalog provide the starting experience; complete task/IDE attachment,
 role/device controls and full scanner coverage remain unfinished.
 
-The accepted complete Linux checkpoint `aafb476` passes **317 groups / 1,923
-tests**, with sixteen declared skips and verified owned cleanup. The restricted
-Windows storage journey now passes all eight original checks, including exact
-exit and fixture/service retirement. Complete Windows source `dc755901` passes
-**417 groups / 2,478 tests**, with 207 declared skips, exact cleanup and a green
-overall workflow. Newer changes retain separate focused evidence.
-The latest agent and helper ownership corrections have focused checks and a
-71-check installed metadata demonstration; a
-recurring first-install shortcut timeout remains under investigation. Source,
-installed, interactive, hardware and account acceptance remain separate.
+Complete Linux checkpoint `961ecb3` passes **348 groups / 2,205 tests**, with
+32 declared platform skips. Its temporary checkout and 11.9 MB of build output
+have been removed after verification. Complete Windows checkpoint `dc755901`
+passes **417 groups / 2,478 tests**, with 207 declared skips; it predates the
+latest backend work. The Windows editor demonstration now reaches an exact
+synthetic task acknowledgement, but the latest native integration run still has
+four acknowledgement failures. A focused correction is under native validation.
+Restricted storage has passing follow-ups, but an intermittent retirement failure
+remains unresolved. Source, installed, interactive, hardware and account
+acceptance remain separate.
 [Current status and exact evidence](docs/switchyard-status.md).
 
 | Explore | Start here |
