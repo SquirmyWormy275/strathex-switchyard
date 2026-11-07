@@ -5,7 +5,7 @@ import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { homedir } from "node:os";
 import { pathToFileURL } from "node:url";
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { EventEmitter } from "node:events";
 import { PassThrough } from "node:stream";
 import { applicationStatus } from "../deployment/suite/application.mjs";
@@ -19,7 +19,7 @@ const { verifySuiteRelease } = await import("../deployment/suite/release.mjs");
 const root = join(installationRoot(), "versions", app.build), m = await verifySuiteRelease(root, { expectedId: app.build, platform: "linux", checkRuntime: true }), checks = [], moduleDigests = {};
 assert.equal(m.development, false);
 const built = { source: m.sourceCommit, id: m.id };
-for (const [evidence, names] of [["credential-process-source-summary.json", ["tools/layout-studio/credential-process.mjs"]], ["external-agent-consent-source-summary.json", ["tools/layout-studio/custom-agents.mjs", "tools/layout-studio/agent-observation.mjs", "integrations/agent-sdk.mjs", "integrations/switchyard_agent.py"]], ["codex-runtime-observation-source-summary.json", [ "tools/layout-studio/codex-turn.mjs", "tools/layout-studio/agents.mjs", "tools/layout-studio/reviewed-task-text.mjs", "tools/layout-studio/design-observations.mjs"]], ["foreground-owner-source-summary.json", ["tools/layout-studio/foreground.mjs"]], ["hotkey-owner-source-summary.json", ["tools/layout-studio/windows-host.mjs"]], ["scanner-history-review-source-summary.json", ["tools/layout-studio/git-index-inputs.mjs", "tools/layout-studio/git-history-inputs.mjs", "tools/layout-studio/repository-inspection.mjs", "packages/control-plane/src/git-inspector.ts", "packages/control-plane/src/git-index-tree.ts"]], ["codex-0167-contract-summary.json", ["tools/layout-studio/codex-requests.mjs", "tools/layout-studio/codex-submissions.mjs"]], ["design-observations-source-summary.json", ["tools/layout-studio/catalog-source.mjs", "tools/layout-studio/haptic-capabilities.mjs"]], ["scanner-recipe-draft-source-summary.json", ["tools/layout-studio/scanner-fixtures.mjs", "apps/windows-companion/src/scanner-fixtures.ts"]], ["conversation-role-boundaries-source-summary.json", ["tools/layout-studio/copilot.mjs"]], ["codex-task-resume-role-boundary-source-summary.json", ["tools/layout-studio/coding-sessions.mjs", "apps/vscode-extension/src/codex-daemon-status.cjs"]], ["claude-focus-role-boundary-source-summary.json", ["tools/layout-studio/claude-coding.mjs", "tools/layout-studio/task-window.mjs", "tools/layout-studio/tmux-task-window.mjs"]], ["windows-editor-endpoint-source-summary.json", ["deployment/suite/release.mjs"]], ["scanner-recipe-save-source-summary.json", ["tools/layout-studio/scanner-recipe-draft.mjs", "tools/layout-studio/scanner-recipe-files.mjs", "packages/control-plane/src/confirmations.ts", "tools/layout-studio/legend-template.mjs", "tools/layout-studio/legend-export.mjs"]], ["windows-scanner-recipe-save-source-summary.json", ["tools/layout-studio/scanner-recipe-save.mjs", "tools/layout-studio/windows-scanner-recipe-files.mjs"]], ["persisted-selection-source-summary.json", ["tools/layout-studio/suite-store.mjs"]], ["consent-generation-source-summary.json", ["tools/layout-studio/codex-runtime-observation.mjs"]], ["role-choices-source-summary.json", ["tools/layout-studio/role-choices.mjs"]], ["editor-project-choices-source-summary.json", ["tools/layout-studio/suite.mjs", "tools/layout-studio/coding-task-owners.mjs"]], ["windows-vscode-focus-source-summary.json", ["tools/layout-studio/windows-native-focus.mjs"]], ["scanner-mixed-input-source-summary.json", ["tools/layout-studio/task-authority.mjs", "tools/layout-studio/shield-git-inputs.mjs", "tools/layout-studio/repository-execution.mjs", "tools/layout-studio/repository-windows-execution.mjs", "tools/layout-studio/windows-reviewed-inputs.mjs", "tools/layout-studio/windows-reviewed-runner.mjs", "tools/layout-studio/windows-history-inputs.mjs", "apps/linux-companion/src/linux-repository-inputs.ts"]]]) {
+for (const [evidence, names] of [["credential-process-source-summary.json", ["tools/layout-studio/credential-process.mjs"]], ["external-agent-consent-source-summary.json", ["tools/layout-studio/custom-agents.mjs", "tools/layout-studio/agent-observation.mjs", "integrations/agent-sdk.mjs", "integrations/switchyard_agent.py"]], ["codex-runtime-observation-source-summary.json", [ "tools/layout-studio/codex-turn.mjs", "tools/layout-studio/agents.mjs", "tools/layout-studio/reviewed-task-text.mjs", "tools/layout-studio/design-observations.mjs"]], ["foreground-owner-source-summary.json", ["tools/layout-studio/foreground.mjs"]], ["hotkey-owner-source-summary.json", ["tools/layout-studio/windows-host.mjs"]], ["scanner-history-review-source-summary.json", ["tools/layout-studio/git-index-inputs.mjs", "tools/layout-studio/git-history-inputs.mjs", "tools/layout-studio/repository-inspection.mjs", "packages/control-plane/src/git-inspector.ts", "packages/control-plane/src/git-index-tree.ts"]], ["codex-0167-contract-summary.json", ["tools/layout-studio/codex-requests.mjs", "tools/layout-studio/codex-submissions.mjs"]], ["design-observations-source-summary.json", ["tools/layout-studio/catalog-source.mjs", "tools/layout-studio/haptic-capabilities.mjs"]], ["scanner-recipe-draft-source-summary.json", ["tools/layout-studio/scanner-fixtures.mjs", "apps/windows-companion/src/scanner-fixtures.ts"]], ["conversation-role-boundaries-source-summary.json", ["tools/layout-studio/copilot.mjs"]], ["codex-task-resume-role-boundary-source-summary.json", ["tools/layout-studio/coding-sessions.mjs", "apps/vscode-extension/src/codex-daemon-status.cjs"]], ["claude-319-source-summary.json", ["tools/layout-studio/claude-account.mjs", "tools/layout-studio/claude-coding.mjs"]], ["claude-focus-role-boundary-source-summary.json", ["tools/layout-studio/task-window.mjs", "tools/layout-studio/tmux-task-window.mjs"]], ["windows-editor-endpoint-source-summary.json", ["deployment/suite/release.mjs"]], ["scanner-recipe-save-source-summary.json", ["tools/layout-studio/scanner-recipe-draft.mjs", "tools/layout-studio/scanner-recipe-files.mjs", "packages/control-plane/src/confirmations.ts", "tools/layout-studio/legend-template.mjs", "tools/layout-studio/legend-export.mjs"]], ["windows-scanner-recipe-save-source-summary.json", ["tools/layout-studio/scanner-recipe-save.mjs", "tools/layout-studio/windows-scanner-recipe-files.mjs"]], ["persisted-selection-source-summary.json", ["tools/layout-studio/suite-store.mjs"]], ["consent-generation-source-summary.json", ["tools/layout-studio/codex-runtime-observation.mjs"]], ["role-choices-source-summary.json", ["tools/layout-studio/role-choices.mjs"]], ["editor-project-choices-source-summary.json", ["tools/layout-studio/suite.mjs", "tools/layout-studio/coding-task-owners.mjs"]], ["windows-vscode-focus-source-summary.json", ["tools/layout-studio/windows-native-focus.mjs"]], ["scanner-mixed-input-source-summary.json", ["tools/layout-studio/task-authority.mjs", "tools/layout-studio/shield-git-inputs.mjs", "tools/layout-studio/repository-execution.mjs", "tools/layout-studio/repository-windows-execution.mjs", "tools/layout-studio/windows-reviewed-inputs.mjs", "tools/layout-studio/windows-reviewed-runner.mjs", "tools/layout-studio/windows-history-inputs.mjs", "apps/linux-companion/src/linux-repository-inputs.ts"]]]) {
     const e = JSON.parse(await readFile(new URL("../docs/evidence/" + evidence, import.meta.url), "utf8"));
     const sourceFiles = e.sourceFiles ?? Object.fromEntries(e.files.map(file => [file.path, file.sha256]));
     for (const name of names) {
@@ -44,6 +44,41 @@ for (const userAgent of ["another/0.167.0 (synthetic)", "switchyard/0.167.0 (syn
     assert.throws(() => reviewedCodexVersion({ userAgent }, "switchyard"), /verified/);
 }
 checks.push("installed-codex-admits-only-exact-reviewed-versions-and-client-identity");
+
+const { reviewedClaudeVersions, readClaudeDesignLogin } = await load("tools/layout-studio/claude-account.mjs");
+assert.deepEqual(reviewedClaudeVersions, ["2.1.308", "2.1.317", "2.1.319"]);
+const syntheticClaudeAccount = { loggedIn: true, authMethod: "claude.ai", apiProvider: "firstParty", email: "synthetic@example.invalid", orgId: "synthetic-org" };
+for (const version of [...reviewedClaudeVersions, "2.1.318", "2.1.320", "2.1.319-preview"]) {
+    const observed = [];
+    const command = async (_exe, args, options) => {
+        assert.ok(args.length === 1 && args[0] === "--version" || JSON.stringify(args) === JSON.stringify(["auth", "status", "--json"]));
+        observed.push(args[0]);
+        await options.onGuardianReady({ schema: "switchyard-runtime-command/v1", id: randomUUID(), guardianPid: 1234, birth: "1", containment: "owned-linux-session" });
+        return { status: "completed", exitCode: 0, treeExitVerified: true, inputDelivered: true, stderr: "", stdout: args[0] === "--version" ? version + " (Claude Code)" : JSON.stringify(syntheticClaudeAccount) };
+    };
+    if (reviewedClaudeVersions.includes(version)) assert.equal((await readClaudeDesignLogin("/synthetic/claude", "/synthetic/project", { command })).version, version);
+    else { await assert.rejects(readClaudeDesignLogin("/synthetic/claude", "/synthetic/project", { command }), /reviewed native version/); assert.deepEqual(observed, ["--version"]); }
+}
+checks.push("installed-Claude-exact-version-admission-and-unreviewed-refusal-use-only-in-memory-command-doubles");
+const { createClaudeCoding } = await load("tools/layout-studio/claude-coding.mjs");
+const attachmentCommands = [], attachmentService = createClaudeCoding({
+    store: { authorize: async () => {}, snapshot: async () => ({ codingSessions: [] }) },
+    resolveCli: async () => "/synthetic/claude", run: async (_exe, args) => {
+        assert.ok(args[0] === "--version" || args[0] === "auth"); attachmentCommands.push(args[0]);
+        return args[0] === "--version" ? "2.1.319 (Claude Code)" : JSON.stringify(syntheticClaudeAccount);
+    }
+});
+try {
+    const discovery = await attachmentService.discovery("synthetic");
+    assert.equal(discovery.available, true); assert.equal(discovery.terminalAttachment.implemented, false);
+    assert.equal(discovery.terminalAttachment.mayRestartStoppedSession, true);
+    assert.equal(discovery.terminalAttachment.liveOnlyOptionVerified, false);
+    assert.equal(discovery.terminalAttachment.launchAuthorized, false);
+    assert.equal(discovery.terminalAttachment.attachmentVerified, false);
+} finally { await attachmentService.close(); }
+assert.equal(attachmentCommands.includes("attach"), false);
+checks.push("installed-Claude-attachment-discovery-distinguishes-restart-risk-without-launching-a-task-or-terminal");
+
 const restricted = codexDesignConfig(["synthetic_mcp"]);
 assert.equal(Object.keys(restricted.features).length, 42);
 assert.ok(Object.values(restricted.features).every(value => value === false));

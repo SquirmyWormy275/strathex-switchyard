@@ -1,0 +1,131 @@
+{
+  "schema": "switchyard-claude-319-source/v1",
+  "sourceParent": "59eec95481703d30804373120f4aa9c92aa901c2",
+  "sourceFiles": {
+    "tools/layout-studio/claude-account.mjs": "7b49b6941984d0b90d53cc1c181ee98d2eb5cc16448949e489a4b2a111aa9a6e",
+    "tools/layout-studio/claude-coding.mjs": "3f74227a37a54551074288e6bca17c4270c08958edae5a37ec7560cb68340a96",
+    "tools/layout-studio/claude-coding.test.mjs": "b5c587966281648f14632670c21642b5b17e7247ad2f98f10229cfc3d86d1c1e",
+    "tools/layout-studio/agents-claude.test.mjs": "ff4873b14b9e46249cbb7269ce2db65bcf7c6231a3098bcf55010141bca0b87a",
+    "tools/layout-studio/claude-submissions.test.mjs": "2816e0a506d0ea0726d4e339b62651177dbe1f860bc83a52d0afa0a0d7a35a63",
+    "scripts/verify-agent-security-host.mjs": "d52e16ec121dbdcc01c28c7ae8801f9664b45919a9b96495c9d8d4310be37253"
+  },
+  "reviewedNativeVersions": [
+    "2.1.308",
+    "2.1.317",
+    "2.1.319"
+  ],
+  "focusedReceipts": [
+    {
+      "id": "7c1f60cc-20a7-43a3-aba4-bc8a90785e11",
+      "sha256": "cb8c832c824f14df5ffabb07a68f3da2e8467ee0de582a0a17f53a93269b793f",
+      "totals": {
+        "required": 3,
+        "passed": 3,
+        "failed": 0,
+        "tests": 45,
+        "passedTests": 45,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "id": "18cb2292-e2dc-4ec7-9726-eb214b1c471f",
+      "sha256": "20041c83a9bce0338e6ef13ab6409c1c143aa2cf25c547e585d5459a2f05244d",
+      "totals": {
+        "required": 6,
+        "passed": 6,
+        "failed": 0,
+        "tests": 93,
+        "passedTests": 93,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    }
+  ],
+  "finalFocusedTests": 93,
+  "finalFocusedGroups": 6,
+  "declaredSkips": 0,
+  "typecheck": true,
+  "originalCommandsBoundsAndCleanupVerified": true,
+  "originalNativeRefusal": {
+    "schema": "switchyard-claude-319-initial-refusal/v1",
+    "at": "2026-11-07T18:02:11.463Z",
+    "nativeVersion": "2.1.319 (Claude Code)",
+    "executableSha256": "dabafec82ca1319fa43d8be36a10fc61b1d11821cb98ad5df04ad95e199b8eed",
+    "executableBytes": 340226576,
+    "metadataCommands": 1,
+    "guardiansVerifiedStopped": 1,
+    "rejectedBeforeAccountRead": true,
+    "modelPrompts": 0,
+    "taskOperations": 0,
+    "loginChanges": 0,
+    "sha256": "83e2cc9047602559115e9ff023b4849741b7867b79ad197c084769c29cdae69c"
+  },
+  "nativeHelp": {
+    "schema": "switchyard-claude-319-native-help/v1",
+    "nativeVersion": "2.1.319",
+    "executableSha256": "dabafec82ca1319fa43d8be36a10fc61b1d11821cb98ad5df04ad95e199b8eed",
+    "metadataOnly": true,
+    "flags": [
+      "--safe-mode",
+      "--tools",
+      "--strict-mcp-config",
+      "--mcp-config",
+      "--settings",
+      "--setting-sources",
+      "--permission-mode",
+      "--permission-prompts",
+      "--no-chrome",
+      "--json-schema",
+      "--session-id",
+      "--resume",
+      "--output-format",
+      "--print"
+    ],
+    "helpSha256": "5ca3a9dac2026e56c221fdd34380c7d7d45ebbb51c1d01b7c17c75cb076a0be8",
+    "attachHelpSha256": "ef416cc9caf999d0338abc1d880739e9242e5976b527f0716ff283013f71d564",
+    "helpBytes": 22344,
+    "attachHelpBytes": 263,
+    "guardiansVerifiedStopped": 2,
+    "liveOnlyAttachOptionVerified": false,
+    "modelPrompts": 0,
+    "taskOperations": 0,
+    "loginChanges": 0,
+    "sha256": "925a34efd6762989b9732e5391680549f62c4a6d2dadb4fcbf77a25bcb60dd1c"
+  },
+  "nativeMetadata": {
+    "receipt": "installed-claude-commands-1794074595593.json",
+    "sha256": "71d377ff2e74c642aa5ff7b77d49ce36d73c2eeac1e1d75ab47644485122e6b8",
+    "checks": 8,
+    "nativeCommandCount": 9,
+    "independentGuardianExits": 9,
+    "temporaryStateRemoved": true,
+    "installedRelease": "fcbd26b5c6703d3d5b0296211ca0b31234d862a759396a6e85ee7f53f8d4c696",
+    "sourceVersionAdmission": true,
+    "installedVersionAdmission": false
+  },
+  "attachment": {
+    "implemented": false,
+    "nativeCommandMayRestartStoppedSession": true,
+    "liveOnlyOptionVerified": false,
+    "focusOrStatusInvokesAttach": false
+  },
+  "primarySources": [
+    "https://code.claude.com/docs/en/cli-reference",
+    "https://code.claude.com/docs/en/agent-view#manage-sessions-from-the-shell"
+  ],
+  "modelRequests": 0,
+  "liveTaskOperations": 0,
+  "loginChanges": 0,
+  "frontendChanged": false,
+  "limitations": [
+    "Actual version, first-party account, inventory and help checks are read-only. Synthetic print children exercise designer/task replies; no real 2.1.319 model turn or terminal attachment is accepted.",
+    "The old installed package remains 90fa879 until a normal update. Its broad metadata discovery works, while its exact designer version guard still refuses 2.1.319.",
+    "Windows native acceptance of the new exact-version tests is separate. Unknown versions and version changes across approval/response still refuse.",
+    "The documented native attach command may restart a stopped session. This change exposes that limitation and does not implement an attachment launcher or activate frontend commands."
+  ]
+}

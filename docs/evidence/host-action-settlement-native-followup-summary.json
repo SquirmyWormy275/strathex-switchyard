@@ -1,0 +1,51 @@
+{
+  "schema": "switchyard-host-action-settlement-native-followup/v1",
+  "sourceCommit": "90fa879d776c0b7756f66d37180fb8c3049b3fc4",
+  "mergeCommit": "1ef2f3659805b45d7f6959cac669c5d0036fd1c9",
+  "sourceTree": "8ff16a293e3de4e702d69d361d43b1a38378f089",
+  "runId": 42397684980,
+  "jobId": 128478698235,
+  "artifactId": 13583869444,
+  "zipBytes": 4123,
+  "zipSha256": "1610a392f4eb597ffa57507c9a0df3877814313b1c5444d46eda1a758b06af51",
+  "envelopeSha256": "1ced2ea43828b1545ed0a99ec2461a418c56425673dd021155ba25db9d2b992a",
+  "receiptSha256": "65fc8adc4ec9b650757d315e0bd51baa9e1be4531f9573811c79b4b00a9763ad",
+  "receiptId": "fd6eafba-7798-425b-b7fa-77b8674a96e6",
+  "acceptedGroup": {
+    "file": "apps/windows-companion/test/windows-host-action-consumer.test.ts",
+    "sha256": "223135a2c9bd7c7d3796107f6c03c7331a37aa7c5adece29144a2ccb578f1770",
+    "testCounts": {
+      "total": 15,
+      "passed": 15,
+      "failed": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    "durationMs": 1624,
+    "effectiveTimeoutMs": 45000
+  },
+  "workerTotals": {
+    "required": 22,
+    "passed": 22,
+    "failed": 0,
+    "tests": 147,
+    "passedTests": 133,
+    "failedTests": 0,
+    "skippedTests": 14,
+    "cancelledTests": 0,
+    "todoTests": 0
+  },
+  "originalManifestCommandsBoundsSkipsAndCleanupVerified": true,
+  "scope": "One complete native Windows host-action consumer fixture group; real protected journal and synthetic application/effect ports. The original unavailable-application assertions pass within unchanged bounds.",
+  "originalFailure": "host-action-settlement-diagnostic-summary.json",
+  "rootCauseRepaired": false,
+  "productionConsumerChanged": false,
+  "completeSourceAcceptance": false,
+  "packageAcceptance": false,
+  "limitations": [
+    "The earlier two-second observation failure remains unresolved; a passing follow-up does not identify its cause.",
+    "No interactive Windows application, real focus effect, account, task or keyboard is exercised.",
+    "The complete native source run and package acceptance remain separate."
+  ]
+}

@@ -95,9 +95,9 @@ It never claims external task completion or physical-key acceptance. See the
 Claude Code uses its separate `coding/claude/turns/` routes with the same
 `review`, `submit`, `list`, `cancel`, `outcome/review`, `outcome/resolve` and `delete`
 operations. The restricted adapter accepts the explicitly reviewed native versions 2.1.308
-and 2.1.317. Approval includes the exact detected version; a version change
+2.1.317 and 2.1.319. Approval includes the exact detected version; a version change
 requires fresh review even if both versions are supported. Real 2.1.317 metadata
-checks pass without a model prompt; current-version model execution is not
+checks and the newer 2.1.319 metadata/help checks pass without a model prompt; current-version model execution is not
 claimed by those checks. Use `coding/claude/text/create` with a stable request UUID, exact Git directory
 and local label. This reserves an account/directory-bound task and requested
 session UUID locally. It explicitly returns `nativeConversationCreated: false`,

@@ -66,6 +66,22 @@ bundle is removed. The complete Linux checkout, nine dependency aliases and
 checkout, nine aliases and 803 generated files/11,910,385 bytes are removed too;
 other worktrees remain.
 
+## Current Claude Code compatibility
+
+The pilot CLI is now **2.1.319**. The designer's prior exact-version guard refused
+it before reading the account; that refusal is preserved. Source now admits this
+exact revision alongside 2.1.308/2.1.317. Six groups/93 tests pass with zero skips,
+including fresh approval after version changes and refusal of late designer
+replies. Real read-only version/account/inventory/help checks confirm the local
+contract and all twelve owned guardian exits. No model prompt or task operation
+ran. Normal installation of this later source is still pending.
+[Source and native metadata evidence](evidence/claude-319-source-summary.json).
+
+Claude discovery now explicitly reports that the unfinished terminal attachment
+launcher is unavailable. The native attach command can restart a stopped session;
+it must not be substituted for focus or status. Frontend activation and live
+terminal/model acceptance remain separate.
+
 ## Windows package verification still in progress
 
 Complete package runs at `e5a5781` and `6727054` reached the existing 90-minute
@@ -114,9 +130,12 @@ original two-second observation and 75 ms fixture coordination bound remain;
 fixture teardown now always stops its consumers, and a failure reports only
 bounded journal kinds/outcome tags. Two local groups/32 tests and TypeScript
 checking pass. The production consumer and all deadlines are unchanged; root
-cause and native diagnostic follow-up remain unresolved.
+cause remains unresolved. The complete native consumer fixture now passes all
+15 tests at `90fa879`, with zero skips and verified original bounds/cleanup.
+This accepts the scoped follow-up, not a root-cause repair or the full cohort.
 [Native project checks](evidence/editor-project-choices-native-summary.json),
-[retained settlement failure](evidence/host-action-settlement-diagnostic-summary.json).
+[retained settlement failure](evidence/host-action-settlement-diagnostic-summary.json),
+[native follow-up](evidence/host-action-settlement-native-followup-summary.json).
 
 ## Unfinished implementation
 

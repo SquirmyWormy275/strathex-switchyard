@@ -26,7 +26,9 @@ activation remains frozen for owner review.
 37 focused groups/117 tests, zero skips, and both TypeScript checks pass.
 [source evidence](evidence/editor-project-choices-source-summary.json).
 Three native Windows inventory/client groups pass 17 tests with zero skips.
-The complete native cohort has a separate retained settlement failure.
+The `cf3bb4c` complete native cohort has a separate retained settlement failure;
+its 15-test consumer group passes at `90fa879` without changing the original bounds.
+[Scoped follow-up](evidence/host-action-settlement-native-followup-summary.json).
 [Native inventory evidence](evidence/editor-project-choices-native-summary.json).
 
 Complete Linux `cf3bb4c` passes 356 groups/2,326 tests with 32 declared skips,
@@ -40,7 +42,10 @@ The frontend picker remains frozen. Native Windows client `9d230ac` passes
 250 tests with no skips. Complete Windows releases `e5a5781` and `6727054`
 were interrupted without final receipts. A separate complete-source workflow
 now preserves every original group across bounded workers and requires a final
-receipt audit; five local groups/45 checks pass, with native acceptance pending.
+receipt audit. Complete Windows source `45c34e5` now passes all 460 groups,
+2,899 tests and 246 declared skips. The later `cf3bb4c` cohort fails a separate
+host-action settlement observation; latest native package acceptance remains
+pending. [Complete source evidence](evidence/complete-windows-45c34e5-summary.json).
 These checkpoints do not establish live provider/task, interactive UI or
 physical-device acceptance.
 [Linux evidence](evidence/linux-2c6497f-complete-summary.json),

@@ -38,6 +38,21 @@ instructions. Do not merge or release.
   persistent-file readback. Keep current plus one rollback. Preserve all
   workspace identities, semantic snapshots, selection and frozen frontend.
 
+## Current Claude version work
+
+The installed native CLI has updated to 2.1.319. Its original exact designer
+version refusal is retained. The source now admits exactly 2.1.308, 2.1.317 and
+2.1.319; unknown versions and changes across approval/response still refuse.
+Six original groups/93 tests and typecheck pass. Actual read-only metadata/help
+checks verify twelve guardian exits in total, with no prompts, task creation,
+resume or login changes. The current installed package is still 90fa879 until
+the next normal update. [Evidence](evidence/claude-319-source-summary.json).
+
+Claude native attach can restart a stopped session and exposes no verified
+live-only flag. Discovery now states that the attachment launcher remains
+unfinished and grants no launch/attachment authority. Do not wire it into focus
+or status. The live native terminal path remains an implementation/acceptance gap.
+
 ## Current backend state
 
 The latest backend addition is read-only saved-project discovery. Both typed editor
@@ -250,6 +265,12 @@ checking pass. The first typecheck rejected `toReversed` under the existing lib;
 a copied array plus `reverse` fixes that without compiler changes. This is a
 fixture lifecycle/diagnostic correction, not a production root-cause repair.
 [Failure evidence](evidence/host-action-settlement-diagnostic-summary.json).
+
+Native `90fa879` worker 4 now passes the complete original host-action consumer
+file: 15 tests, zero skips, original 45-second group bound and exact cleanup.
+The 22-group worker receipt, source/merge tree and in-memory ZIP digest verify;
+only this named group is accepted here. The old failure remains unresolved.
+[Native follow-up](evidence/host-action-settlement-native-followup-summary.json).
 
 ## Continue independently executable work
 

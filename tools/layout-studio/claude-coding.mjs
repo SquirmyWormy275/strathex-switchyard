@@ -131,7 +131,13 @@ export function createClaudeCoding({ store, resolveCli = trustedCli, run, comman
   }
   return {
     async discovery(c) {
-      const result = { adapter, provider: "claude-code", installed: null, available: false };
+      const result = { adapter, provider: "claude-code", installed: null, available: false,
+        terminalAttachment: {
+          implemented: false, nativeCommand: "attach", mayRestartStoppedSession: true,
+          liveOnlyOptionVerified: false, launchAuthorized: false, attachmentVerified: false,
+          reason: "The native attach command can restart a stopped session. Switchyard has no reviewed attachment launcher; existing focus and status controls do not invoke it."
+        }
+      };
       try { await store.authorize(c, { provider: "claude-code" }); } catch (e) { return { ...result, permitted: false, reason: e.message }; }
       try { await access(c); result.installed = true; const version = supportedVersion(await execute(c, ["--version"])); await account(c); return { ...result, available: true, permitted: true, version, capabilities: ["exact-coding-task-bind", "runtime-status", "reserve-reviewed-text-task", "create-empty-tools-disabled-background", "reviewed-owned-background-stop", ...(platform === "linux" ? ["focus-live-interactive-foot-window", "focus-live-interactive-alacritty-window", "focus-live-interactive-tmux-pane"] : [])], terminalFocus: { implemented: platform === "linux", terminals: platform === "linux" ? Object.values(directTaskTerminals) : [], multiplexers: platform === "linux" ? ["tmux"] : [], installationObserved: false, exactSessionWindow: "requires-live-verification", multipleWindowsPerProcess: "refused" } }; }
       catch (e) { return { ...result, permitted: true, reason: e.message }; }

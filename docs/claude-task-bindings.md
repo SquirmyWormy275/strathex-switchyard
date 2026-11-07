@@ -4,12 +4,16 @@ Claude coding tasks are separate from configuration conversations, Codex tasks
 and Claude Desktop. This backend uses the installed native CLI's supported
 `auth status --json` and `agents --json --all --cwd` contracts. Actual acceptance
 used **2.1.308 on Linux**. The restricted designer/text adapters also review
-**2.1.317**: its installed flags and metadata contract are checked, and a
+**2.1.317 and 2.1.319**: installed flags and metadata contracts are checked, and a
 one-use text approval binds the exact detected native version. Switching between
 these supported versions needs a new approval; unreviewed versions still refuse.
-Eight real metadata checks on 2.1.317 verify nine independently exited guardians
-with no prompt/task creation. Current-version model replies are covered by
-explicit synthetic processes; a real 2.1.317 model turn remains unaccepted. Windows uses the same argument-based process path;
+The current pilot has 2.1.319. Eight real metadata checks verify nine independently
+exited command guardians; two help checks verify 14 required flags against the
+exact executable digest. The earlier version refusal is retained. Six source
+groups/93 tests pass, including approval/version-change refusal and rejected
+late designer replies. Native model replies use explicit synthetic processes;
+a real 2.1.319 model turn remains unaccepted.
+[Version evidence](evidence/claude-319-source-summary.json). Windows uses the same argument-based process path;
 native Windows CLI/account acceptance remains pending. The frozen morning
 frontend does not expose this task panel yet.
 
@@ -127,7 +131,14 @@ An empty background job stopped before its first turn has no resumable transcrip
 and is never silently recreated. Installed first-turn/continuation acceptance passed nine checks with two
 synthetic prompts and keyboard-only cleanup. Background `--resume` can create a copy when a
 conversation is running, so it is not used as an exact-resume shortcut. Native
-`attach <id>` is the supported direction for the unfinished terminal adapter.
+`attach <id>` is the documented direction for the unfinished terminal adapter.
+It can restart a stopped session, so it is not interchangeable with focusing an
+existing window. The current 2.1.319 help exposes no live-only option. Discovery
+returns `terminalAttachment.implemented: false`, the restart risk and false
+launch/attachment authority. Status and focus never invoke attach. A reviewed
+launcher and native task/account/terminal acknowledgement remain implementation
+work; no stopped task is resumed automatically.
+[Native session contract](https://code.claude.com/docs/en/agent-view#manage-sessions-from-the-shell).
 
 Primary contracts: [CLI reference](https://code.claude.com/docs/en/cli-reference),
 [inventory and lifecycle](https://code.claude.com/docs/en/agent-view#list-sessions-as-json),

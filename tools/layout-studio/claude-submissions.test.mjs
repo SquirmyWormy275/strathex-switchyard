@@ -69,7 +69,7 @@ test("unapproved policy, live sessions, alternate authentication and changed acc
   settings.row.state = "working"; await assert.rejects(review(), /separate reviewed stop/); settings.row.state = "stopped";
   settings.login.authMethod = "api_key"; await assert.rejects(review(), /supported first-party/); settings.login.authMethod = "claude.ai";
   const approval = await review(); settings.login.orgId = "changed-org"; await assert.rejects(submit(approval), /account changed/); settings.login.orgId = "synthetic-org";
-  settings.version = "2.1.309 (Claude Code)"; await assert.rejects(review(), /reviewed native version/); settings.version = "2.1.308 (Claude Code)";
+  for (const version of ["2.1.309", "2.1.318", "2.1.320", "2.1.319-preview"]) { settings.version = `${version} (Claude Code)`; await assert.rejects(review(), /reviewed native version/); } settings.version = "2.1.308 (Claude Code)";
   await store.update("personal", "synthetic-external", (s) => { delete s.codingSessions[0].launchPolicy; }); await assert.rejects(review(), /created by Switchyard/);
   assert.equal(calls.some((c) => c.args.includes("-p")), false); assert.equal((await store.snapshot("personal")).codingSessions[0].sessionId, task.sessionId);
 }));
@@ -170,11 +170,11 @@ test("missing native history during explicit recovery preserves uncertainty with
   } finally { await suite.close(); }
 }));
 
-test("the exact reviewed native version binds a Claude approval even when both versions are supported", () => fixture(async ({ settings, calls, review, submit, store }) => {
+for (const version of ["2.1.317", "2.1.319"]) test(`the exact reviewed native version ${version} binds a Claude approval even when both versions are supported`, () => fixture(async ({ settings, calls, review, submit, store }) => {
   const old = await review(); assert.equal(old.scope.nativeVersion, "2.1.308");
-  settings.version = "2.1.317 (Claude Code)";
+  settings.version = `${version} (Claude Code)`;
   await assert.rejects(submit(old), /scope|approval|confirm/i); assert.equal(calls.some(c => c.args.includes("-p")), false);
-  const current = await review(); assert.equal(current.scope.nativeVersion, "2.1.317");
-  const result = await submit(current); assert.equal(result.reply, "Ready"); assert.equal(result.nativeVersion, "2.1.317");
-  assert.equal((await store.snapshot("personal")).codingTurns[0].nativeVersion, "2.1.317");
+  const current = await review(); assert.equal(current.scope.nativeVersion, version);
+  const result = await submit(current); assert.equal(result.reply, "Ready"); assert.equal(result.nativeVersion, version);
+  assert.equal((await store.snapshot("personal")).codingTurns[0].nativeVersion, version);
 }));

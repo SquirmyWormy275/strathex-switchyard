@@ -156,8 +156,8 @@ test("oversized saved designer context rejects before any native request and doe
   assert.equal((await design()).reply, response.reply);
 }));
 
-test("reviewed Claude 2.1.317 preserves the restricted designer contract and refuses a version change before retaining its reply", () => fixture(async ({ settings, design, calls, store }) => {
-  settings.version = "2.1.317 (Claude Code)";
+for (const version of ["2.1.317", "2.1.319"]) test(`reviewed Claude ${version} preserves the restricted designer contract and refuses a version change before retaining its reply`, () => fixture(async ({ settings, design, calls, store }) => {
+  settings.version = `${version} (Claude Code)`;
   const result = await design(); assert.equal(result.reply, response.reply);
   const print = calls.find(c => c.args.includes("-p")); assert.equal(print.args[print.args.indexOf("--tools") + 1], ""); assert.ok(print.args.includes("--safe-mode") && print.args.includes("--strict-mcp-config"));
   settings.afterDesign = () => { settings.version = "2.1.308 (Claude Code)"; };

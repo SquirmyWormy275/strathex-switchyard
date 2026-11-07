@@ -29,7 +29,7 @@ export async function readClaudeMetadata(executable, operation, cwd, { command =
     else { const error = new Error("The owned Claude metadata probe guardian has not verified exit. No replacement was launched."); error.ownedClient = client; throw error; }
   }
 }
-export const reviewedClaudeVersions = Object.freeze(["2.1.308", "2.1.317"]);
+export const reviewedClaudeVersions = Object.freeze(["2.1.308", "2.1.317", "2.1.319"]);
 export async function readClaudeDesignLogin(executable, cwd, options = {}) {
   const version = (await readClaudeMetadata(executable, "version", cwd, options)).trim();
   const nativeVersion = reviewedClaudeVersions.find(value => version === `${value} (Claude Code)`);

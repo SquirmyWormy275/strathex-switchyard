@@ -67,6 +67,12 @@ test("a verified native workspace rejection is preserved without claiming an unk
 
 test("Claude creates one empty background session per durable request, preserves native identities and requires explicit current-account binding", () => fixture(async ({ service, options, store, calls, input, stateRoot, changeAccount }) => {
   const discovery = await service.discovery("personal"); assert.equal(discovery.available, true);
+  assert.equal(discovery.terminalAttachment.implemented, false);
+  assert.equal(discovery.terminalAttachment.mayRestartStoppedSession, true);
+  assert.equal(discovery.terminalAttachment.liveOnlyOptionVerified, false);
+  assert.equal(discovery.terminalAttachment.launchAuthorized, false);
+  assert.equal(discovery.terminalAttachment.attachmentVerified, false);
+  assert.ok(calls.every(args => ["--version", "auth"].includes(args[0])));
   if(discovery.terminalFocus.implemented){assert.deepEqual(discovery.terminalFocus.terminals,["foot","alacritty"]);assert.deepEqual(discovery.terminalFocus.multiplexers,["tmux"]);assert.ok(discovery.capabilities.includes("focus-live-interactive-tmux-pane"));assert.equal(discovery.terminalFocus.installationObserved,false);assert.equal(discovery.terminalFocus.exactSessionWindow,"requires-live-verification");assert.equal(discovery.terminalFocus.multipleWindowsPerProcess,"refused");}
   const request = input(), tasks = await Promise.all([service.create("personal", request), service.create("personal", request)]);
   assert.equal(calls.filter((c) => c[0] === "--background").length, 1); assert.equal(tasks.filter((t) => t.duplicatePrevented).length, 1);
@@ -142,13 +148,14 @@ test("keyboard-only cleanup stops exact owned Claude jobs while external bound s
   assert.deepEqual(calls.filter((c) => c[0] === "stop").map((c) => c[1]), [own.backgroundId]);
 }));
 
-test("physical role status routes to the exact Claude task without substituting a configuration conversation", () => fixture(async ({ service, store, input }) => {
+test("physical role status routes to the exact Claude task without substituting a configuration conversation", () => fixture(async ({ service, store, input, calls }) => {
   const task = await service.create("personal", input()); await store.saveWorkflow("personal", { name: "Synthetic", roles: [{ id: "reviewer", label: "Reviewer" }], steps: [] });
   const suite = createSuite({ store, claudeCoding: service, agents: { discovery: async () => [], design: () => { throw new Error("Wrong conversation route"); }, close() {} }, voice: { discovery: async () => ({ available: false }) } });
   try {
     await suite.handle("/api/suite/roles/bind", { roleId: "reviewer", intent: "status", provider: "claude-code", targetKind: "coding-task", targetId: task.id });
     const r = await suite.handle("/api/suite/intent", { implementation: "switchyard.role/v1", roleId: "reviewer", intent: "status" }); assert.equal(r.sessionId, task.sessionId); assert.equal(r.observation.completionVerified, false);
-    await assert.rejects(suite.handle("/api/suite/roles/bind", { roleId: "reviewer", intent: "resume", provider: "claude-code", targetKind: "coding-task", targetId: task.id }), /runtime status only/);
+    for (const intent of ["resume", "summon"]) await assert.rejects(suite.handle("/api/suite/roles/bind", { roleId: "reviewer", intent, provider: "claude-code", targetKind: "coding-task", targetId: task.id }), /runtime status only/);
+    assert.equal(calls.some(args => args[0] === "attach" || args.includes("--resume")), false);
   } finally { await suite.close(); }
 }));
 

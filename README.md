@@ -73,25 +73,18 @@ execution, offline repository scans and recoverable installation. The Home and
 Model F catalog provide the starting experience; complete task/IDE attachment,
 role/device controls and full scanner coverage remain unfinished.
 
-Complete Linux checkpoint `2c6497f` passes **351 groups / 2,312 tests**, with
-32 declared platform skips. Its temporary checkout and 11.9 MB of build output
-have been removed after verification. Complete Windows checkpoint `dc755901`
-passes **417 groups / 2,478 tests**, with 207 declared skips; it predates the
-latest backend work. Installed Linux `2c6497f` preserves all 54 workspaces and
-passes 97 metadata/refusal checks, including named role choices,
-exact-project task choices, original-role guards and recording-consent checks;
-[installed evidence](docs/evidence/installed-external-agent-consent-summary.json).
-Native Windows client checkpoint `9d230ac` passes
-**25 groups / 250 tests with no skips**, including the signed launcher
-demonstration with an exact synthetic task acknowledgement. Interactive
-Terminal/provider acceptance remains separate.
-A newer Windows release run passed its backend shards but was cancelled at its
-90-minute job boundary without a final receipt. Full-suite progress reporting now
-identifies each group; the interruption is still unresolved.
-Restricted storage has passing follow-ups, but an intermittent retirement failure
-remains unresolved. Source, installed, interactive, hardware and account
-acceptance remain separate.
-[Current status and exact evidence](docs/switchyard-status.md).
+The latest installed backend (`90fa879`) passes **99 metadata/refusal checks
+across 58 exact modules** and preserves all 54 saved workspaces. It adds signed
+saved-project discovery; role, device and editor controls still need their
+frontend integration. [Installed evidence](docs/evidence/installed-project-discovery-summary.json).
+
+Complete Linux `cf3bb4c` passes **356 groups / 2,326 tests**, with 32 declared
+skips. Complete Windows source `45c34e5` passes **460 groups / 2,899 tests**,
+with 246 declared skips. These are exact-revision results: the Windows checkpoint
+predates saved-project discovery, whose three native groups pass separately.
+Latest Windows package acceptance remains pending. Earlier focus, storage and
+host-action settlement failures remain recorded; passing follow-ups do not prove
+their causes are resolved. [Current status and evidence](docs/switchyard-status.md).
 
 | Explore | Start here |
 | --- | --- |
