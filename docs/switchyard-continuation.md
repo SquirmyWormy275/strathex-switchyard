@@ -82,15 +82,16 @@ foreign replacement and unknown committed outcomes still refuse admission.
    Command activation and frontend exposure remain frozen.
 4. Native Codex TUI/account/task/model acceptance remains separate. The version
    contract's real native proof covers initialization/config-read only.
-5. A new complete Linux run for `c359cdf` is active: receipt
-   `05f399ed-8f7b-4c33-8e70-e355b91ccf0e`, unit
-   `switchyard-verification-c359cdf-1794051662.service`. Read the private
-   `linux-full-c359cdf-run.json` marker for exact checkout/test-parent identities,
-   nine dependency aliases and cleanup ownership. Do not start a duplicate run.
-   Audit its original manifest and cleanup before acceptance, then remove only
-   its verified staging. Later status diagnostics are outside this source.
-6. Complete Linux `961ecb3` is audited and cleaned: 348 groups, 2,205 tests and
-   32 skips. Do not restart that completed run or delete its removed staging again.
+5. Complete Linux `c359cdf` is audited and cleaned: 348 groups, 2,218 passes
+   and 32 declared skips. Receipt `05f399ed-8f7b-4c33-8e70-e355b91ccf0e`
+   preserves the original manifest, commands, deadlines and child cleanup.
+   The exact checkout, nine aliases, 802 generated files (11,901,729 bytes),
+   empty test parent and active marker are removed. Do not restart or reclean it.
+   Later status diagnostics are outside this source.
+6. Full Windows `318fafc` completed all six backend shards, but the final release
+   job stopped at a stale generated-documentation source digest. The checksum
+   is now regenerated; all seven manual/demo outputs are byte-identical.
+   Full Windows acceptance remains pending. Do not manually rerun workflows.
 
 Restricted-storage follow-up `3795217` passes eight ordinary owner checks,
 eight restricted owner checks, 68 QUERY-only descendant registrations and
@@ -102,18 +103,18 @@ process-query change has been made.
 
 ## Installed application and complete-suite baseline
 
-Installed Linux remains `edb76de`: 76 metadata/in-memory checks, 42 module hashes,
+Installed Linux is `51a73c7`: 76 metadata/in-memory checks, 44 module hashes,
 all 54 semantic workspaces, four profiles, 57 workflows, selected state, pending
-keyboard-only conversation and frozen frontend preserved. Current plus one
-rollback remain. No installed update is part of the journal correction.
-[Installed evidence](evidence/installed-mixed-scanner-input-summary.json).
+keyboard-only conversation and frozen frontend preserved. The current release
+and one rollback remain; its exact prepared bundle has been removed.
+[Installed evidence](evidence/installed-codex-0167-summary.json).
 
-The accepted complete Linux run is `961ecb3`: 348 groups, 2,205 passes
+The accepted complete Linux run is `c359cdf`: 348 groups, 2,218 passes
 and 32 declared platform skips. Its exact checkout, nine dependency aliases,
-802 generated files (11,900,104 bytes), empty test parent and marker are removed.
+802 generated files (11,901,729 bytes), empty test parent and marker are removed.
 The preceding accepted complete Windows run is `dc755901`: 417 groups,
-2,478 passes and 207 declared skips. These revisions predate current editor work.
-[Linux evidence](evidence/linux-961ecb3-complete-summary.json),
+2,478 passes and 207 declared skips. The Windows revision predates current editor work; Linux includes it.
+[Linux evidence](evidence/linux-c359cdf-complete-summary.json),
 [Windows evidence](evidence/windows-complete-dc755901-summary.json).
 
 Combined current/index/history scanner inputs, exact reviewed recipe saving,

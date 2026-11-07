@@ -326,7 +326,7 @@
   "schema": "sxsy-b122.documentation-manifest/v1",
   "simulationOnly": true,
   "sourceDigests": {
-    "docs/SXSY-B122-complete-key-specification-and-audit.md": "9ad138c742d5398306b2cd8aff5a305a9c80f0c4686f8f5f5e6f7fc1c45a0c9b",
+    "docs/SXSY-B122-complete-key-specification-and-audit.md": "d651910b49672d800aec16535b5f0be28aad7449f883d9e8a1f49b28445c044f",
     "docs/acceptance-gates.md": "940ddcfc0c6aa3f02d828472f7453a2024a46b3a670244426784cbeddf403c9b",
     "docs/adversarial-review.md": "0cca9970f40a1cad4b032033c6729a9bae3b450f1920f991db79d72c02994380",
     "docs/historical-interview-notes-reconstructed.md": "67c7a5c04ab8145949c3dff1b751e66031c948b036c3f15d231e9d9218a6d418",

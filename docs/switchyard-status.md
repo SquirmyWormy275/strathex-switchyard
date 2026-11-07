@@ -46,11 +46,11 @@ checkpoints are not cumulative acceptance of the latest suite.
 | --- | --- | --- |
 | Installed Linux `51a73c7` | **76 metadata/in-memory checks; 44 exact module hashes.** All 54 semantic workspaces, four profiles, 57 workflows and frozen frontend preserved. [Receipt](evidence/installed-codex-0167-summary.json). | Codex version and editor code included; no live scanner, provider task, account/model request, native focus or hardware acceptance. |
 | Native Windows client `c359cdf` | **25 groups; 243 tests; no skips.** Original manifest, commands, bounds and cleanup verified. [Receipt](evidence/windows-editor-project-context-native-summary.json). | Terminal/provider doubles remain explicit; not the complete Windows suite, later storage diagnostics or authenticated Codex turns. |
-| Complete Linux `961ecb3` | **348 groups; 2,205 tests; 32 declared platform skips.** Original manifest and cleanup verified. [Receipt](evidence/linux-961ecb3-complete-summary.json). | Predates journal corrections and Codex 0.167 admission. |
+| Complete Linux `c359cdf` | **348 groups; 2,218 tests; 32 declared platform skips.** Original manifest, bounds and cleanup verified. [Receipt](evidence/linux-c359cdf-complete-summary.json). | Includes journal, Codex 0.167 and workspace lifecycle corrections; predates later status-query diagnostics. |
 | Complete Windows `dc755901` | **417 groups; 2,478 tests; 207 declared skips.** All six jobs and overall workflow passed. [Receipt](evidence/windows-complete-dc755901-summary.json). | Predates newer archive, scheduling, profile/workflow and observation corrections. |
 
 Complete Linux staging is removed: its exact checkout, nine dependency aliases,
-802 generated files (11,900,104 bytes), empty test parent and marker. Other
+802 generated files (11,901,729 bytes), empty test parent and marker. Other
 worktrees remain. The journal's earlier failed Windows runs remain recorded in
 the accepted receipt; the independent restricted-storage retirement failure
 remains unresolved.
