@@ -165,6 +165,9 @@ review tokens and launch authority are absent. Choose a project, call
 An empty list means no eligible owned task is currently saved; it is not proof
 that the machine has no projects. Picker/command activation remains frozen.
 [Source evidence](evidence/editor-project-choices-source-summary.json).
+Three native Windows groups pass 17 tests with original bounds and cleanup;
+providers and endpoint-reader doubles remain explicit.
+[Native evidence](evidence/editor-project-choices-native-summary.json).
 
 ## Find saved tasks for a project
 

@@ -117,6 +117,23 @@ initialization caused an independent preservation assertion failure.
 
 ## Complete runs and native evidence
 
+Complete Windows source `45c34e555a16c8946e07176df30c2a0ea4971767` is accepted:
+460 original groups, 2,899 passes, 246 declared skips; all 23 workflow jobs pass.
+All 21 original receipts were downloaded in memory, independently audited and
+matched to the native collector. Only bounded JSON evidence remains locally.
+Package acceptance, later `cf3bb4c` project discovery and the original intermittent
+focus/restricted-storage failures remain separate.
+[Evidence](evidence/complete-windows-45c34e5-summary.json).
+
+Complete Linux `cf3bb4c` now passes 356 original groups, 2,326 tests and 32 declared
+skips. Receipt `2121c57b-7a65-4b1a-b0a8-33f24666ce70` retains original commands,
+bounds, manifest and exact cleanup. Its unit exited zero. The temporary checkout,
+nine dependency aliases, 803 generated files/11,910,385 bytes, empty test parent
+and run marker are removed. No complete Linux run is active. A temporary runner
+syntax failure before any group started is retained separately; it was corrected
+without changing a test or bound. Do not rerun executed start/audit/cleanup scripts.
+[Latest Linux evidence](evidence/linux-cf3bb4c-complete-summary.json).
+
 Complete Linux source `2c6497f8c2829fbd29026fe98f13de9ecade1d65` is accepted:
 351 original groups, 2,312 passing tests and 32 declared platform skips. It covers
 the current installed runtime, guided roles and external-agent consent.
@@ -213,6 +230,24 @@ permissions and refusal assertions. The installed runtime remains `2c6497f`.
 Native `b38ff759` external-agent consent passes three original groups/51 tests,
 including actual encrypted state, authenticated SDK HTTP and consent generation
 fences. Providers remain doubles. [Native receipt](evidence/agent-consent-native-b38-summary.json).
+
+## Latest native settlement failure
+
+The `cf3bb4c` project inventory passes three named native groups/17 tests, zero
+skips. [Native project evidence](evidence/editor-project-choices-native-summary.json).
+The complete source cohort fails worker 4 at the unavailable-application test in
+`windows-host-action-consumer.test.ts`: the original two-second observation expires.
+Its 22-group receipt has 132 passes, one failure and 14 declared skips; commands,
+45-second group bound and cleanup verify. The original journal phase is unknown.
+
+The fixture now stops every consumer before removing its directory, including
+assertion failures. Timeout evidence exposes only counts, journal kinds and closed
+outcome tags. All original assertions, 75 ms coordination/effect bound and
+2,000 ms observation bound remain. Two focused groups/32 tests and TypeScript
+checking pass. The first typecheck rejected `toReversed` under the existing lib;
+a copied array plus `reverse` fixes that without compiler changes. This is a
+fixture lifecycle/diagnostic correction, not a production root-cause repair.
+[Failure evidence](evidence/host-action-settlement-diagnostic-summary.json).
 
 ## Continue independently executable work
 

@@ -53,7 +53,8 @@ checkpoints are not cumulative acceptance of the latest suite.
 | Scope | Verified result | What it does not establish |
 | --- | --- | --- |
 | Installed Linux `2c6497f` | **97 metadata/refusal checks; 57 exact module hashes.** All 54 semantic workspaces, four profiles, 57 workflows, selection, pending keyboard-only conversation and frozen frontend preserved. [Evidence](evidence/installed-external-agent-consent-summary.json). | Live task/model/account operations, editor command activation, hardware or microphone acceptance. |
-| Complete Linux `2c6497f` | **351 groups; 2,312 passing tests; 32 declared skips.** Original manifest, commands, deadlines and cleanup audited. Covers the installed guided roles and external-agent consent correction. [Evidence](evidence/linux-2c6497f-complete-summary.json). | Native Windows, live accounts, interactive UI or physical devices. Later demo/scheduling changes have separate focused evidence. |
+| Complete Linux `cf3bb4c` | **356 groups; 2,326 passing tests; 32 declared skips.** Original manifest, commands, deadlines and cleanup audited. Covers project inventory, connected demo, guided roles, consent fences and paired-runner contracts. [Evidence](evidence/linux-cf3bb4c-complete-summary.json). | Installed runtime remains `2c6497f`. Native Windows, live accounts, interactive UI and physical devices remain separate. Later fixture diagnostics have their own focused evidence. |
+| Complete Windows source `45c34e5` | **460 groups; 2,899 passing tests; 246 declared skips.** All 21 original worker receipts and the native collector pass; all 23 jobs succeed. Source/tree/tool identities, commands, bounds and cleanup are independently audited. [Evidence](evidence/complete-windows-45c34e5-summary.json). | Package, live-host and later project-inventory acceptance. Earlier intermittent retirement failures remain unresolved. |
 | Native Windows contracts `b38ff759` | **Role/dispatch: 24 tests across two complete files. External-agent consent: 51 tests across three files.** Exact source/merge trees, original bounds and cleanup verified. [Roles](evidence/role-choices-native-b38-summary.json), [consent](evidence/agent-consent-native-b38-summary.json). | Complete Windows suite/package acceptance or live provider behavior. |
 | Native Windows client `9d230ac` | **25 groups; 250 tests; zero skips.** Signed launcher composition plus native endpoint/process/socket contracts. [Evidence](evidence/editor-task-choices-native-client-summary.json). | Terminal/provider doubles do not establish interactive task handoff. |
 | Earlier complete Windows `dc755901` | **417 groups; 2,478 tests; 207 declared skips.** All workflow jobs passed. [Evidence](evidence/windows-complete-dc755901-summary.json). | This revision predates later backend changes. |
@@ -61,9 +62,11 @@ checkpoints are not cumulative acceptance of the latest suite.
 The installed payload contains 554 files/4,746,666 bytes. Dated backup and launcher
 readback verify; current plus one rollback remain. Its exact 555-file prepared
 bundle is removed. The complete Linux checkout, nine dependency aliases and
-803 generated files/11,907,805 bytes are also removed; other worktrees remain.
+803 generated files/11,907,805 bytes are also removed. The latest `cf3bb4c`
+checkout, nine aliases and 803 generated files/11,910,385 bytes are removed too;
+other worktrees remain.
 
-## Windows verification still in progress
+## Windows package verification still in progress
 
 Complete package runs at `e5a5781` and `6727054` reached the existing 90-minute
 job boundary without final receipts. Partial output and preliminary shards do
@@ -98,8 +101,22 @@ under the paired schedule. Native package acceptance is pending.
 Focus retirement diagnostics now identify exit versus recording and deadline
 versus rejection, without exposing callback messages. Deterministic checks prove
 that a pending record is reused and no replacement starts before it finishes.
-The original two-second retirement bound remains. This is diagnostic progress;
-the native failure's root cause is still unresolved.
+The original two-second retirement bound remains. Complete native source
+`45c34e5` now passes all 460 groups and the final collector, including the focus
+contract and new diagnostic tests. This is a scoped passing follow-up; the earlier
+failure's root cause is still unresolved.
+[Complete native follow-up](evidence/complete-windows-45c34e5-summary.json).
+
+The later `cf3bb4c` run passes the three named project-inventory/Windows-client
+groups: 17 tests, zero skips, original bounds and cleanup verified. Its full source
+cohort fails a separate unavailable-application settlement observation. The
+original two-second observation and 75 ms fixture coordination bound remain;
+fixture teardown now always stops its consumers, and a failure reports only
+bounded journal kinds/outcome tags. Two local groups/32 tests and TypeScript
+checking pass. The production consumer and all deadlines are unchanged; root
+cause and native diagnostic follow-up remain unresolved.
+[Native project checks](evidence/editor-project-choices-native-summary.json),
+[retained settlement failure](evidence/host-action-settlement-diagnostic-summary.json).
 
 ## Unfinished implementation
 

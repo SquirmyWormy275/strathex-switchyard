@@ -25,8 +25,16 @@ activation remains frozen for owner review.
 [Contract](coding-task-owners.md#find-eligible-saved-projects),
 37 focused groups/117 tests, zero skips, and both TypeScript checks pass.
 [source evidence](evidence/editor-project-choices-source-summary.json).
+Three native Windows inventory/client groups pass 17 tests with zero skips.
+The complete native cohort has a separate retained settlement failure.
+[Native inventory evidence](evidence/editor-project-choices-native-summary.json).
 
-Complete Linux `2c6497f` passes 351 groups/2,312 tests with 32 declared skips.
+Complete Linux `cf3bb4c` passes 356 groups/2,326 tests with 32 declared skips,
+including saved-project discovery, connected demo and scheduling contracts. Its
+exact checkout and 11,910,385 bytes of generated staging are removed.
+[Latest Linux evidence](evidence/linux-cf3bb4c-complete-summary.json).
+
+The earlier installed-source Linux `2c6497f` passes 351 groups/2,312 tests with 32 declared skips.
 It covers the installed guided role choices and external-agent consent corrections.
 The frontend picker remains frozen. Native Windows client `9d230ac` passes
 250 tests with no skips. Complete Windows releases `e5a5781` and `6727054`
