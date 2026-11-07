@@ -41,3 +41,13 @@ privacy, consent and role changes before persistence. Transport responses are
 synthetic. Packaging and installer scenarios pass; live provider and native
 Windows acceptance are separate. Fixture retention/startup mistakes remain
 classified in the [source evidence](evidence/codex-runtime-observation-source-summary.json).
+
+Normal installed Linux `384cf8b` passes 88 metadata/refusal checks against 56
+exact module hashes, including the fixed status parser, private correlation,
+duplicate suppression and changed-binding refusal in memory. All 54 semantic
+workspaces, four profiles, 57 workflows, selection and pending keyboard-only
+conversation remain intact. The dated launcher backup/readback verify; the
+4,829,116-byte temporary package is removed, leaving current plus one rollback.
+The first workflow verifier correctly refused an old source-evidence pin; the
+corrected verifier passes without changing saved workflows.
+[Installed evidence](evidence/installed-runtime-observation-summary.json).

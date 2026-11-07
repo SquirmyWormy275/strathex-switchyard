@@ -67,7 +67,7 @@ guardian readiness and Microsoft fetch/response checks. Reply writes also check
 the binding under the encrypted lease. Five conversation and three Microsoft
 regressions are retained separately from fixture corrections. Eighteen groups
 pass 226 tests with one skip and both TypeScript checks; eleven final cases
-verify retained Microsoft uncertainty. Normal installed `08fa7ea` now verifies
+verify retained Microsoft uncertainty. Normal installed `384cf8b` verifies
 these modules and two in-memory role guards; full suite and real provider/tenant
 acceptance remain separate. The in-memory
 generation cannot observe external selection round trips entirely between reads.
@@ -106,8 +106,10 @@ under existing observation consent, with original account/role/task checks at
 persistence. Queued events cannot cross recording, timeout or account boundaries.
 Twenty-seven groups pass 191 tests with no skips, plus both TypeScript checks;
 package/installer scenarios and encrypted-state demonstrations are included.
-Provider responses remain synthetic. This source change is not yet installed and
-postdates complete Linux `0c7d918`; broader external streams remain unfinished.
+Provider responses remain synthetic. Normal installed `384cf8b` verifies this
+change within 88 metadata/refusal checks and 56 exact modules, with every original
+workspace preserved. It postdates complete Linux `0c7d918`; broader external
+streams remain unfinished. [Installed receipt](evidence/installed-runtime-observation-summary.json).
 [Runtime observation contract](codex-runtime-observation.md).
 
 ## Outstanding verification and implementation
@@ -135,12 +137,12 @@ native helper/runtime bundle was downloaded locally.
    and restricted-storage owner checks also pass. The later `e5a5781` explicit
    native-helper guardian step passes the invalid-status-request case; its final
    complete bundle acceptance remains pending.
-2. Installed Linux now runs `08fa7ea`, release `2e9fbd4ff5b8`, with `4cda61afefac`
+2. Installed Linux now runs `384cf8b`, release `f5404e9f3e35`, with `2e9fbd4ff5b8`
    retained as rollback. All 54 semantic workspaces, selection, one pending
-   keyboard-only conversation and frozen frontend verify. The 86 metadata/
-   refusal checks cover 54 exact modules, four profiles and 57 workflows.
-   Dated launcher backup and readback verify; the exact prepared 553-file,
-   4,823,649-byte bundle is removed. Signed requests reject absent roles, wrong
+   keyboard-only conversation and frozen frontend verify. The 88 metadata/
+   refusal checks cover 56 exact modules, four profiles and 57 workflows.
+   Dated launcher backup and readback verify; the exact prepared 554-file,
+   4,829,116-byte bundle is removed. Signed requests reject absent roles, wrong
    PID/build, stale requests and caller-selected compartments without an effect.
    No browser reload, native focus, live provider/task or hardware use occurred.
    Do not repeat this update or remove its already-removed staging again.
@@ -188,11 +190,11 @@ process-query change has been made.
 
 ## Installed application and complete-suite baseline
 
-Installed Linux is `08fa7ea`: 86 metadata/refusal checks, 54 module hashes,
+Installed Linux is `384cf8b`: 88 metadata/refusal checks, 56 module hashes,
 all 54 semantic workspaces, four profiles, 57 workflows, selected state, pending
 keyboard-only conversation and frozen frontend preserved. The current release
 and one rollback remain; its exact prepared bundle has been removed.
-[Installed evidence](evidence/installed-role-boundaries-summary.json).
+[Installed evidence](evidence/installed-runtime-observation-summary.json).
 
 The accepted complete Linux run is `0c7d918`: 350 groups, 2,274 passes
 and 32 declared platform skips. Its exact checkout, nine dependency aliases,
