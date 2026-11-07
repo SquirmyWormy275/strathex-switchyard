@@ -45,8 +45,9 @@ now pass 84 independent Python reference cases. Ten focused groups pass 96 tests
 including six actual Linux scanner journeys and six Windows guest doubles.
 Duplicate fields, scalar/table conflicts and invalid package identities still
 refuse admission. Original package bounds, typecheck and exact child/tree cleanup
-pass. Installed acceptance is pending for this source; `9eec9cd` remains the
-previous 71-check installed checkpoint. Dependency resolution and broader
+pass. Installed `c50a00c` passes all 84 references in its 71-check metadata
+update, preserving every semantic workspace and the frozen frontend. Dependency
+resolution and broader
 manifest/license coverage remain unfinished. [Contract](cargo-archive-identity.md),
 [source evidence](evidence/cargo-array-manifest-source-summary.json).
 
@@ -60,14 +61,14 @@ Actual Windows native checks remain pending; Suite Windows focus wiring is still
 unfinished. [Contract](../apps/windows-companion/provider-desktop-helper/README.md),
 [evidence](evidence/provider-process-birth-source-summary.json).
 
-Installed `9eec9cd` passes **71 metadata/in-memory checks** and verifies 21 exact
-module hashes, including all 58 Cargo manifest reference cases. All 54 semantic
+Installed `c50a00c` passes **71 metadata/in-memory checks** and verifies 21 exact
+module hashes, including all 84 Cargo manifest reference cases. All 54 semantic
 workspaces, selection, pending keyboard-only conversation and frozen frontend are
 preserved; 53 sealed files are byte-identical and one changes only audit metadata.
 All four profiles and 57 workflows remain compatible. Dated backup and launcher
 readback verify; current plus one rollback remain. The exact 530-file,
-5,155,176-byte prepared bundle is removed.
-[Installed evidence](evidence/installed-cargo-quoted-manifest-summary.json).
+5,155,648-byte prepared bundle is removed.
+[Installed evidence](evidence/installed-cargo-array-manifest-summary.json).
 
 Run only the current repeatable metadata verifiers, each with
 `--read-only-metadata`: `verify-task-owner-host.mjs`,

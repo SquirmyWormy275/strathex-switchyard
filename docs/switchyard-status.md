@@ -17,8 +17,9 @@ now pass 84 independent Python reference cases. Ten focused groups pass 96 tests
 including six actual Linux scanner journeys and six Windows guest doubles.
 Duplicate fields, scalar/table conflicts and invalid package identities still
 refuse admission. Original package bounds, typecheck and exact child/tree cleanup
-pass. Installed acceptance is pending for this source; `9eec9cd` remains the
-previous 71-check installed checkpoint. Dependency resolution and broader
+pass. Installed `c50a00c` passes all 84 references in its 71-check metadata
+update, preserving every semantic workspace and the frozen frontend. Dependency
+resolution and broader
 manifest/license coverage remain unfinished. [Contract](cargo-archive-identity.md),
 [source evidence](evidence/cargo-array-manifest-source-summary.json).
 
@@ -43,7 +44,7 @@ manifests and Windows provider birth checks have separate focused evidence.
 | --- | --- | --- |
 | Complete Linux `a6a6618` | **321 groups, 1,949 passing tests, sixteen declared skips**; exact original inventory, commands, bounds and cleanup. [Receipt](evidence/linux-a6a6618-complete-summary.json). | Later quoted Cargo manifests and Windows provider identity checks have separate focused evidence. |
 | Complete Windows `dc755901` | **417 groups, 2,478 passing tests and 207 declared skips**; all six jobs and the overall workflow succeed, with exact packet/source/merge inventory, bounds and cleanup. [Receipt](evidence/windows-complete-dc755901-summary.json). | Predates wheel RECORD, five-job scheduling, Cargo archive and workflow/profile/observation corrections. Interactive Windows acceptance remains separate. |
-| Installed Linux `9eec9cd` | 71 metadata/in-memory checks and 21 exact module hashes, including 58 Cargo manifest reference cases. All 54 semantic workspaces, selection, pending conversation and frozen frontend are preserved. [Receipt](evidence/installed-cargo-quoted-manifest-summary.json). | No live scanner, provider task, agent command, account action, model request or hardware operation is performed. |
+| Installed Linux `c50a00c` | 71 metadata/in-memory checks and 21 exact module hashes, including 84 Cargo manifest reference cases. All 54 semantic workspaces, selection, pending conversation and frozen frontend are preserved. [Receipt](evidence/installed-cargo-array-manifest-summary.json). | No live scanner, provider task, agent command, account action, model request or hardware operation is performed. |
 | Complete Linux `39db1fe` | **Failed:** 313/314 groups, 1,910 passing tests, sixteen declared skips and one failed scheduling-budget assertion. Exact owned cleanup verifies. [Receipt](evidence/linux-39db1fe-scheduling-failed-summary.json). | A nearly passing run is not complete acceptance. |
 
 Complete Linux aafb476 passes **317 groups, 1,923 tests and sixteen declared
@@ -56,7 +57,7 @@ changes and predates Cargo archive identity and the workflow-ID correction.
 [Complete receipt](evidence/linux-aafb476-complete-summary.json).
 
 The installed update verifies a dated backup and launcher readback. It retains
-current plus one rollback and removes the exact 530-file, 5,155,176-byte prepared
+current plus one rollback and removes the exact 530-file, 5,155,648-byte prepared
 bundle. Fifty-three sealed workspace files are byte-identical; one changes only
 audit metadata. It preserves the repaired native ChatGPT main window, hidden
 overlay, saved artwork and workstation guard.

@@ -13,8 +13,9 @@ now pass 84 independent Python reference cases. Ten focused groups pass 96 tests
 including six actual Linux scanner journeys and six Windows guest doubles.
 Duplicate fields, scalar/table conflicts and invalid package identities still
 refuse admission. Original package bounds, typecheck and exact child/tree cleanup
-pass. Installed acceptance is pending for this source; `9eec9cd` remains the
-previous 71-check installed checkpoint. Dependency resolution and broader
+pass. Installed `c50a00c` passes all 84 references in its 71-check metadata
+update, preserving every semantic workspace and the frozen frontend. Dependency
+resolution and broader
 manifest/license coverage remain unfinished. [Contract](cargo-archive-identity.md),
 [source evidence](evidence/cargo-array-manifest-source-summary.json).
 
