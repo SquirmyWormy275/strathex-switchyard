@@ -294,3 +294,24 @@ without changing runtime `849b9b9`. Combined installed coverage is 90 distinct
 checks/56 hashes; the other receipts remain tied to that exact release. The
 follow-up does not require another application update.
 [Evidence](evidence/installed-consent-followup-summary.json).
+
+## Latest complete Linux checkpoint
+
+Full Linux `0c025df17213bb2bfe0347bfe712f918cfaf90f7` has finished and is audited:
+350 groups, 2,293 passes, 32 declared skips, no failures. Receipt
+`a2d66177-bc40-4c3c-a08c-02e52e1b2857` matches the original manifest, commands,
+deadlines, skips, bounded output and child/tree cleanup. Its source tree is
+`308bda3075037d9a2869e26c25bba099668d55a9`.
+
+The exact temporary checkout, nine dependency aliases, 802 generated files
+(11,904,762 bytes), empty test parent and run marker have been removed. The unit
+exited successfully with no main process; other worktrees were preserved. No new
+dependencies were downloaded. All `linux-0c025df` prepare/audit/cleanup scripts
+have executed; do not rerun them. Earlier mentions of this run as active are
+historical. [Evidence](evidence/linux-0c025df-complete-summary.json).
+
+Installed `849b9b9` has two production-module differences from that complete run:
+`codex-runtime-observation.mjs` and `suite.mjs`, for recording consent and sampler
+retirement. Their eight focused groups pass 124 tests; the installed update and
+follow-up pass 90 distinct checks/56 hashes. Do not call this a complete run of
+that later source, nor conflate it with live account/hardware/UI acceptance.

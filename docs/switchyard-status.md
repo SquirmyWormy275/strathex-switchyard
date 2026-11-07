@@ -124,7 +124,7 @@ checkpoints are not cumulative acceptance of the latest suite.
 | --- | --- | --- |
 | Installed Linux `849b9b9` | **88 metadata/refusal checks; 56 exact module hashes.** All 54 semantic workspaces, four profiles, 57 workflows and frozen frontend preserved. [Receipt](evidence/installed-foreground-retirement-summary.json). | Recording consent generations, persisted selection generation, consented runtime status capture, original-role/provider-effect guards, signed CLI dispatch and Codex version contract included; editor command activation remains pending; no live scanner, provider task, account/model request, native focus or hardware acceptance. |
 | Native Windows client `57af859` | **25 groups; 249 tests; no skips.** Original manifest, commands, bounds and cleanup verified. [Receipt](evidence/selection-native-client-summary.json). | Terminal/provider doubles remain explicit; not the complete Windows suite, runtime-observation backend groups or live authenticated Codex turns. |
-| Complete Linux `0c7d918` | **350 groups; 2,274 tests; 32 declared platform skips.** Original manifest, bounds and cleanup verified. [Receipt](evidence/linux-0c7d918-complete-summary.json). | Covers the installed `08fa7ea` runtime, including role/workspace/provider-effect boundaries; predates subsequent runtime-status capture. |
+| Complete Linux `0c025df` | **350 groups; 2,293 tests; 32 declared platform skips.** Original manifest, bounds and cleanup verified. [Receipt](evidence/linux-0c025df-complete-summary.json). | Covers runtime installed at `57af859`, including persisted selection and Codex status capture; later consent-generation/retirement fixes have separate focused and installed evidence. |
 | Complete Windows `dc755901` | **417 groups; 2,478 tests; 207 declared skips.** All six jobs and overall workflow passed. [Receipt](evidence/windows-complete-dc755901-summary.json). | Predates newer archive, scheduling, profile/workflow and observation corrections. |
 
 Complete Linux staging is removed: its exact checkout, nine dependency aliases,
@@ -415,3 +415,11 @@ the prior 21-check agent verifier with 23 checks, bringing the accepted installe
 total to 90 distinct checks at the same `849b9b9` release and 56 module hashes.
 No recording, provider or foreground operation was started.
 [Installed consent follow-up](evidence/installed-consent-followup-summary.json).
+
+Complete Linux `0c025df` is audited: 350 original groups, 2,293 passing tests,
+32 declared platform skips and no failures. Original manifest, commands, bounds,
+progress reporting and child/process-tree exits verify. Its temporary checkout,
+nine existing dependency aliases, 802 generated files (11,904,762 bytes), empty
+test parent and active marker are removed. No dependencies were downloaded.
+The later installed observation corrections remain explicitly separate.
+[Complete Linux evidence](evidence/linux-0c025df-complete-summary.json).
