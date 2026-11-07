@@ -12,27 +12,11 @@ import { connectedExecutionActions } from "./repository-execution-actions.mjs";
 import { createRepositoryExecution } from "./repository-execution.mjs";
 import { createSuite } from "./suite.mjs";
 import { createStudioServer } from "./serve.mjs";
+import { createScannerRecipeSave } from "./scanner-recipe-save.mjs";
 import { runtimeGuardianStopped } from "./runtime-command.mjs";
 
 const sha = bytes => createHash("sha256").update(bytes).digest("hex");
-const input = f => ({ taskId: f.task.id, action: "shield_codebase_audit", planRevision: "draft-1", scannerFixtureId: "synthetic-scanner", advisoryFixtureId: "synthetic-advisory" });
-async function fixture(t, overrides = {}) {
-  const f = await authorityFixture(t, { executionActions: connectedExecutionActions("linux") });
-  const feeds = createScannerFixtures({ store: f.store, stateDirectory: join(f.stage, "feeds"), now: f.now }); f.onCleanup(() => feeds.close());
-  const perform = async (action, body) => { const r = await feeds.review("personal", { requestId: randomUUID(), action, ...body }); const result = await feeds.apply("personal", { requestId: r.review.requestId, token: r.confirmation.token }); assert.equal(result.status, "completed"); };
-  const signing = await createScannerAuthority({ outputDirectory: join(f.stage, "signing"), authorityId: "draft-test", allowedKinds: ["scanner", "advisory"], expiresAt: new Date(f.now() + 86400000).toISOString() });
-  await perform("install-trust", { policy: JSON.parse(await readFile(signing.trustPolicyPath, "utf8")) });
-  const sample = scannerFixture({ advisory: [] });
-  for (const [kind, feed] of [["scanner", sample.request.scanner], ["advisory", sample.request.advisory]]) {
-    const contentPath = join(f.stage, kind + ".json"); await writeFile(contentPath, sample.content.get(feed.path));
-    const outputDirectory = join(f.stage, kind + "-signed");
-    await signScannerFixture({ ...signing, contentPath, outputDirectory, id: feed.id, kind, feedVersion: "synthetic-v1", toolName: "switchyard-baseline-scanner", toolVersion: "1", generatedAt: new Date(f.now() - 1000).toISOString(), expiresAt: new Date(f.now() + 3600000).toISOString(), maximumAgeSeconds: 7200 });
-    await perform("install-fixture", { manifestPath: join(outputDirectory, "manifest.json") });
-  }
-  const service = createTaskAuthority({ store: f.store, inspection: f.inspection, now: f.now, executionActions: connectedExecutionActions("linux"), checkNative: async () => {}, readScannerSources: (c, i) => feeds.readSources(c, i), resolveScannerFixtures: (c, i) => feeds.resolve(c, i), ...overrides });
-  f.onCleanup(() => service.close());
-  return { ...f, feeds, perform, service };
-}
+import { scannerDraftFixture as fixture, draftInput as input } from "./test-support/scanner-draft-fixture.mjs";
 
 test("authenticated draft assembly returns exact generated controls without source text, repository writes or approval", async t => {
   const f = await fixture(t), secret = "PRIVATE_SOURCE_MUST_NOT_LEAVE_DRAFT_PREPARATION";
@@ -112,9 +96,10 @@ test("draft assembly retains bounded staged and historical source descriptors in
 
 test("materialized draft requires fresh authority and execution review before an actual Linux scan", { skip: process.platform === "win32" }, async t => {
   const f = await fixture(t); await writeFile(join(f.root, "task.txt"), "-----BEGIN PRIVATE KEY-----\nSYNTHETIC_DRAFT_ONLY_SECRET");
-  const index = await readFile(join(f.root, ".git/index")), head = await f.run("rev-parse", "HEAD"), draft = await f.service.prepareScannerDraft("personal", input(f));
+  const saver = createScannerRecipeSave({ store: f.store, authority: f.service, now: f.now }); f.onCleanup(() => saver.close());
+  const index = await readFile(join(f.root, ".git/index")), head = await f.run("rev-parse", "HEAD"), saving = await saver.review("personal", input(f)), draft = saving.draft;
   await assert.rejects(f.service.review("personal", draft.authorityProposal), /task-owned|classification/);
-  await mkdir(join(f.root, draft.directory)); for (const file of draft.files) await writeFile(join(f.root, file.path), file.content, { flag: "wx", mode: 0o600 });
+  assert.equal((await saver.apply("personal", { id: draft.id, token: saving.confirmation.token })).status, "saved");
   const review = await f.service.review("personal", draft.authorityProposal), grant = await f.service.issue("personal", { ...draft.authorityProposal, token: review.confirmation.token });
   const execution = createRepositoryExecution({ store: f.store, authority: f.service, stateDirectory: join(f.stage, "execution"), resolveScannerFixtures: (c, i) => f.feeds.resolve(c, i) }); f.onCleanup(() => execution.close());
   const proposal = { requestId: randomUUID(), authorityId: grant.id, manifestPath: draft.manifestPath, manifestSha256: draft.manifestSha256, action: draft.action }, ready = await execution.review("personal", proposal), request = { requestId: proposal.requestId, token: ready.confirmation.token }, result = await execution.apply("personal", request);

@@ -1,6 +1,6 @@
 /** Profile-derived print exports. No local bindings, device writes or host effects. */
 import { createHash } from "node:crypto";
-import { readFile } from "node:fs/promises";
+import { readLegendTemplate } from "./legend-template.mjs";
 import { importProfile } from "./workspace.mjs";
 import { analyzePlan } from "./model.mjs";
 import { packageDefinition, packageSchema, parsePortablePackage } from "./portable-package.mjs";
@@ -12,7 +12,6 @@ const esc = (v) => String(v).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&
 const number = (v) => Number(v.toFixed(4));
 const sourcePdf = "a16192b9c8cc7f1031527a9b5e60b25fe1aa8eaf1592b9be4d6abc97be4b6040";
 const sourceSvg = "06bb168f1cf6b7cf4d2a84041626d032a62d41b41e1dff2377fcaa32355ec2b3";
-const sourceUrl = new URL("../../third-party/cyber_engineer/pure-template.svg", import.meta.url);
 const modifier = (value) => value === "none" ? "Plain" : value.split("_").map((v) => ({ gui: "GUI", ctrl: "Ctrl", alt: "Alt", shift: "Shift" })[v]).join("+");
 const pageStart = '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="210mm" height="297mm" viewBox="0 0 595.276 841.89" role="img">';
 const guidance = "Print A4 at 100% / actual size. Disable fit and shrink. Measure the source 15 mm reference with a ruler before cutting. Trial-fit one insert; cap fit on this keyboard is unverified.";
@@ -79,7 +78,7 @@ export async function exportAssignmentLegends(document, { format = "review-html"
     // Validate all labels before returning any page, so pagination cannot hide a
     // missing or illegible action. Both source variants are always preserved.
     for (const a of bound) fitted(a.printLabel, Math.min(...templateFaces.compact.map((f) => f.w)) - 5, 20);
-    const svg = await readFile(sourceUrl, "utf8");
+    const svg = await readLegendTemplate();
     if (Buffer.byteLength(svg) > 800000 || digest(svg) !== sourceSvg) throw new Error("The retained print template did not verify. No geometry was substituted.");
     const inner = svg.slice(svg.indexOf(">", svg.indexOf("<svg")) + 1, svg.lastIndexOf("</svg>"));
     if (format === "template-svg") { content = `${pageStart}<title>${esc(profile.name)} / assignment legends / page ${page + 1}</title><desc>${esc(guidance)}</desc>${inner}${overlay(bound.slice(page * 15, page * 15 + 15), page, pageCount, revision)}</svg>`; mimeType = "image/svg+xml"; }

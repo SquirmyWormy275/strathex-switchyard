@@ -39,12 +39,14 @@ the exact 533-file, 5,213,310-byte prepared bundle was removed.
 
 ## Recent backend changes
 
-- **Scanner setup draft:** the authenticated backend now assembles the pinned
-  engine, signed feeds, request and recipe with no write or approval. A real Linux
-  scan exercises separate save/authority/execution steps; 31 focused groups pass
-  154 tests. Automatic reviewed saving and frozen frontend controls remain
-  unfinished. [Contract](scanner-recipe-drafts.md),
-  [evidence](evidence/scanner-recipe-draft-source-summary.json).
+- **Reviewed scanner setup saving:** the authenticated Linux backend now reviews,
+  saves and recovers exact generated controls. A real demonstration saves through
+  this API before fresh authority and execution review. Thirty-five focused groups
+  pass 221 tests, including interrupted-save recovery and all installation cases.
+  The package stays below its original 5 MiB limit with lossless template storage
+  and identical exports. Windows saving and frozen frontend controls remain
+  unfinished. [Contract](scanner-recipe-saving.md),
+  [evidence](evidence/scanner-recipe-save-source-summary.json).
 - **History preparation and read-only inspection:** bounded historical descriptors
   now come from the exact bound task. Protected capture computes Git tree identity
   without modifying cold index caches or object databases. The latest 58 focused

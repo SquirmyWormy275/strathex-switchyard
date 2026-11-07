@@ -1,0 +1,81 @@
+# Review and save a scanner setup
+
+The Linux backend can now save the exact generated scanner setup after a separate,
+one-use review. Saving does not grant task authority or execute the scanner.
+Windows saving and the frozen frontend controls remain unfinished implementation.
+
+Start with the task and installed feed selection described in
+[scanner drafts](scanner-recipe-drafts.md). Send that selection to authenticated
+`POST /api/suite/coding/scanner-save/review`. The response includes the complete
+generated control files, their hashes, a server-generated draft ID and a five-minute
+confirmation. No repository file is written during review. The encrypted journal
+retains metadata and the selection, not source text or copies of the engine/feeds.
+
+After reviewing those files, submit only the returned ID and token:
+
+```json
+{
+  "id": "the-returned-draft-uuid",
+  "token": "the-returned-confirmation-token"
+}
+```
+
+Send this to `POST /api/suite/coding/scanner-save/apply`. The backend rebuilds the
+same draft identity from freshly verified sources and feeds. Its exact scope must
+still match the task, account, workspace, repository snapshot, generated file
+hashes and directory identity. Caller-supplied content, commands, paths and
+approval overrides are refused.
+
+The save creates one new `switchyard-scan-<uuid>` directory and four or five
+control files. Existing directories are never adopted, even when empty. Existing
+files are never overwritten. Linux directory descriptors anchor child operations;
+exclusive creation, owner/link checks, file synchronization, content readback and
+name/descriptor identity checks detect observed replacement. These checks do not
+isolate a compromised process using the same operating-system identity.
+
+Task/account/workspace and installed feed trust, revocation and freshness are
+checked between writes. A mode change or stopped operation fences subsequent
+writes. The result records only saving: use its `authorityProposal` for a **fresh**
+ordinary authority review, then request a separate execution review with the
+returned manifest path/hash. The scanner rechecks its inputs and feed trust.
+
+`POST /api/suite/coding/scanner-save/list` returns the current workspace's metadata
+history. The history holds at most 32 reviews; it never silently evicts uncertain
+ownership records. Confirmations expire after five minutes. Repeating an apply
+returns the retained outcome and never repeats filesystem effects.
+
+## Interrupted saves
+
+Intent and ownership progress are durable before each later effect. Startup,
+workspace suspension and authenticated `POST /api/suite/coding/scanner-save/recover`
+can inspect a prior attempt only after obtaining its original kernel lease. An
+active owner cannot be overtaken.
+
+Recovery performs no repository writes or deletions and starts no native task.
+If every file had verified ownership recorded, all current names, identities,
+hashes and directory contents must still agree before a lost acknowledgement can
+be reported as saved. Partial, missing, linked, changed or unfamiliar output is
+preserved as `outcome-unconfirmed`. Recovery never resumes an interrupted save.
+Its file verification does not refresh authority or establish current feed trust.
+Review uncertain output separately; automatic cleanup is not implemented.
+
+## Evidence and limits
+
+The latest focused results pass **221 tests across 35 groups**, including 23 save
+cases, authenticated routes, changed-source/account/feed refusals, interrupted
+creation/write/acknowledgement, active-owner exclusion and a real Linux scan after
+backend saving and separate authority/execution reviews. Original index/HEAD and
+source files are preserved. Typecheck, original test bounds, process retirement,
+package/update/rollback/recovery checks and owned test-root cleanup verify.
+[Source evidence](evidence/scanner-recipe-save-source-summary.json).
+
+The full Linux package stays below its existing 5 MiB test limit by storing the
+retained upstream print template losslessly compressed. Bounded decoding verifies
+the original SHA-256. Source artwork, frozen frontend and all three exported
+formats remain byte-for-byte equivalent; exported-package rebuilding also retains
+the template through the full 640-file recovery drill. Earlier failed assertions,
+package size and exported-package regression receipts remain recorded.
+
+This does not establish a completed frontend setup journey, Windows save support,
+live provider/account commissioning, hardware acceptance or complete security
+coverage. Earlier complete-suite receipts remain tied to their original revisions.

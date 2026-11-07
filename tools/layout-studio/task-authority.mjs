@@ -181,7 +181,7 @@ export function createTaskAuthority({ store, checkNative, isActive = async () =>
       const { result, preparation } = await prepareScanner(c, input, generation);
       return { ...await reviewCaptured(c, result, generation), preparation };
     }); },
-    async prepareScannerDraft(c, input) { return exclusive(c, async generation => {
+    async prepareScannerDraft(c, input, internal = {}) { return exclusive(c, async generation => {
       const identifier = v => typeof v === "string" && /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/.test(v);
       if (!input || !identifier(input.scannerFixtureId) || Object.hasOwn(input, "advisoryFixtureId") && !identifier(input.advisoryFixtureId) || input.scannerFixtureId === input.advisoryFixtureId) throw Error("Choose one exact installed scanner feed and an optional distinct advisory feed.");
       const { scannerFixtureId, advisoryFixtureId, ...selection } = input;
@@ -196,13 +196,26 @@ export function createTaskAuthority({ store, checkNative, isActive = async () =>
       try {
         const expected = [[scannerFixtureId, "scanner"], ...(advisoryFixtureId ? [[advisoryFixtureId, "advisory"]] : [])];
         if (JSON.stringify(sources.map(item => [item.fixture.id, item.fixture.kind])) !== JSON.stringify(expected)) throw Error("The resolved draft feeds differ from the selected identities.");
-        const draft = await assembleScannerRecipeDraft({ result, preparation, sources, authorize });
+        const draft = await assembleScannerRecipeDraft({ result, preparation, sources, authorize, id: internal.id });
         const refreshed = await capture(c, result.proposed, generation);
         if (refreshed.snapshot.id !== result.snapshot.id || refreshed.binding !== result.binding || refreshed.workspace !== result.workspace) throw Error("The scanner target changed while assembling the draft.");
         const freshFeeds = await resolveScannerFixtures(c, feedInput());
         if (JSON.stringify(freshFeeds) !== JSON.stringify(sources.map(item => item.fixture))) throw Error("The installed feed trust, content or expiry changed during draft assembly.");
         await authorize(); return draft;
       } finally { for (const item of sources) item.bytes.fill(0); }
+    }); },
+    async assertScannerDraftBinding(c, binding, feeds) { return exclusive(c, async generation => {
+      const verify = async () => {
+        const { state, task } = await access(c, binding.taskId, generation, binding.provider);
+        if (taskDigest(task) !== binding.taskDigest || workspaceDigest(state) !== binding.workspaceDigest || task.sessionId !== binding.sessionId) throw Error("The reviewed scanner save task, account or workspace changed.");
+        return task;
+      };
+      const task = await verify(); await checkNative(c, task); await verify();
+      if (feeds) {
+        const fresh = await resolveScannerFixtures(c, { scannerFixtureIds: feeds.filter(f => f.kind === "scanner").map(f => f.id), advisoryFixtureIds: feeds.filter(f => f.kind === "advisory").map(f => f.id), observedAt: new Date(now()) });
+        if (JSON.stringify(fresh) !== JSON.stringify(feeds)) throw Error("The reviewed scanner feed trust, content, freshness or revocation changed during saving.");
+        await verify();
+      }
     }); },
     async historyInputs(c,input){return exclusive(c,async generation=>{
       if(!input||Object.keys(input).some(key=>!["taskId","compartment","paths","depth"].includes(key))||!uuid(input.taskId)||input.compartment!==undefined&&input.compartment!==c)throw Error("Witness only named bounded history inputs for one bound task; arbitrary commits, refs, commands and policies are refused.");

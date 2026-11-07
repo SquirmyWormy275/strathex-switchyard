@@ -10,12 +10,13 @@ const sha = bytes => createHash("sha256").update(bytes).digest("hex");
 const reader = new NodeFileDigestReader({ maxFileBytes: 2 * 1024 * 1024 });
 const exactText = bytes => { const text = bytes.toString("utf8"); if (!Buffer.from(text).equals(bytes)) throw Error("Draft control files require exact UTF-8 bytes."); return text; };
 
-export async function assembleScannerRecipeDraft({ result, preparation, sources, authorize = async () => {} }) {
+export async function assembleScannerRecipeDraft({ result, preparation, sources, authorize = async () => {}, id = randomUUID() }) {
   const root = result.task.repositoryRoot, action = result.proposed.actions[0];
   if (!isAbsolute(root) || result.proposed.actions.length !== 1 || !Array.isArray(sources) || sources.length < 1 || sources.length > 2) throw Error("Prepare one scanner action with one scanner and optional advisory feed.");
   const scanner = sources.find(s => s.fixture.kind === "scanner"), advisory = sources.find(s => s.fixture.kind === "advisory");
   if (!scanner || sources.length !== 1 + Number(Boolean(advisory)) || new Set(sources.map(s => s.fixture.id)).size !== sources.length) throw Error("Draft feeds must have distinct scanner and advisory identities.");
-  const id = randomUUID(), prefix = `switchyard-scan-${id}`, files = [], current = [];
+  if (!/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/.test(id)) throw Error("Use a host-generated draft identity.");
+  const prefix = `switchyard-scan-${id}`, files = [], current = [];
   const generated = (name, bytes) => { const file = { path: `${prefix}/${name}`, sha256: sha(bytes), size: bytes.length, encoding: "utf8", content: exactText(bytes) }; files.push(file); return file; };
   const witnesses = new Map([...result.files.tracked, ...result.files.untracked, ...result.files.ignored.filter(file => file.classification === "included")].map(file => [file.path, file]));
   let total = 0;
@@ -45,6 +46,7 @@ export async function assembleScannerRecipeDraft({ result, preparation, sources,
   if (manifestFile.size > 128 * 1024 || result.proposed.paths.length + files.length > 256) throw Error("The complete draft exceeds its existing manifest or authority bound.");
   await authorize();
   return { schema: "switchyard-scanner-recipe-draft/v1", status: "draft", id, action, targetSnapshotId: result.snapshot.id, repositoryRoot: root, directory: prefix,
+    binding: { taskId: result.task.id, provider: result.task.provider, sessionId: result.task.sessionId, taskDigest: result.binding, workspaceDigest: result.workspace },
     files, manifestPath: manifestFile.path, manifestSha256: manifestFile.sha256, request, recipe, feeds: sources.map(item => structuredClone(item.fixture)),
     authorityProposal: { ...result.proposed, paths: [...result.proposed.paths, ...files.map(file => file.path)].sort(), classifications: { ...result.proposed.classifications, includedUntracked: [...result.proposed.classifications.includedUntracked, ...files.map(file => file.path)].sort() } },
     preparation, sourceBytesReturned: false, filesWritten: false, authorityGranted: false, scanPerformed: false, securityCoverageComplete: false,

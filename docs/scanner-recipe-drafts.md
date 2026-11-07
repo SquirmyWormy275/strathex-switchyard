@@ -54,10 +54,13 @@ including all package/update/recovery scenarios. A reproduced directory-depth
 defect and initial TypeScript annotation failure remain recorded; both are fixed.
 [Source evidence](evidence/scanner-recipe-draft-source-summary.json).
 
-Automatic reviewed saving/installation and frozen frontend controls remain
-unfinished. This draft API does not establish a normal UI setup journey, a real
-Windows guest scan, broad security coverage or a complete passing Shield gate.
-\nInstalled `6ab9b1e` verifies scan-draft assembly within **76 metadata/in-memory
+[Reviewed Linux saving and interruption recovery](scanner-recipe-saving.md) are
+now implemented as separate authenticated routes. Windows saving and frozen
+frontend controls remain unfinished. This draft API does not establish a normal
+UI setup journey, a real Windows guest scan, broad security coverage or a complete
+passing Shield gate.
+
+Installed `6ab9b1e` verifies scan-draft assembly within **76 metadata/in-memory
 checks and 30 exact module hashes**. All 54 semantic workspaces, selection,
 pending keyboard-only conversation and frozen frontend are preserved; 53 sealed
 files are byte-identical and one changes only audit metadata. All four profiles

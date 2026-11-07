@@ -63,7 +63,14 @@ test("suite bundles contain the actual offline backend, frozen frontend and lice
   assert.deepEqual(decodedProvenance, provenance, "Compressed provenance retains every source revision, hash, notice and metadata field.");
   assert.ok(manifest.files.some(f => f.path === provenancePath + ".gz")); assert.equal(manifest.files.some(f => f.path === provenancePath), false);
   assert.ok(manifest.files.some((f) => f.path.endsWith("mymakercorner/LICENSE"))); assert.ok(manifest.files.some((f) => f.path === "integrations/switchyard_agent.py"));
-  for (const name of ["pure-template.svg", "template-faces.json", "pure-template.pdf", "README.md", "ReadMe.txt"]) assert.ok(manifest.files.some((f) => f.path === `third-party/cyber_engineer/${name}`));
+  for (const name of ["pure-template.svg.gz", "template-faces.json", "pure-template.pdf", "README.md", "ReadMe.txt"]) assert.ok(manifest.files.some((f) => f.path === `third-party/cyber_engineer/${name}`));
+  const { readLegendTemplate } = await import(pathToFileURL(join(bundle.directory, "tools/layout-studio/legend-template.mjs")).href);
+  assert.equal(await readLegendTemplate(), await readFile(join(sourceRoot, "third-party/cyber_engineer/pure-template.svg"), "utf8"), "Lossless packaging must preserve every original template byte.");
+  assert.equal(manifest.files.some(f => f.path === "third-party/cyber_engineer/pure-template.svg"), false);
+  const { newPlan, parseBoardProfile } = await import("../../tools/layout-studio/model.mjs"), { portableProfile } = await import("../../tools/layout-studio/workspace.mjs");
+  const document = portableProfile(newPlan(parseBoardProfile({ schema: "sxsy-board-profile/v1", name: "Synthetic package reference", layout: "synthetic", keys: [{ id: "one", label: "A", matrix: [0, 0], x: 0, y: 0, baseKeycode: "KC_A" }] })), "package-print", "Package print");
+  const sourceExport = await import("../../tools/layout-studio/legend-export.mjs"), packagedExport = await import(pathToFileURL(join(bundle.directory, "tools/layout-studio/legend-export.mjs")).href);
+  for (const format of ["template-svg", "template-html", "review-html"]) assert.deepEqual(await packagedExport.exportAssignmentLegends(document, { format }), await sourceExport.exportAssignmentLegends(document, { format }), "Packaging cannot change any exported content or metadata.");
   assert.equal(manifest.files.some((f) => /(?:\.test\.|test-support\/|\.sealed\.|\.git\/|node_modules\/|\.venv\/|__pycache__\/|\.pyc$|base\.en\/)/.test(f.path)), false);
   assert.equal((await buildSuiteRelease(options)).id, bundle.id, "rebuilding identical inputs must reuse one verified bundle");
   const serve = pathToFileURL(join(bundle.directory, "tools/layout-studio/serve.mjs")).href;

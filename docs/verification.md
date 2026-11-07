@@ -1,5 +1,17 @@
 # What has actually been verified
 
+Reviewed scanner setup saving now works through the authenticated Linux backend.
+The latest **35 focused groups pass 221 tests**, including a real save, fresh
+authority review and scanner execution that detects a synthetic secret. A durable
+one-use review binds the exact task/account/workspace, source snapshot, feeds and
+control bytes; interruption recovery verifies owned output without replay or
+deletion. Typecheck, original bounds, all package/update/recovery scenarios and
+owned cleanup pass. Lossless template packaging keeps the original 5 MiB limit
+and exact export output. Windows saving and frozen frontend controls remain
+unfinished implementation; hardware/accounts and native acceptance are separate.
+[Contract](scanner-recipe-saving.md),
+[source evidence](evidence/scanner-recipe-save-source-summary.json).
+
 Complete Linux `d09645a` passes **326 groups, 2,013 tests and sixteen declared
 skips**, with zero failures or cancellations. The exact original inventory,
 commands, deadlines, output bounds and child/tree exits verify. Its owned clean
@@ -26,8 +38,8 @@ approval. It rechecks task/account/workspace, source hashes, feed trust/revocati
 and expiry. The latest results across **31 focused groups pass 154 tests**,
 including a real Linux scan after separately saving and approving the generated
 setup. Typecheck, original bounds, package/recovery checks and owned cleanup pass.
-Automatic reviewed saving, frozen frontend controls and native Windows acceptance
-remain separate unfinished work or unaccepted checks.
+This earlier draft checkpoint predates [reviewed Linux saving](scanner-recipe-saving.md).
+Windows saving, frozen frontend controls and native acceptance remain separate.
 [Contract](scanner-recipe-drafts.md),
 [source evidence](evidence/scanner-recipe-draft-source-summary.json).
 

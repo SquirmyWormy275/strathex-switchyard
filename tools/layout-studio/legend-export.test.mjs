@@ -10,6 +10,8 @@ import test from "node:test";
 import { newPlan, parseBoardProfile } from "./model.mjs";
 import { portableProfile } from "./workspace.mjs";
 import { exportAssignmentLegends } from "./legend-export.mjs";
+import { decodeLegendTemplate } from "./legend-template.mjs";
+import { gzipSync } from "node:zlib";
 import { createSuiteStore } from "./suite-store.mjs";
 import { createSuite } from "./suite.mjs";
 import { createStudioServer } from "./serve.mjs";
@@ -24,6 +26,16 @@ function sample(count = 4) {
   plan.actions = Array.from({ length: count }, (_, i) => ({ id: `action-${i}`, label: ["Return", "Find", "Review", "Stop"][i % 4], family: "lifecycle", consequence: i % 2 ? "mutating" : "read_only", confirmation: i % 2 === 1, frequencyPerDay: 0, secondsSaved: 0, binding: { keyId: i % 2 ? "two" : "one", modifier: "gui_shift" } }));
   return portableProfile(plan, "synthetic-print", "My desk");
 }
+test("declared lossless template encoding preserves original bytes and refuses corruption, oversized expansion and unknown encodings", async () => {
+  const source = await readFile(new URL("../../third-party/cyber_engineer/pure-template.svg", import.meta.url));
+  assert.equal(decodeLegendTemplate(source, "svg/v1"), source.toString("utf8"));
+  assert.equal(decodeLegendTemplate(gzipSync(source), "gzip-svg/v1"), source.toString("utf8"));
+  assert.throws(() => decodeLegendTemplate(source, "zip-svg/v1"), /encoding/);
+  assert.throws(() => decodeLegendTemplate(Buffer.from("corrupt"), "gzip-svg/v1"));
+  assert.throws(() => decodeLegendTemplate(gzipSync(Buffer.alloc(800001)), "gzip-svg/v1"));
+  assert.throws(() => decodeLegendTemplate(gzipSync(Buffer.from("<svg/>")), "gzip-svg/v1"), /did not verify/);
+  assert.throws(() => decodeLegendTemplate(Buffer.alloc(800001), "svg/v1"), /size/);
+});
 test("assignment reference retains every exact modifier, unassigned action, review issue and rotated outline without exporting local state", async () => {
   const document = sample(), before = JSON.stringify(document); document.plan.actions[3].binding = null;
   const result = await exportAssignmentLegends({ ...document, accounts: ["never-export-account"], roleBindings: [{ sessionId: "never-export-session" }] });

@@ -5,6 +5,7 @@ import { mkdir, lstat, open, readFile, readdir, realpath, rename, rm, writeFile 
 import { dirname, join, relative, resolve, sep } from "node:path";
 import { userInfo } from "node:os";
 import { gzipSync } from "node:zlib";
+import { decodeLegendTemplate } from "../../tools/layout-studio/legend-template.mjs";
 
 // Full keyboard catalog plus the complete Windows helper/setup source closure.
 // The byte ceiling stays fixed; this bounded inventory allows the added files.
@@ -97,8 +98,21 @@ export async function buildSuiteRelease({ sourceRoot, sourceFiles, outputRoot, f
   for (const name of ["packages/protocol/src/b122.ts", "apps/windows-companion/src/mediated-git.ts", "apps/windows-companion/src/git-content-stager.ts", "apps/windows-companion/src/git-index-lease.ts", "apps/windows-companion/src/repository-runtime.ts", "apps/windows-companion/src/repository-runtime-broker.ts", "apps/windows-companion/src/receipt-evidence.ts", "apps/windows-companion/src/repository-inputs.ts", "apps/windows-companion/src/scanner-fixtures.ts", "apps/windows-companion/src/scanner-fixture-files.ts", "apps/windows-companion/src/windows-sandbox.ts", "apps/windows-companion/src/execution-cancellation.ts", "apps/linux-companion/src/linux-repository-runtime.ts", "apps/linux-companion/src/linux-repository-inputs.ts"]) await add(name);
   for (const name of ["apps/vscode-extension/src/codex-daemon-status.cjs", "scripts/setup-switchyard-runtime.mjs", "scripts/workflow-monitor.mjs", "scripts/workflow-capture.mjs", "ATTRIBUTION.md"]) await add(name);
   for (const name of ["pure-template.svg", "template-faces.json", "pure-template.pdf", "README.md", "ReadMe.txt"]) await add(`third-party/cyber_engineer/${name}`);
+  // Preserve every upstream SVG byte while avoiding a large uncompressed copy
+  // in each installed generation. The decoder verifies its original exact hash.
+  const legendTemplate = "third-party/cyber_engineer/pure-template.svg";
+  if (inputs.has(legendTemplate)) {
+    decodeLegendTemplate(inputs.get(legendTemplate), "svg/v1");
+    inputs.set(legendTemplate + ".gz", gzipSync(inputs.get(legendTemplate))); inputs.delete(legendTemplate);
+  } else {
+    // Rebuilding an explicitly declared exported package must retain the same
+    // compressed input, including full-inventory interruption recovery drills.
+    const declared = JSON.parse((await bytes(join(sourceRoot, "package.json"))).toString("utf8"));
+    if (declared.name !== "strathex-switchyard-private-suite" || declared.legendTemplate !== "gzip-svg/v1") throw Error("The source does not declare a retained print template encoding.");
+    await add(legendTemplate + ".gz"); decodeLegendTemplate(inputs.get(legendTemplate + ".gz"), "gzip-svg/v1");
+  }
   // A minimal package boundary is sufficient: the application has no npm runtime dependencies.
-  inputs.set("package.json", Buffer.from(JSON.stringify({ name: "strathex-switchyard-private-suite", type: "module", private: true, license: "UNLICENSED", engines: { node: nodeVersion }, catalogProvenance: "gzip-json/v1" }) + "\n"));
+  inputs.set("package.json", Buffer.from(JSON.stringify({ name: "strathex-switchyard-private-suite", type: "module", private: true, license: "UNLICENSED", engines: { node: nodeVersion }, catalogProvenance: "gzip-json/v1", legendTemplate: "gzip-svg/v1" }) + "\n"));
   for (const f of front.files) { portableName(f.file); if (f.file.includes("/")) throw new Error("The frontend review file contract changed."); const b = await bytes(join(frontendRoot, f.file)); if (hash(b) !== f.sha256) throw new Error("A frozen frontend asset changed."); inputs.set(`frontend/${f.file}`, b); }
   if (platform === "win32") {
     for (const name of ["src/provider-desktop.ts", "src/windows-provider-process.ts", "provider-desktop-helper/Program.cs"]) {

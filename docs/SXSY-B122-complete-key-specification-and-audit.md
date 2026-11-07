@@ -1,5 +1,17 @@
 # SXSY-B122 Complete Key Specification and Adversarial Review
 
+Reviewed scanner setup saving now works through the authenticated Linux backend.
+The latest **35 focused groups pass 221 tests**, including a real save, fresh
+authority review and scanner execution that detects a synthetic secret. A durable
+one-use review binds the exact task/account/workspace, source snapshot, feeds and
+control bytes; interruption recovery verifies owned output without replay or
+deletion. Typecheck, original bounds, all package/update/recovery scenarios and
+owned cleanup pass. Lossless template packaging keeps the original 5 MiB limit
+and exact export output. Windows saving and frozen frontend controls remain
+unfinished implementation; hardware/accounts and native acceptance are separate.
+[Contract](scanner-recipe-saving.md),
+[source evidence](evidence/scanner-recipe-save-source-summary.json).
+
 **Status:** The 22 key names, bank allocation, and interview-approved behaviors are captured. Derived safety constraints, architecture proposals, and prototype assumptions remain pending approval and validation.
 **Date:** 2026-08-22
 **Scope:** All 22 re-legendable B122 specialty keys, their settled modifiers, host architecture, safety contract, feasibility assessment, rejected concepts, gaps, and implementation gates
