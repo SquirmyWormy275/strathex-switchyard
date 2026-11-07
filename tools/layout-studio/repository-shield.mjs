@@ -90,13 +90,13 @@ export function parseShieldScannerReport(output,shield,action) {
     let key;
     if(component.ecosystem==="PyPI"){
       if(!exact(component,["ecosystem","name","version","requirementsPath","declaredSha256",...(Object.hasOwn(component,"extras")?["extras"]:[]),...(Object.hasOwn(component,"marker")?["marker"]:[]),...(Object.hasOwn(component,"artifact")?["artifact"]:[])])||!isPinnedRequirementsPath(component.requirementsPath)||pypiIdentity(component.name,component.version).name!==component.name||!Array.isArray(component.declaredSha256)||component.declaredSha256.length>64||component.declaredSha256.some(value=>!digest(value))||new Set(component.declaredSha256).size!==component.declaredSha256.length||component.declaredSha256.join()!==component.declaredSha256.slice().sort().join())throw Error("Invalid exact Python requirement inventory.");
-      if (!report.gaps.includes("python_environment_not_resolved")) throw Error("Python inventory cannot claim a resolved environment.");
+      if (["python_environment_not_resolved", "license_metadata", "package_source_or_integrity"].some(gap => !report.gaps.includes(gap))) throw Error("Python declarations must retain unresolved environment, license and source coverage.");
       if (Object.hasOwn(component, "extras") && (!component.extras?.length || JSON.stringify(pypiExtras(component.extras)) !== JSON.stringify(component.extras) || !report.gaps.includes("python_extras_not_resolved"))) throw Error("Python extras must retain canonical declarations and unresolved coverage.");
       if (Object.hasOwn(component, "marker")) { validatePypiMarker(component.marker); if (!report.gaps.includes("python_markers_not_evaluated")) throw Error("Python markers must retain unevaluated coverage."); }
       const referenceKey = shieldArtifactReferenceKey(component), reference = artifactReferences.get(referenceKey);
       if (reference) {
         const a = component.artifact, file = files.get(reference.path);
-        if (!exact(a, ["path", "sha256", "size", "algorithm", "acceptedSha256", "status", "archive"]) || a.path !== reference.path || a.sha256 !== file?.sha256 || a.size !== file?.size || a.algorithm !== "sha256"
+        if (!exact(a, ["path", "sha256", "size", "algorithm", "acceptedSha256", "status", "archive", "licensePolicy"]) || a.path !== reference.path || a.sha256 !== file?.sha256 || a.size !== file?.size || a.algorithm !== "sha256"
           || JSON.stringify(a.acceptedSha256) !== JSON.stringify(component.declaredSha256)
           || a.status !== (!component.declaredSha256.length ? "unsupported-integrity" : component.declaredSha256.includes(a.sha256) ? "matched" : "mismatched")) throw Error("Python artifact observation differs from its exact reviewed bytes and declared alternatives.");
         if (a.status !== "matched" && !report.gaps.includes("package_artifact_not_verified")) throw Error("Unmatched Python artifacts must retain their coverage gap.");
@@ -105,6 +105,15 @@ export function parseShieldScannerReport(output,shield,action) {
           if (!report.findings.some(f => f.ruleId === "artifact.integrity-mismatch" && f.dimension === "provenance" && f.severity === "high" && f.path === component.requirementsPath && f.line === null && f.fingerprint === fingerprint) && !(report.findings.length === 512 && report.gaps.includes("finding_limit"))) throw Error("A mismatched Python artifact cannot lose its failed integrity finding.");
         }
         validatePypiWheelObservation(a.archive, component.name, component.version);
+        const declaration = a.archive.license?.status === "declared" ? npmLicenseDeclaration(a.archive.license.expression) : null;
+        const assessable = a.status === "matched" && a.archive.status === "matched" && a.archive.record.status === "verified" && declaration;
+        if (assessable ? !["unconfigured", "permitted", "disallowed"].includes(a.licensePolicy) : a.licensePolicy !== "unassessed") throw Error("Wheel license policy requires matched bytes, identity and verified RECORD.");
+        if (a.licensePolicy === "unconfigured" && !report.gaps.includes("license_policy")) throw Error("Unconfigured wheel policy must retain its gap.");
+        if (a.licensePolicy === "permitted" && declaration.choice && !report.gaps.includes("license_choice_not_selected")) throw Error("Permitted wheel alternatives do not establish a selected license.");
+        if (a.licensePolicy === "disallowed") {
+          const fingerprint = sha(["license.archive-disallowed", "PyPI", component.requirementsPath, files.get(component.requirementsPath).sha256, component.name, component.version, a.path, a.sha256, a.archive.manifestSha256, a.archive.record.sha256, declaration.expression].join("\0"));
+          if (!report.findings.some(f => f.ruleId === "license.disallowed" && f.dimension === "licenses" && f.severity === "high" && f.path === component.requirementsPath && f.line === null && f.fingerprint === fingerprint) && !(report.findings.length === 512 && report.gaps.includes("finding_limit"))) throw Error("A disallowed wheel license cannot lose its failed finding.");
+        }
         if (a.archive.record?.status !== "verified" && !report.gaps.includes("python_wheel_record_not_verified")) throw Error("Unverified wheel RECORD must retain its coverage gap.");
         if (a.archive.record?.status === "mismatched") {
           const fingerprint = sha(["artifact.record-mismatch", "PyPI", component.requirementsPath, files.get(component.requirementsPath).sha256, component.name, component.version, a.path, a.sha256, a.archive.record.sha256].join("\0"));

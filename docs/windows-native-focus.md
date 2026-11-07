@@ -93,3 +93,9 @@ checks and 22 exact module hashes. All 54 semantic workspaces, selected workspac
 and frozen frontend remain preserved; the dated backup and launcher readback
 verify, and exact prepared staging is removed. This does not invoke native focus.
 [Installed evidence](evidence/installed-windows-focus-policy-summary.json).
+
+The native Windows client lane at `4f56477` passes seven groups and 94 tests
+without skips, including the policy-ordering correction. Exact artifact digest,
+source/merge tree, commands, bounds and child/tree cleanup verify. Interactive
+desktop focus remains separate.
+[Native receipt](evidence/windows-client-4f56477-passed-summary.json).

@@ -3,14 +3,16 @@ import { readFile, access } from "node:fs/promises";
 import { join } from "node:path";
 import { runtimeGuardianStopped } from "../runtime-command.mjs";
 export async function assertPythonWheelShield(t, factory, action, windows, records = false) {
-  const cases = records ? [["record-quoted-crlf", "matched", "verified"], ["record-changed-content", "matched", "mismatched"], ["record-weak-hash", "matched", "unsupported"]] : [["deflated", "matched"], ["wrong-name", "mismatched"], ["future-wheel", "unsupported"]];
+  const cases = records ? [["record-quoted-crlf", "matched", "verified"], ["record-changed-content", "matched", "mismatched"], ["record-weak-hash", "matched", "unsupported"]] : [["deflated", "matched"], ["wrong-name", "mismatched"], ["future-wheel", "unsupported"], ["license-and", "matched"]];
   for (const [archiveCase, archiveStatus, recordStatus] of cases) {
     const f = await factory(t, { action, shield: true, clean: true, pypiWheel: archiveCase });
     const original = () => Promise.all([readFile(join(f.root, "requirements.txt")), readFile(join(f.root, "reviewed-package.whl")), readFile(join(f.root, ".git/index")), f.run("rev-parse", "HEAD")]), before = await original();
     const review = await f.execution.review("personal", f.proposed), input = { requestId: f.proposed.requestId, token: review.confirmation.token }, result = await f.execution.apply("personal", input);
-    assert.equal(result.status, archiveStatus === "mismatched" || recordStatus === "mismatched" ? "failed" : "incomplete", JSON.stringify(result));
+    assert.equal(result.status, archiveStatus === "mismatched" || recordStatus === "mismatched" || archiveCase === "license-and" ? "failed" : "incomplete", JSON.stringify(result));
     const report = result.data.shieldReport, artifact = report.sbom.components[0].artifact;
     assert.equal(artifact.status, "matched"); assert.equal(artifact.archive.status, archiveStatus);
+    assert.equal(artifact.licensePolicy, archiveCase === "license-and" ? "disallowed" : "unassessed");
+    assert.equal(report.findings.some(f => f.ruleId === "license.disallowed"), archiveCase === "license-and");
     assert.equal(report.findings.some(f => f.ruleId === "artifact.identity-mismatch"), archiveStatus === "mismatched");
     if (records) {
       assert.equal(artifact.archive.record.status, recordStatus);

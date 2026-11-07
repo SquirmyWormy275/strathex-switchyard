@@ -13,7 +13,7 @@ const flags = process.argv.slice(2);
 if (process.platform !== "linux" || flags.length !== 1 || flags[0] !== "--read-only-metadata") throw Error("Usage on the pilot: node scripts/verify-npm-archive-host.mjs --read-only-metadata");
 const sha = b => createHash("sha256").update(b).digest("hex"), app = await applicationStatus(); assert.equal(app.status, "ready");
 const root = join(installationRoot(), "versions", app.build), manifest = await verifySuiteRelease(root, { expectedId: app.build, platform: "linux", checkRuntime: true }); assert.equal(manifest.development, false);
-const source = JSON.parse(await readFile(new URL("../docs/evidence/npm-archive-license-source-summary.json", import.meta.url))), moduleDigests = {}, checks = [];
+const source = JSON.parse(await readFile(new URL("../docs/evidence/pypi-wheel-license-source-summary.json", import.meta.url))), moduleDigests = {}, checks = [];
 for (const path of ["tools/layout-studio/shield-scanner-engine.mjs", "tools/layout-studio/repository-shield.mjs"]) { const digest = sha(await readFile(join(root, path))); assert.equal(digest, source.sourceFiles[path]); moduleDigests[path] = digest; }
 for (const path of ["tools/layout-studio/test-support/shield-scanner-fixture.mjs", "tools/layout-studio/test-support/npm-archive-fixture.mjs"]) assert.equal(sha(await readFile(new URL("../" + path, import.meta.url))), source.sourceFiles[path]);
 checks.push("two-tested-installed-module-hashes-and-exact-fixture-sources");

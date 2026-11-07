@@ -22,7 +22,8 @@ test("bounded wheel ZIP identities match independent Python zipfile and email pa
   for (const row of wheelOracle.cases.slice(0, 7)) {
     const bytes = Buffer.from(row.bytesBase64, "base64"), budget = { remaining: 4 * 1024 * 1024 };
     assert.equal(sha(bytes), row.sha256);
-    const { record, ...identity } = engine.inspectPypiWheel(bytes, budget);
+    const { record, license, ...identity } = engine.inspectPypiWheel(bytes, budget);
+    assert.deepEqual(license, { status: "missing" });
     assert.deepEqual(identity, { status: "inspected", ...row.identity }); assert.equal(record.status, "verified");
     assert.equal(budget.remaining, 4 * 1024 * 1024 - row.identity.expandedBytes);
   }

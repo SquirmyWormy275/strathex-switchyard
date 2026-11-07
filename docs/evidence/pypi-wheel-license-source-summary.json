@@ -1,0 +1,249 @@
+{
+  "schema": "switchyard-pypi-wheel-license-source/v1",
+  "at": "2026-11-07T04:16:54.983570+00:00",
+  "baseSource": "4f56477e49651a14514f3b6a2f8555ab3d094abd",
+  "sourceFiles": {
+    "deployment/suite/release.test.mjs": "a3b3cf50a9f2f12cd92f609202f58bffdd3c21f63606cbdeabd2ee12a8d9a7de",
+    "scripts/fixtures/cargo-archive-oracle.json": "7371721d7fac79948956506d194f675882ef91352674e62a856f569ca97bb324",
+    "scripts/fixtures/pypi-wheel-license-oracle.json": "a1f36c5f802f2d6b6e6addee4261214555e35858e604002c9aa67fce4f437f53",
+    "scripts/fixtures/pypi-wheel-oracle.json": "fad40e5432c47dc0d1aad1cb2ea6d41ded275b57d6e0ba708fe92588072327f5",
+    "scripts/fixtures/pypi-wheel-record-oracle.json": "a38f314da3777e4e58c444eb6fb4d32f976ba250eae6b45eac256f2b47ee583c",
+    "scripts/generate-cargo-archive-oracle.py": "8df25cb55b0f67119c291f93a5a4ef8edf08898bbc76ad35e911af030682d705",
+    "scripts/generate-pypi-wheel-license-oracle.py": "e0ec69ddb60fd45226c448c673d14223af62423dd4213c31ad232ce660fdf573",
+    "scripts/run-isolated-tests.mjs": "5b6a1033be398ca9e9d1a9542defc1b1ca6ba0ea3b8218a3e248111b9d0ffa52",
+    "scripts/run-isolated-tests.test.mjs": "e957fda947d20040b21cfcb02b595427458b70df842702d56eccc7f8c9a2b8e8",
+    "scripts/verify-cargo-inventory-host.mjs": "b022f015a0848db106a77a11be99f7fc5512797009a6e53846d4ef7250d9f25d",
+    "scripts/verify-copilot-journal-host.test.mjs": "14fc59b301374a79a3417458583eb9abebaf590232eca963e6811b3aee1ed57e",
+    "scripts/verify-npm-archive-host.mjs": "7fd09af315f517b348cd03615cb320b90487d467d3d61fcd39778ebd22b49ea6",
+    "scripts/verify-python-inventory-host.mjs": "4a8c32c564a479cb37c3d5dff106f007139e83c0193290e3b75e17420ab4b113",
+    "scripts/windows-backend-shards.test.mjs": "2025ce872294426df0bab0c3b5fa367c9d2a18471568a3a4043109f55eae6234",
+    "scripts/windows-scenario-groups.test.mjs": "513550b7b199fb410c9ce3cffdb94b84dfa041cf3a4e7962162eb0e5a1ca3d9f",
+    "tools/layout-studio/cargo-archive.test.mjs": "585b1843e4bb7874cbd6404b4b7e0f3d31ff2515770946372a052f5f0b870b6b",
+    "tools/layout-studio/cargo-lock-inventory.test.mjs": "57ac3058d30d6a34ee45471ee9cb3bc0cf8b46a29d542d3655142c2f34a438f8",
+    "tools/layout-studio/npm-archive-license.test.mjs": "63e8cc89121adac3989a228f6921db43a4109f37faa8432628c59577e03ab558",
+    "tools/layout-studio/pypi-wheel-identity.test.mjs": "39c085a6198c7c25a29cfc87c3ef913880e222424e5a46e146a78bcbd086bbdf",
+    "tools/layout-studio/pypi-wheel-license.test.mjs": "77bfa9643cd10e320aa64e2f4ca2dee0bebc4fadd9526fe94ffc07e7bfce42c7",
+    "tools/layout-studio/pypi-wheel-record.test.mjs": "457e6ab7c6a801ab5c97f39d198616810bb2066038b775357e854b2cad5712ca",
+    "tools/layout-studio/repository-shield-artifacts.test.mjs": "a4bfcebdc7c5b5684aef1ab86be7bbc250717bb783f6723ca49e28eb39bedb89",
+    "tools/layout-studio/repository-shield-cargo-archives.test.mjs": "5e9c6b8d683a65f46f6166e5545c356b8e5ddcb86d7fb2c0931866e8af93cab0",
+    "tools/layout-studio/repository-shield-cargo-artifacts.test.mjs": "15f884506986dfd94508efe64153b9c329d21f05d813cf37c238cac72fc23e5a",
+    "tools/layout-studio/repository-shield-cargo.test.mjs": "7173a94937079baec95bebdc40339a4563b929c9858f0c3c56b87d855814c781",
+    "tools/layout-studio/repository-shield-licenses.test.mjs": "efebd9372f8ba33bad32cdc9d2295f52a152005d6500c12ce26b064a10e31cea",
+    "tools/layout-studio/repository-shield-npm-archives.test.mjs": "d3aca28127acafed3c79db487000466a01fd450f99e571bf93bc7a9b9de1a5b7",
+    "tools/layout-studio/repository-shield-pypi-artifacts.test.mjs": "294b350f927498b89d710c86e4dbbe5f796d352f2dcdf98eec6f8ddb026e2456",
+    "tools/layout-studio/repository-shield-pypi.test.mjs": "93e15af234e8e7728c2de4b8294ad83f4bb4e6cf83159ad5118def96f842c3b7",
+    "tools/layout-studio/repository-shield-python-records.test.mjs": "a02ff353ef6ce1a001553744594b04b85e038063a2277bb8d8af6aab7fb77378",
+    "tools/layout-studio/repository-shield-python-wheels.test.mjs": "deb795f6a658d2db844ae16cfe91bf0a625e59cfac30601263314857af7f131c",
+    "tools/layout-studio/repository-shield.mjs": "486d8432f3a6afd8e9a8b16ca12bf502945775ee53747bda4880ca2ebb60c3ca",
+    "tools/layout-studio/repository-windows-shield-cargo-archives.test.mjs": "365f9046d35aa27934acf9c11e8db180f2b8287fca9b63ef8c6682150ed8561a",
+    "tools/layout-studio/repository-windows-shield-cargo.test.mjs": "eb94173fa8f2b37812a61aa106e6fa8f4d70a94bf7755ae0f5a7bfbfc0fd4b1c",
+    "tools/layout-studio/repository-windows-shield-licenses.test.mjs": "26ddfd591b30f388ff5d5dfaffbbf61fdffd844a0a61c84e9c61692230a94bcc",
+    "tools/layout-studio/repository-windows-shield-pypi.test.mjs": "ed2a25412cd769db87c5ff57f4cdf05374c459672bfe23e9db52aa9fd1ace073",
+    "tools/layout-studio/repository-windows-shield-python-records.test.mjs": "4ab8d9e1f64110d8302f6c2fac3765d82319a34ff4e0208ead9ef58988a6e7fb",
+    "tools/layout-studio/repository-windows-shield-python-wheels.test.mjs": "32dcfc5b5e93fd13f1f2597ec559096ea85f52606e234b10a507deaba19f7b57",
+    "tools/layout-studio/shield-scanner-engine.mjs": "18910cd38711a7facbdc053cd725a721c1a0cacdf62c2be81587cf4173aedc64",
+    "tools/layout-studio/shield-scanner-engine.test.mjs": "51f4b278b34e34921e056a17f03efb1d66c034688c5d0a2fd5f055b0a0c7c40f",
+    "tools/layout-studio/test-support/assert-cargo-archive-shield.mjs": "4bb598b2c2c5d6ae9f78ac5ef1e700d87fcaa081dae1cc7d9d9b1389b16530b8",
+    "tools/layout-studio/test-support/assert-npm-artifact-execution.mjs": "35ce558af91030ffb710513b324e6de24032675f6584836b2bd94cbc3c1950cf",
+    "tools/layout-studio/test-support/assert-python-wheel-shield.mjs": "3e487b90b2efe95153b4f0639338c1b234864ff8b99ef583f32914fbe051490a",
+    "tools/layout-studio/test-support/cargo-archive-fixture.mjs": "c5eca1d012c2727567cd5d8cb446b7145511a41e7627dea67cf8225be36d58ef",
+    "tools/layout-studio/test-support/npm-archive-fixture.mjs": "dbc8aa1f1cec3d022e5489778c929c86a017af6c4575844c3da93372ee7c76f5",
+    "tools/layout-studio/test-support/pypi-wheel-fixture.mjs": "443b6db92de46a7d8566587dc7ce96272f01e81540c52c8e2ad51fdaae043712",
+    "tools/layout-studio/test-support/shield-scanner-fixture.mjs": "df6bf5e72292ecbb8f34794310e6aa08ce1969e1490b0e086b91946693645cc2"
+  },
+  "receipts": [
+    {
+      "name": "isolated-test-7673e23a-7a89-4e8e-afdb-958879601552.json",
+      "sha256": "aa92966f9094ab553f3ae319e48101692da73d8b25c39c004b1fdd08692eb81c",
+      "success": false,
+      "totals": {
+        "required": 1,
+        "passed": 0,
+        "failed": 1,
+        "tests": 3,
+        "passedTests": 0,
+        "failedTests": 3,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "name": "isolated-test-5d7d5bdb-8846-44d7-857b-06160e6062ab.json",
+      "sha256": "7599eb5d9677edb15d8f186bda0b79ad3ac887c8cbf2223fcd9afe84677ed9be",
+      "success": false,
+      "totals": {
+        "required": 1,
+        "passed": 0,
+        "failed": 1,
+        "tests": 3,
+        "passedTests": 2,
+        "failedTests": 1,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "name": "isolated-test-a12088a5-d605-451e-81bb-1ba9dbe9695d.json",
+      "sha256": "c3d705d7c21dc78c9efac914a57467d29429c8f6da3ded5bac56080408b5e9c9",
+      "success": true,
+      "totals": {
+        "required": 1,
+        "passed": 1,
+        "failed": 0,
+        "tests": 3,
+        "passedTests": 3,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "name": "isolated-test-c9f056c3-cda7-4ec2-ab08-095f22940413.json",
+      "sha256": "8365492dc05c2e32a0f6e988b648c2f179fdc6c2ed1b758f2f713628fc3b28b7",
+      "success": true,
+      "totals": {
+        "required": 1,
+        "passed": 1,
+        "failed": 0,
+        "tests": 4,
+        "passedTests": 4,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "name": "isolated-test-1a03bbca-e512-467d-a247-ca72d7267cae.json",
+      "sha256": "3954d441f2a0b7998b34d5bc8104ac354de04a96d7b2fd9a2389d6b094e1885d",
+      "success": true,
+      "totals": {
+        "required": 11,
+        "passed": 11,
+        "failed": 0,
+        "tests": 120,
+        "passedTests": 120,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "name": "isolated-test-7129236c-49fc-4ce4-8832-a8765df7236e.json",
+      "sha256": "52195f3854d51ba929da06a6602fa93bbaa3745531d57bfd6817595a98b80345",
+      "success": true,
+      "totals": {
+        "required": 9,
+        "passed": 9,
+        "failed": 0,
+        "tests": 46,
+        "passedTests": 46,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "name": "isolated-test-2972beeb-2835-49e0-9827-843d67fc71d4.json",
+      "sha256": "0c54e3757a7cc490f459129ce453e24798963c537d66d275a8274ca60ef4ff13",
+      "success": false,
+      "totals": {
+        "required": 1,
+        "passed": 0,
+        "failed": 1,
+        "tests": 5,
+        "passedTests": 4,
+        "failedTests": 1,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "name": "isolated-test-ae6fb091-c463-4823-9f22-93ddb5f60a00.json",
+      "sha256": "6004728d126bb694c053d0b27852ace9f10d71cc733450256f2b1d2586871971",
+      "success": true,
+      "totals": {
+        "required": 6,
+        "passed": 6,
+        "failed": 0,
+        "tests": 28,
+        "passedTests": 28,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    }
+  ],
+  "distinctFocusedGroups": 20,
+  "distinctFocusedPasses": 167,
+  "initialFocusedPasses": 166,
+  "finalAffectedGroups": 6,
+  "finalAffectedPasses": 28,
+  "initialSourceBeforeBudgetCorrection": {
+    "name": "pypi-wheel-license-pre-budget-source.json",
+    "sha256": "f6eba49e09c529555db4673092dff8e0960a3df95b052d4b077f350b3aad3ff1",
+    "sourceFiles": {
+      "tools/layout-studio/shield-scanner-engine.mjs": "f50182b2e1502903a210a842648e0f939fd6d70bcd471e95a48f69879fc4cbf1",
+      "tools/layout-studio/repository-shield.mjs": "486d8432f3a6afd8e9a8b16ca12bf502945775ee53747bda4880ca2ebb60c3ca",
+      "tools/layout-studio/pypi-wheel-license.test.mjs": "262ec0165251b0212a8728151b040fafb175cd6b815455b41712392282646d3f",
+      "tools/layout-studio/test-support/pypi-wheel-fixture.mjs": "443b6db92de46a7d8566587dc7ce96272f01e81540c52c8e2ad51fdaae043712",
+      "tools/layout-studio/test-support/assert-python-wheel-shield.mjs": "3e487b90b2efe95153b4f0639338c1b234864ff8b99ef583f32914fbe051490a",
+      "scripts/fixtures/pypi-wheel-license-oracle.json": "a1f36c5f802f2d6b6e6addee4261214555e35858e604002c9aa67fce4f437f53"
+    }
+  },
+  "independentReference": {
+    "pythonVersion": "3.15.2",
+    "sources": [
+      {
+        "module": "zipfile",
+        "sha256": "a09d7de3e46e0fa3cc8d57e4edfb175b80c3bb01cc555fc4945098af908ad6bc"
+      },
+      {
+        "module": "email.parser",
+        "sha256": "5af6ef2ef9eb5aed6cae264ec2418ac466fe4316b41fd3f7ece4b149d521a1ee"
+      }
+    ],
+    "cases": 17,
+    "meaning": "Email/ZIP facts are independent reference observations; expected license statuses are the reviewed Switchyard subset contract."
+  },
+  "distinctActualLinuxWheelJourneys": 8,
+  "distinctWindowsWheelGuestDoubles": 8,
+  "wheelJourneySuitesRepeatedAfterBudgetCorrection": true,
+  "originalCommandsBoundsAndSkipsVerified": true,
+  "typecheck": "passed",
+  "originalPackageBounds": "passed",
+  "failureNotes": [
+    "Three original tests reproduced missing wheel declaration and policy handling. An intermediate test exposed absent CycloneDX policy projection.",
+    "A separate red test reproduced a late duplicate-header refusal refunding reserved expansion budget; license parsing now precedes that refund. All six affected groups, including both eight-journey wheel suites, were rerun."
+  ],
+  "effects": {
+    "pipInvocations": 0,
+    "archiveExtractions": 0,
+    "packageExecutions": 0,
+    "newDependencyDownloads": 0,
+    "providerRequests": 0,
+    "accountChanges": 0,
+    "hardwareOperations": 0
+  },
+  "limitations": [
+    "Independent email/ZIP facts do not provide a legal license oracle. The bounded declared-SPDX policy remains separate from license text, dependency resolution and publisher provenance.",
+    "Private/legacy/conflicting declarations remain unsupported; file-only observations export no paths.",
+    "Windows integration uses guest doubles; actual Windows and installed acceptance are separate checkpoints."
+  ],
+  "cleanup": {
+    "everyChildVerified": true,
+    "everyTreeVerified": true,
+    "emptyOwnedRootRemoved": true
+  },
+  "privateReceipt": {
+    "name": "pypi-wheel-license-source.json",
+    "sha256": "09da8d4d3e5c9ab9fb9601f37d965ec8be663a9b054474367121679e2c3abfe8"
+  }
+}

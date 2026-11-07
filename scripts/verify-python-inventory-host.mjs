@@ -17,7 +17,7 @@ assert.equal(app.status, "ready");
 const root = join(installationRoot(), "versions", app.build), manifest = await verifySuiteRelease(root, { expectedId: app.build, platform: "linux", checkRuntime: true });
 assert.equal(manifest.development, false);
 const sourceEvidence = JSON.parse(await readFile(new URL("../docs/evidence/pypi-wheel-record-source-summary.json", import.meta.url), "utf8")), markerEvidence = JSON.parse(await readFile(new URL("../docs/evidence/pypi-markers-source-summary.json", import.meta.url), "utf8")), moduleDigests = {}, checks = [];
-const installedEvidence = JSON.parse(await readFile(new URL("../docs/evidence/npm-archive-license-source-summary.json", import.meta.url), "utf8"));
+const installedEvidence = JSON.parse(await readFile(new URL("../docs/evidence/pypi-wheel-license-source-summary.json", import.meta.url), "utf8"));
 for (const name of ["tools/layout-studio/shield-scanner-engine.mjs", "tools/layout-studio/repository-shield.mjs"]) {
   const digest = sha(await readFile(join(root, name))); assert.equal(digest, installedEvidence.sourceFiles[name]); moduleDigests[name] = digest;
 }
@@ -65,12 +65,12 @@ assert.equal(sha(wheelOracleBytes), sourceEvidence.sourceFiles[wheelOraclePath])
 for (const [index, row] of wheelOracle.cases.entries()) {
   const bytes = Buffer.from(row.bytesBase64, "base64"); assert.equal(sha(bytes), row.sha256);
   const observed = inspectPypiWheel(bytes);
-  if (index < 7) { const { record, ...identity } = observed; assert.deepEqual(identity, { status: "inspected", ...row.identity }); assert.equal(record.status, "verified"); }
+  if (index < 7) { const { record, license, ...identity } = observed; assert.deepEqual(license, { status: "missing" }); assert.deepEqual(identity, { status: "inspected", ...row.identity }); assert.equal(record.status, "verified"); }
   else assert.equal(observed.status, "unsupported");
 }
 checks.push("fifteen-independent-zip-facts-including-unsafe-and-over-budget-wheels");
 const wheelFixturePath = "tools/layout-studio/test-support/pypi-wheel-fixture.mjs";
-assert.equal(sha(await readFile(new URL("../" + wheelFixturePath, import.meta.url))), sourceEvidence.sourceFiles[wheelFixturePath]);
+assert.equal(sha(await readFile(new URL("../" + wheelFixturePath, import.meta.url))), installedEvidence.sourceFiles[wheelFixturePath]);
 const { pypiWheelFixture } = await import("../tools/layout-studio/test-support/pypi-wheel-fixture.mjs");
 let mismatch;
 for (const action of ["shield_supply_chain", "release_shield"]) for (const [archiveCase, status] of [["deflated", "matched"], ["wrong-name", "mismatched"], ["future-wheel", "unsupported"]]) {
@@ -106,7 +106,22 @@ for (const action of ["shield_supply_chain", "release_shield"]) for (const [arch
   }
 }
 checks.push("six-in-memory-record-results-bind-failures-and-incomplete-coverage");
-const evidence = { schema: "switchyard-installed-python-inventory-metadata/v3", at: new Date().toISOString(), sourceCommit: manifest.sourceCommit, applicationRelease: manifest.id, moduleDigests, verifierSourceSha256: sha(await readFile(new URL(import.meta.url))), markerOracleSha256: sha(oracleBytes), extrasOracleSha256: sha(oldOracleBytes), wheelOracleSha256: sha(wheelOracleBytes), wheelRecordOracleSha256: sha(recordBytes), checks, success: true, pureInMemoryOnly: true, markerExpressionsEvaluated: 0, actualScannerProcesses: 0, nativeProcessesStarted: 0, archiveExtractionOrExecution: false, wheelRecordHashesVerifiedInMemory: true, providerOrModelRequests: 0, publicRequests: 0, liveAccountChanges: 0, hardwareOperations: 0 };
+const licenseOraclePath = "scripts/fixtures/pypi-wheel-license-oracle.json", licenseBytes = await readFile(new URL("../" + licenseOraclePath, import.meta.url)), licenseOracle = JSON.parse(licenseBytes);
+assert.equal(sha(licenseBytes), installedEvidence.sourceFiles[licenseOraclePath]); assert.equal(licenseOracle.cases.length, 17);
+for (const row of licenseOracle.cases) {
+  const bytes = Buffer.from(row.bytesBase64, "base64"); assert.equal(sha(bytes), row.sha256); const observed = inspectPypiWheel(bytes);
+  if (row.expected === null) assert.equal(observed.status, "unsupported"); else { assert.equal(observed.status, "inspected"); assert.deepEqual(observed.license, row.expected); }
+  assert.equal(JSON.stringify(observed).includes("NEVER_COPY"), false);
+}
+checks.push("seventeen-in-memory-wheel-license-header-facts-without-private-text-or-paths");
+for (const action of ["shield_supply_chain", "release_shield"]) for (const [archiveCase, expected] of [["license-and", "disallowed"], ["license-or", "permitted"], ["license-record-mismatch", "unassessed"], ["license-wrong-name", "unassessed"]]) {
+  const f = pypiWheelFixture({ action, archiveCase }), r = await scanShieldInputs(f.request, { readInput: f.readInput }), context = { engine: r.engine, requestSha256: r.requestSha256, request: f.request };
+  assert.equal(r.sbom.components[0].artifact.licensePolicy, expected); assert.equal(r.findings.some(f => f.ruleId === "license.disallowed"), expected === "disallowed"); assert.ok(r.gaps.includes("license_metadata"));
+  assert.deepEqual(parseShieldScannerReport(JSON.stringify(r), context, action), r);
+  if (expected === "disallowed") { const forged = structuredClone(r); forged.findings = []; forged.outcome = "incomplete"; forged.coverage.forEach(c => c.findings = 0); assert.throws(() => parseShieldScannerReport(JSON.stringify(forged), context, action)); }
+}
+checks.push("eight-in-memory-wheel-license-reports-require-integrity-identity-record-and-retained-findings");
+const evidence = { schema: "switchyard-installed-python-inventory-metadata/v4", at: new Date().toISOString(), sourceCommit: manifest.sourceCommit, applicationRelease: manifest.id, moduleDigests, verifierSourceSha256: sha(await readFile(new URL(import.meta.url))), markerOracleSha256: sha(oracleBytes), extrasOracleSha256: sha(oldOracleBytes), wheelOracleSha256: sha(wheelOracleBytes), wheelRecordOracleSha256: sha(recordBytes), wheelLicenseOracleSha256: sha(licenseBytes), wheelLicenseDeclarationsCheckedInMemory: true, checks, success: true, pureInMemoryOnly: true, markerExpressionsEvaluated: 0, actualScannerProcesses: 0, nativeProcessesStarted: 0, archiveExtractionOrExecution: false, wheelRecordHashesVerifiedInMemory: true, providerOrModelRequests: 0, publicRequests: 0, liveAccountChanges: 0, hardwareOperations: 0 };
 const { privateDirectory } = await import("../tools/layout-studio/private-fs.mjs");
 const outputRoot = join(process.env.XDG_STATE_HOME || join(homedir(), ".local/state"), "strathex-switchyard/runtime-verification"); await privateDirectory(outputRoot);
 const out = join(outputRoot, "installed-python-inventory-metadata-" + Date.now() + ".json");

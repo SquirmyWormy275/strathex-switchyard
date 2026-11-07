@@ -8,6 +8,13 @@ Implementation: not started / in progress / implemented / unsupported by verifie
 Validation: not run / software-tested / host-tested / hardware-tested.
 Tests use synthetic data unless explicitly labelled host/hardware evidence.
 
+Native Windows client contracts now pass all **seven groups and 94 tests** at
+`4f56477`, with no skips. Exact source/merge tree, artifact digest, original
+commands/deadlines and every child/tree cleanup verify. This closes the earlier
+policy-ordering regression; the failed receipt remains retained. No archive is
+stored locally. Interactive Windows focus and complete Windows release acceptance
+remain separate. [Native passing receipt](evidence/windows-client-4f56477-passed-summary.json).
+
 Windows native-focus dispatch now enforces the persisted selected workspace
 policy before validating a request UUID or entering platform-specific dispatch.
 The original native client run at `02cc6ba` failed one of 93 tests; the same
@@ -15,8 +22,8 @@ failure was reproduced locally. Both Linux and Windows paths now refuse Work
 requests with missing, malformed or valid UUIDs, including attempts to name a
 Personal compartment. All final effect-boundary checks remain. Twenty-eight
 focused groups pass 165 tests with one declared Linux skip; typecheck, original
-bounds and child/tree cleanup verify. Actual Windows follow-up acceptance remains
-pending. Installed `94a0135` passes 74 metadata/in-memory checks and verifies
+bounds and child/tree cleanup verify. The later native Windows client checkpoint
+passes; interactive focus remains unaccepted. Installed `94a0135` passes 74 metadata/in-memory checks and verifies
 22 module hashes while preserving all 54 semantic workspaces and the frozen
 frontend. [Installed evidence](evidence/installed-windows-focus-policy-summary.json).
 [Native failure](evidence/windows-client-02cc6ba-failed-summary.json),
@@ -45,6 +52,17 @@ and launcher readback verify; current plus one rollback remain. The exact
 531-file, 5,186,958-byte prepared bundle is removed. No live scanner, provider,
 account, model, keyboard or native Windows focus action was performed.
 [Installed evidence](evidence/installed-windows-focus-policy-summary.json).
+
+Selected Python wheels now apply declared license policy only after matching
+outer bytes, embedded identity and verified RECORD member hashes. Missing,
+legacy, conflicting and private declarations stay unassessed; file-only results
+export no paths. Twenty focused groups cover 167 distinct passing tests, with
+six affected groups/28 passes repeated after a reproduced reserved-budget bug
+was fixed. Eight actual Linux wheel journeys and eight Windows guest doubles
+pass again with original bounds and verified cleanup. Typecheck and package
+limits pass; staging is removed. Installed and actual Windows acceptance remain
+separate. [Contract](python-wheel-license-declarations.md),
+[source evidence](evidence/pypi-wheel-license-source-summary.json).
 
 Selected npm archives now retain their own bounded license declaration, assessed
 only after matching integrity and embedded identity. Lockfile and archive policy

@@ -49,7 +49,8 @@ an allowance before decompression; failed attempts retain that charge. Forged
 small sizes cannot remove the decompressor's output bound.
 
 [RECORD member-hash checks](python-wheel-records.md) now compare supported internal
-hashes separately from ZIP CRC and package identity. Compatibility tags, signatures,
+hashes separately from ZIP CRC and package identity. [Declared license policy](python-wheel-license-declarations.md)
+now requires matching bytes, identity and verified RECORD. Compatibility tags, signatures,
 dependency graphs, executable behavior, actual license texts and publisher
 provenance remain unfinished implementation. Broader
 ZIP variants also remain unsupported. `artifact_contents_not_inspected` and

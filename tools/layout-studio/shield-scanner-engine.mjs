@@ -639,6 +639,25 @@ function wheelHeaders(bytes, selected) {
   if (result.size !== selected.length) archiveRefuse("manifest");
   return result;
 }
+function wheelLicenseDeclaration(bytes, metadataVersion) {
+  // Identity parsing already verified UTF-8, header shape and byte/line bounds.
+  // Stop at the header/body boundary; a description cannot supply authority.
+  const fields = new Map(); let previous;
+  for (const line of bytes.toString("utf8").replaceAll("\r\n", "\n").split("\n")) {
+    if (!line) break;
+    if (/^[ \t]/.test(line)) { if (fields.has(previous)) fields.get(previous)[fields.get(previous).length - 1] += " " + line.trim(); continue; }
+    const match = /^([A-Za-z][A-Za-z0-9-]{0,63}):[ \t]*(.*)$/.exec(line); previous = match[1].toLowerCase();
+    if (["license-expression", "license-file", "license"].includes(previous)) {
+      if (fields.has(previous) && previous !== "license-file") archiveRefuse("manifest");
+      if (!fields.has(previous)) fields.set(previous, []); fields.get(previous).push(match[2].trim());
+    }
+  }
+  if (!fields.size) return { status: "missing" };
+  if (!["2.4", "2.5", "2.6"].includes(metadataVersion) || fields.has("license")) return { status: "unsupported" };
+  const expression = fields.get("license-expression");
+  if (expression) { const declaration = npmLicenseDeclaration(expression[0]); return declaration ? { status: "declared", expression: declaration.expression } : { status: "unsupported" }; }
+  return { status: fields.get("license-file").every(p => p.length > 0 && p.length <= 512 && /^[\x20-\x7e]+$/.test(p)) ? "file-only" : "unsupported" };
+}
 function inspectWheelRecord(bytes, rows, prefix) {
   const digest = sha(bytes), unsupported = reason => ({ status: "unsupported", sha256: digest, reason });
   if (bytes.length > 256 * 1024) return unsupported("bounds");
@@ -721,16 +740,20 @@ export function inspectPypiWheel(bytes, budget = { remaining: archiveLimit }) {
     const metadataVersion = fields.get("metadata-version"), wheelVersion = wheel.get("wheel-version"); let identity;
     try { identity = pypiIdentity(fields.get("name"), fields.get("version")); if (pypiIdentity(match[1], match[2]).name !== identity.name || pypiVersionKey(match[2]) !== pypiVersionKey(identity.version)) archiveRefuse("manifest"); } catch { archiveRefuse("manifest"); }
     if (!wheelMetadataVersions.includes(metadataVersion) || wheelVersion !== "1.0") archiveRefuse("manifest");
+    const license = wheelLicenseDeclaration(manifest, metadataVersion);
     budget.remaining += allowance - expanded;
-    return { status: "inspected", name: identity.name, version: identity.version, metadataVersion, wheelVersion, manifestSha256: sha(manifest), entries: count, expandedBytes: expanded, record: inspectWheelRecord(metadata.get(prefix + "/RECORD"), rows, prefix) };
+    return { status: "inspected", name: identity.name, version: identity.version, metadataVersion, wheelVersion, manifestSha256: sha(manifest), entries: count, expandedBytes: expanded, record: inspectWheelRecord(metadata.get(prefix + "/RECORD"), rows, prefix), license };
   } catch (error) { if (!archiveReasons.includes(error.archiveReason)) throw error; return { status: "unsupported", reason: error.archiveReason }; }
 }
 export function validatePypiWheelObservation(value, name, version) {
   if (value?.status === "unsupported") { exact(value, ["status", "reason"]); if (!archiveReasons.includes(value.reason)) throw Error("Invalid wheel coverage gap."); return; }
-  exact(value, ["status", "name", "version", "metadataVersion", "wheelVersion", "manifestSha256", "entries", "expandedBytes", "record"]);
+  exact(value, ["status", "name", "version", "metadataVersion", "wheelVersion", "manifestSha256", "entries", "expandedBytes", "record", "license"]);
   if (pypiIdentity(value.name, value.version).name !== value.name || !wheelMetadataVersions.includes(value.metadataVersion) || value.wheelVersion !== "1.0" || !/^[a-f0-9]{64}$/.test(value.manifestSha256 ?? "") || !Number.isSafeInteger(value.entries) || value.entries < 3 || value.entries > 1024 || !Number.isSafeInteger(value.expandedBytes) || value.expandedBytes < 1 || value.expandedBytes > archiveLimit || value.status !== (value.name === name && pypiVersionKey(value.version) === pypiVersionKey(version) ? "matched" : "mismatched")) throw Error("Wheel identity observation is inconsistent.");
   const r = value.record; exact(r, ["status", "sha256", r?.status === "unsupported" ? "reason" : "files"]);
   if (!/^[a-f0-9]{64}$/.test(r.sha256 ?? "") || (r.status === "unsupported" ? !["bounds", "format", "algorithm"].includes(r.reason) : !["verified", "mismatched"].includes(r.status) || !Number.isSafeInteger(r.files) || r.files < 2 || r.files >= value.entries)) throw Error("Invalid wheel RECORD observation.");
+  const license = value.license; exact(license, license?.status === "declared" ? ["status", "expression"] : ["status"]);
+  if (license.status === "declared" ? npmLicenseDeclaration(license.expression)?.expression !== license.expression : !["missing", "file-only", "unsupported"].includes(license.status)) throw Error("Invalid wheel license declaration.");
+  if (["declared", "file-only"].includes(license.status) && !["2.4", "2.5", "2.6"].includes(value.metadataVersion)) throw Error("Wheel license declarations require supporting metadata versions.");
 }
 function archiveProperties(archive) {
   return archive ? [{ name: "switchyard:archive-identity", value: archive.status },
@@ -767,7 +790,7 @@ export function shieldCycloneDxComponent(c) { if(c.ecosystem==="Cargo")return ca
         ...(c.workspace?[{name:"switchyard:source-kind",value:"workspace-link"},{name:"switchyard:workspace-path",value:c.workspace.path},{name:"switchyard:workspace-lock-metadata-sha256",value:c.workspace.lockMetadataSha256},{name:"switchyard:workspace-source",value:"not-verified"}]:[]),
         ...(c.integritySha256 ? [{ name: "switchyard:integrity-string-sha256", value: c.integritySha256 }] : []),
         ...archiveProperties(c.artifact?.archive),
-        ...(c.artifact ? [{ name: "switchyard:artifact-path", value: c.artifact.path }, { name: "switchyard:artifact-sha256", value: c.artifact.sha256 }, ...(c.artifact.algorithm === "sha512" ? [{ name: "switchyard:artifact-observed-sha512", value: c.artifact.observedSha512 }, { name: "switchyard:archive-license-policy", value: c.artifact.licensePolicy }, ...archiveLicenseProperties(c.artifact.archive?.license)] : []), { name: "switchyard:artifact-integrity", value: c.artifact.status }, { name: "switchyard:artifact-content", value: "not-inspected" }] : [])
+        ...(c.artifact ? [{ name: "switchyard:artifact-path", value: c.artifact.path }, { name: "switchyard:artifact-sha256", value: c.artifact.sha256 }, ...(c.artifact.algorithm === "sha512" ? [{ name: "switchyard:artifact-observed-sha512", value: c.artifact.observedSha512 }] : []), { name: "switchyard:archive-license-policy", value: c.artifact.licensePolicy }, ...archiveLicenseProperties(c.artifact.archive?.license), { name: "switchyard:artifact-integrity", value: c.artifact.status }, { name: "switchyard:artifact-content", value: "not-inspected" }] : [])
       ] }; }
 function feed(v) { exact(v, ["id", "path", "sha256"]); return { id: identifier(v.id), path: scannerPath(v.path), sha256: digest(v.sha256) }; }
 function indexSource(v) {
@@ -934,7 +957,12 @@ export async function scanShieldInputs(proposed, { readInput }) {
           const observed = artifactDigests.get(reference.path), acceptedSha256 = [...component.declaredSha256];
           const status = !acceptedSha256.length ? "unsupported-integrity" : acceptedSha256.includes(observed.sha256) ? "matched" : "mismatched";
           const inspected = wheelIdentities.get(reference.path), archive = inspected.status === "unsupported" ? inspected : { ...inspected, status: inspected.name === component.name && pypiVersionKey(inspected.version) === pypiVersionKey(component.version) ? "matched" : "mismatched" };
-          component.artifact = { path: observed.path, sha256: observed.sha256, size: observed.size, algorithm: "sha256", acceptedSha256, status, archive };
+          const declaration = archive.license?.status === "declared" ? npmLicenseDeclaration(archive.license.expression, policy.allowedLicenses) : null;
+          const licensePolicy = status === "matched" && archive.status === "matched" && archive.record.status === "verified" && declaration ? !policy.allowedLicenses.length ? "unconfigured" : declaration.allowed ? "permitted" : "disallowed" : "unassessed";
+          component.artifact = { path: observed.path, sha256: observed.sha256, size: observed.size, algorithm: "sha256", acceptedSha256, status, archive, licensePolicy };
+          if (licensePolicy === "unconfigured") gaps.add("license_policy");
+          if (licensePolicy === "permitted" && declaration.choice) gaps.add("license_choice_not_selected");
+          if (licensePolicy === "disallowed") add({ ruleId: "license.disallowed", dimension: "licenses", severity: "high", path: file.path, line: null, fingerprint: sha(["license.archive-disallowed", "PyPI", file.path, file.sha256, component.name, component.version, observed.path, observed.sha256, archive.manifestSha256, archive.record.sha256, declaration.expression].join("\0")) });
           if (archive.status !== "matched") gaps.add("python_wheel_identity_not_verified");
           if (archive.record?.status !== "verified") gaps.add("python_wheel_record_not_verified");
           if (archive.record?.status === "mismatched") add({ ruleId: "artifact.record-mismatch", dimension: "provenance", severity: "high", path: file.path, line: null, fingerprint: sha(["artifact.record-mismatch", "PyPI", file.path, file.sha256, component.name, component.version, observed.path, observed.sha256, archive.record.sha256].join("\0")) });
