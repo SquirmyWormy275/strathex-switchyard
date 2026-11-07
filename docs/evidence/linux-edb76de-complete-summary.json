@@ -1,0 +1,55 @@
+{
+  "schema": "switchyard-full-linux-source-summary/v1",
+  "sourceCommit": "edb76de69fdc919d81a6dbb7338a37707af816f6",
+  "sourceTree": "58eaf9bd7ad72c4cae63bc7578696540aebe5e3e",
+  "verificationReceipt": "isolated-test-16da54c8-e4f4-496c-acbf-92d171c9644d.json",
+  "verificationReceiptSha256": "f4c12defebad93ea1886dec08434ec4d89517ccf2a8398f4da5b7368b3404131",
+  "success": true,
+  "totals": {
+    "required": 330,
+    "passed": 330,
+    "failed": 0,
+    "tests": 2095,
+    "passedTests": 2074,
+    "failedTests": 0,
+    "skippedTests": 21,
+    "cancelledTests": 0,
+    "todoTests": 0
+  },
+  "allChildAndTreeCleanupVerified": true,
+  "cleanupReceipt": "linux-edb76de-cleanup-1794035751548.json",
+  "cleanup": {
+    "schema": "switchyard-owned-full-linux-cleanup/v1",
+    "sourceCommit": "edb76de69fdc919d81a6dbb7338a37707af816f6",
+    "verificationReceipt": "isolated-test-16da54c8-e4f4-496c-acbf-92d171c9644d.json",
+    "generatedFiles": 788,
+    "generatedBytes": 11809374,
+    "generatedDirectories": [
+      "apps/linux-companion/dist",
+      "apps/provider-adapter-host/dist",
+      "apps/vscode-extension/dist",
+      "apps/windows-companion/dist",
+      "packages/protocol/dist"
+    ],
+    "dependencyAliasCount": 9,
+    "trackedTreeClean": true,
+    "testChildrenExited": true,
+    "testParentEmpty": true,
+    "rootIdentityVerified": true,
+    "testParentIdentityVerified": true,
+    "worktreeRemoved": true,
+    "rootRemoved": true,
+    "testParentRemoved": true,
+    "markerRemoved": true,
+    "otherWorktreesPreserved": true,
+    "dependencyAliasIdentityAndTargetVerified": true,
+    "cleanupPlanSha256": "2e803afd1f8b0faaa92047bce3d7403a099e88b1911bdfea1ba7627482642336"
+  },
+  "providersAndWindowsGuestsDoubledWhereDeclared": true,
+  "installedChanged": false,
+  "originalManifestCommandsBoundsAndSkipsVerified": true,
+  "limitations": [
+    "The later Windows terminal process query and retirement diagnostics are outside this source; they have separate focused evidence.",
+    "Interactive Windows, provider account and physical hardware acceptance remain separate."
+  ]
+}

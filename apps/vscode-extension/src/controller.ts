@@ -5,6 +5,9 @@ import { createReadStream, readFileSync } from "node:fs";
 import { lstat, realpath, stat } from "node:fs/promises";
 import { createServer } from "node:net";
 import { chordCommands, chordFor, type B122Control, type B122Modifier, type ChordCommand } from "./commands.ts";
+import { codexLocalThreadItems, operatorSessionItems, type CodexLocalThreadBinding, type CodexLocalThreadObservation } from "./operator-status.ts";
+import { revealExactTerminal } from "./terminal-focus.ts";
+import { codexTerminalConnectionArguments, codexTerminalResumeArguments } from "./codex-terminal.ts";
 import { commandFor } from "../../../packages/control-plane/src/command-catalog.ts";
 import { authorityBroadcastReviewScopeDigest, type WorkflowArtifact } from "../../../packages/control-plane/src/workflow-artifacts.ts";
 import {
@@ -98,7 +101,7 @@ interface StoredWindowState {
 
 interface TrackedTerminal {
   readonly sessionId: string;
-  readonly adoptionKey: string;
+  readonly adoptionKey?: string;
   adopted: boolean;
   session: ExtensionManagedSession;
 }
@@ -150,6 +153,13 @@ export interface ManagedSessionControllerOptions {
   readonly extensionVersion?: string;
   /** Optional built-in Git adapter; an absent adapter is recorded as unknown. */
   readonly resolveGitRoots?: () => Promise<readonly GitRootRegistration[]>;
+  /** Optional read-only local Codex daemon observation; never changes companion capability. */
+  readonly observeCodexThreads?: (boundThreadIds: readonly string[]) => Promise<readonly CodexLocalThreadObservation[]>;
+  readonly startCodexThread?: (repositoryRoot: string, taskId: string) => Promise<Readonly<{ threadId: string }>>;
+  readonly codexSocketPath?: string;
+  readonly persistCodexBinding?: (binding: CodexLocalThreadBinding) => Promise<CodexLocalThreadBinding>;
+  readonly readCodexBindings?: () => Promise<readonly CodexLocalThreadBinding[]>;
+  readonly codexExecutable?: string;
   /** Real activation wires VS Code's URI API; tests inject a deterministic boundary. */
   readonly openExternal?: (url: string) => Promise<boolean>;
   /** Fixed VS Code commands only; B122 input never selects a command string. */
@@ -238,6 +248,12 @@ export class ManagedSessionController {
   private readonly idFactory: () => string;
   private readonly extensionVersion: string;
   private readonly resolveGitRoots: () => Promise<readonly GitRootRegistration[]>;
+  private readonly observeCodexThreads: (boundThreadIds: readonly string[]) => Promise<readonly CodexLocalThreadObservation[]>;
+  private readonly startCodexThread?: (repositoryRoot: string, taskId: string) => Promise<Readonly<{ threadId: string }>>;
+  private readonly codexSocketPath?: string;
+  private readonly persistCodexBinding?: (binding: CodexLocalThreadBinding) => Promise<CodexLocalThreadBinding>;
+  private readonly readCodexBindings: () => Promise<readonly CodexLocalThreadBinding[]>;
+  private readonly codexExecutable?: string;
   private readonly openExternal: (url: string) => Promise<boolean>;
   private readonly executeCommand: (command: string) => Promise<void>;
   private readonly sealSecret?: (cleartext: Uint8Array) => Promise<string>;
@@ -295,6 +311,12 @@ export class ManagedSessionController {
     this.idFactory = options.idFactory ?? (() => `vscode-${Date.now().toString(36)}-${++counter}`);
     this.extensionVersion = boundedAdapterVersion(options.extensionVersion ?? "unpackaged-test");
     this.resolveGitRoots = options.resolveGitRoots ?? (async () => []);
+    this.observeCodexThreads = options.observeCodexThreads ?? (async () => []);
+    this.startCodexThread = options.startCodexThread;
+    this.persistCodexBinding = options.persistCodexBinding;
+    this.readCodexBindings = options.readCodexBindings ?? (async () => []);
+    this.codexExecutable = options.codexExecutable;
+    this.codexSocketPath = options.codexSocketPath;
     const openExternal = options.openExternal ?? (async () => false);
     this.openExternal = async (url) => { this.assertAdmissionActive(); return openExternal(url); };
     const executeCommand = options.executeCommand ?? (async (command: string) => {
@@ -458,8 +480,30 @@ export class ManagedSessionController {
         await this.registerDebugConfigurations();
       }),
       this.registerAdmittedCommand("sxsy-b122.showManagedSessions", async () => {
-        const summary = this.listKnownSessions().map((session) => `${session.provider}/${session.surface}: ${session.status}`).join("; ") || "No VS Code sessions registered.";
-        await this.vscode.window.showInformationMessage(`SXSY-B122 session registry: ${summary}`);
+        const [listed, bindings] = await Promise.all([
+          this.bridge.listSessions(),
+          this.readCodexBindings().catch(() => [] as readonly CodexLocalThreadBinding[])
+        ]);
+        const codex = await this.observeCodexThreads(bindings.map((binding) => binding.threadId))
+          .catch(() => [] as readonly CodexLocalThreadObservation[]);
+        const items = [
+          ...(listed.ok ? operatorSessionItems(listed.value) : []),
+          ...codexLocalThreadItems(codex, bindings)
+        ];
+        if (!listed.ok && !items.length) {
+          await this.vscode.window.showWarningMessage(`SXSY-B122 operator status is unavailable: ${listed.message}`);
+          return;
+        }
+        if (!items.length) {
+          await this.vscode.window.showInformationMessage("SXSY-B122 has no authenticated managed sessions. Desktop windows and idle terminals are not inferred.");
+          return;
+        }
+        await this.vscode.window.showQuickPick(items, { placeHolder: "Managed sessions and local Codex runtime; selecting a row performs no action" });
+      }),
+      this.registerAdmittedCommand("sxsy-b122.startBoundCodexThread", async () => {
+        await this.startBoundCodexThread().catch(async (error) => {
+          await this.vscode.window.showWarningMessage(`SXSY-B122 could not start the bound Codex thread: ${error instanceof Error ? error.message : "unknown error"}`);
+        });
       }),
       this.registerAdmittedCommand("sxsy-b122.showQuickReference", async () => {
         await this.showQuickReference();
@@ -519,6 +563,106 @@ export class ManagedSessionController {
       this.ownLifecycleDisposables(this.registerAdmittedCommand(command.command, async (argument: unknown) => {
         await this.dispatchChord(command, parseInputArgument(argument));
       }));
+    }
+  }
+
+  /** Start one Codex thread first, then persist exactly the ID returned by App Server. */
+  private async startBoundCodexThread(): Promise<void> {
+    if (process.platform !== "linux" || !this.startCodexThread || !this.persistCodexBinding || !this.codexExecutable || !this.codexSocketPath) {
+      await this.vscode.window.showWarningMessage("SXSY-B122 task-bound Codex requires Linux, the local App Server, and a Codex CLI in a supported user or system location.");
+      return;
+    }
+    const folders = this.vscode.workspace.workspaceFolders ?? [];
+    if (!folders.length || folders.length > 32) {
+      await this.vscode.window.showWarningMessage("Open one exact repository folder in VS Code before starting a bound Codex thread.");
+      return;
+    }
+    let chosen = folders[0];
+    if (folders.length > 1) {
+      const items = folders.map((folder) => ({ label: folder.uri.fsPath, description: "Exact VS Code workspace folder" }));
+      const selected = await this.vscode.window.showQuickPick(items, { placeHolder: "Choose the repository for this Codex thread" });
+      if (!selected) return;
+      chosen = folders[items.indexOf(selected)];
+    }
+    if (!chosen) return;
+    const requested = resolve(chosen.uri.fsPath);
+    const link = await lstat(requested);
+    const root = await realpath(requested);
+    if (!link.isDirectory() || link.isSymbolicLink() || !samePath(root, requested)) throw new Error("The chosen repository folder is not an exact local directory.");
+    if (!this.gitRoots.some((candidate) => samePath(candidate.gitRoot, root))) throw new Error("The chosen folder is not an observed exact Git repository root.");
+    const taskId = await this.vscode.window.showInputBox?.({
+      prompt: "Short task ID for this Codex thread (no prompts or customer names)",
+      validateInput: (value) => /^[A-Za-z0-9_.:-]{1,128}$/.test(value) ? undefined : "Use 1–128 letters, digits, periods, colons, underscores, or hyphens."
+    });
+    if (!taskId) return;
+    if (!/^[A-Za-z0-9_.:-]{1,128}$/.test(taskId)) throw new Error("The task ID is not a bounded opaque identifier.");
+    const executable = await realpath(this.codexExecutable);
+    const executableInfo = await stat(executable);
+    if (!executableInfo.isFile() || (executableInfo.mode & 0o111) === 0) throw new Error("The reviewed Codex executable is unavailable.");
+    codexTerminalConnectionArguments(root, this.codexSocketPath);
+    const imageIdentity = (value: typeof executableInfo) => [value.dev, value.ino, value.size, value.mode, value.mtimeMs, value.ctimeMs].join(":");
+    const assertContextCurrent = async () => {
+      this.assertAdmissionActive();
+      if (!this.vscode.window.state.focused || !(this.vscode.workspace.workspaceFolders ?? []).some(folder => samePath(resolve(folder.uri.fsPath), requested)) || !this.gitRoots.some(candidate => samePath(candidate.gitRoot, root))) throw new Error("The original focused Codex workspace is no longer current.");
+      const fresh = await lstat(requested);
+      if (!fresh.isDirectory() || fresh.isSymbolicLink() || fresh.dev !== link.dev || fresh.ino !== link.ino || !samePath(await realpath(requested), root)) throw new Error("The exact Codex repository directory changed during terminal preparation.");
+      if (!samePath(await realpath(this.codexExecutable!), executable) || imageIdentity(await stat(executable)) !== imageIdentity(executableInfo)) throw new Error("The reviewed Codex executable changed during terminal preparation.");
+      this.assertAdmissionActive();
+      if (!this.vscode.window.state.focused || !(this.vscode.workspace.workspaceFolders ?? []).some(folder => samePath(resolve(folder.uri.fsPath), requested))) throw new Error("The original focused Codex workspace changed during validation.");
+    };
+    const before = await this.bridge.listSessions().catch(() => undefined);
+    const candidates = before?.ok ? before.value.filter((session) => session.provider === "codex" && session.taskId === taskId
+      && session.workspaceRoot && samePath(session.workspaceRoot, root) && session.targetSnapshotId && /^[a-f0-9]{64}$/.test(session.targetSnapshotId)) : [];
+    const source = candidates.length === 1 ? candidates[0] : undefined;
+    let threadId: string | undefined;
+    try {
+      await assertContextCurrent();
+      const started = await this.startCodexThread(root, taskId);
+      threadId = started.threadId;
+      const shellArgs = codexTerminalResumeArguments(threadId, root, this.codexSocketPath);
+      if (this.terminalBySessionId.has(`codex-thread:${threadId}`)) throw new Error("The exact Codex thread already owns a terminal record; no replacement terminal was created.");
+      await assertContextCurrent();
+      const after = source ? await this.bridge.listSessions().catch(() => undefined) : undefined;
+      const target = source && after?.ok && after.value.some((session) => session.id === source.id && session.provider === "codex"
+        && session.taskId === taskId && session.targetSnapshotId === source.targetSnapshotId
+        && session.workspaceRoot && samePath(session.workspaceRoot, root)) ? source.targetSnapshotId! : null;
+      const binding: CodexLocalThreadBinding = {
+        threadId, taskId, sessionId: `codex-thread:${threadId}`, repositoryRoot: root,
+        targetSnapshotId: target, createdAt: this.now()
+      };
+      await assertContextCurrent();
+      const persisted = await this.persistCodexBinding(binding);
+      if (["threadId", "taskId", "sessionId", "repositoryRoot", "targetSnapshotId", "createdAt"].some(key => persisted[key as keyof CodexLocalThreadBinding] !== binding[key as keyof CodexLocalThreadBinding])) throw new Error("The persisted Codex binding did not acknowledge the exact thread, task and repository.");
+      await assertContextCurrent();
+      const session: ExtensionManagedSession = {
+        ...this.makeSession(binding.sessionId, "codex", "vscode_terminal", "unknown", {
+          "sxsy-b122.kind": "codex-app-server-thread",
+          "sxsy-b122.codex.threadId": threadId,
+          "sxsy-b122.codex.binding": "local-thread-start-v1"
+        }, root),
+        taskId,
+        ...(target ? { targetSnapshotId: target } : {})
+      };
+      const registered = await this.bridge.registerSession(session, "terminal").catch(() => undefined);
+      await assertContextCurrent();
+      if (registered?.ok) {
+        const value = registered.value;
+        if (value.id !== session.id || value.provider !== "codex" || value.taskId !== taskId || !value.workspaceRoot || !samePath(value.workspaceRoot, root) || value.targetSnapshotId !== session.targetSnapshotId || value.metadata["sxsy-b122.codex.threadId"] !== threadId) throw new Error("The registry returned a different Codex thread, task or repository binding.");
+        this.sessions.set(session.id, value);
+      }
+      const terminal = this.vscode.window.createTerminal({
+        name: `SXSY Codex · ${taskId}`, cwd: root, shellPath: executable,
+        shellArgs
+      });
+      const record: TrackedTerminal = { sessionId: session.id, adopted: false, session: registered?.ok ? registered.value : session };
+      this.terminalRecords.set(terminal, record);
+      this.terminalBySessionId.set(session.id, record);
+      this.sessions.set(session.id, record.session);
+      await revealExactTerminal(this.vscode.window, terminal, assertContextCurrent);
+      await this.vscode.window.showInformationMessage(`SXSY-B122 opened Codex thread ${threadId} for task ${taskId}; target ${target ?? "unverified"}. Its runtime status does not imply a verified Switchyard outcome.`);
+    } catch (error) {
+      if (!threadId && error instanceof Error && "createdThreadId" in error && typeof error.createdThreadId === "string" && /^[A-Za-z0-9_-]{1,128}$/.test(error.createdThreadId)) threadId = error.createdThreadId;
+      await this.vscode.window.showWarningMessage(`SXSY-B122 Codex thread start stopped${threadId ? ` after Codex created ${threadId}` : ""}: ${error instanceof Error ? error.message : "unknown error"}`);
     }
   }
 
@@ -849,7 +993,7 @@ export class ManagedSessionController {
   private async provisionCredential(): Promise<void> {
     const root = await this.chooseGitRoot("Choose the exact Git root for this credential reference");
     const input = this.vscode.window.showInputBox;
-    if (!root || !input || !this.sealSecret) { if (root) await this.vscode.window.showWarningMessage("SXSY-B122 credential provisioning requires the installed Windows DPAPI host."); return; }
+    if (!root || !input || !this.sealSecret) { if (root) await this.vscode.window.showWarningMessage("SXSY-B122 credential provisioning requires the installed host secret protector."); return; }
     const reference = await input({ prompt: "Credential reference name", value: "github-token", validateInput: (value) => /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/.test(value) ? undefined : "Use a bounded reference name." });
     const scopesText = reference ? await input({
       prompt: `Exact adapter/purpose scopes for ${root.gitRoot} (comma-separated)`,
@@ -857,16 +1001,16 @@ export class ManagedSessionController {
       validateInput: (value) => parseCredentialScopePairs(value, root.gitRoot) ? undefined : "Enter 1-16 unique adapterId/purpose pairs."
     }) : undefined;
     const scopes = scopesText ? parseCredentialScopePairs(scopesText, root.gitRoot) : undefined;
-    const secretText = scopes ? await input({ prompt: "Credential value (sealed with Windows DPAPI before local transport)", password: true, validateInput: (value) => value.length > 0 && Buffer.byteLength(value, "utf8") <= 64 * 1024 ? undefined : "Enter a non-empty value up to 64 KiB." }) : undefined;
+    const secretText = scopes ? await input({ prompt: "Credential value (sealed by the host before local transport)", password: true, validateInput: (value) => value.length > 0 && Buffer.byteLength(value, "utf8") <= 64 * 1024 ? undefined : "Enter a non-empty value up to 64 KiB." }) : undefined;
     if (!reference || !scopes || !secretText) return;
     const bytes = Buffer.from(secretText, "utf8");
     let sealedSecret: string;
-    try { sealedSecret = await this.sealSecret(bytes); } catch { await this.vscode.window.showWarningMessage("SXSY-B122 could not seal the credential with Windows DPAPI; nothing was sent."); return; } finally { bytes.fill(0); }
+    try { sealedSecret = await this.sealSecret(bytes); } catch { await this.vscode.window.showWarningMessage("SXSY-B122 could not seal the credential with the host secret protector; nothing was sent."); return; } finally { bytes.fill(0); }
     const existing = await this.bridge.listCredentials();
     const replaceExisting = existing.ok && existing.value.some((item) => item.reference === reference && !item.revokedAt);
     const result = await this.bridge.provisionCredential({ reference, scopes, sealedSecret, ...(replaceExisting ? { replaceExisting: true } : {}) });
     if (!result.ok) await this.vscode.window.showWarningMessage(`SXSY-B122 credential was not provisioned: ${result.message}`);
-    else await this.vscode.window.showInformationMessage(`SXSY-B122 provisioned DPAPI-sealed reference ${result.value.reference} generation ${result.value.generation} for exact scopes ${result.value.scopes.map((scope) => `${scope.repositoryRoot}=>${scope.adapterId}/${scope.purpose}`).join("; ")}.`);
+    else await this.vscode.window.showInformationMessage(`SXSY-B122 provisioned host-sealed reference ${result.value.reference} generation ${result.value.generation} for exact scopes ${result.value.scopes.map((scope) => `${scope.repositoryRoot}=>${scope.adapterId}/${scope.purpose}`).join("; ")}.`);
   }
 
   private async listCredentials(): Promise<void> {
@@ -1288,6 +1432,10 @@ export class ManagedSessionController {
     const terminal = await this.resolveTerminal(argument);
     if (!terminal) return;
     const record = await this.registerTerminal(terminal);
+    if (!record.adoptionKey) {
+      await this.vscode.window.showWarningMessage("SXSY-B122: this terminal is bound to its exact native Codex thread. Generic provider adoption cannot change that binding or its capabilities.");
+      return;
+    }
     if (record.adopted) {
       await this.vscode.window.showWarningMessage("SXSY-B122: this terminal has already been adopted. Its capability set remains unchanged.");
       return;
@@ -3035,7 +3183,7 @@ export class ManagedSessionController {
         return "Opened a new VS Code window.";
       case "focus_integrated_terminal":
         if (!action.workspaceRoot) throw new Error("The integrated-terminal action is not bound to an exact workspace root.");
-        await this.focusIntegratedTerminal(action.workspaceRoot);
+        await this.focusIntegratedTerminal(action.workspaceRoot, authorization.expiresAt);
         return `Focused the integrated VS Code terminal for ${action.workspaceRoot}.`;
       case "open_compound_palette":
         return this.openCompoundPalette(action.id, action.workspaceRoot);
@@ -3264,9 +3412,17 @@ export class ManagedSessionController {
 
   private async focusManagedSession(session: ExtensionManagedSession): Promise<void> {
     if (session.surface === "vscode_terminal") {
-      const terminal = this.vscode.window.terminals.find((candidate) => this.terminalRecords.get(candidate)?.sessionId === session.id);
-      if (!terminal) throw new Error("The exact managed terminal is no longer open in this VS Code window.");
-      terminal.show();
+      const terminals = this.vscode.window.terminals.filter((candidate) => this.terminalRecords.get(candidate)?.sessionId === session.id);
+      if (terminals.length !== 1) throw new Error("The exact managed terminal is no longer open uniquely in this VS Code window.");
+      const terminal = terminals[0]!;
+      const record = this.terminalRecords.get(terminal)!;
+      const assertCurrent = () => {
+        this.assertAdmissionActive();
+        if (!this.vscode.window.state.focused || this.closedTerminals.has(terminal) || this.terminalRecords.get(terminal) !== record || record.sessionId !== session.id) throw new Error("The exact managed terminal or original window changed before focus.");
+        if (!session.workspaceRoot || !record.session.workspaceRoot || !samePath(record.session.workspaceRoot, session.workspaceRoot) || !(this.vscode.workspace.workspaceFolders ?? []).some(folder => samePath(folder.uri.fsPath, session.workspaceRoot!))) throw new Error("The exact managed-terminal workspace is no longer open in this VS Code window.");
+        if (record.session.metadata["sxsy-b122.kind"] === "codex-app-server-thread" && (record.session.taskId !== session.taskId || record.session.metadata["sxsy-b122.codex.threadId"] !== session.metadata["sxsy-b122.codex.threadId"])) throw new Error("The exact native Codex thread/task binding changed before terminal focus.");
+      };
+      await revealExactTerminal(this.vscode.window, terminal, assertCurrent);
       return;
     }
     if (session.surface === "vscode_window") { await this.executeCommand("workbench.action.focusActiveEditorGroup"); return; }
@@ -3734,11 +3890,14 @@ export class ManagedSessionController {
     if (!Number.isFinite(Date.parse(authorization.expiresAt)) || Date.parse(authorization.expiresAt) <= Date.parse(this.now())) throw new Error("The one-time host-action authorization expired before the local effect.");
   }
 
-  private async focusIntegratedTerminal(workspaceRoot: string): Promise<void> {
+  private async focusIntegratedTerminal(workspaceRoot: string, authorizationExpiresAt: string): Promise<void> {
     const requestedRoot = resolve(workspaceRoot);
-    if (!(this.vscode.workspace.workspaceFolders ?? []).some((folder) => samePath(resolve(folder.uri.fsPath), requestedRoot))) {
-      throw new Error("The exact integrated-terminal workspace is no longer open in this VS Code window.");
-    }
+    const assertCurrent = () => {
+      this.assertAdmissionActive(); this.requireLiveHostAuthorization({ expiresAt: authorizationExpiresAt });
+      if (!(this.vscode.workspace.workspaceFolders ?? []).some(folder => samePath(resolve(folder.uri.fsPath), requestedRoot))) throw new Error("The exact integrated-terminal workspace is no longer open in this VS Code window.");
+      if (!this.vscode.window.state.focused) throw new Error("The original VS Code window lost focus before exact terminal selection could be accepted.");
+    };
+    assertCurrent();
     const eligible = this.vscode.window.terminals.filter((terminal) => {
       const record = this.terminalRecords.get(terminal);
       return !!record?.session.workspaceRoot && samePath(record.session.workspaceRoot, requestedRoot);
@@ -3752,11 +3911,23 @@ export class ManagedSessionController {
       const items = eligible.map((candidate, index) => ({ label: candidate.name, description: `Exact ${requestedRoot} terminal ${index + 1}` }));
       const selected = await this.vscode.window.showQuickPick(items, { placeHolder: `Choose one integrated terminal bound to ${requestedRoot}` });
       if (!selected) throw new Error("Exact integrated-terminal selection was cancelled.");
-      terminal = eligible[items.indexOf(selected)];
+      const index = items.indexOf(selected);
+      if (index < 0) throw new Error("The picker did not return one exact offered terminal identity.");
+      terminal = eligible[index];
     }
+    const offeredTerminal = terminal;
+    const assertSelectionCurrent = () => {
+      assertCurrent();
+      if (!offeredTerminal) return;
+      const record = this.terminalRecords.get(offeredTerminal);
+      if (this.closedTerminals.has(offeredTerminal) || !this.vscode.window.terminals.includes(offeredTerminal) || !record?.session.workspaceRoot || !samePath(record.session.workspaceRoot, requestedRoot)) throw new Error("The exact offered terminal binding changed while selection was pending.");
+    };
+    assertSelectionCurrent();
     terminal ??= this.vscode.window.createTerminal({ name: "SXSY-B122 Terminal", cwd: requestedRoot });
-    terminal.show();
-    await this.registerTerminal(terminal, undefined, requestedRoot);
+    await revealExactTerminal(this.vscode.window, terminal, assertSelectionCurrent);
+    const registered = await this.registerTerminal(terminal, undefined, requestedRoot);
+    assertSelectionCurrent();
+    if (!this.vscode.window.terminals.includes(terminal) || this.vscode.window.activeTerminal !== terminal || !registered.session.workspaceRoot || !samePath(registered.session.workspaceRoot, requestedRoot)) throw new Error("The exact terminal selection or registration changed before acknowledgement.");
   }
 
   private debugConfigurations(): readonly DebugConfigurationLike[] {
@@ -4800,8 +4971,14 @@ function parseUint16Text(value: string): number | undefined {
 function validateUint16Text(value: string): string | undefined { return parseUint16Text(value) === undefined ? "Enter a uint16 in decimal or 0x-prefixed hexadecimal." : undefined; }
 function formatUint16(value: number): string { return value.toString(16).padStart(4, "0"); }
 
-function samePath(left: string, right: string): boolean {
-  const normalize = (value: string) => value.replaceAll("\\", "/").replace(/\/+$/, "").toLowerCase();
+export function samePath(left: string, right: string, platform: NodeJS.Platform = process.platform): boolean {
+  if (!left || !right) return false;
+  const normalize = (value: string) => {
+    const native = platform === "win32" ? value.replaceAll("\\", "/").toLowerCase() : value;
+    if (native === "/") return native;
+    if (platform === "win32" && /^[a-z]:\/+$/i.test(native)) return native.slice(0, 2) + "/";
+    return native.replace(/\/+$/, "");
+  };
   return normalize(left) === normalize(right);
 }
 

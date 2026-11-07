@@ -1,0 +1,33 @@
+{
+  "schema": "switchyard-shortcut-stage-diagnostics-native/v1",
+  "sourceCommit": "80601e9a484190fa13128f6add6d956bf29498b3",
+  "mergeCommit": "adcfa376f41ff42d6fdabf486532cae8eba66a67",
+  "equalTree": "f881c153679a8c9b08bed57c82576563ededc747",
+  "workflowRun": 42289047696,
+  "job": 128137982344,
+  "artifactId": 13539966260,
+  "artifactBytes": 3206,
+  "artifactSha256": "1955600c9833cea2aad91b05754bd07936e3db74cc566f602270f410b5407097",
+  "receipt": "windows-boundary-80601e9-13539966260.json",
+  "receiptSha256": "1ba448d10a635f6b8e26ba4bac4930576ff147b1dcf7c4c3989d7de8dbb434d3",
+  "totals": {
+    "required": 17,
+    "passed": 17,
+    "failed": 0,
+    "tests": 28,
+    "passedTests": 28,
+    "failedTests": 0,
+    "skippedTests": 0,
+    "cancelledTests": 0,
+    "todoTests": 0
+  },
+  "allChildAndTreeCleanupVerified": true,
+  "installationScenarios": 16,
+  "writerTests": 12,
+  "originalExecutionDeadlineMs": 10000,
+  "originalBoundsPreserved": true,
+  "timeoutReproduced": false,
+  "priorRecurringTimeoutCauseEstablished": false,
+  "ordinaryUserOrInteractiveAcceptance": false,
+  "success": true
+}

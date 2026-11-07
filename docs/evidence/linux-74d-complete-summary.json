@@ -1,0 +1,27 @@
+{
+  "schema": "switchyard-complete-linux-acceptance/v1",
+  "source": "74d0d040695238b9380bf67036f5de6762a305ea",
+  "receipt": "isolated-test-2477acaf-2953-406d-8f94-7053fe3a9a28.json",
+  "accepted": true,
+  "totals": {
+    "required": 242,
+    "passed": 242,
+    "failed": 0,
+    "tests": 1540,
+    "passedTests": 1529,
+    "failedTests": 0,
+    "skippedTests": 11,
+    "cancelledTests": 0,
+    "todoTests": 0
+  },
+  "cleanupReceipt": "linux-74d0d04-cleanup-1793942246225.json",
+  "allChildAndTreeCleanupVerified": true,
+  "ownedTemporaryParentIdentityVerifiedAndRemoved": true,
+  "exactCheckoutAliasesBuildsAndMarkerRemoved": true,
+  "testLimitsUnchanged": true,
+  "limits": [
+    "Later authenticated owner-route composition has separate focused HTTP/privacy evidence.",
+    "The preceding a9cefaf quota run remains failed.",
+    "Windows restricted child, installed application, actual provider loading, IDE handoff, physical hardware and approved accounts remain separate acceptance."
+  ]
+}

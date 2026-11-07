@@ -4,8 +4,11 @@ import type { CommandAction } from "./command-catalog.ts";
 import { redactText } from "./redaction.ts";
 import { sha256, type JournalEntry, type JsonStoreTransaction, ProtectedJsonStore } from "./store.ts";
 
+/** Local review domains do not add physical commands or grant execution authority. */
+export type ConfirmationAction = CommandAction | "bind_legacy_conversation" | "load_codex_task" | "launch_codex_editor" | "submit_codex_text" | "resolve_codex_text" | "submit_claude_text" | "resolve_claude_text" | "resolve_copilot_request" | "issue_task_authority" | "reconcile_repository_effect" | "configure_windows_storage" | "configure_scanner_fixtures" | "save_scanner_recipe" | "configure_shield_exceptions" | "revoke_custom_agent" | "review_custom_agent_outcome";
+
 export interface DurableConfirmationRequest {
-  readonly action: CommandAction;
+  readonly action: ConfirmationAction;
   readonly targetSnapshotId?: string;
   readonly sessionId?: string;
   readonly authorityId?: string;
@@ -33,7 +36,7 @@ export interface IssuedConfirmation {
 
 export interface ConfirmationConsumeRequest {
   readonly token: string;
-  readonly action: CommandAction;
+  readonly action: ConfirmationAction;
   readonly targetSnapshotId?: string;
   readonly sessionId?: string;
   readonly authorityId?: string;
@@ -119,13 +122,13 @@ export class DurableConfirmationError extends Error {
  * reauthentication assertion.
  */
 export class DurableConfirmationLedger {
-  private readonly store: ProtectedJsonStore;
+  private readonly store: Pick<ProtectedJsonStore, "transaction" | "readEntries">;
   private readonly clock: () => string;
   private readonly tokenFactory: () => string;
   private readonly idFactory: () => string;
   private readonly ttlMs: number;
 
-  constructor(store: ProtectedJsonStore, options: {
+  constructor(store: Pick<ProtectedJsonStore, "transaction" | "readEntries">, options: {
     readonly clock?: () => string;
     readonly tokenFactory?: () => string;
     readonly idFactory?: () => string;

@@ -1,0 +1,45 @@
+{
+  "schema": "switchyard-owned-codex-unix-summary/v1",
+  "nativeCliVersion": "0.166.0",
+  "nativeExecutableSha256": "b8a11fedf24b2dfb59a70c9e52b030f9a508dcd49cd2dd0d41956f4c785156b8",
+  "receipt": "codex-owned-unix-metadata-1793926156767.json",
+  "receiptSha256": "f103d8f774dca7e0c655ad3b73cc5ea07914de70ab9c3fa8f1e6b49ce55fb49e",
+  "acceptedScope": "owned-listener-read-only-metadata",
+  "matchingAccountReads": 2,
+  "listenerProcessBirthAndExecutableVerified": true,
+  "privateSocketHeldByExactOwnedProcessVerified": true,
+  "nativeRequestedPathSha256MappingObserved": true,
+  "ownedServerExitAndSocketRetirementVerified": true,
+  "ownedRootAndMarkerRemoved": true,
+  "globalDaemonCommandUsed": false,
+  "threadCreated": false,
+  "modelPromptsSubmitted": 0,
+  "accountLoginLogoutOrSwitch": false,
+  "frontendChanged": false,
+  "productionCodexTransport": "unchanged-restricted-stdio",
+  "proxyExposedByApp": false,
+  "effectiveUnixConfigurationReadBack": false,
+  "parentLossAcceptance": false,
+  "fullStudioTaskIdeAttachmentImplemented": false,
+  "focusedReceipt": "isolated-test-5f4bdf50-af24-4042-95d3-b35ec3490fc7.json",
+  "focusedGroups": 4,
+  "focusedPassedTests": 62,
+  "typecheckPassed": true,
+  "failedNativeProbeReceipts": [
+    "codex-owned-unix-metadata-1793925035376.json",
+    "codex-owned-unix-metadata-1793925424272.json",
+    "codex-owned-unix-metadata-1793925782416.json",
+    "codex-owned-unix-metadata-1793925995928.json",
+    "codex-owned-unix-metadata-1793926053104.json"
+  ],
+  "limits": [
+    "Two equal account snapshots do not establish continuous account-event fencing.",
+    "Restricted listener arguments are verified; effective Unix configuration was not read back.",
+    "The failed stdio-proxy attempts stay failed; no proxy fallback is enabled.",
+    "Full Studio-to-IDE/native-task attachment and parent-loss acceptance remain unfinished."
+  ],
+  "sourceSha256": {
+    "tools/layout-studio/agents.mjs": "022e9380b362175d7618c3937dc4a77612ea881252846e842076c066c4782ddb",
+    "tools/layout-studio/codex-stdio-tasks.test.mjs": "45c265c87cbb0b377eb1cea51c07d65a8eb2e70864d5f70ba53291f61c33383b"
+  }
+}

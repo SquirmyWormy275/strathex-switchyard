@@ -1,0 +1,42 @@
+{
+  "schema": "switchyard-editor-ingress-source-summary/v1",
+  "basis": "71614e08baa51387ce0d9737afbb4f9255acebb2",
+  "sourceSha256": {
+    "tools/layout-studio/codex-editor-ingress.py": "9bd370cd4e8f5d1eecbcb2a5f86b054d0128dbdf9c7a54d46c575f013537bc86",
+    "tools/layout-studio/codex-editor-ingress.test.mjs": "d73ff92c1c9e1c0aea9801530695746f863578a799413d2f7481d3659f46ee10",
+    "deployment/suite/release.test.mjs": "a7f38f609daf4e16a99fe4cd78999f0dabbff5b1233ddfe32b2752b079c00a73",
+    "scripts/run-isolated-tests.mjs": "29e21ceff5afd0dd16269aee5a9527d5a4a380ee262479678482f808d927bf68"
+  },
+  "scope": "Internal Linux one-peer JSONL/WebSocket carrier only; not activated or composed with the editor launcher or upstream Codex transport.",
+  "implemented": [
+    "Private directory/device/inode and exact newly bound socket identity; never unlink an existing or substituted socket.",
+    "Ready precedes parent-supplied exact peer PID/birth/executable SHA-256. SO_PEERCRED, current-user and executable metadata/hash verify before HTTP upgrade or message delivery; no child/ancestor/title fallback.",
+    "One accepted peer, no reconnect. Parent and peer liveness/identity rechecks; nonblocking bounded buffers; 1 MiB messages, 16 KiB handshake and eight-second initial deadline.",
+    "Masked client frames, UTF-8 fragmentation, extended lengths, ping/pong and bounded close; duplicate JSON keys, binary/reserved/unmasked/malformed frames and unexpected handshake options refuse.",
+    "Normal EOF/deadline/termination retire only the original socket. Abrupt owner loss kills the carrier through setpriv parent-death signaling; the owner must verify identity and retire the remaining exact socket."
+  ],
+  "validation": {
+    "receipt": "isolated-test-198dd7fb-31c8-4739-ac30-d366937034af.json",
+    "groups": 2,
+    "passed": 16,
+    "ingressTests": 11,
+    "packageTests": 5,
+    "typecheckPassed": true,
+    "childTreeAndTemporaryCleanupVerified": true,
+    "packageBytesMatchSource": true
+  },
+  "retainedFailure": {
+    "receipt": "isolated-test-43f33fe7-ec1e-4c40-9ba9-e5fb6b1abb69.json",
+    "passed": 13,
+    "failed": 1,
+    "cause": "A cleanup SIGTERM could raise a late TimeoutError and emit an interpreter traceback. SIGTERM now exits silently with protected exact-socket cleanup; a dedicated stop test and full ingress/package rerun pass."
+  },
+  "references": [
+    "https://www.rfc-editor.org/rfc/rfc6455"
+  ],
+  "limits": [
+    "The synthetic end-to-end wire check feeds matching account/resume frames into the existing protocol witness. It starts no real provider/task, authorizes no forwarding and claims no IDE attachment.",
+    "Final relay ownership, source-peer binding, launch/return wiring, original-account sampling and native TUI parameter compatibility remain unfinished.",
+    "No frontend, installed state, device, account, model or native-task effects. No new dependency/runtime was installed."
+  ]
+}

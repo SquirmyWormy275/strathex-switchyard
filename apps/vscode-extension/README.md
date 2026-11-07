@@ -21,6 +21,14 @@ output panel for missing trace data. A second Normal VS Code press inside the bo
 to the next open VS Code window; the first press only focuses the last-used
 window.
 
+On Linux, **Start Task-Bound Codex Thread** starts a Codex App Server thread for
+an exact Git root, records Codex's returned thread ID with a short task ID in
+private local state, and opens that thread in the integrated terminal. **Show
+Managed Sessions** labels local daemon status as task-bound or unbound without
+promoting it to companion-verified lifecycle capability. A target is shown only
+when the same exact authenticated session and TargetSnapshot persist across
+thread creation.
+
 Durable workflow provider results are validated against the exact prepared
 artifact ID, digest, and result kind before the extension renders bounded
 read-only Proof, decision, plan, Handoff, focus, authority, or voice
@@ -58,3 +66,13 @@ it never rounds a Windows file identity through an unsafe JavaScript number.
 
 Run `npm run build:vscode` before packaging; it emits the CommonJS extension
 entry point at `dist/apps/vscode-extension/src/extension.js` named by the extension manifest. The VSIX contains the exact compiled control-plane and protocol modules used by the extension's untrusted-response validators; it has no runtime dependency on repository source files.
+## Exact terminal targeting and Codex launch
+
+Shift Terminal preserves the selected VS Code terminal object across picker and
+authorization delays. The local Codex command pins an explicit Unix endpoint,
+returned session UUID, repository and read-only/on-request policy. Local thread
+registration remains separate from verified account/task execution authority.
+Read the [targeting contract and real API demonstration](../../docs/ide-terminal-selection.md)
+before trying the opt-in disposable native check. Production task attachment and
+native TUI acceptance remain unfinished; the [verification ledger](../../docs/verification.md)
+separates source checks, actual demonstrations and remaining work.

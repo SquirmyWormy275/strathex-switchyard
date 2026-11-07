@@ -1,0 +1,36 @@
+{
+  "schema": "switchyard-restricted-assertion-location-source/v1",
+  "basis": "370c21e7d635430d28a1087162c09df8a0ec76b3",
+  "sourceSha256": {
+    "deployment/windows/test-support/storage-broker-protocol/RestrictedChildPipes.cs": "689173b7ee7ebe55f43628a27f16a7ea87cbe28145abf4f5edb271be3c73b881",
+    "deployment/windows/test-support/storage-broker-protocol/RestrictedChildStderrProof.cs": "cfb9f65c841fabd41458f3cb3173f62fa41b5a2b62052e9256efbee15e83f8eb",
+    "scripts/windows-restricted-owner-report.mjs": "29cbdfb87440f4b9fe09b8848caddbe82ad1ce0e32586ec62f632b01cb8e6412",
+    "scripts/windows-restricted-owner-report.test.mjs": "6894c34621aeda87d958e40d8f07324b815a7c1059dbbb3af993990dad04f4f4",
+    "scripts/verify-windows-storage-broker.mjs": "9560054df2d5d0214fde3d4568cb927ce5b8e765c49200c8ff36442c3085d2c4"
+  },
+  "change": "Parse only fixed known upstream Node source basenames and bounded line numbers from its assertion header; retain a fixed ncrypto::CSPRNG label when present. Never publish a path, signature, assertion expression or native stack address.",
+  "priorNativeObservation": "7a75189 exits 134 and emits 663 bounded stderr bytes classified as assertion; original condition unidentified.",
+  "managedBuild": {
+    "receipt": "managed-source-build-1793939606473.json",
+    "targets": 2,
+    "portableChecksPassed": 1856,
+    "stderrParserChecks": 40,
+    "warnings": 0,
+    "errors": 0,
+    "existingSdkReused": true,
+    "ownedScratchRemoved": true
+  },
+  "software": {
+    "receipt": "isolated-test-4e1f2f33-3703-4969-b561-1624ae2143e6.json",
+    "testsPassed": 10,
+    "allChildAndTreeCleanupVerified": true,
+    "typecheck": true
+  },
+  "nativeAcceptance": "pending",
+  "reference": "https://github.com/nodejs/node/blob/v24.14.0/src/node_errors.cc#L370",
+  "limits": [
+    "The fixed diagnostic may still yield an unknown source. No cause is guessed from the assertion category.",
+    "This is diagnostic-only test assembly work; token, desktop, Job, runtime, limits and success requirements stay unchanged.",
+    "The complete local Linux 370c21e run is in progress in its owned checkout."
+  ]
+}

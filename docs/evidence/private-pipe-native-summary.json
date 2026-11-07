@@ -1,0 +1,76 @@
+{
+  "schema": "switchyard-private-pipe-native-and-owner/v1",
+  "pipeProof": {
+    "kind": "pipe",
+    "sourceCommit": "22027204431792112a3e1929ec518002241ee519",
+    "executionCommit": "cd8d04fde4a26a2a9a0fcc4d4231729cb8200b60",
+    "sourceAndExecutionTree": "c9e2fa0b72374e4bbe9b17478557236b65bf2ea2",
+    "runId": 42265268787,
+    "artifactId": 13526508458,
+    "archiveBytes": 713,
+    "archiveSha256": "f529be9fd39bc367259bb4172183bfaae7b21fae1b22045997885fa909a0534c",
+    "zipSavedLocally": false,
+    "privateReceipt": "windows-pipe-2202720-native.json",
+    "success": true,
+    "privatePipeChecks": 36,
+    "protectedFileChecks": 16,
+    "jobId": 128055860945,
+    "serviceInstalled": false,
+    "volumeOpened": false,
+    "guestLaunched": false
+  },
+  "setupProof": {
+    "kind": "setup",
+    "sourceCommit": "22027204431792112a3e1929ec518002241ee519",
+    "executionCommit": "cd8d04fde4a26a2a9a0fcc4d4231729cb8200b60",
+    "sourceAndExecutionTree": "c9e2fa0b72374e4bbe9b17478557236b65bf2ea2",
+    "runId": 42265268787,
+    "artifactId": 13526393503,
+    "archiveBytes": 949,
+    "archiveSha256": "7e821755ead56ca4fae52b42fe5b94c5619a29df64c32c31332d18bbd6f8698c",
+    "zipSavedLocally": false,
+    "privateReceipt": "windows-setup-2202720-native.json",
+    "success": true,
+    "checks": 6,
+    "nativeExitVerified": true,
+    "elevationRequested": false
+  },
+  "restrictedOwner": {
+    "kind": "owner",
+    "sourceCommit": "22027204431792112a3e1929ec518002241ee519",
+    "executionCommit": "cd8d04fde4a26a2a9a0fcc4d4231729cb8200b60",
+    "sourceAndExecutionTree": "c9e2fa0b72374e4bbe9b17478557236b65bf2ea2",
+    "runId": 42265268787,
+    "artifactId": 13526198811,
+    "archiveBytes": 4617,
+    "archiveSha256": "58bf568f94ebea6eda4126a3dc752f93058433843c85e4a26e1025be711a37ae",
+    "zipSavedLocally": false,
+    "privateReceipt": "windows-owner-2202720-native.json",
+    "success": false,
+    "jobId": 128055861139,
+    "acceptedChecks": 0,
+    "failedPhase": "probe-identity-return-structured-result",
+    "descendantQueries": [
+      {
+        "role": "guardian",
+        "status": "verified",
+        "grantedMask": 8
+      },
+      {
+        "role": "worker",
+        "status": "verified",
+        "grantedMask": 8
+      },
+      {
+        "role": "status",
+        "status": "verified",
+        "grantedMask": 8
+      }
+    ],
+    "workerCreated": true,
+    "workerStartupCauseEstablished": false,
+    "ordinaryUserAccepted": false,
+    "guestLaunched": false
+  },
+  "installedChanged": false
+}

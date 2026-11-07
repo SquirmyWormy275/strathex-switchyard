@@ -1,0 +1,27 @@
+{
+  "schema": "switchyard-windows-guardian-query-native/v1",
+  "sourceCommit": "0a0dd118597b5b936b2f692c0c58309f6ebf4ce5",
+  "executionCommit": "d6642cd5610d76a24a8187507fa94407ba723b30",
+  "sourceAndExecutionTree": "bd0368006121aeceabacb9d11d9fe3a5f5b543cf",
+  "runId": 42240575085,
+  "jobId": 127969966527,
+  "artifactId": 13515367553,
+  "archiveBytes": 4352,
+  "archiveSha256": "fd61a93c95b010b3f818dd2a863b489fc67493613775d641efc94db05c83f0ef",
+  "zipSavedLocally": false,
+  "privateReceipt": "windows-guardian-query-0a-native.json",
+  "failure": {
+    "waitResult": 0,
+    "exitCode": 2,
+    "resultAvailable": true,
+    "childReportedSuccess": false,
+    "ownerReportedSuccess": false,
+    "completedChecks": 0,
+    "failedPhase": "probe-identity-created-native-job-create-code5-qdenied",
+    "failureCategory": "Error",
+    "stateLockFailure": null
+  },
+  "finding": "After Job creation fails with Win32 error 5, the same actual guardian also receives error 5 from OpenProcessToken on its own pseudo-process handle with TOKEN_QUERY mask 8. This differs from the cold child with its existing QUERY allowance; it does not establish whether the process/token DACL or the Job API internal access caused the original failure.",
+  "restrictedOwnerAccepted": false,
+  "permissionsChanged": false
+}

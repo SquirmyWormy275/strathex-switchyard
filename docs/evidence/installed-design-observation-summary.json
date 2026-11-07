@@ -1,0 +1,24 @@
+{
+  "sourceCommit": "7d9310a0d00de650bf63f2bff6ef12cdfe0f0f97",
+  "release": "fb94fc38c52ce4753cdcc125a4e9198f984f46cdd186fcf8a423fd6d6cc8ef9b",
+  "updateReceipt": "assignment-legends-1793902553579.json",
+  "updateChecks": 6,
+  "metadataReceipt": "installed-copilot-journal-metadata-1793902553952.json",
+  "metadataChecks": 7,
+  "installedSourceSha256": {
+    "tools/layout-studio/agents.mjs": "96fbecd4b2117da95e808ed74250f6d1dae303a6680861c4ff91a4ade607bce3",
+    "tools/layout-studio/agent-observation.mjs": "327ad37cd820d14bf1be360b4d29815a236dcba4b1545bd9de8587cdca16a012",
+    "tools/layout-studio/workflow.mjs": "54a4be32f5e2ab3494e66399ace0fe549b65d7a0399ffb601a0574170e36ee7a"
+  },
+  "sourcePins": 3,
+  "selectedStatePreserved": true,
+  "workspaceCreated": false,
+  "modelPromptsSubmitted": 0,
+  "keyboardOpened": false,
+  "nativeConfigurationTurnAcceptance": false,
+  "schema": "switchyard-installed-design-observation-summary/v1",
+  "receipt": "installed-design-observation-source-1793902845347.json",
+  "receiptSha256": "ab1bc3d5fa2df363bb89cffefa391f5564e6d23825b76e70eb1871f701200582",
+  "workspaceInventoryCount": 54,
+  "ownedBundleAndCheckoutRemoved": true
+}

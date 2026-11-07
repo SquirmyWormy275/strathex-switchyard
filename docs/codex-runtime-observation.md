@@ -1,0 +1,67 @@
+# Observe status during an owned Codex turn
+
+Switchyard can record runtime status while an already authorized Codex design
+conversation or reviewed coding-text turn runs. This supplements local request
+and reply history with the provider's reported active, waiting-on-approval, idle,
+error or not-loaded state. None of these states proves that the user's task is
+complete.
+
+The existing observation session must explicitly include `agent-events`, remain
+recording in a personal companion workspace, and permit the `codex` category.
+Starting a turn does not enable recording. Pausing, deleting, excluding the source
+or changing the original binding prevents later metadata from being retained.
+The narrow authenticated `/api/suite/observation/start` route supplies this
+consent; guided frontend exposure remains unfinished.
+
+Only `thread/status/changed` notifications on the exact owned connection and
+thread are considered. The native account and turn generation remain pinned;
+the original role or coding-task binding is checked again inside the encrypted
+write. A new or resumed recording cannot inherit an earlier queued event. The
+stored record contains fixed status/provenance, local time and a compartment-bound
+subject digest. It contains no prompt, reply, file path, account or native thread
+identifier. Sending aggregate observations to a designer still requires the
+separate existing observation review.
+
+Repeated statuses collapse. Up to 64 distinct transitions are accepted within
+the original turn deadline and output bounds. Accepted writes finish before a
+successful reply is retained. Overflow or failed persistence leaves the turn
+unconfirmed, invokes its existing owned cleanup and never submits a replacement.
+A callback that finishes after cancellation, timeout or an account change cannot
+write late metadata.
+
+This observes an existing turn; it creates no provider process, subscription,
+resume or model request. As the [official app-server contract](https://learn.chatgpt.com/docs/app-server)
+explains, a metadata-only thread read does not subscribe to runtime events. There
+is no continuous external-session observer here. Unsupported status shapes are
+ignored, so complete stream coverage is not claimed.
+
+Twenty-seven groups pass 191 tests with no skips, and both TypeScript checks
+pass. Encrypted-state demonstrations cover design and reviewed-text paths,
+privacy, consent and role changes before persistence. Transport responses are
+synthetic. Packaging and installer scenarios pass; live provider and native
+Windows acceptance are separate. Fixture retention/startup mistakes remain
+classified in the [source evidence](evidence/codex-runtime-observation-source-summary.json).
+
+Normal installed Linux `384cf8b` passes 88 metadata/refusal checks against 56
+exact module hashes, including the fixed status parser, private correlation,
+duplicate suppression and changed-binding refusal in memory. All 54 semantic
+workspaces, four profiles, 57 workflows, selection and pending keyboard-only
+conversation remain intact. The dated launcher backup/readback verify; the
+4,829,116-byte temporary package is removed, leaving current plus one rollback.
+The first workflow verifier correctly refused an old source-evidence pin; the
+corrected verifier passes without changing saved workflows.
+[Installed evidence](evidence/installed-runtime-observation-summary.json).
+
+Each explicitly started or resumed recording now has a private generation. The
+writer rechecks that identity inside encrypted persistence, so pause/resume cannot
+reuse an earlier event merely because the wall clock did not advance. A duplicate
+recording-status request preserves the current interval. Events sharing the exact
+start/resume timestamp are ambiguous and omitted; later metadata remains eligible.
+Legacy recordings retain their timestamp behavior until the next explicit resume.
+
+Two original regressions reproduced acceptance across renewed consent. Eight
+focused groups now pass 120 tests with no skips, including the encrypted Suite
+API, runtime notifications, foreground sampling, role dispatch and design-context
+review. This is source-only evidence after installed `57af859` and complete Linux
+checkpoint `0c025df`; it invokes no live provider or hardware.
+[Consent-generation evidence](evidence/consent-generation-source-summary.json).

@@ -273,6 +273,10 @@ export interface DurableMediatedExecutorOptions {
   readonly snapshots?: TargetSnapshotLedger;
   readonly checkpoints?: CheckpointLedger;
   readonly checkpointCapture?: CheckpointCaptureAdapter;
+  /** Host configuration can require extra checkpoints, never remove built-in ones. */
+  readonly additionalCheckpointActions?: readonly CommandAction[];
+  /** Exact host-reviewed invocation scope; never accepted from a command packet. */
+  readonly operationScopeDigest?: string;
   /**
    * Read-only verification of each captured recovery artifact.  Risky work is
    * unavailable when the host cannot prove the preservation reference still
@@ -335,25 +339,28 @@ export class DurableMediatedExecutor {
   readonly recovery: NoReplayOperationRecovery;
   private readonly options: DurableMediatedExecutorOptions;
   private readonly now: () => Date;
-  private readonly executionControls = new ExecutionControlRegistry();
+  private readonly executionControls: ExecutionControlRegistry;
   private readonly deadlineSchedules = new Map<string, DeadlineSchedule>();
   private recoveryPoll?: DeadlineSchedule;
   private recoveryPollRunning = false;
   private recoveryPollingEnabled = false;
+  private observationStopped = false;
+  private readonly observationTasks = new Set<Promise<void>>();
 
   constructor(options: DurableMediatedExecutorOptions) {
     this.options = options;
     this.now = options.now ?? (() => new Date());
+    this.executionControls = new ExecutionControlRegistry(() => this.now().getTime());
     this.sessions = options.sessions ?? new SessionRegistry(options.store);
     this.authorities = options.authorities ?? new AuthorityLedger(options.store, { clock: () => this.now().toISOString() });
     this.gateEvidence = options.gateEvidence ?? new GateEvidenceLedger(options.store);
     this.snapshots = options.snapshots ?? new TargetSnapshotLedger(options.store);
     this.checkpoints = options.checkpoints ?? new CheckpointLedger(options.store);
     this.confirmations = options.confirmations ?? new DurableConfirmationLedger(options.store, { clock: () => this.now().toISOString() });
-    this.budgets = options.budgets ?? new DurableBudgetManager(options.store);
+    this.budgets = options.budgets ?? new DurableBudgetManager(options.store, { clock: () => this.now().toISOString() });
     this.operations = new OperationSagaStore(options.store);
     this.receipts = new ReceiptLedger(options.store);
-    this.operationCoordinator = new DurableOperationCoordinator(this.operations, this.receipts);
+    this.operationCoordinator = new DurableOperationCoordinator(this.operations, this.receipts, { scopeDigest: options.operationScopeDigest });
     this.recovery = new NoReplayOperationRecovery(this.operations);
     for (const [action, reconciler] of Object.entries(options.operationReconcilers ?? {})) this.recovery.register(action, reconciler);
   }
@@ -438,6 +445,7 @@ export class DurableMediatedExecutor {
       budgets: this.budgets,
       checkpoints: this.checkpoints,
       checkpointCapture: this.options.checkpointCapture,
+      additionalCheckpointActions: this.options.additionalCheckpointActions,
       checkpointVerifier: this.options.checkpointVerifier,
       policyVersion: this.options.policyVersion,
       revalidator: this.finalTargetRevalidator(),
@@ -449,6 +457,7 @@ export class DurableMediatedExecutor {
       now: this.now,
       deadlineScheduler: this.options.deadlineScheduler ?? systemDeadlineScheduler,
       deadlineSchedules: this.deadlineSchedules,
+      observeInBackground: callback => this.observeInBackground(callback),
       ...(this.options.budgetConfiguration ? { budgetConfiguration: this.options.budgetConfiguration } : {})
     });
     const dispatcher = new CommandDispatcher({
@@ -743,8 +752,10 @@ export class DurableMediatedExecutor {
   }
 
   private async resumeRecoveredBudgetLifecycle(): Promise<void> {
+    if (this.observationStopped) return;
     const active = (await this.budgets.list()).filter((claim) => ["running", "cancelling", "timed_out"].includes(claim.state));
     for (const claim of active) {
+      if (this.observationStopped) return;
       this.executionControls.bind(claim.operationId, claim.expiresAt, claim.id);
       if (claim.state === "running" && !this.deadlineSchedules.has(claim.id)) this.scheduleRecoveredDeadline(claim);
       if (claim.state === "cancelling" || claim.state === "timed_out") {
@@ -763,10 +774,11 @@ export class DurableMediatedExecutor {
   }
 
   private scheduleRecoveredDeadline(claim: BudgetClaim): void {
+    if (this.observationStopped) return;
     const delay = Math.max(0, Date.parse(claim.expiresAt) - this.now().getTime());
     const schedule = (this.options.deadlineScheduler ?? systemDeadlineScheduler).schedule(delay, () => {
       this.deadlineSchedules.delete(claim.id);
-      void this.handleRecoveredDeadline(claim.operationId, claim.id);
+      this.observeInBackground(() => this.handleRecoveredDeadline(claim.operationId, claim.id));
     });
     this.deadlineSchedules.set(claim.id, schedule);
   }
@@ -781,15 +793,15 @@ export class DurableMediatedExecutor {
   }
 
   private scheduleRecoveryPoll(): void {
-    if (!this.recoveryPollingEnabled || this.recoveryPoll || this.recoveryPollRunning || !this.options.operationControl?.observe) return;
+    if (this.observationStopped || !this.recoveryPollingEnabled || this.recoveryPoll || this.recoveryPollRunning || !this.options.operationControl?.observe) return;
     this.recoveryPoll = (this.options.deadlineScheduler ?? systemDeadlineScheduler).schedule(250, () => {
       this.recoveryPoll = undefined;
-      void this.runRecoveryPoll();
+      this.observeInBackground(() => this.runRecoveryPoll());
     });
   }
 
   private enableLiveOperationReconciliation(): void {
-    if (!this.options.operationControl?.observe) return;
+    if (this.observationStopped || !this.options.operationControl?.observe) return;
     this.recoveryPollingEnabled = true;
     this.scheduleRecoveryPoll();
   }
@@ -815,11 +827,34 @@ export class DurableMediatedExecutor {
 
   /** Recovery entry point for companion startup. It observes durable state and never replays a side effect. */
   async recoverAfterRestart(): Promise<Readonly<{ operations: readonly ReconciliationResult[]; budgets: readonly BudgetedOperationReconciliation[] }>> {
+    if (this.observationStopped) throw new Error("This runtime's observation lifecycle has stopped.");
     this.recoveryPollingEnabled = true;
     const operations = await this.recovery.recoverPending();
     const budgets = await this.reconcileBudgetedOperations();
     await this.resumeRecoveredBudgetLifecycle();
     return { operations, budgets };
+  }
+
+  /** Stop this instance's observation timers after its host lifecycle has stopped owned effects.
+   * Durable claims and unknown outcomes remain intact for the next host instance.
+   */
+  private observeInBackground(callback: () => Promise<void>): void {
+    if (this.observationStopped) return;
+    const task = Promise.resolve().then(async () => { if (!this.observationStopped) await callback(); });
+    this.observationTasks.add(task);
+    // Failed observation leaves its durable claims unresolved. Joining the task
+    // still prevents an asynchronous state write after host teardown returns.
+    void task.finally(() => this.observationTasks.delete(task)).catch(() => undefined);
+  }
+
+  async stopObservation(): Promise<void> {
+    this.observationStopped = true;
+    this.recoveryPollingEnabled = false;
+    this.recoveryPoll?.cancel();
+    this.recoveryPoll = undefined;
+    for (const timer of this.deadlineSchedules.values()) timer.cancel();
+    this.deadlineSchedules.clear();
+    await Promise.allSettled([...this.observationTasks]);
   }
 
   /**
@@ -1340,6 +1375,7 @@ interface DurableRuntimeGovernanceOptions {
   readonly budgets: DurableBudgetManager;
   readonly checkpoints: CheckpointLedger;
   readonly checkpointCapture?: CheckpointCaptureAdapter;
+  readonly additionalCheckpointActions?: readonly CommandAction[];
   readonly checkpointVerifier?: RecoveryArtifactVerifier;
   readonly revalidator: TargetSnapshotRevalidator;
   readonly sessions: SessionRegistry;
@@ -1352,6 +1388,7 @@ interface DurableRuntimeGovernanceOptions {
   readonly now: () => Date;
   readonly deadlineScheduler: DeadlineScheduler;
   readonly deadlineSchedules: Map<string, DeadlineSchedule>;
+  readonly observeInBackground: (callback: () => Promise<void>) => void;
 }
 
 interface RuntimeEffectGuardInput {
@@ -1461,7 +1498,7 @@ class DurableRuntimeGovernance implements DispatchGovernance {
 
   async admit(input: DispatchGovernanceRequest): Promise<DispatchGovernanceAdmission> {
     let effectGuard: EffectGuard | undefined;
-    const workflow = checkpointWorkflow(input.definition);
+    const workflow = checkpointWorkflow(input.definition) ?? (this.options.additionalCheckpointActions?.includes(input.definition.action) ? "risky_mutation" : undefined);
     if (workflow) {
       if (!input.target) return { allowed: false, status: "unavailable", summary: "This risky workflow needs a durably recorded exact TargetSnapshot before a checkpoint can be captured." };
       if (!this.options.checkpointCapture) return { allowed: false, status: "unavailable", summary: "This risky workflow has no trusted checkpoint-capture adapter; no broker was called." };
@@ -1569,7 +1606,7 @@ class DurableRuntimeGovernance implements DispatchGovernance {
   private scheduleDeadline(operationId: string, claimId: string, expiresAt: string): void {
     const delay = Math.max(0, Date.parse(expiresAt) - this.options.now().getTime());
     const timer = this.options.deadlineScheduler.schedule(delay, () => {
-      void this.handleDeadline(operationId, claimId);
+      this.options.observeInBackground(() => this.handleDeadline(operationId, claimId));
     });
     this.options.deadlineSchedules.set(claimId, timer);
   }

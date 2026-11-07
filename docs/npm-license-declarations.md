@@ -1,0 +1,124 @@
+# Declared npm license obligations and alternatives
+
+Supply Chain and Release Shield now understand a bounded declaration syntax
+with `AND`, `OR`, `WITH` and parentheses. `MIT AND GPL-3.0-only` fails an allowlist
+containing only MIT and Apache-2.0. `MIT OR GPL-3.0-only` has a permitted
+alternative, but reports `license_choice_not_selected`; Switchyard does not
+choose a license or claim legal compliance. Every result still has incomplete
+coverage.
+
+This follows the operator precedence in [SPDX 2.3.1 Annex D](https://spdx.github.io/spdx-spec/v2.3.1/SPDX-license-expressions/):
+WITH binds a simple license and exception before AND and OR; grouping changes obligations, operators are
+case sensitive, and identifier comparison is case insensitive.
+[npm documents expressions for multiple-license declarations](https://docs.npmjs.com/cli/v11/configuring-npm/package-json/#license).
+The scanner checks syntax, an explicitly signed literal-identifier allowlist,
+and identifier membership in pinned SPDX License List 3.29.0. License and exception
+names use separate namespaces; every branch must be listed, even if policy permits
+another OR branch. It does not inspect license texts, infer compatibility, approve
+later versions or verify a publisher's declaration.
+`GPL-2.0+` matches only that explicitly allowed identifier, not `GPL-2.0-only`.
+
+The self-contained pinned engine accepts at most 512 ASCII characters, 128
+tokens, 64 identifiers and sixteen nested groups. It normalizes spaces and
+redundant grouping without changing precedence. It never evaluates source
+code, expands a file reference, loads a dependency or makes a network request.
+Unsupported LicenseRef/DocumentRef references, NONE/NOASSERTION,
+malformed input and excess bounds remain `license_metadata` gaps. An apparently
+permitted prefix cannot salvage an unsupported expression. Policy entries are unique canonical identifiers or complete `license WITH exception`
+pairs. Compound AND/OR policies, redundant groups/spacing and case aliases refuse.
+
+The typed inventory and CycloneDX 1.6 output retain normalized declared text
+under `license.name`. Three fixed properties record catalog version, whether all
+identifiers are listed, and whether any identifier is deprecated. An unlisted
+license or exception retains the `license_metadata` gap even when a literal signed
+policy permits it. Deprecated identifiers remain valid declarations and are
+identified without silently replacing them. Catalog membership does not establish
+a selected legal license, actual license text or publisher verification.
+Host admission requires canonical syntax and exact inventory/BOM equality.
+Missing publisher, source, artifact and repository coverage remain incomplete.
+
+The earlier AND/OR checkpoint passed actual Linux namespace execution and the
+Windows software path with guest execution doubled: exact signed feeds, one
+license finding, alternatives/unsupported metadata gaps, authenticated failed/
+incomplete evidence, duplicate receipt, original index/HEAD/lockfile preservation
+and independently confirmed scanner exit/cleanup. Their first seven-group
+check retained a runner inventory omission as failed
+(`isolated-test-8f7edfdc-d48e-4a72-a1ab-20ad0b15b699.json`, 47/48 tests); all
+scanner and integration groups passed and every cleanup verified. The fixed
+runner, workflow, CLI guard and engine pass 42 checks in four isolated groups
+(`isolated-test-a36853c4-cfd3-4110-a308-23c245b7955b.json`), with every cleanup
+verified. Type checking and the deterministic development BOM check pass. Native
+Windows execution of the new license worker remains a separate check.
+
+The installed verifier accepts a standalone exact action:
+
+```sh
+node scripts/verify-shield-host.mjs --synthetic \
+  --action=shield_supply_chain --license-expressions
+```
+
+`release_shield` is also supported. This mode installs no dependencies, submits
+no prompt and opens no keyboard. It uses a new disposable synthetic repository
+and separately approved signed fixture data, then verifies retirement and
+restoration. Invalid or combined flags refuse before installed state access.
+
+
+Normal installed source `402dd7e`, release `55d42108…`, now passes six update
+checks, 14 Supply Chain and 14 Release checks. Four actual scanner exits verify
+required-license failures, permitted but unselected alternatives, unsupported
+exception gaps, authenticated incomplete coverage, signed-feed retirement and
+original state/frozen Home restoration. All owned source/signing/packages/
+staging/bundle/checkout are removed; zero prompts or keyboard access.
+[Source-bound installed evidence](evidence/installed-license-summary.json).
+
+
+## Explicit exception pairs
+
+A signed entry such as `GPL-2.0-only WITH Classpath-exception-2.0` permits only
+that declared pair. It does not permit bare `GPL-2.0-only` or a different exception.
+Allowing the base and exception as separate entries does not permit their pair.
+The exception has one identifier without a `+` suffix. WITH requires surrounding
+whitespace and a simple left operand; a parenthesized group cannot take an exception.
+The existing bounded parser normalizes declarations and preserves unselected choices.
+These remain literal-policy decisions. The separate pinned catalog check verifies
+identifier membership without asserting legal approval.
+
+Seven isolated groups/59 tests pass, including actual Linux Supply Chain/Release
+execution and Windows guest doubles, signed feeds, eight declared components,
+exact BOM/report equality, receipt replay, unchanged original files/index/HEAD
+and independent process/scratch cleanup. A subsequent 26-test engine pass
+strengthens identifier/operator case checks. Typecheck passes. The installed
+verifier's unsupported fixture now uses LicenseRef; no installed scanner was run.
+[Source and evidence](evidence/license-exception-declaration-summary.json).
+
+## Pinned offline identifier catalog
+
+The generated worker includes all 740 license IDs and 86 exception IDs from
+[SPDX license-list-data v3.29.0](https://github.com/spdx/license-list-data/tree/31ba1a50e5397e00a304dbadc76531740e89ee48).
+Only identifiers and deprecation flags are retained. The small source projection
+records the immutable upstream commit, Git blob identities and SHA-256 hashes
+of both original JSON documents; those exact bytes were checked during import.
+This is source attribution, not a signature-verification claim.
+
+`scripts/generate-spdx-license-catalog.mjs --check` reproduces the embedded data
+without network access. The scanner remains a single dependency-free,
+digest-pinned file. It performs no lookup, package installation or license-text
+download at runtime. A unary + checks its base identifier but never borrows a
+base-only policy permission. Unknown names, exception/license swaps and unknown
+terms in otherwise allowed alternatives remain incomplete.
+
+Forty-seven checks in seven isolated groups pass, including every upstream ID,
+case and namespace distinctions, forged/missing evidence refusals, real Linux
+Supply Chain/Release scans and Windows guest doubles. The composed journeys now
+cover twelve declarations, retain all original three disallowed findings, verify
+exact BOM/report equality and preserve original index/HEAD/lockfiles. Every child
+and process tree exits and owned staging is removed. Typecheck, deterministic
+SBOM regeneration and application/release packaging checks pass. Installed and
+native Windows guest acceptance remain separate.
+[Source evidence](evidence/spdx-catalog-source-summary.json).
+
+Native Windows source `a5520be` now passes both Supply Chain and Release license
+journeys with twelve declarations, exact signed feeds/report/BOM/receipt binding
+and verified child/tree cleanup. Windows guest execution remains doubled; no
+actual guest, account, installed app or license text is accepted by these checks.
+[Windows evidence](evidence/spdx-catalog-native-summary.json).

@@ -1,0 +1,58 @@
+{
+  "schema": "switchyard-pipe-buffer-and-task-source/v1",
+  "basis": "f7fda6bd9f2054cf9db07fac762017b6b3f5608a",
+  "sourceSha256": {
+    ".github/workflows/switchyard-windows-filesystem.yml": "d297e262aa600dad5076846810d4cd625c29c4ae69f3b36600b7ec940d88a652",
+    "apps/desktop-hotkeys/RuntimePrivatePipeSecurity.cs": "f5c302d5baca69f27efa068ed02b320b4116fca056243364857ef74f0c3c36af",
+    "scripts/verify-windows-storage-contracts.mjs": "4eae3842587d6a3d538be58cbcec1d2f42c658db40036a5e1c053f7d9bc50ba0",
+    "scripts/windows-scenario-groups.test.mjs": "08d76b92c895931563d75019e205d12dfcc7cdfabb043a24dc8f76446b2e9fe6"
+  },
+  "focused": {
+    "receipt": "isolated-test-25b57158-2a2b-4b23-b173-1dc50fe92177.json",
+    "totals": {
+      "required": 30,
+      "passed": 30,
+      "failed": 0,
+      "tests": 68,
+      "passedTests": 67,
+      "failedTests": 0,
+      "skippedTests": 1,
+      "cancelledTests": 0,
+      "todoTests": 0
+    },
+    "taskOwnerCasesPassedOnce": 26,
+    "allChildAndTreeCleanupVerified": true
+  },
+  "managed": {
+    "receipt": "private-pipe-buffer-managed-1793986726781.json",
+    "builds": [
+      {
+        "name": "helper",
+        "warnings": 0,
+        "errors": 0,
+        "managedAssemblySha256": "852095d3fa11b3a564add3c8b68eb74493f91b0be5f9042c8e53d51732f91c91",
+        "managedPeSubsystem": 2
+      },
+      {
+        "name": "proof",
+        "warnings": 0,
+        "errors": 0,
+        "managedAssemblySha256": "878e72a8977e88a417d3f5689599eab053e9012b7c2a72c635293cda317c699b",
+        "managedPeSubsystem": 3
+      }
+    ],
+    "portableChecks": 2101,
+    "cleanup": {
+      "files": 149,
+      "bytes": 3382640,
+      "removed": true
+    }
+  },
+  "taskOwnerNativeIndependentJobAdded": true,
+  "originalTaskOwnerChildTimeoutMs": 45000,
+  "originalTaskOwnerNativeLinuxOnlySkips": 2,
+  "descriptorAcceptanceChanged": false,
+  "permissionChange": false,
+  "nativeAcceptance": false,
+  "installedChanged": false
+}

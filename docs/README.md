@@ -1,5 +1,8 @@
 # Documentation provenance
 
+Current workflow and platform guidance: [first-use guide](try-switchyard.md), [August 2026 reassessment](workflow-reassessment-2026-10.md), [Linux/Windows capability matrix](platform-capability-matrix.md), [local baseline workflow capture](workflow-capture.md), and [read-only Codex thread inventory](codex-thread-inventory.md). They preserve the canonical 65 assigned chords and keep uncommissioned physical behavior unaccepted.
+For custom keyboard planning, start with the [offline Layout Studio](../tools/layout-studio/README.md). It imports an owner-supplied physical profile and never generates flashable firmware.
+
 - `SXSY-B122-complete-key-specification-and-audit.md` is the accepted complete
   22-key specification and includes its full adversarial review and 27 gates.
   It was copied faithfully from the accepted local source artifact on 2026-08-22;

@@ -6,6 +6,13 @@
 > [linux-software-completion-audit.md](linux-software-completion-audit.md).
 > Neither audit closes physical, live-provider, production, or acceptance gates.
 
+> **October 2026 verification reconciliation:** The host-specific `npm test`
+> lane selects shared plus native Linux groups on Linux and the Windows groups
+> on Windows. `npm run test:all` preserves the cross-host diagnostic suite.
+> The new read-only managed-session view uses the authenticated companion
+> registry and adds no chord or authority path. See
+> [the platform capability matrix](platform-capability-matrix.md).
+
 > **Status:** implementation and local-test audit only. This document does **not** mark any acceptance gate as passed or make a production-readiness claim. The accepted design and gate language remain authoritative in [SXSY-B122-complete-key-specification-and-audit.md](SXSY-B122-complete-key-specification-and-audit.md).
 
 ## Purpose and evidence standard

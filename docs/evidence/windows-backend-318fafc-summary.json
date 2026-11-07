@@ -1,0 +1,141 @@
+{
+  "schema": "switchyard-windows-backend-source-summary/v1",
+  "sourceCommit": "318fafcaf65342ba4a8de87bc7606535735b2f5c",
+  "mergeCommit": "d773b0ad64190b0783068d869c2e4d00e7729bfc",
+  "tree": "31da1aeb2c0f5fef583c3ad6c15d905a1996e95c",
+  "workflowRun": 42368587301,
+  "backendShardsAccepted": true,
+  "completeWorkflowAccepted": false,
+  "totals": {
+    "groups": 232,
+    "passed": 1355,
+    "skipped": 179
+  },
+  "shards": [
+    {
+      "shard": 1,
+      "artifact": 13572907324,
+      "receipt": {
+        "id": "9b7921fd-220d-46b2-b705-7d372a43915d",
+        "sha256": "974daf461b3d2a9ac1d08215f3911057bc1916eea321b7985a329c7f4fcfe457"
+      },
+      "totals": {
+        "required": 38,
+        "passed": 38,
+        "failed": 0,
+        "tests": 280,
+        "passedTests": 254,
+        "failedTests": 0,
+        "skippedTests": 26,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "shard": 2,
+      "artifact": 13573735020,
+      "receipt": {
+        "id": "10831523-8c82-4ddd-a1f0-441fe0c3ef7d",
+        "sha256": "5ae94874d5331ea74b41037065134fc5d48adebb525a9f30f5474a1e48b51154"
+      },
+      "totals": {
+        "required": 38,
+        "passed": 38,
+        "failed": 0,
+        "tests": 259,
+        "passedTests": 223,
+        "failedTests": 0,
+        "skippedTests": 36,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "shard": 3,
+      "artifact": 13573117649,
+      "receipt": {
+        "id": "d0948331-1cf0-45b7-8c0a-bf57a421170b",
+        "sha256": "9ad59667c6f0b12a31049dc5bb05c19db29b7139130b133d9b9efe8c6af5f84e"
+      },
+      "totals": {
+        "required": 39,
+        "passed": 39,
+        "failed": 0,
+        "tests": 217,
+        "passedTests": 200,
+        "failedTests": 0,
+        "skippedTests": 17,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "shard": 4,
+      "artifact": 13572837430,
+      "receipt": {
+        "id": "5012a8f9-2b2b-4c59-994f-83ba98b332df",
+        "sha256": "a4e639ee3ff872717cecf93d60687d853a3f9fe08b7c60f985b7d265ada4ac01"
+      },
+      "totals": {
+        "required": 38,
+        "passed": 38,
+        "failed": 0,
+        "tests": 222,
+        "passedTests": 197,
+        "failedTests": 0,
+        "skippedTests": 25,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "shard": 5,
+      "artifact": 13573062927,
+      "receipt": {
+        "id": "95d0f2c8-77cc-4507-bc85-12d1769a3f32",
+        "sha256": "706a1215c2b6b4e3fe8abe241889f5b0cb7378a8995cb49478d9deda405996bd"
+      },
+      "totals": {
+        "required": 40,
+        "passed": 40,
+        "failed": 0,
+        "tests": 290,
+        "passedTests": 262,
+        "failedTests": 0,
+        "skippedTests": 28,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "shard": 6,
+      "artifact": 13573052803,
+      "receipt": {
+        "id": "64dfb762-b011-4b60-af31-7853f3350522",
+        "sha256": "3109b5e2bb4393da6d05cf2656831353fc5c3316b6a8c5c131da774a946ebe99"
+      },
+      "totals": {
+        "required": 39,
+        "passed": 39,
+        "failed": 0,
+        "tests": 266,
+        "passedTests": 219,
+        "failedTests": 0,
+        "skippedTests": 47,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    }
+  ],
+  "originalManifestCommandsBoundsSkipsAndCleanupVerified": true,
+  "releaseFailure": {
+    "job": 128395967133,
+    "step": "Verify generated documentation and the complete manual PDF",
+    "staleFile": "docs/generated/SXSY-B122-documentation-manifest.json"
+  },
+  "limitations": [
+    "All six preliminary backend shards pass; final release validation stopped at the stale documentation digest. Later release/native checks are not accepted.",
+    "This source predates c359cdf workspace lifecycle and 841618d status diagnostics.",
+    "Guest and provider doubles retain their original boundaries. No live account, native TUI, physical hardware or installed update acceptance is inferred."
+  ]
+}

@@ -1,0 +1,39 @@
+{
+  "schema": "switchyard-windows-import-build-failure/v1",
+  "sourceCommit": "164a622214bb13b51278295be4501dfd5516e0b4",
+  "executionCommit": "d00708a50872fdf007fce72bbd9515d74192c6ab",
+  "sourceAndExecutionTree": "6f37466deac5e2c3a615aa4e3b42f056b3460bdd",
+  "sourceTreeAndMergeParentsVerified": true,
+  "runId": 42179571048,
+  "jobId": 127766092969,
+  "jobConclusion": "failure",
+  "failure": "The new import/probe build wrapper failed at its generic exit/image check, before the restricted Node journey. Redirected dump output was not uploaded; the exact tool error is unavailable.",
+  "originalNodeJourneyExecuted": false,
+  "newImportArtifactAvailable": false,
+  "independentJobs": {
+    "filesystem": {
+      "jobId": 127766093024,
+      "conclusion": "success"
+    },
+    "nativeSetup": {
+      "jobId": 127766093067,
+      "conclusion": "success"
+    }
+  },
+  "followupSourceSha256": {
+    "deployment/windows/test-support/storage-broker-protocol/Build-ColdRandom.ps1": "38407a7196c423e1e30f50788ed14fd4d03b8e0db20bb40b723cee936234fecb"
+  },
+  "followup": [
+    "Resolve exactly one executable from the running Node process instead of interpreting shell command lookup results as one path. This is a candidate correction, not a confirmed cause.",
+    "Distinct toolchain/import/compiler exit codes and a bounded LNK error classification now survive in a fixed failure artifact. No raw paths, dump output or unrelated imports are retained."
+  ],
+  "validation": {
+    "workflowTests": 5,
+    "passed": true,
+    "nativeFollowup": "pending"
+  },
+  "limits": [
+    "Job and source identity are verified; there is no archive digest because the failed run produced neither the new import artifact nor the restricted exchange receipt.",
+    "The earlier restricted CSPRNG failure remains unresolved; this newer run failed earlier and does not retest it."
+  ]
+}

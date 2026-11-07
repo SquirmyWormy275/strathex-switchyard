@@ -16,6 +16,10 @@ Capture an ordinary session as a narrative:
 - how many Codex, Claude, terminal, editor, and browser sessions are active;
 - whether agents live in integrated terminals, separate windows, or both;
 - how projects, repositories, branches, and worktrees are selected;
+- whether a task is resumed in the same native thread, moved between local and worktree, or started fresh;
+- what exact task/thread identity, goal, plan revision, and pending decision survive a handoff;
+- whether Omarchy's existing cross-application clipboard already solves the immediate transfer step;
+- which status signals are provider-attested and which surfaces remain unknown;
 - which actions recur through typing, clicking, window switching, or command history;
 - how finished agent work is reviewed;
 - how permissions, interruptions, redirections, and failures are handled; and
@@ -37,8 +41,15 @@ Observe at least ten representative work sessions before installing the candidat
 | Error | Wrong target, wrong command, retry, or none |
 | Friction | Operator-rated 1-5 |
 | Candidate control | Proposed durable intent, if any |
+| Task binding | Exact local task/thread ID when available; otherwise unknown |
+| Status evidence | Provider/companion observation, user report, or no evidence |
+| Machine | Primary Omarchy Linux, provisioned Windows, or plain keyboard host |
 
 Do not record source code, credentials, prompts, customer data, or repository secrets in the observation log.
+
+The first retrospective input is [the August 2026 workflow reassessment](workflow-reassessment-2026-10.md). It is a directional sample of repository history and local task records, not the ten observed sessions required for a control-map revision. Clipboard transfer counts as friction only when the existing Omarchy clipboard flow fails to preserve the task binding or decision context.
+
+For the prospective baseline, use the local [workflow capture procedure](workflow-capture.md) to record bounded event metadata and an aggregate report. It creates no background monitor and makes no claim about native agent state without provider evidence.
 
 ## Phase C - candidate scoring
 

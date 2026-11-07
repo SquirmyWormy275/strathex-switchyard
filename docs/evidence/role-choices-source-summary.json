@@ -1,0 +1,64 @@
+{
+  "schema": "switchyard-role-choices-source-summary/v1",
+  "baseCommit": "75dbe338fa2e2fe26ec22b62726d056c85298cb3",
+  "sourceFiles": {
+    "tools/layout-studio/suite.mjs": "1381b404dc6997c30e5fecfdd381ca844da9e3195feaa2610b5e2dc22cfc83ab",
+    "tools/layout-studio/role-choices.mjs": "1482a86f23b6d3ece6e4e263c17d578ca832c293079a69ff7d3533d012476dcf",
+    "tools/layout-studio/role-dispatch.test.mjs": "f03b43c79529c59f8291cea5c23865b4da771cbad4ed1e1841968b0ff6abe0cd",
+    "scripts/verify-agent-security-host.mjs": "c065be31843d93f5e028bac2f95852b6c1265b11508df88a24df7c6c2305b83b",
+    "scripts/verify-task-owner-host.mjs": "5eb4cee8553f1277b9a72ce4cd3e0cbb2c4b9db990b1219f4953117952e28a57"
+  },
+  "receipts": [
+    {
+      "id": "166162de-9fb5-47ee-9a35-6f20e76bd6a3",
+      "sha256": "fbe89be141363b02611c136889354f772371b5d90c296b0538988c928afce21c",
+      "totals": {
+        "required": 4,
+        "passed": 4,
+        "failed": 0,
+        "tests": 80,
+        "passedTests": 80,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "originalManifestCommandsBoundsSkipsAndCleanupVerified": true
+    },
+    {
+      "id": "a74a0d82-928b-4a9c-a49a-06ba0c0a3a97",
+      "sha256": "6b1e559ee425f196b850900757ee12a9e3e8494a6ab1c0e509cee0175790bedd",
+      "totals": {
+        "required": 7,
+        "passed": 7,
+        "failed": 0,
+        "tests": 102,
+        "passedTests": 101,
+        "failedTests": 0,
+        "skippedTests": 1,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "originalManifestCommandsBoundsSkipsAndCleanupVerified": true
+    }
+  ],
+  "accepted": {
+    "groups": 7,
+    "passedTests": 101,
+    "skippedTests": 1,
+    "rootTypecheck": true,
+    "extensionTypecheck": true
+  },
+  "scope": [
+    "Saved workflow-role choices list readable names and local connection IDs through authenticated Suite HTTP without returning native session/account credentials or dispatching a command.",
+    "Companion mode, original workspace selection, provider policy and existing intent validation filter the inventory. Copilot-only Work offers only its permitted documented surface; unsupported or stale actions are absent.",
+    "An opaque state digest binds role, policy, enrolled accounts, original session/capabilities and prior role binding to the saved workspace-selection generation. It is a concurrency check, not an approval token.",
+    "The selected local binding is saved under the original state lease after fresh checks. Session/role/permission/rebinding/selection drift and replay of a consumed choice refuse without a state write. Heartbeats alone do not invalidate a supported current connection.",
+    "Real encrypted storage and authenticated HTTP compose in the fixtures. Ambiguous/oversized inventories refuse completely, and original physical dispatch/legacy bind paths retain their checks."
+  ],
+  "limitations": [
+    "Installed 9d230ac and the accepted complete Linux 7f2a52a run predate these guided-role routes. Prepared installed verifier checks have not run yet.",
+    "Listing saved candidates does not observe a current provider/account or prove native availability. Future dispatch retains its original policy/session and action-specific review.",
+    "Frontend picker/command activation, live provider/account/task actions, interactive Windows and physical-device acceptance remain separate."
+  ]
+}

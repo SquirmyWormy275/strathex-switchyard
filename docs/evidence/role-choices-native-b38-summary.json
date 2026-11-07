@@ -1,0 +1,48 @@
+{
+  "schema": "switchyard-native-contract-summary/v1",
+  "sourceCommit": "b38ff75907992568cbdc69535d984827644e9d2a",
+  "sourceTree": "0426df57d7956b7bba5bf2f7d3d0a0de684ec2ac",
+  "mergeCommit": "3fc8d3d0977e717c1659bd69378bfd1e20037b38",
+  "mergeTree": "0426df57d7956b7bba5bf2f7d3d0a0de684ec2ac",
+  "runId": 42389294892,
+  "jobId": 128453615879,
+  "artifactId": 13580579406,
+  "zipSha256": "1ca7e646bbc544e8cec2d573f10771849b6acafcfd8dea24d19c6cd6f641d134",
+  "receipt": {
+    "id": "f40ec71c-f7c6-4451-9f6a-03f8e19a0c9c",
+    "sha256": "ea1aadc61561069da2d101a3dc594dfcb1442e0eeb8c96cb492e346d97130d81"
+  },
+  "success": true,
+  "totals": {
+    "required": 2,
+    "passed": 2,
+    "failed": 0,
+    "tests": 24,
+    "passedTests": 24,
+    "failedTests": 0,
+    "skippedTests": 0,
+    "cancelledTests": 0,
+    "todoTests": 0
+  },
+  "groups": [
+    {
+      "file": "tools/layout-studio/role-dispatch.test.mjs",
+      "timeoutMs": 45000,
+      "durationMs": 30957,
+      "passedTests": 19
+    },
+    {
+      "file": "tools/layout-studio/guided-role-choices.test.mjs",
+      "timeoutMs": 45000,
+      "durationMs": 15109,
+      "passedTests": 5
+    }
+  ],
+  "originalManifestCommandsBoundsSkipsAndCleanupVerified": true,
+  "sourceFilesUnchangedSinceNativeRevision": true,
+  "manifestProjectionOnly": true,
+  "limitations": [
+    "This accepts the named contract files on native Windows at the exact source; it is not the complete Windows suite or package acceptance.",
+    "Providers are explicit doubles; no live account/task, interactive desktop or physical keyboard acceptance."
+  ]
+}

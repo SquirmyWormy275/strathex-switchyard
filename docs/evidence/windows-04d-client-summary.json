@@ -1,0 +1,26 @@
+{
+  "schema": "switchyard-windows-client-summary/v1",
+  "sourceCommit": "04d9d6c4e544a216b9325e57fb33c011273808b6",
+  "executionCommit": "b78a8054a093b75d30ff624feb3357717c2357a5",
+  "workflowRun": 42031677157,
+  "artifactId": 13416218605,
+  "archiveSha256": "7f339bc9c0c8ad449591ad40a73aad224ebf87e1ba0ffb9fb87ca4492214529d",
+  "digestVerified": true,
+  "privateReceipt": "windows-client-platform-04d.json",
+  "success": true,
+  "totals": {
+    "required": 7,
+    "passed": 7,
+    "failed": 0,
+    "tests": 70,
+    "passedTests": 70,
+    "failedTests": 0,
+    "skippedTests": 0,
+    "cancelledTests": 0,
+    "todoTests": 0
+  },
+  "everyChildCleanupVerified": true,
+  "nativeFocusAndPhysicalIntentRemainSeparateCompleteFiles": true,
+  "originalTimeoutsPreserved": true,
+  "realLinuxDesktopFocusAcceptance": "See native-main-window-focus-summary.json and native-vscode-focus-summary.json; Windows CI uses host/window doubles."
+}

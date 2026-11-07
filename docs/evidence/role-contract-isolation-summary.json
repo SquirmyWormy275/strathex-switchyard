@@ -1,0 +1,47 @@
+{
+  "schema": "switchyard-role-contract-isolation-summary/v1",
+  "baseCommit": "d951185b41de677f997e08dc8f02c662d2bd59ad",
+  "sourceFiles": {
+    "scripts/run-isolated-tests.mjs": "cb1e96c9b5aeadc592b27afb7cf014300f089b06098e4c420398e55ef365d8cc",
+    "scripts/windows-scenario-groups.test.mjs": "16ac7de925f5ab5422237b03ecabf0032181ada014d12255a5d248c9313528bc",
+    "scripts/verify-windows-storage-contracts.mjs": "263760c9c077dddcba50c3c2c1f41a875fe067b50591f1fdcc11273dc1a692d3",
+    "tools/layout-studio/role-dispatch.test.mjs": "4609ec251378876373e8f32fb5b2cac3ff4c4f365e69923f20ff66cc7fbaab65",
+    "tools/layout-studio/guided-role-choices.test.mjs": "d5f5f0c53d17bc517c650390710820c7561686656845b6d8dc9eb5659e7f26d4",
+    "tools/layout-studio/test-support/role-dispatch.mjs": "dd96aff867a1c4758fa4be10095b1aad9879bdb631c0a2e2c7895160d0518af4"
+  },
+  "accepted": {
+    "groups": 6,
+    "passedTests": 64,
+    "skippedTests": 0,
+    "receipt": "db07483d-8a4c-4977-94c0-d31addf966d7",
+    "receiptSha256": "e96145db09cc54987a18907cd43e27209fdbe1d51cfa64353234eed531e91b8e",
+    "originalManifestCommandsBoundsSkipsAndCleanupVerified": true
+  },
+  "nativeFailure": {
+    "sourceCommit": "f74a3805a150b9675c70a0f1b3ea8f4b266cbc35",
+    "mergeCommit": "e6b0a2fcb03259343623a090680bbd27a9843ab6",
+    "sourceAndMergeTree": "2e5855a69e760ec7b71c829620bb34753b361cbe",
+    "runId": 42387491933,
+    "jobId": 128448129553,
+    "artifactId": 13580351981,
+    "zipBytes": 1728,
+    "zipSha256": "bc335192360bfa72f9302dae6fd2cafa3cec1a49b7b54f9951f18a39c696999c",
+    "receiptSha256": "ce164577febfbda5d0d157114f2144358d4399dde99c52f662d02fb3e478d2a2",
+    "runIdInReceipt": "d489d6df-793c-4bfa-abe9-68ec083e4e72",
+    "childLimitMs": 45000,
+    "childDurationMs": 45233,
+    "timedOut": true,
+    "completeTestCountsUnavailable": true,
+    "exactCleanupVerified": true
+  },
+  "scope": [
+    "The native whole-file child exceeded its original 45-second limit. Partial TAP lines, including passing bodies, do not establish a completed group.",
+    "All five guided-choice test bodies and all nineteen dispatch/selection bodies are preserved byte-for-byte in two complete files. The encrypted fixture is shared unchanged except its export/import location.",
+    "Both files retain their original default 45-second child limit, zero skips and no pattern filters. The native role-choices lane selects both original manifest objects; no job bound, permission, assertion or failure was relaxed.",
+    "The shared test-support directory is excluded by the existing release filter. Installed runtime 2c6497f and its frozen frontend are unchanged."
+  ],
+  "limitations": [
+    "This source-only six-group acceptance does not establish native Windows success. Normal branch events will run the two files; no CI dispatch, retry or cancellation was requested.",
+    "The complete Linux run at 2c6497f uses the prior single-file arrangement and is independently in progress."
+  ]
+}

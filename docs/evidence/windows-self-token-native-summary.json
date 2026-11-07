@@ -1,0 +1,148 @@
+{
+  "schema": "switchyard-windows-self-token-native-summary/v1",
+  "sourceCommit": "32eba3c38a373be18bc6c7fe7684d1b0888582f2",
+  "executionCommit": "3af6ade43022ee00fafd0ee0eae52ea5cd64de78",
+  "sourceAndExecutionTree": "8e4fa4502814c3df651369c236e3bfe9b10d5676",
+  "mergeParents": [
+    "d8af73553de1b61402520aad1fe0c9fbad2e8c5a",
+    "32eba3c38a373be18bc6c7fe7684d1b0888582f2"
+  ],
+  "runId": 42188677417,
+  "restrictedJobId": 127795572122,
+  "artifact": {
+    "id": 13489350451,
+    "bytes": 3556,
+    "sha256": "904e4fbe138c1076e9ff678d879bd609848354c69321f4707d91b13e795947cf",
+    "privateReceipt": "windows-self-token-32e-native.json",
+    "zipSavedLocally": false
+  },
+  "coldDiagnostic": {
+    "schema": "switchyard-cold-restricted-random/v4",
+    "executableSha256": "c5ff54fd010505a1c52fa42d7e5b17eab8c8df6db31f670a347d937379786367",
+    "waitResult": 0,
+    "exitCode": 0,
+    "reportValid": true,
+    "report": {
+      "systemStatus": 0,
+      "providerOpenStatus": 0,
+      "providerStatus": 0,
+      "providerCloseStatus": 0,
+      "handlesClosedVerified": true,
+      "buffersClearedVerified": true,
+      "firstApi": "legacy-cryptoapi",
+      "legacy": {
+        "providerOpened": false,
+        "providerOpenError": 5,
+        "generated": null,
+        "generateError": null,
+        "providerCloseError": null,
+        "handlesClosedVerified": true,
+        "buffersClearedVerified": true
+      },
+      "enhancedProvider": {
+        "providerOpened": false,
+        "providerOpenError": 5,
+        "generated": null,
+        "generateError": null,
+        "providerCloseError": null,
+        "handlesClosedVerified": true,
+        "buffersClearedVerified": true
+      },
+      "providerLookups": {
+        "user": {
+          "succeeded": true,
+          "error": 0,
+          "providerClass": "strong",
+          "bufferClearedVerified": true
+        },
+        "machine": {
+          "succeeded": true,
+          "error": 0,
+          "providerClass": "strong",
+          "bufferClearedVerified": true
+        }
+      },
+      "selfTokenAccess": {
+        "query": {
+          "opened": false,
+          "error": 5,
+          "closeError": null,
+          "handlesClosedVerified": true
+        },
+        "queryDuplicate": {
+          "opened": false,
+          "error": 5,
+          "closeError": null,
+          "handlesClosedVerified": true
+        },
+        "queryDuplicateImpersonate": {
+          "opened": false,
+          "error": 5,
+          "closeError": null,
+          "handlesClosedVerified": true
+        }
+      }
+    },
+    "primaryTokenVerified": true,
+    "tokenRecheckedAfterExit": true,
+    "treeExitVerified": true,
+    "processHandlesClosedVerified": true,
+    "creatorQuotaRestoredVerified": true,
+    "standardIo": {
+      "schema": "switchyard-restricted-child-stdio/v1",
+      "standardHandles": 3,
+      "inheritanceRestricted": true,
+      "stdinEof": true,
+      "stdoutBytes": 0,
+      "stderrBytes": 0,
+      "outputBounded": true,
+      "handlesClosedVerified": true,
+      "drainsCompleted": true,
+      "stderr": {
+        "category": "empty",
+        "function": null,
+        "code": null,
+        "sourceFile": null,
+        "sourceLine": null
+      }
+    },
+    "nodeStartupAccepted": false
+  },
+  "node": {
+    "sha256": "63c259c81e5d472b5f11c8d506070130cb04a1ecf84b80377a34ed6ec9048088",
+    "exitCode": 134,
+    "resultAvailable": false,
+    "assertion": {
+      "category": "assertion",
+      "function": "ncrypto::CSPRNG",
+      "code": null,
+      "sourceFile": "node.cc",
+      "sourceLine": 1221
+    },
+    "stdoutBytes": 0,
+    "stderrBytes": 663,
+    "accepted": false
+  },
+  "separateChecks": {
+    "restrictedMetadata": 13,
+    "nativeExchange": 31,
+    "ordinaryJavaScriptOwner": 8,
+    "filesystemJob": {
+      "id": 127795572114,
+      "conclusion": "success"
+    },
+    "nativeSetupJob": {
+      "id": 127795572302,
+      "conclusion": "success"
+    }
+  },
+  "originalFailedFixturePreserved": true,
+  "ownershipFailureReported": false,
+  "conclusion": "The exact restricted primary child cannot open its own token even for query-only access. This narrows the access failure but does not prove CryptoAPI or Node attempted that operation. Original Node startup remains failed.",
+  "importerPreflightFailure": "The first in-memory importer received the connector file-reference object instead of its URL and failed before downloading or writing a file. The corrected import verified the archive digest before retaining the small JSON receipt.",
+  "limits": [
+    "No token/SID/privilege, DACL, provider-default, registry, account or runtime fallback changed.",
+    "Cold diagnostic handles, buffers, Job tree, creator quota restoration and before/after token witnesses verify. The original failed owner journey is not upgraded to acceptance.",
+    "Failed fixture remains preserved; no whole-run cleanup or Windows guest/ordinary-user acceptance claim."
+  ]
+}

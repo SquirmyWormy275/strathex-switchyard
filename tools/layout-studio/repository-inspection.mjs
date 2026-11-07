@@ -1,0 +1,251 @@
+/** Fixed read-only Git queries through owned native guardians; no repository scripts. */
+import { realpath, stat, lstat, mkdtemp, rm } from "node:fs/promises";
+import { join, dirname, basename, resolve } from "node:path";
+import { homedir } from "node:os";
+import { privateDirectory, directoryIdentity } from "./private-fs.mjs";
+import { GitCliInspector, NodeFileDigestReader } from "../../packages/control-plane/src/git-inspector.ts";
+import { TargetSnapshotFactory } from "../../packages/control-plane/src/snapshot.ts";
+import { runOwnedNativeCommand } from "./owned-native-command.mjs";
+import { runRuntimeCommand, runtimeGuardianStopped } from "./runtime-command.mjs";
+import { verifyRepositoryIdentity } from "./coding-task-identity.mjs";
+import { shieldInventoryQueries, buildShieldInputInventory } from "./shield-input-inventory.mjs";
+import { ignoredTreeRoots, ignoredTreeQuery, assertIgnoredTreeListing, ignoredTreeWitness } from "./ignored-tree-policy.mjs";
+import { gitIndexPaths, gitIndexLimits, gitIndexListingQuery, gitIndexBatchQuery, selectGitIndexEntries, gitIndexBatchInput, witnessGitIndexBatch, gitIndexWitnessReport } from "./git-index-inputs.mjs";
+import { historySelection, historyRevisionQuery, historyTreeQuery, historyCommitList, historyCommitInput, witnessHistoryCommits, verifyHistoryChain, historyTreeEntries, historyWitnessReport } from "./git-history-inputs.mjs";
+
+const queries = new Set([
+  ["rev-parse", "--show-toplevel"], ["remote", "get-url", "origin"], ["branch", "--show-current"],
+  ["symbolic-ref", "--quiet", "--short", "refs/remotes/origin/HEAD"],
+  ["rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{upstream}"], ["rev-parse", "HEAD"],
+  ["rev-parse", "HEAD^{tree}"], ["rev-parse", "--absolute-git-dir"], ["rev-parse", "--git-path", "index"], ["ls-files", "-z"], ["ls-files", "--deleted", "-z"],
+  ["ls-files", "--others", "--exclude-standard", "-z"],
+  ["ls-files", "--others", "--ignored", "--exclude-standard", "-z"],
+  ["submodule", "status", "--recursive"], ["rev-parse", "--is-shallow-repository"], gitIndexListingQuery, ...Object.values(shieldInventoryQueries)
+].map(v => JSON.stringify(v)));
+export async function fixedGitExecutable() {
+  for (const name of process.platform === "win32" ? ["C:\\Program Files\\Git\\cmd\\git.exe", "C:\\Program Files\\Git\\bin\\git.exe"] : ["/usr/bin/git"]) {
+    try { if ((await stat(name)).isFile()) return realpath(name); } catch (e) { if (e.code !== "ENOENT") throw e; }
+  }
+  throw new Error("A fixed native Git installation is unavailable.");
+}
+export function inspectionEnvironment(scratch) {
+  const windows = process.platform === "win32", system = process.env.SystemRoot || "C:\\Windows";
+  return { ...(windows ? { SystemRoot: system, WINDIR: system, PATH: `${system}\\System32`, GIT_CONFIG_GLOBAL: "NUL" } : { PATH: "/usr/bin:/bin", HOME: "/nonexistent", GIT_CONFIG_GLOBAL: "/dev/null" }),
+    GIT_CONFIG_NOSYSTEM: "1", GIT_OPTIONAL_LOCKS: "0", GIT_NO_REPLACE_OBJECTS: "1", GIT_NO_LAZY_FETCH: "1", GIT_TERMINAL_PROMPT: "0", GCM_INTERACTIVE: "Never", GIT_ALLOW_PROTOCOL: "", LC_ALL: "C", ...(scratch ? { TMPDIR: scratch, TMP: scratch, TEMP: scratch } : {}) };
+}
+function safeRemote(value) {
+  if (!value) return;
+  // A target must never expose credentials embedded in Git's configured URL.
+  if (/^git@[A-Za-z0-9.-]+:[A-Za-z0-9_./-]+$/.test(value)) return value;
+  try { const u = new URL(value); if (["https:", "ssh:"].includes(u.protocol) && !u.password && (!u.username || u.protocol === "ssh:" && u.username === "git") && !u.search && !u.hash) return value; } catch { /* local/opaque remotes are not consequential identities */ }
+  throw new Error("Use a credential-free HTTPS or SSH origin before reviewing task authority.");
+}
+export function createRepositoryInspection({ store, command = runRuntimeCommand, guardianStopped = runtimeGuardianStopped, resolveGit = fixedGitExecutable, ownerKind = "standalone-inspection", now = () => Date.now(), runtimeRoot = join(process.env.XDG_RUNTIME_DIR || process.env.LOCALAPPDATA || join(homedir(), ".local/state"), "switchyard-repository-probes") } = {}) {
+  const running = new Map(), generations = new Map(), seen = new Set(); let closed = false;
+  async function removeScratch(path, identity) {
+    if (!path) return;
+    if (dirname(path) !== runtimeRoot || !/^probe-[A-Za-z0-9]{6}$/.test(basename(path)) || !identity) throw new Error("Preserve repository scratch with an unrecognized ownership record.");
+    let current; try { current = await directoryIdentity(path); } catch (e) { if (e.code === "ENOENT") return; throw e; }
+    if (current.dev.toString() !== identity.device || current.ino.toString() !== identity.inode) throw new Error("The owned repository scratch directory changed; preserve it for recovery.");
+    await rm(path, { recursive: true });
+  }
+  async function cleanScratch(c, path, identity) {
+    await removeScratch(path, identity);
+    await store.update(c, "repository-probe-scratch-cleaned", s => { for (const p of s.repositoryProbes ?? []) if (p.scratch === path) p.scratchCleanupPending = false; });
+  }
+  async function stopCompartment(c) {
+    seen.add(c);
+    generations.set(c, (generations.get(c) ?? 0) + 1);
+    const resources = [...(running.get(c) ?? [])]; resources.forEach(r => r.controller.abort());
+    const stops = await Promise.all(resources.flatMap(r => [...r.clients].map(client => client.stop().catch(() => false))));
+    let retainedStopped = true;
+    for (const probe of (await store.snapshot(c)).repositoryProbes ?? []) if (!probe.stoppedVerified && (!probe.ownerKind || probe.ownerKind === ownerKind)) {
+      if (!await guardianStopped(probe.ownedRuntime)) { retainedStopped = false; continue; }
+      await store.update(c, "repository-probe-stop-readback", s => { const p = s.repositoryProbes?.find(p => p.ownedRuntime.id === probe.ownedRuntime.id); if (!p) throw new Error("The retained repository guardian ownership record changed."); p.stoppedVerified = true; });
+    }
+    if (stops.every(Boolean) && retainedStopped) {
+      const paths = new Map();
+      for (const r of resources) if (r.scratch) paths.set(r.scratch, r.scratchIdentity);
+      const records = (await store.snapshot(c)).repositoryProbes ?? [];
+      for (const p of records) if (p.scratch && p.scratchCleanupPending !== false && (!p.ownerKind || p.ownerKind === ownerKind)) paths.set(p.scratch, p.scratchIdentity);
+      for (const [path, identity] of paths) {
+        const owners = records.filter(p => p.scratch === path);
+        if (!(await Promise.all(owners.map(p => guardianStopped(p.ownedRuntime)))).every(Boolean)) { retainedStopped = false; continue; }
+        await cleanScratch(c, path, identity);
+      }
+      if (retainedStopped) { for (const r of resources) if ([...r.clients].every(p => p.closed)) running.get(c)?.delete(r); if (!running.get(c)?.size) running.delete(c); }
+    }
+    return { stopped: stops.every(Boolean) && retainedStopped };
+  }
+  return {
+    async observe(c, task, authorize = async () => {}) { return this.capture(c, task, {}, authorize, { metadataOnly: true }); },
+    async scannerInputs(c, task, authorize = async () => {}) { return this.capture(c, task, {}, authorize, { scannerInventory: true }); },
+    async indexInputs(c, task, paths, authorize = async () => {}) { return this.capture(c, task, {}, authorize, { indexPaths: gitIndexPaths(paths) }); },
+    async historyInputs(c, task, paths, depth, authorize = async () => {}) { return this.capture(c, task, {}, authorize, { history: historySelection(paths, depth) }); },
+    async useHistoryInputs(c,task,paths,depth,consume,authorize=async()=>{}) {
+      if(typeof consume!=="function")throw Error("A private history consumer is required.");
+      return this.capture(c,task,{},authorize,{history:historySelection(paths,depth),consumeHistory:consume});
+    },
+    async useIndexInputs(c, task, paths, consume, authorize = async () => {}) {
+      if (typeof consume !== "function") throw Error("A private index consumer is required.");
+      return this.capture(c, task, {}, authorize, { indexPaths: gitIndexPaths(paths), consumeIndex: consume });
+    },
+    async capture(c, task, classifications, authorize = async () => {}, { metadataOnly = false, scannerInventory = false, indexPaths, consumeIndex, history, consumeHistory } = {}) {
+      const selectedIndexPaths = indexPaths === undefined ? undefined : gitIndexPaths(indexPaths);
+      const selectedHistory = history === undefined ? undefined : historySelection(history.paths, history.depth), historyQueries = new Set();
+      const excludedTrees = ignoredTreeRoots(classifications.excludedIgnoredTrees ?? []), excludedQuery = excludedTrees.length ? ignoredTreeQuery(excludedTrees) : undefined;
+      const generation = generations.get(c) ?? 0, resource = { controller: new AbortController(), clients: new Set() }; seen.add(c);
+      const check = async () => { if (closed || generation !== (generations.get(c) ?? 0) || resource.controller.signal.aborted) throw new Error("Repository inspection was stopped."); await authorize(); };
+      await check(); await store.authorize(c, { provider: task.provider }); await verifyRepositoryIdentity(task);
+      // A restarted process must independently settle every retained guardian first.
+      for (const record of (await store.snapshot(c)).repositoryProbes ?? []) if (record.stoppedVerified !== true) {
+        if (!await guardianStopped(record.ownedRuntime)) throw new Error("A previous repository guardian has not verified exit. Its protected identity was preserved.");
+        await store.update(c, "repository-probe-reconcile", s => { const current = s.repositoryProbes?.find(p => p.ownedRuntime.id === record.ownedRuntime.id); if (current) current.stoppedVerified = true; });
+      }
+      const old = (await store.snapshot(c)).repositoryProbes ?? [], cleanup = new Map();
+      for (const p of old) if (p.scratch && p.scratchCleanupPending !== false && (!p.ownerKind || p.ownerKind === ownerKind) && ![...(running.get(c) ?? [])].some(r => r.scratch === p.scratch)) cleanup.set(p.scratch, p.scratchIdentity);
+      for (const [path, identity] of cleanup) if ((await Promise.all(old.filter(p => p.scratch === path).map(p => guardianStopped(p.ownedRuntime)))).every(Boolean)) await cleanScratch(c, path, identity);
+      await check(); const executable = await resolveGit(); await check();
+      const members = running.get(c) ?? new Set(); members.add(resource); running.set(c, members);
+      let fileCount = 0, totalBytes = 0, scratch, scratchIdentity; const blobCopies = new Map();
+      const digests = new NodeFileDigestReader({ maxFileBytes: 4 * 1024 * 1024 });
+      const digestReader = {
+        async digest(root, path) {
+          await check(); if (++fileCount > 4096 || path.includes("\\")) throw new Error("Repository manifest exceeds its supported bound or contains an ambiguous path.");
+          totalBytes += Number((await lstat(join(root, path))).size);
+          if (!Number.isSafeInteger(totalBytes) || totalBytes > 64 * 1024 * 1024) throw new Error("Repository digest budget exceeded.");
+          const result = await digests.digest(root, path); await check(); return result;
+        },
+        async state(root, path) { await check(); if (++fileCount > 4096 || path.includes("\\")) throw new Error("Repository manifest is unsupported."); return digests.state(root, path); }
+      };
+      const start = now(); let allowedBatchInput;
+      const runner = { async run(args, cwd = task.repositoryRoot, text) {
+        const batch = JSON.stringify(args) === JSON.stringify(gitIndexBatchQuery) && typeof allowedBatchInput === "string" && text === allowedBatchInput;
+        await check(); const elapsed=now()-start;
+        if (elapsed < 0 || elapsed >= 45000 || (!batch && (!queries.has(JSON.stringify(args)) && !historyQueries.has(JSON.stringify(args)) && JSON.stringify(args) !== JSON.stringify(excludedQuery) || text !== undefined)) || cwd !== task.repositoryRoot) throw new Error("Only bounded exact-root Git inspection queries and derived object identities are permitted.");
+        let readyPersisted = false;
+        const result = await runOwnedNativeCommand({ executable, args: ["--no-pager", "-c", "core.fsmonitor=false", "-c", "core.untrackedCache=false", "-c", "protocol.allow=never", ...args], cwd,
+          env: inspectionEnvironment(scratch), ...(batch ? { text } : {}), timeout: Math.min(10000,45000-elapsed), maxOutputBytes: batch ? gitIndexLimits.outputBytes : 262144, captureStderrBytes: 4096, signal: resource.controller.signal, resource, command, guardianStopped,
+          onReady: async scope => { await check(); await store.update(c, "repository-probe-ready", s => { const all = s.repositoryProbes ?? [], held = all.filter(p => !p.stoppedVerified || p.scratch && p.scratchCleanupPending !== false); const recentLimit = Math.min(7, Math.max(0, 15 - held.length)); s.repositoryProbes = held.concat(recentLimit ? all.filter(p => !held.includes(p)).slice(-recentLimit) : []); if (s.repositoryProbes.length >= 16) throw new Error("Unsettled repository guardians require reconciliation."); s.repositoryProbes.push({ taskId: task.id, ownerKind, ownedRuntime: scope, stoppedVerified: false, scratchCleanupPending: true, scratch, scratchIdentity: { device: scratchIdentity.dev.toString(), inode: scratchIdentity.ino.toString() }, at: now() }); }, { provider: task.provider }); readyPersisted = true; await check(); },
+          onStopped: async scope => { if (!readyPersisted) { if (!await guardianStopped(scope)) throw new Error("The unacknowledged repository guardian has not verified exit."); return; } await store.update(c, "repository-probe-exit", s => { const p = s.repositoryProbes?.find(p => p.ownedRuntime.id === scope.id); if (!p) throw new Error("The exact repository guardian record is unavailable."); p.stoppedVerified = true; }); }
+        });
+        await check();
+        if(now()<start||now()-start>=45000)throw Error("The read-only repository inspection reached its original deadline; no late witness was accepted.");
+        if (!["completed", "failed"].includes(result.status) || !Number.isSafeInteger(result.exitCode)) throw new Error("The repository query did not settle within its native bounds.");
+        // Query diagnostics are never returned as credentials or authority material.
+        let stdout = result.stdout;
+        if (result.exitCode === 0 && JSON.stringify(args) === JSON.stringify(["rev-parse", "--show-toplevel"])) {
+          // Native Git prints '/' on Windows; compare actual directory identity
+          // through realpath before using one canonical spelling in later queries.
+          const canonical = await realpath(stdout.trim());
+          if (canonical !== await realpath(task.repositoryRoot)) throw new Error("Git reported a different repository root.");
+          stdout = canonical + "\n";
+        }
+        return { exitCode: result.exitCode, stdout, stderr: result.exitCode ? "Native Git query unavailable" : "" };
+      } };
+      try {
+        await privateDirectory(runtimeRoot); scratch = await mkdtemp(join(runtimeRoot, "probe-")); scratchIdentity = await directoryIdentity(scratch); resource.scratch = scratch; resource.scratchIdentity = { device: scratchIdentity.dev.toString(), inode: scratchIdentity.ino.toString() };
+        if(selectedHistory){
+          const read=async args=>{const result=await runner.run(args);if(result.exitCode)throw Error("The bounded immutable history query is unavailable.");return result.stdout;};
+          await read(["rev-parse","--show-toplevel"]);const head=(await read(["rev-parse","HEAD"])).trim(),shallowText=await read(["rev-parse","--is-shallow-repository"]);
+          if(!/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(head)||!["true\n","false\n"].includes(shallowText))throw Error("Exact history repository metadata is unavailable.");
+          const revisionQuery=historyRevisionQuery(selectedHistory.depth);historyQueries.add(JSON.stringify(revisionQuery));
+          const revisionText=await read(revisionQuery),listed=historyCommitList(revisionText,head,selectedHistory);allowedBatchInput=historyCommitInput(listed.commits);
+          const rawCommits=await runner.run(gitIndexBatchQuery,task.repositoryRoot,allowedBatchInput);allowedBatchInput=undefined;if(rawCommits.exitCode)throw Error("Raw history commit objects are unavailable.");
+          const commits=witnessHistoryCommits(rawCommits.stdout,listed.commits),shallow=shallowText==="true\n",stopping=verifyHistoryChain(commits,listed,shallow),versions=[],absent=[],trees=[];
+          for(const commit of commits){const args=historyTreeQuery(commit.commit,selectedHistory.paths);historyQueries.add(JSON.stringify(args));const found=historyTreeEntries(await read(args),commit.commit,selectedHistory.paths,commit.tree);versions.push(...found.versions);absent.push({commit:commit.commit,paths:found.absent});trees.push({commit:commit.commit,objects:found.treeObjects,sha256:found.treeWitnessSha256});}
+          const objectIds=[...new Set(versions.map(version=>version.objectId))],entries=objectIds.map((objectId,i)=>({path:`history-blob-${i}`,mode:"100644",objectId}));let blobs=[];
+          if(entries.length){allowedBatchInput=gitIndexBatchInput(entries);const result=await runner.run(gitIndexBatchQuery,task.repositoryRoot,allowedBatchInput);allowedBatchInput=undefined;if(result.exitCode)throw Error("Selected historical blob bytes are unavailable.");blobs=(await witnessGitIndexBatch(result.stdout,entries,consumeHistory?(row,bytes)=>{blobCopies.set(row.objectId,Buffer.from(bytes));}:undefined)).map(({objectId,size,sha256})=>({objectId,size,sha256}));}
+          const finalRevisions=await read(revisionQuery),finalShallow=await read(["rev-parse","--is-shallow-repository"]);
+          if(finalRevisions!==revisionText||finalShallow!==shallowText)throw Error("The repository revision or shallow boundary changed during historical witnessing.");
+          await check();await verifyRepositoryIdentity(task);const report={...historyWitnessReport({head,selection:selectedHistory,commits,shallow,stopping,versions,absent,blobs,trees,observedAt:new Date(now()).toISOString()}),repositoryRoot:task.repositoryRoot,observationOnly:true};
+          if(!consumeHistory)return report;
+          const consumed=await consumeHistory(report,blobCopies);await check();
+          if(await read(revisionQuery)!==revisionText||await read(["rev-parse","--is-shallow-repository"])!==shallowText)throw Error("The historical revision or shallow boundary changed while preparing private scanner inputs.");
+          await check();await verifyRepositoryIdentity(task);return consumed;
+        }
+        if (selectedIndexPaths) {
+          const root = await runner.run(["rev-parse", "--show-toplevel"]), head = await runner.run(["rev-parse", "HEAD"]), before = await runner.run(gitIndexListingQuery);
+          if (root.exitCode || head.exitCode || before.exitCode || !/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(head.stdout.trim())) throw Error("Exact Git index repository metadata is unavailable.");
+          const entries = selectGitIndexEntries(before.stdout, selectedIndexPaths, head.stdout.trim().length);
+          allowedBatchInput = gitIndexBatchInput(entries);
+          const blobs = await runner.run(gitIndexBatchQuery, task.repositoryRoot, allowedBatchInput);
+          allowedBatchInput = undefined;
+          if (blobs.exitCode) throw Error("The exact selected index blobs are unavailable; no filters or network fallback were used.");
+          const rows = await witnessGitIndexBatch(blobs.stdout, entries, consumeIndex ? (row, bytes) => { blobCopies.set(row.path, Buffer.from(bytes)); } : undefined);
+          const after = await runner.run(gitIndexListingQuery), finalHead = await runner.run(["rev-parse", "HEAD"]);
+          if (after.exitCode || finalHead.exitCode || after.stdout !== before.stdout || finalHead.stdout !== head.stdout) throw Error("The Git index or repository revision changed during input witnessing; inspect again.");
+          await check(); await verifyRepositoryIdentity(task);
+          const report = { ...gitIndexWitnessReport({ head: head.stdout.trim(), listing: before.stdout, rows, observedAt: new Date(now()).toISOString() }), repositoryRoot: task.repositoryRoot, observationOnly: true };
+          if (!consumeIndex) return report;
+          const consumed = await consumeIndex(report, blobCopies);
+          const consumedIndex = await runner.run(gitIndexListingQuery), consumedHead = await runner.run(["rev-parse", "HEAD"]);
+          if (consumedIndex.exitCode || consumedHead.exitCode || consumedIndex.stdout !== before.stdout || consumedHead.stdout !== head.stdout) throw Error("The Git index or revision changed while preparing private scanner inputs.");
+          await check(); await verifyRepositoryIdentity(task); return consumed;
+        }
+        if (scannerInventory) {
+          const root = await runner.run(["rev-parse", "--show-toplevel"]), head = await runner.run(["rev-parse", "HEAD"]);
+          if (root.exitCode || head.exitCode || !/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(head.stdout.trim())) throw Error("Exact scanner inventory repository metadata is unavailable.");
+          const output = {};
+          for (const [name, args] of Object.entries(shieldInventoryQueries)) {
+            const result = await runner.run(args);
+            if (result.exitCode) throw Error("The bounded scanner input listing is unavailable.");
+            output[name] = result.stdout;
+          }
+          const after = await runner.run(["rev-parse", "HEAD"]);
+          if (after.exitCode || after.stdout.trim() !== head.stdout.trim()) throw Error("The repository revision changed during scanner inventory; inspect again.");
+          await check(); await verifyRepositoryIdentity(task);
+          return { ...buildShieldInputInventory(output), repositoryRoot: task.repositoryRoot, head: head.stdout.trim(), observedAt: new Date(now()).toISOString(), observationOnly: true };
+        }
+        if (metadataOnly) {
+          const names = ["root", "branch", "head", "headTree", "gitDirectory", "indexPath"], fixed = [["rev-parse", "--show-toplevel"], ["branch", "--show-current"], ["rev-parse", "HEAD"], ["rev-parse", "HEAD^{tree}"], ["rev-parse", "--absolute-git-dir"], ["rev-parse", "--git-path", "index"]];
+          const values = [];
+          // Sequential probes keep their shared scratch alive until each exact
+          // guardian has exited, and remain inside the same 45-second budget.
+          for (const args of fixed) { const result = await runner.run(args); if (result.exitCode !== 0) throw new Error("The fixed repository recovery metadata is unavailable."); values.push(result.stdout.trim()); }
+          const observed = Object.fromEntries(names.map((name, i) => [name, values[i]]));
+          if (!/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(observed.head) || !/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(observed.headTree)) throw new Error("Repository recovery metadata contains an invalid object identity.");
+          observed.gitDirectory = await realpath(observed.gitDirectory); observed.indexPath = resolve(task.repositoryRoot, observed.indexPath);
+          await check(); await verifyRepositoryIdentity(task); return observed;
+        }
+        const included = new Set(classifications.includedUntracked), excluded = new Set(classifications.excludedUntracked), includedIgnored = new Set(classifications.includedIgnored ?? []), ignored = new Set(classifications.excludedIgnored);
+        const excludedWitnesses = [];
+        if (excludedTrees.length) {
+          const listing = await runner.run(shieldInventoryQueries.ignored);
+          if (listing.exitCode) throw Error("The exact ignored generated-tree inventory is unavailable.");
+          assertIgnoredTreeListing(listing.stdout, excludedTrees);
+          for (const path of excludedTrees) excludedWitnesses.push(await ignoredTreeWitness(task.repositoryRoot, path, check));
+        }
+        let inspection;
+        const scopedRunner = excludedQuery ? { run: (args, cwd) => runner.run(JSON.stringify(args) === JSON.stringify(["ls-files", "--others", "--ignored", "--exclude-standard", "-z"]) ? excludedQuery : args, cwd) } : runner;
+        const inspector = new GitCliInspector({ runner: scopedRunner, digestReader, classifyUntracked: p => included.has(p) ? "included" : excluded.has(p) ? "excluded" : "unknown", classifyIgnored: p => includedIgnored.has(p) ? "included" : ignored.has(p) ? "excluded" : "unknown" });
+        const factory = new TargetSnapshotFactory({ async inspect(root) {
+          inspection = await inspector.inspect(root); inspection.canonicalRemote = safeRemote(inspection.canonicalRemote);
+          if (excludedTrees.length) {
+            if (inspection.trackedFiles.some(file => excludedTrees.some(root => file.path === root || file.path.startsWith(root + "/")))) throw Error("An excluded generated tree contains tracked data; review its exact files instead.");
+            const listing = await runner.run(shieldInventoryQueries.ignored);
+            if (listing.exitCode) throw Error("The ignored generated-tree inventory changed during inspection.");
+            assertIgnoredTreeListing(listing.stdout, excludedTrees);
+            for (const original of excludedWitnesses) if (JSON.stringify(await ignoredTreeWitness(task.repositoryRoot, original.path, check)) !== JSON.stringify(original)) throw Error("An excluded generated-tree identity changed during target capture.");
+            inspection.ignoredFiles = [...inspection.ignoredFiles, ...excludedWitnesses];
+          }
+          return inspection;
+        } }, { clock: () => new Date(now()).toISOString() });
+        const snapshot = await factory.capture({ targetHint: task.repositoryRoot, policyVersion: excludedTrees.length ? "switchyard-task-shield-ignored-trees/v1" : "switchyard-task-local-authority/v1", environment: { toolVersions: { node: process.versions.node }, values: { gitContract: "fixed-read-only-guardian/v1", ...(excludedTrees.length ? { ignoredTreePolicy: "explicit-directory-identity-not-source-bytes/v1" } : {}) } } });
+        await check(); await verifyRepositoryIdentity(task);
+        if (snapshot.repositoryRoot !== task.repositoryRoot) throw new Error("Git did not verify the exact bound repository root.");
+        return { snapshot, files: { tracked: inspection?.trackedFiles ?? [], untracked: inspection?.untrackedFiles ?? [], ignored: inspection?.ignoredFiles ?? [] } };
+      } finally {
+        for (const bytes of blobCopies.values()) bytes.fill(0); blobCopies.clear();
+        const stops = await Promise.all([...resource.clients].map(client => client.stop().catch(() => false)));
+        if (!stops.every(Boolean)) throw new Error("Owned repository guardian exit is unconfirmed; protected recovery state and scratch were retained.");
+        if (scratch) {
+          await cleanScratch(c, scratch, scratchIdentity && { device: scratchIdentity.dev.toString(), inode: scratchIdentity.ino.toString() });
+        }
+        members.delete(resource); if (!members.size) running.delete(c);
+      }
+    },
+    stopCompartment,
+    async close() { closed = true; const result = await Promise.all([...seen].map(stopCompartment)); if (result.some(r => !r.stopped)) throw new Error("A repository inspection guardian has not verified exit."); }
+  };
+}

@@ -1,0 +1,110 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { EventEmitter } from 'node:events';
+import { codexAccountFingerprint, codexDesignConfig } from './agents.mjs';
+import { createCodexEditorRelay } from './codex-editor-relay.mjs';
+
+const account = { type: 'chatgpt', email: 'editor@example.invalid' };
+const target = { sessionId: '11111111-1111-4111-8111-111111111111', repositoryRoot: '/original/repository', accountFingerprint: codexAccountFingerprint(account) };
+const initialize = { id: 1, method: 'initialize', params: { clientInfo: { name: 'codex_tui', version: '0.166.0' } } };
+const resumed = () => ({ thread: { id: target.sessionId, cwd: target.repositoryRoot, status: { type: 'idle' } }, cwd: target.repositoryRoot, sandbox: { type: 'readOnly' }, approvalPolicy: 'on-request', modelProvider: 'openai' });
+const resume = (id = 2) => ({ id, method: 'thread/resume', params: { threadId: target.sessionId, cwd: target.repositoryRoot, sandbox: 'read-only', approvalPolicy: 'on-request', excludeTurns: true } });
+const gate = () => { let resolve; const promise = new Promise(r => resolve = r); return { promise, resolve }; };
+function fixture(t, options = {}) {
+  const calls = [], delivered = [], acknowledgements = [], abort = new AbortController();
+  const client = new EventEmitter(); client.closed = false;
+  client.close = () => { if (client.closed) return; client.closed = true; client.emit('disconnected'); };
+  client.send = m => { calls.push(structuredClone(m)); };
+  client.request = async (method, params) => {
+    const row = { method, params: structuredClone(params) }; calls.push(row);
+    const reply = method === 'initialize' ? { userAgent: params.clientInfo.name + '/0.166.0 (synthetic)' }
+      : method === 'config/read' ? { config: codexDesignConfig() }
+      : method === 'account/read' ? { account: { ...account } }
+      : method === 'thread/resume' ? resumed() : { thread: resumed().thread };
+    await options.reply?.(row, reply); return reply;
+  };
+  const relay = createCodexEditorRelay({ target, client, signal: abort.signal, assertCurrent: options.assertCurrent ?? (async () => {}),
+    send: async m => { delivered.push(structuredClone(m)); await options.send?.(m); },
+    onAcknowledged: async (observation, signal) => { acknowledgements.push(observation); await options.onAcknowledged?.(observation, signal); } });
+  t.after(() => relay.stop());
+  return { calls, delivered, acknowledgements, abort, client, relay, async ready() { await relay.receive(initialize); await relay.receive({ method: 'initialized', params: {} }); } };
+}
+
+test('one connection brackets the exact resume with account reads and withholds its reply until acknowledgement is retained', async t => {
+  const entered = gate(), release = gate(), f = fixture(t, { onAcknowledged: async () => { entered.resolve(); await release.promise; } }); await f.ready();
+  const work = f.relay.receive(resume()); await entered.promise;
+  assert.deepEqual(f.calls.map(c => c.method), ['initialize','initialized','config/read','account/read','account/read','thread/resume','account/read']);
+  assert.equal(f.delivered.some(m => m.id === 2), false); assert.equal(f.relay.observation().protocolAcknowledged, false);
+  release.resolve(); await work; assert.equal(f.delivered.at(-1).result.thread.id, target.sessionId); assert.equal(f.relay.observation().protocolAcknowledged, true);
+  assert.equal(f.relay.observation().ideAttached, false); assert.equal(f.relay.observation().authorityGranted, false);
+});
+test('unreviewed requests, effects, foreign task IDs and expanded permissions never reach the provider', async t => {
+  for (const method of ['turn/start','turn/steer','thread/start','thread/fork','account/logout','account/login/start','config/value/write','unknown/method']) {
+    const f = fixture(t); await f.ready(); const prior = f.calls.length; await assert.rejects(f.relay.receive({ id: 2, method, params: {} })); assert.equal(f.calls.length, prior); assert.equal(f.client.closed, true);
+  }
+  for (const change of [{ threadId: '22222222-2222-4222-8222-222222222222' }, { cwd: '/other' }, { sandbox: 'workspace-write' }, { approvalPolicy: 'never' }, { config: {} }, { model: 'other' }]) {
+    const f = fixture(t); await f.ready(); const m = resume(); Object.assign(m.params, change); await assert.rejects(f.relay.receive(m)); assert.equal(f.calls.some(c => c.method === 'thread/resume'), false);
+  }
+});
+test('unreviewed versions and experimental initialization are refused before any task request', async t => {
+  const f = fixture(t, { reply: async (m,r) => { if (m.method === 'initialize') r.userAgent = 'codex_tui/0.168.0 (unverified)'; } });
+  await assert.rejects(f.relay.receive(initialize)); assert.deepEqual(f.calls.map(c => c.method), ['initialize']);
+  for (const capabilities of [{ experimentalApi: true }, { optOutNotificationMethods: ['account/updated'] }, null]) {
+    const x = fixture(t); await assert.rejects(x.relay.receive({ ...initialize, params: { ...initialize.params, capabilities } })); assert.deepEqual(x.calls, []);
+  }
+});
+test('changed account on either side of resume invalidates without returning the task acknowledgement', async t => {
+  for (const changedRead of [1,2,3]) {
+    let reads = 0; const f = fixture(t, { reply: async (m,r) => { if (m.method === 'account/read' && ++reads === changedRead) r.account.email = 'other@example.invalid'; } });
+    if (changedRead === 1) await assert.rejects(f.ready()); else { await f.ready(); await assert.rejects(f.relay.receive(resume())); }
+    assert.equal(f.delivered.some(m => m.id === 2), false); assert.equal(f.relay.observation().protocolAcknowledged, false); assert.equal(f.client.closed, true);
+  }
+});
+test('wrong native task or permissions and ineffective configuration invalidate before delivery', async t => {
+  for (const mutate of [r => { r.thread.id = 'foreign'; }, r => { r.cwd = '/other'; }, r => { r.sandbox.type = 'workspaceWrite'; }, r => { r.approvalPolicy = 'never'; }, r => { r.modelProvider = 'other'; }]) {
+    const f = fixture(t, { reply: async (m,r) => { if (m.method === 'thread/resume') mutate(r); } }); await f.ready(); await assert.rejects(f.relay.receive(resume())); assert.equal(f.acknowledgements.length, 0);
+  }
+  const f = fixture(t, { reply: async (m,r) => { if (m.method === 'config/read') r.config.features.hooks = true; } }); await assert.rejects(f.ready()); assert.equal(f.calls.some(c => c.method === 'thread/resume'), false);
+});
+test('duplicate client IDs, second resume and client replies cannot replay an effect', async t => {
+  for (const message of [resume(), resume(3), { id: 3, result: {} }]) {
+    const f = fixture(t); await f.ready(); await f.relay.receive(resume()); await assert.rejects(f.relay.receive(message)); assert.equal(f.calls.filter(c => c.method === 'thread/resume').length, 1);
+  }
+  const f = fixture(t); await f.ready(); await f.relay.receive(resume('1')); assert.equal(f.relay.observation().protocolAcknowledged, true);
+});
+test('account boundaries or cancellation during a pending durable callback prevent acknowledgement and join that callback', async t => {
+  for (const event of ['account','abort']) {
+    const entered = gate(), release = gate(); let receivedSignal;
+    const f = fixture(t, { onAcknowledged: async (_o,signal) => { receivedSignal = signal; entered.resolve(); await release.promise; } }); await f.ready();
+    const work = f.relay.receive(resume()); const rejected = assert.rejects(work); await entered.promise;
+    if (event === 'account') f.client.emit('notification', { method: 'account/updated', params: {} }); else f.abort.abort();
+    assert.equal(receivedSignal.aborted, true); let stopped = false; const stop = f.relay.stop().then(() => stopped = true); await new Promise(r => setImmediate(r)); assert.equal(stopped, false);
+    release.resolve(); await rejected; await stop; assert.equal(f.delivered.some(m => m.id === 2), false); assert.equal(f.relay.observation().protocolAcknowledged, false);
+  }
+});
+test('account notifications and original task unloading withdraw live acknowledgement synchronously', async t => {
+  for (const message of [{ method: 'account/updated', params: {} }, { method: 'account/login/completed', params: { success: true } }, { method: 'thread/closed', params: { threadId: target.sessionId } }, { method: 'thread/status/changed', params: { threadId: target.sessionId, status: { type: 'notLoaded' } } }]) {
+    const f = fixture(t); await f.ready(); await f.relay.receive(resume()); f.client.emit('notification', message); assert.equal(f.relay.observation().protocolAcknowledged, false); assert.equal(f.client.closed, true);
+  }
+});
+test('only exact task reads and bounded status notifications reach the terminal after acknowledgement', async t => {
+  const f = fixture(t); await f.ready(); await f.relay.receive(resume());
+  await f.relay.receive({ id: 3, method: 'thread/read', params: { threadId: target.sessionId, includeTurns: true } }); assert.equal(f.delivered.at(-1).id, 3);
+  f.client.emit('notification', { method: 'item/commandExecution/requestApproval', id: 9, params: { command: 'PRIVATE_NEVER_FORWARD' } });
+  f.client.emit('notification', { method: 'thread/status/changed', params: { threadId: target.sessionId, status: { type: 'active' } } }); await new Promise(r => setImmediate(r));
+  assert.equal(f.delivered.at(-1).method, 'thread/status/changed'); assert.equal(JSON.stringify(f.delivered).includes('PRIVATE'), false);
+  await assert.rejects(f.relay.receive({ id: 4, method: 'thread/read', params: { threadId: 'foreign' } })); assert.equal(f.calls.filter(c => c.method === 'thread/read').length, 1);
+});
+test('queued input is copied, bounded and cancelled without starting a pending request', async t => {
+  const entered = gate(), release = gate(); const f = fixture(t, { assertCurrent: async () => { entered.resolve(); await release.promise; } });
+  const first = f.relay.receive(initialize), rejected = assert.rejects(first); await entered.promise;
+  const queued = []; for (let i = 0; i < 63; i++) queued.push(assert.rejects(f.relay.receive({ id: i+2, method: 'account/read', params: { refreshToken: false } })));
+  await assert.rejects(f.relay.receive({ id: 1000, method: 'account/read', params: { refreshToken: false } })); release.resolve(); await rejected; await Promise.all(queued); assert.deepEqual(f.calls, []);
+  const x = fixture(t); const m = structuredClone(initialize), work = x.relay.receive(m); m.params.clientInfo.name = 'changed'; await work; assert.equal(x.calls[0].params.clientInfo.name, 'codex_tui');
+});
+test('unconfirmed send or retention never reports an attached editor or live protocol acknowledgement', async t => {
+  for (const hook of ['send','onAcknowledged']) {
+    const f = fixture(t, { [hook]: async m => { if (hook === 'onAcknowledged' || m.id === 2) throw Error('PRIVATE transport failure'); } }); await f.ready(); await assert.rejects(f.relay.receive(resume()));
+    assert.equal(f.relay.observation().protocolAcknowledged, false); assert.equal(f.relay.observation().ideAttached, false); assert.equal(JSON.stringify(f.relay.observation()).includes('PRIVATE'), false);
+  }
+});

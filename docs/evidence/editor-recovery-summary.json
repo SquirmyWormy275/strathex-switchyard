@@ -1,0 +1,48 @@
+{
+  "schema": "switchyard-editor-crash-recovery/v1",
+  "basis": "c828be8b417fa55add772dff3472079a78f2ff46",
+  "sourceSha256": {
+    "tools/layout-studio/codex-editor-recovery.mjs": "895aa376bad5581b8e39e9ce4ea8e01a29f5dd215e04e5010e216ea436129b0e",
+    "tools/layout-studio/codex-editor-recovery.test.mjs": "f710fbe59f41ec079b9b48fbea7943c99c062685f5e0b7c87f0eb1e4a7912f87",
+    "tools/layout-studio/test-support/editor-recovery-fixture.mjs": "15ce8bdb84fe6665e9e985de84c7192e168260a00bffac320ec70d21cb0b09fa",
+    "tools/layout-studio/coding-editor-journal.mjs": "cfd33f3cabbc7c8e298733e7b8f6b17f186b8a1726422120d0a445598a4707d9",
+    "tools/layout-studio/coding-editor-connections.mjs": "c62148e745e4b205ba5cbf4797d0914dd3cc7b533c94759c9177a5cbd3aa1ef1",
+    "tools/layout-studio/codex-editor-ingress.mjs": "ccd6cd1e7ddc5012a12ce0298b15bb8014df3c623ff5b860695d1b355cb55448"
+  },
+  "receipt": "isolated-test-2129e4b5-8932-413c-a372-48c6c6473e75.json",
+  "groups": 6,
+  "passed": 64,
+  "allChildAndTreeCleanupVerified": true,
+  "typecheckPassed": true,
+  "javascriptParseChecksPassed": true,
+  "packageImportPassed": true,
+  "implemented": [
+    "Protected reservations pin original host PID, birth, UID and boot identity. Unfinished foreign-host records prevent a new endpoint.",
+    "Recovery verifies original host, upstream and carrier exit without signaling, adopting or opening a provider/account connection. Exact protected record and directory/socket identities are checked before cleanup.",
+    "The original stale socket and empty owned directory retire after abrupt synthetic host loss. A live original host, unknown spawn window, substituted name or foreign content prevents verified retirement.",
+    "Terminal carrier closure immediately withdraws live acknowledgement, fences new admission and joins dedicated upstream cleanup. The original provider owner remains alive."
+  ],
+  "demonstration": {
+    "realEncryptedStoreAndKernelLeases": true,
+    "realLinuxCarriers": true,
+    "syntheticProviderAndTerminal": true,
+    "ownedHostAbruptlyKilled": true,
+    "originalStaleSocketRetired": true,
+    "foreignEntriesPreserved": true,
+    "liveNativeAccountOrTaskEffects": false
+  },
+  "earlierPassingReceipt": "isolated-test-333bf833-9dbe-4e21-bca3-1bd0359cfe4c.json",
+  "retainedFailure": {
+    "receipt": "isolated-test-22541f74-6f01-44ed-9d43-c8df7fafc41d.json",
+    "passed": 19,
+    "failed": 1,
+    "cause": "The synthetic process-exit helper handled ENOENT but not ESRCH when /proc raced process retirement. Production recovery already accepted both; the fixture now does too.",
+    "allChildAndTreeCleanupVerified": true
+  },
+  "limits": [
+    "Signed routes, typed client responses and retained Terminal activation are not wired yet.",
+    "Recovery preserves unrecorded spawn windows and records lacking original host proof. It does not claim to retire unidentified resources.",
+    "Native TUI and installed Codex 0.167.0 compatibility remain unaccepted; the reviewed 0.166.0 version gate is unchanged.",
+    "The latest complete Linux 072e066 run predates this recovery checkpoint. Windows restricted helper startup remains failed software validation."
+  ]
+}

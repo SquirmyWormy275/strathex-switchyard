@@ -1,0 +1,38 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <StartupObject>Program</StartupObject>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <EnableNETAnalyzers>true</EnableNETAnalyzers>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../../../../apps/desktop-hotkeys/RuntimePrivatePipeSecurity.cs" Link="RuntimePrivatePipeSecurity.cs" />
+    <Compile Include="../../../../apps/desktop-hotkeys/PipeTextProtocol.cs" Link="PipeTextProtocol.cs" />
+    <Compile Include="../../../../apps/desktop-hotkeys/StateLeaseWorker.cs" Link="StateLeaseWorker.cs" />
+    <Compile Include="../../../../apps/desktop-hotkeys/WindowsStorageBrokerServiceHeader.cs" Link="WindowsStorageBrokerServiceHeader.cs" />
+    <Compile Include="../../../../apps/desktop-hotkeys/WindowsStorageBrokerProtocol.cs" Link="WindowsStorageBrokerProtocol.cs" />
+    <Compile Include="../../../../apps/desktop-hotkeys/WindowsStorageBrokerExchangeProtocol.cs" Link="WindowsStorageBrokerExchangeProtocol.cs" />
+    <Compile Include="../../../../apps/desktop-hotkeys/WindowsStorageBrokerExchangeJournal.cs" Link="WindowsStorageBrokerExchangeJournal.cs" />
+    <Compile Include="../../../../apps/desktop-hotkeys/WindowsStorageBrokerExchangeFiles.cs" Link="WindowsStorageBrokerExchangeFiles.cs" />
+    <Compile Include="../../../../apps/desktop-hotkeys/WindowsStorageBrokerExchangeFacts.cs" Link="WindowsStorageBrokerExchangeFacts.cs" />
+    <Compile Include="../../../../apps/desktop-hotkeys/WindowsStorageBrokerExchangeMapping.cs" Link="WindowsStorageBrokerExchangeMapping.cs" />
+    <Compile Include="../../../../apps/desktop-hotkeys/WindowsStorageBrokerExchangeEngine.cs" Link="WindowsStorageBrokerExchangeEngine.cs" />
+    <Compile Include="../../../../apps/desktop-hotkeys/ReviewedInputStager.cs" Link="ReviewedInputStager.cs" />
+    <Compile Include="../../../../apps/desktop-hotkeys/ReviewedIndexInputs.cs" Link="ReviewedIndexInputs.cs" />
+    <Compile Include="../../../../apps/desktop-hotkeys/ReviewedHistoryInputs.cs" Link="ReviewedHistoryInputs.cs" />
+    <Compile Include="../../../../apps/desktop-hotkeys/BoundedExchangeVolume.cs" Link="BoundedExchangeVolume.cs" />
+    <Compile Include="../../../../apps/desktop-hotkeys/BoundedExchangeImage.cs" Link="BoundedExchangeImage.cs" />
+    <Compile Include="../../../../apps/desktop-hotkeys/BrokerExchangeImage.cs" Link="BrokerExchangeImage.cs" />
+    <Compile Include="../../../../apps/desktop-hotkeys/WindowsStorageBrokerFiles.cs" Link="WindowsStorageBrokerFiles.cs" />
+    <Compile Include="../../../../apps/desktop-hotkeys/WindowsStorageBrokerInstallation.cs" Link="WindowsStorageBrokerInstallation.cs" />
+    <Compile Include="../../../../apps/desktop-hotkeys/WindowsStorageBrokerRuntime.cs" Link="WindowsStorageBrokerRuntime.cs" />
+    <Compile Include="../../../../apps/desktop-hotkeys/RuntimePackageMetadata.cs" Link="RuntimePackageMetadata.cs" />
+    <Compile Include="../../../../apps/desktop-hotkeys/WindowsStorageBrokerPipe.cs" Link="WindowsStorageBrokerPipe.cs" />
+    <Compile Include="../../../../apps/desktop-hotkeys/WindowsStorageBrokerDiagnostic.cs" Link="WindowsStorageBrokerDiagnostic.cs" />
+    <Compile Include="../../../../apps/desktop-hotkeys/WindowsStoragePrerequisites.cs" Link="WindowsStoragePrerequisites.cs" />
+    <Compile Include="../../../../apps/windows-companion/sandbox-helper/Program.cs" Link="SandboxGuestWorker.cs" />
+  </ItemGroup>
+</Project>

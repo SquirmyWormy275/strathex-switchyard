@@ -1,0 +1,110 @@
+{
+  "schema": "switchyard-restricted-console-candidate/v1",
+  "basis": "b83b1a094b8487d023bf8d57546829e75e17e7a5",
+  "sourceSha256": {
+    "deployment/windows/test-support/storage-broker-protocol/NativeRestrictedHostProof.cs": "bee7df842726293e5158145529810bc90f9c400bba2cd04cf1f833ffcd6e4648",
+    "scripts/windows-restricted-owner-report.mjs": "3148869ad51d3332ca3252e629a4c97db3dadd899ad54f9eb1d248c2d64cbaca"
+  },
+  "nativeNamespaceObservation": {
+    "source": "b83b1a094b8487d023bf8d57546829e75e17e7a5",
+    "executionMerge": "30e9303ac454372eef489642ca2d8d1983275427",
+    "runId": 42159103712,
+    "jobId": 127700522228,
+    "artifactId": 13476116891,
+    "archiveSha256": "02e86734f1b8fc7e1204ecf002784e74bacfe558d875d06ce9ebd7e5a2ddd825",
+    "receipt": "windows-restricted-namespace-b83-native.json",
+    "diagnostic": {
+      "schema": "switchyard-restricted-namespace-access/v1",
+      "queryStatus": "completed",
+      "handlesClosedVerified": true,
+      "entries": [
+        {
+          "scope": "global",
+          "access": "query-traverse",
+          "creatorStatus": 0,
+          "restrictedStatus": 0
+        },
+        {
+          "scope": "global",
+          "access": "directory-operations",
+          "creatorStatus": 0,
+          "restrictedStatus": 0
+        },
+        {
+          "scope": "global",
+          "access": "all",
+          "creatorStatus": 3221225506,
+          "restrictedStatus": 3221225506
+        },
+        {
+          "scope": "session",
+          "access": "query-traverse",
+          "creatorStatus": 0,
+          "restrictedStatus": 0
+        },
+        {
+          "scope": "session",
+          "access": "directory-operations",
+          "creatorStatus": 0,
+          "restrictedStatus": 0
+        },
+        {
+          "scope": "session",
+          "access": "all",
+          "creatorStatus": 0,
+          "restrictedStatus": 0
+        },
+        {
+          "scope": "restricted-session",
+          "access": "query-traverse",
+          "creatorStatus": 0,
+          "restrictedStatus": 0
+        },
+        {
+          "scope": "restricted-session",
+          "access": "directory-operations",
+          "creatorStatus": 3221225506,
+          "restrictedStatus": 3221225506
+        },
+        {
+          "scope": "restricted-session",
+          "access": "all",
+          "creatorStatus": 3221225506,
+          "restrictedStatus": 3221225506
+        }
+      ]
+    },
+    "childExit": {
+      "waitResult": 0,
+      "exitCode": 3221225794,
+      "resultAvailable": false
+    },
+    "overallSuccess": false,
+    "failedFixturePreserved": true
+  },
+  "candidate": "Use DETACHED_PROCESS for the fixed file/pipe-only proof child instead of CREATE_NO_WINDOW. Keep CreateProcessAsUserW, the same restricted token, medium label, private desktop, suspended token inspection, creation-time Job, independent exit and original deadline.",
+  "causalClaim": false,
+  "managedBuild": {
+    "receipt": "managed-source-build-1793937486394.json",
+    "targets": 2,
+    "portableChecksPassed": 1816,
+    "warnings": 0,
+    "errors": 0,
+    "existingSdkReused": true,
+    "ownedScratchRemoved": true
+  },
+  "software": {
+    "receipt": "isolated-test-e1fb7436-b123-4f65-b601-aa5a44300370.json",
+    "testsPassed": 8,
+    "allChildAndTreeCleanupVerified": true,
+    "typecheck": true
+  },
+  "nativeAcceptance": "pending",
+  "acceptanceGuard": "The closed report now also requires the exact detached creation mode. It does not assert console-handle readback.",
+  "limits": [
+    "The namespace matrix has matching outcomes; it does not identify the original DLL failure cause.",
+    "The original child remains failed; no token/privilege/ACL/Job/exit guard is relaxed.",
+    "No console mode, hardware or account change was made on this Linux workstation."
+  ],
+  "reference": "https://learn.microsoft.com/en-us/windows/win32/procthread/process-creation-flags"
+}

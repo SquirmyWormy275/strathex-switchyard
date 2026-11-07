@@ -1,0 +1,158 @@
+{
+  "schema": "switchyard-cargo-license-source/v1",
+  "at": "2026-11-07T03:34:18.023812+00:00",
+  "baseSource": "658c5d5116c9317135fbd03b08401e818cf595fa",
+  "sourceFiles": {
+    "deployment/suite/release.test.mjs": "a3b3cf50a9f2f12cd92f609202f58bffdd3c21f63606cbdeabd2ee12a8d9a7de",
+    "scripts/fixtures/cargo-archive-oracle.json": "7371721d7fac79948956506d194f675882ef91352674e62a856f569ca97bb324",
+    "scripts/generate-cargo-archive-oracle.py": "8df25cb55b0f67119c291f93a5a4ef8edf08898bbc76ad35e911af030682d705",
+    "scripts/verify-cargo-inventory-host.mjs": "8bbe6602f14b52f595c2449ebe3e294f8acf3dabe34aa199c0702fe4f47c0de5",
+    "scripts/verify-copilot-journal-host.test.mjs": "d3542f3f6dbec0538a32de9dd32c98b772e548f0f4e093768eaea034347f03b8",
+    "scripts/verify-python-inventory-host.mjs": "7a60c5a7ea497cc2c2455e03c2d8a1003c55ab6d52087bbb208d75504864b576",
+    "tools/layout-studio/cargo-archive.test.mjs": "585b1843e4bb7874cbd6404b4b7e0f3d31ff2515770946372a052f5f0b870b6b",
+    "tools/layout-studio/cargo-lock-inventory.test.mjs": "57ac3058d30d6a34ee45471ee9cb3bc0cf8b46a29d542d3655142c2f34a438f8",
+    "tools/layout-studio/pypi-wheel-identity.test.mjs": "71ff17c6c19f14a3852a7f09417fb54f967a22b105bcbf964388422087b67c15",
+    "tools/layout-studio/pypi-wheel-record.test.mjs": "457e6ab7c6a801ab5c97f39d198616810bb2066038b775357e854b2cad5712ca",
+    "tools/layout-studio/repository-shield-cargo-archives.test.mjs": "5e9c6b8d683a65f46f6166e5545c356b8e5ddcb86d7fb2c0931866e8af93cab0",
+    "tools/layout-studio/repository-shield-cargo-artifacts.test.mjs": "15f884506986dfd94508efe64153b9c329d21f05d813cf37c238cac72fc23e5a",
+    "tools/layout-studio/repository-shield-cargo.test.mjs": "7173a94937079baec95bebdc40339a4563b929c9858f0c3c56b87d855814c781",
+    "tools/layout-studio/repository-shield-licenses.test.mjs": "efebd9372f8ba33bad32cdc9d2295f52a152005d6500c12ce26b064a10e31cea",
+    "tools/layout-studio/repository-shield-npm-archives.test.mjs": "85655d1645bbb92970aab654b2e1e8bb796fd8ab975fa666cef8745ce91287f1",
+    "tools/layout-studio/repository-shield.mjs": "dcd78762d263f1b1f78a69f438415b64932f19587a62bfbb1491854cfb541aea",
+    "tools/layout-studio/repository-windows-shield-cargo-archives.test.mjs": "365f9046d35aa27934acf9c11e8db180f2b8287fca9b63ef8c6682150ed8561a",
+    "tools/layout-studio/repository-windows-shield-cargo.test.mjs": "eb94173fa8f2b37812a61aa106e6fa8f4d70a94bf7755ae0f5a7bfbfc0fd4b1c",
+    "tools/layout-studio/repository-windows-shield-licenses.test.mjs": "26ddfd591b30f388ff5d5dfaffbbf61fdffd844a0a61c84e9c61692230a94bcc",
+    "tools/layout-studio/shield-scanner-engine.mjs": "7f19f409104e053534f9ddf2dc8dfc0a43dd59e898688c8182b5cfd372da4c5c",
+    "tools/layout-studio/shield-scanner-engine.test.mjs": "51f4b278b34e34921e056a17f03efb1d66c034688c5d0a2fd5f055b0a0c7c40f",
+    "tools/layout-studio/test-support/assert-cargo-archive-shield.mjs": "4bb598b2c2c5d6ae9f78ac5ef1e700d87fcaa081dae1cc7d9d9b1389b16530b8",
+    "tools/layout-studio/test-support/cargo-archive-fixture.mjs": "c5eca1d012c2727567cd5d8cb446b7145511a41e7627dea67cf8225be36d58ef",
+    "tools/layout-studio/test-support/npm-archive-fixture.mjs": "dbc8aa1f1cec3d022e5489778c929c86a017af6c4575844c3da93372ee7c76f5",
+    "tools/layout-studio/test-support/shield-scanner-fixture.mjs": "e0a2d704ce0ba16531780a953906e2c0880d193f0586f291266e2434d29c6433"
+  },
+  "receipts": [
+    {
+      "name": "isolated-test-8bdc21bf-d9e0-404a-b3c9-b42d105c869a.json",
+      "sha256": "15ce1165189b963728ec38e6ea682a557e078171a1288b3271951d6753f33287",
+      "success": false,
+      "totals": {
+        "required": 1,
+        "passed": 0,
+        "failed": 1,
+        "tests": 11,
+        "passedTests": 7,
+        "failedTests": 4,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "name": "isolated-test-bbb2352d-39e4-4794-8ee2-8022eef666c9.json",
+      "sha256": "dffe93a5c32389247c8745ba0137bf058124504c12fb52455dc3696e382a8073",
+      "success": true,
+      "totals": {
+        "required": 1,
+        "passed": 1,
+        "failed": 0,
+        "tests": 11,
+        "passedTests": 11,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "name": "isolated-test-9a0176d0-d073-410c-8b85-c17e48b2e9de.json",
+      "sha256": "a469f690966bea19025fa68af7a9cf9a46bbd17fb6090c18612a6e4dd0e41a5c",
+      "success": true,
+      "totals": {
+        "required": 1,
+        "passed": 1,
+        "failed": 0,
+        "tests": 12,
+        "passedTests": 12,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "name": "isolated-test-99201ff2-6213-4283-9c39-57a31ad182bb.json",
+      "sha256": "06da0bfe1e531663a6903c59cdd2eacd9f9abbd295d2f8252bd2cf7e72ee41ef",
+      "success": true,
+      "totals": {
+        "required": 8,
+        "passed": 8,
+        "failed": 0,
+        "tests": 84,
+        "passedTests": 84,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "name": "isolated-test-1e8e9d5f-aad1-4355-ab14-e8390edcc1d1.json",
+      "sha256": "53fc033f2159f9073ef323d17cb1db2e97a2a974401e1c00fd865f999a4948b1",
+      "success": true,
+      "totals": {
+        "required": 7,
+        "passed": 7,
+        "failed": 0,
+        "tests": 40,
+        "passedTests": 40,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    }
+  ],
+  "distinctFocusedGroups": 15,
+  "distinctFocusedPasses": 124,
+  "independentReference": {
+    "python": "3.15.2",
+    "libraries": [
+      "tomllib",
+      "tarfile.USTAR_FORMAT",
+      "gzip"
+    ],
+    "cases": 112,
+    "supportedCases": 57
+  },
+  "actualLinuxCargoJourneys": 8,
+  "windowsCargoGuestDoubles": 8,
+  "originalCommandsBoundsAndSkipsVerified": true,
+  "typecheck": "passed",
+  "originalPackageBounds": "passed",
+  "cleanup": {
+    "everyChildVerified": true,
+    "everyTreeVerified": true,
+    "emptyOwnedRootRemoved": true
+  },
+  "effects": {
+    "cargoInvocations": 0,
+    "archiveExtractions": 0,
+    "packageExecutions": 0,
+    "newDependencyDownloads": 0,
+    "providerRequests": 0,
+    "accountChanges": 0,
+    "hardwareOperations": 0
+  },
+  "failureNotes": [
+    "Four new tests reproduced absent Cargo declaration and policy handling. The original failed receipt remains retained. An initial selection named a nonexistent Windows artifact test; its manifest guard refused before tests. The corrected selection uses the existing Windows Cargo group without changing bounds."
+  ],
+  "limitations": [
+    "This is a closed manifest grammar, not a complete TOML parser or Cargo resolver.",
+    "Declared SPDX policy does not verify license text, choose an OR alternative, resolve dependencies or establish legal approval. File-only or unsupported declarations retain gaps; raw rejected text and file paths are not exported.",
+    "Target predicates are parsed as literal table keys and never evaluated.",
+    "Installed source acceptance and actual Windows guest/provider/hardware validation remain separate."
+  ],
+  "privateReceipt": {
+    "name": "cargo-license-source.json",
+    "sha256": "e4701f00f589ccd2976d80cb1c4262d8ebe3a18333b1d0b69cbc6820c713c565"
+  }
+}

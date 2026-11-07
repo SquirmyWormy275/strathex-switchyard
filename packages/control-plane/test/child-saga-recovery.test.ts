@@ -22,6 +22,22 @@ async function withStore(run: (store: ProtectedJsonStore) => Promise<void>): Pro
   }
 }
 
+test("scoped parent recovery releases only its reviewed root without manufacturing a passing receipt", async () => {
+  await withStore(async store => {
+    const operations = new OperationSagaStore(store), roots = [];
+    for (const id of ["reviewed-root", "other-root"]) {
+      const root = await operations.begin({ id, action: "local_commit", targetSnapshotId: `target-${id}`, idempotencyKey: id }); await operations.advance(root.operation.id, "executing");
+      const child = await operations.beginChild(root.operation.id, { action: "git.local-commit", targetSnapshotId: `target-${id}`, idempotencyKey: `child-${id}` });
+      await operations.advance(child.operation.id, "executing"); await operations.advance(child.operation.id, "external_committed"); await operations.advance(child.operation.id, "recorded"); roots.push(root.operation.id);
+    }
+    await assert.rejects(operations.settleRecoveredParents({ rootOperationId: "" }), /root operation id/);
+    const recovered = await operations.settleRecoveredParents({ rootOperationId: roots[0] });
+    assert.deepEqual(recovered.map(r => r.operationId), [roots[0]]);
+    const root = await operations.get(roots[0]!); assert.equal(root?.state, "recorded"); assert.equal(root?.details.commandStatus, "incomplete"); assert.equal(root?.details.recoveredWithoutReceipt, "true");
+    assert.equal((await operations.get(roots[1]!))?.state, "executing"); assert.equal((await new ReceiptLedger(store).list()).length, 0);
+  });
+});
+
 test("broker child sagas prevent replay, preserve ambiguity, and reconcile only through observation adapters", async () => {
   await withStore(async (store) => {
     const operations = new OperationSagaStore(store, {

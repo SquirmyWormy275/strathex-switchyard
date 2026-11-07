@@ -1,0 +1,30 @@
+{
+  "schema": "switchyard-native-restricted-host-failure/v1",
+  "pullRequestHead": "80e8551b33a2e1c30ae5c1d4beac0bb54441997a",
+  "artifactRevision": "2ab1993f4ea653a1ff848e5ff427c9834a08ffac",
+  "workflowRun": 42026148640,
+  "artifactId": 13413554767,
+  "archiveSha256": "0b4aac30accc5ed42c17ed01a49cb4fdc0002587daedffda0f2e2ca1c97d6bcd",
+  "localReceipt": "windows-restricted-owner-80.json",
+  "receiptSha256": "47d5a9cdb665d86cea631dbd12ef2ab8e52063b4f9b01513d7ce8eaa849adb3b",
+  "success": false,
+  "failedPhase": "create-restricted-child-with-token",
+  "nativeCode": 87,
+  "creatorPrivileges": {
+    "quotaAssigned": true,
+    "quotaEnabled": false,
+    "assignPrimaryAssigned": false,
+    "assignPrimaryEnabled": false,
+    "impersonateAssigned": true,
+    "impersonateEnabled": true
+  },
+  "restrictedChildStarted": false,
+  "originalServicePreserved": true,
+  "ownedContextRetained": true,
+  "restrictedMetadataChecksBeforeFailure": 13,
+  "restrictedExchangeChecksBeforeFailure": 31,
+  "workerTokenHostOwnerChecksBeforeFailure": 8,
+  "guestAccepted": false,
+  "ordinaryUserAccountAccepted": false,
+  "archiveRetainedLocally": false
+}

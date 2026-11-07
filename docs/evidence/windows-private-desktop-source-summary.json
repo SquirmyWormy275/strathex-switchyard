@@ -1,0 +1,38 @@
+{
+  "schema": "switchyard-private-desktop-proof-source-summary/v1",
+  "sourcePurpose": "Give the restricted primary-token proof a temporary same-user private USER object namespace instead of inheriting the parent interactive desktop",
+  "priorFailedReceipt": "windows-restricted-owner-074-native.json",
+  "priorChildExit": "0xC0000142",
+  "rootCauseConfirmed": false,
+  "interactiveDesktopAclChanged": false,
+  "persistentMachineConfigurationChanged": false,
+  "accountCreated": false,
+  "tokenRestrictionsChanged": false,
+  "privilegeChecksWaived": false,
+  "existingObjectNamesRefused": true,
+  "mediumLabelAndSameUserSystemOnlyDaclRequested": true,
+  "privateObjectCloseReturnsChecked": true,
+  "startupDesktopAndRetirementRequiredByReportValidator": true,
+  "managedTargetsCompiled": 2,
+  "buildReceipt": "windows-index-native-build-1793922093969.json",
+  "portableChecks": 223,
+  "reusedSdk": "8.0.424",
+  "newSdkInstalled": false,
+  "focusedReceipt": "isolated-test-8b137de0-8031-4550-a784-099cc760becb.json",
+  "focusedGroups": 3,
+  "focusedChecks": 28,
+  "allChildCleanup": true,
+  "allProcessTreeTerminationComplete": true,
+  "nativeWindowsAcceptance": false,
+  "sourceSha256": {
+    "deployment/windows/test-support/storage-broker-protocol/PrivateDesktopSpace.cs": "81244cbc6e84bfe7e964c528fb22af87ce38d18a8a501769da28123e6e975771",
+    "deployment/windows/test-support/storage-broker-protocol/NativeRestrictedHostProof.cs": "73f4c3eea97b2ef750879b566e4d28d3b05d01eb66f625dc5a62eeb834e91708",
+    "scripts/windows-restricted-owner-report.mjs": "00cb65871cda41fe66509470df83708ea89518777c7fa4a9e4e7ae67ef4cfcb1",
+    "scripts/windows-restricted-owner-report.test.mjs": "587b3b83b89299e5219f12f5f5ae4a66081ad88783f294edb459212f4bf33634"
+  },
+  "references": [
+    "https://learn.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-createprocessasuserw",
+    "https://learn.microsoft.com/en-us/windows/win32/winstation/window-station-security-and-access-rights",
+    "https://learn.microsoft.com/en-us/windows/win32/winstation/desktop-security-and-access-rights"
+  ]
+}

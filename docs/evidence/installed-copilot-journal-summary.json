@@ -1,0 +1,47 @@
+{
+  "schema": "switchyard-installed-copilot-journal-summary/v1",
+  "sourceCommit": "ea5a0f71b8ade5551aa42d23e8eb06d8cca399d4",
+  "release": "7096e4c8e00128ad732937d1e4c5f3b1acc3b3db15b578738d84b27bb550d824",
+  "updateReceipt": "assignment-legends-1793901907905.json",
+  "updateChecks": 6,
+  "metadataReceipt": "installed-copilot-journal-metadata-1793901908363.json",
+  "metadataChecks": 7,
+  "cleanupReceipt": "installed-agent-observation-cleanup-1793902084887.json",
+  "selectedStatePreserved": true,
+  "requestJournalsHiddenFromGenericSnapshot": true,
+  "unauthenticatedRequestsRefused": true,
+  "invalidAndReplayFieldsRefused": true,
+  "frozenHomeSha256": "20ba0095a6b9650046df34541872aa7e0a7cdc7db5182f065abb009127c6c130",
+  "ownedBundleAndCheckoutRemoved": true,
+  "workspaceCreated": false,
+  "microsoftRequestsMade": 0,
+  "modelPromptsSubmitted": 0,
+  "keyboardOpened": false,
+  "microphoneOpened": false,
+  "tenantAccepted": false,
+  "priorCheckpoints": [
+    {
+      "sourceCommit": "1877f27197cea0f6e9178b6e9bc8ace404682f2c",
+      "release": "e5993034f3cabc5d2d254ca7f8f62c21a02d6e801c9f397490727feada38a6a9",
+      "updateReceipt": "assignment-legends-1793895792934.json",
+      "metadataReceipt": "installed-copilot-journal-metadata-1793895793602.json",
+      "cleanupReceipt": "installed-copilot-journal-cleanup-1793895967301.json"
+    },
+    {
+      "sourceCommit": "514bf685d5f103911fab6702613fe422d5bdc6a3",
+      "release": "86bdffe016ceb5c021b3f30ce01197a4e5a3e5041419a955efd5d0b6f133f0a9",
+      "updateReceipt": "assignment-legends-1793899372851.json",
+      "metadataReceipt": "installed-copilot-journal-metadata-1793899373305.json",
+      "cleanupReceipt": "installed-copilot-journal-cleanup-1793899469334.json"
+    },
+    {
+      "sourceCommit": "2276ac29e7dcc3f9720e2b9490fccb1e678b58f8",
+      "release": "f325bc4627b2d9f5de699179414724d69cffddb600a0154b457a0abdaa9d3abd",
+      "updateReceipt": "assignment-legends-1793900687899.json",
+      "metadataReceipt": "installed-copilot-journal-metadata-1793900688219.json",
+      "cleanupReceipt": "installed-copilot-journal-cleanup-1793900795969.json"
+    }
+  ],
+  "workspaceInventoryCount": 54,
+  "sealedBytePreservationScope": "The read-only metadata journey, before the separate native-task demonstration and its normal audit bookkeeping."
+}

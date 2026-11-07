@@ -1,0 +1,50 @@
+{
+  "schema": "switchyard-keyless-windows-lease-summary/v1",
+  "scope": "Windows keyless worker reuse and end-to-end bounded restricted-child failure projection",
+  "receipt": "isolated-test-975eeef4-3999-438e-96e8-9d7bd678b277.json",
+  "success": true,
+  "totals": {
+    "required": 9,
+    "passed": 9,
+    "failed": 0,
+    "tests": 85,
+    "passedTests": 85,
+    "failedTests": 0,
+    "skippedTests": 0,
+    "cancelledTests": 0,
+    "todoTests": 0
+  },
+  "allChildCleanup": true,
+  "allProcessTreeTerminationComplete": true,
+  "typecheckPassed": true,
+  "sourceSha256": {
+    "tools/layout-studio/keyless-lease-pool.mjs": "5599ea863112ad364093db2e04f8badd9af6418dcf5ee062ee05d8470c09f871",
+    "tools/layout-studio/state-lock.mjs": "019cc5493f432b333e797854e11b8000845a23d1ee762df406242ac92dbfca95",
+    "tools/layout-studio/state-lock.ps1": "e1013c82f631a26329f5d2b95a8cff63ba6ebbd9738484dc4fd61f95e5193e1d",
+    "scripts/verify-windows-storage-contracts.mjs": "0a3480355dfca53be3082525d76c75d0536014e922e27b5666db63a22b17508b",
+    "scripts/windows-restricted-owner-report.mjs": "258a9d197cd76118ae38d43c5500ea9856dc73cf839a1159e7040c6cf7599053",
+    "scripts/verify-windows-storage-broker.mjs": "323c73757231f3a1ea68f7b48a5730a1c912e2565cc623c860735b1c99dba8ae"
+  },
+  "workerIdleMs": 1000,
+  "maximumWorkers": 64,
+  "maximumPendingUsesPerPath": 64,
+  "acquisitionBudgetMs": 15000,
+  "nativeSharingWaitMs": 10000,
+  "releaseAckBudgetMs": 2000,
+  "protectedStateOrKeyCached": false,
+  "kernelHandleReleasedBetweenTransactions": true,
+  "callbackAutomaticallyReplayed": false,
+  "portableProtocolChildrenDoubled": true,
+  "nativeWindowsAcceptance": true,
+  "frontendChanged": false,
+  "hardwareOpened": false,
+  "note": "Native Windows remains required. The original coordinator privacy projection omitted the new restricted-child diagnostic; the shared tested projection now retains only bounded exit/phase/count fields.",
+  "nativeFollowup": {
+    "prHead": "074079170f62133754b329f26452ad94ea332923",
+    "receipt": "windows-keyless-leases-074-native.json",
+    "groups": 2,
+    "passedTests": 16,
+    "declaredSkips": 1,
+    "wholeWorkflowAccepted": false
+  }
+}

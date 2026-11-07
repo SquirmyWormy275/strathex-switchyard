@@ -1,0 +1,24 @@
+{
+  "schema": "switchyard-python-inventory-verifier-source/v1",
+  "baseCommit": "5ffe1eb9571bf2d0056f08581fabd6e714b69bb8",
+  "sourceFiles": {
+    "scripts/verify-python-inventory-host.mjs": "e5cfe7ed3b7fb0f239f82ebfafec752300fa35016f6b632c636ffe164468e196",
+    "scripts/verify-copilot-journal-host.test.mjs": "0e6af30d328e0fc5c90e5ef44c1cdb06fb484d14e4b4c09b66dbe3d8794432c0"
+  },
+  "receipt": "isolated-test-eacce966-4bd9-4157-a91c-33880aecc9a9.json",
+  "receiptSha256": "b9687a7d84812b513aadab063ad789fdd21b37837c72aa61d4fe0bd47b33bb16",
+  "totals": {
+    "required": 1,
+    "passed": 1,
+    "failed": 0,
+    "tests": 4,
+    "passedTests": 4,
+    "failedTests": 0,
+    "skippedTests": 0,
+    "cancelledTests": 0,
+    "todoTests": 0
+  },
+  "allChildAndTreeCleanupVerified": true,
+  "ownedFocusedRootRemoved": true,
+  "installedAcceptancePending": true
+}

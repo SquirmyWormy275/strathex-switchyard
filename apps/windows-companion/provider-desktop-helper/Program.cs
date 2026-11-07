@@ -16,7 +16,7 @@ using Microsoft.Win32.SafeHandles;
 
 namespace Sxsy.B122.ProviderDesktopHelper;
 
-internal static class Program
+internal static partial class Program
 {
     private const string RequestSchema = "sxsy-b122.provider-desktop-request";
     private const string ResponseSchema = "sxsy-b122.provider-desktop-response";
@@ -25,6 +25,7 @@ internal static class Program
     private const int LaunchSurfaceTimeoutMs = 15_000;
     private const uint ProcessQueryLimitedInformation = 0x1000;
     private const uint Synchronize = 0x00100000;
+    private const uint TokenQuery = 0x00000008;
     private const uint GenericRead = 0x80000000;
     private const uint FileReadAttributes = 0x00000080;
     private const uint FileShareRead = 0x00000001;
@@ -51,9 +52,19 @@ internal static class Program
             ["codex"] = new("openai.codex", "Codex", "OpenAI, L.L.C.", "codex-windows-sandbox", "")
         };
 
+    // This target is available only to the Suite focus-only entrypoint. Keep
+    // the companion's four provider enrollments and launch profiles unchanged.
+    private static readonly ProductDefinition NativeEditorProduct = new(
+        "microsoft.visual-studio-code", "VS Code", "Microsoft Corporation", "Visual Studio Code", "Microsoft Corporation");
+
     public static int Main(string[] args)
     {
         if (args.Length == 1 && args[0] == "--self-test") return SelfTest();
+        if (args.Length == 1 && args[0] == "--native-desktop-owner-v1") return ObserveFocusOwner();
+        if (args.Length == 1 && args[0] == "--editor-terminal-process-v1") return ObserveEditorTerminalProcess();
+        if (args.Length == 1 && args[0] == "--editor-terminal-peer-v1") return ObserveEditorTerminalProcess(peer: true);
+        if (args.Length == 1 && args[0] == "--editor-endpoint-v1") return ReadEditorEndpoint();
+        if (args.Length == 1 && args[0] == "--editor-endpoint-fixture-v1") return CreateEditorEndpointFixture();
         if (args.Length == 2 && args[0] == "--managed-terminal-v1")
         {
             try
@@ -72,14 +83,22 @@ internal static class Program
                 return 70;
             }
         }
-        if (args.Length != 1 || args[0] != "--stdio-v1") return 64;
+        bool focusOnly = args.Length == 1 && args[0] == "--native-desktop-focus-v3";
+        if (!focusOnly && (args.Length != 1 || args[0] != "--stdio-v2")) return 64;
         string requestId = "unknown";
         try
         {
             if (!OperatingSystem.IsWindows()) throw new ProtocolException("windows_required");
+            if (focusOnly)
+            {
+                using var current = new SafeFileHandle(GetCurrentProcess(), ownsHandle: false);
+                AssertCurrentUserSession(current);
+                Write(new { schema = "switchyard-native-focus-owner/v1", processId = Environment.ProcessId, processStartTime = ProcessStartTime(current) });
+            }
             string line = ReadBoundedLine(Console.In, MaximumRequestChars);
-            Request request = ParseRequest(line);
+            Request request = ParseRequest(line, focusOnly);
             requestId = request.RequestId;
+            if (focusOnly && !IsFocusAction(request.Action)) throw new ProtocolException("focus_only_action_required");
             return request.Action switch
             {
                 "list" => List(request),
@@ -90,13 +109,169 @@ internal static class Program
         }
         catch (ProtocolException exception)
         {
-            Write(new { schema = ResponseSchema, version = 1, requestId, kind = "error", code = exception.Code });
+            Write(new { schema = ResponseSchema, version = 2, requestId, kind = "error", code = exception.Code });
             return 65;
         }
         catch
         {
-            Write(new { schema = ResponseSchema, version = 1, requestId, kind = "error", code = "native_failure" });
+            Write(new { schema = ResponseSchema, version = 2, requestId, kind = "error", code = "native_failure" });
             return 70;
+        }
+    }
+
+    private static bool IsFocusAction(string action) => action is "list" or "focus";
+    private static bool SupportsEditorFocus(string action, bool focusOnly) => focusOnly && IsFocusAction(action);
+
+    private static int ObserveEditorTerminalProcess(bool peer = false)
+    {
+        string family = peer ? "switchyard-editor-terminal-peer" : "switchyard-editor-terminal-process";
+        try
+        {
+            if (!OperatingSystem.IsWindows()) throw new ProtocolException("windows_required");
+            using JsonDocument document = ParseJson(ReadBoundedLine(Console.In, MaximumRequestChars));
+            JsonElement value = document.RootElement;
+            RequireProperties(value, peer ? new[] { "schema", "requestId", "processId", "expectedBirth", "image", "connection" } : new[] { "schema", "requestId", "processId", "expectedBirth", "image" });
+            string requestId = Text(value, "requestId"); int processId = Integer(value, "processId");
+            if (Text(value, "schema") != family + "-query/v1" || !Guid.TryParseExact(requestId, "D", out Guid requestGuid) || requestGuid == Guid.Empty || processId < 1) throw new ProtocolException("invalid_terminal_query");
+            string? expectedBirth = Property(value, "expectedBirth").ValueKind == JsonValueKind.Null ? null : Text(value, "expectedBirth");
+            if (peer && expectedBirth is null || expectedBirth is not null && !ValidProcessStartTime(expectedBirth)) throw new ProtocolException("invalid_process_birth");
+            JsonElement connection = default; int clientPort = 0, serverPort = 0;
+            if (peer)
+            {
+                connection = Property(value, "connection");
+                RequireProperties(connection, "localAddress", "localPort", "remoteAddress", "remotePort");
+                clientPort = Integer(connection, "localPort"); serverPort = Integer(connection, "remotePort");
+                if (Text(connection, "localAddress") != "127.0.0.1" || Text(connection, "remoteAddress") != "127.0.0.1"
+                    || clientPort is < 1024 or > 65535 || serverPort is < 1024 or > 65535 || clientPort == serverPort) throw new ProtocolException("invalid_terminal_connection");
+            }
+            JsonElement image = Property(value, "image");
+            RequireProperties(image, "path", "sha256", "device", "inode", "size");
+            string path = Text(image, "path"), expectedHash = Text(image, "sha256");
+            ulong Decimal(string name, bool zero = false)
+            {
+                string text = Text(image, name);
+                if (text.Length is < 1 or > 20 || text.Any(c => c is < '0' or > '9') || text.Length > 1 && text[0] == '0' || !ulong.TryParse(text, NumberStyles.None, CultureInfo.InvariantCulture, out ulong number) || !zero && number == 0) throw new ProtocolException("invalid_terminal_image_identity");
+                return number;
+            }
+            ulong device = Decimal("device", true), inode = Decimal("inode"), size = Decimal("size");
+            if (device > uint.MaxValue || size > 512UL * 1024 * 1024 || expectedHash.Length != 64 || !expectedHash.All(IsLowerHex)
+                || path.Length is < 4 or > 4096 || !char.IsAsciiLetter(path[0]) || path[1] != ':' || path[2] != '\\'
+                || path[3..].Any(c => c < 32 || c == 127 || "<>:\"/|?*".Contains(c)) || Path.GetFullPath(path) != path
+                || path[3..].Split('\\').Any(part => part.Length == 0 || part.EndsWith('.') || part.EndsWith(' '))) throw new ProtocolException("invalid_terminal_image_path");
+            using SafeFileHandle process = OpenProcess(ProcessQueryLimitedInformation | Synchronize, false, (uint)processId);
+            if (process.IsInvalid) throw NativeFailure("terminal_process_unavailable");
+            void CurrentProcess(string? birth)
+            {
+                if (WaitForSingleObject(process, 0) != WaitTimeout) throw new ProtocolException("terminal_process_exited");
+                AssertCurrentUserSession(process);
+                if (!SamePath(ProcessImagePath(process), path) || birth is not null && ProcessStartTime(process) != birth) throw new ProtocolException("terminal_process_changed");
+            }
+            CurrentProcess(expectedBirth); string observedBirth = ProcessStartTime(process);
+            if (peer) AssertTerminalTcpPeer((uint)processId, clientPort, serverPort);
+            using SafeFileHandle file = CreateFileW(path, GenericRead, FileShareRead, IntPtr.Zero, OpenExisting, 0, IntPtr.Zero);
+            if (file.IsInvalid) throw NativeFailure("terminal_image_unavailable");
+            void CurrentFile(SafeFileHandle handle)
+            {
+                if (!GetFileInformationByHandle(handle, out ByHandleFileInformation info)) throw NativeFailure("terminal_image_identity_unavailable");
+                if ((info.FileAttributes & (0x10 | 0x400)) != 0 || info.VolumeSerialNumber != device || (((ulong)info.FileIndexHigh << 32) | info.FileIndexLow) != inode || (ulong)info.FileSize != size || !SamePath(FinalPath(handle), path)) throw new ProtocolException("terminal_image_changed");
+            }
+            CurrentFile(file);
+            // Hash the held file itself. No pathname reopen can substitute bytes.
+            using (var borrowed = new SafeFileHandle(file.DangerousGetHandle(), ownsHandle: false))
+            using (var stream = new FileStream(borrowed, FileAccess.Read, 1024 * 1024, false))
+            {
+                string observedHash = Convert.ToHexString(SHA256.HashData(stream)).ToLowerInvariant();
+                if (!CryptographicOperations.FixedTimeEquals(Encoding.ASCII.GetBytes(observedHash), Encoding.ASCII.GetBytes(expectedHash))) throw new ProtocolException("terminal_image_digest_changed");
+            }
+            using SafeFileHandle named = CreateFileW(path, FileReadAttributes, FileShareRead, IntPtr.Zero, OpenExisting, 0, IntPtr.Zero);
+            if (named.IsInvalid) throw NativeFailure("terminal_image_name_unavailable");
+            CurrentFile(named); CurrentFile(file); CurrentProcess(observedBirth);
+            if (peer) { AssertTerminalTcpPeer((uint)processId, clientPort, serverPort); CurrentProcess(observedBirth); }
+            var result = new Dictionary<string, object?> { ["schema"] = family + "-result/v1", ["requestId"] = requestId, ["processId"] = processId, ["birth"] = observedBirth,
+                ["image"] = new { path, sha256 = expectedHash, device = device.ToString(CultureInfo.InvariantCulture), inode = inode.ToString(CultureInfo.InvariantCulture), size = size.ToString(CultureInfo.InvariantCulture) },
+                ["currentUserVerified"] = true, ["currentSessionVerified"] = true, ["processAccessMask"] = ProcessQueryLimitedInformation | Synchronize, ["tokenAccessMask"] = TokenQuery,
+                ["processTerminated"] = false, ["windowFocused"] = false, ["taskAttached"] = false, ["accountVerified"] = false };
+            if (peer) { result["connection"] = connection; result["connectionVerified"] = true; }
+            Write(result);
+            return 0;
+        }
+        catch (ProtocolException exception) { Write(new { schema = family + "-error/v1", code = exception.Code }); return 65; }
+        catch { Write(new { schema = family + "-error/v1", code = "native_failure" }); return 70; }
+    }
+
+    // The tuple is the client's established IPv4 loopback connection, obtained
+    // from the server's held accepted socket. Never discover or choose a PID.
+    private static void AssertTerminalTcpPeer(uint processId, int clientPort, int serverPort)
+    {
+        const uint InsufficientBuffer = 122, AddressFamilyInet = 2, OwnerPidConnections = 4;
+        uint size = 0, status = GetExtendedTcpTable(IntPtr.Zero, ref size, false, AddressFamilyInet, OwnerPidConnections, 0);
+        if (status != InsufficientBuffer) throw new ProtocolException("terminal_connection_table_unavailable");
+        for (int attempt = 0; attempt < 3; attempt++)
+        {
+            if (size is < 4 or > 2097152) throw new ProtocolException("terminal_connection_table_bound");
+            int allocated = checked((int)size); IntPtr buffer = Marshal.AllocHGlobal(allocated);
+            try
+            {
+                status = GetExtendedTcpTable(buffer, ref size, false, AddressFamilyInet, OwnerPidConnections, 0);
+                if (status == InsufficientBuffer) continue;
+                if (status != 0 || size > allocated || size < 4) throw new ProtocolException("terminal_connection_table_unavailable");
+                uint count = unchecked((uint)Marshal.ReadInt32(buffer)); int width = Marshal.SizeOf<TcpOwnerPidRow>();
+                if (width != 24 || count > (size - 4) / width) throw new ProtocolException("terminal_connection_table_bound");
+                uint loopback = BitConverter.ToUInt32(new byte[] { 127, 0, 0, 1 }); int matches = 0;
+                static int Port(uint value) => (int)(((value & 255) << 8) | ((value >> 8) & 255));
+                for (int i = 0; i < count; i++)
+                {
+                    TcpOwnerPidRow row = Marshal.PtrToStructure<TcpOwnerPidRow>(IntPtr.Add(buffer, checked(4 + i * width)));
+                    if (row.LocalAddress != loopback || row.RemoteAddress != loopback || Port(row.LocalPort) != clientPort || Port(row.RemotePort) != serverPort) continue;
+                    if (row.State != 5 || row.ProcessId != processId || ++matches != 1) throw new ProtocolException("terminal_connection_owner_changed");
+                }
+                if (matches != 1) throw new ProtocolException("terminal_connection_unavailable");
+                return;
+            }
+            finally { Marshal.Copy(new byte[allocated], 0, buffer, allocated); Marshal.FreeHGlobal(buffer); }
+        }
+        throw new ProtocolException("terminal_connection_table_changed");
+    }
+
+    private static int ObserveFocusOwner()
+    {
+        try
+        {
+            if (!OperatingSystem.IsWindows()) throw new ProtocolException("windows_required");
+            using JsonDocument document = ParseJson(ReadBoundedLine(Console.In, MaximumRequestChars));
+            JsonElement value = document.RootElement;
+            RequireProperties(value, "schema", "processId", "processStartTime");
+            if (Text(value, "schema") != "switchyard-native-focus-owner-query/v1") throw new ProtocolException("invalid_owner_schema");
+            int processId = Integer(value, "processId");
+            string birth = Text(value, "processStartTime");
+            if (processId < 1 || !ValidProcessStartTime(birth)) throw new ProtocolException("invalid_owner_identity");
+            bool exited = FocusOwnerExited(processId, birth);
+            Write(new { schema = "switchyard-native-focus-owner-result/v1", processId, processStartTime = birth,
+                state = exited ? "exited" : "running", exited, processAccessMask = ProcessQueryLimitedInformation | Synchronize,
+                tokenAccessMask = TokenQuery, processTerminated = false, windowFocused = false });
+            return 0;
+        }
+        catch (ProtocolException exception) { Write(new { schema = "switchyard-native-focus-owner-error/v1", code = exception.Code }); return 65; }
+        catch { Write(new { schema = "switchyard-native-focus-owner-error/v1", code = "native_failure" }); return 70; }
+    }
+
+    private static bool FocusOwnerExited(int processId, string birth)
+    {
+        // GetProcessById's documented absent-process exception proves absence.
+        // Denied or failed native queries remain unknown; no alternate identity
+        // or broader access is attempted after either lookup fails.
+        Process selected;
+        try { selected = Process.GetProcessById(processId); }
+        catch (ArgumentException) { return true; }
+        using (selected)
+        using (SafeFileHandle process = OpenProcess(ProcessQueryLimitedInformation | Synchronize, false, (uint)processId))
+        {
+            if (process.IsInvalid) throw NativeFailure("owner_process_unavailable");
+            uint state = WaitForSingleObject(process, 0);
+            if (state == 0) return true;
+            if (state != WaitTimeout) throw NativeFailure("owner_process_wait_failed");
+            AssertCurrentUserSession(process);
+            return ProcessStartTime(process) != birth;
         }
     }
 
@@ -111,8 +286,30 @@ internal static class Program
             && QuoteArgument("C:\\Program Files\\Provider\\Provider.exe") == "\"C:\\Program Files\\Provider\\Provider.exe\"";
         bool surfaces = TryParseSurfaceId("hwnd:1a", out IntPtr handle) && handle == new IntPtr(0x1a)
             && !TryParseSurfaceId("pid:42", out _);
-        Write(new { schema = "sxsy-b122.provider-desktop-self-test", version = 1, status = products && quoting && surfaces ? "ok" : "failed" });
-        return products && quoting && surfaces ? 0 : 1;
+        bool births = ValidProcessStartTime("133000000000000001") && ValidProcessStartTime("18446744073709551615")
+            && !new[] { "", "0", "01", "-1", "1.0", "18446744073709551616" }.Any(ValidProcessStartTime);
+        bool? currentProcessVerified = null;
+        bool? ownerQueryVerified = null;
+        string? processStartTime = null;
+        if (OperatingSystem.IsWindows())
+        {
+            using var current = new SafeFileHandle(GetCurrentProcess(), ownsHandle: false);
+            string birth = ProcessStartTime(current);
+            processStartTime = birth;
+            AssertCurrentUserSession(current);
+            currentProcessVerified = birth == ProcessStartTime(current);
+            ownerQueryVerified = !FocusOwnerExited(Environment.ProcessId, birth)
+                && FocusOwnerExited(Environment.ProcessId, birth == "1" ? "2" : "1");
+        }
+        bool focusOnlyPolicyVerified = IsFocusAction("list") && IsFocusAction("focus")
+            && !new[] { "launch", "managed_terminal", "authorize", "", "Focus" }.Any(IsFocusAction);
+        bool nativeEditorPolicyVerified = SupportsEditorFocus("list", true) && SupportsEditorFocus("focus", true)
+            && !new[] { "list", "focus", "launch", "managed_terminal" }.Any(action => SupportsEditorFocus(action, false))
+            && !new[] { "launch", "managed_terminal", "authorize", "", "Focus" }.Any(action => SupportsEditorFocus(action, true))
+            && NativeEditorProduct.ProductId == "microsoft.visual-studio-code";
+        bool ok = products && quoting && surfaces && births && focusOnlyPolicyVerified && nativeEditorPolicyVerified && currentProcessVerified != false && ownerQueryVerified != false;
+        Write(new { schema = "sxsy-b122.provider-desktop-self-test", version = 1, status = ok ? "ok" : "failed", desktopProtocolVersion = 2, processBirthGrammarVerified = births, focusOnlyPolicyVerified, nativeEditorPolicyVerified, currentProcessVerified, ownerQueryVerified, processId = Environment.ProcessId, processStartTime, tokenAccessMask = TokenQuery, windowFocused = false });
+        return ok ? 0 : 1;
     }
 
     private static Request ParseManagedTerminalDescriptor(string encoded)
@@ -241,19 +438,19 @@ internal static class Program
         Write(new
         {
             schema = ResponseSchema,
-            version = 1,
+            version = 2,
             requestId = request.RequestId,
             kind = "result",
-            observations = surfaces.Items.Select(surface => new { processId = surface.ProcessId, surfaceId = surface.SurfaceId, isForeground = surface.Window == foreground }).ToArray()
+            observations = surfaces.Items.Select(surface => new { processId = surface.ProcessId, processStartTime = surface.StartTime, surfaceId = surface.SurfaceId, isForeground = surface.Window == foreground }).ToArray()
         });
         return 0;
     }
 
     private static int Focus(Request request)
     {
-        if (request.ExpectedProcessId is null || request.ExpectedSurfaceId is null) throw new ProtocolException("invalid_focus_target");
+        if (request.ExpectedProcessId is null || request.ExpectedSurfaceId is null || request.ExpectedProcessStartTime is null) throw new ProtocolException("invalid_focus_target");
         using SurfaceSet surfaces = SurfaceSet.Acquire(request);
-        List<HeldSurface> matches = surfaces.Items.Where(surface => surface.ProcessId == request.ExpectedProcessId.Value && surface.SurfaceId == request.ExpectedSurfaceId).ToList();
+        List<HeldSurface> matches = surfaces.Items.Where(surface => surface.ProcessId == request.ExpectedProcessId.Value && surface.SurfaceId == request.ExpectedSurfaceId && surface.StartTime == request.ExpectedProcessStartTime).ToList();
         if (matches.Count != 1) throw new ProtocolException("changed_focus_surface");
         HeldSurface held = matches[0];
 
@@ -261,23 +458,26 @@ internal static class Program
         Write(new
         {
             schema = ResponseSchema,
-            version = 1,
+            version = 2,
             requestId = request.RequestId,
             kind = "ready",
             authorizationToken = token,
             processId = held.ProcessId,
+            processStartTime = held.StartTime,
             surfaceId = held.SurfaceId
         });
         ReadAuthorization(request.RequestId, token);
 
         held.RevalidateLockedHandles();
         using SurfaceSet final = SurfaceSet.Acquire(request);
-        List<HeldSurface> finalMatches = final.Items.Where(surface => surface.ProcessId == held.ProcessId && surface.SurfaceId == held.SurfaceId).ToList();
+        List<HeldSurface> finalMatches = final.Items.Where(surface => surface.ProcessId == held.ProcessId && surface.SurfaceId == held.SurfaceId && surface.StartTime == held.StartTime).ToList();
         if (finalMatches.Count != 1) throw new ProtocolException("changed_focus_surface");
         held.RevalidateLockedHandles();
         finalMatches[0].RevalidateLockedHandles();
         if (!SetForegroundWindow(held.Window)) throw new ProtocolException("focus_denied");
-        Write(new { schema = ResponseSchema, version = 1, requestId = request.RequestId, kind = "result", processId = held.ProcessId, surfaceId = held.SurfaceId });
+        held.RevalidateLockedHandles();
+        if (GetForegroundWindow() != held.Window) throw new ProtocolException("focus_readback_failed");
+        Write(new { schema = ResponseSchema, version = 2, requestId = request.RequestId, kind = "result", processId = held.ProcessId, processStartTime = held.StartTime, surfaceId = held.SurfaceId, windowFocusVerified = true });
         return 0;
     }
 
@@ -293,7 +493,7 @@ internal static class Program
         Write(new
         {
             schema = ResponseSchema,
-            version = 1,
+            version = 2,
             requestId = request.RequestId,
             kind = "ready",
             authorizationToken = token,
@@ -331,7 +531,7 @@ internal static class Program
             Write(new
             {
                 schema = ResponseSchema,
-                version = 1,
+                version = 2,
                 requestId = request.RequestId,
                 kind = "result",
                 processId = launched.ProcessId,
@@ -413,13 +613,13 @@ internal static class Program
         using JsonDocument document = ParseJson(line);
         JsonElement root = document.RootElement;
         RequireProperties(root, "schema", "version", "requestId", "kind", "authorizationToken");
-        if (Text(root, "schema") != RequestSchema || Integer(root, "version") != 1 || Text(root, "requestId") != requestId
+        if (Text(root, "schema") != RequestSchema || Integer(root, "version") != 2 || Text(root, "requestId") != requestId
             || Text(root, "kind") != "authorize" || !CryptographicOperations.FixedTimeEquals(
                 Encoding.ASCII.GetBytes(Text(root, "authorizationToken")), Encoding.ASCII.GetBytes(token)))
             throw new ProtocolException("authorization_rejected");
     }
 
-    private static Request ParseRequest(string line)
+    private static Request ParseRequest(string line, bool focusOnly = false)
     {
         using JsonDocument document = ParseJson(line);
         JsonElement root = document.RootElement;
@@ -427,24 +627,28 @@ internal static class Program
         string[] allowed = action switch
         {
             "list" => new[] { "schema", "version", "requestId", "action", "provider", "identity" },
-            "focus" => new[] { "schema", "version", "requestId", "action", "provider", "identity", "expectedProcessId", "expectedSurfaceId" },
+            "focus" => new[] { "schema", "version", "requestId", "action", "provider", "identity", "expectedProcessId", "expectedProcessStartTime", "expectedSurfaceId" },
             "launch" => new[] { "schema", "version", "requestId", "action", "provider", "identity", "args", "requireDistinctSurface" },
             _ => throw new ProtocolException("invalid_action")
         };
         RequireProperties(root, allowed);
-        if (Text(root, "schema") != RequestSchema || Integer(root, "version") != 1) throw new ProtocolException("invalid_schema");
+        if (Text(root, "schema") != RequestSchema || Integer(root, "version") != 2) throw new ProtocolException("invalid_schema");
         string requestId = Text(root, "requestId");
         if (requestId.Length != 48 || !requestId.All(IsLowerHex)) throw new ProtocolException("invalid_request_id");
         string provider = Text(root, "provider");
-        if (!Products.TryGetValue(provider, out ProductDefinition? product) || product is null) throw new ProtocolException("invalid_provider");
-        if (provider is not ("claude_desktop" or "chatgpt_desktop")) throw new ProtocolException("invalid_provider");
+        ProductDefinition product;
+        if (provider == "vscode" && SupportsEditorFocus(action, focusOnly)) product = NativeEditorProduct;
+        else if (provider is "claude_desktop" or "chatgpt_desktop") product = Products[provider];
+        else throw new ProtocolException("invalid_provider");
         ExecutableIdentity identity = ParseIdentity(Property(root, "identity"), product, "desktop");
         uint? processId = action == "focus" ? UnsignedInteger(root, "expectedProcessId") : null;
         string? surfaceId = action == "focus" ? Text(root, "expectedSurfaceId") : null;
+        string? startTime = action == "focus" ? Text(root, "expectedProcessStartTime") : null;
+        if (startTime is not null && !ValidProcessStartTime(startTime)) throw new ProtocolException("invalid_process_birth");
         if (surfaceId is not null && !TryParseSurfaceId(surfaceId, out _)) throw new ProtocolException("invalid_surface_id");
         string[] arguments = action == "launch" ? StringArray(root, "args") : Array.Empty<string>();
         bool distinct = action == "launch" && Boolean(root, "requireDistinctSurface");
-        var request = new Request(requestId, action, provider, identity, processId, surfaceId, arguments, distinct);
+        var request = new Request(requestId, action, provider, identity, processId, surfaceId, arguments, distinct, ExpectedProcessStartTime: startTime);
         if (action == "launch") ValidateFixedArguments(request);
         return request;
     }
@@ -595,7 +799,7 @@ internal static class Program
     private sealed record ExecutableIdentity(string CanonicalExecutablePath, string ExecutableSha256, ProductDefinition Product, string SignerSubject, string SignerThumbprint, long Size, double ModifiedMs, ulong Device, ulong Inode);
     private sealed record WorkspaceIdentity(string CanonicalPath, ulong Device, ulong Inode);
     private sealed record ReceiptDescriptor(string PipeName, string Token);
-    private sealed record Request(string RequestId, string Action, string Provider, ExecutableIdentity Identity, uint? ExpectedProcessId, string? ExpectedSurfaceId, string[] Arguments, bool RequireDistinctSurface, WorkspaceIdentity? Workspace = null, ReceiptDescriptor? Receipt = null);
+    private sealed record Request(string RequestId, string Action, string Provider, ExecutableIdentity Identity, uint? ExpectedProcessId, string? ExpectedSurfaceId, string[] Arguments, bool RequireDistinctSurface, WorkspaceIdentity? Workspace = null, ReceiptDescriptor? Receipt = null, string? ExpectedProcessStartTime = null);
 
     private sealed class ProtocolException : Exception
     {
@@ -715,6 +919,7 @@ internal static class Program
         private readonly SafeFileHandle _process;
         private readonly HeldExecutable _executable;
         public uint ProcessId { get; }
+        public string StartTime { get; }
         public IntPtr Window { get; }
         public string SurfaceId => Program.SurfaceId(Window);
 
@@ -724,6 +929,7 @@ internal static class Program
             _process = process;
             _executable = executable;
             ProcessId = processId;
+            StartTime = ProcessStartTime(process);
             Window = window;
         }
 
@@ -736,6 +942,7 @@ internal static class Program
             {
                 string image = ProcessImagePath(process);
                 if (!SamePath(image, request.Identity.CanonicalExecutablePath)) { process.Dispose(); return null; }
+                AssertCurrentUserSession(process);
                 executable = HeldExecutable.Acquire(request);
                 var held = new HeldSurface(request, process, executable, processId, window);
                 held.Revalidate();
@@ -758,6 +965,8 @@ internal static class Program
         public void Revalidate()
         {
             if (_process.IsClosed || _process.IsInvalid || WaitForSingleObject(_process, 0) != WaitTimeout) throw new ProtocolException("provider_process_changed");
+            if (ProcessStartTime(_process) != StartTime) throw new ProtocolException("provider_process_birth_changed");
+            AssertCurrentUserSession(_process);
             if (!SamePath(ProcessImagePath(_process), _request.Identity.CanonicalExecutablePath)) throw new ProtocolException("provider_process_changed");
             if (!IsWindow(Window) || !IsWindowVisible(Window) || GetWindow(Window, GwOwner) != IntPtr.Zero) throw new ProtocolException("provider_surface_changed");
             GetWindowThreadProcessId(Window, out uint currentProcessId);
@@ -768,6 +977,8 @@ internal static class Program
         public void RevalidateLockedHandles()
         {
             if (_process.IsClosed || _process.IsInvalid || WaitForSingleObject(_process, 0) != WaitTimeout) throw new ProtocolException("provider_process_changed");
+            if (ProcessStartTime(_process) != StartTime) throw new ProtocolException("provider_process_birth_changed");
+            AssertCurrentUserSession(_process);
             if (!SamePath(ProcessImagePath(_process), _request.Identity.CanonicalExecutablePath)) throw new ProtocolException("provider_process_changed");
             if (!SafeWindow(Window)) throw new ProtocolException("provider_surface_changed");
             GetWindowThreadProcessId(Window, out uint currentProcessId);
@@ -897,6 +1108,54 @@ internal static class Program
         public void Dispose() { _thread.Dispose(); Process.Dispose(); }
     }
 
+    private static bool ValidProcessStartTime(string value) => value.Length is >= 1 and <= 20
+        && value[0] is >= '1' and <= '9' && value.All(c => c is >= '0' and <= '9')
+        && ulong.TryParse(value, NumberStyles.None, CultureInfo.InvariantCulture, out _);
+
+    private static string ProcessStartTime(SafeFileHandle process)
+    {
+        // ExitTime is undefined for a live process. Liveness comes only from the
+        // retained process handle, never from that unused FILETIME output.
+        if (!GetProcessTimes(process, out FileTimeNative created, out _, out _, out _)) throw NativeFailure("process_birth_unavailable");
+        ulong value = ((ulong)created.High << 32) | created.Low;
+        if (value == 0) throw new ProtocolException("invalid_process_birth");
+        return value.ToString(CultureInfo.InvariantCulture);
+    }
+
+    private static (byte[] User, uint Session) ProcessOwner(SafeFileHandle process)
+    {
+        // Query only: no token duplication, privilege changes, ACL changes,
+        // account-name lookup or alternative identity source on denial.
+        if (!OpenProcessToken(process, TokenQuery, out SafeAccessTokenHandle token)) throw NativeFailure("process_owner_unavailable");
+        using (token)
+        {
+            const int capacity = 256;
+            IntPtr buffer = Marshal.AllocHGlobal(capacity);
+            try
+            {
+                if (!GetTokenInformation(token, 1, buffer, capacity, out uint length) || length < IntPtr.Size || length > capacity) throw NativeFailure("process_owner_unavailable");
+                IntPtr sid = Marshal.ReadIntPtr(buffer);
+                long offset = sid.ToInt64() - buffer.ToInt64();
+                if (offset < IntPtr.Size || offset > length - 8 || !IsValidSid(sid)) throw new ProtocolException("invalid_process_owner");
+                uint size = GetLengthSid(sid);
+                if (size is < 8 or > 68 || offset + size > length) throw new ProtocolException("invalid_process_owner");
+                byte[] user = new byte[size]; Marshal.Copy(sid, user, 0, user.Length);
+                // TokenSessionId is class 12 and requires the same QUERY right.
+                if (!GetTokenInformation(token, 12, buffer, sizeof(uint), out length) || length != sizeof(uint)) throw NativeFailure("process_session_unavailable");
+                return (user, unchecked((uint)Marshal.ReadInt32(buffer)));
+            }
+            finally { Marshal.FreeHGlobal(buffer); }
+        }
+    }
+
+    private static void AssertCurrentUserSession(SafeFileHandle process)
+    {
+        var target = ProcessOwner(process);
+        using var currentProcess = new SafeFileHandle(GetCurrentProcess(), ownsHandle: false);
+        var current = ProcessOwner(currentProcess);
+        if (target.Session != current.Session || !target.User.SequenceEqual(current.User)) throw new ProtocolException("provider_user_session_changed");
+    }
+
     private static string ProcessImagePath(SafeFileHandle process)
     {
         var builder = new StringBuilder(4096);
@@ -993,6 +1252,9 @@ internal static class Program
         public UIntPtr PeakJobMemoryUsed;
     }
 
+    [StructLayout(LayoutKind.Sequential)]
+    private struct TcpOwnerPidRow { public uint State, LocalAddress, LocalPort, RemoteAddress, RemotePort, ProcessId; }
+    [DllImport("iphlpapi.dll")] private static extern uint GetExtendedTcpTable(IntPtr table, ref uint size, [MarshalAs(UnmanagedType.Bool)] bool order, uint family, uint tableClass, uint reserved);
     [DllImport("user32.dll", SetLastError = true)] [return: MarshalAs(UnmanagedType.Bool)] private static extern bool EnumWindows(EnumWindowsCallback callback, IntPtr parameter);
     [DllImport("user32.dll")] [return: MarshalAs(UnmanagedType.Bool)] private static extern bool IsWindowVisible(IntPtr window);
     [DllImport("user32.dll")] [return: MarshalAs(UnmanagedType.Bool)] private static extern bool IsWindow(IntPtr window);
@@ -1002,6 +1264,12 @@ internal static class Program
     [DllImport("user32.dll")] private static extern uint GetWindowThreadProcessId(IntPtr window, out uint processId);
     [DllImport("user32.dll")] [return: MarshalAs(UnmanagedType.Bool)] private static extern bool SetForegroundWindow(IntPtr window);
     [DllImport("kernel32.dll", SetLastError = true)] private static extern SafeFileHandle OpenProcess(uint desiredAccess, [MarshalAs(UnmanagedType.Bool)] bool inheritHandle, uint processId);
+    [DllImport("kernel32.dll")] private static extern IntPtr GetCurrentProcess();
+    [DllImport("kernel32.dll", SetLastError = true)] [return: MarshalAs(UnmanagedType.Bool)] private static extern bool GetProcessTimes(SafeFileHandle process, out FileTimeNative created, out FileTimeNative exited, out FileTimeNative kernel, out FileTimeNative user);
+    [DllImport("advapi32.dll", SetLastError = true)] [return: MarshalAs(UnmanagedType.Bool)] private static extern bool OpenProcessToken(SafeFileHandle process, uint access, out SafeAccessTokenHandle token);
+    [DllImport("advapi32.dll", SetLastError = true)] [return: MarshalAs(UnmanagedType.Bool)] private static extern bool GetTokenInformation(SafeAccessTokenHandle token, int kind, IntPtr value, int length, out uint returned);
+    [DllImport("advapi32.dll")] [return: MarshalAs(UnmanagedType.Bool)] private static extern bool IsValidSid(IntPtr sid);
+    [DllImport("advapi32.dll")] private static extern uint GetLengthSid(IntPtr sid);
     [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode)] [return: MarshalAs(UnmanagedType.Bool)] private static extern bool QueryFullProcessImageNameW(SafeFileHandle process, uint flags, StringBuilder path, ref uint size);
     [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode)] private static extern SafeFileHandle CreateFileW(string path, uint desiredAccess, uint shareMode, IntPtr securityAttributes, uint creationDisposition, uint flags, IntPtr template);
     [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode)] private static extern uint GetFinalPathNameByHandleW(SafeFileHandle file, StringBuilder path, uint size, uint flags);

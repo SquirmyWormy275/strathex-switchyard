@@ -1,0 +1,27 @@
+{
+  "schema": "switchyard-windows-release-failure/v1",
+  "sourceCommit": "b600a6d29e5d9ffd9c4439640ad70ff5fa14e439",
+  "executionCommit": "91353d21983d081a236ddf34c4f1e3fe270447d2",
+  "runId": 42246264439,
+  "jobId": 127991024754,
+  "releaseAccepted": false,
+  "preliminaryBackend": {
+    "accepted": false,
+    "timeoutMinutes": 20,
+    "completePlan": false,
+    "reportedFailedCase": "the native Windows lease worker refuses replaced and hard-linked lock files and malformed release",
+    "failureDetailsUnavailable": true
+  },
+  "build": {
+    "started": false,
+    "parameter": "TestPythonPath",
+    "failure": "Cannot process argument transformation: Cannot convert value to type System.String."
+  },
+  "independentNativeGuardian": {
+    "passedTests": 18,
+    "failedTests": 0,
+    "skippedTests": 0
+  },
+  "independentRuntimeReceipt": "windows-runtime-b600-native.json",
+  "cleanupClaim": "Fresh optional runtime removed according to its independent receipt. No complete release cleanup is claimed."
+}

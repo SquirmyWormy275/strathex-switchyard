@@ -1,0 +1,40 @@
+{
+  "schema": "switchyard-linux-complete-summary/v1",
+  "sourceCommit": "d900499bdeb3d0bf61a8ef46f098abb0e93a9e06",
+  "receipt": "isolated-test-d46a4996-be23-4592-a599-b2e7905bce67.json",
+  "totals": {
+    "required": 248,
+    "passed": 248,
+    "failed": 0,
+    "tests": 1611,
+    "passedTests": 1600,
+    "failedTests": 0,
+    "skippedTests": 11,
+    "cancelledTests": 0,
+    "todoTests": 0
+  },
+  "allChildAndTreeCleanupVerified": true,
+  "ownedCleanupReceipt": "linux-d900499-cleanup-1793956186943.json",
+  "ownedCleanup": {
+    "schema": "switchyard-owned-linux-checkout-cleanup/v1",
+    "source": "d900499bdeb3d0bf61a8ef46f098abb0e93a9e06",
+    "runReceipt": "isolated-test-d46a4996-be23-4592-a599-b2e7905bce67.json",
+    "runAccepted": true,
+    "allChildAndTreeCleanupVerified": true,
+    "exactRootIdentityVerified": true,
+    "dependencyAliasesVerifiedRemoved": true,
+    "ownedBuildsRemoved": true,
+    "emptyArtifactsDirectoryRemoved": true,
+    "checkoutRemoved": true,
+    "rootRemoved": true,
+    "markerRemoved": true,
+    "ownedTestParentRemoved": true
+  },
+  "scope": "Complete Linux manifest from immutable published source, including the exact editor process observer and Windows token-security diagnostic source.",
+  "limits": [
+    "Eleven declared Windows-only skips; no native Windows, guest or ordinary-user acceptance is inferred.",
+    "Provider/editor doubles and real owned synthetic kernel processes are distinct from live IDE/account/task attachment.",
+    "Later protocol witness and query-only ACL correction have separate focused evidence and are not included in this complete source run.",
+    "Installed source remains 5a2c324, with separate normal-update/offline/metadata evidence; frontend, hardware and work accounts remain separate."
+  ]
+}

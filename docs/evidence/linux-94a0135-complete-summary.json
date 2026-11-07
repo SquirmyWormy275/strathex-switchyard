@@ -1,0 +1,55 @@
+{
+  "schema": "switchyard-full-linux-source-summary/v1",
+  "sourceCommit": "94a01353f540fc516ac51efa62f3e88e9aa7ce67",
+  "sourceTree": "1ab298738995d2600afc90a727b1d1699fe0fccb",
+  "verificationReceipt": "isolated-test-c7892cf9-25a5-4b56-9ad7-11be84658bca.json",
+  "verificationReceiptSha256": "f9c343f0e013afef1160758d5dc674c9e05922832925630a053cffb4034e0ea6",
+  "success": true,
+  "totals": {
+    "required": 323,
+    "passed": 323,
+    "failed": 0,
+    "tests": 1995,
+    "passedTests": 1979,
+    "failedTests": 0,
+    "skippedTests": 16,
+    "cancelledTests": 0,
+    "todoTests": 0
+  },
+  "allChildAndTreeCleanupVerified": true,
+  "cleanupReceipt": "linux-94a0135-cleanup-1794025552071.json",
+  "cleanup": {
+    "schema": "switchyard-owned-full-linux-cleanup/v1",
+    "sourceCommit": "94a01353f540fc516ac51efa62f3e88e9aa7ce67",
+    "verificationReceipt": "isolated-test-c7892cf9-25a5-4b56-9ad7-11be84658bca.json",
+    "generatedFiles": 782,
+    "generatedBytes": 11790322,
+    "generatedDirectories": [
+      "apps/linux-companion/dist",
+      "apps/provider-adapter-host/dist",
+      "apps/vscode-extension/dist",
+      "apps/windows-companion/dist",
+      "packages/protocol/dist"
+    ],
+    "dependencyAliasCount": 9,
+    "trackedTreeClean": true,
+    "testChildrenExited": true,
+    "testParentEmpty": true,
+    "rootIdentityVerified": true,
+    "testParentIdentityVerified": true,
+    "worktreeRemoved": true,
+    "rootRemoved": true,
+    "testParentRemoved": true,
+    "markerRemoved": true,
+    "otherWorktreesPreserved": true,
+    "dependencyAliasIdentityAndTargetVerified": true,
+    "cleanupPlanSha256": "656e1b5fbe82c10392e23351c618788b96ac01ae2a59902accaf59ff4ed40684"
+  },
+  "providersAndWindowsGuestsDoubledWhereDeclared": true,
+  "installedChanged": false,
+  "originalManifestCommandsBoundsAndSkipsVerified": true,
+  "limitations": [
+    "Python wheel license changes made after this source have separate focused evidence.",
+    "Interactive Windows, provider account and physical hardware acceptance remain separate."
+  ]
+}

@@ -1,0 +1,29 @@
+{
+  "schema": "switchyard-native-restricted-owner-074-failure/v1",
+  "prHead": "074079170f62133754b329f26452ad94ea332923",
+  "executionMergeLabel": "99b78e9dc2e0c0f79cb98e1975f607e875d6c26d",
+  "runId": 42128276275,
+  "jobId": 127598003935,
+  "artifactId": 13463075965,
+  "archiveSha256": "b91899206f74ac5c292fe440925ba14303dc181d492b3965a59dd98b8426907a",
+  "receipt": "windows-restricted-owner-074-native.json",
+  "archiveDigestVerified": true,
+  "success": false,
+  "accepted": false,
+  "restrictedMetadataChecks": 13,
+  "restrictedNativeExchangeChecks": 31,
+  "originalHostOwnerChecks": 8,
+  "restrictedOwnerPhase": "bounded-owner-journey",
+  "childExit": {
+    "waitResult": 0,
+    "exitCode": 3221225794,
+    "hex": "0xC0000142",
+    "name": "STATUS_DLL_INIT_FAILED",
+    "resultAvailable": false
+  },
+  "nativeExitDiagnosticNowPreserved": true,
+  "hardwareOrAccountBlocked": false,
+  "protectedOriginalInstallationPreserved": true,
+  "statusReference": "https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-erref/596a1078-e883-4972-9bbc-49e60bebca55",
+  "boundary": "Kernel/token checks and the original owner do not accept this failing restricted primary-token child. Root cause and repair acceptance remain open."
+}

@@ -1,0 +1,50 @@
+{
+  "schema": "switchyard-private-pipe-buffer-native/v1",
+  "observations": [
+    {
+      "kind": "pipe",
+      "sourceCommit": "9fde0a3d4534193a5248ba9d89a2d6b0afbcfa72",
+      "executionCommit": "304fb9159b4f33be35c000e4c713245fa66f6047",
+      "sourceAndExecutionTree": "20f857447c6337886faa093b0e8ac5ac836aacfa",
+      "runId": 42264278450,
+      "artifactId": 13525762911,
+      "archiveBytes": 712,
+      "archiveSha256": "db9ca05c77c71d575a4acb089ccfdb0e662be5bae279e8dc87f912810220224d",
+      "zipSavedLocally": false,
+      "privateReceipt": "windows-pipe-9fde-native.json",
+      "success": false,
+      "completedChecks": 15,
+      "failurePhase": "descriptor-readback",
+      "descriptorObservation": {
+        "stage": "descriptor-buffer",
+        "reportedBytes": 0,
+        "capacity": 4096
+      },
+      "workerStartFailure": null
+    },
+    {
+      "kind": "setup",
+      "sourceCommit": "9fde0a3d4534193a5248ba9d89a2d6b0afbcfa72",
+      "executionCommit": "304fb9159b4f33be35c000e4c713245fa66f6047",
+      "sourceAndExecutionTree": "20f857447c6337886faa093b0e8ac5ac836aacfa",
+      "runId": 42264278450,
+      "artifactId": 13526960939,
+      "archiveBytes": 740,
+      "archiveSha256": "ff1c77d24f5167349a8c60536ed857c0bbdfda141769130b90b05adfb67245a8",
+      "zipSavedLocally": false,
+      "privateReceipt": "windows-setup-9fde-native.json",
+      "success": false,
+      "completedChecks": 1,
+      "failurePhase": null,
+      "descriptorObservation": null,
+      "workerStartFailure": {
+        "phase": "pipe-security-verify",
+        "nativeCode": null
+      }
+    }
+  ],
+  "requiredPipeChecks": 36,
+  "nativePipeCompleteAcceptance": false,
+  "originalOwnerAcceptedChecks": 0,
+  "installedChanged": false
+}

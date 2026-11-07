@@ -1,0 +1,99 @@
+{
+  "schema": "switchyard-archive-independent-scheduling/v1",
+  "baselineCommit": "7e45654a5dca544815f86336b4bc2512c60648a9",
+  "sourceFiles": {
+    "tools/layout-studio/shield-scanner-engine.mjs": "62c7328b814fa0ce559930d3ba029fb7aff85d23110e75f8aaadcf04db44ec0e",
+    "tools/layout-studio/repository-shield-artifacts.test.mjs": "a4bfcebdc7c5b5684aef1ab86be7bbc250717bb783f6723ca49e28eb39bedb89",
+    "tools/layout-studio/repository-shield-npm-archives.test.mjs": "85655d1645bbb92970aab654b2e1e8bb796fd8ab975fa666cef8745ce91287f1",
+    "tools/layout-studio/test-support/assert-npm-artifact-execution.mjs": "68a6171d38864bd668e77e85feaf72bb3e41046c116a181a88f1f29894e964ae",
+    "scripts/run-isolated-tests.mjs": "9f608af079486bace6abe06a1199e50f02e28b2dd79267ce1aecaecf43c06b61",
+    "scripts/run-isolated-tests.test.mjs": "95b38de203f7d72187cd2f0067d838d351bd822d16007055957f21ffd6ae7b96",
+    "scripts/windows-scenario-groups.test.mjs": "513550b7b199fb410c9ce3cffdb94b84dfa041cf3a4e7962162eb0e5a1ca3d9f",
+    "scripts/verify-windows-storage-contracts.mjs": "12b41964ea879b9da25addabbc7b9c812c850b358633a4e78bc11135cabeccf8",
+    ".github/workflows/switchyard-windows-filesystem.yml": "643097722f59bd1740211b52bea73b39ea648452bda37dc339e7d4c7997df2f7"
+  },
+  "initialFailedReceipt": "isolated-test-59c36e90-6593-439d-8af2-9bc1f2592e7e.json",
+  "initialFailure": "expected timeout inventory omitted the new independent file",
+  "acceptedInitialGroups": [
+    {
+      "file": "scripts/windows-backend-shards.test.mjs",
+      "counts": {
+        "total": 2,
+        "passed": 2,
+        "failed": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      }
+    },
+    {
+      "file": "scripts/windows-scenario-groups.test.mjs",
+      "counts": {
+        "total": 9,
+        "passed": 9,
+        "failed": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      }
+    },
+    {
+      "file": "tools/layout-studio/repository-shield-artifacts.test.mjs",
+      "counts": {
+        "total": 10,
+        "passed": 10,
+        "failed": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      }
+    },
+    {
+      "file": "tools/layout-studio/repository-shield-npm-archives.test.mjs",
+      "counts": {
+        "total": 12,
+        "passed": 12,
+        "failed": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      }
+    }
+  ],
+  "correctedHarnessReceipt": "isolated-test-d3c90a2d-5251-4dd7-85a0-964e38ae40ce.json",
+  "correctedHarnessTotals": {
+    "required": 1,
+    "passed": 1,
+    "failed": 0,
+    "tests": 20,
+    "passedTests": 20,
+    "failedTests": 0,
+    "skippedTests": 0,
+    "cancelledTests": 0,
+    "todoTests": 0
+  },
+  "acceptedDistinctGroups": 5,
+  "acceptedDistinctTests": 53,
+  "reportBoundsReceipt": "isolated-test-efec4f7a-1b10-433c-a1bb-59200d196f57.json",
+  "reportBoundsTotals": {
+    "required": 4,
+    "passed": 4,
+    "failed": 0,
+    "tests": 4,
+    "passedTests": 4,
+    "failedTests": 0,
+    "skippedTests": 0,
+    "cancelledTests": 0,
+    "todoTests": 0
+  },
+  "allChildAndTreeCleanupVerified": true,
+  "nativeWindowsPending": true,
+  "originalWindowsChildBoundMs": 300000,
+  "originalLinuxChildBoundMs": 120000,
+  "originalCiStepBoundMinutes": 6,
+  "originalAssertionsPreserved": true,
+  "nativeFailureSummary": "npm-archive-native-timeout-summary.json",
+  "newRuntimeOrDependencyDownloaded": false,
+  "installedChanged": false,
+  "frontendChanged": false
+}

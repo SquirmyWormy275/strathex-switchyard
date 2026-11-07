@@ -1,0 +1,41 @@
+{
+  "schema": "switchyard-cold-legacy-random-source/v1",
+  "basis": "b4ab4169d14958affdcf0b75bc78949adc1d94cb",
+  "sourceSha256": {
+    "deployment/windows/test-support/storage-broker-protocol/Build-ColdRandom.ps1": "549a5e17e39535d1a09b7b4dae0fc130a2ecfd8b907513f1efe543d76f67f5e0",
+    "deployment/windows/test-support/storage-broker-protocol/ColdRandom.cpp": "28905bc8894fb559cdee0fd5a940f31559bb5369048f7456df880f18b5f5c56f",
+    "deployment/windows/test-support/storage-broker-protocol/ColdRandomProcess.cs": "c9068e8dca6e5089c025476797e8a7510d104c5b07eabfe87de92f277680ff8c",
+    "deployment/windows/test-support/storage-broker-protocol/ColdRandomReport.cs": "cbb54486dd7ce74a87745d3a9d9a72bd7ac7aad8a190ebb73e8bfc06949fa2fa",
+    "scripts/verify-windows-storage-broker.mjs": "05c0ac40e16329a9cccf774e1c7443a8fc987e20c99a23a29d02ae2d2bf9f343",
+    "scripts/windows-restricted-owner-report.mjs": "da43e0df138d2ff3e16b1e2f84311fe47b91cfcf5172e0abce25e77ed64bc580",
+    "scripts/windows-restricted-owner-report.test.mjs": "8560be9d341017258103f2188c9ff8e9249b117ef63b717bdc76a52a6a6436d6"
+  },
+  "purpose": "Observe CryptAcquireContextW(PROV_RSA_FULL, CRYPT_VERIFYCONTEXT | CRYPT_SILENT), CryptGenRandom and CryptReleaseContext first in a fresh native process under the original restricted primary token. Existing CNG observations follow. No entropy leaves the child or is supplied to Node.",
+  "managedBuild": {
+    "receipt": "managed-source-build-1793950254998.json",
+    "targets": 2,
+    "portableChecksPassed": 1884,
+    "coldParserChecks": 28,
+    "warnings": 0,
+    "errors": 0,
+    "existingSdkReused": true,
+    "ownedScratchRemoved": true
+  },
+  "focused": {
+    "receipt": "isolated-test-07903e34-cd2b-451e-8a09-1b2fb64071e6.json",
+    "groups": 2,
+    "passedTests": 19,
+    "allChildAndTreeCleanupVerified": true
+  },
+  "nativeAcceptance": "pending",
+  "limits": [
+    "Version 2 uses a fixed 64-byte status/boolean packet; old, malformed or incomplete cleanup reports refuse.",
+    "Legacy CryptoAPI executes first. The later BCrypt calls are no longer claimed as first crypto calls in this new child; historical cold-CNG evidence remains source-specific.",
+    "The same original primary token, private desktop, environment, owned pipes, Job, deadlines and Node acceptance checks remain.",
+    "This is a CI-only observation of the upstream legacy API parameters, not an RNG fallback, persisted key-container operation or startup repair."
+  ],
+  "references": [
+    "https://raw.githubusercontent.com/nodejs/node/v24.14.0/deps/openssl/openssl/providers/implementations/rands/seeding/rand_win.c",
+    "https://learn.microsoft.com/en-us/windows/win32/api/wincrypt/nf-wincrypt-cryptacquirecontextw"
+  ]
+}

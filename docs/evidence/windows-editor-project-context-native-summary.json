@@ -1,0 +1,79 @@
+{
+  "schema": "switchyard-windows-project-context-native-summary/v1",
+  "sourceCommit": "c359cdfbc4b15c6c852986a9a2b36fe6f640d9df",
+  "mergeCommit": "4919f30ae0a82cd28f0b5490e8c57af216ddb31e",
+  "tree": "d212a9b991c70b7ba99210b8a06ffcd4497d355f",
+  "workflowRun": 42369157567,
+  "helperJob": 128394345225,
+  "clientJob": 128394575999,
+  "artifact": {
+    "id": 13573327590,
+    "bytes": 3535,
+    "sha256": "af46de9fe47c0001dfdb7440b73dfec2bd94f8d81b9880173114b5b98f632fcb"
+  },
+  "receipt": {
+    "id": "99f8af6f-c972-4012-9824-789bf3bdb56e",
+    "sha256": "5867153e26d9e6ec6e6bfece65e6bd7a8fa68adefb7afcfe6da18afc003dbdad"
+  },
+  "success": true,
+  "totals": {
+    "required": 25,
+    "passed": 25,
+    "failed": 0,
+    "tests": 243,
+    "passedTests": 243,
+    "failedTests": 0,
+    "skippedTests": 0,
+    "cancelledTests": 0,
+    "todoTests": 0
+  },
+  "selectedGroups": [
+    {
+      "file": "tools/layout-studio/windows-coding-editor-connections.test.mjs",
+      "passed": 9,
+      "durationMs": 79288,
+      "originalDeadlineMs": 120000,
+      "cleanupVerified": true
+    },
+    {
+      "file": "tools/layout-studio/windows-editor-journal.test.mjs",
+      "passed": 15,
+      "durationMs": 33005,
+      "originalDeadlineMs": 45000,
+      "cleanupVerified": true
+    },
+    {
+      "file": "tools/layout-studio/windows-editor-endpoint.test.mjs",
+      "passed": 8,
+      "durationMs": 4377,
+      "originalDeadlineMs": 120000,
+      "cleanupVerified": true
+    },
+    {
+      "file": "apps/vscode-extension/test/studio-windows-editor-files.test.ts",
+      "passed": 1,
+      "durationMs": 265,
+      "originalDeadlineMs": 45000,
+      "cleanupVerified": true
+    },
+    {
+      "file": "apps/vscode-extension/test/studio-windows-editor-launch.test.ts",
+      "passed": 13,
+      "durationMs": 18792,
+      "originalDeadlineMs": 45000,
+      "cleanupVerified": true
+    }
+  ],
+  "originalManifestCommandsBoundsSkipsAndCleanupVerified": true,
+  "retainedFailures": [
+    "windows-editor-launch-native-failure-summary.json",
+    "editor-journal-native-failure-summary.json",
+    "editor-journal-read-queue-native-failure-summary.json"
+  ],
+  "limitations": [
+    "This accepts the whole native client lane at this source, including the workspace-generation and signed retirement changes, not the complete Windows suite, later storage diagnostics or authenticated native Codex turns.",
+    "Terminal/file/provider doubles remain explicit in the signed launcher demonstration; separate groups exercise real native endpoints, file policy, process/Job and socket checks.",
+    "No live account/task/model request, native TUI interaction, hardware operation or installed application update is inferred.",
+    "The independent restricted-storage retirement failure remains unresolved."
+  ]
+}

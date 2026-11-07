@@ -1,0 +1,54 @@
+{
+  "schema": "switchyard-native-contract-summary/v1",
+  "sourceCommit": "b38ff75907992568cbdc69535d984827644e9d2a",
+  "sourceTree": "0426df57d7956b7bba5bf2f7d3d0a0de684ec2ac",
+  "mergeCommit": "3fc8d3d0977e717c1659bd69378bfd1e20037b38",
+  "mergeTree": "0426df57d7956b7bba5bf2f7d3d0a0de684ec2ac",
+  "runId": 42389294892,
+  "jobId": 128453616151,
+  "artifactId": 13580703956,
+  "zipSha256": "2eddb56facc286cfe461ac03ae4abb5c513b58c7cbade365de546ef9e3f1e552",
+  "receipt": {
+    "id": "05783d90-3dfc-4034-bd78-b302806582be",
+    "sha256": "c6019c4bbda6a4e13d52e8de2d18e37152316a8866e38e937dcd32a1d945127e"
+  },
+  "success": true,
+  "totals": {
+    "required": 3,
+    "passed": 3,
+    "failed": 0,
+    "tests": 51,
+    "passedTests": 51,
+    "failedTests": 0,
+    "skippedTests": 0,
+    "cancelledTests": 0,
+    "todoTests": 0
+  },
+  "groups": [
+    {
+      "file": "tools/layout-studio/agent-revocation.test.mjs",
+      "timeoutMs": 45000,
+      "durationMs": 18683,
+      "passedTests": 17
+    },
+    {
+      "file": "tools/layout-studio/agent-observation.test.mjs",
+      "timeoutMs": 45000,
+      "durationMs": 720,
+      "passedTests": 17
+    },
+    {
+      "file": "tools/layout-studio/integrations.test.mjs",
+      "timeoutMs": 45000,
+      "durationMs": 3831,
+      "passedTests": 17
+    }
+  ],
+  "originalManifestCommandsBoundsSkipsAndCleanupVerified": true,
+  "sourceFilesUnchangedSinceNativeRevision": true,
+  "manifestProjectionOnly": true,
+  "limitations": [
+    "This accepts the named contract files on native Windows at the exact source; it is not the complete Windows suite or package acceptance.",
+    "Providers are explicit doubles; no live account/task, interactive desktop or physical keyboard acceptance."
+  ]
+}

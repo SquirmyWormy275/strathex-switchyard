@@ -1,9 +1,10 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { mkdir, mkdtemp, readFile, realpath, rm, stat, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, realpath, rename, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
+import type { CodexLocalThreadBinding } from "../src/operator-status.ts";
 import {
   type BridgeResult,
   type ExtensionCompanionBridge,
@@ -63,7 +64,7 @@ import {
   type AutomationOperationProposal
 } from "../../../packages/control-plane/src/automation-operation-manifest.ts";
 import { authorityBroadcastReviewScopeDigest, type WorkflowArtifact } from "../../../packages/control-plane/src/workflow-artifacts.ts";
-import { deactivateManagedExtension, exactExtensionPackageVersion, ManagedSessionController, workflowResultPresentation } from "../src/controller.ts";
+import { deactivateManagedExtension, exactExtensionPackageVersion, ManagedSessionController, samePath, workflowResultPresentation } from "../src/controller.ts";
 import { chordFor, type B122Control, type B122Modifier } from "../src/commands.ts";
 import type { DebugConfigurationLike, DebugSessionLike, DisposableLike, ExtensionContextLike, QuickPickItemLike, TerminalLike, VscodeLike, WorkspaceFolderLike } from "../src/vscode-like.ts";
 
@@ -141,13 +142,23 @@ function readyContainmentIncident(repositoryRoot: string, fenceEpoch: number, ac
   };
 }
 
+test("exact host path comparisons preserve Linux case and literal backslashes while using Windows path semantics only on Windows", () => {
+  assert.equal(samePath("/work/Repo", "/work/repo", "linux"), false);
+  assert.equal(samePath("/work/a\\b", "/work/a/b", "linux"), false);
+  assert.equal(samePath("/work/repo/", "/work/repo", "linux"), true);
+  assert.equal(samePath("/", "", "linux"), false); assert.equal(samePath("/", "/", "linux"), true);
+  assert.equal(samePath("C:\\Work\\Repo\\", "c:/work/repo", "win32"), true);
+  assert.equal(samePath("C:\\", "c:/", "win32"), true); assert.equal(samePath("C:\\", "C:", "win32"), false);
+  assert.equal(samePath("/work/Repo", "/work/repo", "darwin"), false, "unverified volume case behavior cannot broaden exact identity");
+});
+
 class FakeTerminal implements TerminalLike {
   readonly sent: string[] = [];
   shown = 0;
   readonly name: string;
   readonly processId: PromiseLike<number | undefined> = Promise.resolve(4242);
-  constructor(name: string) { this.name = name; }
-  show(): void { this.shown += 1; }
+  constructor(name: string, private readonly onShow?: (terminal: FakeTerminal) => void) { this.name = name; }
+  show(): void { this.shown += 1; this.onShow?.(this); }
   sendText(text: string): void { this.sent.push(text); }
 }
 
@@ -185,6 +196,7 @@ class FakeVscode {
   focused = true;
   private readonly openListeners: Array<(terminal: TerminalLike) => unknown> = [];
   private readonly closeListeners: Array<(terminal: TerminalLike) => unknown> = [];
+  private readonly activeTerminalListeners = new Set<(terminal: TerminalLike | undefined) => unknown>();
   private readonly workspaceListeners: Array<() => unknown> = [];
   private readonly debugStartListeners: Array<(session: DebugSessionLike) => unknown> = [];
   private readonly debugStopListeners: Array<(session: DebugSessionLike) => unknown> = [];
@@ -196,7 +208,7 @@ class FakeVscode {
   readonly api: VscodeLike;
 
   constructor(terminalNames = ["Manual terminal"], workspaceRoots = ["C:\\repo"]) {
-    this.terminals = terminalNames.map((name) => new FakeTerminal(name));
+    this.terminals = terminalNames.map((name) => new FakeTerminal(name, terminal => this.activateTerminal(terminal)));
     this.activeTerminal = this.terminals[0];
     this.workspaceFolders = workspaceRoots.map((fsPath) => ({ uri: { fsPath } }));
     const self = this;
@@ -214,7 +226,7 @@ class FakeVscode {
         get activeTerminal(): TerminalLike | undefined { return self.activeTerminal; },
         createTerminal(options): TerminalLike {
           self.terminalOptions.push(options);
-          const terminal = new FakeTerminal(options.name);
+          const terminal = new FakeTerminal(options.name, candidate => self.activateTerminal(candidate));
           self.createdTerminals.push(terminal);
           self.terminals.push(terminal);
           self.activeTerminal = terminal;
@@ -237,6 +249,7 @@ class FakeVscode {
         async showOpenDialog(): Promise<readonly { fsPath: string }[] | undefined> { const path = self.openDialogPaths.shift(); return path ? [{ fsPath: path }] : undefined; },
         onDidOpenTerminal(listener): DisposableLike { self.openListeners.push(listener); return new FakeDisposable(); },
         onDidCloseTerminal(listener): DisposableLike { self.closeListeners.push(listener); return new FakeDisposable(); },
+        onDidChangeActiveTerminal(listener): DisposableLike { self.activeTerminalListeners.add(listener); return { dispose: () => { self.activeTerminalListeners.delete(listener); } }; },
         onDidChangeWindowState(listener): DisposableLike { self.focusListeners.push(listener); return new FakeDisposable(); }
       },
       workspace: {
@@ -284,6 +297,12 @@ class FakeVscode {
   }
 
   async fireOpen(terminal: FakeTerminal): Promise<void> { for (const listener of this.openListeners) await listener(terminal); }
+  activateTerminal(terminal: FakeTerminal | undefined): void { this.activeTerminal = terminal; for (const listener of this.activeTerminalListeners) listener(terminal); }
+  async fireClose(terminal: FakeTerminal): Promise<void> {
+    const index = this.terminals.indexOf(terminal); if (index >= 0) this.terminals.splice(index, 1);
+    if (this.activeTerminal === terminal) this.activateTerminal(undefined);
+    for (const listener of this.closeListeners) await listener(terminal);
+  }
   async fireWorkspaceChange(): Promise<void> { for (const listener of this.workspaceListeners) await listener(); }
   async fireDebugStart(session: DebugSessionLike): Promise<void> { this.activeDebugSession = session; for (const listener of this.debugStartListeners) await listener(session); }
   async fireDebugStop(session: DebugSessionLike): Promise<void> { for (const listener of this.debugStopListeners) await listener(session); if (this.activeDebugSession === session) this.activeDebugSession = undefined; }
@@ -1139,6 +1158,125 @@ test("registers VS Code window, workspace, terminals, and debug configurations w
   assert.equal(bridge.adopted[0].provider, "claude");
   await vscode.invoke("sxsy-b122.adoptTerminal", { terminalName: "Manual terminal", provider: "codex" });
   assert.match(vscode.warnings.at(-1) ?? "", /already been adopted/i);
+});
+
+test("operator command shows unbound live Codex runtime without changing authenticated sessions", async () => {
+  const vscode = new FakeVscode([], []);
+  const bridge = new FakeBridge();
+  const controller = new ManagedSessionController(vscode.api, new FakeContext(), bridge, {
+    idFactory: sequenceFactory(),
+    observeCodexThreads: async () => [
+      { id: "live-thread", observation: "active" },
+      { id: "stored-thread", observation: "not-observed" }
+    ]
+  });
+  await controller.start();
+  bridge.listedSessions = [];
+  await vscode.invoke("sxsy-b122.showManagedSessions");
+  const rows = vscode.quickPickSurfaces.at(-1)?.items ?? [];
+  assert.equal(rows.length, 1);
+  assert.match((rows[0] as QuickPickItemLike).label, /active \(unbound\)/);
+  assert.match((rows[0] as QuickPickItemLike).detail ?? "", /no verified session capability/);
+  assert.equal(bridge.statuses.length, 0);
+  await controller.stop();
+});
+
+test("Linux Codex start binds the App Server thread ID, task, repository, and exact existing target before opening the TUI", { skip: process.platform !== "linux" }, async () => {
+  const root = await mkdtemp(join(tmpdir(), "sxsy-codex-bound-root-"));
+  const vscode = new FakeVscode([], [root]);
+  const bridge = new FakeBridge();
+  let saved: CodexLocalThreadBinding | undefined;
+  const controller = new ManagedSessionController(vscode.api, new FakeContext(), bridge, {
+    idFactory: sequenceFactory(),
+    resolveGitRoots: async () => [{ gitRoot: root }],
+    codexExecutable: process.execPath,
+    codexSocketPath: "/synthetic/control.sock",
+    startCodexThread: async (repositoryRoot, taskId) => { assert.equal(repositoryRoot, root); assert.equal(taskId, "task-7"); return { threadId: "019a36f0-1345-7345-b123-123456789abc" }; },
+    persistCodexBinding: async (binding) => { saved = binding; return binding; },
+    readCodexBindings: async () => saved ? [saved] : [],
+    observeCodexThreads: async (boundThreadIds) => { assert.deepEqual(boundThreadIds, ["019a36f0-1345-7345-b123-123456789abc"]); return [{ id: "019a36f0-1345-7345-b123-123456789abc", observation: "active" }]; }
+  });
+  try {
+    await controller.start();
+    bridge.listedSessions = [{
+      id: "source-session", provider: "codex", surface: "vscode_terminal", capabilities: ["registered"], status: "unknown",
+      workspaceRoot: root, targetSnapshotId: "a".repeat(64), taskId: "task-7", plannedFiles: [],
+      lastHeartbeat: "2026-10-27T00:00:00.000Z", adapterVersion: "fixture", metadata: {}
+    }];
+    vscode.input("task-7");
+    await vscode.invoke("sxsy-b122.startBoundCodexThread");
+    assert.equal(saved?.threadId, "019a36f0-1345-7345-b123-123456789abc");
+    assert.equal(saved?.taskId, "task-7");
+    assert.equal(saved?.targetSnapshotId, "a".repeat(64));
+    assert.deepEqual(vscode.terminalOptions.at(-1)?.shellArgs, ["resume", "--remote", "unix:///synthetic/control.sock", "--sandbox", "read-only", "--ask-for-approval", "on-request", "--cd", root, "019a36f0-1345-7345-b123-123456789abc"]);
+    assert.equal(bridge.registered.at(-1)?.metadata["sxsy-b122.codex.threadId"], "019a36f0-1345-7345-b123-123456789abc");
+    assert.deepEqual(bridge.registered.at(-1)?.capabilities, ["registered"]);
+    const terminal = vscode.createdTerminals[0]!, registeredCount = bridge.registered.length;
+    await vscode.fireOpen(terminal);
+    assert.equal(bridge.registered.length, registeredCount, "the open event must reuse the exact thread binding instead of registering a phantom generic terminal");
+    assert.equal(controller.listKnownSessions().filter(session => session.surface === "vscode_terminal").length, 1);
+    const neighbor = vscode.api.window.createTerminal({ name: terminal.name, cwd: root });
+    bridge.nextDispatch = { status: "running", summary: "Exact integrated terminal awaits host acknowledgement.", data: {
+      hostActionId: `host-action:${"8".repeat(64)}`, hostActionKind: "focus_integrated_terminal", hostActionExpiresAt: "2099-01-01T00:00:00.000Z", hostActionWorkspaceRoot: root
+    } };
+    await controller.dispatchChord(chordFor("TERMINAL", "shift")!);
+    assert.equal(vscode.activeTerminal, terminal); assert.notEqual(vscode.activeTerminal, neighbor);
+    assert.equal(vscode.createdTerminals.length, 2, "the exact Codex terminal must be reused without creating another shell");
+    vscode.choose(terminal.name);
+    await vscode.invoke("sxsy-b122.adoptTerminal", { terminalName: terminal.name, provider: "claude" });
+    assert.equal(bridge.adopted.length, 0, "generic adoption cannot redirect a native thread binding to another provider");
+    await vscode.invoke("sxsy-b122.showManagedSessions");
+    const rows = vscode.quickPickSurfaces.at(-1)?.items ?? [];
+    assert.ok(rows.some((row) => typeof row !== "string" && /active \(task-bound\)/.test(row.label) && row.detail?.includes("task task-7")));
+    await vscode.fireClose(terminal);
+    assert.equal(bridge.statuses.at(-1)?.sessionId, "codex-thread:019a36f0-1345-7345-b123-123456789abc");
+    assert.equal(bridge.statuses.at(-1)?.status, "unreachable");
+    assert.equal(controller.listKnownSessions().find(session => session.id === "codex-thread:019a36f0-1345-7345-b123-123456789abc")?.status, "unreachable");
+  } finally {
+    await controller.stop();
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("Linux Codex terminal launch fences asynchronous context/native identity drift and preserves partial creation identity", { skip: process.platform !== "linux" }, async () => {
+  for (const drift of ["workspace", "window-focus", "directory", "executable", "named-session", "before-start", "persistence", "bad-persisted-id", "partial-start", "registration", "substituted-registry", "invalid-socket"] as const) {
+    const stage = await mkdtemp(join(tmpdir(), "sxsy-codex-drift-")), root = join(stage, "repository"), cli = join(stage, "codex");
+    await mkdir(root); await writeFile(cli, "#!/bin/sh\nexit 0\n", { mode: 0o700 });
+    const vscode = new FakeVscode([], [root]), bridge = new FakeBridge(); let starts = 0, saved = false;
+    const id = "019a36f0-1345-7345-b123-123456789abc";
+    const controller = new ManagedSessionController(vscode.api, new FakeContext(), bridge, {
+      idFactory: sequenceFactory(), resolveGitRoots: async () => [{ gitRoot: root }], codexExecutable: cli,
+      codexSocketPath: drift === "invalid-socket" ? "/invalid/%socket" : "/synthetic/control.sock",
+      startCodexThread: async () => {
+        starts++;
+        if (drift === "workspace") vscode.workspaceFolders = [];
+        if (drift === "window-focus") vscode.focused = false;
+        if (drift === "directory") { await rename(root, root + "-old"); await mkdir(root); }
+        if (drift === "executable") await writeFile(cli, "#!/bin/sh\nexit 23\n");
+        if (drift === "partial-start") throw Object.assign(new Error("Synthetic native policy readback refused"), { createdThreadId: id });
+        return { threadId: drift === "named-session" ? "same-name" : id };
+      },
+      persistCodexBinding: async binding => { saved = true; if (drift === "persistence") vscode.focused = false; return drift === "bad-persisted-id" ? { ...binding, threadId: "019a36f0-1345-7345-b123-123456789abd" } : binding; }
+    });
+    try {
+      await controller.start();
+      const register = bridge.registerSession.bind(bridge);
+      bridge.registerSession = async session => {
+        const isThread = session.metadata["sxsy-b122.kind"] === "codex-app-server-thread";
+        if (drift === "registration" && isThread) vscode.workspaceFolders = [];
+        const result = await register(session);
+        return drift === "substituted-registry" && isThread && result.ok ? { ok: true, value: { ...result.value, taskId: "different-task" } } : result;
+      };
+      if (drift === "before-start") vscode.api.window.showInputBox = async () => { vscode.workspaceFolders = []; return "task-drift"; };
+      else vscode.input("task-drift");
+      await vscode.invoke("sxsy-b122.startBoundCodexThread");
+      assert.equal(starts, drift === "before-start" || drift === "invalid-socket" ? 0 : 1, drift);
+      assert.equal(saved, ["persistence", "bad-persisted-id", "registration", "substituted-registry"].includes(drift), drift);
+      assert.equal(vscode.createdTerminals.length, 0, drift);
+      assert.ok(vscode.warnings.length > 0, drift);
+      if (starts > 0) assert.match(vscode.warnings.at(-1)!, /after Codex created/, "the returned native identity must survive refusal without suggesting another creation");
+    } finally { await controller.stop(); await rm(stage, { recursive: true, force: true }); }
+  }
 });
 
 test("credential provisioning sends only operator-entered exact adapter/purpose triples for the selected repository", async () => {
@@ -4594,6 +4732,93 @@ test("Shift Terminal never focuses an arbitrary active terminal and creates or r
   assert.match(bridge.completedHostActions.at(-1)?.summary ?? "", /workspace.*no longer open/i);
   await controller.stop();
 });
+
+test("Linux Shift Terminal keeps separately open case-distinct repository roots on different terminal objects", { skip: process.platform !== "linux" }, async () => {
+  const stage = await mkdtemp(join(tmpdir(), "sxsy-terminal-case-")), upper = join(stage, "Repo"), lower = join(stage, "repo");
+  await mkdir(upper); await mkdir(lower);
+  const vscode = new FakeVscode([], [upper, lower]), bridge = new FakeBridge();
+  const controller = new ManagedSessionController(vscode.api, new FakeContext(), bridge, { idFactory: sequenceFactory(), resolveGitRoots: async () => [{ gitRoot: upper }, { gitRoot: lower }] });
+  try {
+    await controller.start();
+    for (const root of [upper, lower]) {
+      bridge.nextDispatch = { status: "running", summary: "Exact integrated terminal awaits host acknowledgement.", data: {
+        hostActionId: `host-action:${(root === upper ? "8" : "9").repeat(64)}`, hostActionKind: "focus_integrated_terminal", hostActionExpiresAt: "2099-01-01T00:00:00.000Z", hostActionWorkspaceRoot: root
+      } };
+      vscode.choose(root); await controller.dispatchChord(chordFor("TERMINAL", "shift")!);
+      assert.equal(bridge.completedHostActions.at(-1)?.succeeded, true);
+    }
+    assert.deepEqual(vscode.terminalOptions.map(options => options.cwd), [upper, lower]);
+    assert.equal(vscode.createdTerminals.length, 2); assert.equal(vscode.createdTerminals[0]?.shown, 1); assert.equal(vscode.createdTerminals[1]?.shown, 1);
+    assert.equal(vscode.activeTerminal, vscode.createdTerminals[1]);
+    assert.deepEqual(controller.listKnownSessions().filter(session => session.surface === "vscode_terminal").map(session => session.workspaceRoot), [upper, lower]);
+  } finally { await controller.stop(); await rm(stage, { recursive: true, force: true }); }
+});
+
+for (const drift of ["none", "active-terminal", "closed-terminal", "workspace", "expiry", "window-focus", "unknown-item"] as const) {
+  test(`Shift Terminal rechecks the exact same-title picker target after ${drift} drift`, async () => {
+    const root = process.platform === "win32" ? "C:\\picker-root" : "/picker-root";
+    const vscode = new FakeVscode(["Identical title", "Identical title"], [root]);
+    vscode.activeTerminal = undefined;
+    const original = vscode.api.window.showQuickPick;
+    const offered = vscode.terminals[1]!;
+    let now = "2026-11-05T00:00:00.000Z", pickerReached = false;
+    vscode.api.window.showQuickPick = async <T extends string | QuickPickItemLike>(items: readonly T[], options?: { readonly placeHolder?: string }): Promise<T | undefined> => {
+      if (!options?.placeHolder?.startsWith("Choose one integrated terminal bound to")) return original(items, options);
+      pickerReached = true; await Promise.resolve();
+      if (drift === "closed-terminal") await vscode.fireClose(offered);
+      if (drift === "workspace") vscode.workspaceFolders = [];
+      if (drift === "expiry") now = "2099-01-01T00:00:00.000Z";
+      if (drift === "window-focus") vscode.focused = false;
+      if (drift === "active-terminal") vscode.activateTerminal(vscode.terminals[0]);
+      return drift === "unknown-item" ? { label: "Identical title" } as T : items[1];
+    };
+    const bridge = new FakeBridge();
+    const controller = new ManagedSessionController(vscode.api, new FakeContext(), bridge, {
+      idFactory: sequenceFactory(), now: () => now, resolveGitRoots: async () => [{ gitRoot: root }]
+    });
+    try {
+      await controller.start();
+      bridge.nextDispatch = { status: "running", summary: "Exact integrated terminal awaits host acknowledgement.", data: {
+        hostActionId: `host-action:${"8".repeat(64)}`, hostActionKind: "focus_integrated_terminal", hostActionExpiresAt: "2099-01-01T00:00:00.000Z", hostActionWorkspaceRoot: root
+      } };
+      await controller.dispatchChord(chordFor("TERMINAL", "shift")!);
+      assert.equal(pickerReached, true); assert.equal(vscode.createdTerminals.length, 0, "a missing offered target must never create a replacement");
+      assert.equal(vscode.terminals[0]?.shown, 0, "the same title or active terminal must not substitute for the selected object");
+      const succeeded = drift === "none" || drift === "active-terminal";
+      assert.equal(bridge.completedHostActions.at(-1)?.succeeded, succeeded);
+      assert.equal(offered.shown, succeeded ? 1 : 0);
+      if (succeeded) assert.equal(vscode.activeTerminal, offered);
+      else assert.match(bridge.completedHostActions.at(-1)?.summary ?? "", /binding changed|no longer open|expired|lost focus|offered terminal identity/i);
+    } finally { await controller.stop(); }
+  });
+}
+
+for (const drift of ["closed-terminal", "active-terminal", "workspace", "expiry"] as const) {
+  test(`Shift Terminal refuses acknowledgement after new-terminal registration encounters ${drift} drift`, async () => {
+    const root = process.platform === "win32" ? "C:\\registration-root" : "/registration-root";
+    const vscode = new FakeVscode([], [root]), bridge = new FakeBridge(); let now = "2026-11-05T00:00:00.000Z";
+    const controller = new ManagedSessionController(vscode.api, new FakeContext(), bridge, { idFactory: sequenceFactory(), now: () => now, resolveGitRoots: async () => [{ gitRoot: root }] });
+    await controller.start(); const before = bridge.registerCalls;
+    let release!: () => void; bridge.registerGate = new Promise<void>(resolve => { release = resolve; });
+    try {
+      bridge.nextDispatch = { status: "running", summary: "Exact integrated terminal awaits host acknowledgement.", data: {
+        hostActionId: `host-action:${"8".repeat(64)}`, hostActionKind: "focus_integrated_terminal", hostActionExpiresAt: "2099-01-01T00:00:00.000Z", hostActionWorkspaceRoot: root
+      } };
+      const dispatching = controller.dispatchChord(chordFor("TERMINAL", "shift")!);
+      for (let attempt = 0; attempt < 100 && bridge.registerCalls === before; attempt++) await new Promise(resolve => setTimeout(resolve, 5));
+      assert.equal(bridge.registerCalls, before + 1); const terminal = vscode.createdTerminals[0]!; assert.equal(terminal.shown, 1);
+      if (drift === "closed-terminal") await vscode.fireClose(terminal);
+      if (drift === "active-terminal") vscode.activateTerminal(undefined);
+      if (drift === "workspace") vscode.workspaceFolders = [];
+      if (drift === "expiry") now = "2099-01-01T00:00:00.000Z";
+      release(); await dispatching;
+      assert.equal(vscode.createdTerminals.length, 1); assert.equal(terminal.shown, 1);
+      assert.equal(bridge.completedHostActions.at(-1)?.succeeded, false);
+      assert.equal(bridge.completedHostActions.at(-1)?.effectDisposition, "ambiguous", "a shown terminal must not be misreported as no local effect");
+      assert.match(bridge.completedHostActions.at(-1)?.summary ?? "", /before acknowledgement|no longer open|expired/i);
+    } finally { release(); await controller.stop(); }
+  });
+}
 
 test("Raw-HID provisioning UI collects only the exact device tuple and never a helper path or digest", async () => {
   const vscode = new FakeVscode();

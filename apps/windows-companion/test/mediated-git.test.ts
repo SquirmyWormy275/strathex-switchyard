@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
-import { mkdtemp, realpath, rm, writeFile } from "node:fs/promises";
+import { access, mkdtemp, readFile, readdir, realpath, rename, rm, writeFile, type FileHandle } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -12,7 +12,8 @@ import type { AuthorityGrant, ManagedSession, TargetSnapshot } from "../../../pa
 import { GitCliInspector } from "../../../packages/control-plane/src/git-inspector.ts";
 import { PolicyEngine } from "../../../packages/control-plane/src/policy.ts";
 import { TargetSnapshotFactory, type SnapshotCaptureOptions } from "../../../packages/control-plane/src/snapshot.ts";
-import { LocalMediatedGitHandler } from "../src/mediated-git.ts";
+import { LocalMediatedGitHandler, SpawnLocalGitRunner, type LocalGitRunner } from "../src/mediated-git.ts";
+import { OwnedGitIndexLease, reopenOwnedGitFileLock, captureGitFile, removePreservedGitFile } from "../src/git-index-lease.ts";
 import type { ChildOperationLease, ChildOperationOutcome, ChildOperationSaga, ChildOperationStart } from "../../../packages/control-plane/src/operations.ts";
 
 class RecordingChildSaga implements ChildOperationSaga {
@@ -25,7 +26,7 @@ class RecordingChildSaga implements ChildOperationSaga {
   async settle(_lease: ChildOperationLease, outcome: ChildOperationOutcome, details?: Readonly<Record<string, string>>) { this.events.push({ kind: `settle:${outcome}`, value: details }); }
 }
 
-async function command(cwd: string, ...args: string[]): Promise<{ readonly code: number; readonly stdout: string; readonly stderr: string }> {
+async function command(cwd: string, ...args: string[]): Promise<{ readonly code: number; readonly stdout: string; readonly stderr: string; readonly stdoutBytes: Buffer }> {
   return new Promise((resolveResult, reject) => {
     const child = spawn(args[0]!, args.slice(1), { cwd, shell: false, windowsHide: true });
     const stdout: Buffer[] = [];
@@ -33,7 +34,7 @@ async function command(cwd: string, ...args: string[]): Promise<{ readonly code:
     child.stdout.on("data", (value: Buffer) => stdout.push(value));
     child.stderr.on("data", (value: Buffer) => stderr.push(value));
     child.once("error", reject);
-    child.once("close", (code) => resolveResult({ code: code ?? 1, stdout: Buffer.concat(stdout).toString("utf8"), stderr: Buffer.concat(stderr).toString("utf8") }));
+    child.once("close", (code) => resolveResult({ code: code ?? 1, stdout: Buffer.concat(stdout).toString("utf8"), stdoutBytes: Buffer.concat(stdout), stderr: Buffer.concat(stderr).toString("utf8") }));
   });
 }
 
@@ -129,9 +130,9 @@ function grant(target: TargetSnapshot): AuthorityGrant {
   };
 }
 
-function permittedRequest(target: TargetSnapshot, guard: EffectGuard) {
+function permittedRequest(target: TargetSnapshot, guard: EffectGuard, ownedPaths: readonly string[] = ["src-safe.ts"]) {
   const definition = commandForAction("local_commit");
-  const selected = session(target);
+  const selected = { ...session(target), plannedFiles: ownedPaths };
   const authority = grant(target);
   const policy = new PolicyEngine({ version: "isolated-mediated-git-v1" });
   const confirmation = policy.createConfirmation({
@@ -150,7 +151,7 @@ function permittedRequest(target: TargetSnapshot, guard: EffectGuard) {
       authority,
       permit,
       effectGuard: guard,
-      mutation: { kind: "local_commit" as const, paths: ["src-safe.ts"], message: "reviewed isolated change" }
+      mutation: { kind: "local_commit" as const, paths: ownedPaths, message: "reviewed isolated change" }
     }
   };
 }
@@ -286,4 +287,254 @@ test("mediated local commit rejects unowned paths, a dirty shared index, contain
   } finally {
     await isolated.dispose();
   }
+});
+
+
+const shellQuote = (value: string) => "'" + value.replaceAll("\\", "/").replaceAll("'", "'\\''") + "'";
+
+test("raw commit mediation bypasses repository clean/process/diff/textconv/fsmonitor commands and hooks", async () => {
+  const isolated = await fixture();
+  try {
+    const marker = join(isolated.state, "must-not-run"), script = join(isolated.state, "tripwire.cjs");
+    await writeFile(script, `require('node:fs').writeFileSync(${JSON.stringify(marker)},'unexpected');process.stdout.write('unreviewed')`);
+    await writeFile(join(isolated.root, ".gitattributes"), "src-safe.ts filter=tripwire diff=tripwire\n");
+    await requireCommand(isolated.root, "git", "add", ".gitattributes"); await requireCommand(isolated.root, "git", "commit", "-m", "synthetic attributes");
+    const program = `${shellQuote(process.execPath)} ${shellQuote(script)}`;
+    for (const key of ["filter.tripwire.clean", "filter.tripwire.process", "diff.tripwire.command", "diff.tripwire.textconv", "core.fsmonitor"]) await requireCommand(isolated.root, "git", "config", key, program);
+    await requireCommand(isolated.root, "git", "config", "filter.tripwire.required", "true"); await requireCommand(isolated.root, "git", "config", "diff.tripwire.trustExitCode", "true");
+    for (const name of ["pre-commit", "post-commit", "reference-transaction"]) await writeFile(join(isolated.root, ".git/hooks", name), `#!/bin/sh\nprintf unexpected > ${shellQuote(marker)}\nexit 0\n`, { mode: 0o755 });
+    const content = "export const value = 'literal reviewed bytes';\n"; await writeFile(join(isolated.root, "src-safe.ts"), content);
+    const target = await isolated.capture(); assert.equal(target.completeness, "complete", target.reasons.join(" "));
+    const { policy, request } = permittedRequest(target, effectGuard(isolated)), broker = new InMemoryGitBroker(policy);
+    broker.register("local_commit", input => new LocalMediatedGitHandler({ stateDirectory: isolated.state }).execute(input));
+    const outcome = await broker.execute(request); assert.equal(outcome.status, "completed", outcome.summary);
+    assert.equal(await requireCommand(isolated.root, "git", "show", "HEAD:src-safe.ts"), content.trim());
+    await assert.rejects(access(marker), { code: "ENOENT" });
+  } finally { await isolated.dispose(); }
+});
+
+test("new binary files cross the private blob pipe unchanged and remain non-executable", async () => {
+  const isolated = await fixture();
+  try {
+    const bytes = Buffer.alloc(1025); for (let i = 0; i < bytes.length; i++) bytes[i] = i % 256;
+    await writeFile(join(isolated.root, "new.bin"), bytes);
+    const target = await isolated.capture(), { policy, request } = permittedRequest(target, effectGuard(isolated), ["new.bin"]), broker = new InMemoryGitBroker(policy);
+    broker.register("local_commit", input => new LocalMediatedGitHandler({ stateDirectory: isolated.state }).execute(input));
+    const outcome = await broker.execute(request); assert.equal(outcome.status, "completed", outcome.summary);
+    assert.deepEqual((await command(isolated.root, "git", "show", "HEAD:new.bin")).stdoutBytes, bytes);
+    assert.match(await requireCommand(isolated.root, "git", "ls-tree", "HEAD", "new.bin"), /^100644 blob /);
+  } finally { await isolated.dispose(); }
+});
+
+test("a file changed between its manifest witness and private byte read cannot be committed", async () => {
+  const isolated = await fixture();
+  try {
+    await writeFile(join(isolated.root, "src-safe.ts"), "approved bytes\n"); const target = await isolated.capture();
+    const delegate = new SpawnLocalGitRunner(); let changed = false;
+    const runner: LocalGitRunner = { async run(args, options) { if (!changed && args.includes("--stage")) { changed = true; await writeFile(join(isolated.root, "src-safe.ts"), "unreviewed bytes\n"); } return delegate.run(args, options); } };
+    const { policy, request } = permittedRequest(target, effectGuard(isolated)), broker = new InMemoryGitBroker(policy);
+    broker.register("local_commit", input => new LocalMediatedGitHandler({ stateDirectory: isolated.state, runner }).execute(input));
+    const outcome = await broker.execute(request); assert.equal(outcome.effectDisposition, "not_started", outcome.summary); assert.equal(changed, true);
+    assert.equal(await requireCommand(isolated.root, "git", "rev-parse", "HEAD"), target.head);
+    assert.equal(await readFile(join(isolated.root, "src-safe.ts"), "utf8"), "unreviewed bytes\n");
+  } finally { await isolated.dispose(); }
+});
+
+test("a competing branch update wins its own CAS and is never overwritten by a reviewed local commit", async () => {
+  const isolated = await fixture();
+  try {
+    await writeFile(join(isolated.root, "src-safe.ts"), "approved bytes\n"); const target = await isolated.capture();
+    const delegate = new SpawnLocalGitRunner(); let rival: string | undefined;
+    const runner: LocalGitRunner = { async run(args, options) {
+      if (!rival && args.includes("update-ref")) {
+        const object = await delegate.run(["-c", "commit.gpgSign=false", "commit-tree", target.indexTree!, "-p", target.head!, "-m", "synthetic concurrent actor"], options); assert.equal(object.exitCode, 0); rival = object.stdout.trim();
+        const update = await delegate.run(["update-ref", `refs/heads/${target.branch}`, rival, target.head!], options); assert.equal(update.exitCode, 0);
+      }
+      return delegate.run(args, options);
+    } };
+    const { policy, request } = permittedRequest(target, effectGuard(isolated)), broker = new InMemoryGitBroker(policy);
+    broker.register("local_commit", input => new LocalMediatedGitHandler({ stateDirectory: isolated.state, runner }).execute(input));
+    const outcome = await broker.execute(request); assert.equal(outcome.status, "incomplete"); assert.ok(rival);
+    assert.equal(await requireCommand(isolated.root, "git", "rev-parse", "HEAD"), rival);
+  } finally { await isolated.dispose(); }
+});
+
+
+test("feature-branch creation uses an expected-HEAD transaction without checkout filters", async () => {
+  const isolated = await fixture();
+  try {
+    await requireCommand(isolated.root, "git", "checkout", "main");
+    await writeFile(join(isolated.root, ".gitattributes"), "src-safe.ts filter=tripwire\n");
+    await requireCommand(isolated.root, "git", "add", ".gitattributes"); await requireCommand(isolated.root, "git", "commit", "-m", "synthetic attributes");
+    const marker = join(isolated.state, "must-not-run"), script = join(isolated.state, "tripwire.cjs");
+    await writeFile(script, `require('node:fs').writeFileSync(${JSON.stringify(marker)},'unexpected');process.stdout.write('unreviewed')`);
+    const program = `${shellQuote(process.execPath)} ${shellQuote(script)}`;
+    await requireCommand(isolated.root, "git", "config", "filter.tripwire.clean", program); await requireCommand(isolated.root, "git", "config", "filter.tripwire.required", "true");
+    await writeFile(join(isolated.root, "src-safe.ts"), "approved dirty worktree\n");
+    const target = await isolated.capture(), { policy, request } = permittedRequest(target, effectGuard(isolated)), broker = new InMemoryGitBroker(policy);
+    broker.register("local_commit", input => new LocalMediatedGitHandler({ stateDirectory: isolated.state }).execute(input));
+    const outcome = await broker.execute({ ...request, mutation: { ...request.mutation, featureBranch: "feature/raw-branch" } });
+    assert.equal(outcome.status, "incomplete", outcome.summary); assert.equal(outcome.data?.freshReviewRequired, true);
+    assert.equal(await requireCommand(isolated.root, "git", "branch", "--show-current"), "feature/raw-branch"); assert.equal(await requireCommand(isolated.root, "git", "rev-parse", "HEAD"), target.head);
+    await assert.rejects(access(marker), { code: "ENOENT" });
+  } finally { await isolated.dispose(); }
+});
+
+test("an unconfirmed native Git exit retains its exact indices and shared lock for recovery", async () => {
+  const isolated = await fixture();
+  try {
+    await writeFile(join(isolated.root, "src-safe.ts"), "approved bytes\n"); const target = await isolated.capture(), delegate = new SpawnLocalGitRunner();
+    const runner: LocalGitRunner = { async run(args, options) { if (args.includes("update-ref")) throw Object.assign(new Error("Synthetic native exit unconfirmed"), { code: "RUNTIME_STOP_UNCONFIRMED" }); return delegate.run(args, options); } };
+    const { policy, request } = permittedRequest(target, effectGuard(isolated)), broker = new InMemoryGitBroker(policy);
+    broker.register("local_commit", input => new LocalMediatedGitHandler({ stateDirectory: isolated.state, runner }).execute(input));
+    const outcome = await broker.execute(request); assert.equal(outcome.effectDisposition, "ambiguous"); assert.equal(outcome.data?.recoveryStatePreserved, true);
+    await access(join(isolated.root, ".git/index.lock")); assert.equal(await requireCommand(isolated.root, "git", "rev-parse", "HEAD"), target.head);
+  } finally { await isolated.dispose(); }
+});
+
+test("a readback failure after a verified reference update retains exact transaction recovery files", async () => {
+  const isolated = await fixture();
+  try {
+    await writeFile(join(isolated.root, "src-safe.ts"), "approved bytes\n"); const target = await isolated.capture(), delegate = new SpawnLocalGitRunner(); let advanced = false;
+    const runner: LocalGitRunner = { async run(args, options) { if (advanced && args[0] === "rev-parse" && args[1] === "HEAD") throw new Error("Synthetic unavailable HEAD readback"); const result = await delegate.run(args, options); if (args.includes("update-ref") && result.exitCode === 0) advanced = true; return result; } };
+    const { policy, request } = permittedRequest(target, effectGuard(isolated)), broker = new InMemoryGitBroker(policy);
+    broker.register("local_commit", input => new LocalMediatedGitHandler({ stateDirectory: isolated.state, runner }).execute(input));
+    const outcome = await broker.execute(request); assert.equal(outcome.effectDisposition, "ambiguous"); assert.equal(outcome.data?.recoveryStatePreserved, true);
+    assert.notEqual(await requireCommand(isolated.root, "git", "rev-parse", "HEAD"), target.head); await access(join(isolated.root, ".git/index.lock"));
+    assert.ok((await readdir(join(isolated.state, "git-operations"))).length); assert.ok((await readdir(join(isolated.state, "git-locks"))).length);
+  } finally { await isolated.dispose(); }
+});
+
+test("exact preserved index and private leases can be reopened for separately reviewed reconciliation without another commit", async () => {
+  const isolated = await fixture();
+  try {
+    await writeFile(join(isolated.root, "src-safe.ts"), "approved recovery bytes\n"); const target = await isolated.capture(), delegate = new SpawnLocalGitRunner(); let advanced = false;
+    let preservation: Parameters<NonNullable<import("../src/mediated-git.ts").MediatedGitHandlerOptions["onPreservation"]>>[0] | undefined;
+    const runner: LocalGitRunner = { async run(args, options) { if (advanced && args[0] === "rev-parse" && args[1] === "HEAD") throw new Error("Synthetic unavailable readback"); const r = await delegate.run(args, options); if (args.includes("update-ref") && r.exitCode === 0) advanced = true; return r; } };
+    const { policy, request } = permittedRequest(target, effectGuard(isolated)), broker = new InMemoryGitBroker(policy);
+    broker.register("local_commit", input => new LocalMediatedGitHandler({ stateDirectory: isolated.state, runner, onPreservation: async value => { preservation = value; } }).execute(input));
+    const outcome = await broker.execute(request); assert.equal(outcome.data?.recoveryStatePreserved, true); assert.ok(preservation?.privateIndex);
+    const committed = await requireCommand(isolated.root, "git", "rev-parse", "HEAD");
+    // This helper assumes the caller has independently verified all former owners
+    // stopped, holds its host resource lease and obtained exact recovery approval.
+    const lease = await OwnedGitIndexLease.reopenPreserved(preservation.sharedIndex);
+    await lease.replaceWith(preservation.privateIndex);
+    const worktree = await reopenOwnedGitFileLock({ filePath: preservation.worktreeLock.path, identity: preservation.worktreeLock.identity, contentSha256: preservation.worktreeLock.contentSha256 }); await worktree.release();
+    assert.equal(await requireCommand(isolated.root, "git", "rev-parse", "HEAD"), committed); assert.equal(await requireCommand(isolated.root, "git", "diff", "--cached", "--name-only"), "");
+    await assert.rejects(access(join(isolated.root, ".git/index.lock")), { code: "ENOENT" }); await assert.rejects(OwnedGitIndexLease.reopenPreserved(preservation.sharedIndex), { code: "ENOENT" });
+  } finally { await isolated.dispose(); }
+});
+
+test("reopening a preserved lease refuses in-place lock changes and changed original index bytes", async () => {
+  const isolated = await fixture();
+  try {
+    const path = join(isolated.root, ".git/index"), lease = await OwnedGitIndexLease.acquire(path); await lease.copyOriginalTo(join(isolated.state, "copy")); const preservation = lease.preservation(); await lease.abandon();
+    await writeFile(path + ".lock", "different writer");
+    await assert.rejects(OwnedGitIndexLease.reopenPreserved(preservation), /lock changed/); assert.equal(await readFile(path + ".lock", "utf8"), "different writer");
+    await rm(path + ".lock"); const second = await OwnedGitIndexLease.acquire(path); await second.copyOriginalTo(join(isolated.state, "copy-2")); const next = second.preservation(); await second.abandon();
+    await writeFile(path, "different original bytes");
+    await assert.rejects(OwnedGitIndexLease.reopenPreserved(next), /original Git index content changed/); assert.equal(await readFile(path, "utf8"), "different original bytes"); await access(path + ".lock");
+  } finally { await isolated.dispose(); }
+});
+
+test("the Windows replacement sequence closes its destination and preserves a competing replacement after that close", async () => {
+  const isolated = await fixture();
+  try {
+    const path = join(isolated.root, ".git/index"), copy = join(isolated.state, "windows-copy"), lease = await OwnedGitIndexLease.acquire(path); await lease.copyOriginalTo(copy);
+    const expected = await readFile(path), replacementIdentity = lease.lockIdentity; await lease.replaceWith(copy, { closeOriginalBeforeRename: true });
+    const captured = await captureGitFile(path); try { assert.deepEqual(captured.identity, replacementIdentity); assert.deepEqual(captured.bytes, expected); } finally { captured.bytes.fill(0); }
+    const second = await OwnedGitIndexLease.acquire(path), nextCopy = join(isolated.state, "windows-copy-2"); await second.copyOriginalTo(nextCopy);
+    // Fault the actual descriptor close: another writer replaces the pathname
+    // in the Windows-specific gap. The final named identity check must reject it.
+    const held = (second as unknown as { index: FileHandle }).index, close = held.close.bind(held);
+    held.close = async () => { await close(); await rename(path, path + ".prior-owned"); await writeFile(path, "competing index after destination close"); };
+    try { await assert.rejects(second.replaceWith(nextCopy, { closeOriginalBeforeRename: true }), /original Git index changed/); }
+    finally { await second.abandon(); }
+    assert.equal(await readFile(path, "utf8"), "competing index after destination close"); await access(path + ".lock");
+  } finally { await isolated.dispose(); }
+});
+
+test("reviewed private index bytes and artifact identity must still match before replacement or cleanup", async () => {
+  const isolated = await fixture();
+  try {
+    const index = join(isolated.root, ".git/index"), privateIndex = join(isolated.state, "reviewed-index"), lease = await OwnedGitIndexLease.acquire(index); await lease.copyOriginalTo(privateIndex);
+    const expected = await readFile(index), proof = await captureGitFile(privateIndex); proof.bytes.fill(0);
+    await writeFile(privateIndex, "different private index bytes"); await assert.rejects(lease.replaceWith(privateIndex, { expectedPrivateIndexSha256: proof.sha256 }), /exact reviewed recovery bytes/); assert.deepEqual(await readFile(index), expected); await lease.release();
+    const changed = await captureGitFile(privateIndex); changed.bytes.fill(0); await rename(privateIndex, privateIndex + ".owned-old"); await writeFile(privateIndex, "foreign replacement artifact");
+    await assert.rejects(removePreservedGitFile(privateIndex, changed), /owned Git file was replaced/); assert.equal(await readFile(privateIndex, "utf8"), "foreign replacement artifact");
+    const named = await captureGitFile(privateIndex); named.bytes.fill(0); await assert.rejects(removePreservedGitFile(privateIndex, { ...named, sha256: "0".repeat(64) }), /artifact bytes changed/); await removePreservedGitFile(privateIndex, named); await assert.rejects(access(privateIndex), { code: "ENOENT" });
+  } finally { await isolated.dispose(); }
+});
+
+
+test("a replacement shared index lock is preserved after the exact reviewed commit advances HEAD", async () => {
+  const isolated = await fixture();
+  try {
+    await writeFile(join(isolated.root, "src-safe.ts"), "approved bytes\n"); const target = await isolated.capture(), delegate = new SpawnLocalGitRunner();
+    const originalIndex = await readFile(join(isolated.root, ".git/index")); let replaced = false;
+    const runner: LocalGitRunner = { async run(args, options) { const result = await delegate.run(args, options); if (!replaced && args.includes("update-ref") && result.exitCode === 0) { replaced = true; const path = join(isolated.root, ".git/index.lock"); await rename(path, path + ".old-owned"); await writeFile(path, "different writer lock", { mode: 0o600 }); } return result; } };
+    const { policy, request } = permittedRequest(target, effectGuard(isolated)), broker = new InMemoryGitBroker(policy);
+    broker.register("local_commit", input => new LocalMediatedGitHandler({ stateDirectory: isolated.state, runner }).execute(input));
+    const outcome = await broker.execute(request); assert.equal(outcome.status, "incomplete", outcome.summary); assert.equal(outcome.effectDisposition, "committed"); assert.equal(outcome.data?.recoveryStatePreserved, true);
+    assert.equal(await readFile(join(isolated.root, ".git/index.lock"), "utf8"), "different writer lock");
+    assert.deepEqual(await readFile(join(isolated.root, ".git/index")), originalIndex);
+  } finally { await isolated.dispose(); }
+});
+
+test("a replacement original index is never overwritten during shared-index reconciliation", async () => {
+  const isolated = await fixture();
+  try {
+    await writeFile(join(isolated.root, "src-safe.ts"), "approved bytes\n"); const target = await isolated.capture(), delegate = new SpawnLocalGitRunner(); let replaced = false;
+    const runner: LocalGitRunner = { async run(args, options) { const result = await delegate.run(args, options); if (!replaced && args.includes("update-ref") && result.exitCode === 0) { replaced = true; const path = join(isolated.root, ".git/index"); await rename(path, path + ".old-owned"); await writeFile(path, "different index selected by another writer", { mode: 0o600 }); } return result; } };
+    const { policy, request } = permittedRequest(target, effectGuard(isolated)), broker = new InMemoryGitBroker(policy);
+    broker.register("local_commit", input => new LocalMediatedGitHandler({ stateDirectory: isolated.state, runner }).execute(input));
+    const outcome = await broker.execute(request); assert.equal(outcome.status, "incomplete", outcome.summary); assert.equal(outcome.effectDisposition, "committed");
+    assert.equal(await readFile(join(isolated.root, ".git/index"), "utf8"), "different index selected by another writer");
+  } finally { await isolated.dispose(); }
+});
+
+test("the previous worktree owner cannot delete a replacement private lock during cleanup", async () => {
+  const isolated = await fixture();
+  try {
+    await writeFile(join(isolated.root, "src-safe.ts"), "approved bytes\n"); const target = await isolated.capture(), delegate = new SpawnLocalGitRunner(); let replacement: string | undefined;
+    const runner: LocalGitRunner = { async run(args, options) { const result = await delegate.run(args, options); if (!replacement && args.includes("update-ref") && result.exitCode === 0) { const directory = join(isolated.state, "git-locks"), names = await readdir(directory); assert.equal(names.length, 1); replacement = join(directory, names[0]!); await rename(replacement, replacement + ".old-owned"); await writeFile(replacement, "different worktree owner", { mode: 0o600 }); } return result; } };
+    const { policy, request } = permittedRequest(target, effectGuard(isolated)), broker = new InMemoryGitBroker(policy);
+    broker.register("local_commit", input => new LocalMediatedGitHandler({ stateDirectory: isolated.state, runner }).execute(input));
+    const outcome = await broker.execute(request); assert.equal(outcome.status, "completed", outcome.summary); assert.ok(replacement);
+    assert.equal(await readFile(replacement, "utf8"), "different worktree owner");
+  } finally { await isolated.dispose(); }
+});
+
+test("host preservation records exact index and lock identities before any reference update", async () => {
+  const isolated = await fixture();
+  try {
+    await writeFile(join(isolated.root, "src-safe.ts"), "approved bytes\n"); const target = await isolated.capture(), delegate = new SpawnLocalGitRunner(); let saved = false;
+    const runner: LocalGitRunner = { async run(args, options) { if (args.includes("update-ref")) assert.equal(saved, true); return delegate.run(args, options); } };
+    const { policy, request } = permittedRequest(target, effectGuard(isolated)), broker = new InMemoryGitBroker(policy);
+    broker.register("local_commit", input => new LocalMediatedGitHandler({ stateDirectory: isolated.state, runner, onPreservation: async p => { assert.equal(p.beforeHead, target.head); assert.equal(p.beforeIndexTree, target.indexTree); assert.match(p.sharedIndex.originalIndexSha256, /^[a-f0-9]{64}$/); assert.match(p.sharedIndex.lockIdentity.inode, /^[0-9]+$/); assert.match(p.worktreeLock.contentSha256, /^[a-f0-9]{64}$/); await access(p.privateIndexCopy); await access(p.privateIndex!); saved = true; } }).execute(input));
+    const outcome = await broker.execute(request); assert.equal(outcome.status, "completed", outcome.summary); assert.equal(saved, true);
+  } finally { await isolated.dispose(); }
+});
+
+
+test("shared lock content changed in place is preserved rather than overwritten", async () => {
+  const isolated = await fixture();
+  try {
+    await writeFile(join(isolated.root, "src-safe.ts"), "approved bytes\n"); const target = await isolated.capture(), delegate = new SpawnLocalGitRunner(); let changed = false;
+    const runner: LocalGitRunner = { async run(args, options) { const result = await delegate.run(args, options); if (!changed && args.includes("update-ref") && result.exitCode === 0) { changed = true; await writeFile(join(isolated.root, ".git/index.lock"), "changed in place", { mode: 0o600 }); } return result; } };
+    const { policy, request } = permittedRequest(target, effectGuard(isolated)), broker = new InMemoryGitBroker(policy);
+    broker.register("local_commit", input => new LocalMediatedGitHandler({ stateDirectory: isolated.state, runner }).execute(input));
+    const outcome = await broker.execute(request); assert.equal(outcome.status, "incomplete"); assert.equal(outcome.effectDisposition, "committed"); assert.equal(await readFile(join(isolated.root, ".git/index.lock"), "utf8"), "changed in place");
+  } finally { await isolated.dispose(); }
+});
+
+test("private lock content changed in place remains untouched during cleanup", async () => {
+  const isolated = await fixture();
+  try {
+    await writeFile(join(isolated.root, "src-safe.ts"), "approved bytes\n"); const target = await isolated.capture(), delegate = new SpawnLocalGitRunner(); let changed: string | undefined;
+    const runner: LocalGitRunner = { async run(args, options) { const result = await delegate.run(args, options); if (!changed && args.includes("update-ref") && result.exitCode === 0) { const directory = join(isolated.state, "git-locks"); changed = join(directory, (await readdir(directory))[0]!); await writeFile(changed, "changed in place", { mode: 0o600 }); } return result; } };
+    const { policy, request } = permittedRequest(target, effectGuard(isolated)), broker = new InMemoryGitBroker(policy);
+    broker.register("local_commit", input => new LocalMediatedGitHandler({ stateDirectory: isolated.state, runner }).execute(input));
+    const outcome = await broker.execute(request); assert.equal(outcome.status, "completed", outcome.summary); assert.ok(changed); assert.equal(await readFile(changed, "utf8"), "changed in place");
+  } finally { await isolated.dispose(); }
 });

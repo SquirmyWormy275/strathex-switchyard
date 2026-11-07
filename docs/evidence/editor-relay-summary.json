@@ -1,0 +1,40 @@
+{
+  "schema": "switchyard-editor-relay-summary/v1",
+  "basis": "700e7f2c45401b797828a4797f7a43bd05a04608",
+  "sourceSha256": {
+    "tools/layout-studio/codex-editor-relay.mjs": "e03b2ca7c197ab04972ee7a37d8f06b8798e8d242afc4e2c07ea2e6c7cdef25f",
+    "tools/layout-studio/codex-owned-listener.mjs": "f084107075ed5b88edd3db0679dccf122302380028336d3a253e2ee9b6fecb5b",
+    "tools/layout-studio/agents.mjs": "33cb7d7f5d4f814725ab491a837bc98611de3d5b115e65e3779b16f9bad4a702",
+    "tools/layout-studio/codex-editor-relay.test.mjs": "7a3ac25a8c82df7edaaabc1cfc3a36d788ca2c061fa4c3f6d7f9138c96f5bc61",
+    "tools/layout-studio/codex-owned-listener.test.mjs": "c6f446d973cbe71aa10c1b949cc7b69b3bb4c6e9d88da9c2e68b9a84724644eb",
+    "tools/layout-studio/codex-editor-ingress-owner.test.mjs": "bff6cce1edad6cb8fded71099c10a4055fc539618242ea7666072e42c4874f19",
+    "tools/layout-studio/test-support/codex-owned-listener-fixture.cjs": "9eabad7693efb5f8b507a6bdd38116d2be241e4e18f0cd03c8ec1a6b49e76875"
+  },
+  "receipt": "isolated-test-0d76638b-8d16-4b05-82e2-e8f1acef1352.json",
+  "groups": 7,
+  "passed": 79,
+  "allChildAndTreeCleanupVerified": true,
+  "typecheckPassed": true,
+  "packageImportPassed": true,
+  "implemented": [
+    "One dedicated peer-pinned connection starts only after original owner admission and a joined registration callback. It shares the original owner lifetime and account boundary.",
+    "The relay admits only reviewed initialization, exact account/config reads, one exact read-only/on-request resume and exact original-task reads. No unknown method, model turn, login/config mutation or other-task forwarding is permitted.",
+    "The same connection checks effective restrictions and original account, brackets resume with fresh account samples, verifies its reply, and withholds acknowledgement until the caller retention callback and delivery complete.",
+    "Cancellation and account/task unloading withdraw acknowledgement; stop joins pending registration, protocol and notification callbacks. Process exit remains a separate owner check."
+  ],
+  "demonstration": {
+    "syntheticProvider": true,
+    "syntheticTerminal": true,
+    "realLinuxIngressAndPinnedUpstream": true,
+    "exactPeerCredentialsVerified": true,
+    "resumeAndBeforeAfterAccountReadsOnOneConnection": true,
+    "forbiddenTurnNotForwarded": true,
+    "originalCarriersAndProviderRetired": true
+  },
+  "limits": [
+    "Production durable ingress journal, signed routes and retained Terminal activation remain unfinished. The retention callback in this demonstration is controlled test storage.",
+    "Native TUI request/capability compatibility and live account/task attachment are unverified; no real provider task, model request, account change or keyboard operation ran.",
+    "Codex 0.167.0 is not admitted. The relay uses the existing 0.166.0 reviewed-version gate.",
+    "This focused result does not replace the exact-source d243d81 full Linux checkpoint."
+  ]
+}

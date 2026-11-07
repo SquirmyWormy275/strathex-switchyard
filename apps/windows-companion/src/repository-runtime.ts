@@ -15,6 +15,7 @@ import type { Readable } from "node:stream";
 import { redactText, untrustedSummary } from "../../../packages/control-plane/src/redaction.ts";
 import type { EffectDisposition } from "../../../packages/control-plane/src/contracts.ts";
 import type { OperationControllerObservation, OperationReconciliationBinding } from "../../../packages/control-plane/src/runtime.ts";
+import { validateRepositoryInputs, type RepositoryInputFile } from "./repository-inputs.ts";
 
 export const repositoryRuntimeManifestSchema = "sxsy-b122.repository-runtime" as const;
 export const repositoryRuntimeManifestVersion = 1 as const;
@@ -57,6 +58,10 @@ export interface RepositoryProcessRecipe {
   readonly isolation: RepositoryRuntimeIsolation;
   readonly timeoutMs: number;
   readonly maxOutputBytes: number;
+  /** Optional v1 extension; Linux disposable roots require these exact host-pinned bytes. */
+  readonly inputFiles?: readonly RepositoryInputFile[];
+  /** Explicit Linux-only disposable workspace permission; absent remains read-only in the Suite. */
+  readonly workspaceMode?: "read-only" | "temporary-build";
   readonly web?: RepositoryWebRecipe;
   readonly python?: Readonly<{ readonly interpreter: string }>;
 }
@@ -129,6 +134,7 @@ export interface RepositoryExecutionRootProvider {
     action: RepositoryProcessAction;
     repositoryRoot: string;
     isolation: RepositoryRuntimeIsolation;
+    inputFiles?: readonly RepositoryInputFile[];
   }>): Promise<RepositoryExecutionRootLease>;
 }
 
@@ -163,11 +169,15 @@ export interface RepositoryRuntimeExecuteOptions {
   readonly sessionId?: string;
   readonly authorityId?: string;
   readonly signal?: AbortSignal;
+  /** Transfers cancellation/deadline ownership through the managed child's verified exit. */
+  readonly managedLifecycle?: Readonly<{ started(): void; stopped(): void }>;
   /** Exact dispatch-bound final barrier; the constructor guard remains the fail-closed default. */
   readonly effectGuard?: RuntimeEffectGuard;
 }
 
 export interface RepositoryProcessStartRequest {
+  /** Host-only Linux descriptor, kept open by the namespace supervisor until native exit. */
+  readonly linuxExecutable?: Readonly<{ fd: number; sha256: string }>;
   readonly action: RepositoryProcessAction;
   readonly operationId: string;
   readonly targetSnapshotId: string;
@@ -178,6 +188,7 @@ export interface RepositoryProcessStartRequest {
   readonly executionRoot?: string;
   readonly isolation?: RepositoryRuntimeIsolation;
   readonly manifestSha256: string;
+  readonly workspaceMode?: "read-only" | "temporary-build";
   readonly executable: string;
   readonly executableSha256: string;
   readonly args: readonly string[];
@@ -270,6 +281,13 @@ export async function loadVerifiedRepositoryRuntimeManifest(options: LoadReposit
   const metadata = await stat(options.filePath);
   if (!metadata.isFile() || metadata.size <= 0 || metadata.size > manifestMaximumBytes) throw new Error("Repository runtime manifest exceeds its bounded file size or is not a file.");
   const bytes = await readFile(options.filePath);
+  return verifyRepositoryRuntimeManifest(bytes, options);
+}
+
+/** Host-read, bounded bytes still require their exact independently reviewed digest. */
+export async function verifyRepositoryRuntimeManifest(contents: Uint8Array, options: Omit<LoadRepositoryRuntimeManifestOptions, "filePath">): Promise<VerifiedRepositoryRuntimeManifest> {
+  if (!(contents instanceof Uint8Array) || contents.byteLength < 1 || contents.byteLength > manifestMaximumBytes || !/^[a-f0-9]{64}$/i.test(options.expectedSha256)) throw new Error("Choose bounded manifest bytes and their exact reviewed digest.");
+  const bytes = Buffer.from(contents);
   const digest = computeRepositoryRuntimeManifestDigest(bytes);
   if (!constantTimeTextEqual(digest, options.expectedSha256.toLowerCase())) throw new Error("Repository runtime manifest digest does not match the trusted host pin.");
   let unknown: unknown;
@@ -396,7 +414,7 @@ function validateStopRecipe(value: Record<string, unknown>, errors: string[]): R
 }
 
 function validateProcessRecipe(action: RepositoryProcessAction, value: Record<string, unknown>, allowedHttpsUrls: readonly string[], errors: string[]): RepositoryProcessRecipe {
-  exactKeys(value, ["kind", "executable", "args", "cwd", "environment", "lifecycle", "isolation", "timeoutMs", "maxOutputBytes", "web", "python"], ["kind", "executable", "args", "cwd", "environment", "lifecycle", "isolation", "timeoutMs", "maxOutputBytes"], action, errors);
+  exactKeys(value, ["kind", "executable", "args", "cwd", "environment", "lifecycle", "isolation", "timeoutMs", "maxOutputBytes", "web", "python", "inputFiles", "workspaceMode"], ["kind", "executable", "args", "cwd", "environment", "lifecycle", "isolation", "timeoutMs", "maxOutputBytes"], action, errors);
   if (value.kind !== "process") errors.push(`${action} must use a process recipe.`);
   if (!boundedString(value.executable, `${action}.executable`, errors, 2_048) || !isAbsolute(value.executable as string)) errors.push(`${action}.executable must be an exact absolute executable path.`);
   const args: string[] = [];
@@ -426,6 +444,12 @@ function validateProcessRecipe(action: RepositoryProcessAction, value: Record<st
   const isolation = value.isolation === "disposable" ? "disposable" : "repository";
   if (value.isolation !== "repository" && value.isolation !== "disposable") errors.push(`${action}.isolation must be repository or disposable.`);
   if (disposableRequired.has(action) && isolation !== "disposable") errors.push(`${action} requires a disposable execution root.`);
+  let inputFiles: readonly RepositoryInputFile[] | undefined;
+  if (value.inputFiles !== undefined) {
+    try { inputFiles = validateRepositoryInputs(value.inputFiles); } catch (error) { errors.push(`${action}.inputFiles: ${(error as Error).message}`); }
+    if (isolation !== "disposable") errors.push(`${action}.inputFiles requires disposable isolation.`);
+  }
+  if (value.workspaceMode !== undefined && (value.workspaceMode !== "read-only" && value.workspaceMode !== "temporary-build" || isolation !== "disposable" || !inputFiles?.length)) errors.push(`${action}.workspaceMode requires read-only or temporary-build and exact disposable inputs.`);
   boundedInteger(value.timeoutMs, `${action}.timeoutMs`, errors, 50, maximumTimeoutMs);
   boundedInteger(value.maxOutputBytes, `${action}.maxOutputBytes`, errors, 1, maximumOutputBytes);
   const web = value.web === undefined ? undefined : validateWebRecipe(action, value.web, allowedHttpsUrls, errors);
@@ -445,6 +469,8 @@ function validateProcessRecipe(action: RepositoryProcessAction, value: Record<st
     isolation,
     timeoutMs: typeof value.timeoutMs === "number" ? value.timeoutMs : 1_000,
     maxOutputBytes: typeof value.maxOutputBytes === "number" ? value.maxOutputBytes : 4_096,
+    ...(inputFiles ? { inputFiles } : {}),
+    ...(value.workspaceMode === "read-only" || value.workspaceMode === "temporary-build" ? { workspaceMode: value.workspaceMode } : {}),
     ...(web ? { web } : {}),
     ...(python ? { python } : {})
   };
@@ -494,7 +520,7 @@ function isExactSafeWebUrl(value: string, allowlistedHttpsUrls: readonly string[
 export async function captureRepositoryExecutableIdentity(executable: string): Promise<RepositoryExecutableIdentity> {
   const canonicalPath = await realpath(executable).catch(() => { throw new Error("Repository runtime executable does not exist."); });
   const metadata = await stat(canonicalPath, { bigint: true });
-  if (!metadata.isFile()) throw new Error("Repository runtime executable is not a regular file.");
+  if (!metadata.isFile() || metadata.size > 512n * 1024n * 1024n) throw new Error("Repository runtime executable is not a bounded regular file.");
   const sha256 = createHash("sha256").update(await readFile(canonicalPath)).digest("hex");
   if (metadata.size > BigInt(Number.MAX_SAFE_INTEGER) || metadata.mtimeMs > BigInt(Number.MAX_SAFE_INTEGER)) throw new Error("Repository runtime executable metadata exceeds the supported exact range.");
   return { canonicalPath, sha256, device: metadata.dev.toString(10), inode: metadata.ino.toString(10), size: Number(metadata.size), modifiedMs: Number(metadata.mtimeMs) };
@@ -565,6 +591,7 @@ interface ManagedRecord {
   readonly lease: RepositoryExecutionRootLease;
   timeout?: ReturnType<typeof setTimeout>;
   abortCleanup?: () => void;
+  managedLifecycle?: RepositoryRuntimeExecuteOptions["managedLifecycle"];
 }
 
 const denyEffects: RuntimeEffectGuard = {
@@ -676,7 +703,10 @@ export class RepositoryRuntime {
   private readonly executionRoots: RepositoryExecutionRootProvider;
   private readonly healthProbe: RuntimeHealthProbe;
   private readonly processSupervisor: RepositoryProcessSupervisor;
+  private readonly temporaryBuilds: boolean;
   private readonly managed = new Map<string, ManagedRecord>();
+  private readonly managedObservers = new Set<Promise<void>>();
+  private managedObservationFailure?: unknown;
 
   constructor(
     verified: VerifiedRepositoryRuntimeManifest,
@@ -685,6 +715,7 @@ export class RepositoryRuntime {
       executionRoots?: RepositoryExecutionRootProvider;
       healthProbe?: RuntimeHealthProbe;
       processSupervisor?: RepositoryProcessSupervisor;
+      temporaryBuilds?: boolean;
     }> = {}
   ) {
     if (verified[verifiedBrand] !== true) throw new Error("Repository runtime requires a digest-verified host manifest.");
@@ -693,6 +724,7 @@ export class RepositoryRuntime {
     this.executionRoots = dependencies.executionRoots ?? defaultExecutionRoots;
     this.healthProbe = dependencies.healthProbe ?? defaultHealthProbe;
     this.processSupervisor = dependencies.processSupervisor ?? new DirectChildProcessSupervisor();
+    this.temporaryBuilds = dependencies.temporaryBuilds === true;
   }
 
   async recoverManagedProcesses(): Promise<readonly ManagedRepositoryProcess[]> {
@@ -715,7 +747,7 @@ export class RepositoryRuntime {
         lease
       };
       this.managed.set(process.supervisorId, record);
-      void this.observeManagedExit(record);
+      this.startManagedExitObserver(record);
     }
     return this.listManagedProcesses();
   }
@@ -793,7 +825,7 @@ export class RepositoryRuntime {
     if (!options.targetSnapshotId || !/^[a-f0-9]{64}$/.test(options.targetSnapshotId)) {
       return { status: "blocked", summary: "Repository process execution requires an exact protected TargetSnapshot identity.", effectDisposition: "not_started" };
     }
-      return this.executeProcess(action as RepositoryProcessAction, recipe, options.signal, effectGuard, options.operationId ?? `runtime:${createHash("sha256").update(`${randomUUID()}:${action}:${Date.now()}`).digest("hex")}`, options.targetSnapshotId, options.sessionId, options.authorityId);
+      return this.executeProcess(action as RepositoryProcessAction, recipe, options.signal, effectGuard, options.operationId ?? `runtime:${createHash("sha256").update(`${randomUUID()}:${action}:${Date.now()}`).digest("hex")}`, options.targetSnapshotId, options.sessionId, options.authorityId, options.managedLifecycle);
   }
 
   allowsManagedStop(action: "run_target" | "debug_target" | "launch_web_app"): boolean {
@@ -801,13 +833,14 @@ export class RepositoryRuntime {
     return recipe?.kind === "stop" && recipe.managedActions.includes(action);
   }
 
-  private async executeProcess(action: RepositoryProcessAction, recipe: RepositoryProcessRecipe, signal: AbortSignal | undefined, effectGuard: RuntimeEffectGuard, operationId: string, targetSnapshotId: string, sessionId?: string, authorityId?: string): Promise<RepositoryRuntimeResult> {
+  private async executeProcess(action: RepositoryProcessAction, recipe: RepositoryProcessRecipe, signal: AbortSignal | undefined, effectGuard: RuntimeEffectGuard, operationId: string, targetSnapshotId: string, sessionId?: string, authorityId?: string, managedLifecycle?: RepositoryRuntimeExecuteOptions["managedLifecycle"]): Promise<RepositoryRuntimeResult> {
     if (!operationId.trim() || operationId.length > 256 || /[\0\r\n]/.test(operationId)) return { status: "blocked", summary: "Repository runtime operation identity is invalid.", effectDisposition: "not_started" };
     if (signal?.aborted) return { status: "cancelled", summary: `${action} was cancelled before execution.`, effectDisposition: "not_started" };
     const admission = await effectGuard.check(action, this.verified.canonicalRepositoryRoot);
     if (!admission.allowed) return { status: "blocked", summary: untrustedSummary(admission.reason), effectDisposition: "not_started" };
+    if (recipe.workspaceMode !== undefined && (!this.temporaryBuilds || process.platform !== "linux")) return { status: "unavailable", summary: "Explicit isolated workspace modes are not connected to this host runtime; no host fallback was selected.", effectDisposition: "not_started" };
     let lease: RepositoryExecutionRootLease;
-    try { lease = await this.executionRoots.prepare({ action, repositoryRoot: this.verified.canonicalRepositoryRoot, isolation: recipe.isolation }); }
+    try { lease = await this.executionRoots.prepare({ action, repositoryRoot: this.verified.canonicalRepositoryRoot, isolation: recipe.isolation, ...(recipe.inputFiles ? { inputFiles: recipe.inputFiles } : {}) }); }
     catch (error) {
       return error instanceof RuntimeUnavailableError
         ? { status: "unavailable", summary: untrustedSummary(error.message), effectDisposition: "not_started" }
@@ -834,7 +867,7 @@ export class RepositoryRuntime {
       const finalCwd = await realpath(cwd);
       if (!samePath(finalRoot, executionRoot) || !inside(finalCwd, finalRoot)) return { status: "blocked", summary: "Execution root changed during the final effect check." };
       const executable = await assertExecutableUnchanged(expectedExecutable);
-      const started = await this.startChild(action, recipe, executable, finalCwd, lease, signal, operationId, targetSnapshotId, sessionId, authorityId);
+      const started = await this.startChild(action, recipe, executable, finalCwd, lease, signal, operationId, targetSnapshotId, sessionId, authorityId, managedLifecycle);
       if ("result" in started) return started.result;
       effectStarted = true;
       transferredLease = recipe.lifecycle === "managed";
@@ -881,7 +914,8 @@ export class RepositoryRuntime {
     operationId: string,
     targetSnapshotId: string,
     sessionId?: string,
-    authorityId?: string
+    authorityId?: string,
+    managedLifecycle?: RepositoryRuntimeExecuteOptions["managedLifecycle"]
   ): Promise<{ readonly record: ManagedRecord } | { readonly result: RepositoryRuntimeResult }> {
     if (recipe.lifecycle === "managed" && [...this.managed.values()].some((item) => item.public.action === action && item.public.state === "running")) {
       return { result: { status: "blocked", summary: `A managed ${action} process is already running for this repository.`, effectDisposition: "not_started" } };
@@ -901,6 +935,7 @@ export class RepositoryRuntime {
         executionRoot: lease.root,
         isolation: lease.isolation,
         manifestSha256: this.verified.digest,
+        ...(recipe.workspaceMode ? { workspaceMode: recipe.workspaceMode } : {}),
         executable,
         executableSha256: expectedExecutable.sha256,
         args: recipe.args,
@@ -929,14 +964,17 @@ export class RepositoryRuntime {
       lease
     };
     if (recipe.lifecycle === "managed") {
+      record.managedLifecycle = managedLifecycle;
+      managedLifecycle?.started();
       this.managed.set(id, record);
       record.timeout = setTimeout(() => { void this.terminateRecord(record, 250, 1_000, "timed_out"); }, recipe.timeoutMs);
       if (signal) {
         const abort = (): void => { void this.terminateRecord(record, 250, 1_000, "cancelled"); };
         signal.addEventListener("abort", abort, { once: true });
         record.abortCleanup = () => signal.removeEventListener("abort", abort);
+        if (signal.aborted) abort();
       }
-      void this.observeManagedExit(record);
+      this.startManagedExitObserver(record);
     }
     return { record };
   }
@@ -1026,10 +1064,23 @@ export class RepositoryRuntime {
     record.public.state = terminal;
   }
 
+  /** Call only after the exact host supervisors have independently exited. */
+  async waitForManagedExitObservers(): Promise<void> {
+    await Promise.all([...this.managedObservers]);
+    if (this.managedObservationFailure) throw this.managedObservationFailure;
+  }
+
+  private startManagedExitObserver(record: ManagedRecord): void {
+    const task = this.observeManagedExit(record).catch(error => { this.managedObservationFailure ??= error; });
+    this.managedObservers.add(task);
+    void task.finally(() => this.managedObservers.delete(task));
+  }
+
   private async observeManagedExit(record: ManagedRecord): Promise<void> {
     const { code, terminalEvidence } = await record.exit;
     if (record.timeout) clearTimeout(record.timeout);
     record.abortCleanup?.();
+    record.managedLifecycle?.stopped();
     if (terminalEvidence === "ambiguous") {
       if (record.public.state === "running" || record.public.state === "stopping") record.public.state = "unknown";
     } else {

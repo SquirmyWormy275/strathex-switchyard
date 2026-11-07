@@ -1,0 +1,36 @@
+{
+  "schema": "switchyard-restricted-storage-followup-summary/v1",
+  "sourceCommit": "37952173f5f43899ea93cb2284c83b0bd3a4436a",
+  "mergeCommit": "241366fbab11bb79fe7a882c369b37bb81ce924a",
+  "tree": "d7b84990573a4c40bcc321808d3b098de56e27ca",
+  "workflowRun": 42359981378,
+  "job": 128366346351,
+  "artifact": {
+    "id": 13568894490,
+    "bytes": 4588,
+    "sha256": "f48d9fcd00540779019dc36222efdbc73673b46c05486dad795145f830ed7e26"
+  },
+  "receiptSha256": "184a163835fb8c4ce4a5e48b49d313d96aad61212fda21555ea0b332fba55353",
+  "success": true,
+  "checks": {
+    "preliminary": 9,
+    "restrictedClient": 13,
+    "restrictedExchange": 31,
+    "hostOwner": 8,
+    "restrictedHostOwner": 8,
+    "descendantQuery": 68,
+    "allDescendantQueryMasksEight": true
+  },
+  "cleanup": {
+    "originalNativeExitVerified": true,
+    "originalPrivateFixturesRemoved": true,
+    "originalServiceAndFilesRemoved": true
+  },
+  "unchangedRetirementImplementationSinceFailure": true,
+  "unresolvedFailure": "restricted-storage-47c80be-failure-summary.json",
+  "limitations": [
+    "This passing follow-up does not identify or repair the earlier intermittent original-guardian retirement failure.",
+    "Restricted CI token evidence does not accept an ordinary interactive Windows account, UAC journey or VM guest.",
+    "No token mask, privilege, SID/account rule, runtime fallback, command or deadline was changed to obtain this pass."
+  ]
+}

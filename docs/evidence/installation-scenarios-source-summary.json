@@ -1,0 +1,50 @@
+{
+  "schema": "switchyard-installation-scenarios-source/v1",
+  "basis": "c367dff7c1d4cbd4ea339d21e6b4368d466b8d86",
+  "sourceSha256": {
+    "scripts/run-isolated-tests.mjs": "c20a3601a67f3ee45e20ea75ed355fabf5b863e07e54d8bb9cc874b318f578ad",
+    "scripts/windows-scenario-groups.mjs": "f416f3b1ad5c0c498e67faa93b4a00464e8bc265630c0796eb2e806708dbb289",
+    "scripts/windows-scenario-groups.test.mjs": "9cfe73a8491053a8b411deba9c5427f36b9f7f41bb9fa13e9a1ecdcc8e3ac371"
+  },
+  "unchangedInstallationSourceSha256": "9d9f10b0591817d1c23abaf87efacf79b695d14934a5b4e09537a1a4aa36779f",
+  "initialAttempt": {
+    "receipt": "isolated-test-f499e356-09f9-4b5b-bcd0-c851fc35dabc.json",
+    "success": false,
+    "totals": {
+      "required": 5,
+      "passed": 3,
+      "failed": 2,
+      "tests": 34,
+      "passedTests": 34,
+      "failedTests": 0,
+      "skippedTests": 0,
+      "cancelledTests": 0,
+      "todoTests": 0
+    },
+    "reason": "The harness deliberately escapes selectors as literal case names. The two regular-expression strings selected no cases and were correctly refused by zero-plan detection. Literal selector behavior remains unchanged."
+  },
+  "accepted": {
+    "receipt": "isolated-test-1ae5ca8c-ec65-46b2-93e6-5dfa39814c58.json",
+    "totals": {
+      "required": 19,
+      "passed": 19,
+      "failed": 0,
+      "tests": 48,
+      "passedTests": 48,
+      "failedTests": 0,
+      "skippedTests": 0,
+      "cancelledTests": 0,
+      "todoTests": 0
+    },
+    "installationCases": 16,
+    "casesPerChild": 1,
+    "childTimeoutMs": 120000,
+    "minimumChildDurationMs": 1193,
+    "maximumChildDurationMs": 4070,
+    "allChildAndTreeCleanupVerified": true
+  },
+  "behavior": "All sixteen original assertions run exactly once as existing literal selectors. Missing, duplicated or broadened selections refuse. The original source test file and production installation code are unchanged. Each child keeps the 120-second bound and the CI contract step keeps six minutes; no complete Windows acceptance is inferred.",
+  "nativeWindowsAcceptance": "b600a6d: all sixteen original cases pass exactly once under the original per-child bound, with cleanup; see installation-scenarios-native-summary.json. Earlier failed attempts remain retained.",
+  "installedChanged": false,
+  "downloads": false
+}

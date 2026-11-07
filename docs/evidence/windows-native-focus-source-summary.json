@@ -1,0 +1,207 @@
+{
+  "schema": "switchyard-windows-native-focus-source/v1",
+  "at": "2026-11-07T02:48:43.580776+00:00",
+  "baseSource": "1eae4a54fc2c3e4851002d6527a3784ad6b9a1fe",
+  "sourceFiles": {
+    "tools/layout-studio/windows-native-focus.mjs": "706b7487d8260bfdd7b37fe1b99312b1d8b863de37bf8a42462fea97d3ee76b2",
+    "tools/layout-studio/windows-native-focus.test.mjs": "d0cb592b45752115b65d08a7d8f9eb15b2440e5c4045bd0b96c9339d50bc451d",
+    "tools/layout-studio/suite.mjs": "64d8a35abb8d3a61234bfe3405bee76067c4d5c1205841bbab97762566d670fb",
+    "tools/layout-studio/suite-store.mjs": "6d7f2065670eb1c79528d79fdb0dd83071dded9574c10cf694272a98dd0ce2e4",
+    "apps/windows-companion/src/provider-desktop.ts": "acbb3add74a8a44513e98a26b2cdcb2757858e5db199f8643da00525d1e8ba11",
+    "apps/windows-companion/src/windows-provider-process.ts": "4218ff1ed077072a3cc8c694576a6bf7a98d892f319e0a40fe975fa6e7f159a2",
+    "deployment/suite/release.mjs": "502e716aa5092672985af6ceb412bcc428c2cd1532e4a7ad0964485dfa88435d",
+    "deployment/suite/release.test.mjs": "a3b3cf50a9f2f12cd92f609202f58bffdd3c21f63606cbdeabd2ee12a8d9a7de",
+    "deployment/suite/test-support/fixture.mjs": "2689dd64366544cbe221645eca4858ea2780c0cd094e6069c231d99225cf3a0e",
+    "scripts/run-isolated-tests.mjs": "7c756c4811246556c74a66f333a5085ee508192d579b736fb1b6db9b8f5558ad",
+    "scripts/verify-agent-security-host.mjs": "fa5cbf742f2f2464fc2ed07be6987313a69b4bcf3c78a175004402a8ecb2c2f7",
+    "scripts/run-isolated-tests.test.mjs": "e957fda947d20040b21cfcb02b595427458b70df842702d56eccc7f8c9a2b8e8",
+    "deployment/suite/application.test.mjs": "bfff39c8699b6d578edd54a80e1e26fd9d346c708b1707ac27e332e934d4b83b",
+    "tools/layout-studio/credential-process.test.mjs": "957bb3e9880ffcfd9631656b668dc106a78a5b3296555c44526db0105321cc41",
+    "deployment/suite/connection-restoration.test.mjs": "f6d3a0a56de1e3d1eb325a285bf2ade1513fe40513c6eeb996f9159ed45de217",
+    "deployment/suite/installation.test.mjs": "9d9f10b0591817d1c23abaf87efacf79b695d14934a5b4e09537a1a4aa36779f",
+    "tools/layout-studio/agent-observation.test.mjs": "d63ddc68d3e2a69c2572972884237002e6324ad70907e8e542208d455cc6a96c",
+    "tools/layout-studio/suite.test.mjs": "18d65cf5a39999ae18be36a9eb2662f29823e9710aef941e2f31f6ab76972521",
+    "tools/layout-studio/physical-intent.test.mjs": "b699e0abb89eec4a59af8da606d5562ed645ea59f22a018be5727a0eb4e0accf",
+    "tools/layout-studio/native-focus-gateway.test.mjs": "f902036c18680e47da7f4ff3733d118970b8af5bede8d10c6b420cae28a5248c",
+    "tools/layout-studio/foreground.test.mjs": "a0d5f3375e0edef45ef85dd9ad5197174fedf80ee312149b31732d155d5b37e0",
+    "tools/layout-studio/windows-host.test.mjs": "1546efd7a113c213e18cfe1d2d6d814a67e7a844c83d47f567e8eb0fe5e84d2d",
+    "tools/layout-studio/design-observations.test.mjs": "c1b13b48c4514051d4c7867e6afe891ae018a51703db5c3d39b1bd09de88c996",
+    "apps/windows-companion/test/provider-desktop.test.ts": "b4c643048a8c3e98a74278618fc17953f8a7200bbee36fed59597712fc54283c",
+    "apps/windows-companion/test/provider-desktop-adapter.test.ts": "13ed08c99b4f187132cc989f83add6e0f85bce69b67c42dd79b73cc7681adeaa",
+    "apps/windows-companion/test/provider-desktop-configuration.test.ts": "029efba154e94a677e963ed8d44b2b2e2d34aa0a4587f17434db0989541ff688",
+    "apps/windows-companion/test/provider-desktop-effects.test.ts": "d6f332000ff95452272462974a9862089806e19c8483a9688be298b874dc69e9",
+    "apps/windows-companion/test/repository-runtime-release-package.test.ts": "709463f0194e4f3e286b38d119d621e1d435b81019388f8c8a7cb81e2447edae",
+    "apps/windows-companion/test/windows-provider-process.test.ts": "07e775cee34f903ddf02b5c934c2cd0ca5ed999d7a321a65b78f92bbd7f049bd"
+  },
+  "receipts": [
+    {
+      "name": "isolated-test-1e4be595-3ab4-40f7-afe5-251fad131082.json",
+      "sha256": "131808030587bff81d85b3456f62721e9d438e0a1bcf83396c98e5ad54848ff2",
+      "success": true,
+      "totals": {
+        "required": 1,
+        "passed": 1,
+        "failed": 0,
+        "tests": 10,
+        "passedTests": 10,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "name": "isolated-test-7a8a2315-a9f4-4f6b-8237-260f4736cfa7.json",
+      "sha256": "16ff76cb41931260ca92555bcde35938df7dbdfe8eafe87d904d19b387f811db",
+      "success": true,
+      "totals": {
+        "required": 1,
+        "passed": 1,
+        "failed": 0,
+        "tests": 12,
+        "passedTests": 12,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "name": "isolated-test-c7bbd89d-d478-4e93-9807-d2c8acdc3a1b.json",
+      "sha256": "d64e64dcee88cbe561fa612d05d77a80622debcd72ecc4d965020e44cf812658",
+      "success": true,
+      "totals": {
+        "required": 1,
+        "passed": 1,
+        "failed": 0,
+        "tests": 14,
+        "passedTests": 14,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "name": "isolated-test-93b7c86c-e891-4ecd-a849-99da38decf3d.json",
+      "sha256": "cf54d5a2b4ba3a509ae32d4ba39d1ae7345cb8034a4e9035b5f0085218aa93b7",
+      "success": false,
+      "totals": {
+        "required": 1,
+        "passed": 0,
+        "failed": 1,
+        "tests": 5,
+        "passedTests": 4,
+        "failedTests": 1,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "name": "isolated-test-ace6b6a3-ec35-42b3-82c4-ed58b055bfa4.json",
+      "sha256": "3b3aed1031e24c35a206d14055dcc5c1bfda2b3a0b4f87fd959f225c6585ee0a",
+      "success": false,
+      "totals": {
+        "required": 1,
+        "passed": 0,
+        "failed": 1,
+        "tests": 5,
+        "passedTests": 4,
+        "failedTests": 1,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "name": "isolated-test-f95533cb-7772-4072-a40e-4aebf87462b2.json",
+      "sha256": "bd688b7a42cf815b7807ec86f476329e15f823f93b1e6d9950df2a5ba60eb65f",
+      "success": true,
+      "totals": {
+        "required": 2,
+        "passed": 2,
+        "failed": 0,
+        "tests": 19,
+        "passedTests": 19,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "name": "isolated-test-746f1a4c-26f2-40e0-b238-9e06643c3f0f.json",
+      "sha256": "9ebd6fa02ebaa5a209ffb4cc4db23ec2af5234aaf18b0887dc3e4664932f3b00",
+      "success": true,
+      "totals": {
+        "required": 35,
+        "passed": 35,
+        "failed": 0,
+        "tests": 231,
+        "passedTests": 231,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "name": "isolated-test-8d490ec1-7265-4a73-8ec8-1ff9684060c0.json",
+      "sha256": "d28b766f2c924afa58b2c4cc10acb35ea2c390e26d5218220645f72bf5ba8a73",
+      "success": true,
+      "totals": {
+        "required": 35,
+        "passed": 35,
+        "failed": 0,
+        "tests": 232,
+        "passedTests": 232,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    }
+  ],
+  "finalReceipt": "isolated-test-8d490ec1-7265-4a73-8ec8-1ff9684060c0.json",
+  "verification": {
+    "groups": 35,
+    "tests": 232,
+    "skips": 0,
+    "originalManifestCommandsAndBounds": true,
+    "allChildAndTreeCleanupVerified": true,
+    "typecheckPassed": true,
+    "metadataVerifierSyntaxPassed": true,
+    "authenticatedGatewayDemonstration": "synthetic executables/signatures/processes with real encrypted store, byte identity, protocol parser and same-origin HTTP gateway",
+    "linuxPackageOriginalFiveMiBBoundPassed": true,
+    "windowsSourceClosureAndImportsPassed": true,
+    "nativeWindowsDesktopExecuted": false,
+    "newRuntimeOrDependencyDownloads": false
+  },
+  "unacceptedWindowsRun": {
+    "id": 42320456748,
+    "source": "76facc920f3282a4206b81482e8edf8d9b0dce82",
+    "conclusion": "cancelled",
+    "overallAcceptance": false
+  },
+  "limitations": [
+    "Native Windows owner/window acceptance pending",
+    "Frozen frontend configuration controls remain unfinished",
+    "Windows VS Code focus remains unfinished",
+    "No application launch, account verification, task resumption, typing or model prompt",
+    "Recent settled UUID replay is bounded; uncertain focus outcomes remain preserved",
+    "No full current-source Linux or Windows suite pass claimed"
+  ],
+  "preflightCorrections": [
+    "Focused selector initially expected 20 groups for 20 files; the unchanged manifest expands them to 35 scenario groups. No tests ran before the selector was corrected.",
+    "Release fixture lacked the two new TypeScript source entries; its original failed receipt is retained.",
+    "All-platform inclusion exceeded the original full Linux package bound; Windows-specific loading and packaging corrected it without changing the bound."
+  ],
+  "cleanup": {
+    "files": 0,
+    "bytes": 0,
+    "removed": true,
+    "processAbsenceVerified": true
+  },
+  "privateReceiptSha256": "939ef1694a9f3602d6a75ad2689d12c5f07bd5660005ebce48c9c2775a7fa623"
+}

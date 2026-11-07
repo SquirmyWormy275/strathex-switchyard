@@ -1,0 +1,78 @@
+{
+  "schema": "switchyard-consent-generation-source-summary/v1",
+  "baseCommit": "0c025df17213bb2bfe0347bfe712f918cfaf90f7",
+  "sourceFiles": {
+    "tools/layout-studio/suite.mjs": "829f15f7acf92fcde4f43c28f0fe82ca038f88a7f797b43e00892cacfcbbe771",
+    "tools/layout-studio/codex-runtime-observation.mjs": "5d60231ef5ff2c17fc58605a62b4c7e010f83836e48ff5d537c0a8dd0210cae2",
+    "tools/layout-studio/agent-observation.test.mjs": "9cb37e41af1d31f488d3ad5b5170482a6feec0d8151666c85964df66b3dd2fc3",
+    "tools/layout-studio/editor-observation.test.mjs": "293795da7e534aafd0796d1173f13f87b44b783e6635a3efa27e2f700871160d"
+  },
+  "receipts": [
+    {
+      "id": "7b61cdcc-c21e-4d68-b88b-a2478cc5bcc0",
+      "kind": "original-regressions",
+      "sha256": "06b419e0f0dd8b122101f9261fed7a7fcddb9b68890744f6c51a9a346f1674e6",
+      "totals": {
+        "required": 2,
+        "passed": 0,
+        "failed": 2,
+        "tests": 23,
+        "passedTests": 21,
+        "failedTests": 2,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "originalManifestCommandsBoundsSkipsAndCleanupVerified": true
+    },
+    {
+      "id": "e7553f72-c439-4937-a0bf-924bc8133fdf",
+      "kind": "generation-correction",
+      "sha256": "24ba1ac540eafb21440a4c232373b386149218586af49b519e333acfc9c2e59e",
+      "totals": {
+        "required": 2,
+        "passed": 2,
+        "failed": 0,
+        "tests": 23,
+        "passedTests": 23,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "originalManifestCommandsBoundsSkipsAndCleanupVerified": true
+    },
+    {
+      "id": "088c0dd1-f88f-45a8-877f-da2835415955",
+      "kind": "accepted",
+      "sha256": "6241b80ca59c9b206a408d0d0506407390e0b5a77052eec2d6cec5e36466316b",
+      "totals": {
+        "required": 8,
+        "passed": 8,
+        "failed": 0,
+        "tests": 120,
+        "passedTests": 120,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "originalManifestCommandsBoundsSkipsAndCleanupVerified": true
+    }
+  ],
+  "accepted": {
+    "groups": 8,
+    "passedTests": 120,
+    "skippedTests": 0
+  },
+  "scope": [
+    "Explicit observation start and resume create a new private recording generation; repeated recording status preserves the current generation.",
+    "Queued Codex runtime status rechecks the original consent generation within encrypted persistence. Same-clock or backward-clock resumes cannot reuse the captured interval.",
+    "Native events sharing the exact start/resume timestamp are ambiguous and omitted for newly generated intervals. A later event is accepted normally; existing legacy recordings retain their original timestamp semantics until resumed.",
+    "The encrypted Suite API demonstration exercises actual consent transitions and delayed persistence with synthetic runtime metadata. No provider process, model request, account, keyboard or microphone is used."
+  ],
+  "limitations": [
+    "This corrects consent during owned Codex status capture; it does not add external stream subscriptions or claim complete provider coverage.",
+    "Installed 57af859 and the running complete Linux 0c025df check predate this correction. Source checks do not establish live provider or native Windows acceptance."
+  ]
+}

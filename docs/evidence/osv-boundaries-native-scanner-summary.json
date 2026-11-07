@@ -1,0 +1,29 @@
+{
+  "schema": "switchyard-osv-boundaries-native-scanner/v1",
+  "sourceCommit": "6e967a3d45e46aafd36da85a86bf73b7693e241d",
+  "executionCommit": "da80bf1660af8b220ddac54232f775972db8b208",
+  "sourceAndExecutionTree": "e78b3ad17174b3f68521ec514fcd6e27e3c35110",
+  "runId": 42271740559,
+  "jobId": 128078156466,
+  "artifactId": 13529722331,
+  "archiveBytes": 1000,
+  "archiveSha256": "353bcbf70320b1365b4be989f96636a3065945bd59cdcef89e8e68858defe8fc",
+  "zipSavedLocally": false,
+  "success": true,
+  "totals": {
+    "required": 1,
+    "passed": 1,
+    "failed": 0,
+    "tests": 15,
+    "passedTests": 7,
+    "failedTests": 0,
+    "skippedTests": 8,
+    "cancelledTests": 0,
+    "todoTests": 0
+  },
+  "privateReceipt": "windows-osv-scanner-6e967a3-native.json",
+  "allChildAndTreeCleanupVerified": true,
+  "windowsGuestExecutionDoubled": true,
+  "actualGuestAccepted": false,
+  "installedChanged": false
+}

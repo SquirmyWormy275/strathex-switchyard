@@ -1,0 +1,50 @@
+{
+  "schema": "switchyard-editor-task-choices-native-client-summary/v1",
+  "sourceCommit": "9d230acf4bdec18293f9c64424e41a25b0b59517",
+  "mergeCommit": "4c6f005befb64d139e7c89b4ebb9c0ca0170695e",
+  "tree": "e139656a53df1c54778bcc3203a773289008af0b",
+  "sourceAndMergeTreesEqual": true,
+  "workflowRun": 42384156675,
+  "jobs": {
+    "helper": 128437911488,
+    "client": 128438120889,
+    "conclusion": "success"
+  },
+  "artifact": {
+    "id": 13579081791,
+    "bytes": 3526,
+    "sha256": "83c1807523339f2af20a5c3b56a5be6ea22740967328a9119dfcb7cebde56241",
+    "zipRetained": false,
+    "nativeHelperDownloaded": false
+  },
+  "receipt": {
+    "id": "ccb41291-5319-4bfd-aac9-e31e117b294e",
+    "file": "ci-artifact-13579081791-0.json",
+    "sha256": "0921a7b1b16f0d45c9f588c5c9c942e501f0c94fcfb59c199ad98c12928a5872"
+  },
+  "totals": {
+    "required": 25,
+    "passed": 25,
+    "failed": 0,
+    "tests": 250,
+    "passedTests": 250,
+    "failedTests": 0,
+    "skippedTests": 0,
+    "cancelledTests": 0,
+    "todoTests": 0
+  },
+  "originalManifestCommandsBoundsSkipsAndCleanupVerified": true,
+  "metadataOnlyPlatformProjection": true,
+  "projectionStartedNoTestProcesses": true,
+  "projectionStagingRemoved": true,
+  "sourceFiles": {
+    "scripts/run-isolated-tests.mjs": "5b30e4c7e831b40933fc39f691d81323a7f51963552ce9a5896d0380cdee7c6e",
+    "scripts/windows-scenario-groups.mjs": "bf9e991f1d3ccf5a36db7af6d01d375dc205b665b9177bbaf179e245d9e9f3b7",
+    "scripts/test-support/process-tree.mjs": "a480913dcafb50351ac4544d07e184ea4b21c53eb5b13a59b245952e63d859e6",
+    "scripts/verify-client-platform.mjs": "7c85086841008e6fc409ffa8afbf9e87951f7e59689cbb49bce33d8b9be90ff4"
+  },
+  "limitations": [
+    "The native client lane includes both signed task-choice consumers but not the protected-store task-owner backend scenario. It predates guided role choices and does not accept the complete Windows release.",
+    "Terminal/provider doubles remain explicit; this does not accept live accounts, TUI handoff, interactive desktop, keyboard or microphone behavior. Editor command activation remains frozen."
+  ]
+}

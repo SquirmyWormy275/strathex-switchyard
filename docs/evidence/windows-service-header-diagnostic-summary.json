@@ -1,0 +1,38 @@
+{
+  "schema": "switchyard-service-header-diagnostic-summary/v1",
+  "purpose": "Identify which original SCM type/start/error invariant fails without relaxing any of the three guards",
+  "originalFailurePhase": "service-absence-configuration-header",
+  "acceptedHeader": {
+    "type": 16,
+    "start": 2,
+    "error": 1
+  },
+  "semanticChecksUnchanged": true,
+  "newFixedFieldPhaseLabels": true,
+  "pathsAccountsOrBufferBytesPublished": false,
+  "pureHeaderGuardChecks": 769,
+  "portableChecksTotal": 992,
+  "managedTargetsCompiled": 2,
+  "buildReceipt": "windows-index-native-build-1793922687072.json",
+  "reusedSdk": "8.0.424",
+  "newSdkInstalled": false,
+  "ownedCompileScratchRemoved": true,
+  "focusedReceipt": "isolated-test-56289dc9-be89-4f2c-9db6-a6497a8e0bf1.json",
+  "focusedGroups": 5,
+  "focusedChecks": 52,
+  "allChildCleanup": true,
+  "allProcessTreeTerminationComplete": true,
+  "nativeProofAndCoordinatorRequireHeaderCounter": true,
+  "nativeRootCauseConfirmed": false,
+  "nativeRepairAccepted": false,
+  "sourceSha256": {
+    "apps/desktop-hotkeys/WindowsStorageBrokerServiceHeader.cs": "205fdc92393c4ea5c7873e464a4f2baf1809c571091cd0e95573afe90b2b8b5a",
+    "apps/desktop-hotkeys/WindowsStorageBrokerControl.cs": "14e7f36b18604fe0cffb2156fcf0999722b3fbe9d152040d32aeaa40255e46a6",
+    "apps/desktop-hotkeys/WindowsStorageBrokerBootstrap.cs": "6c2d612447084928a907cf7e3b3fc2837de141f5c21fc82ae0e068676a5866f2",
+    "deployment/windows/test-support/storage-broker-protocol/ServiceHeaderProof.cs": "de14d8755763d81138880fe952239279e617fcf9384680ff7068be0173846717",
+    "deployment/windows/test-support/storage-broker-protocol/Program.cs": "1d9931f7b48e51463e6dc77cf17d58095a8fd9d185f6183539ab88cae82d6cc2",
+    "deployment/windows/test-support/storage-broker-protocol/StorageBrokerProtocol.Proof.csproj": "86ba9440c186572abbe7001244c70f14c43f72e99600f94ca13449ec97eda5aa",
+    "scripts/verify-windows-storage-broker.mjs": "282b4d47b6962215116726b7a31cc3ce5f149d55147d545f845ce8c3e631f0df",
+    ".github/workflows/switchyard-windows-filesystem.yml": "bef1ee6e332a68cb738dd6f210fa1086f430e5bf721b104f222eb3746ca6f70c"
+  }
+}

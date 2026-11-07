@@ -26,6 +26,7 @@
       }
     },
     "resourcePolicyDigest": { "type": "string", "pattern": "^[a-fA-F0-9]{64}$" },
-    "helperDigest": { "type": "string", "pattern": "^[a-fA-F0-9]{64}$" }
+    "helperDigest": { "type": "string", "pattern": "^[a-fA-F0-9]{64}$" },
+    "hostOwnsGuestShutdown": { "type": "boolean", "default": false, "description": "Host-owned reviewed sessions stop the exact VM after observing the worker result; legacy requests retain guest self-shutdown." }
   }
 }

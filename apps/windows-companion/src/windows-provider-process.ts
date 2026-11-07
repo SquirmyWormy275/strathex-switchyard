@@ -11,6 +11,7 @@ import { createHash, randomBytes } from "node:crypto";
 import { createReadStream } from "node:fs";
 import { lstat, realpath, stat } from "node:fs/promises";
 import { dirname, isAbsolute, resolve } from "node:path";
+import { windowsEditorProductIdentity } from "./provider-desktop.ts";
 
 import type {
   DesktopProviderId,
@@ -23,13 +24,16 @@ import type {
 
 const requestSchema = "sxsy-b122.provider-desktop-request" as const;
 const responseSchema = "sxsy-b122.provider-desktop-response" as const;
-const helperArguments = ["--stdio-v1"] as const;
+const helperArguments = ["--stdio-v2"] as const;
 const digestPattern = /^[a-f0-9]{64}$/;
 const surfacePattern = /^hwnd:[a-f0-9]{1,16}$/;
 const maximumProtocolBytes = 64 * 1024;
 const maximumRequestBytes = 16 * 1024;
 const maximumObservations = 64;
 const maximumHelperBytes = 256 * 1024 * 1024;
+const helperRetirementMs = 2_000;
+type NativeFocusProviderId = DesktopProviderId | "vscode";
+type NativeFocusEffectRequest = Omit<ProviderProcessEffectRequest, "provider"> & { readonly provider: NativeFocusProviderId };
 
 const desktopProducts: Readonly<Record<DesktopProviderId, ProviderProductIdentity>> = {
   claude_desktop: {
@@ -55,10 +59,30 @@ export interface ProviderDesktopHelperInvocation {
 }
 
 export interface ProviderDesktopHelperSession {
+  readonly processId?: number;
   write(line: string): Promise<void>;
   read(): Promise<string>;
   terminate(): Promise<void>;
-  wait(): Promise<{ readonly code: number; readonly signal: NodeJS.Signals | null }>;
+  wait(): Promise<ProviderDesktopHelperExit>;
+}
+
+export interface ProviderDesktopHelperExit {
+  readonly code: number;
+  readonly signal: NodeJS.Signals | null;
+  readonly protocolFailed?: boolean;
+  readonly unreadResponses?: number;
+}
+
+export interface ProviderDesktopHelperOwner {
+  readonly processId: number;
+  readonly processStartTime: string;
+}
+
+interface OwnedHelper {
+  readonly session: ProviderDesktopHelperSession;
+  identity?: ProviderDesktopHelperOwner;
+  recording?: Promise<void>;
+  stoppingRecord?: Promise<void>;
 }
 
 export interface ProviderDesktopHelperTransport {
@@ -69,6 +93,10 @@ export interface WindowsProviderDesktopProcessPortOptions {
   readonly helperPath: string;
   readonly helperSha256: string;
   readonly transport?: ProviderDesktopHelperTransport;
+  /** Closed Suite mode: native discovery/focus only, never provider launch. */
+  readonly focusOnly?: boolean;
+  readonly onHelperOwned?: (owner: ProviderDesktopHelperOwner) => Promise<void>;
+  readonly onHelperStopped?: (owner: ProviderDesktopHelperOwner) => Promise<void>;
   /** Injectable only so non-Windows protocol tests can prove ambient values are removed. */
   readonly hostEnvironment?: NodeJS.ProcessEnv;
 }
@@ -100,8 +128,9 @@ export class NodeProviderDesktopHelperTransport implements ProviderDesktopHelper
     const exit = new Promise<{ readonly code: number; readonly signal: NodeJS.Signals | null }>((resolveExit) => { settleExit = resolveExit; });
     const fail = (error: Error): void => {
       if (!terminalError) terminalError = error;
+      queued.length = 0;
       while (readers.length) readers.shift()!.reject(terminalError);
-      if (!exited) child.kill();
+      try { if (!exited) child.kill(); } catch { /* Only the close event proves retirement. */ }
     };
     const emit = (line: string): void => {
       const bytes = Buffer.byteLength(line, "utf8");
@@ -115,6 +144,7 @@ export class NodeProviderDesktopHelperTransport implements ProviderDesktopHelper
 
     child.stdout.setEncoding("utf8");
     child.stdout.on("data", (chunk: string) => {
+      if (terminalError) return;
       buffer += chunk;
       if (Buffer.byteLength(buffer, "utf8") > maximumProtocolBytes) return fail(new Error("The provider helper emitted an oversized unterminated response."));
       for (let newline = buffer.indexOf("\n"); newline >= 0; newline = buffer.indexOf("\n")) {
@@ -128,6 +158,9 @@ export class NodeProviderDesktopHelperTransport implements ProviderDesktopHelper
       if (stderrBytes > 4_096) fail(new Error("The provider helper exceeded its bounded diagnostic output."));
     });
     child.once("error", () => fail(new Error("The fixed provider helper could not be started.")));
+    child.stdin.on("error", () => fail(new Error("The fixed provider helper request stream failed.")));
+    child.stdout.on("error", () => fail(new Error("The fixed provider helper response stream failed.")));
+    child.stderr.on("error", () => fail(new Error("The fixed provider helper diagnostic stream failed.")));
     child.once("close", (code, signal) => {
       exited = true;
       if (buffer.length > 0 && !terminalError) terminalError = new Error("The provider helper ended with an incomplete response.");
@@ -137,20 +170,21 @@ export class NodeProviderDesktopHelperTransport implements ProviderDesktopHelper
     });
 
     return {
+      processId: child.pid,
       write: async (line) => {
         if (exited || terminalError || child.stdin.destroyed) throw terminalError ?? new Error("The provider helper protocol is closed.");
         if (/\r|\n/.test(line) || Buffer.byteLength(line, "utf8") > maximumRequestBytes) throw new Error("The provider helper request is invalid or oversized.");
         await new Promise<void>((resolveWrite, rejectWrite) => child.stdin!.write(`${line}\n`, (error) => error ? rejectWrite(error) : resolveWrite()));
       },
       read: async () => {
+        if (terminalError) throw terminalError;
         const line = queued.shift();
         if (line !== undefined) return line;
-        if (terminalError) throw terminalError;
         if (exited) throw new Error("The provider helper exited before its response was complete.");
         return new Promise<string>((resolveRead, rejectRead) => readers.push({ resolve: resolveRead, reject: rejectRead }));
       },
       terminate: async () => { if (!exited) child.kill(); },
-      wait: async () => exit
+      wait: async () => ({ ...await exit, protocolFailed: terminalError !== undefined, unreadResponses: queued.length })
     };
   }
 }
@@ -164,8 +198,18 @@ export class WindowsProviderDesktopProcessPort implements ProviderDesktopProcess
   private readonly helperSha256: string;
   private readonly transport: ProviderDesktopHelperTransport;
   private readonly environment: Readonly<Record<string, string>>;
+  private readonly focusOnly: boolean;
+  private readonly onHelperOwned?: WindowsProviderDesktopProcessPortOptions["onHelperOwned"];
+  private readonly onHelperStopped?: WindowsProviderDesktopProcessPortOptions["onHelperStopped"];
+  private busy = false;
+  private owner?: OwnedHelper;
 
   constructor(options: WindowsProviderDesktopProcessPortOptions) {
+    if (options.focusOnly !== undefined && typeof options.focusOnly !== "boolean") throw new Error("The provider helper mode must be a literal boolean.");
+    this.focusOnly = options.focusOnly === true;
+    if (this.focusOnly && (typeof options.onHelperOwned !== "function" || typeof options.onHelperStopped !== "function")) throw new Error("Focus-only helpers require exact owner and retirement persistence callbacks.");
+    this.onHelperOwned = options.onHelperOwned;
+    this.onHelperStopped = options.onHelperStopped;
     if (!isAbsolute(options.helperPath) || !/\.exe$/i.test(options.helperPath) || !digestPattern.test(options.helperSha256)) {
       throw new Error("The provider process port requires an exact absolute helper path and SHA-256 digest.");
     }
@@ -176,11 +220,11 @@ export class WindowsProviderDesktopProcessPort implements ProviderDesktopProcess
   }
 
   async listRunning(identity: ProviderExecutableIdentity, signal: AbortSignal): Promise<readonly ProviderDesktopProcessObservation[]> {
-    const provider = providerForIdentity(identity);
+    const provider = providerForIdentity(identity, this.focusOnly);
     return this.withSession(signal, async (session, requestId) => {
       await session.write(encodeRequest({
         schema: requestSchema,
-        version: 1,
+        version: 2,
         requestId,
         action: "list",
         provider,
@@ -190,6 +234,7 @@ export class WindowsProviderDesktopProcessPort implements ProviderDesktopProcess
       const observations = parseObservations(response.observations);
       return observations.map((observation) => ({
         processId: observation.processId,
+        processStartTime: observation.processStartTime,
         windowId: observation.surfaceId,
         isForeground: observation.isForeground,
         identity
@@ -197,37 +242,41 @@ export class WindowsProviderDesktopProcessPort implements ProviderDesktopProcess
     });
   }
 
-  async focusExisting(request: ProviderProcessEffectRequest & { readonly process: ProviderDesktopProcessObservation }): Promise<Readonly<{ processId: number }>> {
-    validateEffectRequest(request);
+  async focusExisting(request: NativeFocusEffectRequest & { readonly process: ProviderDesktopProcessObservation }): Promise<Readonly<{ processId: number }>> {
+    validateEffectRequest(request, this.focusOnly);
     if (request.process.processId <= 0 || !Number.isSafeInteger(request.process.processId) || !surfacePattern.test(request.process.windowId)) {
       throw new Error("The expected provider surface identity is invalid.");
     }
     if (!sameNativeIdentity(request.identity, request.process.identity)) throw new Error("The expected provider process identity changed before native focus.");
+    const expectedStartTime = processBirthIdentity(request.process.processStartTime);
     return this.withSession(request.signal, async (session, requestId) => {
       await session.write(encodeRequest({
         schema: requestSchema,
-        version: 1,
+        version: 2,
         requestId,
         action: "focus",
         provider: request.provider,
         identity: nativeIdentity(request.identity),
         expectedProcessId: request.process.processId,
+        expectedProcessStartTime: expectedStartTime,
         expectedSurfaceId: request.process.windowId
       }));
       const ready = parseResponse(await session.read(), requestId, "ready");
       const token = authorizationToken(ready.authorizationToken);
       const processId = processIdentity(ready.processId);
       const surfaceId = surfaceIdentity(ready.surfaceId);
-      if (processId !== request.process.processId || surfaceId !== request.process.windowId) {
+      const processStartTime = processBirthIdentity(ready.processStartTime);
+      if (processId !== request.process.processId || surfaceId !== request.process.windowId || processStartTime !== expectedStartTime) {
         throw new Error("The exact provider process or surface changed before the final focus barrier.");
       }
       await request.beforeEffect();
       assertNotAborted(request.signal);
       await session.write(authorization(requestId, token));
       const result = parseResponse(await session.read(), requestId, "result");
-      if (processIdentity(result.processId) !== processId || surfaceIdentity(result.surfaceId) !== surfaceId) {
+      if (processIdentity(result.processId) !== processId || surfaceIdentity(result.surfaceId) !== surfaceId || processBirthIdentity(result.processStartTime) !== processStartTime) {
         throw new Error("The provider helper returned a changed focus surface.");
       }
+      if (result.windowFocusVerified !== true) throw new Error("The provider helper did not verify native foreground readback.");
       return { processId };
     });
   }
@@ -237,12 +286,13 @@ export class WindowsProviderDesktopProcessPort implements ProviderDesktopProcess
     surfaceId: string;
     distinctSurface: boolean;
   }>> {
+    if (this.focusOnly) throw new Error("The focus-only provider helper cannot launch an application or a fresh surface.");
     validateEffectRequest(request);
     validateFixedLaunchProfile(request.provider, request.args, request.requireDistinctSurface);
     return this.withSession(request.signal, async (session, requestId) => {
       await session.write(encodeRequest({
         schema: requestSchema,
-        version: 1,
+        version: 2,
         requestId,
         action: "launch",
         provider: request.provider,
@@ -271,18 +321,73 @@ export class WindowsProviderDesktopProcessPort implements ProviderDesktopProcess
 
   private async withSession<T>(signal: AbortSignal, run: (session: ProviderDesktopHelperSession, requestId: string) => Promise<T>): Promise<T> {
     assertNotAborted(signal);
+    if (this.busy) throw new Error("An exact provider helper operation is already in progress.");
+    this.busy = true;
+    try {
+      // A prior uncertain stop retains the original session. Never replace it
+      // merely because a signal was sent or the caller abandoned its request.
+      if (this.owner) await this.retire(this.owner);
+      return await this.runSession(signal, run);
+    } finally { this.busy = false; }
+  }
+
+  /** Retry retirement of this instance's original child without a new request. */
+  async retireOwned(): Promise<Readonly<{ stopped: boolean }>> {
+    if (this.busy) return { stopped: false };
+    if (!this.owner) return { stopped: true };
+    this.busy = true;
+    try { await this.retire(this.owner); return { stopped: true }; }
+    catch { return { stopped: false }; }
+    finally { this.busy = false; }
+  }
+
+  private async retire(owner: OwnedHelper): Promise<ProviderDesktopHelperExit> {
+    const session = owner.session;
+    let phase = "exit";
+    const unconfirmed = () => Object.assign(new Error(phase === "exit" ? "The original provider helper exit is unconfirmed. No replacement was started." : "The original provider helper retirement record is unconfirmed. No replacement was started."), { code: phase === "exit" ? "PROVIDER_HELPER_EXIT_UNCONFIRMED" : "PROVIDER_HELPER_RETIREMENT_UNCONFIRMED" });
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const deadline = new Promise<never>((_resolve, reject) => { timer = setTimeout(() => reject(unconfirmed()), helperRetirementMs); });
+    // Termination errors cannot erase ownership. An independent close event may
+    // still prove that this exact child has already exited.
+    void Promise.resolve().then(() => session.terminate()).catch(() => undefined);
+    try {
+      const exit = await Promise.race([
+        Promise.resolve().then(() => session.wait()),
+        deadline
+      ]);
+      if (!exit || !Number.isSafeInteger(exit.code) || exit.code < -1 || exit.code > 0xffffffff || !(exit.signal === null || typeof exit.signal === "string")) throw unconfirmed();
+      phase = "record";
+      if (owner.identity) {
+        // Join even a failed/in-flight owner write before recording retirement.
+        // A timed-out retirement write is reused, never raced by a replacement.
+        await Promise.race([owner.recording?.catch(() => undefined), deadline]);
+        if (!owner.stoppingRecord) {
+          const recording = Promise.resolve().then(() => this.onHelperStopped!(owner.identity!));
+          owner.stoppingRecord = recording;
+          void recording.catch(() => { if (owner.stoppingRecord === recording) owner.stoppingRecord = undefined; });
+        }
+        await Promise.race([owner.stoppingRecord, deadline]);
+      }
+      if (this.owner === owner) this.owner = undefined;
+      return exit;
+    } catch { throw unconfirmed(); }
+    finally { clearTimeout(timer); }
+  }
+
+  private async runSession<T>(signal: AbortSignal, run: (session: ProviderDesktopHelperSession, requestId: string) => Promise<T>): Promise<T> {
+    assertNotAborted(signal);
     const canonicalHelperPath = await this.assertHelperIdentity();
     assertNotAborted(signal);
     const session = await this.transport.start({
       helperPath: canonicalHelperPath,
       helperSha256: this.helperSha256,
-      arguments: helperArguments,
+      arguments: this.focusOnly ? ["--native-desktop-focus-v3"] : helperArguments,
       environment: this.environment
     });
+    const owner: OwnedHelper = { session }; this.owner = owner;
     let rejectAbort!: (error: Error) => void;
     const aborted = new Promise<never>((_resolve, reject) => { rejectAbort = reject; });
     const abort = () => {
-      void session.terminate();
       rejectAbort(new Error("The provider native operation was cancelled before its effect completed."));
     };
     signal.addEventListener("abort", abort, { once: true });
@@ -291,12 +396,24 @@ export class WindowsProviderDesktopProcessPort implements ProviderDesktopProcess
         abort();
         return await aborted;
       }
-      const operation = run(session, randomBytes(24).toString("hex"));
+      const operation = (async () => {
+        if (this.focusOnly) {
+          const identity = parseHelperOwner(await session.read(), session.processId);
+          assertNotAborted(signal);
+          owner.identity = identity;
+          owner.recording = Promise.resolve().then(() => this.onHelperOwned!(identity));
+          await owner.recording;
+          assertNotAborted(signal);
+        }
+        return run(session, randomBytes(24).toString("hex"));
+      })();
       operation.catch(() => undefined);
       return await Promise.race([operation, aborted]);
     } finally {
       signal.removeEventListener("abort", abort);
-      await session.terminate().catch(() => undefined);
+      const exit = await this.retire(owner);
+      if (exit.protocolFailed === true || exit.unreadResponses !== undefined && exit.unreadResponses !== 0)
+        throw new Error("The provider helper closed with failed or unconsumed protocol output. Its earlier result was not accepted.");
     }
   }
 
@@ -322,17 +439,18 @@ function strictHelperEnvironment(source: NodeJS.ProcessEnv): Readonly<Record<str
   return { SystemRoot: systemRoot, WINDIR: windir };
 }
 
-function validateEffectRequest(request: ProviderProcessEffectRequest): void {
+function validateEffectRequest(request: NativeFocusEffectRequest, focusOnly = false): void {
   if (request.shell !== false) throw new Error("The provider process port never permits a shell.");
   if (!/^[A-Za-z0-9:._-]{1,256}$/.test(request.operationId)) throw new Error("The provider operation identity is invalid.");
-  const expected = desktopProducts[request.provider];
-  if (!sameProduct(expected, request.identity.productIdentity)) throw new Error("The provider product identity is not the fixed desktop catalog identity.");
+  const expected = request.provider === "vscode" ? (focusOnly ? windowsEditorProductIdentity : undefined) : desktopProducts[request.provider];
+  if (!expected || !sameProduct(expected, request.identity.productIdentity)) throw new Error("The provider product identity is not allowed in this fixed helper mode.");
   nativeIdentity(request.identity);
   assertNotAborted(request.signal);
 }
 
-function providerForIdentity(identity: ProviderExecutableIdentity): DesktopProviderId {
+function providerForIdentity(identity: ProviderExecutableIdentity, focusOnly = false): NativeFocusProviderId {
   nativeIdentity(identity);
+  if (focusOnly && sameProduct(windowsEditorProductIdentity, identity.productIdentity)) return "vscode";
   for (const provider of Object.keys(desktopProducts) as DesktopProviderId[]) {
     if (sameProduct(desktopProducts[provider], identity.productIdentity)) return provider;
   }
@@ -385,14 +503,24 @@ function encodeRequest(value: Record<string, unknown>): string {
 }
 
 function authorization(requestId: string, token: string): string {
-  return encodeRequest({ schema: requestSchema, version: 1, requestId, kind: "authorize", authorizationToken: token });
+  return encodeRequest({ schema: requestSchema, version: 2, requestId, kind: "authorize", authorizationToken: token });
+}
+
+function parseHelperOwner(line: string, childProcessId: number | undefined): ProviderDesktopHelperOwner {
+  if (typeof line !== "string" || Buffer.byteLength(line, "utf8") > 512) throw new Error("The native focus helper owner identity is oversized or invalid.");
+  let value: unknown;
+  try { value = JSON.parse(line); } catch { throw new Error("The native focus helper owner identity is malformed."); }
+  if (!record(value) || Object.keys(value).sort().join() !== "processId,processStartTime,schema" || value.schema !== "switchyard-native-focus-owner/v1") throw new Error("The native focus helper owner identity is missing or substituted.");
+  const processId = processIdentity(value.processId), processStartTime = processBirthIdentity(value.processStartTime);
+  if (processId > 0x7fffffff || processId !== childProcessId) throw new Error("The native focus helper owner is not the exact started child.");
+  return Object.freeze({ processId, processStartTime });
 }
 
 function parseResponse(line: string, requestId: string, expectedKind: "ready" | "result"): Record<string, unknown> {
   if (typeof line !== "string" || Buffer.byteLength(line, "utf8") > maximumProtocolBytes) throw new Error("The provider helper emitted an oversized response.");
   let value: unknown;
   try { value = JSON.parse(line); } catch { throw new Error("The provider helper emitted an invalid response."); }
-  if (!record(value) || value.schema !== responseSchema || value.version !== 1 || value.requestId !== requestId) {
+  if (!record(value) || value.schema !== responseSchema || value.version !== 2 || value.requestId !== requestId) {
     throw new Error("The provider helper response was not bound to the exact request.");
   }
   if (value.kind === "error") {
@@ -403,17 +531,18 @@ function parseResponse(line: string, requestId: string, expectedKind: "ready" | 
   return value;
 }
 
-function parseObservations(value: unknown): readonly { readonly processId: number; readonly surfaceId: string; readonly isForeground: boolean }[] {
+function parseObservations(value: unknown): readonly { readonly processId: number; readonly processStartTime: string; readonly surfaceId: string; readonly isForeground: boolean }[] {
   if (!Array.isArray(value) || value.length > maximumObservations) throw new Error("The provider helper returned an invalid or ambiguous observation set.");
   const seen = new Set<string>();
   return value.map((observation) => {
     if (!record(observation)) throw new Error("The provider helper returned an invalid observation.");
     const processId = processIdentity(observation.processId);
+    const processStartTime = processBirthIdentity(observation.processStartTime);
     const surfaceId = surfaceIdentity(observation.surfaceId);
     if (typeof observation.isForeground !== "boolean") throw new Error("The provider helper returned an invalid foreground observation.");
     if (seen.has(surfaceId)) throw new Error("The provider helper returned duplicate surface identities.");
     seen.add(surfaceId);
-    return { processId, surfaceId, isForeground: observation.isForeground };
+    return { processId, processStartTime, surfaceId, isForeground: observation.isForeground };
   });
 }
 
@@ -431,6 +560,11 @@ function processIdentity(value: unknown): number {
 
 function surfaceIdentity(value: unknown): string {
   if (typeof value !== "string" || !surfacePattern.test(value)) throw new Error("The provider helper returned an invalid surface identity.");
+  return value;
+}
+
+function processBirthIdentity(value: unknown): string {
+  if (typeof value !== "string" || !/^[1-9][0-9]{0,19}$/.test(value) || BigInt(value) > 0xffff_ffff_ffff_ffffn) throw new Error("The provider helper returned an invalid process birth identity.");
   return value;
 }
 

@@ -1,0 +1,159 @@
+{
+  "schema": "switchyard-windows-editor-launch-source-summary/v1",
+  "at": "2026-11-07T10:22:37.559Z",
+  "baseCommit": "74412894737c36830cd7a444a3c4b93a3ece0d21",
+  "sourceFiles": {
+    "apps/desktop-hotkeys/Program.cs": "d92065d2e6b7a9719f1a7a8a53597e796b12986247d0ae49850af30d2e89ea54",
+    "apps/vscode-extension/src/studio-windows-editor-files.ts": "f2934a5428f2d02375d8adbc196adfaa4b0e1e89d8d65bdabc63d7da658f8c8d",
+    "apps/vscode-extension/src/studio-windows-editor-launch.ts": "a83753ee26fbc76302bbbc6a284b45f911ce2dd28c567899fb1311153946a7c6",
+    "apps/vscode-extension/src/studio-windows-native.ts": "dd6677afee55e8713ea15602da49cd9a6ea0f1b54008bdc479f0fb32930be055",
+    "apps/vscode-extension/src/studio-windows-task-client.ts": "3d16c8899d1efcddc83c0afbfddd80d36b1993130291fe756f5da0b0f16d583f",
+    "apps/vscode-extension/test/codex-windows-terminal.test.ts": "e2e2527afd53ab7567fe400a69b2720c31c826412fbc2b8910e623ef6e6b2e90",
+    "apps/vscode-extension/test/studio-windows-editor-files.test.ts": "bf49a8c1ba46199aeb2a8230bb1c84ac2c7b0f4c52c67874a71c55d9959c788d",
+    "apps/vscode-extension/test/studio-windows-editor-launch.test.ts": "f3c31fadabd192ee87ff0fb1708a64149acee6d3d8abea82cfe41a29cc6e2479",
+    "apps/vscode-extension/test/studio-windows-native.test.ts": "4f9b0cb9f7ef7edec7250ca1adcb38c254540213f39c6c1338aa06ad7da1d080",
+    "apps/vscode-extension/test/studio-windows-task-client.test.ts": "0f4de187dfdfbb4aba33a482be3facf776fffefb8c42a4b907cf8a60a7d34d08",
+    "apps/windows-companion/provider-desktop-helper/EditorEndpoint.cs": "386b4a68c978467f6f5a5523380b1bb34c3f15091cebd771399e2a03e7fea85e",
+    "apps/windows-companion/provider-desktop-helper/Program.cs": "649bc0229926ebda2fc5bf75c3136ea30771a318c647963e9c559b7b0e8740c9",
+    "deployment/suite/release.test.mjs": "0d89e2e4011fa5fbbd71615e15ef4b4a85138a800b690e6165b05eb2902caf57",
+    "scripts/run-isolated-tests.mjs": "90921463ea948a9fdeac0ede1e2e8074cf5c3a80a6adf4aa240b225527f03499",
+    "scripts/run-isolated-tests.test.mjs": "55b7e4d01e370c34949f19730bca2ff0574b4c9840f90e8437e042363e09e358",
+    "scripts/verify-client-platform.mjs": "7c85086841008e6fc409ffa8afbf9e87951f7e59689cbb49bce33d8b9be90ff4",
+    "tools/layout-studio/owned-native-command.mjs": "111ae7ad96adf1a461e3aaa8d73c0c7c698de95e9348ea6b0abc596c1d77261a",
+    "tools/layout-studio/runtime-command.mjs": "d4dd534b5ae23651554fac74e98d6847054b65c6fc7454fb4d7c47a47e3b4745",
+    "tools/layout-studio/windows-coding-editor-connections.mjs": "7f909de3d475610a2ab566b334679fe2956e07f5bc63e04c3e6c63761a43eaf8",
+    "tools/layout-studio/windows-coding-editor-connections.test.mjs": "15cd06b4c48499baef172fd650634ee2556fe5d83f4ab9111a05fb7cf8f56c3a",
+    "tools/layout-studio/windows-editor-endpoint.mjs": "3f42e59907d2730bf0550ed28de82e3478c10a41f2de60a977aedfa0390ded92",
+    "tools/layout-studio/windows-editor-endpoint.test.mjs": "0dd19e1541663084286d5b5fa7326c95b2c03ce16b5ef4d2d2885f44b9afbe47",
+    "tools/layout-studio/windows-terminal-process.test.mjs": "bc9e7fc89888f2b81d2c3806a726ae2af9dc59c61607ecd2f6cc2b6aa4cd68b9"
+  },
+  "receipts": [
+    {
+      "name": "isolated-test-dbb84302-b90b-4077-97fb-b61f7b62dec3.json",
+      "sha256": "3c816b3eff6868220e85d8a1b34a7768e2caf132fc27bfeeccff693d18e28041",
+      "totals": {
+        "required": 5,
+        "passed": 5,
+        "failed": 0,
+        "tests": 51,
+        "passedTests": 51,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "name": "isolated-test-902cb0a9-5cea-4cbb-941b-221cab697436.json",
+      "sha256": "8c5debdfd8a118377eb378a47609a1894a32ae74bee21ac80331973e3d109aee",
+      "totals": {
+        "required": 6,
+        "passed": 6,
+        "failed": 0,
+        "tests": 52,
+        "passedTests": 51,
+        "failedTests": 0,
+        "skippedTests": 1,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "name": "isolated-test-f34bbf73-e3d8-4257-9f7b-08896d41d1e7.json",
+      "sha256": "f1d6f884c7ed6b28d8d89a6abb2afca4b44363cf011bd000a235af92630e996a",
+      "totals": {
+        "required": 9,
+        "passed": 9,
+        "failed": 0,
+        "tests": 76,
+        "passedTests": 73,
+        "failedTests": 0,
+        "skippedTests": 3,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "name": "isolated-test-bc800475-a3cc-4152-9edb-6c7c91e845e7.json",
+      "sha256": "5d47e4d4ddc5c2594b13eea3d9ecfbf16693243bd51ee18a2585c6cfab7338d4",
+      "totals": {
+        "required": 10,
+        "passed": 10,
+        "failed": 0,
+        "tests": 85,
+        "passedTests": 81,
+        "failedTests": 0,
+        "skippedTests": 4,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    }
+  ],
+  "groups": 10,
+  "passedTests": 81,
+  "skippedTests": 4,
+  "originalCommandsBoundsSkipsAndCleanupVerified": true,
+  "typecheck": {
+    "command": "npm run typecheck",
+    "node": "24.14.0",
+    "passed": true
+  },
+  "extensionCommonJsTypecheck": {
+    "command": "node node_modules/typescript/bin/tsc --noEmit -p apps/vscode-extension/tsconfig.build.json",
+    "passed": true
+  },
+  "compile": {
+    "receipt": "windows-editor-launch-offline-compile.json",
+    "sha256": "de6e5b6f2ebe0ee7d0f2c8f0e8dfb3189fb761f709c9629ad457db4e14ef30bc",
+    "sources": 36,
+    "sdk": "existing .tools/dotnet-8.0.424",
+    "warnings": 0,
+    "errors": 0,
+    "nativeExecution": false
+  },
+  "scope": {
+    "reviewedOneUseWindowsLaunch": true,
+    "exactTerminalObjectAndPidRetained": true,
+    "tokenOnlyInTerminalEnvironment": true,
+    "defaultNativeReaderClientLauncherComposition": true,
+    "originalAccountAndTaskReobservedOnReturn": true,
+    "partialCreationNeverRetried": true,
+    "cancellationJoinsOriginalNativeQuery": true,
+    "uncertainCarrierRetirementFails": true,
+    "workingLauncherClientSuiteProtectedStateRealSocketDemonstration": true,
+    "syntheticProviderAndHostBoundariesExplicit": true
+  },
+  "nativeFailure": "windows-editor-runtime-native-failure-summary.json",
+  "fixtureCorrection": {
+    "powerShellStartupDependencyRemoved": true,
+    "fixedNativeFixtureOnly": true,
+    "newUuidDirectoryUnderOriginalHeldTemporaryParent": true,
+    "noExistingAclOrFileChanges": true,
+    "noArbitraryContentOrSecurityDescriptorInput": true,
+    "tokenAccessMask": 8,
+    "setupTimeoutMs": 10000,
+    "groupTimeoutMs": 120000
+  },
+  "effects": {
+    "liveModelPrompts": 0,
+    "liveProviderTasks": 0,
+    "accountChanges": 0,
+    "hardwareOpened": false,
+    "frontendChanged": false,
+    "installedApplicationChanged": false,
+    "newDependencies": false
+  },
+  "limitations": [
+    "Working launcher demonstration uses explicit endpoint-reader, native process/file, Terminal and provider doubles with actual signed routes, protected state and socket traffic.",
+    "Actual Windows file checks and native fixture replacement await CI. The original two PowerShell setup failures remain retained.",
+    "No editor command/frontend activation or live Codex/account acceptance; installed CLI gate is unchanged.",
+    "The separately retained restricted-storage guardian-retirement failure remains unresolved."
+  ],
+  "cleanup": {
+    "compilerFilesRemoved": 5,
+    "compilerBytesRemoved": 626475,
+    "originalChildAndTreeRetirementVerified": true,
+    "fixtureRootsRemoved": true
+  },
+  "success": true
+}

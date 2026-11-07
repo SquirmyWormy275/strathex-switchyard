@@ -1,0 +1,110 @@
+{
+  "schema": "switchyard-windows-service-deletion-state-summary/v1",
+  "observedSourceHead": "842416e6ba8d0b440a23e7191e575f62aa129a80",
+  "executionMerge": "6ef4870b0dcbc443a5384d25474b35d89fbbff31",
+  "runId": 42139894665,
+  "workflowAccepted": false,
+  "observedRemovalFailurePhase": "service-absence-configuration-header-start-disabled",
+  "observedNativeSetupManagedExitCode": 134,
+  "normalServiceHeader": {
+    "type": 16,
+    "start": 2,
+    "error": 1,
+    "disabledRefused": true
+  },
+  "acknowledgedDeletionHeader": {
+    "type": 16,
+    "allowedStart": [
+      2,
+      4
+    ],
+    "error": 1,
+    "requiresStoppedState": true,
+    "stillRequiresActualScmAbsence": true,
+    "sourceCandidateOnly": false
+  },
+  "nativeRemovalCandidateAccepted": true,
+  "allOtherOwnershipConfigurationAndProcessGuardsRetained": true,
+  "timeoutsChanged": false,
+  "portableBuildReceipt": "windows-index-native-build-1793926949638.json",
+  "managedTargetsCompiled": 2,
+  "warnings": 0,
+  "errors": 0,
+  "originalNormalHeaderCases": 769,
+  "newAcknowledgedDeletionHeaderCases": 772,
+  "allHeaderCases": 1541,
+  "allPortableChecks": 1764,
+  "ownedBuildScratchRemoved": true,
+  "reusedSdk": "8.0.424",
+  "softwareReceipt": "isolated-test-0e9b7861-8892-4e9c-b0ad-d13ee4941b5f.json",
+  "softwareGroups": 5,
+  "softwarePassedTests": 50,
+  "allSoftwareChildAndTreeCleanupVerified": true,
+  "nativeFixtureInvalidation": {
+    "success": true,
+    "tests": 5,
+    "allChildAndTreeCleanupVerified": true,
+    "earlier491FailureRemainsFailed": true,
+    "earlierTimeoutCauseNotProven": true
+  },
+  "restrictedPrimaryChild": {
+    "success": false,
+    "exitCode": 3221225794,
+    "exitName": "STATUS_DLL_INIT_FAILED",
+    "resultAvailable": false,
+    "priorMetadataChecks": 13,
+    "priorExchangeChecks": 31,
+    "priorOriginalJavascriptOwnerChecks": 8,
+    "originalProtectedInstallationPreserved": true
+  },
+  "artifacts": [
+    {
+      "id": 13468266132,
+      "archiveSha256": "4b5fa2637464e38c017f7f7c928656d7fa1ae5b72a9dbde676a519022c3a0377",
+      "receipt": "windows-restricted-owner-842-native.json",
+      "receiptSha256": "3f7b84a150714a15c502a4cf19a22ca85e3d55b42b85f69bbe74f4b7cb6fbe0e"
+    },
+    {
+      "id": 13468105822,
+      "archiveSha256": "749879e9e4edc19ca4cbae5e6921d35327fa3b0a0cb4abf3639f14a86635b9e2",
+      "receipt": "windows-native-setup-842-failed.json",
+      "receiptSha256": "79bdfae3978a144f8929c97b59e33ffd30b5867b177af62d1d99e28ed39784b7"
+    },
+    {
+      "id": 13467192428,
+      "archiveSha256": "cd6650cdc909285ae45de8d06a3b2effd2b6ece825cd6309b5d7fc7867587add",
+      "receipt": "windows-broker-bootstrap-842-failed.json",
+      "receiptSha256": "6ba31b79b29e0733afb618d66de56adeb5df796ce178decb0e076abe8b47ea42"
+    },
+    {
+      "id": 13467068315,
+      "archiveSha256": "d1b5ce5880763fccd763be685cabce59ffff2daa0c8f10c914eae1e0c3dfdff6",
+      "receipt": "windows-fixture-invalidation-842-native.json",
+      "receiptSha256": "ee71a3f563ccb8fe06528ec53a5ded627cfb71d3b0f63dc6e14b2730d1860720"
+    }
+  ],
+  "sourceSha256": {
+    "apps/desktop-hotkeys/WindowsStorageBrokerServiceHeader.cs": "b2ce888b17bdf5f960eef00c89f46fd355fb3368b56c2067fb422b8b9fb72ebf",
+    "apps/desktop-hotkeys/WindowsStorageBrokerControl.cs": "148afe8cdbf5ad96841d683e72be7273fcd27ebf730582a8cbe3bbf776148fd9",
+    "deployment/windows/test-support/storage-broker-protocol/ServiceHeaderProof.cs": "4ae2c067cdc6cca2479445c608b89aab83b44b7f75b9acd8adbab4ebdb4ff3f5",
+    ".github/workflows/switchyard-windows-filesystem.yml": "478ae87a475ca2611d257138ccae044c0f9282228f1b583a1e5db71eb923fc00",
+    "scripts/verify-windows-storage-broker.mjs": "c6462e3e6381d75dce6a7b766b091b4c818fd7ae1c9c883835b8e1961d68b4e8"
+  },
+  "limits": [
+    "Observed disabled state is exact native evidence; Microsoft documents delayed deletion but does not promise this intermediate start type.",
+    "This source fix treats disabled only as pending after acknowledged deletion, never as a usable installation or absence.",
+    "Corrected native filesystem/service/setup journeys now pass at the exact source; the restricted primary child still fails and keeps the workflow unaccepted."
+  ],
+  "nativeDisabledPostDeleteBranchForced": false,
+  "nativeFollowup": {
+    "sourceHead": "fdb055946c7cbbfbaa7cc2bd81d955d00de2f08c",
+    "runId": 42141522247,
+    "summary": "windows-fdb-native-summary.json",
+    "filesystemChecks": 30,
+    "serviceLifecycleChecks": 6,
+    "nativeSetupLifecycleChecks": 6,
+    "restrictedMetadataChecksPerLifecycle": 13,
+    "headerCases": 1541,
+    "wholeWorkflowAccepted": false
+  }
+}

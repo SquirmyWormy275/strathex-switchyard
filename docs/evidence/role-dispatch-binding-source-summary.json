@@ -1,0 +1,83 @@
+{
+  "schema": "switchyard-role-dispatch-binding-source-summary/v1",
+  "baseCommit": "72e9dcdd3cb564b8ad185db15077469beceb496a",
+  "sourceFiles": {
+    "tools/layout-studio/suite.mjs": "b45ba880cddad8c8dcba93db42250896e2da75f73a8b56f9812efb07bbc60268",
+    "tools/layout-studio/custom-agents.mjs": "f6aaa92ad43258825747ff2f884b7cee737eb164e6ca224dc0a5a0734f79f0a3",
+    "tools/layout-studio/role-dispatch.test.mjs": "cb3dcbf9c87dc5e0085bcaa98c1e1659749acdc1c1b29cfd7c2fec8456cb59ed",
+    "scripts/run-isolated-tests.mjs": "960b647e39e81be0e3307ccfae658d6eaebcd7673ac946408ffe5c6fed1735f6"
+  },
+  "receipts": [
+    {
+      "id": "7d8bb21d-3964-4b2c-9765-e3af7955e24f",
+      "sha256": "346b76613e6451103ca83cbe1c5692a2a7ac4a8364470c110eab8c3dd299c12a",
+      "success": false,
+      "totals": {
+        "required": 1,
+        "passed": 0,
+        "failed": 1,
+        "tests": 7,
+        "passedTests": 2,
+        "failedTests": 5,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "originalManifestCommandsBoundsSkipsAndCleanupVerified": true
+    },
+    {
+      "id": "9080059d-a754-4459-b8bf-fa0a09d90727",
+      "sha256": "8dd40ffafa057a12fde7f25fee9b01dc3ba6d75f37348c4476fcf784485886ac",
+      "success": true,
+      "totals": {
+        "required": 1,
+        "passed": 1,
+        "failed": 0,
+        "tests": 7,
+        "passedTests": 7,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "originalManifestCommandsBoundsSkipsAndCleanupVerified": true
+    },
+    {
+      "id": "fe1ef4f4-3a0a-4912-86f3-6bf531150468",
+      "sha256": "ff7ab8805a5b10f0a598ce2d40fad75faa315909acd1c79525b119abdfb4a359",
+      "success": true,
+      "totals": {
+        "required": 6,
+        "passed": 6,
+        "failed": 0,
+        "tests": 89,
+        "passedTests": 88,
+        "failedTests": 0,
+        "skippedTests": 1,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "originalManifestCommandsBoundsSkipsAndCleanupVerified": true
+    }
+  ],
+  "scope": {
+    "customAgentBindingCheckedUnderEnqueueStateLease": true,
+    "everyDeliberateBindingGetsFreshIdentity": true,
+    "roleEditsAndRemovalInvalidateOriginalDispatch": true,
+    "finalRoleHistoryRequiresOriginalBinding": true,
+    "alreadyQueuedCommandPreservedWithOriginalSession": true,
+    "noAutomaticRetryOrRedirection": true,
+    "authenticatedExactSessionPollAndAcknowledgement": true,
+    "legacyBindingsPreservedUntilRebound": true
+  },
+  "typechecks": [
+    "tsconfig.json",
+    "apps/vscode-extension/tsconfig.build.json"
+  ],
+  "limitations": [
+    "The atomic before-effect binding check added here covers the custom-agent queue. Other provider adapters still need equivalent checks at their native effect boundaries; the shared final history check alone does not prevent those effects.",
+    "This does not add active-workspace generation checks to physical role dispatch.",
+    "Synthetic enrolled agents and encrypted temporary state were used; no installed agent, account, model, keyboard, frontend or editor activation was changed.",
+    "Source-level change only; installed application remains 738c1f7."
+  ]
+}

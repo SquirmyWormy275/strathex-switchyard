@@ -1,0 +1,29 @@
+{
+  "schema": "switchyard-installed-consent-followup/v1",
+  "sourceCommit": "849b9b9cccdb7e457f26e556f367c25471dc54d0",
+  "release": "5ee98aa4c93005b9cd025e90e2347ca6605008e00f1b00830084003267efbca2",
+  "baseUpdateEvidence": "installed-foreground-retirement-summary.json",
+  "baseMetadataChecks": 88,
+  "replacedVerifierChecks": 21,
+  "currentVerifierChecks": 23,
+  "combinedDistinctChecks": 90,
+  "exactModuleDigests": 56,
+  "receipt": {
+    "file": "installed-agent-security-metadata-1794062045798.json",
+    "sha256": "1710f73e26297c2e4d8fbc96a2f7dce8ebfd5d55e2a30ebeea76eb52c189f7a9"
+  },
+  "verifierSourceFiles": {
+    "scripts/verify-agent-security-host.mjs": "f235631f73294757f30f7411089d4a1ef89158b399d50d0f4a006246a2b22f96"
+  },
+  "newChecks": [
+    "installed-runtime-metadata-cannot-cross-legacy-or-current-consent-generation-replacement",
+    "installed-runtime-metadata-omits-ambiguous-consent-boundary-and-accepts-a-later-event"
+  ],
+  "moduleHashesUnchangedFromAcceptedUpdate": true,
+  "pureInMemoryOnly": true,
+  "liveAccountProviderKeyboardMicrophoneEffects": 0,
+  "limitations": [
+    "This follows up the installed update with synthetic in-memory consent cases, not a live recording or foreground observation.",
+    "The other accepted installed checks are reused by exact source/release/module identity; their counts are not duplicated. Complete Linux 0c025df remains a separate earlier-source run."
+  ]
+}

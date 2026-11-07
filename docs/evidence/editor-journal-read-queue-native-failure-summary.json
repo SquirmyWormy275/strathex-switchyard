@@ -1,0 +1,57 @@
+{
+  "schema": "switchyard-editor-journal-read-queue-native-failure-summary/v1",
+  "sourceCommit": "0594c8d318c1619a063000a06eabc152bb7fba23",
+  "mergeCommit": "312317d360473082db24d88472b64ea03b8c61bd",
+  "tree": "f9d606069a6e19bfe0b3c130cff81f6a20664f2c",
+  "workflowRun": 42365874853,
+  "job": 128383860203,
+  "artifact": {
+    "id": 13571333429,
+    "bytes": 4681,
+    "sha256": "de2b77eec1405704d73d9bf96f5f4dfb5903e54db76b86b6e86ce18402dd4b4f"
+  },
+  "receipt": {
+    "id": "433e07ee-c026-43e4-b7ce-11faadc20104",
+    "sha256": "97e22b2a2b28c120d2f31be58d20fb5f6f691be76be56318838566ef2443d627"
+  },
+  "success": false,
+  "totals": {
+    "required": 25,
+    "passed": 24,
+    "failed": 1,
+    "tests": 235,
+    "passedTests": 234,
+    "failedTests": 1,
+    "skippedTests": 0,
+    "cancelledTests": 0,
+    "todoTests": 0
+  },
+  "failure": {
+    "file": "tools/layout-studio/windows-coding-editor-connections.test.mjs",
+    "counts": {
+      "total": 9,
+      "passed": 8,
+      "failed": 1,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    "durationMs": 81691,
+    "timeoutMs": 120000,
+    "timeout": false,
+    "reason": "The first eight composed lifecycle tests pass; the ninth reviewed launcher still exceeds its original acknowledgement deadline. Natural cleanup and full TAP complete.",
+    "processTreeTermination": {
+      "strategy": "natural-exit",
+      "completed": true,
+      "supervisorExitCode": null,
+      "supervisorError": null
+    },
+    "cleanupCompleted": true
+  },
+  "originalCommandsBoundsAndCleanupVerified": true,
+  "limits": [
+    "A subsequent source correction shares only overlapping original-handle observations; corrected native acceptance and the remaining launcher failure cause remain pending.",
+    "The whole client lane is not accepted.",
+    "No live provider/account/task, interactive editor or hardware acceptance is inferred."
+  ]
+}

@@ -1,0 +1,127 @@
+{
+  "schema": "switchyard-linux-complete-source-summary/v1",
+  "sourceCommit": "7f2a52a064151fe2d6d80938aeefbb578098daaa",
+  "tree": "6b4c3592520b948b01f56ce5a245630d98bafe73",
+  "receipt": {
+    "id": "a2e51d06-3bf6-4c33-99b6-4ee00da91814",
+    "sha256": "391f29e8dbbe375ac575c4beda6279c5ce019684e88f320f3f5898397c43f6c4"
+  },
+  "startedAt": "2026-11-07T15:03:38.010Z",
+  "endedAt": "2026-11-07T15:25:53.888Z",
+  "success": true,
+  "totals": {
+    "required": 351,
+    "passed": 351,
+    "failed": 0,
+    "tests": 2334,
+    "passedTests": 2302,
+    "failedTests": 0,
+    "skippedTests": 32,
+    "cancelledTests": 0,
+    "todoTests": 0
+  },
+  "declaredSkips": [
+    {
+      "file": "tools/layout-studio/windows-scanner-recipe-files.test.mjs",
+      "pattern": null,
+      "count": 4
+    },
+    {
+      "file": "tools/layout-studio/windows-history-staging.test.mjs",
+      "pattern": null,
+      "count": 1
+    },
+    {
+      "file": "tools/layout-studio/client-launch.test.mjs",
+      "pattern": null,
+      "count": 1
+    },
+    {
+      "file": "tools/layout-studio/windows-terminal-process.test.mjs",
+      "pattern": null,
+      "count": 1
+    },
+    {
+      "file": "tools/layout-studio/windows-editor-endpoint.test.mjs",
+      "pattern": null,
+      "count": 1
+    },
+    {
+      "file": "tools/layout-studio/windows-terminal-peer.test.mjs",
+      "pattern": null,
+      "count": 1
+    },
+    {
+      "file": "tools/layout-studio/windows-editor-ingress.test.mjs",
+      "pattern": null,
+      "count": 1
+    },
+    {
+      "file": "tools/layout-studio/windows-owned-stdio.test.mjs",
+      "pattern": null,
+      "count": 3
+    },
+    {
+      "file": "tools/layout-studio/codex-windows-tasks.test.mjs",
+      "pattern": null,
+      "count": 1
+    },
+    {
+      "file": "tools/layout-studio/state-lock.test.mjs",
+      "pattern": null,
+      "count": 1
+    },
+    {
+      "file": "tools/layout-studio/runtime-command-suspended.test.mjs",
+      "pattern": null,
+      "count": 5
+    },
+    {
+      "file": "tools/layout-studio/windows-editor-recovery.test.mjs",
+      "pattern": null,
+      "count": 1
+    },
+    {
+      "file": "tools/layout-studio/windows-coding-editor-connections.test.mjs",
+      "pattern": null,
+      "count": 1
+    },
+    {
+      "file": "apps/vscode-extension/test/named-pipe-transport.test.ts",
+      "pattern": null,
+      "count": 7
+    },
+    {
+      "file": "apps/vscode-extension/test/studio-windows-editor-files.test.ts",
+      "pattern": null,
+      "count": 1
+    },
+    {
+      "file": "apps/provider-adapter-host/test/tls-network-e2e.test.ts",
+      "pattern": "provider secret generation validates and Initialize emits its exact ready-to-provision receipt",
+      "count": 1
+    },
+    {
+      "file": "apps/provider-adapter-host/test/tls-network-e2e.test.ts",
+      "pattern": "packaged provider host lifecycle and the production pinned network broker interoperate over exact loopback TLS",
+      "count": 1
+    }
+  ],
+  "originalManifestCommandsBoundsSkipsAndChildCleanupVerified": true,
+  "temporaryCheckoutCleanup": {
+    "completed": true,
+    "generatedFilesRemoved": 803,
+    "generatedBytesRemoved": 11907805,
+    "dependencyAliasesRemoved": 9,
+    "noNewDependencies": true,
+    "originalUnitExitVerified": true,
+    "originalCheckoutRemoved": true,
+    "emptyTestParentRemoved": true,
+    "otherWorktreesPreserved": true,
+    "markerRemoved": true
+  },
+  "limitations": [
+    "This complete run covers installed runtime 9d230ac, including persisted selection, consent-generation/original-source retirement and signed exact-project task choices. Later guided role choices and the Windows scheduling data refresh have separate focused evidence; they are outside this exact source.",
+    "Windows, live account/model tasks, interactive IDE behavior and physical hardware are not accepted by Linux software tests."
+  ]
+}
