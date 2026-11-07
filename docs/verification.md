@@ -1,5 +1,13 @@
 # What has actually been verified
 
+Quoted Cargo manifest keys/tables and literal strings pass **58 independent
+Python reference cases** and **ten focused groups/96 tests**, including six
+actual Linux scanner journeys and six Windows guest doubles. Original package
+bounds, typecheck, unchanged inputs/Git state and exact child/tree cleanup pass.
+The original unsupported result is retained. Installed/native acceptance and
+dependency resolution remain separate.
+[Source evidence](evidence/cargo-quoted-manifest-source-summary.json).
+
 The Windows provider desktop protocol now binds process creation identity from
 discovery through authorized focus and requires foreground readback. Six isolated
 groups pass **56 tests**, with exact child/tree cleanup; typecheck and the managed

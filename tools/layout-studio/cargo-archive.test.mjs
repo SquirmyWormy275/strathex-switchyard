@@ -8,7 +8,7 @@ const sha = b => createHash("sha256").update(b).digest("hex");
 import { cargoArchiveFixture, crate, cargoManifest as manifest, cargoRoot as root } from "./test-support/cargo-archive-fixture.mjs";
 const admit = (r, f) => parseShieldScannerReport(JSON.stringify(r), { engine: r.engine, requestSha256: r.requestSha256, request: f.request }, f.request.action);
 test("independent Python TOML, USTAR and gzip facts bind the closed manifest subset", () => {
-  assert.equal(oracle.cases.length, 26);
+  assert.equal(oracle.cases.length, 58);
   for (const row of oracle.cases) {
     const bytes = Buffer.from(row.bytesBase64, "base64"); assert.equal(sha(bytes), row.sha256);
     const observed = engine.inspectCargoArchive(bytes); assert.equal(observed.status, row.supported ? "inspected" : "unsupported", row.id);
@@ -44,6 +44,7 @@ test("Cargo archive checks retain original expansion, entry and shared budget li
   const oversized = crate(manifest, [{ path: root + "/huge", content: Buffer.alloc(4 * 1024 * 1024) }]);
   assert.equal(engine.inspectCargoArchive(oversized).reason, "bounds");
   assert.equal(engine.inspectCargoArchive(crate(manifest, Array.from({ length: 1024 }, (_, i) => ({ path: root + "/f" + i })))).reason, "bounds");
+  for (const text of [manifest + "description = '" + "x".repeat(2049) + "'\n", manifest + "[" + Array(17).fill("'part'").join(".") + "]\n", manifest + "'" + "x".repeat(2049) + "' = 'value'\n"]) assert.equal(engine.inspectCargoArchive(crate(text)).status, "unsupported");
 });
 test("Cargo host admission rejects forged archive identity, coverage and BOM claims", async () => {
   const f = cargoArchiveFixture({ text: manifest.replace("build.7", "build.8"), directory: root.replace("build.7", "build.8") }), r = await f.scan();

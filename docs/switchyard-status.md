@@ -12,6 +12,15 @@ No merge or public release has been accepted.
 
 ## Current checkpoints
 
+Cargo archive identity now accepts quoted platform tables, quoted field keys and
+single-line literal strings while detecting duplicate aliases and scalar/table
+conflicts. Fifty-eight independent reference cases and ten groups/96 tests pass,
+including actual Linux scans and Windows guest doubles. Package bounds and exact
+cleanup pass. Installed acceptance remains pending; dependency resolution and
+broader archive/license inspection remain unfinished.
+[Contract](cargo-archive-identity.md),
+[source evidence](evidence/cargo-quoted-manifest-source-summary.json).
+
 The commissioned Windows provider adapter now rejects process-ID reuse across
 discovery/focus and requires current-user/session checks plus exact foreground
 readback. Six focused groups pass 56 checks; the managed build and type checking

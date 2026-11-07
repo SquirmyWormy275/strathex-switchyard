@@ -40,6 +40,16 @@ instructions. Do not merge or release.
 
 ## Current installed and source checkpoint
 
+Cargo archive quoted keys/tables and single-line literal strings now pass 58
+independent Python references and ten focused groups/96 tests, including six
+actual Linux scans and six Windows guest doubles. Typecheck, original package
+bounds and exact owned cleanup pass. Current Python/Cargo metadata verifiers pin
+`cargo-quoted-manifest-source-summary.json`; they must not be run against the
+older installed engine and bypassed on mismatch. Install the tested published
+checkpoint normally, then run only permitted metadata checks and compare all 54
+workspaces/frozen frontend. [Contract](cargo-archive-identity.md),
+[source evidence](evidence/cargo-quoted-manifest-source-summary.json).
+
 The commissioned Windows provider adapter now carries exact process creation
 identity across discovery/focus, checks current-user/session with TOKEN_QUERY 8,
 and requires native foreground readback. Desktop helper protocol is v2; managed
@@ -107,7 +117,8 @@ aliases and temporary-parent identities are in
 `~/.cache/switchyard-full-linux-path.json`. Preserve that marker and its owned
 paths until final exit and exact inventory/cleanup verification. It uses the
 original command, timeout and skip manifest and existing toolchains. New Windows
-provider changes have separate focused evidence and are outside this source.
+provider changes and quoted Cargo manifests have separate focused evidence and
+are outside this source.
 
 Workflow editing now rejects non-string role/step IDs and repeated dependency
 edges before persistence. Two regressions reproduce the previous acceptance of

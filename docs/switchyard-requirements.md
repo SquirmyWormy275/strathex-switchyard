@@ -8,6 +8,13 @@ Implementation: not started / in progress / implemented / unsupported by verifie
 Validation: not run / software-tested / host-tested / hardware-tested.
 Tests use synthetic data unless explicitly labelled host/hardware evidence.
 
+Cargo archive quoted table/field keys and literal strings now pass 58 independent
+Python references and ten focused groups/96 tests. Actual Linux scanner execution,
+Windows guest doubles, original package limits and cleanup pass. Native guest and
+installed acceptance remain separate; broader TOML/dependency/license coverage
+is unfinished. [Contract](cargo-archive-identity.md),
+[source evidence](evidence/cargo-quoted-manifest-source-summary.json).
+
 The commissioned Windows provider desktop adapter now binds process birth across
 discovery and focus, checks the current-user/session with QUERY-only tokens and
 requires native foreground readback. Six focused groups/56 checks and the managed

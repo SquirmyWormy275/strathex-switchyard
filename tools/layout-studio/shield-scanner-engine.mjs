@@ -479,39 +479,88 @@ function inspectTarArchive(bytes, budget, cargo = false) {
 }
 export const inspectNpmArchive = (bytes, budget = { remaining: archiveLimit }) => inspectTarArchive(bytes, budget);
 export const inspectCargoArchive = (bytes, budget = { remaining: archiveLimit }) => inspectTarArchive(bytes, budget, true);
-/** Closed TOML subset: basic strings, string arrays, booleans, decimal integers,
- * bare keys and ordinary bare-key tables. Unsupported syntax refuses the whole
- * manifest, including metadata after the package identity. Never a resolver. */
+// Archive-only grammar. Cargo.lock keeps its separate, narrower contract.
+const cargoLiteral = /^'[^'\x00-\x1f]*'/;
+function cargoManifestString(value) {
+  const token = value[0] === "'" ? cargoLiteral.exec(value) : cargoQuoted.exec(value);
+  cargoRequire(token?.[0] === value);
+  const parsed = value[0] === "'" ? value.slice(1, -1) : JSON.parse(value);
+  cargoRequire(parsed.length <= 2048 && parsed.isWellFormed() && !/[\x00-\x1f\x7f]/.test(parsed));
+  return parsed;
+}
+function cargoManifestUncomment(line) {
+  let result = "", rest = line;
+  while (rest) {
+    if (rest[0] === "#") break;
+    if (["'", '"'].includes(rest[0])) {
+      const token = (rest[0] === "'" ? cargoLiteral : cargoQuoted).exec(rest); cargoRequire(token);
+      result += token[0]; rest = rest.slice(token[0].length);
+    } else { cargoRequire(/^[\t\x20-\x7e]$/.test(rest[0])); result += rest[0]; rest = rest.slice(1); }
+  }
+  return result.trim();
+}
+function cargoManifestKey(value) {
+  const quoted = ["'", '"'].includes(value[0]), token = (quoted ? value[0] === "'" ? cargoLiteral : cargoQuoted : /^[A-Za-z0-9_-]+/).exec(value);
+  cargoRequire(token && token[0].length <= 8192);
+  return { name: quoted ? cargoManifestString(token[0]) : token[0], rest: value.slice(token[0].length).trim() };
+}
+function cargoManifestTable(value) {
+  const parts = []; let rest = value.trim();
+  while (rest) {
+    const key = cargoManifestKey(rest); parts.push(key.name); cargoRequire(parts.length <= 16);
+    rest = key.rest; if (!rest) break;
+    cargoRequire(rest[0] === "."); rest = rest.slice(1).trim(); cargoRequire(rest);
+  }
+  cargoRequire(parts.length); return parts;
+}
+function cargoManifestList(value) {
+  cargoRequire(value[0] === "[" && value.at(-1) === "]"); let rest = value.slice(1, -1).trim(); const items = [];
+  while (rest) {
+    const token = (rest[0] === "'" ? cargoLiteral : cargoQuoted).exec(rest); cargoRequire(token && items.length < 4096);
+    items.push(cargoManifestString(token[0])); rest = rest.slice(token[0].length).trim();
+    if (!rest) break; cargoRequire(rest[0] === ","); rest = rest.slice(1).trim();
+  }
+  return items;
+}
+/** Closed TOML subset: single-line basic/literal strings, string arrays,
+ * booleans, decimal integers, quoted/bare keys and ordinary tables. Unsupported
+ * syntax refuses the entire manifest, including metadata after its identity.
+ * A Map tree preserves literal dots and key aliases without prototype effects. */
 function cargoArchiveManifest(bytes) {
   try {
     const text = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(bytes);
     cargoRequire(!/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]|\r(?!\n)/.test(text));
-    const lines = text.replaceAll("\r\n", "\n").split("\n"), tables = new Set(), scalars = new Set(), identity = {};
+    const lines = text.replaceAll("\r\n", "\n").split("\n"), identity = {};
     cargoRequire(lines.length <= 2048 && lines.every(line => line.length <= 8192));
-    let table = "", pending = "", key;
+    const node = () => ({ kind: "table", explicit: false, children: new Map() }), root = node();
+    let table = [], current = root, pending = "", key;
     const store = (name, value) => {
-      const path = table ? table + "." + name : name;
-      cargoRequire(!scalars.has(path) && !tables.has(path) && ![...tables, ...scalars].some(p => p.startsWith(path + ".")));
+      cargoRequire(!current.children.has(name));
       let parsed;
-      if (value.startsWith('"')) parsed = cargoString(value);
-      else if (value.startsWith("[")) parsed = cargoDependencyList(value);
+      if (["'", '"'].includes(value[0])) parsed = cargoManifestString(value);
+      else if (value.startsWith("[")) parsed = cargoManifestList(value);
       else if (["true", "false"].includes(value)) parsed = value === "true";
       else { cargoRequire(/^[+-]?(?:0|[1-9][0-9]{0,18})$/.test(value)); const n = BigInt(value); cargoRequire(n >= -9223372036854775808n && n <= 9223372036854775807n); }
-      scalars.add(path); if (table === "package" && ["name", "version"].includes(name)) { cargoRequire(typeof parsed === "string"); identity[name] = parsed; }
+      current.children.set(name, { kind: "scalar" });
+      if (table.length === 1 && table[0] === "package" && ["name", "version"].includes(name)) { cargoRequire(typeof parsed === "string"); identity[name] = parsed; }
     };
     for (const raw of lines) {
-      const line = cargoUncomment(raw); if (!line) continue;
+      const line = cargoManifestUncomment(raw); if (!line) continue;
       if (pending) { cargoRequire(pending.length + line.length <= 65536); pending += " " + line; if (line.endsWith("]")) { store(key, pending); pending = ""; } continue; }
-      const section = /^\[([A-Za-z0-9_-]+(?:\.[A-Za-z0-9_-]+){0,15})\]$/.exec(line);
-      if (section) {
-        table = section[1]; cargoRequire(!tables.has(table));
-        const parts = table.split("."); for (let i = 1; i <= parts.length; i++) cargoRequire(!scalars.has(parts.slice(0, i).join(".")));
-        tables.add(table); continue;
+      if (line.startsWith("[")) {
+        cargoRequire(line.endsWith("]") && !line.startsWith("[["));
+        table = cargoManifestTable(line.slice(1, -1)); current = root;
+        for (const part of table) {
+          if (!current.children.has(part)) current.children.set(part, node());
+          current = current.children.get(part); cargoRequire(current.kind === "table");
+        }
+        cargoRequire(!current.explicit); current.explicit = true; continue;
       }
-      const field = /^([A-Za-z0-9_-]+)\s*=\s*(.+)$/.exec(line); cargoRequire(field); key = field[1];
-      if (field[2].startsWith("[") && !field[2].endsWith("]")) pending = field[2]; else store(key, field[2]);
+      const field = cargoManifestKey(line); key = field.name; cargoRequire(field.rest.startsWith("="));
+      const value = field.rest.slice(1).trim(); cargoRequire(value);
+      if (value.startsWith("[") && !value.endsWith("]")) pending = value; else store(key, value);
     }
-    cargoRequire(!pending && tables.has("package")); cargoIdentity(identity.name, identity.version);
+    cargoRequire(!pending && root.children.get("package")?.explicit); cargoIdentity(identity.name, identity.version);
     return { ...identity, manifestSha256: sha(bytes) };
   } catch { archiveRefuse("manifest"); }
 }
