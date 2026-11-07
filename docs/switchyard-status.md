@@ -19,14 +19,15 @@ checkpoints are not cumulative acceptance of the latest suite.
 | --- | --- | --- |
 | Installed Linux `6ab9b1e` | **76 metadata/in-memory checks; 30 exact module hashes.** All 54 semantic workspaces and frozen frontend preserved. [Receipt](evidence/installed-scanner-recipe-draft-summary.json). | No live scanner, provider task, account/model request, native focus or hardware operation. |
 | Native Windows client `4f56477` | **Seven groups; 94 passing tests; no skips.** Source/merge tree, artifact digest, commands, bounds and child/tree cleanup verified. [Receipt](evidence/windows-client-4f56477-passed-summary.json). | Client contracts only; interactive focus and complete Windows release acceptance are separate. |
-| Complete Linux `94a0135` | **323 groups; 1,979 passing tests; sixteen declared skips.** Original inventory, commands, bounds and owned cleanup verified. [Receipt](evidence/linux-94a0135-complete-summary.json). | Includes native-focus policy and Cargo/npm archive work; predates Python wheel-license changes. |
+| Complete Linux `d09645a` | **326 groups; 2,013 passing tests; sixteen declared skips.** Original inventory, commands, bounds and owned cleanup verified. [Receipt](evidence/linux-d09645a-complete-summary.json). | Includes wheel-license and staged/historical preparation; predates scanner-draft assembly. |
 | Complete Windows `dc755901` | **417 groups; 2,478 passing tests; 207 declared skips.** All six jobs and overall workflow passed with verified packet/source/cleanup. [Receipt](evidence/windows-complete-dc755901-summary.json). | Predates newer archive, scheduling, profile/workflow and observation corrections. |
 
-Complete Linux `94a0135` has zero failures or cancellations. Every original
+Complete Linux `d09645a` has zero failures or cancellations. Every original
 command, deadline, declared skip and child/tree retirement verifies. The owned
-checkout, nine dependency aliases, 782 generated files (11,790,322 bytes), empty
-test parent and marker are removed; other worktrees remain. Python wheel-license
-changes have their own later focused and installed evidence.
+checkout, nine dependency aliases, 788 generated files (11,803,414 bytes), empty
+test parent and marker are removed; other worktrees remain. This includes the
+read-only index correction. Scanner-draft assembly has later focused and
+installed evidence.
 
 The latest installation includes 17 wheel license-header cases, 112 Cargo
 manifest reference cases, and eight in-memory policy reports for each of wheels,

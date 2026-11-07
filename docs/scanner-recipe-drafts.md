@@ -66,4 +66,3 @@ current plus one rollback remain. The exact 533-file, 5,213,310-byte prepared
 bundle is removed. No installed draft, scanner, native provider task, account/model
 request or hardware operation was invoked.
 [Installed evidence](evidence/installed-scanner-recipe-draft-summary.json).
-
