@@ -11,6 +11,8 @@ files.add("tools/layout-studio/windows-coding-editor-connections.test.mjs");
 files.add("apps/vscode-extension/test/codex-windows-terminal.test.ts");
 files.add("apps/vscode-extension/test/studio-windows-task-client.test.ts");
 files.add("tools/layout-studio/windows-editor-endpoint.test.mjs");
+files.add("scripts/vscode-windows-runtime.test.mjs");
+files.add("apps/vscode-extension/test/studio-windows-native.test.ts");
 const groups = requiredGroups.filter(g => files.has(g.file));
 if (groups.length !== files.size) throw new Error("The exact client platform verification inventory changed.");
 const { receipt, receiptPath } = await runVerification({ groups });

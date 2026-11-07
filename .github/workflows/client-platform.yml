@@ -15,6 +15,8 @@ on:
       - 'apps/windows-companion/test/repository-runtime.test.ts'
       - 'tools/layout-studio/**'
       - 'scripts/verify-client-platform.mjs'
+      - 'scripts/copy-vscode-runtime.mjs'
+      - 'scripts/vscode-windows-runtime*'
       - 'scripts/run-isolated-tests.mjs'
       - 'deployment/suite/**'
   push:

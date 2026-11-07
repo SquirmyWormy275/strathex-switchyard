@@ -3,7 +3,6 @@ import { randomUUID } from "node:crypto";
 import { dirname, join, win32 } from "node:path";
 import { fileURLToPath } from "node:url";
 import { Socket } from "node:net";
-import { verifySuiteRelease } from "../../deployment/suite/release.mjs";
 import { runOwnedNativeCommand } from "./owned-native-command.mjs";
 import { runRuntimeCommand, runtimeGuardianStopped } from "./runtime-command.mjs";
 import { desktopEnvironment } from "./process-environment.mjs";
@@ -81,6 +80,9 @@ export async function inspectWindowsTerminalSocket(probe, socket, input, { asser
 }
 
 export async function packagedWindowsEditorHelper() {
+  // Suite-only default. The extension binds its own verified packaged helper,
+  // so its small native-query graph does not load Suite packaging modules.
+  const { verifySuiteRelease } = await import("../../deployment/suite/release.mjs");
   const root = fileURLToPath(new URL("../../", import.meta.url)), release = await verifySuiteRelease(root, { platform: "win32", checkRuntime: true });
   require(!release.development);
   const image = release.files.find(row => row.path === "runtime/hotkeys/Switchyard.Hotkeys.exe"); require(image);

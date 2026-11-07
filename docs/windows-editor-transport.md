@@ -296,3 +296,31 @@ passes native CI at `485b7c6`: twenty groups, 205 tests and no skips.
 
 VS Code packaging, terminal observation and launcher composition remain
 unfinished. This boundary does not activate commands or change the installed app.
+
+## Package the native boundary for VS Code
+
+The extension now packages six shared query modules and a closed digest/size
+manifest. Windows builds include the exact-source native helper; Linux builds
+include no Windows binary. The loader checks the complete inventory and bytes
+before native ES-module import, then binds its verified helper into the reader
+and process-probe factories. Windows release builds create the required helper
+even when an explicit build skips verification.
+
+`StudioWindowsNative` retains those factories and reads the exact VS Code
+`Terminal.processId`. Its peer result binds the reviewed image and native birth;
+it does not search process trees or infer task/account attachment. Shutdown joins
+a pending runtime load or native query before closing the original readers.
+The launcher and command activation remain unfinished.
+
+[Source evidence](evidence/windows-editor-runtime-source-summary.json): ten
+groups, 90 passing tests and three Windows-only skips; typecheck passes. An
+isolated CommonJS emit loaded the copied bridge, returned synthetic endpoint
+metadata, and closed both original readers. All 49 emitted/staging files
+(1,067,969 bytes) were removed.
+
+The [first native endpoint run](evidence/windows-editor-endpoint-native-failure-summary.json)
+at `e3fd587` passed 212 tests and failed one. Its original PowerShell fixture setup
+hit its 10-second limit before the endpoint query. Group/child cleanup verified;
+this is an unresolved test setup failure, not native ACL acceptance. Fixed stage
+markers now distinguish startup, owner, files, ACLs and links without changing
+the original timeout, token rights, permission rules or skip expectations.

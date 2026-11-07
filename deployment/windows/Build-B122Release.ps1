@@ -342,10 +342,9 @@ $tscCli=Join-Path $buildRoot 'node_modules\typescript\lib\tsc.js'
 if(-not(Test-Path -LiteralPath $tscCli -PathType Leaf)-or(Get-Item -LiteralPath $tscCli -Force).Attributes-band[IO.FileAttributes]::ReparsePoint){throw 'The lockfile-installed TypeScript compiler is missing or unsafe.'}
 $nodeExecutableSha256=(Get-FileHash -LiteralPath $node.FullName -Algorithm SHA256).Hash.ToLowerInvariant();$npmCliSha256=(Get-FileHash -LiteralPath $npmCli.FullName -Algorithm SHA256).Hash.ToLowerInvariant();$tscSha256=(Get-FileHash -LiteralPath $tscCli -Algorithm SHA256).Hash.ToLowerInvariant()
 $npmVersion=(Invoke-B122IsolatedCapture -Executable $node.FullName -Arguments @($npmCli.FullName,'--version') -FailureMessage 'Bundled npm version probe failed.').Trim();$tscVersion=(Invoke-B122IsolatedCapture -Executable $node.FullName -Arguments @($tscCli,'--version') -FailureMessage 'Lockfile TypeScript version probe failed.').Trim();if($npmVersion-notmatch'^\d+\.\d+\.\d+'-or$tscVersion-notmatch'^Version \d+\.\d+\.\d+'){throw 'Bundled npm or lockfile TypeScript returned an invalid version.'}
-if (-not $SkipVerification) {
-  # git archive intentionally excludes runtime/. Build the lease helper from
-  # this same committed snapshot before source tests use their fixed path.
-  # Never borrow an ignored helper from the outer working tree.
+  # The Windows extension now ships the same native query helper. Build it even
+  # when verification is explicitly skipped; an omitted test run cannot create
+  # a package with a missing runtime. Never borrow an ignored outer-tree image.
   $stateLeasePublish = Join-Path $output '.state-lease-helper-publish'
   Invoke-B122PinnedDotNetPublish -Project (Join-Path $buildRoot 'apps\desktop-hotkeys\Switchyard.Hotkeys.csproj') -Destination $stateLeasePublish -FailureMessage 'Exact-source state lease helper build failed.'
   $stateLeaseImage = Join-Path $stateLeasePublish 'Switchyard.Hotkeys.exe'
@@ -368,6 +367,7 @@ if (-not $SkipVerification) {
   } finally { $stateLeaseSource.Dispose() }
   if ((Get-FileHash -LiteralPath $stateLeaseDestination -Algorithm SHA256).Hash.ToLowerInvariant() -cne $stateLeaseDigest) { throw 'Staged source state helper bytes changed.' }
   Write-Utf8NoBom (Join-Path $output 'state-lease-test-helper.json') ([ordered]@{ schema='switchyard-state-lease-test-helper/v1'; sourceCommit=$sourceCommit; sha256=$stateLeaseDigest; bytes=$stateLeaseItem.Length; sourceAssembly='git-archive'; copiedBytesVerified=$true; nativeAcceptance=$false } | ConvertTo-Json)
+if (-not $SkipVerification) {
   Invoke-B122PinnedNpm -Arguments @('run','typecheck') -FailureMessage 'Typecheck failed.'
   Invoke-B122PinnedNpm -Arguments @('test') -FailureMessage 'Test verification failed.'
   if ((Get-FileHash -LiteralPath $TestPythonPath -Algorithm SHA256).Hash.ToLowerInvariant() -cne $testPython.executableSha256) { throw 'The verification Python image changed during tests.' }

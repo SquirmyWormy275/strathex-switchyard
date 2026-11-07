@@ -1,0 +1,45 @@
+{
+  "schema": "switchyard-windows-editor-endpoint-native-failure/v1",
+  "sourceCommit": "e3fd58748a49dec9659e5cfc1f4fa32c37fbd0fa",
+  "mergeCommit": "ec64dbe80fc96abf42182ebb393cb6f59d91a065",
+  "equalSourceAndMergeTree": "5a3ee2d05fb20cae6e819dabd57a7e126187ed86",
+  "workflowRun": 42361799718,
+  "clientJob": 128371734449,
+  "helperBuildJob": 128371559763,
+  "artifact": {
+    "source": "e3fd58748a49dec9659e5cfc1f4fa32c37fbd0fa",
+    "merge": "ec64dbe80fc96abf42182ebb393cb6f59d91a065",
+    "tree": "5a3ee2d05fb20cae6e819dabd57a7e126187ed86",
+    "artifact": 13570525057,
+    "bytes": 4189,
+    "sha256": "9bc8b673ef9238ffd7a1adb4d4d0354d09b0e7387c67e70531b95021c704cbf2"
+  },
+  "receipt": "isolated-test-227fdea9-7148-4391-b41a-3e6c2e71512f.json",
+  "receiptSha256": "ed09004785d3e3d70bdd453d952c4c97f4281aab49054e05c51b7f1b8372dcf6",
+  "totals": {
+    "required": 21,
+    "passed": 20,
+    "failed": 1,
+    "tests": 213,
+    "passedTests": 212,
+    "failedTests": 1,
+    "skippedTests": 0,
+    "cancelledTests": 0,
+    "todoTests": 0
+  },
+  "failure": {
+    "file": "tools/layout-studio/windows-editor-endpoint.test.mjs",
+    "stage": "owned PowerShell synthetic fixture setup",
+    "nativeCommandTimeoutMs": 10000,
+    "groupTimeoutMs": 120000,
+    "nativeEndpointQueryReached": false,
+    "diagnosis": "Original fixture setup returned timed-out; exact setup phase not yet recorded.",
+    "resolved": false
+  },
+  "ownedChildAndTreeCleanupVerified": true,
+  "correctiveWork": "Fixed non-secret setup stage markers added without changing original timeout, ACL, token-access, skip or assertion policy. Next native run must establish the failing phase.",
+  "limitations": [
+    "Native ACL/path acceptance remains unfinished; compiled helper is not proof of runtime acceptance.",
+    "The separate restricted-storage guardian-retirement failure remains unresolved."
+  ]
+}
