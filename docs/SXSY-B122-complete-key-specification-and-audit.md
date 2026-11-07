@@ -1,5 +1,15 @@
 # SXSY-B122 Complete Key Specification and Adversarial Review
 
+Installed Linux `b320506` verifies reviewed-save source within **76 metadata/in-memory
+checks and 34 exact module hashes**. All 54 semantic workspaces, selection, pending
+keyboard-only conversation and frozen frontend are preserved; 53 sealed files
+are byte-identical and one changes only audit metadata. All four profiles and
+57 workflows remain compatible. The retained template decodes to its original
+hash. Dated backup and launcher readback verify; current plus one rollback remain.
+The exact 536-file, 4,677,752-byte prepared bundle is removed. No installed save,
+scanner, provider task, account/model request or hardware operation was invoked.
+[Installed evidence](evidence/installed-scanner-recipe-save-summary.json).
+
 Reviewed scanner setup saving now works through the authenticated Linux backend.
 The latest **35 focused groups pass 221 tests**, including a real save, fresh
 authority review and scanner execution that detects a synthetic secret. A durable

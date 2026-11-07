@@ -17,7 +17,7 @@ checkpoints are not cumulative acceptance of the latest suite.
 
 | Checkpoint | Verified result | Limit |
 | --- | --- | --- |
-| Installed Linux `6ab9b1e` | **76 metadata/in-memory checks; 30 exact module hashes.** All 54 semantic workspaces and frozen frontend preserved. [Receipt](evidence/installed-scanner-recipe-draft-summary.json). | No live scanner, provider task, account/model request, native focus or hardware operation. |
+| Installed Linux `b320506` | **76 metadata/in-memory checks; 34 exact module hashes.** All 54 semantic workspaces and frozen frontend preserved. [Receipt](evidence/installed-scanner-recipe-save-summary.json). | No live scanner, provider task, account/model request, native focus or hardware operation. |
 | Native Windows client `4f56477` | **Seven groups; 94 passing tests; no skips.** Source/merge tree, artifact digest, commands, bounds and child/tree cleanup verified. [Receipt](evidence/windows-client-4f56477-passed-summary.json). | Client contracts only; interactive focus and complete Windows release acceptance are separate. |
 | Complete Linux `d09645a` | **326 groups; 2,013 passing tests; sixteen declared skips.** Original inventory, commands, bounds and owned cleanup verified. [Receipt](evidence/linux-d09645a-complete-summary.json). | Includes wheel-license and staged/historical preparation; predates scanner-draft assembly. |
 | Complete Windows `dc755901` | **417 groups; 2,478 passing tests; 207 declared skips.** All six jobs and overall workflow passed with verified packet/source/cleanup. [Receipt](evidence/windows-complete-dc755901-summary.json). | Predates newer archive, scheduling, profile/workflow and observation corrections. |
@@ -26,8 +26,7 @@ Complete Linux `d09645a` has zero failures or cancellations. Every original
 command, deadline, declared skip and child/tree retirement verifies. The owned
 checkout, nine dependency aliases, 788 generated files (11,803,414 bytes), empty
 test parent and marker are removed; other worktrees remain. This includes the
-read-only index correction. Scanner-draft assembly has later focused and
-installed evidence.
+read-only index correction. Scanner draft/save functionality has later focused and installed evidence.
 
 The latest installation includes 17 wheel license-header cases, 112 Cargo
 manifest reference cases, and eight in-memory policy reports for each of wheels,
@@ -35,7 +34,8 @@ Cargo archives and npm archives. All four saved profiles and 57 workflows remain
 compatible. Selection and the pending keyboard-only conversation are preserved;
 53 sealed workspace files are byte-identical and one changes only audit metadata.
 Dated backup and launcher readback verify. Only current plus one rollback remain;
-the exact 533-file, 5,213,310-byte prepared bundle was removed.
+the exact 536-file, 4,677,752-byte prepared bundle was removed. Lossless template
+storage reduces the package payload to 4,581,074 bytes without changing exports.
 
 ## Recent backend changes
 
