@@ -5,6 +5,7 @@ files.add("tools/layout-studio/windows-codex-editor-connection.test.mjs");
 files.add("tools/layout-studio/windows-owned-stdio.test.mjs");
 files.add("tools/layout-studio/codex-windows-tasks.test.mjs");
 files.add("tools/layout-studio/codex-retained-editor-client.test.mjs");
+files.add("tools/layout-studio/windows-editor-journal.test.mjs");
 const groups = requiredGroups.filter(g => files.has(g.file));
 if (groups.length !== files.size) throw new Error("The exact client platform verification inventory changed.");
 const { receipt, receiptPath } = await runVerification({ groups });

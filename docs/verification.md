@@ -1,25 +1,25 @@
 # What has actually been verified
 
-Windows editor target preparation now rechecks the original Job-owned process
-against its creation time and held executable identity, then repeats the saved
-load, task, account, repository and policy checks. It grants no terminal effect
-or second resume. Logical editor registration stays bound to that same target.
-**Thirty-three focused groups pass 104 tests with two declared platform skips**;
-typecheck passes. Provider/native-query doubles are explicit in local checks.
-The extended native case includes real process reinspection, protected registry
-target preparation and logical editor registration; its acceptance is pending.
-[Target contract](coding-task-owners.md),
-[source evidence](evidence/windows-editor-target-source-summary.json).
+The protected editor journal now has a Windows contract for the original native
+host, Job-owned task binding, logical editor client, loopback listener capability
+hash and exact terminal peer. Retirement keeps logical-client, carrier and query
+helper evidence separate, and never invents provider-process exit. **Thirty-eight
+focused groups pass 164 tests with one declared platform skip**; typecheck passes.
+These checks use real encrypted state/kernel leases and explicit native/recovery
+doubles, alongside Linux journal/recovery regressions.
+[Journal contract](windows-editor-transport.md),
+[source evidence](evidence/windows-editor-journal-source-summary.json).
 
-The earlier retained editor channel passes Windows client CI at `fcfe38a`:
-**fifteen groups, 155 tests and no skips**. An actual Job-backed synthetic
-app server returns its retained initialization response to the logical editor;
-closing that editor leaves the original task metadata connection alive.
-Source/merge tree, artifact, original commands, bounds and cleanup verify.
-Windows durable editor journal/recovery, Suite editor connections and VS Code
-launching remain unfinished implementation.
-[Native channel evidence](evidence/retained-editor-client-native-summary.json),
-[editor contract](windows-editor-transport.md).
+The earlier Windows target implementation passes native client CI at `2d1cc65`:
+**fifteen groups, 159 tests and no skips**. Actual original-worker process
+reinspection and protected target/logical-client registration pass with a
+synthetic app server. Source/merge tree, artifact, original commands, bounds and
+cleanup verify. The later journal contract awaits Windows execution. The Windows
+lifecycle still needs durable query-helper ownership, native host/helper recovery,
+Suite editor connection routing and VS Code launching; those are unfinished
+implementation rather than hardware/account blockers.
+[Native target evidence](evidence/windows-editor-target-native-summary.json),
+[target contract](coding-task-owners.md).
 
 The underlying persistent process layer passes Windows client CI at `45fe70e`:
 **thirteen groups, 139 tests and no skips**, including all three actual native Job

@@ -127,3 +127,42 @@ This channel is a backend component. [Windows target preparation](coding-task-ow
 is implemented with separate source checks. Durable editor journals and recovery,
 Suite editor connections and VS Code launching still need integration;
 no terminal command or frontend control was enabled.
+
+
+## Retain Windows ownership after interruption
+
+The shared protected journal accepts an explicit Windows contract. Each record
+uses `switchyard-windows-editor-connection/v1` with an exact read-only native host
+proof. The logical upstream binds the original Job scope and provider PID/birth/
+digest; the listener retains only the capability hash. Ordered transitions pin
+the exact terminal peer and endpoint before protocol acknowledgement. No POSIX
+directory/socket identity or provider-process exit is substituted for Windows
+coordinates.
+
+The existing consumed-permit, kernel-lease, immutable-record and no-replay rules
+still apply. A duplicate or restarted host cannot obtain a new handle from a
+saved record. Replacement protected bytes cannot be overwritten by an older
+handle, including during cleanup. Query-helper uncertainty keeps retirement
+uncertain; recovery requires original-host exit plus independent logical-client,
+carrier and query-helper facts. This contract accepts a verifier supplied by its
+owning service; it is not itself a native recovery implementation.
+
+Personal observation recording remains separately opt-in. Historical events use
+a private subject digest and status only, preserve exclusions/recording boundaries
+and claim neither live IDE attachment nor task completion. The journal and its
+native coordinates remain encrypted.
+
+Thirty-eight focused groups pass **164 tests with one platform skip**, plus
+typecheck. Tests use actual protected storage/leases with explicit native and
+recovery-verifier doubles. A malformed observation fixture was corrected after
+the original bounded failure was retained; production validation stayed intact.
+Existing Linux journal, recovery, observation, routing and packaging checks pass.
+[Source evidence](evidence/windows-editor-journal-source-summary.json).
+
+The earlier target implementation passes Windows CI at `2d1cc65`: fifteen
+groups, 159 tests, no skips, including real process reinspection and protected
+target/client registration against a synthetic app server.
+[Native target evidence](evidence/windows-editor-target-native-summary.json).
+The newer journal's Windows run is pending. Its production lifecycle still must
+retain every active query helper, verify native host/helper retirement after
+interruption, and connect the Suite and VS Code editor paths.

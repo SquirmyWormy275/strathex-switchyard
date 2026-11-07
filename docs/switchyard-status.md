@@ -18,7 +18,7 @@ checkpoints are not cumulative acceptance of the latest suite.
 | Checkpoint | Verified result | Limit |
 | --- | --- | --- |
 | Installed Linux `edb76de` | **76 metadata/in-memory checks; 42 exact module hashes.** All 54 semantic workspaces and frozen frontend preserved. [Receipt](evidence/installed-mixed-scanner-input-summary.json). | No live scanner, provider task, account/model request, native focus or hardware operation. |
-| Native Windows client `fcfe38a` | **Fifteen groups; 155 passing tests; no skips.** An actual Job-backed synthetic provider keeps task metadata alive after logical editor closure. Exact source/merge tree, artifact, commands, bounds and cleanup verify. [Receipt](evidence/retained-editor-client-native-summary.json). | Predates Windows target process reinspection and protected target composition. |
+| Native Windows client `2d1cc65` | **Fifteen groups; 159 passing tests; no skips.** Actual original-worker process reinspection and protected target/client registration pass with a synthetic provider. Exact source/merge tree, artifact, commands, bounds and cleanup verify. [Receipt](evidence/windows-editor-target-native-summary.json). | Predates the Windows journal contract and lifecycle integration. |
 | Complete Linux `edb76de` | **330 groups; 2,074 passing tests; 21 declared platform skips.** Original inventory, commands, bounds and owned cleanup verified. [Receipt](evidence/linux-edb76de-complete-summary.json). | Includes combined inputs and Windows saving source; predates terminal/peer probes. |
 | Complete Windows `dc755901` | **417 groups; 2,478 passing tests; 207 declared skips.** All six jobs and overall workflow passed with verified packet/source/cleanup. [Receipt](evidence/windows-complete-dc755901-summary.json). | Predates newer archive, scheduling, profile/workflow and observation corrections. |
 
@@ -38,13 +38,19 @@ storage reduces the package payload to 4,599,483 bytes without changing exports.
 
 ## Recent backend changes
 
-- **Windows editor target preparation:** rechecks the original native process,
-  image, acknowledged load, account, task, repository and policy without launching
-  a terminal or resuming again. Thirty-three groups pass 104 tests with two
-  platform skips; typecheck passes. Native-query/provider doubles are explicit
-  locally; extended native protected-target acceptance awaits CI.
+- **Windows editor journal contract:** retains native host, original Job binding,
+  logical-client ownership, capability hash and peer coordinates. Cleanup facts
+  remain separate; no provider-exit claim is invented. Thirty-eight groups pass
+  164 tests with one platform skip; typecheck passes. Native/recovery doubles
+  are explicit. Durable query-helper tracking, native recovery, Suite editor
+  routing and VS Code launching remain unfinished implementation.
+  [Contract](windows-editor-transport.md),
+  [source evidence](evidence/windows-editor-journal-source-summary.json).
+- **Windows editor target preparation:** native CI passes fifteen groups,
+  159 tests and no skips at `2d1cc65`, including actual process reinspection
+  and protected registry target/client registration.
   [Contract](coding-task-owners.md),
-  [source evidence](evidence/windows-editor-target-source-summary.json).
+  [native evidence](evidence/windows-editor-target-native-summary.json).
 - **Retained Windows editor channel:** native CI passes fifteen groups, 155 tests
   and no skips at `fcfe38a`. Closing a logical editor leaves the original task
   connection alive without claiming process exit.

@@ -615,7 +615,8 @@ production retirement bound or success condition was relaxed.
 
 The native fixture is extended to use actual Windows process reinspection and
 protected registry target/client composition with a synthetic app server; this
-newer acceptance is pending. The earlier retained logical channel passes at
-`fcfe38a`: fifteen native client groups, 155 tests and no skips.
+now passes at `2d1cc65`: fifteen native client groups, 159 tests and no skips.
+Exact source/merge tree, artifact, commands, bounds and cleanup verify.
+[Native target evidence](evidence/windows-editor-target-native-summary.json).
 [Target source evidence](evidence/windows-editor-target-source-summary.json),
 [native channel evidence](evidence/retained-editor-client-native-summary.json).

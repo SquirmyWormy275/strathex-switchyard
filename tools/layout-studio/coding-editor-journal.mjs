@@ -2,6 +2,8 @@
 import { createHash } from 'node:crypto';
 import { posix } from 'node:path';
 import { appendEditorObservation } from './editor-observation.mjs';
+import { windowsCodexBinding } from './windows-codex-binding.mjs';
+import { windowsEditorHost, changeWindowsEditorJournal, windowsEditorRetirementFields, windowsEditorJournalStates } from './windows-editor-journal-contract.mjs';
 
 const field = 'codingEditorConnections';
 const uuid = v => typeof v === 'string' && /^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/.test(v);
@@ -21,8 +23,12 @@ const digest = v => typeof v==='string' && /^[a-f0-9]{64}$/.test(v);
 const view = row => Object.freeze({ requestId:row.requestId, editorId:row.editorId, ownerRequestId:row.ownerRequestId, loadRequestId:row.loadRequestId, status:row.status,
   protocolAcknowledgementRecorded:row.acknowledgement!==undefined, stoppedVerified:row.status==='stopped', terminalLaunched:false, ideAttached:false, authorityGranted:false, completionVerified:false });
 
-export function createCodingEditorJournal({ store, authorizations, now=Date.now }={}) {
+export function createCodingEditorJournal({ store, authorizations, now=Date.now, platform='linux' }={}) {
   require(store && typeof authorizations?.returnTarget==='function');
+  require(['linux','win32'].includes(platform));
+  const windows=platform==='win32',schema=windows?'switchyard-windows-editor-connection/v1':'switchyard-editor-connection/v1';
+  const validHost=windows?windowsEditorHost:hostIdentity;
+  const retirementFields=windows?windowsEditorRetirementFields:['upstreamExitVerified','carrierExitVerified','socketRemovedVerified','directoryRemovedVerified'];
   let closed=false; const pending=new Set(), leases=new Map();
   const track = fn => { const work=Promise.resolve().then(fn);pending.add(work);void work.then(()=>pending.delete(work),()=>pending.delete(work));return work; };
   const key=(c,s)=>'editor:'+c+':'+s.requestId;
@@ -39,11 +45,13 @@ export function createCodingEditorJournal({ store, authorizations, now=Date.now 
     require(!closed && observed?.metadataObserved===true && observed.nativeLoadAcknowledged===true && ['nativeTaskLoaded','authorityGranted','terminalLaunched','ideAttached','modelPromptSubmitted','completionVerified'].every(k=>observed[k]===false)
       && observed.targetDigest===hash(observed.target) && observed.target.ownerRequestId===s.ownerRequestId && observed.target.loadRequestId===s.loadRequestId
       && uuid(observed.target.taskId) && uuid(observed.target.sessionId) && observed.target.permissions==='read-only/on-request' && digest(observed.target.accountFingerprint) && digest(observed.target.endpoint?.peerExecutableSha256));
+    if(windows)windowsCodexBinding(observed.target.endpoint);
     return {target:structuredClone(observed.target),targetDigest:observed.targetDigest,policyDigest:policy(state)};
   }
   async function current(c,s,original) { require(hash(await capture(c,s))===hash(original)); }
   function change(row,event,target) {
     require(object(event));
+    if(windows && event.kind!=='acknowledged')return changeWindowsEditorJournal(row,event,target);
     if(event.kind==='directory-intent') {
       require(row.status==='reserved' && exact(event,['kind','parent','path']) && exact(event.parent,['path','identity']) && path(event.parent.path) && identity(event.parent.identity)
         && (BigInt(event.parent.identity.mode)&0o170000n)===0o040000n && path(event.path) && event.path===posix.join(event.parent.path,row.requestId) && Buffer.byteLength(event.path+'/s')<=100);
@@ -86,7 +94,7 @@ export function createCodingEditorJournal({ store, authorizations, now=Date.now 
     throw Error('This editor ownership checkpoint is not supported.');
   }
   return Object.freeze({
-    reserve(c,input,options={}) {const s=selection(input);require(exact(options,[]) || exact(options,['host']) && hostIdentity(options.host));const host=options.host&&structuredClone(options.host);return track(async()=>{
+    reserve(c,input,options={}) {const s=selection(input);require(!windows && exact(options,[]) || exact(options,['host']) && validHost(options.host));const host=options.host&&structuredClone(options.host);return track(async()=>{
       const original=await capture(c,s);
       return store.withResourceLock('client-launch',key(c,s),async lock=>{
         await current(c,s,original);lock.assert();let saved,inserted=false;
@@ -96,7 +104,7 @@ export function createCodingEditorJournal({ store, authorizations, now=Date.now 
           const previous=rowFor(state,s);if(previous){saved=structuredClone(previous);return;}
           freshAuthorization(state,s,original);
           const rows=state[field]??=[];require(rows.length<64 && !rows.some(row=>row.status!=='stopped' && !leases.has(key(c,row))));
-          saved={schema:'switchyard-editor-connection/v1',...s,...(host?{host}:{}),taskId:original.target.taskId,targetDigest:original.targetDigest,policyDigest:original.policyDigest,status:'reserved',revision:0,createdAt:now()};rows.push(saved);appendEditorObservation(state,saved);inserted=true;
+          saved={schema,...s,...(host?{host}:{}),taskId:original.target.taskId,targetDigest:original.targetDigest,policyDigest:original.policyDigest,status:'reserved',revision:0,createdAt:now()};rows.push(saved);appendEditorObservation(state,saved);inserted=true;
         },{provider:'codex'});
         // A saved row, including a stopped or interrupted one, never issues a
         // new handle after a lost reply or across host instances.
@@ -110,7 +118,7 @@ export function createCodingEditorJournal({ store, authorizations, now=Date.now 
           observation:()=>view(lease.row),
           assertCurrent:()=>track(async()=>{require(!['stopped','uncertain'].includes(lease.row.status));await current(c,s,original);matches(await store.snapshot(c));}),
           record(event) {
-            let copy;try {require(object(event) && Buffer.byteLength(JSON.stringify(event))<=16384);copy=structuredClone(event);if(copy.kind==='ingress' && object(copy.ownership))copy.ownership.socketIdentity??=null;}catch(error){return Promise.reject(error);}
+            let copy;try {require(object(event) && Buffer.byteLength(JSON.stringify(event))<=16384);copy=structuredClone(event);if(!windows && copy.kind==='ingress' && object(copy.ownership))copy.ownership.socketIdentity??=null;}catch(error){return Promise.reject(error);}
             return track(()=>store.withResourceLock('client-launch',ownershipKey,async owned=>{
               await current(c,s,original);owned.assert();matches(await store.snapshot(c));const next=structuredClone(lease.row);change(next,copy,original.target);next.revision++;next.updatedAt=now();
               await store.update(c,'coding-editor-connection-checkpoint',state=>{require(!closed && policy(state)===original.policyDigest);owned.assert();matches(state);const row=rowFor(state,s);Object.assign(row,next);appendEditorObservation(state,row);},{provider:'codex'});
@@ -118,7 +126,7 @@ export function createCodingEditorJournal({ store, authorizations, now=Date.now 
             }));
           },
           retire(facts) {
-            let copy;try{require(exact(facts,['upstreamExitVerified','carrierExitVerified','socketRemovedVerified','directoryRemovedVerified']) && Object.values(facts).every(v=>typeof v==='boolean'));copy={...facts};}catch(error){return Promise.reject(error);}
+            let copy;try{require(exact(facts,retirementFields) && Object.values(facts).every(v=>typeof v==='boolean'));copy={...facts};}catch(error){return Promise.reject(error);}
             // Retirement remains available after policy/workspace cancellation.
             // It grants no provider admission and can only update this live handle.
             return track(()=>store.withResourceLock('client-launch',ownershipKey,async owned=>{
@@ -135,14 +143,14 @@ export function createCodingEditorJournal({ store, authorizations, now=Date.now 
     });},
     recover(c,input,verify) {const s=selection(input);require(typeof verify==='function');return track(()=>store.withResourceLock('client-launch',key(c,s),async lock=>{
       require(!closed);await store.authorize(c);const original=structuredClone(rowFor(await store.snapshot(c),s));
-      require(original?.schema==='switchyard-editor-connection/v1' && uuid(original.taskId) && digest(original.targetDigest) && digest(original.policyDigest) && Number.isSafeInteger(original.revision) && original.revision>=0);
+      require(original?.schema===schema && uuid(original.taskId) && digest(original.targetDigest) && digest(original.policyDigest) && Number.isSafeInteger(original.revision) && original.revision>=0);
       if(original.status==='stopped')return {...view(original),duplicatePrevented:true};
       require(!leases.has(key(c,s)));
-      require(['reserved','directory-planned','private','upstream','ingress-reserved','ingress-started','ready','peer-pinned','peer-requested','connected','acknowledged','uncertain'].includes(original.status));
-      if(!hostIdentity(original.host))return {...view(original),recoveryBlocked:true};
+      require((windows?windowsEditorJournalStates:['reserved','directory-planned','private','upstream','ingress-reserved','ingress-started','ready','peer-pinned','peer-requested','connected','acknowledged','uncertain']).includes(original.status));
+      if(!validHost(original.host))return {...view(original),recoveryBlocked:true};
       const current=async()=>{require(!closed);await store.authorize(c);lock.assert();require(hash(rowFor(await store.snapshot(c),s))===hash(original));};
       await current();const facts=await verify(structuredClone(original),current);
-      require(exact(facts,['hostExitVerified','upstreamExitVerified','carrierExitVerified','socketRemovedVerified','directoryRemovedVerified']) && Object.values(facts).every(v=>typeof v==='boolean'));await current();
+      require(exact(facts,['hostExitVerified',...retirementFields]) && Object.values(facts).every(v=>typeof v==='boolean'));await current();
       if(!facts.hostExitVerified)return {...view(original),recoveryBlocked:true};
       const next={...original,status:Object.values(facts).every(Boolean)?'stopped':'uncertain',retirement:{...facts},revision:original.revision+1,updatedAt:now()};
       await store.update(c,'coding-editor-connection-recover',state=>{require(!closed);lock.assert();require(hash(rowFor(state,s))===hash(original));const row=rowFor(state,s);Object.assign(row,next);appendEditorObservation(state,row);});return view(next);
