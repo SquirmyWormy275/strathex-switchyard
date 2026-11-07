@@ -32,6 +32,16 @@ and launcher readback verify; current plus one rollback remain. The exact
 account, model, keyboard or native Windows focus action was performed.
 [Installed evidence](evidence/installed-cargo-license-summary.json).
 
+Selected npm archives now retain their own bounded license declaration, assessed
+only after matching integrity and embedded identity. Lockfile and archive policy
+remain independent; disallowed obligations fail and unresolved coverage remains
+explicit. Sixteen focused groups pass 146 tests, including eight actual Linux
+npm archive journeys and eight Windows guest doubles. Typecheck, original bounds,
+commands, skips and child/tree cleanup verify; owned staging is removed.
+Installed acceptance and actual Windows execution remain separate.
+[Contract](npm-archive-license-declarations.md),
+[source evidence](evidence/npm-archive-license-source-summary.json).
+
 Selected Cargo archives now expose bounded package license declarations and
 apply the reviewed SPDX policy only after both byte integrity and manifest
 identity match. Disallowed obligations fail; permitted alternatives remain

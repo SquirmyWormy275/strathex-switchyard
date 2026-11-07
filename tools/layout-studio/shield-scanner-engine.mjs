@@ -225,7 +225,7 @@ export function cargoCycloneDxComponent(c) {
       {name:'switchyard:ecosystem',value:'Cargo'},{name:'switchyard:lockfile',value:c.lockPath},{name:'switchyard:cargo-source-kind',value:c.sourceKind},
       ...(c.sourceSha256?[{name:'switchyard:declared-source-sha256',value:c.sourceSha256}]:[]),...(c.declaredSha256?[{name:'switchyard:declared-sha256',value:c.declaredSha256}]:[]),
       {name:'switchyard:declared-dependencies-sha256',value:c.dependenciesSha256},{name:'switchyard:cargo-resolution',value:'not-performed'},
-      ...(c.artifact ? [{name:'switchyard:artifact-path',value:c.artifact.path},{name:'switchyard:artifact-sha256',value:c.artifact.sha256},{name:'switchyard:artifact-integrity',value:c.artifact.status},{name:'switchyard:artifact-content',value:'not-inspected'},{name:'switchyard:archive-license-policy',value:c.artifact.licensePolicy},...archiveProperties(c.artifact.archive),...cargoLicenseProperties(c.artifact.archive.license)] : [])
+      ...(c.artifact ? [{name:'switchyard:artifact-path',value:c.artifact.path},{name:'switchyard:artifact-sha256',value:c.artifact.sha256},{name:'switchyard:artifact-integrity',value:c.artifact.status},{name:'switchyard:artifact-content',value:'not-inspected'},{name:'switchyard:archive-license-policy',value:c.artifact.licensePolicy},...archiveProperties(c.artifact.archive),...archiveLicenseProperties(c.artifact.archive.license)] : [])
     ]};
 }
 
@@ -407,7 +407,11 @@ function archiveManifest(bytes) {
     }
   }
   if (!npmName(value.name) || !npmVersion(value.version)) archiveRefuse("manifest");
-  return { name: value.name, version: value.version, manifestSha256: sha(bytes) };
+  const declaration = npmLicenseDeclaration(value.license);
+  const license = Object.hasOwn(value, "licenses") ? { status: "unsupported" } : !Object.hasOwn(value, "license") ? { status: "missing" }
+    : typeof value.license === "string" && /^SEE LICENSE IN [\x21-\x7e][\x20-\x7e]{0,495}$/.test(value.license) ? { status: "file-only" }
+    : declaration && declaration.expression.toUpperCase() !== "UNLICENSED" ? { status: "declared", expression: declaration.expression } : { status: "unsupported" };
+  return { name: value.name, version: value.version, manifestSha256: sha(bytes), license };
 }
 /** Metadata comparison only. Never extracts paths or executes archive contents. */
 function inspectTarArchive(bytes, budget, cargo = false) {
@@ -601,7 +605,8 @@ export function validateCargoArchiveObservation(value, name, version) {
   validateTarArchiveObservation(value, name, version, (n, v) => { try { cargoIdentity(n, v); return true; } catch { return false; } }, true);
 }
 export function validateNpmArchiveObservation(value, name, version) {
-  return validateTarArchiveObservation(value, name, version, (n, v) => npmName(n) && npmVersion(v));
+  validateTarArchiveObservation(value, name, version, (n, v) => npmName(n) && npmVersion(v), true);
+  if (value.license?.status === "declared" && value.license.expression.toUpperCase() === "UNLICENSED") throw Error("An npm UNLICENSED marker is not an assessed SPDX declaration.");
 }
 function validateTarArchiveObservation(value, name, version, identity, cargo = false) {
   if (value?.status === "unsupported") { exact(value, ["status", "reason"]); if (!archiveReasons.includes(value.reason)) throw Error("Invalid archive coverage gap."); return; }
@@ -735,8 +740,8 @@ function archiveProperties(archive) {
       { name: "switchyard:archive-declared-version", value: archive.version },
       ...(archive.metadataVersion ? [{ name: "switchyard:wheel-metadata-version", value: archive.metadataVersion }, { name: "switchyard:wheel-format-version", value: archive.wheelVersion }, { name: "switchyard:wheel-record-verification", value: archive.record.status }, { name: "switchyard:wheel-record-sha256", value: archive.record.sha256 }, ...(archive.record.status === "unsupported" ? [{ name: "switchyard:wheel-record-gap", value: archive.record.reason }] : [{ name: "switchyard:wheel-record-files", value: String(archive.record.files) }])] : [])])] : [];
 }
-function cargoLicenseProperties(license) {
-  return license ? [{ name: "switchyard:archive-license-declaration", value: license.status }, ...(license.status === "declared" ? [{ name: "switchyard:archive-declared-license", value: license.expression }, ...licenseCatalogProperties(license.expression)] : [])] : [];
+function archiveLicenseProperties(license) {
+  return license ? [{ name: "switchyard:archive-license-declaration", value: license.status }, ...(license.status === "declared" ? [{ name: "switchyard:archive-declared-license", value: license.expression }, ...licenseCatalogProperties(license.expression).map(p => ({ ...p, name: p.name.replace("switchyard:spdx-", "switchyard:archive-spdx-") }))] : [])] : [];
 }
 export const shieldArtifactReferenceKey = row => row.ecosystem === "Cargo"
   ? JSON.stringify(["Cargo", row.lockPath, row.name, row.version, row.sourceSha256])
@@ -762,7 +767,7 @@ export function shieldCycloneDxComponent(c) { if(c.ecosystem==="Cargo")return ca
         ...(c.workspace?[{name:"switchyard:source-kind",value:"workspace-link"},{name:"switchyard:workspace-path",value:c.workspace.path},{name:"switchyard:workspace-lock-metadata-sha256",value:c.workspace.lockMetadataSha256},{name:"switchyard:workspace-source",value:"not-verified"}]:[]),
         ...(c.integritySha256 ? [{ name: "switchyard:integrity-string-sha256", value: c.integritySha256 }] : []),
         ...archiveProperties(c.artifact?.archive),
-        ...(c.artifact ? [{ name: "switchyard:artifact-path", value: c.artifact.path }, { name: "switchyard:artifact-sha256", value: c.artifact.sha256 }, ...(c.artifact.algorithm === "sha512" ? [{ name: "switchyard:artifact-observed-sha512", value: c.artifact.observedSha512 }] : []), { name: "switchyard:artifact-integrity", value: c.artifact.status }, { name: "switchyard:artifact-content", value: "not-inspected" }] : [])
+        ...(c.artifact ? [{ name: "switchyard:artifact-path", value: c.artifact.path }, { name: "switchyard:artifact-sha256", value: c.artifact.sha256 }, ...(c.artifact.algorithm === "sha512" ? [{ name: "switchyard:artifact-observed-sha512", value: c.artifact.observedSha512 }, { name: "switchyard:archive-license-policy", value: c.artifact.licensePolicy }, ...archiveLicenseProperties(c.artifact.archive?.license)] : []), { name: "switchyard:artifact-integrity", value: c.artifact.status }, { name: "switchyard:artifact-content", value: "not-inspected" }] : [])
       ] }; }
 function feed(v) { exact(v, ["id", "path", "sha256"]); return { id: identifier(v.id), path: scannerPath(v.path), sha256: digest(v.sha256) }; }
 function indexSource(v) {
@@ -978,7 +983,13 @@ export async function scanShieldInputs(proposed, { readInput }) {
           const status = expectedSha512 === null ? "unsupported-integrity" : expectedSha512 === observed.observedSha512 ? "matched" : "mismatched";
           const inspected = archiveIdentities.get(reference.path);
           const archive = inspected.status === "unsupported" ? inspected : { ...inspected, status: inspected.name === name && inspected.version === p.version ? "matched" : "mismatched" };
-          component.artifact = { ...observed, algorithm: "sha512", expectedSha512, status, archive };
+          const declaration = archive.license?.status === "declared" ? npmLicenseDeclaration(archive.license.expression, policy.allowedLicenses) : null;
+          const licensePolicy = status === "matched" && archive.status === "matched" && declaration ? !policy.allowedLicenses.length ? "unconfigured" : declaration.allowed ? "permitted" : "disallowed" : "unassessed";
+          component.artifact = { ...observed, algorithm: "sha512", expectedSha512, status, archive, licensePolicy };
+          if (!declaration || !spdxLicenseMembership(declaration.expression).listed) gaps.add("license_metadata");
+          if (licensePolicy === "unconfigured") gaps.add("license_policy");
+          if (licensePolicy === "permitted" && declaration.choice) gaps.add("license_choice_not_selected");
+          if (licensePolicy === "disallowed") add({ ruleId: "license.disallowed", dimension: "licenses", severity: "high", path: file.path, line: null, fingerprint: sha(["license.archive-disallowed", "npm", file.path, file.sha256, location, observed.path, observed.sha256, archive.manifestSha256, declaration.expression].join("\0")) });
           if (archive.status !== "matched") gaps.add("npm_archive_identity_not_verified");
           if (archive.status === "mismatched") add({ ruleId: "artifact.identity-mismatch", dimension: "provenance", severity: "high", path: file.path, line: null, fingerprint: sha(["artifact.identity-mismatch", file.path, file.sha256, location, observed.path, observed.sha256, archive.manifestSha256].join("\0")) });
           if (status !== "matched") gaps.add("package_artifact_not_verified");

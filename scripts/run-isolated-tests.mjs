@@ -222,6 +222,7 @@ export const requiredGroups = [
   { file: "tools/layout-studio/repository-execution.test.mjs", timeoutMs: 240_000, ...nativeTestOverrides("tools/layout-studio/repository-execution.test.mjs"), ...(process.platform !== "linux" ? { expectedSkipped: 1 } : {}) },
   { file: "tools/layout-studio/cargo-lock-inventory.test.mjs" },
   { file: "tools/layout-studio/cargo-archive.test.mjs" },
+  { file: "tools/layout-studio/npm-archive-license.test.mjs" },
   { file: "tools/layout-studio/repository-shield-cargo-archives.test.mjs", ...nativeTestOverrides("tools/layout-studio/repository-shield-cargo-archives.test.mjs"), expectedSkipped: process.platform === "linux" ? 0 : 2 },
   { file: "tools/layout-studio/repository-windows-shield-cargo-archives.test.mjs", ...nativeTestOverrides("tools/layout-studio/repository-windows-shield-cargo-archives.test.mjs") },
   { file: "tools/layout-studio/repository-shield-cargo.test.mjs", ...nativeTestOverrides("tools/layout-studio/repository-shield-cargo.test.mjs"), expectedSkipped: process.platform === "linux" ? 0 : 4 },

@@ -41,7 +41,7 @@ export function cargoArtifactFixture({ action = "shield_supply_chain", artifactS
   return f;
 }
 export function npmArtifactFixture({ action = "shield_supply_chain", artifactStatus = "matched", archiveStatus } = {}) {
-  const original = archiveStatus ? npmArchiveFixture({ name: archiveStatus === "mismatched" ? "different" : "synthetic", malformed: archiveStatus === "unsupported" }) : Buffer.from([0x1f, 0x8b, 0, 0, 0x53, 0x58, 0x53, 0x59]);
+  const original = archiveStatus ? npmArchiveFixture({ manifest: JSON.stringify({ name: archiveStatus === "mismatched" ? "different" : "synthetic", version: "1.0.0", license: archiveStatus === "license-disallowed" ? "MIT AND GPL-3.0-only" : "MIT OR Apache-2.0", scripts: { install: "NEVER_EXECUTE_PACKAGE_SCRIPT" } }), malformed: archiveStatus === "unsupported" }) : Buffer.from([0x1f, 0x8b, 0, 0, 0x53, 0x58, 0x53, 0x59]);
   const selected = Buffer.from(original); if (artifactStatus === "mismatched") selected[7] ^= 1;
   const integrity = artifactStatus === "unsupported-integrity" ? "sha256-" + createHash("sha256").update(original).digest("base64") : "sha512-" + createHash("sha512").update(original).digest("base64");
   const f = scannerFixture({ action, files: { "app.js": "const ordinary = 1;", "package-lock.json": JSON.stringify({ lockfileVersion: 3, packages: { "node_modules/synthetic": { version: "1.0.0", license: "MIT", resolved: "https://registry.npmjs.org/synthetic/-/synthetic-1.0.0.tgz", integrity } } }), "reviewed-package.tgz": selected }, advisory: [{ ecosystem: "npm", name: "synthetic", version: "1.0.0", advisories: [] }] });

@@ -14,7 +14,7 @@ if (process.platform !== "linux" || flags.length !== 1 || flags[0] !== "--read-o
   throw Error("Usage on the pilot: node scripts/verify-cargo-inventory-host.mjs --read-only-metadata");
 const sha = b => createHash("sha256").update(b).digest("hex"), app = await applicationStatus(); assert.equal(app.status, "ready");
 const root = join(installationRoot(), "versions", app.build), manifest = await verifySuiteRelease(root, { expectedId: app.build, platform: "linux", checkRuntime: true }); assert.equal(manifest.development, false);
-const source = JSON.parse(await readFile(new URL("../docs/evidence/cargo-license-source-summary.json", import.meta.url))), moduleDigests = {}, checks = [];
+const source = JSON.parse(await readFile(new URL("../docs/evidence/npm-archive-license-source-summary.json", import.meta.url))), moduleDigests = {}, checks = [];
 for (const path of ["tools/layout-studio/shield-scanner-engine.mjs", "tools/layout-studio/repository-shield.mjs"]) {
   const digest = sha(await readFile(join(root, path))); assert.equal(digest, source.sourceFiles[path]); moduleDigests[path] = digest;
 }

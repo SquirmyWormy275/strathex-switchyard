@@ -4,6 +4,10 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { fileURLToPath } from "node:url";
 const execute = promisify(execFile);
+test("installed npm archive proof refuses package, network and execution flags before installed-state access", async () => {
+  const script = fileURLToPath(new URL("./verify-npm-archive-host.mjs", import.meta.url));
+  for (const flags of [[], ["--synthetic"], ["--read-only-metadata", "--install"], ["--read-only-metadata", "--scan"], ["--read-only-metadata", "--registry=NEVER_CONTACT"], ["--read-only-metadata", "--approved"], ["--read-only-metadata", "--read-only-metadata"]]) await assert.rejects(execute(process.execPath, [script, ...flags], { timeout: 5000, maxBuffer: 32768 }), error => error.code === 1 && error.stdout === "" && /Usage on the pilot:/.test(error.stderr));
+});
 test("installed workflow metadata proof refuses edit, import and broad flags before installed-state access", async () => {
   const script = fileURLToPath(new URL("./verify-workflow-host.mjs", import.meta.url));
   for (const flags of [[], ["--synthetic"], ["--read-only-metadata", "--edit"], ["--read-only-metadata", "--import=NEVER_OPEN"], ["--read-only-metadata", "--approved"], ["--read-only-metadata", "--read-only-metadata"]]) await assert.rejects(execute(process.execPath, [script, ...flags], { timeout: 5000, maxBuffer: 32768 }), error => error.code === 1 && error.stdout === "" && /Usage on the pilot:/.test(error.stderr));

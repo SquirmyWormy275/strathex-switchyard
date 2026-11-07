@@ -153,10 +153,20 @@ export function parseShieldScannerReport(output,shield,action) {
       const referenceKey = JSON.stringify([component.lockPath, component.location]), reference = artifactReferences.get(referenceKey);
       if (reference) {
         const a = component.artifact, file = files.get(reference.path), hash512 = v => typeof v === "string" && /^[a-f0-9]{128}$/.test(v);
-        if (component.workspace || !exact(a, ["path", "sha256", "size", "observedSha512", "algorithm", "expectedSha512", "status", "archive"]) || a.path !== reference.path || a.sha256 !== file?.sha256 || a.size !== file?.size || a.algorithm !== "sha512" || !hash512(a.observedSha512)
+        if (component.workspace || !exact(a, ["path", "sha256", "size", "observedSha512", "algorithm", "expectedSha512", "status", "archive", "licensePolicy"]) || a.path !== reference.path || a.sha256 !== file?.sha256 || a.size !== file?.size || a.algorithm !== "sha512" || !hash512(a.observedSha512)
           || a.expectedSha512 !== null && (!hash512(a.expectedSha512) || component.integritySha256 !== sha("sha512-" + Buffer.from(a.expectedSha512, "hex").toString("base64")))
           || a.status !== (a.expectedSha512 === null ? "unsupported-integrity" : a.expectedSha512 === a.observedSha512 ? "matched" : "mismatched")) throw Error("Artifact observation differs from its exact reviewed reference and integrity declaration.");
         validateNpmArchiveObservation(a.archive, component.name, component.version);
+        const declaration = a.archive.license?.status === "declared" ? npmLicenseDeclaration(a.archive.license.expression) : null;
+        const assessable = a.status === "matched" && a.archive.status === "matched" && declaration;
+        if (assessable ? !["unconfigured", "permitted", "disallowed"].includes(a.licensePolicy) : a.licensePolicy !== "unassessed") throw Error("npm archive license policy cannot apply to unmatched or unsupported metadata.");
+        if ((!declaration || !spdxLicenseMembership(declaration.expression).listed) && !report.gaps.includes("license_metadata")) throw Error("Missing or unlisted npm archive declarations must retain their metadata gap.");
+        if (a.licensePolicy === "unconfigured" && !report.gaps.includes("license_policy")) throw Error("Unconfigured npm archive policy must retain its gap.");
+        if (a.licensePolicy === "permitted" && declaration.choice && !report.gaps.includes("license_choice_not_selected")) throw Error("Permitted npm archive alternatives do not establish a selected license.");
+        if (a.licensePolicy === "disallowed") {
+          const fingerprint = sha(["license.archive-disallowed", "npm", component.lockPath, files.get(component.lockPath).sha256, component.location, a.path, a.sha256, a.archive.manifestSha256, declaration.expression].join("\0"));
+          if (!report.findings.some(f => f.ruleId === "license.disallowed" && f.dimension === "licenses" && f.severity === "high" && f.path === component.lockPath && f.line === null && f.fingerprint === fingerprint) && !(report.findings.length === 512 && report.gaps.includes("finding_limit"))) throw Error("A disallowed npm archive declaration cannot lose its failed finding.");
+        }
         if (a.archive.status !== "matched" && !report.gaps.includes("npm_archive_identity_not_verified")) throw Error("Unverified npm archive identity must retain its coverage gap.");
         if (a.archive.status === "mismatched") {
           const fingerprint = sha(["artifact.identity-mismatch", component.lockPath, files.get(component.lockPath).sha256, component.location, a.path, a.sha256, a.archive.manifestSha256].join("\0"));

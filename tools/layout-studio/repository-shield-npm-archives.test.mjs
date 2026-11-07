@@ -17,7 +17,7 @@ test("bounded archive metadata supports USTAR prefixes, directories, NUL regular
   const tar = ustarFixture([{ path: "package/", type: "5" }, { path: "package.json", prefix: "package", type: "\0", content: manifest },
     { path: "package/lib/", type: "5" }, { path: "package/lib/opaque.bin", content: Buffer.from([0xff, 0, 255]) }]);
   const result = inspectNpmArchive(gzipSync(tar));
-  assert.deepEqual(result, { status: "inspected", name: "@scope/package", version: "1.2.3-beta.1+build", manifestSha256: sha(manifest), entries: 4, expandedBytes: tar.length });
+  assert.deepEqual(result, { status: "inspected", name: "@scope/package", version: "1.2.3-beta.1+build", manifestSha256: sha(manifest), license: { status: "missing" }, entries: 4, expandedBytes: tar.length });
   // No executable/member bytes or private metadata enter the fixed observation.
   assert.ok(!JSON.stringify(result).includes("NEVER_EXECUTE"));
   assert.equal(inspectNpmArchive(npmArchiveFixture({ entries: [{ path: "package/README", content: "ordinary" }] })).status, "inspected");

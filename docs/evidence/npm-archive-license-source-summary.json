@@ -1,0 +1,188 @@
+{
+  "schema": "switchyard-npm-archive-license-source/v1",
+  "at": "2026-11-07T03:51:34.483094+00:00",
+  "baseSource": "e4a509b5bb1e831ffe19f74ffba16c6d3f3c3d69",
+  "sourceFiles": {
+    "deployment/suite/release.test.mjs": "a3b3cf50a9f2f12cd92f609202f58bffdd3c21f63606cbdeabd2ee12a8d9a7de",
+    "scripts/fixtures/cargo-archive-oracle.json": "7371721d7fac79948956506d194f675882ef91352674e62a856f569ca97bb324",
+    "scripts/generate-cargo-archive-oracle.py": "8df25cb55b0f67119c291f93a5a4ef8edf08898bbc76ad35e911af030682d705",
+    "scripts/run-isolated-tests.mjs": "0a601b6d5a10bfbcd78213491db8b99341e49e4907c1a665ed9b5cbea2e64f37",
+    "scripts/run-isolated-tests.test.mjs": "e957fda947d20040b21cfcb02b595427458b70df842702d56eccc7f8c9a2b8e8",
+    "scripts/verify-cargo-inventory-host.mjs": "5a842766788ae2aca52eca3cf0c5fa89636bbdc37c1fe97ed0785ff1f8ad258b",
+    "scripts/verify-copilot-journal-host.test.mjs": "14fc59b301374a79a3417458583eb9abebaf590232eca963e6811b3aee1ed57e",
+    "scripts/verify-npm-archive-host.mjs": "6a6000d31ef30c355608fe385eea1b137f9d1812b7e9a19cb3f42e29c741674d",
+    "scripts/verify-python-inventory-host.mjs": "4110f77f422ce0bece7bcfca1215be4572a497c112f8a96361dbf1f28a478284",
+    "scripts/windows-backend-shards.test.mjs": "2025ce872294426df0bab0c3b5fa367c9d2a18471568a3a4043109f55eae6234",
+    "scripts/windows-scenario-groups.test.mjs": "513550b7b199fb410c9ce3cffdb94b84dfa041cf3a4e7962162eb0e5a1ca3d9f",
+    "tools/layout-studio/cargo-archive.test.mjs": "585b1843e4bb7874cbd6404b4b7e0f3d31ff2515770946372a052f5f0b870b6b",
+    "tools/layout-studio/cargo-lock-inventory.test.mjs": "57ac3058d30d6a34ee45471ee9cb3bc0cf8b46a29d542d3655142c2f34a438f8",
+    "tools/layout-studio/npm-archive-license.test.mjs": "63e8cc89121adac3989a228f6921db43a4109f37faa8432628c59577e03ab558",
+    "tools/layout-studio/pypi-wheel-identity.test.mjs": "71ff17c6c19f14a3852a7f09417fb54f967a22b105bcbf964388422087b67c15",
+    "tools/layout-studio/pypi-wheel-record.test.mjs": "457e6ab7c6a801ab5c97f39d198616810bb2066038b775357e854b2cad5712ca",
+    "tools/layout-studio/repository-shield-artifacts.test.mjs": "a4bfcebdc7c5b5684aef1ab86be7bbc250717bb783f6723ca49e28eb39bedb89",
+    "tools/layout-studio/repository-shield-cargo-archives.test.mjs": "5e9c6b8d683a65f46f6166e5545c356b8e5ddcb86d7fb2c0931866e8af93cab0",
+    "tools/layout-studio/repository-shield-cargo-artifacts.test.mjs": "15f884506986dfd94508efe64153b9c329d21f05d813cf37c238cac72fc23e5a",
+    "tools/layout-studio/repository-shield-cargo.test.mjs": "7173a94937079baec95bebdc40339a4563b929c9858f0c3c56b87d855814c781",
+    "tools/layout-studio/repository-shield-licenses.test.mjs": "efebd9372f8ba33bad32cdc9d2295f52a152005d6500c12ce26b064a10e31cea",
+    "tools/layout-studio/repository-shield-npm-archives.test.mjs": "d3aca28127acafed3c79db487000466a01fd450f99e571bf93bc7a9b9de1a5b7",
+    "tools/layout-studio/repository-shield.mjs": "40d9ac7b660455997dd98bd62c07be6fe3f3865e32db49f836d2cf8e1860aa2a",
+    "tools/layout-studio/repository-windows-shield-cargo-archives.test.mjs": "365f9046d35aa27934acf9c11e8db180f2b8287fca9b63ef8c6682150ed8561a",
+    "tools/layout-studio/repository-windows-shield-cargo.test.mjs": "eb94173fa8f2b37812a61aa106e6fa8f4d70a94bf7755ae0f5a7bfbfc0fd4b1c",
+    "tools/layout-studio/repository-windows-shield-licenses.test.mjs": "26ddfd591b30f388ff5d5dfaffbbf61fdffd844a0a61c84e9c61692230a94bcc",
+    "tools/layout-studio/shield-scanner-engine.mjs": "a2dbb8475d2f56e625be24d1f9a2e930bec6b15a73369a4c1c37e5406791d8f0",
+    "tools/layout-studio/shield-scanner-engine.test.mjs": "51f4b278b34e34921e056a17f03efb1d66c034688c5d0a2fd5f055b0a0c7c40f",
+    "tools/layout-studio/test-support/assert-cargo-archive-shield.mjs": "4bb598b2c2c5d6ae9f78ac5ef1e700d87fcaa081dae1cc7d9d9b1389b16530b8",
+    "tools/layout-studio/test-support/assert-npm-artifact-execution.mjs": "35ce558af91030ffb710513b324e6de24032675f6584836b2bd94cbc3c1950cf",
+    "tools/layout-studio/test-support/cargo-archive-fixture.mjs": "c5eca1d012c2727567cd5d8cb446b7145511a41e7627dea67cf8225be36d58ef",
+    "tools/layout-studio/test-support/npm-archive-fixture.mjs": "dbc8aa1f1cec3d022e5489778c929c86a017af6c4575844c3da93372ee7c76f5",
+    "tools/layout-studio/test-support/shield-scanner-fixture.mjs": "df6bf5e72292ecbb8f34794310e6aa08ce1969e1490b0e086b91946693645cc2"
+  },
+  "receipts": [
+    {
+      "name": "isolated-test-205658e2-4c1e-4e80-bb5a-d73271dc7687.json",
+      "sha256": "fcc08b5216d54045624e165f786ebb55b641a39ef092f2b3823630a984bfa50a",
+      "success": false,
+      "totals": {
+        "required": 1,
+        "passed": 0,
+        "failed": 1,
+        "tests": 4,
+        "passedTests": 0,
+        "failedTests": 4,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "name": "isolated-test-edde637e-1bf4-4a31-b1de-b514c700b1e8.json",
+      "sha256": "ff59ee8ad6e0e1446b1c22f42bed8fd17e129fc8ba808b7282465f346df465c0",
+      "success": true,
+      "totals": {
+        "required": 1,
+        "passed": 1,
+        "failed": 0,
+        "tests": 4,
+        "passedTests": 4,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "name": "isolated-test-36ed0d26-2bde-4054-a485-a85e4d3c4f65.json",
+      "sha256": "5f6018a63f1ac99ebbe34ddfc952a2fc38fe60d9175d4985278458c8de6748db",
+      "success": true,
+      "totals": {
+        "required": 1,
+        "passed": 1,
+        "failed": 0,
+        "tests": 4,
+        "passedTests": 4,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "name": "isolated-test-4fe7b2eb-1e8d-4b3b-b9a3-b854f58c3839.json",
+      "sha256": "7f16989ec8aa87639004255bd90a1f259ac15ccb11f971ae88f477273e5a0bb5",
+      "success": true,
+      "totals": {
+        "required": 1,
+        "passed": 1,
+        "failed": 0,
+        "tests": 6,
+        "passedTests": 6,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "name": "isolated-test-8fb96bf6-78a3-48bf-a1b8-6e6361e08927.json",
+      "sha256": "d31c6a9d33d48d7e0de35abbc508927b1e94996217d88b841e6bed37956730ef",
+      "success": true,
+      "totals": {
+        "required": 8,
+        "passed": 8,
+        "failed": 0,
+        "tests": 112,
+        "passedTests": 112,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "name": "isolated-test-544eb8ab-e1ca-4580-b1f0-743c05300948.json",
+      "sha256": "806a355d2598f31554de8404363518b403892d6015fb13b74a531e40ef8fd5e9",
+      "success": true,
+      "totals": {
+        "required": 6,
+        "passed": 6,
+        "failed": 0,
+        "tests": 22,
+        "passedTests": 22,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "name": "isolated-test-785fdf25-816e-4401-996d-ae7abf8d36a5.json",
+      "sha256": "8ca91f485b10cd9e2d65bd45675f7e129892e6c310bada92edf05aab9608d013",
+      "success": true,
+      "totals": {
+        "required": 2,
+        "passed": 2,
+        "failed": 0,
+        "tests": 12,
+        "passedTests": 12,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    }
+  ],
+  "distinctFocusedGroups": 16,
+  "distinctFocusedPasses": 146,
+  "actualLinuxNpmArchiveJourneys": 8,
+  "windowsNpmArchiveGuestDoubles": 8,
+  "originalCommandsBoundsAndSkipsVerified": true,
+  "typecheck": "passed",
+  "originalPackageBounds": "passed",
+  "cleanup": {
+    "everyChildVerified": true,
+    "everyTreeVerified": true,
+    "emptyOwnedRootRemoved": true
+  },
+  "effects": {
+    "npmInvocations": 0,
+    "archiveExtractions": 0,
+    "packageExecutions": 0,
+    "newDependencyDownloads": 0,
+    "providerRequests": 0,
+    "accountChanges": 0,
+    "hardwareOperations": 0
+  },
+  "failureNotes": [
+    "Four new tests reproduced absent npm archive declaration and policy handling. The original failed receipt is retained."
+  ],
+  "limitations": [
+    "Only the explicit package.json license declaration is assessed after exact archive integrity and identity match.",
+    "Deprecated license objects/arrays, licenses, UNLICENSED, unknown syntax and private identifiers are unsupported. File-only declarations retain status without paths.",
+    "Lockfile and archive license policies remain independent. Declaration policy does not verify license text, choose an OR alternative, resolve dependencies or establish legal approval.",
+    "Installed source acceptance and actual Windows guest/provider/hardware validation remain separate."
+  ],
+  "privateReceipt": {
+    "name": "npm-archive-license-source.json",
+    "sha256": "a6e5fe3bc4fb9868340bcac47cde2bd6fed743b9daa335a0eb9dbc17bb021052"
+  }
+}
