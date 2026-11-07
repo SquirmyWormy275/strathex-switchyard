@@ -1,0 +1,22 @@
+{
+  "schema": "switchyard-windows-full-interruption-summary/v1",
+  "sourceCommit": "67270542181bebbc5b434f596e94e6deaf010d7e",
+  "mergeCommit": "69e25d466fce8b5d869689c054b5fc9a3bff32b6",
+  "sourceAndMergeTree": "744785ebddc1a028cbecfa21c89742bece00468d",
+  "sourceTreeVerification": "windows-scheduling-refresh-summary.json",
+  "runId": 42379166911,
+  "jobId": 128429676307,
+  "status": "completed",
+  "conclusion": "cancelled",
+  "startedAt": "2026-11-07T14:24:16Z",
+  "completedAt": "2026-11-07T15:54:21Z",
+  "configuredJobLimitMinutes": 90,
+  "bundleStageStartedAt": "2026-11-07T14:29:04Z",
+  "observations": [
+    "GitHub reports cancellation after approximately 90 minutes of the release job. This is interruption evidence, not a complete test receipt.",
+    "The retained job log has no final isolated-test receipt or progress event. The post-job upload found no receipt files at its configured paths; no complete verification artifact exists in the run artifact inventory.",
+    "Preliminary shards one through five passed; shard six separately reached its 20-minute job boundary after 39 of 40 groups. That earlier interruption remains recorded in the scheduling evidence.",
+    "The last active complete-suite group and its outcome cannot be established from these retained logs. No manual dispatch, retry, cancellation, deadline increase or permission change was made."
+  ],
+  "completeWindowsAcceptance": false
+}

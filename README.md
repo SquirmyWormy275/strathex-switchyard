@@ -72,10 +72,10 @@ Complete Linux checkpoint `7f2a52a` passes **351 groups / 2,302 tests**, with
 32 declared platform skips. Its temporary checkout and 11.9 MB of build output
 have been removed after verification. Complete Windows checkpoint `dc755901`
 passes **417 groups / 2,478 tests**, with 207 declared skips; it predates the
-latest backend work. Installed Linux `7393da1` preserves all 54 workspaces and
+latest backend work. Installed Linux `2c6497f` preserves all 54 workspaces and
 passes 95 distinct metadata/refusal checks, including named role choices,
 exact-project task choices, original-role guards and recording-consent checks;
-[installed evidence](docs/evidence/installed-guided-role-choices-summary.json).
+[installed evidence](docs/evidence/installed-external-agent-consent-summary.json).
 Native Windows client checkpoint `9d230ac` passes
 **25 groups / 250 tests with no skips**, including the signed launcher
 demonstration with an exact synthetic task acknowledgement. Interactive

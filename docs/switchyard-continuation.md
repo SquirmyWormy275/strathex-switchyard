@@ -45,13 +45,13 @@ generation across Node/Python SDK queues and encrypted-state waits. Nine groups/
 141 tests pass; a signed HTTP demonstration composes two real encrypted stores.
 Two original failing consent regressions are retained. The new `agent-consent`
 Windows lane selects the three complete original contract files; native
-acceptance and the installed update remain pending.
+acceptance remains pending. The normal installed update passes 97 metadata/refusal checks across 57 exact modules.
 [Evidence](evidence/external-agent-consent-source-summary.json).
 
 The latest source feature is guided role choices: readable saved connection labels
 and a digest-checked local binding route. It preserves selected-workspace, policy,
 original session/capability, role and prior-binding identity. Seven groups/101 tests
-pass with one declared platform skip and both TypeScript checks. It is installed at `7393da1`; all 95 metadata/refusal checks and 57 exact
+pass with one declared platform skip and both TypeScript checks. It is installed at `2c6497f`; all 97 metadata/refusal checks and 57 exact
 module hashes pass, including the pure role contracts and installed route refusals.
 [Contract](role-dispatch-binding.md#choose-a-saved-connection-by-name),
 [source evidence](evidence/role-choices-source-summary.json).
@@ -79,15 +79,15 @@ a replacement. Eight groups/124 tests and installed metadata checks cover them.
 
 ## Installed checkpoint
 
-- Source: `7393da1106f769ef84f479a98405909306b06f0f`.
-- Release: `d470f3d1d4ffe27a1781d201afe61cbad7ab545a07dda4849ce09b87634b7ed7`.
-- Rollback: `e23a6a4687d31d148c7b5e2fcfa8243e02f34d7751f2e4b996c635c263d2eae6`.
+- Source: `2c6497f8c2829fbd29026fe98f13de9ecade1d65`.
+- Release: `ce4da39419d1bdc55565a39c8650a98ca01d45569df8585568349616bb23e83c`.
+- Rollback: `d470f3d1d4ffe27a1781d201afe61cbad7ab545a07dda4849ce09b87634b7ed7`.
 - Frozen frontend: `24100ef601b810efb0cda95e4fe0842d2944560734b02c4cf482c25e19150543`.
-- 95 metadata/refusal checks, 57 exact module hashes; all 54 semantic workspaces,
+- 97 metadata/refusal checks, 57 exact module hashes; all 54 semantic workspaces,
   four profiles, 57 workflows, selection and one pending keyboard-only conversation
   preserved. 53 sealed files are byte-identical; one changes audit metadata only.
 - Dated backup and launcher readback verify. Current plus one rollback remain.
-  The exact temporary package, 555 files/4,844,712 bytes, is already removed.
+  The exact temporary package, 555 files/4,846,150 bytes, is already removed.
   Do not repeat the executed installation or cleanup scripts.
 
 The signed-intent verifier initially pinned the previous shared instance module.
@@ -96,7 +96,7 @@ the accepted task-choice evidence; the corrected verifier passes all eight check
 The original failure remains in the installed evidence. Host-facing task-owner,
 Copilot-journal and signed-intent verifiers must run sequentially; earlier parallel
 initialization caused an independent preservation assertion failure.
-[Installed receipt](evidence/installed-guided-role-choices-summary.json).
+[Installed receipt](evidence/installed-external-agent-consent-summary.json).
 
 ## Complete runs and native evidence
 
@@ -106,8 +106,9 @@ installed runtime `9d230ac`, including consent and exact-project task choices.
 Receipt `a2e51d06-3bf6-4c33-99b6-4ee00da91814` retains original manifest,
 commands, bounds, skip counts and child/tree cleanup. The exact checkout, nine
 dependency aliases, 803 generated files/11,907,805 bytes, empty test parent and
-run marker have been removed. No complete local run is active. Do not rerun
-the executed cleanup scripts. The newer guided role choices and scheduling-data
+run marker have been removed. Do not rerun
+the executed cleanup scripts. A new complete run at installed source 2c6497f
+is active under its owned unit; see the active-run record below. The newer guided role choices and scheduling-data
 refresh have separate focused acceptance.
 [Complete receipt](evidence/linux-7f2a52a-complete-summary.json).
 
@@ -135,7 +136,9 @@ passes. Bounded complete-suite progress reporting is now wired in.
 Later Windows run `42379166911` at source `6727054` has five passing
 preliminary shards and shard six cancelled at its 20-minute budget. Logs show
 39/40 groups completed; the final Windows scanner-file group had started, with
-no final receipt. Full release was last observed still running.
+no final receipt. The complete release job also reached its 90-minute boundary without a final
+receipt or retained progress event; its last active group remains unknown.
+[Full interruption](evidence/windows-6727054-full-interruption-summary.json).
 
 The scheduling fixture now uses 232 audited `e5a5781` native measurements,
 retaining a higher prior estimate for any existing group. Current batches estimate
@@ -150,6 +153,17 @@ Earlier complete Windows `dc755901` passes 417 groups/2,478 tests with 207
 declared skips. It predates subsequent changes. The intermittent restricted-storage
 retirement failure remains unresolved despite passing follow-ups; retain native
 phase/error diagnostics and keep all process/token permissions unchanged.
+
+## Active complete Linux run
+
+Source `2c6497f8c2829fbd29026fe98f13de9ecade1d65` runs all 351 original Linux
+groups with existing dependencies and unchanged bounds. The private ownership
+record is `linux-full-2c6497f-run.json` in the usual runtime-verification directory;
+unit `switchyard-verification-2c6497f-1794066762.service`. Receipt ID observed in
+progress: `4be21e52-4d54-4cea-b06e-944b3aaee8fe`. Read actual result/progress before
+reporting completion. Preserve the owned checkout until the final receipt and
+exact generated-file/alias inventory have been audited, then clean only that
+recorded staging. No new dependency or runtime download was made.
 
 ## Continue independently executable work
 

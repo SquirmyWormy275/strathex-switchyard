@@ -47,7 +47,8 @@ claim while being omitted from observation history. The source SDKs use the same
 Nine original groups pass 141 tests, including signed HTTP through two stores
 sharing the real encrypted state lease, fresh-report acceptance, and Node/Python
 timestamp checks. The original two failing consent regressions are retained.
-Native Windows acceptance and the installed update are separate from this source
+The normal installed update at 2c6497f passes 97 metadata/refusal checks across
+57 exact modules; native Windows acceptance remains separate from this source
 result. [Evidence](evidence/external-agent-consent-source-summary.json).
 
 The same explicit `agent-events` recording now includes commands handled through
