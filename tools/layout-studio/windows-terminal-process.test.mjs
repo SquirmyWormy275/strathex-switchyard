@@ -64,6 +64,14 @@ test("changed context, proof substitution and uncertain exit cannot return evide
   unknown.exited(true); assert.equal((await unknown.service.close()).stoppedVerified, true);
 });
 
+test("a synchronous context callback cannot re-enter the reserved process probe", async t => {
+  const f = fixture(t); let checked = false;
+  const observed = await f.service.inspect(input(), { ...f.context, assertCurrent: () => {
+    if (!checked) { checked = true; assert.throws(() => f.service.inspect(input(), f.context)); assert.equal(f.calls.length, 0); }
+  } });
+  assert.ok(checked); assert.equal(observed.processId, 321); assert.equal(f.calls.length, 1);
+});
+
 test("cancellation joins held context reads and platform/input refusal precedes helper startup", async t => {
   let nativeCalls = 0;
   const unavailable = createWindowsTerminalProcessProbe({ platform: "linux", helper: async () => { nativeCalls++; } });

@@ -133,6 +133,7 @@ internal static class Program
         if (args.SequenceEqual(new[] { "--native-desktop-self-test" })) return Sxsy.B122.ProviderDesktopHelper.Program.Main(new[] { "--self-test" });
         if (args.SequenceEqual(new[] { "--native-desktop-owner-v1" })) return Sxsy.B122.ProviderDesktopHelper.Program.Main(args);
         if (args.SequenceEqual(new[] { "--editor-terminal-process-v1" })) return Sxsy.B122.ProviderDesktopHelper.Program.Main(args);
+        if (args.SequenceEqual(new[] { "--editor-terminal-peer-v1" })) return Sxsy.B122.ProviderDesktopHelper.Program.Main(args);
         if (args.SequenceEqual(new[] { "--state-lease-worker" })) return OperatingSystem.IsWindows() ? StateLeaseWorker.Run() : 2;
         if (args.Length > 0 && args[0] == "--catalog" && string.Equals(Path.GetFileName(Environment.ProcessPath), "b122-sandbox-worker.exe", StringComparison.OrdinalIgnoreCase)) return OperatingSystem.IsWindows() ? Sxsy.B122.SandboxHelper.Program.Main(args).GetAwaiter().GetResult() : 2;
         if (args.SequenceEqual(new[] { "--stage-guest-tools" })) return OperatingSystem.IsWindows() ? ReviewedInputStager.RunToolLink() : 2;

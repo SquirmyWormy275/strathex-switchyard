@@ -62,6 +62,7 @@ internal static class Program
         if (args.Length == 1 && args[0] == "--self-test") return SelfTest();
         if (args.Length == 1 && args[0] == "--native-desktop-owner-v1") return ObserveFocusOwner();
         if (args.Length == 1 && args[0] == "--editor-terminal-process-v1") return ObserveEditorTerminalProcess();
+        if (args.Length == 1 && args[0] == "--editor-terminal-peer-v1") return ObserveEditorTerminalProcess(peer: true);
         if (args.Length == 2 && args[0] == "--managed-terminal-v1")
         {
             try
@@ -119,18 +120,28 @@ internal static class Program
     private static bool IsFocusAction(string action) => action is "list" or "focus";
     private static bool SupportsEditorFocus(string action, bool focusOnly) => focusOnly && IsFocusAction(action);
 
-    private static int ObserveEditorTerminalProcess()
+    private static int ObserveEditorTerminalProcess(bool peer = false)
     {
+        string family = peer ? "switchyard-editor-terminal-peer" : "switchyard-editor-terminal-process";
         try
         {
             if (!OperatingSystem.IsWindows()) throw new ProtocolException("windows_required");
             using JsonDocument document = ParseJson(ReadBoundedLine(Console.In, MaximumRequestChars));
             JsonElement value = document.RootElement;
-            RequireProperties(value, "schema", "requestId", "processId", "expectedBirth", "image");
+            RequireProperties(value, peer ? new[] { "schema", "requestId", "processId", "expectedBirth", "image", "connection" } : new[] { "schema", "requestId", "processId", "expectedBirth", "image" });
             string requestId = Text(value, "requestId"); int processId = Integer(value, "processId");
-            if (Text(value, "schema") != "switchyard-editor-terminal-process-query/v1" || !Guid.TryParseExact(requestId, "D", out Guid requestGuid) || requestGuid == Guid.Empty || processId < 1) throw new ProtocolException("invalid_terminal_query");
+            if (Text(value, "schema") != family + "-query/v1" || !Guid.TryParseExact(requestId, "D", out Guid requestGuid) || requestGuid == Guid.Empty || processId < 1) throw new ProtocolException("invalid_terminal_query");
             string? expectedBirth = Property(value, "expectedBirth").ValueKind == JsonValueKind.Null ? null : Text(value, "expectedBirth");
-            if (expectedBirth is not null && !ValidProcessStartTime(expectedBirth)) throw new ProtocolException("invalid_process_birth");
+            if (peer && expectedBirth is null || expectedBirth is not null && !ValidProcessStartTime(expectedBirth)) throw new ProtocolException("invalid_process_birth");
+            JsonElement connection = default; int clientPort = 0, serverPort = 0;
+            if (peer)
+            {
+                connection = Property(value, "connection");
+                RequireProperties(connection, "localAddress", "localPort", "remoteAddress", "remotePort");
+                clientPort = Integer(connection, "localPort"); serverPort = Integer(connection, "remotePort");
+                if (Text(connection, "localAddress") != "127.0.0.1" || Text(connection, "remoteAddress") != "127.0.0.1"
+                    || clientPort is < 1024 or > 65535 || serverPort is < 1024 or > 65535 || clientPort == serverPort) throw new ProtocolException("invalid_terminal_connection");
+            }
             JsonElement image = Property(value, "image");
             RequireProperties(image, "path", "sha256", "device", "inode", "size");
             string path = Text(image, "path"), expectedHash = Text(image, "sha256");
@@ -154,6 +165,7 @@ internal static class Program
                 if (!SamePath(ProcessImagePath(process), path) || birth is not null && ProcessStartTime(process) != birth) throw new ProtocolException("terminal_process_changed");
             }
             CurrentProcess(expectedBirth); string observedBirth = ProcessStartTime(process);
+            if (peer) AssertTerminalTcpPeer((uint)processId, clientPort, serverPort);
             using SafeFileHandle file = CreateFileW(path, GenericRead, FileShareRead, IntPtr.Zero, OpenExisting, 0, IntPtr.Zero);
             if (file.IsInvalid) throw NativeFailure("terminal_image_unavailable");
             void CurrentFile(SafeFileHandle handle)
@@ -172,14 +184,51 @@ internal static class Program
             using SafeFileHandle named = CreateFileW(path, FileReadAttributes, FileShareRead, IntPtr.Zero, OpenExisting, 0, IntPtr.Zero);
             if (named.IsInvalid) throw NativeFailure("terminal_image_name_unavailable");
             CurrentFile(named); CurrentFile(file); CurrentProcess(observedBirth);
-            Write(new { schema = "switchyard-editor-terminal-process-result/v1", requestId, processId, birth = observedBirth,
-                image = new { path, sha256 = expectedHash, device = device.ToString(CultureInfo.InvariantCulture), inode = inode.ToString(CultureInfo.InvariantCulture), size = size.ToString(CultureInfo.InvariantCulture) },
-                currentUserVerified = true, currentSessionVerified = true, processAccessMask = ProcessQueryLimitedInformation | Synchronize, tokenAccessMask = TokenQuery,
-                processTerminated = false, windowFocused = false, taskAttached = false, accountVerified = false });
+            if (peer) { AssertTerminalTcpPeer((uint)processId, clientPort, serverPort); CurrentProcess(observedBirth); }
+            var result = new Dictionary<string, object?> { ["schema"] = family + "-result/v1", ["requestId"] = requestId, ["processId"] = processId, ["birth"] = observedBirth,
+                ["image"] = new { path, sha256 = expectedHash, device = device.ToString(CultureInfo.InvariantCulture), inode = inode.ToString(CultureInfo.InvariantCulture), size = size.ToString(CultureInfo.InvariantCulture) },
+                ["currentUserVerified"] = true, ["currentSessionVerified"] = true, ["processAccessMask"] = ProcessQueryLimitedInformation | Synchronize, ["tokenAccessMask"] = TokenQuery,
+                ["processTerminated"] = false, ["windowFocused"] = false, ["taskAttached"] = false, ["accountVerified"] = false };
+            if (peer) { result["connection"] = connection; result["connectionVerified"] = true; }
+            Write(result);
             return 0;
         }
-        catch (ProtocolException exception) { Write(new { schema = "switchyard-editor-terminal-process-error/v1", code = exception.Code }); return 65; }
-        catch { Write(new { schema = "switchyard-editor-terminal-process-error/v1", code = "native_failure" }); return 70; }
+        catch (ProtocolException exception) { Write(new { schema = family + "-error/v1", code = exception.Code }); return 65; }
+        catch { Write(new { schema = family + "-error/v1", code = "native_failure" }); return 70; }
+    }
+
+    // The tuple is the client's established IPv4 loopback connection, obtained
+    // from the server's held accepted socket. Never discover or choose a PID.
+    private static void AssertTerminalTcpPeer(uint processId, int clientPort, int serverPort)
+    {
+        const uint InsufficientBuffer = 122, AddressFamilyInet = 2, OwnerPidConnections = 4;
+        uint size = 0, status = GetExtendedTcpTable(IntPtr.Zero, ref size, false, AddressFamilyInet, OwnerPidConnections, 0);
+        if (status != InsufficientBuffer) throw new ProtocolException("terminal_connection_table_unavailable");
+        for (int attempt = 0; attempt < 3; attempt++)
+        {
+            if (size is < 4 or > 2097152) throw new ProtocolException("terminal_connection_table_bound");
+            int allocated = checked((int)size); IntPtr buffer = Marshal.AllocHGlobal(allocated);
+            try
+            {
+                status = GetExtendedTcpTable(buffer, ref size, false, AddressFamilyInet, OwnerPidConnections, 0);
+                if (status == InsufficientBuffer) continue;
+                if (status != 0 || size > allocated || size < 4) throw new ProtocolException("terminal_connection_table_unavailable");
+                uint count = unchecked((uint)Marshal.ReadInt32(buffer)); int width = Marshal.SizeOf<TcpOwnerPidRow>();
+                if (width != 24 || count > (size - 4) / width) throw new ProtocolException("terminal_connection_table_bound");
+                uint loopback = BitConverter.ToUInt32(new byte[] { 127, 0, 0, 1 }); int matches = 0;
+                static int Port(uint value) => (int)(((value & 255) << 8) | ((value >> 8) & 255));
+                for (int i = 0; i < count; i++)
+                {
+                    TcpOwnerPidRow row = Marshal.PtrToStructure<TcpOwnerPidRow>(IntPtr.Add(buffer, checked(4 + i * width)));
+                    if (row.LocalAddress != loopback || row.RemoteAddress != loopback || Port(row.LocalPort) != clientPort || Port(row.RemotePort) != serverPort) continue;
+                    if (row.State != 5 || row.ProcessId != processId || ++matches != 1) throw new ProtocolException("terminal_connection_owner_changed");
+                }
+                if (matches != 1) throw new ProtocolException("terminal_connection_unavailable");
+                return;
+            }
+            finally { Marshal.Copy(new byte[allocated], 0, buffer, allocated); Marshal.FreeHGlobal(buffer); }
+        }
+        throw new ProtocolException("terminal_connection_table_changed");
     }
 
     private static int ObserveFocusOwner()
@@ -1201,6 +1250,9 @@ internal static class Program
         public UIntPtr PeakJobMemoryUsed;
     }
 
+    [StructLayout(LayoutKind.Sequential)]
+    private struct TcpOwnerPidRow { public uint State, LocalAddress, LocalPort, RemoteAddress, RemotePort, ProcessId; }
+    [DllImport("iphlpapi.dll")] private static extern uint GetExtendedTcpTable(IntPtr table, ref uint size, [MarshalAs(UnmanagedType.Bool)] bool order, uint family, uint tableClass, uint reserved);
     [DllImport("user32.dll", SetLastError = true)] [return: MarshalAs(UnmanagedType.Bool)] private static extern bool EnumWindows(EnumWindowsCallback callback, IntPtr parameter);
     [DllImport("user32.dll")] [return: MarshalAs(UnmanagedType.Bool)] private static extern bool IsWindowVisible(IntPtr window);
     [DllImport("user32.dll")] [return: MarshalAs(UnmanagedType.Bool)] private static extern bool IsWindow(IntPtr window);

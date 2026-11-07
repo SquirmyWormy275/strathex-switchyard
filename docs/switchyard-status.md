@@ -18,15 +18,14 @@ checkpoints are not cumulative acceptance of the latest suite.
 | Checkpoint | Verified result | Limit |
 | --- | --- | --- |
 | Installed Linux `edb76de` | **76 metadata/in-memory checks; 42 exact module hashes.** All 54 semantic workspaces and frozen frontend preserved. [Receipt](evidence/installed-mixed-scanner-input-summary.json). | No live scanner, provider task, account/model request, native focus or hardware operation. |
-| Native Windows client `4f56477` | **Seven groups; 94 passing tests; no skips.** Source/merge tree, artifact digest, commands, bounds and child/tree cleanup verified. [Receipt](evidence/windows-client-4f56477-passed-summary.json). | Client contracts only; interactive focus and complete Windows release acceptance are separate. |
-| Complete Linux `b320506` | **328 groups; 2,049 passing tests; sixteen declared skips.** Original inventory, commands, bounds and owned cleanup verified. [Receipt](evidence/linux-b320506-complete-summary.json). | Includes scanner drafting and Linux saving; predates Windows saving. |
+| Native Windows client `dec4dd5` | **Eight groups; 100 passing tests; no skips.** Includes the actual terminal process query; source/merge tree, artifact, original commands/bounds and cleanup verify. [Receipt](evidence/windows-terminal-process-native-summary.json). | Predates the TCP peer query; task attachment, interactive focus and full Windows release remain separate. |
+| Complete Linux `edb76de` | **330 groups; 2,074 passing tests; 21 declared platform skips.** Original inventory, commands, bounds and owned cleanup verified. [Receipt](evidence/linux-edb76de-complete-summary.json). | Includes combined inputs and Windows saving source; predates terminal/peer probes. |
 | Complete Windows `dc755901` | **417 groups; 2,478 passing tests; 207 declared skips.** All six jobs and overall workflow passed with verified packet/source/cleanup. [Receipt](evidence/windows-complete-dc755901-summary.json). | Predates newer archive, scheduling, profile/workflow and observation corrections. |
 
-Complete Linux `b320506` has zero failures or cancellations. Every original
-command, deadline, declared skip and child/tree retirement verifies. The owned
-checkout, nine dependency aliases, 788 generated files (11,809,393 bytes), empty
-test parent and marker are removed; other worktrees remain. Windows saving has
-later focused, installed and native saving evidence; full Windows acceptance remains separate.
+Complete Linux `edb76de` has zero failures or cancellations. Its isolated checkout,
+nine dependency aliases, 788 generated files (11,809,374 bytes), empty test parent
+and active marker are removed. Other worktrees remain. Newer terminal and peer
+changes have separate focused evidence.
 
 The latest installation includes 17 wheel license-header cases, 112 Cargo
 manifest reference cases, and eight in-memory policy reports for each of wheels,
@@ -39,6 +38,14 @@ storage reduces the package payload to 4,599,483 bytes without changing exports.
 
 ## Recent backend changes
 
+- **Windows terminal connection identity:** a held accepted socket now supplies
+  the exact loopback tuple; native TCP ownership is checked against the original
+  process before and after image verification. Socket closure cancels and joins
+  observation. Thirteen focused groups pass 172 tests with three platform skips;
+  34 native sources compile offline. Native peer acceptance awaits CI, while the
+  earlier process-only probe is accepted. Authenticated transport and task
+  attachment remain unfinished. [Contract](windows-terminal-process.md),
+  [source evidence](evidence/windows-terminal-peer-source-summary.json).
 - **Combined scanner inputs:** current, staged and bounded historical versions can
   share one reviewed scan with separate provenance and authority checks. Fifty-six
   focused groups pass 348 tests with five declared skips. Actual Linux scanning
@@ -81,7 +88,8 @@ storage reduces the package payload to 4,599,483 bytes without changing exports.
 - **Windows terminal identity:** a read-only native helper now verifies exact
   PID/birth, held executable bytes, current user and session. Fifteen focused
   groups pass 192 tests with two platform skips; typecheck and 34-source C#
-  compilation pass. Actual Windows execution awaits CI. Suite/editor attachment
+  compilation pass. Eight native client groups now pass 100 tests at `dec4dd5`,
+  including the actual process query. Suite/editor attachment
   remains unfinished. [Contract](windows-terminal-process.md).
 - **Windows native focus:** reviewed ChatGPT and stable VS Code executables have
   separate protected configurations, exact helper ownership, one-use requests

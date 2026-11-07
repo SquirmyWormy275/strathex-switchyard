@@ -1,5 +1,18 @@
 # Switchyard authoritative requirement ledger
 
+Complete Linux `edb76de` passes **330 groups, 2,074 tests and 21 declared
+platform skips**, with zero failures or cancellations. Exact original inventory,
+commands, bounds, skips and child/tree retirement verify. The isolated checkout,
+nine dependency aliases, 788 generated files (11,809,374 bytes), empty test parent
+and active marker are removed; other worktrees remain. This source includes
+combined scanner inputs and Windows saving, but predates terminal/peer probes.
+[Complete Linux evidence](evidence/linux-edb76de-complete-summary.json).
+
+Windows process-only identity now passes **eight native client groups, 100 tests,
+no skips**, at `dec4dd5`, including the actual synthetic process query. Exact
+source/merge tree, artifact, commands and cleanup verify.
+[Native process evidence](evidence/windows-terminal-process-native-summary.json).
+
 Installed Linux `edb76de` passes **76 metadata/in-memory checks and 42 exact module
 hashes** for combined scanner support. All 54 semantic workspaces, four profiles,
 57 workflows, selection, pending keyboard-only conversation and frozen frontend
@@ -25,7 +38,7 @@ unresolved. [Native evidence](evidence/windows-mixed-scanner-native-summary.json
 Windows terminal process verification now has a native read-only helper and a
 supervised adapter: **15 focused groups, 192 passes and two platform skips**.
 Typecheck and all 34 native sources compile offline; the owned compiler output
-is removed. Native Windows execution awaits CI. Suite/editor task attachment
+is removed. Native process execution now passes at `dec4dd5`. Suite/editor task attachment
 remains unfinished. [Contract](windows-terminal-process.md),
 [source evidence](evidence/windows-terminal-process-source-summary.json).
 
