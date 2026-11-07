@@ -34,6 +34,13 @@ and 57 exact module hashes; frontend activation remains frozen.
 
 ## Current evidence
 
+The latest source correction prevents delayed external-agent status or
+acknowledgement reports from entering a resumed recording. Original report time
+and recording generation survive SDK and state-lease waits. Nine groups/141 tests
+pass, including real encrypted storage and authenticated HTTP. Installed and
+native Windows acceptance of this correction remain pending.
+[Consent evidence](evidence/external-agent-consent-source-summary.json).
+
 Each result belongs to its exact source revision. Test totals from different
 checkpoints are not cumulative acceptance of the latest suite.
 

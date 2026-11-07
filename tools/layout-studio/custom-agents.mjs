@@ -1,5 +1,5 @@
 /** Scoped event/action bridge. No plugin code or commands are loaded in the suite. */
-import { appendAgentObservation } from "./agent-observation.mjs";
+import { appendAgentObservation, captureAgentObservation } from "./agent-observation.mjs";
 import { scopeHash, suiteConfirmations } from "./confirmations.mjs";
 import { randomBytes, randomUUID } from "node:crypto";
 import { agentIntents, agentRoutes, agentMessageSchema, agentResponseSchema, requestMac, responseMac, sameMac } from "../../integrations/agent-protocol.mjs";
@@ -99,6 +99,10 @@ export function createCustomAgents({ store, now = () => Date.now() }) {
     },
     async message(path, body, signature, raw = JSON.stringify(body)) {
       if (!body || !idPattern.test(body.compartment)) throw Error("Agent v2 compartment is invalid.");
+      const receivedAt = now();
+      const observe = path === agentRoutes.event || path === agentRoutes.ack
+        ? captureAgentObservation(await store.snapshot(body.compartment, { provider: "custom-agent" }),
+          { provider: "custom-agent", at: Math.min(body.at, receivedAt) }) : null;
       const { token, result } = await store.update(body.compartment, "agent-message", async (s) => {
         const a = s.agents.find((a) => a.id === body.agentId);
         if (!a || a.enrollmentStatus === "revoked") throw Error("This agent is not actively enrolled.");
@@ -116,7 +120,7 @@ export function createCustomAgents({ store, now = () => Date.now() }) {
           }
           if (event.status === "stopped") retireCommands(s, a, "authenticated adapter reported stopped; external process and task outcomes unverified");
           a.protocolVersion = 2; a.lastSeen = now(); a.sessionId = body.sessionId; a.reportedStatus = event.status; a.provenance = "authenticated adapter self-report; not verified task completion";
-          appendAgentObservation(s, { provider: "custom-agent", subjectId: `${a.id}:${body.sessionId}`, phase: "adapter-status-observed", status: event.status, at: now() });
+          observe(s, { subjectId: `${a.id}:${body.sessionId}`, phase: "adapter-status-observed", status: event.status });
           return accept({ accepted: true, provenance: a.provenance });
         }
         if (path === agentRoutes.poll) {
@@ -132,7 +136,7 @@ export function createCustomAgents({ store, now = () => Date.now() }) {
           const command = a.commands.find((c) => c.id === body.commandId);
           if (!command || epoch(command) !== epoch(a) || !["claimed", "uncertain-session-ended"].includes(command.status) || command.sessionId !== body.sessionId || !["completed", "failed", "cancelled"].includes(body.outcome)) throw new Error("The command acknowledgement has no exact active claim.");
           command.status = body.outcome; command.finishedAt = now(); command.provenance = "agent acknowledgement; external task outcome unverified";
-          appendAgentObservation(s, { provider: "custom-agent", subjectId: command.id, phase: "adapter-command-acknowledged", status: body.outcome === "completed" ? "done" : body.outcome === "failed" ? "failed" : "stopped", intent: command.intent, at: command.finishedAt });
+          observe(s, { subjectId: command.id, phase: "adapter-command-acknowledged", status: body.outcome === "completed" ? "done" : body.outcome === "failed" ? "failed" : "stopped", intent: command.intent });
           return accept({ accepted: true, provenance: command.provenance });
         }
         throw new Error("Unknown agent route.");

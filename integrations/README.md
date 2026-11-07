@@ -35,6 +35,15 @@ processes must coordinate that one enrollment's sequence, or use distinct enroll
 identities. Do not retry a claimed command after a timeout: inspect its uncertain
 outcome. Claims are delivered once and are never automatically replayed.
 
+Both SDKs date a report when its call begins, before queue, lock or sequence-save
+delays. The existing 30-second freshness window still applies. A delayed status
+or acknowledgement can reconcile its original agent/command, but recording it
+also requires the original opted-in recording generation. Reports from before
+resume, from an ambiguous consent timestamp, or waiting across a consent change
+are omitted from recording history. Future clock skew cannot move an observation
+past the server's original receipt time. This does not verify an agent's claim
+or create recording permission. [Consent evidence](../docs/evidence/external-agent-consent-source-summary.json).
+
 Publishing `stopped` retires that session's pending commands in the same protected
 transaction: unclaimed commands cancel locally; claimed work remains uncertain.
 Readiness cannot resume under that stopped identity. A new process publishes

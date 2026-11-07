@@ -32,6 +32,7 @@ class SwitchyardAgent:
         self.lock = threading.RLock()
 
     def send(self, path, session_id, **fields):
+        at = int(time.time() * 1000)
         with self.lock:
             if self._persisting:
                 raise ValueError("The persistence callback cannot send SDK requests")
@@ -52,7 +53,7 @@ class SwitchyardAgent:
                         raise ValueError("Use a synchronous sequence persistence callback")
                 finally:
                     self._persisting = False
-            body = {"schema": "switchyard-agent-message/v2", "compartment": self.enrollment["compartment"], "agentId": self.enrollment["agentId"], "sessionId": session_id, "sequence": self.sequence, "at": int(time.time() * 1000), **fields}
+            body = {"schema": "switchyard-agent-message/v2", "compartment": self.enrollment["compartment"], "agentId": self.enrollment["agentId"], "sessionId": session_id, "sequence": self.sequence, "at": at, **fields}
             data = json.dumps(body, separators=(",", ":"), ensure_ascii=False).encode()
             key = self.enrollment["token"].encode()
             signature = hmac.new(key, b"SWITCHYARD-REQUEST-V2\nPOST\n" + path.encode() + b"\n" + data, hashlib.sha256).hexdigest()

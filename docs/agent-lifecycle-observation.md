@@ -36,6 +36,20 @@ Work policy continues to prohibit recording.
 
 ## Custom-agent command history
 
+External status and acknowledgement reports retain their original occurrence
+time across SDK queues, sequence persistence and encrypted-state leases. The
+server captures the opted-in recording generation before waiting to commit.
+Pause/resume or replacement consent cannot inherit a queued report, even when
+timestamps match. A report can still update its exact authenticated agent or
+claim while being omitted from observation history. The source SDKs use the same
+30-second freshness limit; late messages do not gain a new timestamp to pass it.
+
+Nine original groups pass 141 tests, including signed HTTP through two stores
+sharing the real encrypted state lease, fresh-report acceptance, and Node/Python
+timestamp checks. The original two failing consent regressions are retained.
+Native Windows acceptance and the installed update are separate from this source
+result. [Evidence](evidence/external-agent-consent-source-summary.json).
+
 The same explicit `agent-events` recording now includes commands handled through
 the authenticated custom-agent bridge. These events retain one of its six fixed
 intents, a compartment-specific command digest and a bounded phase/status pair.

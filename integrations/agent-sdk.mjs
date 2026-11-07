@@ -21,13 +21,14 @@ export function switchyardAgent({ baseUrl, compartment, agentId, token, initialS
   if (base.protocol !== "http:" || !["127.0.0.1", "localhost"].includes(base.hostname) || base.username || base.password || base.pathname !== "/" || base.search || base.hash || typeof token !== "string" || !/^[A-Za-z0-9_-]{43}$/.test(token) || !Number.isSafeInteger(initialSequence) || initialSequence < 0) throw new Error("The SDK requires its exact enrolled loopback workspace and private credential.");
   let sequence = initialSequence, pending = Promise.resolve(), currentSession = null; const claims = new Map();
   function send(path, sessionId, fields) {
+    const at = Date.now();
     const operation = pending.catch(() => {}).then(async () => {
       if (typeof sessionId !== "string" || !/^[A-Za-z0-9_.:-]{1,128}$/.test(sessionId) || !Number.isSafeInteger(sequence + 1)) throw new Error("Publish an exact ready session before polling or acknowledging.");
       if (path === agentRoutes.poll && claims.size >= 64) throw new Error("Resolve the SDK's existing exact claims before accepting more commands.");
       // A failed save consumes this local counter but sends no request. Never
       // reuse it: persistence may have succeeded before its acknowledgement failed.
       await onSequence(++sequence);
-      const body = { schema: agentMessageSchema, compartment, agentId, sessionId, sequence, at: Date.now(), ...fields }, text = JSON.stringify(body);
+      const body = { schema: agentMessageSchema, compartment, agentId, sessionId, sequence, at, ...fields }, text = JSON.stringify(body);
       const signature = requestMac(token, path, text);
       const r = await exchange(new URL(path, base), text, signature), raw = r.raw;
       if (r.status !== 200) throw new Error("Switchyard did not return an accepted response. Check policy, SDK version, session and sequence; review uncertain request outcomes before retrying.");

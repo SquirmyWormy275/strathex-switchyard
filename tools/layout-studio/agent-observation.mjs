@@ -12,6 +12,22 @@ const commandPhases = new Map([
   ["adapter-command-outcome-reviewed", ["unknown"]]
 ]);
 
+/** Capture consent before an external report waits for a state mutation. The
+ * report's occurrence time cannot be replaced by its later delivery time. */
+export function captureAgentObservation(state, { provider, at }) {
+  const category = provider === "codex" ? "codex" : provider === "claude-code" ? "claude" : "other";
+  const generation = session => JSON.stringify([session.id, session.createdAt, session.recordingSince, session.recordingGeneration]);
+  const eligible = session => session.status === "recording" && session.sources?.includes("agent-events")
+    && !session.exclusions?.includes(category) && Array.isArray(session.events) && observationAcceptsEventAt(session, at)
+    && (session.recordingGeneration === undefined || at > session.recordingSince);
+  const consent = new Set(state.policy === "personal" && state.mode === "personal-companion"
+    ? (state.observations ?? []).filter(eligible).map(generation) : []);
+  const compartment = state.id;
+  return (current, event) => appendAgentObservation({ ...current,
+    observations: current.id === compartment ? (current.observations ?? []).filter(session => consent.has(generation(session))) : []
+  }, { ...event, provider, at });
+}
+
 export function appendAgentObservation(state, { provider, subjectId, phase, status, intent, at }) {
   const commandPhase = commandPhases.has(phase);
   if (phase === "runtime-status-observed" && provider !== "codex") return 0;

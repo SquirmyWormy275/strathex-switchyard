@@ -28,6 +28,68 @@ async function fixture(fn) {
   } finally { await rm(root, { recursive: true, force: true }); }
 }
 
+test("delayed authenticated reports update their original agent but cannot backfill a resumed recording", () => fixture(async ({ store, bridge, enroll, message, advance }) => {
+  const e = await enroll(); await message(e.token, 1);
+  const claim = await bridge.dispatch("personal", { agentId: "test", sessionId: "same-session", intent: "review" });
+  await message(e.token, 2, agentRoutes.poll, {});
+  await store.update("personal", "synthetic-resume", s => {
+    s.observations = [{ id: "recording", status: "recording", sources: ["agent-events"], exclusions: [], createdAt: 90000, updatedAt: 100001, recordingSince: 100001, recordingGeneration: "resumed", events: [] }];
+  });
+  advance(2);
+  let sequence = 2;
+  for (const [path, fields] of [[agentRoutes.event, { event: { status: "busy" } }], [agentRoutes.ack, { commandId: claim.commandId, outcome: "completed" }]]) {
+    const body = { schema: agentMessageSchema, compartment: "personal", agentId: "test", sessionId: "same-session", sequence: ++sequence, at: 100000, ...fields }, raw = JSON.stringify(body);
+    await bridge.message(path, body, requestMac(e.token, path, raw), raw);
+  }
+  const state = await store.snapshot("personal");
+  assert.equal(state.agents[0].reportedStatus, "busy");
+  assert.equal(state.agents[0].commands[0].status, "completed");
+  assert.deepEqual(state.observations[0].events, [], "Remote reports from before renewed consent are not new recording events.");
+}));
+
+test("authenticated HTTP reports cannot cross a recording generation while awaiting another encrypted store lease", () => fixture(async ({ root, secrets, store, bridge, enroll, message }) => {
+  const e = await enroll(); await message(e.token, 1);
+  await store.update("personal", "synthetic-recording", s => {
+    s.observations = [{ id: "recording", status: "recording", sources: ["agent-events"], exclusions: [], createdAt: 90000, updatedAt: 100000, recordingSince: 99999, recordingGeneration: "original", events: [] }];
+  });
+  const other = createSuiteStore({ root, secrets, clock: () => 100000 }), update = store.update.bind(store);
+  let release, entered, arrived;
+  const gate = new Promise(resolve => { release = resolve; });
+  const holding = new Promise(resolve => { entered = resolve; });
+  const waiting = new Promise(resolve => { arrived = resolve; });
+  store.update = (id, operation, fn, request) => {
+    if (operation === "agent-message") arrived();
+    return update(id, operation, fn, request);
+  };
+  const changing = other.update("personal", "synthetic-consent-round-trip", async s => {
+    entered(); await gate; s.observations[0].recordingGeneration = "replacement";
+  });
+  const server = createStudioServer({ bridge: { close() {} }, suite: { agentMessage: (...args) => bridge.message(...args), close() {} } });
+  server.listen(0, "127.0.0.1"); await once(server, "listening");
+  const base = `http://127.0.0.1:${server.address().port}`;
+  const post = (sequence, status) => {
+    const body = { schema: agentMessageSchema, compartment: "personal", agentId: "test", sessionId: "same-session", sequence, at: 100000, event: { status } }, raw = JSON.stringify(body);
+    return fetch(base + agentRoutes.event, { method: "POST", headers: { "Content-Type": "application/json", "X-Switchyard-Signature": requestMac(e.token, agentRoutes.event, raw) }, body: raw });
+  };
+  let pending;
+  try {
+    await holding; pending = post(2, "busy");
+    await waiting; release(); await changing;
+    const response = await pending; await response.arrayBuffer(); assert.equal(response.status, 200);
+    const state = await store.snapshot("personal");
+    assert.equal(state.agents[0].reportedStatus, "busy");
+    assert.deepEqual(state.observations[0].events, [], "Lease delay cannot transfer the report into replacement consent.");
+    const fresh = await post(3, "waiting"); await fresh.arrayBuffer(); assert.equal(fresh.status, 200);
+    const after = await store.snapshot("personal");
+    assert.deepEqual(after.observations[0].events.map(event => [event.status, event.at]), [["waiting", 100000]]);
+    const sealed = await readFile(join(root, "personal.sealed.json"), "utf8");
+    for (const value of [e.token, "same-session", "adapter-status-observed"]) assert.equal(sealed.includes(value), false);
+  } finally {
+    release(); await changing; await pending?.catch(() => {});
+    server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); await server.cleanup();
+  }
+}));
+
 test("reviewed revocation preserves uncertain history, removes exact roles and cannot authorize a replacement credential", () => fixture(async ({ root, store, bridge, keys, enroll, message }) => {
   const original = await enroll(); await message(original.token, 1);
   const claim = await bridge.dispatch("personal", { agentId: "test", sessionId: "same-session", intent: "review" });

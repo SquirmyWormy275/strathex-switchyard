@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { appendAgentObservation } from "./agent-observation.mjs";
+import { appendAgentObservation, captureAgentObservation } from "./agent-observation.mjs";
 import { observationAcceptsEventAt } from "./workflow.mjs";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
@@ -53,6 +53,24 @@ const session = changes => ({ id: "observation", status: "recording", sources: [
 const state = changes => ({ id: "personal", policy: "personal", mode: "personal-companion", observations: [session()], ...changes });
 const event = changes => ({ provider: "codex", subjectId: "private-native-subject", phase: "status-observed", status: "active", at: 20, ...changes });
 const commandEvent = changes => event({ provider: "custom-agent", subjectId: "private-command", phase: "adapter-command-queued", status: "reserved-locally", intent: "handoff", ...changes });
+
+test("captured external observation consent preserves its original time and refuses replacement or new recordings", () => {
+  const fresh = () => state({ observations: [session({ createdAt: 10, recordingSince: 10, recordingGeneration: "original" })] });
+  const metadata = { subjectId: "private-adapter", phase: "adapter-status-observed", status: "busy" };
+  for (const mutate of [s => { s.id = "different"; }, s => { s.observations[0].recordingGeneration = "replacement"; }, s => { s.observations[0].status = "paused"; }, s => { s.observations[0].sources = ["deliberate"]; }, s => { s.observations[0].exclusions = ["other"]; }, s => { s.mode = "keyboard-only"; }]) {
+    const s = fresh(), record = captureAgentObservation(s, { provider: "custom-agent", at: 20 }); mutate(s);
+    assert.equal(record(s, metadata), 0); assert.equal(s.observations[0].events.length, 0);
+  }
+  const s = fresh(), record = captureAgentObservation(s, { provider: "custom-agent", at: 20 });
+  s.observations.push(session({ id: "new-recording", createdAt: 10, recordingSince: 10, recordingGeneration: "original" }));
+  assert.equal(record(s, { ...metadata, at: 99, provider: "codex" }), 1);
+  assert.equal(s.observations[0].events[0].at, 20); assert.equal(s.observations[0].events[0].provider, "custom-agent");
+  assert.equal(s.observations[1].events.length, 0);
+  const boundary = fresh(); assert.equal(captureAgentObservation(boundary, { provider: "custom-agent", at: 10 })(boundary, metadata), 0);
+  const initiallyPaused = fresh(); initiallyPaused.observations[0].status = "paused";
+  const paused = captureAgentObservation(initiallyPaused, { provider: "custom-agent", at: 20 }); initiallyPaused.observations[0].status = "recording";
+  assert.equal(paused(initiallyPaused, metadata), 0);
+});
 
 test("custom command history separates local bookkeeping from agent acknowledgements and keeps one private correlation", () => {
   const s = state(), phases = [["queued", "reserved-locally"], ["claimed", "running"], ["retired", "unknown"], ["acknowledged", "done"], ["outcome-reviewed", "unknown"]];

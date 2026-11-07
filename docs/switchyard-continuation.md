@@ -40,6 +40,14 @@ instructions. Do not merge or release.
 
 ## Current backend state
 
+The latest source correction preserves external-agent report time and recording
+generation across Node/Python SDK queues and encrypted-state waits. Nine groups/
+141 tests pass; a signed HTTP demonstration composes two real encrypted stores.
+Two original failing consent regressions are retained. The new `agent-consent`
+Windows lane selects the three complete original contract files; native
+acceptance and the installed update remain pending.
+[Evidence](evidence/external-agent-consent-source-summary.json).
+
 The latest source feature is guided role choices: readable saved connection labels
 and a digest-checked local binding route. It preserves selected-workspace, policy,
 original session/capability, role and prior-binding identity. Seven groups/101 tests

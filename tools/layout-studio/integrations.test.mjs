@@ -208,7 +208,7 @@ async function sequenceServer(t, token, readSequence = async () => null) {
     try {
       let raw = ""; for await (const chunk of req) raw += chunk;
       const body = JSON.parse(raw), persisted = await readSequence();
-      received.push({ sequence: body.sequence, persisted, compartment: body.compartment, agentId: body.agentId, authenticated: sameMac(req.headers["x-switchyard-signature"], requestMac(token, req.url, raw)) });
+      received.push({ sequence: body.sequence, at: body.at, persisted, compartment: body.compartment, agentId: body.agentId, authenticated: sameMac(req.headers["x-switchyard-signature"], requestMac(token, req.url, raw)) });
       const text = JSON.stringify({ schema: agentResponseSchema, requestSequence: body.sequence, sessionId: body.sessionId, result: { accepted: true } });
       res.setHeader("X-Switchyard-Response-Signature", responseMac(token, req.url, 200, text)); res.end(text);
     } catch { res.writeHead(500); res.end(); }
@@ -236,6 +236,20 @@ test("Node SDK persistence rejection sends nothing and cannot reuse the consumed
   const sdk = switchyardAgent({ ...enrollment, onSequence: async sequence => { if (sequence === 1) throw Error("Synthetic persistence failure"); saved.push(sequence); } });
   await assert.rejects(sdk.publish("one", "ready"), /Synthetic persistence failure/); assert.equal(received.length, 0);
   await sdk.publish("two", "ready"); assert.deepEqual(saved, [2]); assert.deepEqual(received.map(r => r.sequence), [2]);
+});
+
+test("Node SDK dates each report before its serialized request and sequence persistence wait", async t => {
+  const token = "x".repeat(43), { baseUrl, received } = await sequenceServer(t, token);
+  const original = Date.now; let at = 100000;
+  Date.now = () => at;
+  try {
+    const sdk = switchyardAgent({ baseUrl, token, compartment: "personal", agentId: "test", onSequence: async () => { at += 100; } });
+    const first = sdk.publish("one", "ready"); at++;
+    const second = sdk.publish("one", "busy"); at++;
+    await Promise.all([first, second]);
+    assert.deepEqual(received.map(row => row.at), [100000, 100001]);
+    assert.equal(received.every(row => row.authenticated), true);
+  } finally { Date.now = original; }
 });
 
 async function pythonSdk(program, enrollment) {
@@ -266,6 +280,13 @@ test("Python SDK persists before sending, refuses failed or asynchronous hooks a
   const { baseUrl, received } = await sequenceServer(t, token, async () => Number(await readFile(path, "utf8").catch(() => "0")));
   const result = await pythonSdk(`from pathlib import Path\np=Path(enrollment['sequencePath'])\ndef persist(sequence):\n    if sequence==1: raise RuntimeError('Synthetic persistence failure')\n    p.write_text(str(sequence))\nsdk=SwitchyardAgent(enrollment,on_sequence=persist)\ntry: sdk.publish('one','ready')\nexcept RuntimeError: pass\nelse: raise AssertionError('Failed save sent a request')\nsdk.publish('two','ready')\nrestarted=SwitchyardAgent({**enrollment,'initialSequence':int(p.read_text())},on_sequence=persist)\nrestarted.publish('three','ready')\nasync def unsupported(sequence): pass\ntry: SwitchyardAgent(enrollment,on_sequence=unsupported).publish('async','ready')\nexcept ValueError: pass\nelse: raise AssertionError('An asynchronous hook was accepted')\ntry: SwitchyardAgent(enrollment,on_sequence=lambda _:unsupported(1)).publish('awaitable','ready')\nexcept ValueError: pass\nelse: raise AssertionError('A returned awaitable was accepted')\nrecursive=SwitchyardAgent(enrollment,on_sequence=lambda _:recursive.publish('nested','ready'))\ntry: recursive.publish('outer','ready')\nexcept ValueError: pass\nelse: raise AssertionError('A persistence hook sent a nested request')\nassert recursive.sequence==1\ntry: SwitchyardAgent(enrollment,on_sequence=7)\nexcept ValueError: pass\nelse: raise AssertionError('Invalid hook was accepted')\nprint(json.dumps({'saved':int(p.read_text())}))`, { baseUrl, token, compartment: "personal", agentId: "test", sequencePath: path });
   assert.equal(result.saved, 3); assert.deepEqual(received.map(r => [r.sequence, r.persisted, r.authenticated]), [[2, 2, true], [3, 3, true]]);
+});
+
+test("Python SDK dates reports before the private sequence callback can delay them", async t => {
+  const token = "x".repeat(43), { baseUrl, received } = await sequenceServer(t, token);
+  await pythonSdk(`import switchyard_agent\nclock=[100]\nswitchyard_agent.time.time=lambda:clock[0]\ndef persist(sequence):\n    clock[0]+=10\nsdk=SwitchyardAgent(enrollment,on_sequence=persist)\nsdk.publish('one','ready')\nsdk.publish('one','busy')\nprint(json.dumps({'sent':2}))`, { baseUrl, token, compartment: "personal", agentId: "test" });
+  assert.deepEqual(received.map(row => row.at), [100000, 110000]);
+  assert.equal(received.every(row => row.authenticated), true);
 });
 
 test("a real bundled Node example exits after abrupt loss of its owning parent", { timeout: 12000 }, async (t) => {
