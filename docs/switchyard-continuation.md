@@ -64,14 +64,15 @@ resolution and broader
 manifest/license coverage remain unfinished. [Contract](cargo-archive-identity.md),
 [source evidence](evidence/cargo-array-manifest-source-summary.json).
 
-Installed `c50a00c` passes **71 metadata/in-memory checks** and verifies 21 exact
-module hashes, including all 84 Cargo manifest reference cases. All 54 semantic
-workspaces, selection, pending keyboard-only conversation and frozen frontend are
-preserved; 53 sealed files are byte-identical and one changes only audit metadata.
-All four profiles and 57 workflows remain compatible. Dated backup and launcher
-readback verify; current plus one rollback remain. The exact 530-file,
-5,155,648-byte prepared bundle is removed.
-[Installed evidence](evidence/installed-cargo-array-manifest-summary.json).
+Installed `21f7ddc` passes **71 metadata/in-memory checks** and verifies 22 exact
+module hashes, including the Windows focus service source and all
+84 Cargo manifest reference cases. All 54 semantic workspaces, selection, pending
+keyboard-only conversation and frozen frontend are preserved; 53 sealed files are
+byte-identical and one changes only audit metadata. All four profiles and 57
+workflows remain compatible. Dated backup and launcher readback verify; current
+plus one rollback remain. The exact 531-file, 5,177,330-byte prepared bundle is
+removed. This Linux update does not establish native Windows focus acceptance.
+[Installed evidence](evidence/installed-windows-native-focus-summary.json).
 
 Run only the current repeatable metadata verifiers, each with
 `--read-only-metadata`: `verify-task-owner-host.mjs`,
@@ -185,12 +186,11 @@ native Windows profile correction acceptance remains separate.
 2. Inspect available native Windows receipts. The new five-shard schedule and
    later helper, SDK, Python/Cargo work require their own final results.
    Retain original failures and distinguish guest doubles from actual guests.
-3. Wire the Windows focus-only v3 callbacks into authenticated Suite owner
-   records, then add explicit executable/signer review and physical-intent
-   dispatch. Reconcile uncertain original PID/birth via the read-only owner query;
-   do not weaken process birth, current-user/session or foreground proof. Native
-   Windows owner/window acceptance and VS Code support remain separate. Also
-   continue broader Shield syntax/coverage and dependency
+3. Windows ChatGPT review, owner records, dispatch and read-only recovery are
+   published and installed as source at `21f7ddc`. Keep native Windows owner/
+   window acceptance separate. Continue Windows VS Code support without weakening
+   process birth, current-user/session or foreground proof; frontend controls
+   remain frozen. Also continue broader Shield syntax/coverage and dependency
    resolution, complete archive/license inspection, publisher provenance,
    verified local vulnerability context and external observation streams.
    The current Cargo manifest parser is deliberately a closed TOML subset;

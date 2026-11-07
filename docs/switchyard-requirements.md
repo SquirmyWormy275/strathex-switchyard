@@ -21,6 +21,16 @@ frontend configuration controls and Windows VS Code focus remain unfinished.
 [Contract](windows-native-focus.md),
 [source evidence](evidence/windows-native-focus-source-summary.json).
 
+Installed `21f7ddc` passes **71 metadata/in-memory checks** and verifies 22 exact
+module hashes, including the Windows focus service source and all
+84 Cargo manifest reference cases. All 54 semantic workspaces, selection, pending
+keyboard-only conversation and frozen frontend are preserved; 53 sealed files are
+byte-identical and one changes only audit metadata. All four profiles and 57
+workflows remain compatible. Dated backup and launcher readback verify; current
+plus one rollback remain. The exact 531-file, 5,177,330-byte prepared bundle is
+removed. This Linux update does not establish native Windows focus acceptance.
+[Installed evidence](evidence/installed-windows-native-focus-summary.json).
+
 Cargo archives with multiple `[[bin]]`, `[[example]]` and nested array tables
 now pass 84 independent Python reference cases. Ten focused groups pass 96 tests,
 including six actual Linux scanner journeys and six Windows guest doubles.
