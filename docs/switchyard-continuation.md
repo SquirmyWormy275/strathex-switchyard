@@ -66,12 +66,14 @@ foreign replacement and unknown committed outcomes still refuse admission.
 
 1. Native Windows client `9c3bccf` is audited: exact merge tree, 25 groups,
    237 tests, zero skips, original deadlines and verified cleanup.
-2. Prepare the normal installed backend update. The installed metadata verifier
-   now references the exact tested Codex contract and checks both admitted versions,
-   all 42 restrictions and first-party/MCP boundaries with in-memory metadata.
-   Preserve dated launcher backups, all 54 semantic workspaces, selection and
-   pending conversation, frozen frontend, current plus one rollback. No browser
-   reload or live task.
+2. Installed Linux now runs `51a73c7`, release `edf66107db84`, with `cb2df88680ca`
+   retained as rollback. All 54 semantic workspaces, selection, one pending
+   keyboard-only conversation and frozen frontend verify. The 76 metadata/
+   in-memory checks cover 44 exact modules, four profiles and 57 workflows.
+   Dated launcher backup and readback verify; the exact prepared 552-file,
+   4,813,488-byte bundle is removed. No browser reload, live task or hardware use.
+   Two stale hash references and five stale error assertions in host verification
+   are corrected; the original failures are retained. Do not repeat this update.
 3. Continue task-specific Windows IDE/project integration and the remaining
    backend requirements. Command activation and frontend exposure remain frozen.
 4. Native Codex TUI/account/task/model acceptance remains separate. The version

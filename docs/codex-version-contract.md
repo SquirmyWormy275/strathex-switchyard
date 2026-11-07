@@ -2,8 +2,9 @@
 
 The source adapter admits exactly **0.166.0 and 0.167.0**. A different patch,
 future version, malformed hello or unexpected client identity is refused before
-account or task access. The installed Switchyard package has not yet been updated
-to this source checkpoint.
+account or task access. Installed Linux `51a73c7` includes this contract. Its 76 metadata/in-memory
+checks and 44 exact module hashes pass while preserving all 54 workspaces.
+[Installed evidence](evidence/installed-codex-0167-summary.json).
 
 Both versions receive the same explicit restrictions before initialization:
 42 disabled feature flags, no project instructions, user-reviewed approvals,

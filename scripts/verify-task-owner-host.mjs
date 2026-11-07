@@ -62,13 +62,13 @@ try {
   evidence.checks.push("unknown owner and unexpected effect fields refuse before provider start or task resume");
   const { StudioTaskClient } = await import("../apps/vscode-extension/src/studio-task-client.ts"), editor = new StudioTaskClient({ endpointPath: endpointFile, assertCurrent: current });
   try {
-    await assert.rejects(editor.editorTarget({ compartment: selected, ownerRequestId: missing, loadRequestId: randomUUID() }), /original Switchyard editor target did not authenticate or validate/);
+    await assert.rejects(editor.editorTarget({ compartment: selected, ownerRequestId: missing, loadRequestId: randomUUID() }), /^Error: The original Switchyard instance did not authenticate or validate\.$/);
     const input = { compartment: selected, ownerRequestId: missing, loadRequestId: randomUUID(), requestId: randomUUID(), editorId: randomUUID() };
     assert.equal((before.codingEditorAuthorizations ?? []).some(row => row.requestId === input.requestId), false);
-    await assert.rejects(editor.reviewEditor(input), /original Switchyard editor target did not authenticate or validate/);
-    await assert.rejects(editor.issueEditor({ ...input, token: randomUUID() }), /original Switchyard editor target did not authenticate or validate/);
-    await assert.rejects(editor.consumeEditor({ ...input, permit: randomUUID() }), /original Switchyard editor target did not authenticate or validate/);
-    await assert.rejects(editor.returnEditorTarget(input), /original Switchyard editor target did not authenticate or validate/);
+    await assert.rejects(editor.reviewEditor(input), /^Error: The original Switchyard instance did not authenticate or validate\.$/);
+    await assert.rejects(editor.issueEditor({ ...input, token: randomUUID() }), /^Error: The original Switchyard instance did not authenticate or validate\.$/);
+    await assert.rejects(editor.consumeEditor({ ...input, permit: randomUUID() }), /^Error: The original Switchyard instance did not authenticate or validate\.$/);
+    await assert.rejects(editor.returnEditorTarget(input), /^Error: The original Switchyard instance did not authenticate or validate\.$/);
     evidence.signedEditorAuthorizationRefusals = 4;
     evidence.checks.push("signed editor review, issue, consume and return refuse unknown ownership without confirmation, permit or terminal effects");
   }

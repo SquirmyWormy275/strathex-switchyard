@@ -24,7 +24,7 @@ Codex source checkpoint `9c3bccf` admits exact 0.166.0 and 0.167.0 revisions wit
 groups pass 152 tests with two skips. The actual 0.167 binary passes production
 argument construction and hello/config validators in an empty network-isolated
 home. No account, thread or model request is sent; its original tree and 66
-generated files are removed. The native Windows client lane also passes all 237 tests at this exact source. Installed Switchyard remains on the earlier source.
+generated files are removed. The native Windows client lane also passes all 237 tests at this exact source. Installed Linux `51a73c7` now includes this contract and passes 76 metadata/in-memory checks while preserving all 54 workspace snapshots.
 [Version contract and evidence](codex-version-contract.md).
 
 ## Current evidence
@@ -34,7 +34,7 @@ checkpoints are not cumulative acceptance of the latest suite.
 
 | Checkpoint | Verified result | Limit |
 | --- | --- | --- |
-| Installed Linux `edb76de` | **76 metadata/in-memory checks; 42 exact module hashes.** All 54 semantic workspaces and frozen frontend preserved. [Receipt](evidence/installed-mixed-scanner-input-summary.json). | Predates current editor and Codex version work. No live scanner, provider task, account/model request, native focus or hardware operation. |
+| Installed Linux `51a73c7` | **76 metadata/in-memory checks; 44 exact module hashes.** All 54 semantic workspaces, four profiles, 57 workflows and frozen frontend preserved. [Receipt](evidence/installed-codex-0167-summary.json). | Codex version and editor code included; no live scanner, provider task, account/model request, native focus or hardware acceptance. |
 | Native Windows client `9c3bccf` | **25 groups; 237 tests; no skips.** Original manifest, commands, bounds and cleanup verified. [Receipt](evidence/windows-codex-0167-client-summary.json). | Terminal/provider doubles remain explicit; not the complete Windows suite or actual authenticated Codex turns. |
 | Complete Linux `961ecb3` | **348 groups; 2,205 tests; 32 declared platform skips.** Original manifest and cleanup verified. [Receipt](evidence/linux-961ecb3-complete-summary.json). | Predates journal corrections and Codex 0.167 admission. |
 | Complete Windows `dc755901` | **417 groups; 2,478 tests; 207 declared skips.** All six jobs and overall workflow passed. [Receipt](evidence/windows-complete-dc755901-summary.json). | Predates newer archive, scheduling, profile/workflow and observation corrections. |

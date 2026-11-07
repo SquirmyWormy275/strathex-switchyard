@@ -3,10 +3,10 @@
 The full suite remains unfinished. Use the [current status](switchyard-status.md)
 for accepted revisions and the table below for implementation scope.
 
-Native Windows client `5033c18` passes all 25 groups, 237 tests and no skips,
+Native Windows client `9c3bccf` passes all 25 groups, 237 tests and no skips,
 including the signed launcher demonstration and original cleanup. Native
 Terminal/provider doubles remain explicit; interactive acceptance is separate.
-[Native receipt](evidence/windows-editor-journal-accepted-summary.json).
+[Native receipt](evidence/windows-codex-0167-client-summary.json).
 
 Complete Linux `961ecb3` passes 348 groups, 2,205 tests and 32 declared platform
 skips. Exact temporary staging is removed. This predates journal corrections and
@@ -15,8 +15,9 @@ Codex 0.167 work. [Complete receipt](evidence/linux-961ecb3-complete-summary.jso
 Codex source `9c3bccf` admits exact 0.166.0/0.167.0 with 42 feature exclusions
 and version-bound text review. Twelve groups pass 152 tests with two skips;
 actual 0.167 production initialization/config-read passes in an empty
-network-isolated home. Installed Switchyard and live account/task/model/TUI
-acceptance remain separate. [Contract](codex-version-contract.md).
+network-isolated home. Installed Linux `51a73c7` passes 76 metadata/in-memory
+checks and preserves every workspace. Live account/task/model/TUI acceptance
+remains separate. [Contract](codex-version-contract.md).
 
 ## Requirement status
 
