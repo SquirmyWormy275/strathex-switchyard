@@ -24,9 +24,14 @@ const statePath = join(homedir(), ".local/state/strathex-switchyard/suite", sele
 const evidence = { schema: "switchyard-installed-signed-intent-metadata/v1", sourceCommit: manifest.sourceCommit, release: manifest.id, checks: [], sourceFiles: {}, nativeFocusEffects: 0, nativeProviderStarts: 0, modelPrompts: 0, physicalKeyboardEvents: 0, workspaceCreated: false };
 let failure;
 try {
-  const source = JSON.parse(await readFile(new URL("../docs/evidence/signed-physical-intent-source-summary.json", import.meta.url), "utf8"));
-  for (const file of ["tools/layout-studio/physical-intent-contract.mjs", "tools/layout-studio/physical-intent.mjs", "tools/layout-studio/instance.mjs", "tools/layout-studio/serve.mjs"]) {
-    const digest = hash(await readFile(join(root, file))); assert.equal(digest, source.sourceFiles[file]); evidence.sourceFiles[file] = digest;
+  for (const [summary, files] of [
+    ["signed-physical-intent-source-summary.json", ["tools/layout-studio/physical-intent-contract.mjs", "tools/layout-studio/physical-intent.mjs"]],
+    ["editor-task-choices-source-summary.json", ["tools/layout-studio/instance.mjs", "tools/layout-studio/serve.mjs"]]
+  ]) {
+    const source = JSON.parse(await readFile(new URL("../docs/evidence/" + summary, import.meta.url), "utf8"));
+    for (const file of files) {
+      const digest = hash(await readFile(join(root, file))); assert.equal(digest, source.sourceFiles[file]); evidence.sourceFiles[file] = digest;
+    }
   }
   evidence.checks.push("installed dispatch, gateway, route and closed contract match the tested source hashes");
   const { requestPhysicalIntent } = await import(pathToFileURL(join(root, "tools/layout-studio/instance.mjs")));

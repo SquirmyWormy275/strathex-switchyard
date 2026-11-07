@@ -86,7 +86,10 @@ fixture reads real encrypted storage through the signed server and feeds the
 chosen identity into the existing fresh-review flow. All 34 focused groups pass
 87 tests with no skips, including the workspace-switch race and packaging, and
 both TypeScript checks pass. Frontend picker and command
-activation remain frozen; this is source acceptance, not a live task demonstration.
+activation remain frozen. Installed `9d230ac` passes 92 metadata/refusal checks
+across 56 exact modules while preserving all 54 workspaces, four profiles and
+57 workflows. This does not establish live task or UI acceptance.
+[Installed evidence](evidence/installed-editor-task-choices-summary.json).
 [Task-choice contract](coding-task-owners.md#find-saved-tasks-for-a-project),
 [source evidence](evidence/editor-task-choices-source-summary.json).
 

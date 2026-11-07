@@ -17,7 +17,10 @@ fixture reads real encrypted storage through the signed server and feeds the
 chosen identity into the existing fresh-review flow. All 34 focused groups pass
 87 tests with no skips, including the workspace-switch race and packaging, and
 both TypeScript checks pass. Frontend picker and command
-activation remain frozen; this is source acceptance, not a live task demonstration.
+activation remain frozen. Installed `9d230ac` passes 92 metadata/refusal checks
+across 56 exact modules while preserving all 54 workspaces, four profiles and
+57 workflows. This does not establish live task or UI acceptance.
+[Installed evidence](evidence/installed-editor-task-choices-summary.json).
 [Task-choice contract](coding-task-owners.md#find-saved-tasks-for-a-project),
 [source evidence](evidence/editor-task-choices-source-summary.json).
 
@@ -121,8 +124,8 @@ streams remain unfinished. [Installed receipt](evidence/installed-runtime-observ
 A later persisted selection generation also refuses physical requests after an
 independent store switches away and back, including same-name reselection. Legacy
 reads remain unchanged. Two original regressions are retained; seven groups pass
-111 tests with one skip, and both TypeScript checks pass. This correction is not
-installed as `57af859` with 88 metadata/refusal checks and 56 module hashes.
+111 tests with one skip, and both TypeScript checks pass. This correction was
+installed at `57af859` with 88 metadata/refusal checks and 56 module hashes.
 [Source evidence](evidence/persisted-selection-source-summary.json),
 [installed readback](evidence/installed-persisted-selection-summary.json).
 
@@ -133,7 +136,7 @@ checkpoints are not cumulative acceptance of the latest suite.
 
 | Checkpoint | Verified result | Limit |
 | --- | --- | --- |
-| Installed Linux `849b9b9` | **88 metadata/refusal checks; 56 exact module hashes.** All 54 semantic workspaces, four profiles, 57 workflows and frozen frontend preserved. [Receipt](evidence/installed-foreground-retirement-summary.json). | Recording consent generations, persisted selection generation, consented runtime status capture, original-role/provider-effect guards, signed CLI dispatch and Codex version contract included; editor command activation remains pending; no live scanner, provider task, account/model request, native focus or hardware acceptance. |
+| Installed Linux `9d230ac` | **92 metadata/refusal checks; 56 exact module hashes.** All 54 semantic workspaces, four profiles, 57 workflows and frozen frontend preserved. [Receipt](evidence/installed-editor-task-choices-summary.json). | Exact-project saved task choices, recording consent generations, persisted selection generation, consented runtime status capture, original-role/provider-effect guards, signed CLI dispatch and Codex version contract included; editor command activation remains pending; no live scanner, provider task, account/model request, native focus or hardware acceptance. |
 | Native Windows client `57af859` | **25 groups; 249 tests; no skips.** Original manifest, commands, bounds and cleanup verified. [Receipt](evidence/selection-native-client-summary.json). | Terminal/provider doubles remain explicit; not the complete Windows suite, runtime-observation backend groups or live authenticated Codex turns. |
 | Complete Linux `0c025df` | **350 groups; 2,293 tests; 32 declared platform skips.** Original manifest, bounds and cleanup verified. [Receipt](evidence/linux-0c025df-complete-summary.json). | Covers runtime installed at `57af859`, including persisted selection and Codex status capture; later consent-generation/retirement fixes have separate focused and installed evidence. |
 | Complete Windows `dc755901` | **417 groups; 2,478 tests; 207 declared skips.** All six jobs and overall workflow passed. [Receipt](evidence/windows-complete-dc755901-summary.json). | Predates newer archive, scheduling, profile/workflow and observation corrections. |
@@ -147,10 +150,11 @@ remains unresolved.
 The latest installation preserves all four saved profiles, 57 workflows, selected
 state, one pending keyboard-only conversation and the frozen frontend. All 54
 semantic workspaces match; 53 sealed files are byte-identical and one changes
-only audit metadata. The first signed-route preservation check overlapped other
-metadata verifiers and failed; the unchanged check passed sequentially. Its
-failure remains retained. Dated backup and launcher readback verify. Only current
-plus one rollback remain; the exact 554-file, 4,830,690-byte prepared bundle is
+only audit metadata. An earlier signed-route preservation check overlapped other
+metadata verifiers and failed; its sequential follow-up passed. The latest update
+also retained a stale shared-gateway verifier pin failure before dispatch; after
+referencing the accepted gateway evidence, all eight signed-intent checks pass. Dated backup and launcher readback verify. Only current
+plus one rollback remain; the exact 554-file, 4,835,483-byte prepared bundle is
 removed. The installed payload is 4,731,342 bytes across 553 files.
 
 Windows `e5a5781` passed all six preliminary backend shards and 27 native guardian
