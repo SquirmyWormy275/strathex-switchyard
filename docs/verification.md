@@ -1,5 +1,28 @@
 # What has actually been verified
 
+Installed a97a835 passes **61 metadata/in-memory checks**: thirteen task-owner,
+seven Copilot-journal, fourteen agent/helper/SDK, twelve Python, ten Cargo and
+five workflow checks. Fifteen exact installed module hashes verify; all 57 saved
+workflows validate. All 54 semantic workspace snapshots, selection, pending
+keyboard-only conversation and frozen frontend are preserved. Fifty-three sealed
+files are byte-identical; one changes only audit metadata during the update.
+Dated backup, launcher readback and current plus one rollback verify. The exact
+528-file, 5,230,101-byte prepared bundle is removed. The repeatable workflow
+verifier independently repeats its five checks with all 54 sealed files unchanged.
+No scanner process, native task, agent action, model request, account change or
+hardware operation is performed.
+[Installed evidence](evidence/installed-workflow-identity-summary.json).
+
+Portable imports and local role connections now require literal string identities.
+Malformed v1 imports can no longer acquire helper defaults or replace the current
+encrypted arrangement. Two regressions reproduce the original defect; five
+focused groups/81 checks plus six verifier guards pass. All four saved profile
+documents remain compatible and all 54 sealed workspace files are unchanged.
+Legacy Studio-plan migration and intentional helper defaults still work.
+Typecheck, original package bounds and exact owned cleanup pass. Installed and
+native Windows profile correction acceptance remain pending.
+[Source evidence](evidence/profile-identity-source-summary.json).
+
 Complete Linux aafb476 passes **317 groups, 1,923 tests and sixteen declared
 skips**, with zero failures/cancellations. The exact original manifest, commands,
 deadlines and skip inventory verify, along with every child/tree retirement.
@@ -15,8 +38,9 @@ malformed JSON identities; four focused groups/72 checks now pass, including
 unchanged encrypted profile, bindings and history after refusal. Read-only
 compatibility checks accept all 57 saved workflows across 54 workspaces and
 preserve all 54 sealed files byte-for-byte. Typecheck, original package bounds
-and exact cleanup pass. Installed correction and native Windows acceptance
-remain pending. [Source and compatibility evidence](evidence/workflow-identity-source-summary.json).
+and exact cleanup pass. Installed workflow correction acceptance now passes five additional metadata
+checks; native Windows acceptance remains separate.
+[Installed evidence](evidence/installed-workflow-identity-summary.json). [Source and compatibility evidence](evidence/workflow-identity-source-summary.json).
 
 Installed 12b3c87 passes **56 metadata/in-memory checks**: thirteen task-owner,
 seven Copilot-journal, fourteen agent/helper/SDK, twelve Python and ten Cargo.

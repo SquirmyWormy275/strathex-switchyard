@@ -40,22 +40,24 @@ instructions. Do not merge or release.
 
 ## Current installed and source checkpoint
 
-Installed source: `12b3c87b9a8781648450c6adecc935aeea8d5ceb`.
-
-Release: `c5e99a6b9a4ae82819620fef38e374d075a559a18efdd7e2cad43281e26c5ee7`.
-
-The normal update passes **56 metadata/in-memory checks**: thirteen task-owner,
-seven Copilot-journal, fourteen agent/helper/SDK, twelve Python and ten Cargo.
-Fourteen exact module hashes verify. All 54 semantic workspaces, selection,
-pending keyboard-only conversation and frozen frontend remain intact. Fifty-three
-sealed files are byte-identical; one changes only audit metadata. The exact
-528-file, 5,229,972-byte prepared bundle is removed.
-[Installed receipt](evidence/installed-cargo-archive-summary.json).
+Installed a97a835 passes **61 metadata/in-memory checks**: thirteen task-owner,
+seven Copilot-journal, fourteen agent/helper/SDK, twelve Python, ten Cargo and
+five workflow checks. Fifteen exact installed module hashes verify; all 57 saved
+workflows validate. All 54 semantic workspace snapshots, selection, pending
+keyboard-only conversation and frozen frontend are preserved. Fifty-three sealed
+files are byte-identical; one changes only audit metadata during the update.
+Dated backup, launcher readback and current plus one rollback verify. The exact
+528-file, 5,230,101-byte prepared bundle is removed. The repeatable workflow
+verifier independently repeats its five checks with all 54 sealed files unchanged.
+No scanner process, native task, agent action, model request, account change or
+hardware operation is performed.
+[Installed evidence](evidence/installed-workflow-identity-summary.json).
 
 Run only the current repeatable metadata verifiers, each with
 `--read-only-metadata`: `verify-task-owner-host.mjs`,
 `verify-copilot-journal-host.mjs`, `verify-agent-security-host.mjs`,
-`verify-python-inventory-host.mjs` and `verify-cargo-inventory-host.mjs`.
+`verify-python-inventory-host.mjs`, `verify-cargo-inventory-host.mjs` and
+`verify-workflow-host.mjs`.
 They live under `scripts/`. Their pinned source evidence must match the intended
 installed modules; a mismatch requires investigation, never bypass. Older live
 verifiers are outside current scope: for example, `verify-shield-host.mjs`
@@ -89,8 +91,9 @@ malformed JSON identities; four focused groups/72 checks now pass, including
 unchanged encrypted profile, bindings and history after refusal. Read-only
 compatibility checks accept all 57 saved workflows across 54 workspaces and
 preserve all 54 sealed files byte-for-byte. Typecheck, original package bounds
-and exact cleanup pass. Installed correction and native Windows acceptance
-remain pending. [Source and compatibility evidence](evidence/workflow-identity-source-summary.json).
+and exact cleanup pass. Installed workflow correction acceptance now passes five additional metadata
+checks; native Windows acceptance remains separate.
+[Installed evidence](evidence/installed-workflow-identity-summary.json). [Source and compatibility evidence](evidence/workflow-identity-source-summary.json).
 
 The earlier 39db1fe full failure remains recorded. Five native backend jobs
 preserve original group objects, measurements, child bounds, twenty-minute job
@@ -113,7 +116,17 @@ receipts; remove downloaded archives.
 
 ## Continue independent implementation
 
-1. Publish the workflow identity correction and adopt it through the normal
+Portable imports and local role connections now require literal string identities.
+Malformed v1 imports can no longer acquire helper defaults or replace the current
+encrypted arrangement. Two regressions reproduce the original defect; five
+focused groups/81 checks plus six verifier guards pass. All four saved profile
+documents remain compatible and all 54 sealed workspace files are unchanged.
+Legacy Studio-plan migration and intentional helper defaults still work.
+Typecheck, original package bounds and exact owned cleanup pass. Installed and
+native Windows profile correction acceptance remain pending.
+[Source evidence](evidence/profile-identity-source-summary.json).
+
+1. Publish the profile-import identity correction and adopt it through the normal
    versioned update with read-only installed checks and snapshot preservation.
    Keep later Cargo/workflow focused evidence separate from complete aafb476.
    A new full run must use clean, published immutable source and a short owned

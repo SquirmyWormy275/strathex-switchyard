@@ -21,8 +21,20 @@ and device transactions have their own review and capability checks.
 The backend correction rejects non-string role/step IDs, unknown relationships,
 duplicate edges and cycles. Rejected edits preserve the encrypted profile,
 bindings and revision history. All 57 existing saved workflows pass read-only
-compatibility checks. This correction has source acceptance; installed
-acceptance is pending. [Evidence](evidence/workflow-identity-source-summary.json).
+compatibility checks. Five read-only/in-memory checks also pass against the
+installed workflow module. [Source evidence](evidence/workflow-identity-source-summary.json),
+[installed evidence](evidence/installed-workflow-identity-summary.json).
+
+Portable imports and local role connections now require literal string identities.
+Malformed v1 imports can no longer acquire helper defaults or replace the current
+encrypted arrangement. Two regressions reproduce the original defect; five
+focused groups/81 checks plus six verifier guards pass. All four saved profile
+documents remain compatible and all 54 sealed workspace files are unchanged.
+Legacy Studio-plan migration and intentional helper defaults still work.
+Typecheck, original package bounds and exact owned cleanup pass. Installed and
+native Windows profile correction acceptance remain pending.
+[Source evidence](evidence/profile-identity-source-summary.json).
+
 
 The [Studio guide](../tools/layout-studio/README.md) covers QMK imports, aggregate
 observations, direct editing and exports. The [portable-profile guide](portable-profiles.md)

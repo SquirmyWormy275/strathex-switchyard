@@ -22,6 +22,19 @@ function plan() {
   return p;
 }
 
+test("portable identities and local role targets refuse coerced or missing JSON identifiers", () => {
+  const original = portableProfile(plan(), "desk", "Desk");
+  for (const value of [null, 1, true, ["desk"], {}, "", "bad id"]) assert.throws(() => portableProfile(plan(), value, "Desk"), /identity/);
+  for (const value of [undefined, null, 1, true, ["desk"], {}]) {
+    assert.throws(() => importProfile({ ...original, id: value }), /identity/);
+    assert.throws(() => compileConnection(plan(), "summon", "switchyard.role/v1", { roleId: value, intent: "resume" }), /exact locally bound role/);
+  }
+  assert.throws(() => importProfile({ ...original, name: undefined }), /identity/);
+  assert.equal(portableProfile(plan()).id, "my-workflow");
+  assert.equal(importProfile(plan()).id, "my-workflow");
+  assert.deepEqual(importProfile(original), original);
+});
+
 function chatgptFocusFixture() {
   const process = { pid: 123, uid: userInfo().uid, executable: join(homedir(), ".local/lib/chatgpt-visible-voice/native/ChatGPT"), state: "S", startTicks: "12345" };
   const window = { pid: process.pid, address: "0x123", initialClass: "chatgpt", mapped: true, hidden: false, floating: false }, windows = [window], calls = [];

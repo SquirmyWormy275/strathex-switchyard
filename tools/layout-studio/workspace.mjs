@@ -8,7 +8,7 @@ const identifier = /^[A-Za-z0-9_.:-]{1,64}$/;
 const object = (v) => v && typeof v === "object" && !Array.isArray(v);
 
 export function portableProfile(plan, id = "my-workflow", name = plan.profile.name, workflow = null) {
-  if (!identifier.test(id) || typeof name !== "string" || !name.trim() || name.length > 120 || /[\0\r\n]/.test(name)) throw new Error("Profile identity is invalid.");
+  if (typeof id !== "string" || !identifier.test(id) || typeof name !== "string" || !name.trim() || name.length > 120 || /[\0\r\n]/.test(name)) throw new Error("Profile identity is invalid.");
   return { schema: portableSchema, id, name: name.trim(), plan: parsePlan(plan), ...(workflow ? { workflow: parseWorkflow(workflow) } : {}) };
 }
 
@@ -17,6 +17,7 @@ export function importProfile(value) {
   if (!object(value)) throw new Error("Choose a portable profile or Studio plan.");
   if (value.schema === "sxsy-agentic-layout-plan/v1") return portableProfile(value);
   if (value.schema !== portableSchema) throw new Error("This profile version is unsupported. Keep the original file; the open plan has not changed.");
+  if (typeof value.id !== "string" || typeof value.name !== "string") throw new Error("Profile identity is invalid. Keep the original file and choose an explicit name and identity.");
   return portableProfile(value.plan, value.id, value.name, value.workflow);
 }
 
@@ -67,7 +68,7 @@ const modifierValues = { shift: ["SHIFT", 1], ctrl: ["CTRL", 4], alt: ["ALT", 8]
 export function compileConnection(input, actionId, implementation, target = null) {
   if (input?.profile?.evidence === "source-reference") throw new Error("This preset contains a reference typing layer. Read or import your actual keyboard configuration before connecting shortcuts.");
   if (!["native-chatgpt.focus/v1", "native-vscode.focus/v1", "switchyard.role/v1"].includes(implementation)) throw new Error("That local action is unavailable. Choose an explicitly supported connection.");
-  if (implementation === "switchyard.role/v1" && (!target || !identifier.test(target.roleId) || !["summon", "resume", "review", "handoff", "status", "cancel"].includes(target.intent))) throw new Error("Choose an exact locally bound role and stable intent.");
+  if (implementation === "switchyard.role/v1" && (!target || typeof target.roleId !== "string" || !identifier.test(target.roleId) || !["summon", "resume", "review", "handoff", "status", "cancel"].includes(target.intent))) throw new Error("Choose an exact locally bound role and stable intent.");
   const review = analyzePlan(input);
   const action = review.plan.actions.find((a) => a.id === actionId);
   if (!action?.binding) throw new Error("Assign the action to a physical key and modifier first.");

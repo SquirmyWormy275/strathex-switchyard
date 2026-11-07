@@ -462,6 +462,15 @@ test("invalid workflow edits preserve the encrypted profile, role bindings and r
   }
 }));
 
+test("invalid imported profile identities cannot enter the encrypted library or replace its current arrangement", () => fixture(async ({ store, root }) => {
+  await store.initialize("personal"); const profile = portableProfile(samplePlan(), "desk", "Desk"); await store.saveProfile("personal", profile);
+  const before = await store.snapshot("personal"), bytes = await readFile(join(root, "personal.sealed.json"));
+  for (const value of [undefined, null, 1, true, ["desk"]]) {
+    await assert.rejects(store.saveProfile("personal", { ...profile, id: value }), /identity/);
+    assert.deepEqual(await store.snapshot("personal"), before); assert.deepEqual(await readFile(join(root, "personal.sealed.json")), bytes);
+  }
+}));
+
 test("workflow reordering preserves role meaning, while renaming cannot silently inherit a bound role", () => {
   const previous = parseWorkflow({ name: "Loop", roles: [{ id: "builder", label: "Builder" }, { id: "reviewer", label: "Reviewer" }], steps: [{ id: "build", label: "Build", roleId: "builder", after: [] }, { id: "review", label: "Review", roleId: "reviewer", after: ["build"] }] });
   const reordered = reconcileWorkflow({ name: "Loop", roles: ["Reviewer", "Builder"], steps: ["Review", "Build"] }, previous);
