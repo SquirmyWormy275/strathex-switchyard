@@ -17,6 +17,7 @@ import { codexAccountFingerprint,codexDesignConfig } from './agents.mjs';
 import { queryIntentForOwner } from './windows-query-ownership.mjs';
 import { editorServerFrame } from './editor-websocket-frames.mjs';
 import { StudioWindowsTaskClient } from '../../apps/vscode-extension/src/studio-windows-task-client.ts';
+import { StudioWindowsEditorLauncher } from '../../apps/vscode-extension/src/studio-windows-editor-launch.ts';
 
 const gate=()=>{let resolve;const promise=new Promise(r=>resolve=r);return{promise,resolve};};
 const hash=v=>createHash('sha256').update(JSON.stringify(v)).digest('hex');
@@ -119,4 +120,23 @@ test('Windows workspace and keyboard-only transitions join the editor before sto
     else assert.equal((await suite.handle('/api/suite/mode',{mode:'keyboard-only'})).ownedProcessesStopped,true);
     assert(events.includes('owner-stop'));assert.equal((await f.store.snapshot('personal')).codingEditorConnections[0].status,'stopped');
   }
+});
+
+test('the reviewed Windows launcher crosses signed Suite routes, protected state and a real authenticated carrier with explicit host/provider doubles',async t=>{
+  const f=await fixture(t),{suite,events}=await routed(f),token='s'.repeat(43),instance={id:randomUUID(),build:'a'.repeat(64)};
+  const server=createStudioServer({suite,token,instance,onApplicationStop:()=>suite.close(),bridge:{close(){}}});server.listen(0,'127.0.0.1');await once(server,'listening');f.cleanup.push(async()=>{server.closeAllConnections();await new Promise((r,j)=>server.close(e=>e?j(e):r()));});
+  const client=new StudioWindowsTaskClient({readEndpoint:async()=>JSON.stringify({schema:'switchyard-active-endpoint/v1',url:'http://127.0.0.1:'+server.address().port+'/#access='+token,instance,pid:process.pid}),assertCurrent:async()=>assert(f.active)});
+  const terminals=[],calls=[],activeListeners=new Set(),closeListeners=new Set();let activeTerminal,wireWork,nativeClosed=false;
+  const window={state:{focused:true},terminals,get activeTerminal(){return activeTerminal;},onDidCloseTerminal(fn){closeListeners.add(fn);return{dispose(){closeListeners.delete(fn);}};},onDidChangeActiveTerminal(fn){activeListeners.add(fn);return{dispose(){activeListeners.delete(fn);}};},createTerminal(options){
+    calls.push(options);const endpoint={url:options.shellArgs[2],authToken:options.env.SWITCHYARD_CODEX_REMOTE_TOKEN};assert.equal(options.shellPath,peer.image.path);assert(!options.shellArgs.includes(endpoint.authToken));
+    wireWork=(async()=>{const wire=await terminal(t,endpoint);wire.send({id:1,method:'initialize',params:{clientInfo:{name:'codex_tui',version:'0.166.0'}}});assert.equal((await wire.receive()).id,1);wire.send({method:'initialized',params:{}});await f.resume(wire);})();void wireWork.catch(()=>{});
+    const object={name:options.name,processId:Promise.resolve(peer.processId),show(){activeTerminal=object;for(const fn of activeListeners)fn(object);},sendText(){throw Error('NEVER_SEND_TEXT');}};terminals.push(object);return object;
+  }};
+  const launcher=new StudioWindowsEditorLauncher({client,host:{window,workspace:{workspaceFolders:[{uri:{fsPath:f.target.repositoryRoot}}]}},executable:peer.image.path,platform:'win32',assertCurrent:async()=>assert(f.active),
+    files:{image:async(_path,_sha,current)=>{await current();return{executable:peer.image.path,executableIdentity:'explicit synthetic file identity',image:peer.image};},current:async()=>assert(f.active)},
+    native:{observeTerminal:async options=>{await options.assertCurrent();assert.equal(await options.terminal.processId,peer.processId);return peer;},close:async()=>{nativeClosed=true;}}});
+  f.cleanup.push(()=>launcher.close());const review=await launcher.review({compartment:'personal',ownerRequestId:f.selected.ownerRequestId,loadRequestId:f.selected.loadRequestId});assert.equal(calls.length,0);
+  const result=await launcher.launch(review);await wireWork;assert.equal(result.protocolAcknowledgementObserved,true);assert.equal(result.nativeProcessObserved,true);assert.equal(result.ideAttached,false);assert.equal(result.modelPromptSubmitted,false);assert.equal(calls.length,1);assert.equal(f.registrations,1);
+  const row=(await f.store.snapshot('personal')).codingEditorConnections.find(r=>r.requestId===review.selection.requestId);assert.equal(row.status,'acknowledged');assert.equal(row.queryOwner.stopped,true);assert.equal(JSON.stringify(row).includes(calls[0].env.SWITCHYARD_CODEX_REMOTE_TOKEN),false);
+  await assert.rejects(launcher.launch(review));await launcher.focus(review);assert.equal(calls.length,1);await launcher.close();assert.equal(nativeClosed,true);assert.equal(closeListeners.size,0);assert.equal(activeListeners.size,0);await suite.close();assert.equal(events.at(-1),'owner-close');assert.equal(f.provider.closed,false);
 });

@@ -324,3 +324,39 @@ hit its 10-second limit before the endpoint query. Group/child cleanup verified;
 this is an unresolved test setup failure, not native ACL acceptance. Fixed stage
 markers now distinguish startup, owner, files, ACLs and links without changing
 the original timeout, token rights, permission rules or skip expectations.
+
+## Review and launch one Windows terminal
+
+`StudioWindowsEditorLauncher` now consumes the signed review once, opens the
+original carrier, and retains the exact Terminal returned by VS Code. Fixed
+read-only/on-request resume arguments keep the bearer in the terminal-local
+environment. Native observation supplies the original PID, birth and reviewed
+image; the launcher then waits for the separate carrier/task acknowledgement.
+Partial creation, changed context and cancellation cannot reuse a review.
+Closing the launcher joins pending work and retires the original connection
+and native readers without disposing user terminals or claiming task completion.
+`createStudioWindowsEditorLauncher` composes the packaged native reader, signed
+client and launcher. It does not register or activate a command.
+
+The working demonstration crosses this launcher, the actual signed Windows
+client, Suite routes, protected journal and a real authenticated socket to an
+exact synthetic task acknowledgement. Host/file/Terminal/provider boundaries
+are explicit doubles. [Source evidence](evidence/windows-editor-launch-source-summary.json):
+ten groups, 81 passes and four Windows-only skips; both TypeScript configurations
+pass. All 36 C# sources compile with zero warnings/errors using the existing SDK;
+five temporary compiler files (626,475 bytes) are removed.
+
+The second [native setup failure](evidence/windows-editor-runtime-native-failure-summary.json)
+at `7441289` again returned no fixed PowerShell stage marker before its original
+10-second timeout. The setup now uses the existing native helper to create only
+fixed synthetic contents under a fresh UUID directory inside the caller's held,
+identity-checked temporary parent. ACLs are specified when those new objects are
+created; there is no existing-file/ACL mutation, arbitrary contents/SDDL input,
+or token-right expansion. Node creates the owned hard link and junction. The
+reader's permission rules and all original timeouts/assertions remain unchanged.
+Actual Windows acceptance of this replacement and the launcher file checks is
+pending; the PowerShell failures are retained, not reclassified as passing.
+
+[Windows file security creation rules](https://learn.microsoft.com/en-us/windows/win32/fileio/file-security-and-access-rights)
+underpin the fixture's explicit descriptors. This fixture role is separate from
+the read-only endpoint operation and is not exposed by the extension or Suite API.

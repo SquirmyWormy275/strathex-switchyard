@@ -1,24 +1,24 @@
 # Switchyard authoritative requirement ledger
 
-Windows editor query helpers now expose their original guardian, helper digest,
-request identity and role before worker acknowledgement. The carrier forwards
-those checkpoints to the protected journal, which refuses replacement until
-retirement is recorded. Revocation does not prevent cleanup, and an active helper
-cannot produce a successful live-retirement claim. **Fourteen focused groups
-pass 150 tests with four declared platform skips**; typecheck passes. Local
-native-query behavior is explicitly doubled; the actual Windows carrier case is
-extended with callback assertions and awaits CI.
-[Query ownership contract](windows-editor-transport.md),
-[source evidence](evidence/windows-query-ownership-source-summary.json).
+The full suite remains unfinished. Use the [current status](switchyard-status.md)
+for accepted source revisions and the table below for implementation scope.
+The Windows reviewed launcher now completes the signed client → Suite → protected
+journal → real carrier demonstration with explicit native/Terminal/provider
+doubles. Ten focused groups pass 81 tests with four platform skips; both
+TypeScript configurations and all 36 native sources compile. Native endpoint
+fixture and file acceptance await CI; activation and live account checks remain
+separate. [Launcher evidence](evidence/windows-editor-launch-source-summary.json).
 
-The earlier journal contract passes Windows client CI at `75fd0b1`:
-**sixteen groups, 165 tests and no skips**. Journal cases use actual protected
-storage/leases and explicit native/recovery-verifier doubles; separate cases
-exercise actual process, Job, carrier and target/registry composition.
-Source/merge tree, artifact, original commands, bounds and cleanup verify.
-Production Windows lifecycle composition, native host/helper recovery, Suite
-editor connection routing and VS Code launching remain unfinished implementation.
-[Native journal evidence](evidence/windows-editor-journal-native-summary.json).
+The latest wholly accepted native client checkpoint is `485b7c6`: twenty groups,
+205 tests, no skips. Two later PowerShell fixture setups failed before reaching
+the endpoint reader. Their cleanup/failures are retained; a fixed native fixture
+replacement preserves the original bounds and read policy. The restricted-storage
+guardian-retirement failure also remains unresolved.
+
+## Earlier checkpoint notes
+
+The following dated results describe their own source revisions. Current scope
+and unresolved work are given above and in the requirement table.
 
 The underlying persistent process layer passes Windows client CI at `45fe70e`:
 **thirteen groups, 139 tests and no skips**, including all three actual native Job
@@ -293,6 +293,8 @@ child/tree cleanup verify; owned staging is removed. Dependency resolution and
 broader manifest/license coverage remain unfinished.
 [Contract](cargo-archive-identity.md),
 [source evidence](evidence/cargo-inline-manifest-source-summary.json).
+
+## Requirement status
 
 | Requirement | Implementation | Validation | Actual paths | UI entry | Tests | Remaining implementation / exact blocked validation |
 | --- | --- | --- | --- | --- | --- | --- |

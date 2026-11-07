@@ -10,14 +10,17 @@ Start with the [README](../README.md) for the product and first run, the
 on [draft PR 20](https://github.com/SquirmyWormy275/strathex-switchyard/pull/20).
 No merge or public release has been accepted.
 
-The Windows extension now packages its native query runtime and observes the
-exact VS Code terminal PID. Ten focused groups pass 90 tests with three platform
-skips, and the emitted CommonJS bridge passes its synthetic load/read/close check.
-[Implementation evidence](evidence/windows-editor-runtime-source-summary.json).
-The reviewed Windows terminal launcher remains unfinished. The first native
-endpoint fixture setup timed out before reaching the reader; its
-[failure and original cleanup](evidence/windows-editor-endpoint-native-failure-summary.json)
-are retained, with bounded phase diagnostics added for the next CI run.
+The reviewed Windows launcher now completes a working demonstration through the
+signed client, protected Suite journal and real authenticated carrier to an exact
+synthetic task acknowledgement. Ten focused groups pass 81 tests with four
+Windows-only skips; both TypeScript configurations and all 36 native C# sources
+compile. [Evidence](evidence/windows-editor-launch-source-summary.json).
+Native reader/file/Terminal/provider doubles are explicit; command/frontend
+activation and live provider acceptance remain unfinished. Two native endpoint
+fixture setups timed out before reaching the reader; the
+[second retained failure](evidence/windows-editor-runtime-native-failure-summary.json)
+now has a fixed native setup replacement awaiting CI, with original bounds and
+permission checks preserved.
 
 ## Current evidence
 

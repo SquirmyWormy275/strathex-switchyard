@@ -64,6 +64,7 @@ internal static partial class Program
         if (args.Length == 1 && args[0] == "--editor-terminal-process-v1") return ObserveEditorTerminalProcess();
         if (args.Length == 1 && args[0] == "--editor-terminal-peer-v1") return ObserveEditorTerminalProcess(peer: true);
         if (args.Length == 1 && args[0] == "--editor-endpoint-v1") return ReadEditorEndpoint();
+        if (args.Length == 1 && args[0] == "--editor-endpoint-fixture-v1") return CreateEditorEndpointFixture();
         if (args.Length == 2 && args[0] == "--managed-terminal-v1")
         {
             try

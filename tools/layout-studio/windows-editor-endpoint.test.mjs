@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash, randomUUID } from 'node:crypto';
 import { spawn } from 'node:child_process';
-import { mkdtemp, readFile, realpath, rm, lstat } from 'node:fs/promises';
+import { mkdtemp, readFile, realpath, rm, lstat, link, symlink } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { windowsEditorEndpointQuery, windowsEditorEndpointResult, createWindowsEditorEndpointReader } from './windows-editor-endpoint.mjs';
@@ -67,27 +67,11 @@ test('actual Windows endpoint reader accepts private held bytes and refuses shar
   const reader=createWindowsEditorEndpointReader({helper:async()=>native}),resource={clients:new Set()},observers=new Set();
   const observe=scope=>runtimeGuardianStopped(scope,{windowsHelper:native.path,onGuardianChild:child=>observers.add(child)});
   t.after(async()=>{await reader.close();for(const client of resource.clients)assert.equal(await client.stop(),true);for(const child of observers)assert.equal((await stopOwnedChild(child)).stopped,true);const now=await lstat(root,{bigint:true});assert.equal(now.ino,identity.ino);assert.equal(now.dev,identity.dev);await rm(root,{recursive:true});});
-  const quote=s=>"'"+s.replaceAll("'","''")+"'";
-  const script=`$ErrorActionPreference='Stop';$root=${quote(root)};Write-Output 'fixture-start'
-$token=[Security.Principal.WindowsIdentity]::GetCurrent([Security.Principal.TokenAccessLevels]::Query)
-try{$sid=$token.User;$acl=New-Object Security.AccessControl.DirectorySecurity;$acl.SetOwner($sid);$acl.SetAccessRuleProtection($true,$false);$acl.AddAccessRule((New-Object Security.AccessControl.FileSystemAccessRule($sid,'FullControl','ContainerInherit,ObjectInherit','None','Allow')));[IO.Directory]::SetAccessControl($root,$acl)}finally{$token.Dispose()}
-Write-Output 'fixture-owner'
-foreach($name in @('private','shared-file','shared-parent','hard-link','oversize')){$dir=Join-Path $root $name;[IO.Directory]::CreateDirectory($dir)|Out-Null;$acl=[IO.Directory]::GetAccessControl($dir);$acl.SetOwner($sid);[IO.Directory]::SetAccessControl($dir,$acl);$file=Join-Path $dir 'endpoint.json';[IO.File]::WriteAllText($file,'{"synthetic":true}',(New-Object Text.UTF8Encoding($false)));$acl=[IO.File]::GetAccessControl($file);$acl.SetOwner($sid);[IO.File]::SetAccessControl($file,$acl)}
-Write-Output 'fixture-files'
-$everyone=New-Object Security.Principal.SecurityIdentifier('S-1-1-0')
-$file=Join-Path $root 'shared-file\\endpoint.json';$acl=[IO.File]::GetAccessControl($file);$acl.AddAccessRule((New-Object Security.AccessControl.FileSystemAccessRule($everyone,'Read','Allow')));[IO.File]::SetAccessControl($file,$acl)
-$dir=Join-Path $root 'shared-parent';$acl=[IO.Directory]::GetAccessControl($dir);$acl.AddAccessRule((New-Object Security.AccessControl.FileSystemAccessRule($everyone,'Read','Allow')));[IO.Directory]::SetAccessControl($dir,$acl)
-Write-Output 'fixture-acls'
-New-Item -ItemType HardLink -Path (Join-Path $root 'duplicate.json') -Target (Join-Path $root 'hard-link\\endpoint.json')|Out-Null
-New-Item -ItemType Junction -Path (Join-Path $root 'junction') -Target (Join-Path $root 'private')|Out-Null
-Write-Output 'fixture-links'
-[IO.File]::WriteAllText((Join-Path $root 'oversize\\endpoint.json'),('x'*4097),(New-Object Text.UTF8Encoding($false)))
-Write-Output 'fixture-ready'`;
-  const powershell=join(process.env.SystemRoot,'System32','WindowsPowerShell','v1.0','powershell.exe');let owner;
-  const setup=await runOwnedNativeCommand({executable:powershell,args:['-NoLogo','-NoProfile','-NonInteractive','-EncodedCommand',Buffer.from(script,'utf16le').toString('base64')],env:desktopEnvironment(),text:'',resource,timeout:10000,maxOutputBytes:4096,captureStderrBytes:0,
+  const requestId=randomUUID(),fixtureRoot=join(root,'fixture-'+requestId);let owner;
+  const setup=await runOwnedNativeCommand({executable:native.path,args:['--editor-endpoint-fixture-v1'],env:desktopEnvironment(),expectedExecutableSha256:native.sha256,text:JSON.stringify({schema:'switchyard-editor-endpoint-fixture-query/v1',requestId,parent:root,device:String(identity.dev),inode:String(identity.ino)})+'\n',resource,timeout:10000,maxOutputBytes:4096,captureStderrBytes:0,
     command:(exe,args,options)=>runRuntimeCommand(exe,args,{...options,windowsHelper:native.path}),guardianStopped:observe,onReady:async scope=>{owner=scope;},onStopped:async scope=>assert.equal(await observe(scope),true)});
-  const stages=setup.stdout.trim().split(/\r?\n/).filter(line=>/^fixture-(start|owner|files|acls|links|ready)$/.test(line));
-  assert.ok(owner);assert.equal(setup.status,'completed','Original fixture setup stopped after: '+stages.join(','));assert.equal(setup.exitCode,0,'Original fixture setup failed after: '+stages.join(','));assert.deepEqual(stages,['fixture-start','fixture-owner','fixture-files','fixture-acls','fixture-links','fixture-ready']);
-  assert.equal(await reader.read(join(root,'private','endpoint.json'),context()),'{"synthetic":true}');
-  for(const name of ['shared-file','shared-parent','hard-link','junction','oversize'])await assert.rejects(reader.read(join(root,name,'endpoint.json'),context()),name);
+  assert.ok(owner);assert.equal(setup.status,'completed');assert.equal(setup.exitCode,0);assert.deepEqual(JSON.parse(setup.stdout),{schema:'switchyard-editor-endpoint-fixture-result/v1',requestId,root:fixtureRoot,tokenAccessMask:8,syntheticOnly:true,existingFilesModified:false});
+  await link(join(fixtureRoot,'hard-link','endpoint.json'),join(fixtureRoot,'duplicate.json'));await symlink(join(fixtureRoot,'private'),join(fixtureRoot,'junction'),'junction');
+  assert.equal(await reader.read(join(fixtureRoot,'private','endpoint.json'),context()),'{"synthetic":true}');
+  for(const name of ['shared-file','shared-parent','hard-link','junction','oversize'])await assert.rejects(reader.read(join(fixtureRoot,name,'endpoint.json'),context()),name);
 });

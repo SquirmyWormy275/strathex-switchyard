@@ -113,4 +113,61 @@ internal static partial class Program
     [DllImport("advapi32.dll", EntryPoint = "GetSecurityInfo")] private static extern uint EndpointGetSecurityInfo(SafeFileHandle handle, uint type, uint information, out IntPtr owner, out IntPtr group, out IntPtr dacl, out IntPtr sacl, out IntPtr descriptor);
     [DllImport("advapi32.dll", EntryPoint = "GetSecurityDescriptorLength")] private static extern uint EndpointGetSecurityDescriptorLength(IntPtr descriptor);
     [DllImport("kernel32.dll", EntryPoint = "LocalFree")] private static extern IntPtr EndpointLocalFree(IntPtr memory);
+
+    // Explicit synthetic test setup, separate from the read-only endpoint role.
+    // The caller retains its original temporary parent identity and cleanup.
+    // Only fresh fixed-name fixtures below one new UUID directory are created;
+    // no existing file/ACL, arbitrary content, identity or permission is changed.
+    private static int CreateEditorEndpointFixture()
+    {
+        try
+        {
+            if (!OperatingSystem.IsWindows()) throw new ProtocolException("windows_required");
+            using JsonDocument document = ParseJson(ReadBoundedLine(Console.In, 8192));
+            JsonElement request = document.RootElement; RequireProperties(request, "schema", "requestId", "parent", "device", "inode");
+            string id = Text(request, "requestId"), parent = Text(request, "parent");
+            if (Text(request, "schema") != "switchyard-editor-endpoint-fixture-query/v1" || !Guid.TryParseExact(id, "D", out Guid guid) || guid == Guid.Empty
+                || parent.Length is < 4 or > 2048 || !char.IsAsciiLetter(parent[0]) || parent[1] != ':' || parent[2] != '\\' || Path.GetFullPath(parent) != parent
+                || !Path.GetFileName(parent).StartsWith("switchyard-endpoint-", StringComparison.Ordinal) || parent[3..].Any(c => c < 32 || c == 127 || "<>:\"/|?*".Contains(c)))
+                throw new ProtocolException("invalid_endpoint_fixture");
+            using SafeFileHandle heldParent = CreateFileW(parent, FileReadAttributes, FileShareRead | FileShareWrite, IntPtr.Zero, OpenExisting, FileFlagBackupSemantics | EndpointOpenReparsePoint, IntPtr.Zero);
+            if (heldParent.IsInvalid || !GetFileInformationByHandle(heldParent, out var parentInfo) || (parentInfo.FileAttributes & 0x410) != 0x10 || !SamePath(FinalPath(heldParent), parent)
+                || Text(request, "device") != parentInfo.VolumeSerialNumber.ToString(CultureInfo.InvariantCulture) || Text(request, "inode") != (((ulong)parentInfo.FileIndexHigh << 32) | parentInfo.FileIndexLow).ToString(CultureInfo.InvariantCulture))
+                throw new ProtocolException("endpoint_fixture_parent_changed");
+            using var process = new SafeFileHandle(GetCurrentProcess(), ownsHandle: false);
+            string sid = new SecurityIdentifier(ProcessOwner(process).User, 0).Value;
+            EndpointFixtureSecurity Security(bool directory, bool shared)
+            {
+                string flags = directory ? "OICI" : "", sddl = $"O:{sid}D:P(A;{flags};FA;;;{sid})" + (shared ? "(A;;FR;;;WD)" : "");
+                if (!EndpointConvertSecurity(sddl, 1, out IntPtr descriptor, out _)) throw new ProtocolException("endpoint_fixture_security_failed");
+                return new EndpointFixtureSecurity { Length = checked((uint)Marshal.SizeOf<EndpointFixtureSecurity>()), Descriptor = descriptor, Inherit = false };
+            }
+            void NewDirectory(string path, bool shared = false)
+            {
+                var security = Security(true, shared);
+                try { if (!EndpointCreateDirectory(path, ref security)) throw new ProtocolException("endpoint_fixture_directory_exists_or_failed"); }
+                finally { EndpointLocalFree(security.Descriptor); }
+            }
+            string root = Path.Combine(parent, "fixture-" + id); NewDirectory(root);
+            foreach (string name in new[] { "private", "shared-file", "shared-parent", "hard-link", "oversize" })
+            {
+                string directory = Path.Combine(root, name); NewDirectory(directory, name == "shared-parent");
+                var security = Security(false, name == "shared-file");
+                try
+                {
+                    using SafeFileHandle file = EndpointCreateFile(Path.Combine(directory, "endpoint.json"), 0x40000000, FileShareRead, ref security, 1, EndpointOpenReparsePoint, IntPtr.Zero);
+                    if (file.IsInvalid) throw new ProtocolException("endpoint_fixture_file_exists_or_failed");
+                    using var stream = new FileStream(file, FileAccess.Write); byte[] bytes = Encoding.UTF8.GetBytes(name == "oversize" ? new string('x', 4097) : "{\"synthetic\":true}"); stream.Write(bytes); stream.Flush(true);
+                }
+                finally { EndpointLocalFree(security.Descriptor); }
+            }
+            Write(new { schema = "switchyard-editor-endpoint-fixture-result/v1", requestId = id, root, tokenAccessMask = TokenQuery, syntheticOnly = true, existingFilesModified = false }); return 0;
+        }
+        catch (ProtocolException e) { Write(new { schema = "switchyard-editor-endpoint-fixture-error/v1", code = e.Code }); return 65; }
+        catch { Write(new { schema = "switchyard-editor-endpoint-fixture-error/v1", code = "native_failure" }); return 70; }
+    }
+    [StructLayout(LayoutKind.Sequential)] private struct EndpointFixtureSecurity { public uint Length; public IntPtr Descriptor; [MarshalAs(UnmanagedType.Bool)] public bool Inherit; }
+    [DllImport("advapi32.dll", EntryPoint = "ConvertStringSecurityDescriptorToSecurityDescriptorW", CharSet = CharSet.Unicode, SetLastError = true)] [return: MarshalAs(UnmanagedType.Bool)] private static extern bool EndpointConvertSecurity(string text, uint revision, out IntPtr descriptor, out uint size);
+    [DllImport("kernel32.dll", EntryPoint = "CreateDirectoryW", CharSet = CharSet.Unicode, SetLastError = true)] [return: MarshalAs(UnmanagedType.Bool)] private static extern bool EndpointCreateDirectory(string path, ref EndpointFixtureSecurity security);
+    [DllImport("kernel32.dll", EntryPoint = "CreateFileW", CharSet = CharSet.Unicode, SetLastError = true)] private static extern SafeFileHandle EndpointCreateFile(string path, uint access, uint sharing, ref EndpointFixtureSecurity security, uint creation, uint flags, IntPtr template);
 }
