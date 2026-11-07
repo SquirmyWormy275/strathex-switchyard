@@ -9,18 +9,18 @@ controls remain unfinished. Original owner retirement, lost acknowledgements and
 Linux save/scan regressions verify. The owned 1,479,448-byte compiler output and
 empty test parent are removed. [Windows source evidence](evidence/windows-scanner-recipe-save-source-summary.json).
 
-Installed Linux `b320506` verifies reviewed-save source within **76 metadata/in-memory
-checks and 34 exact module hashes**. All 54 semantic workspaces, selection, pending
+Installed Linux `5ec16fe` verifies reviewed-save source within **76 metadata/in-memory
+checks and 35 exact module hashes**. All 54 semantic workspaces, selection, pending
 keyboard-only conversation and frozen frontend are preserved; 53 sealed files
 are byte-identical and one changes only audit metadata. All four profiles and
 57 workflows remain compatible. The retained template decodes to its original
 hash. Dated backup and launcher readback verify; current plus one rollback remain.
-The exact 536-file, 4,677,752-byte prepared bundle is removed. No installed save,
+The exact 537-file, 4,692,422-byte prepared bundle is removed. No installed save,
 scanner, provider task, account/model request or hardware operation was invoked.
-[Installed evidence](evidence/installed-scanner-recipe-save-summary.json).
+[Installed evidence](evidence/installed-windows-scanner-recipe-save-summary.json).
 
 Reviewed scanner setup saving now works through the authenticated Linux backend.
-The latest **35 focused groups pass 221 tests**, including a real save, fresh
+The Linux checkpoint’s **35 focused groups pass 221 tests**, including a real save, fresh
 authority review and scanner execution that detects a synthetic secret. A durable
 one-use review binds the exact task/account/workspace, source snapshot, feeds and
 control bytes; interruption recovery verifies owned output without replay or

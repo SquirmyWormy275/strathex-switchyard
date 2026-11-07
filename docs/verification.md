@@ -1,5 +1,19 @@
 # What has actually been verified
 
+## Installed scanner save portability checkpoint
+
+Normal Linux installation of `5ec16fe` passes 76 metadata/in-memory checks and
+35 exact module hashes. All 54 semantic workspaces, four profiles, 57 workflows,
+selection, pending keyboard-only conversation and frozen frontend are preserved.
+Fifty-three sealed files remain byte-identical; one changes audit metadata only.
+The existing print template decodes to its original hash. Dated backup and
+launcher readback verify. Current plus one rollback remain; the exact 537-file,
+4,692,422-byte prepared bundle is removed. No installed save, scanner, provider
+task, account/model request or hardware operation was invoked. This verifies
+installed source/compatibility, not native Windows execution.
+[Installed receipt](evidence/installed-windows-scanner-recipe-save-summary.json).
+
+
 ## Windows scanner save implementation
 
 The fixed NTFS helper now provides exclusive generated-directory/file creation
