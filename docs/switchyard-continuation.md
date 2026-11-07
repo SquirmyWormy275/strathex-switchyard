@@ -74,8 +74,13 @@ foreign replacement and unknown committed outcomes still refuse admission.
    4,813,488-byte bundle is removed. No browser reload, live task or hardware use.
    Two stale hash references and five stale error assertions in host verification
    are corrected; the original failures are retained. Do not repeat this update.
-3. Continue task-specific Windows IDE/project integration and the remaining
-   backend requirements. Command activation and frontend exposure remain frozen.
+3. Audit native CI for the new Windows project-context source. It retains the
+   exact local workspace folder/generation, rejects replacement/reopen/ambiguity,
+   retires the original carrier on departure, and joins signed retirement before
+   transport closure. Eight groups/67 tests/two skips and both typechecks pass.
+   Retained regressions include five stale-context failures and the first
+   correction's original 45-second cleanup timeout. Command activation and
+   frontend exposure remain frozen. Continue independent backend requirements.
 4. Native Codex TUI/account/task/model acceptance remains separate. The version
    contract's real native proof covers initialization/config-read only.
 5. Complete Linux `961ecb3` is audited and cleaned: 348 groups, 2,205 tests and

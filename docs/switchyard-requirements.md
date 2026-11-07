@@ -19,6 +19,12 @@ network-isolated home. Installed Linux `51a73c7` passes 76 metadata/in-memory
 checks and preserves every workspace. Live account/task/model/TUI acceptance
 remains separate. [Contract](codex-version-contract.md).
 
+The Windows editor now binds each review to its original local workspace folder
+and change generation. Departure retires the original carrier; shutdown preserves
+its signed retirement response. Eight groups pass 67 tests with two skips; native
+Windows acceptance and guided project-selection/command activation remain pending.
+[Project context](evidence/windows-editor-project-context-summary.json).
+
 ## Requirement status
 
 | Requirement | Implementation | Validation | Actual paths | UI entry | Tests | Remaining implementation / exact blocked validation |

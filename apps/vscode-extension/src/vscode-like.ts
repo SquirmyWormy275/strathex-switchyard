@@ -18,7 +18,7 @@ export interface ExtensionContextLike {
 }
 
 export interface WorkspaceFolderLike {
-  readonly uri: { readonly fsPath: string };
+  readonly uri: { readonly fsPath: string; readonly scheme?: string };
   readonly name?: string;
 }
 

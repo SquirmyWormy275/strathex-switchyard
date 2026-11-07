@@ -415,3 +415,30 @@ cleanup are verified. Earlier failures remain retained, and the separate
 restricted-storage retirement issue remains unresolved. This accepts the
 synthetic/native boundaries of the lane, not a live TUI/account/task or a physical
 device. [Accepted receipt](evidence/windows-editor-journal-accepted-summary.json).
+
+
+## Project context and retirement
+
+A reviewed Windows launch now retains the exact local-file workspace folder and
+the workspace generation observed for that review. A removed and reopened folder
+cannot reuse the old review, even at the same path and disk identity. Replaced,
+ambiguous and non-file workspace folders are refused. Checks run across native
+file reads, signed review and consumption, terminal creation and later focus.
+
+A workspace change invalidates the saved review and retires its original carrier.
+The user's Terminal and provider remain intact. Shutdown joins outstanding
+requests and the original signed retirement acknowledgement before closing the
+transport; the original five-second request bound remains. Unconfirmed retirement
+still fails explicitly. Fixture cleanup attempts every owned resource and retains
+errors.
+
+Eight focused groups pass 67 tests with two platform skips; both TypeScript
+checks pass. The real carrier demonstration includes project departure and exact
+retirement, with explicit VS Code, native-file/process and provider doubles.
+Native Windows acceptance of this source remains pending. Command registration,
+guided project selection and live native task/TUI acceptance remain separate.
+
+[Project regression and retained failures](evidence/windows-editor-project-context-summary.json).
+The [VS Code workspace implementation](https://github.com/microsoft/vscode/blob/main/src/vs/workbench/api/common/extHostWorkspace.ts)
+returns array copies that retain the underlying folder objects; the launcher
+also binds workspace-change events and rechecks folder path and URI scheme.

@@ -7,14 +7,16 @@ import { StudioWindowsNative } from "./studio-windows-native.ts";
 import { StudioWindowsTaskClient } from "./studio-windows-task-client.ts";
 import type { StudioEditorRequest, StudioEditorSelection } from "./studio-task-client.ts";
 import type { WindowsEditorConnectionReady, WindowsEditorReview, WindowsEditorTarget, WindowsEditorPeer } from "./studio-windows-task-client.ts";
-import type { TerminalLike, VscodeLike } from "./vscode-like.ts";
+import type { TerminalLike, VscodeLike, WorkspaceFolderLike } from "./vscode-like.ts";
 
 type Client = Pick<StudioWindowsTaskClient, "editorTarget" | "returnEditorTarget" | "reviewEditor" | "issueEditor" | "consumeEditor" | "openEditorConnection" | "pinEditorPeer" | "observeEditorConnection" | "stopEditorConnection" | "cancelPending" | "close">;
 type Host = Pick<VscodeLike, "window" | "workspace">;
 const digest = (value: unknown) => createHash("sha256").update(JSON.stringify(value)).digest("hex");
 function requireCurrent(value: unknown): asserts value { if (!value) throw Error("The original reviewed editor launch is no longer current."); }
+interface ProjectContext { readonly folder: WorkspaceFolderLike; readonly generation: number; }
 interface Prepared extends WindowsReviewedImage {
   readonly selection: StudioEditorRequest; readonly review: WindowsEditorReview;
+  readonly project: ProjectContext;
   readonly targetDigest: string;
   attempted: boolean; createCalled: boolean; terminal?: TerminalLike; focusVerified: boolean; process?: WindowsEditorPeer;
   connectionAttempted?: boolean; connection?: WindowsEditorConnectionReady; peerAttempted?: boolean; protocolAcknowledgementObserved?: boolean; retirement?: Promise<void>;
@@ -42,6 +44,8 @@ export class StudioWindowsEditorLauncher {
   private closed = false;
   private closing?: Promise<void>;
   private readonly terminalClose: { dispose(): void };
+  private readonly workspaceChange: { dispose(): void };
+  private projectGeneration = 0;
   private readonly options: Readonly<{ client: Client; host: Host; executable: string; assertCurrent: (target: WindowsEditorTarget) => void | Promise<void>; native: Pick<StudioWindowsNative,"observeTerminal"|"close">; files: WindowsEditorFileChecks; platform: NodeJS.Platform }>;
   constructor(options: { client: Client; host: Host; executable: string; assertCurrent: (target: WindowsEditorTarget) => void | Promise<void>; native: Pick<StudioWindowsNative,"observeTerminal"|"close">; files?: WindowsEditorFileChecks; platform?: NodeJS.Platform }) {
     requireCurrent(windowsEditorLocalPath(options.executable) && options.executable.length>3 && typeof options.assertCurrent === "function");
@@ -52,20 +56,31 @@ export class StudioWindowsEditorLauncher {
         void this.track(() => this.retire(p)).catch(() => undefined);
       }
     });
+    this.workspaceChange = options.host.workspace.onDidChangeWorkspaceFolders(() => {
+      // Removing and reopening a project cannot revive an earlier review, even
+      // when its pathname and on-disk identity are unchanged.
+      this.projectGeneration++;
+      for (const p of this.reviews.values()) {
+        p.focusVerified = false; p.protocolAcknowledgementObserved = false;
+        void this.track(() => this.retire(p)).catch(() => undefined);
+      }
+    });
   }
   private track<T>(fn: () => Promise<T>): Promise<T> {
     const operation = Promise.resolve().then(fn); this.pending.add(operation);
     void operation.then(() => this.pending.delete(operation), () => this.pending.delete(operation)); return operation;
   }
-  private focused(target: WindowsEditorTarget): void {
+  private focused(target: WindowsEditorTarget, project?: ProjectContext): void {
     requireCurrent(this.options.platform === "win32" && !this.closed && this.options.host.window.state.focused);
-    requireCurrent(this.options.host.workspace.workspaceFolders?.some(folder => folder.uri.fsPath === target.repositoryRoot));
+    const matches = this.options.host.workspace.workspaceFolders?.filter(folder => folder.uri.fsPath === target.repositoryRoot);
+    requireCurrent(matches?.length === 1 && matches[0].uri.scheme === "file");
+    if (project) requireCurrent(project.generation === this.projectGeneration && matches[0] === project.folder);
   }
-  private async current(target: WindowsEditorTarget, prepared?: Prepared): Promise<void> {
-    this.focused(target); await this.options.assertCurrent(target); this.focused(target);
+  private async current(target: WindowsEditorTarget, prepared?: Prepared, project = prepared?.project): Promise<void> {
+    this.focused(target, project); await this.options.assertCurrent(target); this.focused(target, project);
     await this.options.files.current(target, prepared);
     requireCurrent(!prepared?.retirement);
-    this.focused(target);
+    this.focused(target, project);
   }
   private retire(p: Prepared): Promise<void> {
     p.protocolAcknowledgementObserved = false;
@@ -83,19 +98,23 @@ export class StudioWindowsEditorLauncher {
     await this.current(p.review.target, p);
     p.protocolAcknowledgementObserved = true;
   }
-  private image(target: WindowsEditorTarget): Promise<WindowsReviewedImage> {
-    return this.options.files.image(this.options.executable, target.endpoint.peerExecutableSha256, () => this.current(target));
+  private image(target: WindowsEditorTarget, project: ProjectContext): Promise<WindowsReviewedImage> {
+    return this.options.files.image(this.options.executable, target.endpoint.peerExecutableSha256, () => this.current(target, undefined, project));
   }
   review(input: StudioEditorSelection): Promise<WindowsEditorReview> {
     // The client validates this copied closed selection before any I/O.
     const selected = Object.freeze({ ...input });
     return this.track(async () => {
       requireCurrent(!this.closed && this.reviews.size < 64);
-      const observed = await this.options.client.editorTarget(selected); await this.current(observed.target);
-      const image = await this.image(observed.target), selection = Object.freeze({ ...selected, requestId: randomUUID(), editorId: this.editorId });
+      const generation = this.projectGeneration;
+      const observed = await this.options.client.editorTarget(selected);
+      requireCurrent(generation === this.projectGeneration); this.focused(observed.target);
+      const project = Object.freeze({ generation, folder: this.options.host.workspace.workspaceFolders!.find(folder => folder.uri.fsPath === observed.target.repositoryRoot)! });
+      await this.current(observed.target, undefined, project);
+      const image = await this.image(observed.target, project), selection = Object.freeze({ ...selected, requestId: randomUUID(), editorId: this.editorId });
       const review = await this.options.client.reviewEditor(selection);
       requireCurrent(digest(review.target) === observed.targetDigest);
-      const prepared: Prepared = { selection, review, targetDigest: observed.targetDigest, ...image, attempted: false, createCalled: false, focusVerified: false };
+      const prepared: Prepared = { selection, review, project, targetDigest: observed.targetDigest, ...image, attempted: false, createCalled: false, focusVerified: false };
       await this.current(review.target, prepared); requireCurrent(this.reviews.size < 64);
       this.reviews.set(review, prepared); return review;
     });
@@ -121,7 +140,7 @@ export class StudioWindowsEditorLauncher {
       requireCurrent("endpoint" in connection && connection.duplicatePrevented === false);
       p.connection = connection; await current();
       const { shellArgs, env } = codexWindowsTerminalResume(review.target.sessionId, review.target.repositoryRoot, connection.endpoint);
-      this.focused(review.target); p.createCalled = true;
+      this.focused(review.target, p.project); p.createCalled = true;
       p.terminal = this.options.host.window.createTerminal({ name: "Switchyard · Codex task", cwd: review.target.repositoryRoot, shellPath: p.executable, shellArgs, env });
       requireCurrent(p.terminal);
       // Keep this exact object even if focus or a later context check fails.
@@ -186,8 +205,12 @@ export class StudioWindowsEditorLauncher {
   }
   close(): Promise<void> {
     if (this.closing) return this.closing;
-    this.closed = true; this.processAbort.abort(); this.terminalClose.dispose(); this.options.client.cancelPending();
+    this.closed = true; this.processAbort.abort(); this.terminalClose.dispose(); this.workspaceChange.dispose();
     this.closing = (async () => {
+      // Existing signed exchanges retain their original five-second bound.
+      // Cancelling them here can destroy an in-flight retirement acknowledgement
+      // and turn confirmed cleanup into an unknown outcome. New work is closed;
+      // join the original operations before closing the client transport.
       await Promise.allSettled([...this.pending]);
       const results = await Promise.allSettled([...this.reviews.values()].map(p => this.retire(p)));
       this.options.client.close();

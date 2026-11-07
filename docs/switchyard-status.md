@@ -27,6 +27,13 @@ home. No account, thread or model request is sent; its original tree and 66
 generated files are removed. The native Windows client lane also passes all 237 tests at this exact source. Installed Linux `51a73c7` now includes this contract and passes 76 metadata/in-memory checks while preserving all 54 workspace snapshots.
 [Version contract and evidence](codex-version-contract.md).
 
+Windows project reviews now bind the original local workspace folder and
+invalidate on workspace changes. Leaving the project retires the original carrier
+while preserving the user's terminal. Shutdown joins the signed retirement
+response before closing transport. Eight focused groups pass 67 tests with two
+platform skips and both TypeScript checks pass; native acceptance is pending.
+[Project-context evidence](evidence/windows-editor-project-context-summary.json).
+
 ## Current evidence
 
 Each result belongs to its exact source revision. Test totals from different

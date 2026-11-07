@@ -34,11 +34,17 @@ async function fixture(t:TestContext){
   const client=new StudioWindowsTaskClient({readEndpoint:async()=>JSON.stringify({schema:'switchyard-active-endpoint/v1',instance:identity,pid:process.pid,url:origin+'/#access='+token}),assertCurrent:async()=>{}});
   const state={focused:true},terminals:TerminalLike[]=[],calls:TerminalOptionsLike[]=[],closed=new Set<(terminal:TerminalLike)=>unknown>(),active=new Set<(terminal:TerminalLike|undefined)=>unknown>();let activeTerminal:TerminalLike|undefined,nativeCalls=0,nativeClosed=0;
   const window={state,terminals,get activeTerminal(){return activeTerminal;},createTerminal(options:TerminalOptionsLike){calls.push(options);if(controls.createThrows)throw Error('synthetic partial creation');const terminal:TerminalLike={name:options.name,processId:Promise.resolve(123),show(){if(controls.showThrows)throw Error('synthetic focus failure');activeTerminal=terminal;for(const fn of active)fn(terminal);},sendText(){throw Error('NEVER_SEND_TEXT');}};terminals.push(terminal);controls.afterCreate?.();return terminal;},onDidCloseTerminal(fn:(terminal:TerminalLike)=>unknown){closed.add(fn);return{dispose(){closed.delete(fn);}};},onDidChangeActiveTerminal(fn:(terminal:TerminalLike|undefined)=>unknown){active.add(fn);return{dispose(){active.delete(fn);}};}};
-  const workspace={workspaceFolders:[{uri:{fsPath:target.repositoryRoot}}]},launcher=new StudioWindowsEditorLauncher({client,host:{window,workspace} as unknown as Pick<VscodeLike,'window'|'workspace'>,executable,platform:'win32',assertCurrent:async()=>assert.ok(!controls.contextChanged),
+  const workspaceListeners=new Set<()=>unknown>(),workspace={workspaceFolders:[{uri:{scheme:'file',fsPath:target.repositoryRoot}}],onDidChangeWorkspaceFolders(fn:()=>unknown){workspaceListeners.add(fn);return{dispose(){workspaceListeners.delete(fn);}};}},launcher=new StudioWindowsEditorLauncher({client,host:{window,workspace} as unknown as Pick<VscodeLike,'window'|'workspace'>,executable,platform:'win32',assertCurrent:async()=>assert.ok(!controls.contextChanged),
     files:{image:async(path,sha,current)=>{await current();assert.equal(path,executable);assert.equal(sha,image.sha256);return{executable,executableIdentity:'synthetic image identity',image};},current:async()=>{assert.ok(!controls.filesChanged);}},
     native:{observeTerminal:async options=>{nativeCalls++;await options.assertCurrent();assert.equal(await options.terminal.processId,123);await controls.nativeHold?.(options.signal);assert.equal(options.signal.aborted,false);await options.assertCurrent();return{processId:123,expectedBirth:'133000000000000099',image};},close:async()=>{nativeClosed++;}}});
-  t.after(async()=>{if(controls.expectedCloseFailure)await assert.rejects(launcher.close());else await launcher.close();await auth.close();server.closeAllConnections();await new Promise<void>(resolve=>server.close(()=>resolve()));assert.equal(closed.size,0);assert.equal(active.size,0);await rm(root,{recursive:true});});
-  return{launcher,selected,target,endpoint,executable,controls,routes,connections,calls,terminals,state,workspace,store,counts:()=>({nativeCalls,nativeClosed}),closeTerminal:()=>{const terminal=terminals.shift()!;for(const fn of closed)fn(terminal);}};
+  t.after(async()=>{const failures:unknown[]=[];for(const cleanup of [
+    async()=>{if(controls.expectedCloseFailure)await assert.rejects(launcher.close());else await launcher.close();},
+    async()=>{await auth.close();},
+    async()=>{server.closeAllConnections();await new Promise<void>(resolve=>server.close(()=>resolve()));},
+    async()=>{assert.equal(closed.size,0);assert.equal(active.size,0);assert.equal(workspaceListeners.size,0);},
+    async()=>{await rm(root,{recursive:true});}
+  ]){try{await cleanup();}catch(error){failures.push(error);}}if(failures.length)throw new AggregateError(failures,'Original Windows launcher fixture cleanup failed.');});
+  return{launcher,selected,target,endpoint,executable,controls,routes,connections,calls,terminals,state,workspace,store,changeWorkspace:()=>{for(const fn of workspaceListeners)fn();},counts:()=>({nativeCalls,nativeClosed}),closeTerminal:()=>{const terminal=terminals.shift()!;for(const fn of closed)fn(terminal);}};
 }
 test('a reviewed Windows launch consumes signed permission once, retains its Terminal, and puts the bearer only in its environment',async t=>{
   const f=await fixture(t),review=await f.launcher.review(f.selected);assert.equal(f.calls.length,0);const result=await f.launcher.launch(review);assert.equal(f.calls.length,1);
@@ -62,4 +68,46 @@ test('shutdown joins a held native terminal query before retiring the carrier an
 test('closed terminals cannot be recreated and uncertain carrier retirement remains a failure',async t=>{
   const f=await fixture(t),review=await f.launcher.review(f.selected);await f.launcher.launch(review);f.closeTerminal();await assert.rejects(f.launcher.focus(review));await assert.rejects(f.launcher.launch(review));assert.equal(f.calls.length,1);
   const g=await fixture(t),other=await g.launcher.review(g.selected);await g.launcher.launch(other);g.controls.stopUncertain=true;g.controls.expectedCloseFailure=true;await assert.rejects(g.launcher.close());assert.equal(g.counts().nativeClosed,1);
+});
+
+test('a removed and reopened Windows project requires a fresh review even at the same path',async t=>{
+  const f=await fixture(t),review=await f.launcher.review(f.selected),original=f.workspace.workspaceFolders[0];
+  f.workspace.workspaceFolders=[];f.changeWorkspace();f.workspace.workspaceFolders=[original];f.changeWorkspace();
+  await assert.rejects(f.launcher.launch(review));assert.equal(f.calls.length,0);assert.equal(f.routes.includes('consume'),false);
+  const fresh=await f.launcher.review(f.selected);assert.equal((await f.launcher.launch(fresh)).protocolAcknowledgementObserved,true);assert.equal(f.calls.length,1);
+});
+test('Windows project identity is checked again after the signed review response',async t=>{
+  const f=await fixture(t);f.controls.after=action=>{if(action==='review')f.changeWorkspace();};
+  await assert.rejects(f.launcher.review(f.selected));assert.equal(f.calls.length,0);assert.deepEqual(f.routes,['review']);
+});
+test('replaced, ambiguous and non-file workspace folders cannot inherit a Windows project review',async t=>{
+  for(const drift of ['replacement','duplicate','remote']){
+    const f=await fixture(t),review=await f.launcher.review(f.selected);
+    if(drift==='replacement')f.workspace.workspaceFolders=[{uri:{scheme:'file',fsPath:f.target.repositoryRoot}}];
+    if(drift==='duplicate')f.workspace.workspaceFolders.push(f.workspace.workspaceFolders[0]);
+    if(drift==='remote')f.workspace.workspaceFolders[0].uri.scheme='vscode-remote';
+    await assert.rejects(f.launcher.launch(review));assert.equal(f.calls.length,0);assert.equal(f.connections.length,0);
+  }
+});
+test('Windows workspace change during carrier open retires the original attempt before terminal creation',async t=>{
+  const f=await fixture(t),review=await f.launcher.review(f.selected);f.controls.after=action=>{if(action==='open')f.changeWorkspace();};
+  await assert.rejects(f.launcher.launch(review));assert.equal(f.calls.length,0);await f.launcher.close();assert.equal(f.connections.filter(v=>v==='stop').length,1);
+});
+test('Windows project departure retires the retained carrier and preserves its exact user terminal',async t=>{
+  for(const uncertain of [false,true]){
+    const f=await fixture(t),review=await f.launcher.review(f.selected);await f.launcher.launch(review);const terminal=f.terminals[0];
+    f.controls.stopUncertain=uncertain;f.controls.expectedCloseFailure=uncertain;f.changeWorkspace();
+    assert.equal(f.launcher.observation(review).protocolAcknowledgementObserved,false);assert.equal(f.launcher.observation(review).focusVerified,false);
+    await assert.rejects(f.launcher.focus(review));if(uncertain)await assert.rejects(f.launcher.close());else await f.launcher.close();
+    assert.equal(f.connections.filter(v=>v==='stop').length,1);assert.equal(f.calls.length,1);assert.equal(f.terminals[0],terminal);
+  }
+});
+
+test('shutdown joins an already-started signed project retirement response',async t=>{
+  const f=await fixture(t),review=await f.launcher.review(f.selected);await f.launcher.launch(review);
+  let enter!:()=>void,release!:()=>void;const entered=new Promise<void>(r=>enter=r),held=new Promise<void>(r=>release=r);
+  f.controls.after=async action=>{if(action==='stop'){enter();await held;}};f.changeWorkspace();await entered;
+  let closed=false;const closing=f.launcher.close().then(()=>{closed=true;});
+  try{await new Promise(r=>setImmediate(r));assert.equal(closed,false);}finally{release();}
+  await closing;assert.equal(f.connections.filter(v=>v==='stop').length,1);assert.equal(f.calls.length,1);assert.equal(f.terminals.length,1);
 });
