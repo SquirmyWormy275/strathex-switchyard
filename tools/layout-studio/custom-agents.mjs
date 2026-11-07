@@ -140,10 +140,11 @@ export function createCustomAgents({ store, now = () => Date.now() }) {
       const payload = { schema: agentResponseSchema, requestSequence: body.sequence, sessionId: body.sessionId, result };
       return { payload, signature: responseMac(token, path, 200, JSON.stringify(payload)) };
     },
-    async dispatch(compartment, { agentId, intent, sessionId, content, credentialEpoch }, { assertCurrentState = () => {} } = {}) {
+    async dispatch(compartment, { agentId, intent, sessionId, content, credentialEpoch }, { assertCurrent = async () => {}, assertCurrentState = () => {} } = {}) {
       await store.authorize(compartment, { provider: "custom-agent" });
       if (!agentIntents.includes(intent) || content != null && (typeof content !== "string" || content.length > 12000)) throw new Error("Agent intent or reviewed content is invalid.");
-      return store.update(compartment, "agent-intent", (s) => {
+      return store.update(compartment, "agent-intent", async (s) => {
+        await assertCurrent();
         // The trusted role guard runs synchronously under the same state lease as enqueue.
         assertCurrentState(s);
         const a = s.agents.find((a) => a.id === agentId);

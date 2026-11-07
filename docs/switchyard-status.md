@@ -73,8 +73,11 @@ Custom-agent dispatch now checks its original role binding atomically with
 enqueue. Rebinding, editing or removing the role refuses a pending request;
 already queued commands remain with their original session. Seven new cases
 pass, including five reproduced regressions, and six focused groups pass 88 tests
-with one platform skip. Other provider effect boundaries and active-workspace
-lifecycle checks remain separate work. This correction is not installed yet.
+with one platform skip. The follow-up workspace fence passes seven groups and
+106 tests with one skip: departure attempts, round trips and shutdown cannot
+revive a pending custom-agent shortcut, and native-focus/client-launch callbacks
+receive the same generation guard. Other provider effect boundaries remain
+separate work. These corrections are not installed yet.
 [Role dispatch evidence and limitations](role-dispatch-binding.md).
 
 ## Current evidence

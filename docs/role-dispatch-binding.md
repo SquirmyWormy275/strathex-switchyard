@@ -21,10 +21,24 @@ six-group check passes 88 tests with one declared Windows-only skip; both
 TypeScript checks pass. Original process bounds and cleanup verify.
 [Source evidence](evidence/role-dispatch-binding-source-summary.json).
 
-This is a source-level correction; the installed application remains `738c1f7`.
-The atomic enqueue check covers custom agents. Other provider adapters still
-need equivalent checks immediately before their native effects. The shared final
-history check prevents stale attribution, but does not prevent an earlier native
-effect. Active-workspace changes during physical role dispatch also need their
-own lifecycle check. No live account, model, installed agent, keyboard or frontend
-operation was used for this verification.
+A physical shortcut also captures the active workspace's selection generation.
+Starting a departure invalidates the request even if the departure fails or the
+user returns to the same workspace. The custom-agent enqueue checks the saved
+selection and the active generation under its state lease; shutdown refuses the
+pending command. The existing native-focus and fixed-client-launch callbacks
+receive the same workspace guard. A fresh request after deliberately returning
+works normally. Commands already queued keep their original session.
+
+Five additional cases reproduced the earlier workspace race. The expanded check
+passes seven groups, 106 tests and one declared platform skip, with both
+TypeScript checks. It includes authenticated HTTP native-focus doubles, round-trip
+workspace changes and a failed departure. The generation belongs to the running
+Suite; a separate process rewriting selection away and back entirely between
+reads is outside this generation check.
+[Workspace lifecycle evidence](evidence/physical-workspace-lifecycle-source-summary.json).
+
+These are source-level corrections; the installed application remains `738c1f7`.
+Other provider adapters still need equivalent checks immediately before their
+native effects. The shared final history check prevents stale attribution, but
+does not prevent an earlier native effect. No live account, model, installed
+agent, keyboard or frontend operation was used for this verification.

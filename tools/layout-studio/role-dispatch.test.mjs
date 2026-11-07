@@ -7,7 +7,7 @@ import { createSuiteStore } from "./suite-store.mjs";
 import { createSuite } from "./suite.mjs";
 import { agentRoutes, agentMessageSchema, requestMac, responseMac } from "../../integrations/agent-protocol.mjs";
 
-async function fixture(fn) {
+async function fixture(fn, overrides = {}) {
   const root = await mkdtemp(join(tmpdir(), "switchyard-role-dispatch-"));
   const keys = new Map(), pending = new Set();
   const store = createSuiteStore({ root, secrets: {
@@ -30,7 +30,7 @@ async function fixture(fn) {
     releases.push(release); gate = { operation, enter, wait };
     return { entered, release };
   };
-  const suite = createSuite({ store, agents: { discovery: async () => [], close: async () => {} }, voice: { discovery: async () => ({ available: false }) } });
+  const suite = createSuite({ store, agents: { discovery: async () => [], close: async () => {} }, voice: { discovery: async () => ({ available: false }) }, ...overrides });
   const enrollments = new Map();
   const send = async (id, path, fields = {}) => {
     const enrollment = enrollments.get(id);
@@ -43,9 +43,9 @@ async function fixture(fn) {
     return reply.payload.result;
   };
   const bind = (targetId = "alpha") => suite.handle("/api/suite/roles/bind", { roleId: "operator", provider: "custom-agent", targetId, intent: "status" });
-  const dispatch = () => {
+  const dispatch = (physical = false) => {
     // Attach both handlers immediately: a refusal may settle while the fixture is changing the binding.
-    const result = suite.handle("/api/suite/roles/dispatch", { roleId: "operator", intent: "status" }).then(value => ({ value }), error => ({ error }));
+    const result = suite.handle(physical ? "/api/suite/intent" : "/api/suite/roles/dispatch", { roleId: "operator", intent: "status", ...(physical ? { implementation: "switchyard.role/v1" } : {}) }).then(value => ({ value }), error => ({ error }));
     pending.add(result); return result;
   };
   try {
@@ -58,7 +58,7 @@ async function fixture(fn) {
       await send(id, agentRoutes.event, { event: { status: "ready" } });
     }
     await bind();
-    await fn({ store, bind, dispatch, pause, send });
+    await fn({ suite, store, bind, dispatch, pause, send });
   } finally {
     for (const release of releases) release();
     await Promise.allSettled(pending);
@@ -123,3 +123,56 @@ test("unrebound legacy role bindings remain usable until deliberately replaced",
   await store.update("personal", "synthetic-legacy-binding", state => { delete state.roleBindings[0].bindingId; });
   assert.equal((await dispatch()).value.status, "queued");
 }));
+
+for (const change of ["another workspace", "away and back", "saved selection", "shutdown"]) {
+  test(`a physical role intent refuses ${change} before enqueue`, () => fixture(async ({ suite, store, dispatch, pause }) => {
+    await suite.handle("/api/suite/compartment/create", { compartment: "second" });
+    const held = pause("agent-intent"), result = dispatch(true);
+    await held.entered;
+    if (change === "shutdown") await suite.close();
+    else if (change === "saved selection") await store.selection("second");
+    else {
+      await suite.handle("/api/suite/compartment/select", { compartment: "second" });
+      if (change === "away and back") await suite.handle("/api/suite/compartment/select", { compartment: "personal" });
+    }
+    held.release();
+    assert.match((await result).error?.message ?? "command was accepted", /workspace changed/);
+    const state = await store.snapshot("personal");
+    assert.equal(state.agents.every(agent => agent.commands.length === 0), true);
+    assert.equal(state.intentResults?.length ?? 0, 0);
+    assert.equal((await store.snapshot("second")).agents.length, 0);
+  }));
+}
+
+test("a workspace change after physical enqueue preserves the original command and refuses stale attribution", () => fixture(async ({ suite, store, dispatch, pause, send }) => {
+  await suite.handle("/api/suite/compartment/create", { compartment: "second" });
+  const held = pause("role-intent-result"), result = dispatch(true);
+  await held.entered;
+  const original = (await store.snapshot("personal")).agents.find(agent => agent.id === "alpha").commands[0];
+  await suite.handle("/api/suite/compartment/select", { compartment: "second" });
+  held.release();
+  assert.match((await result).error?.message ?? "result was attributed", /workspace changed/);
+  const state = await store.snapshot("personal");
+  assert.deepEqual(state.agents.find(agent => agent.id === "alpha").commands, [original]);
+  assert.equal(state.intentResults?.length ?? 0, 0);
+  assert.equal((await send("alpha", agentRoutes.poll)).command.id, original.id);
+  assert.equal((await send("alpha", agentRoutes.poll)).command, null);
+}));
+
+test("a fresh physical role intent works after deliberately returning to its workspace", () => fixture(async ({ suite, dispatch }) => {
+  await suite.handle("/api/suite/compartment/create", { compartment: "second" });
+  await suite.handle("/api/suite/compartment/select", { compartment: "second" });
+  await suite.handle("/api/suite/compartment/select", { compartment: "personal" });
+  assert.equal((await dispatch(true)).value.status, "queued");
+}));
+
+test("an unsuccessful workspace departure cannot revive an earlier physical intent", () => fixture(async ({ suite, store, dispatch, pause }) => {
+  await suite.handle("/api/suite/compartment/create", { compartment: "second" });
+  const held = pause("agent-intent"), result = dispatch(true);
+  await held.entered;
+  await assert.rejects(suite.handle("/api/suite/compartment/select", { compartment: "second" }), /owner has not verified exit/);
+  assert.equal(await store.selection(), "personal");
+  held.release();
+  assert.match((await result).error?.message ?? "command was accepted", /workspace changed/);
+  assert.equal((await store.snapshot("personal")).agents.every(agent => agent.commands.length === 0), true);
+}, { codingTaskOwners: { stopCompartment: async () => ({ stopped: false }), close: async () => [] } }));

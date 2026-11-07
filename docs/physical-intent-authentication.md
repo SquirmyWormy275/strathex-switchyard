@@ -28,6 +28,11 @@ the caller must inspect the original target before another deliberate action.
 Successful local dispatch still does not establish a physical keyboard event,
 external application focus, resumed task, model prompt or task completion.
 
+The pending source update also fences custom-agent enqueue and the existing
+native-focus/client-launch callbacks with the original workspace generation.
+Leaving and returning cannot revive an older shortcut. Commands already queued
+stay with their original session. [Role and workspace boundaries](role-dispatch-binding.md).
+
 ## Verification and current availability
 
 Twenty-seven focused groups pass 136 tests with one declared platform skip. A

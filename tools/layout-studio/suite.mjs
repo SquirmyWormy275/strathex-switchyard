@@ -65,6 +65,7 @@ export function createSuite({ store = createSuiteStore(), platform = process.pla
   const uncertainExamples = new Set(), exampleRetirements = new WeakMap();
   const started = new Set(), initializing = new Map(), monitors = new Map();
   let activeCompartment = "personal";
+  let selectionGeneration = 0;
   let selectionLoaded = false;
   let selectionLoading;
   let closed = false;
@@ -143,6 +144,20 @@ export function createSuite({ store = createSuiteStore(), platform = process.pla
     selectionLoading ??= (async () => { await initialize("personal"); activeCompartment = await store.selection(); await initialize(activeCompartment); selectionLoaded = true; })().finally(() => { selectionLoading = null; });
     await selectionLoading;
   }
+  function selectedIntentContext(selected) {
+    const generation = selectionGeneration;
+    const changed = () => new Error("The selected shortcut workspace changed; no alternate target or automatic retry was selected.");
+    const assertCurrentState = () => {
+      if (closed || generation !== selectionGeneration || copilotTransitions.has(selected) || selected !== activeCompartment) throw changed();
+    };
+    const assertCurrent = async () => {
+      assertCurrentState();
+      const saved = await store.selection();
+      assertCurrentState();
+      if (saved !== selected) throw changed();
+    };
+    return { assertCurrent, assertCurrentState };
+  }
   function roleTarget(state, roleId, intent) {
     if (!agentIntents.includes(intent) || !state.workflow.roles.some((r) => r.id === roleId)) throw new Error("Choose an existing workflow role and supported intent.");
     const binding = state.roleBindings?.find((b) => b.roleId === roleId && b.intent === intent);
@@ -216,7 +231,7 @@ export function createSuite({ store = createSuiteStore(), platform = process.pla
       if (path === "/api/suite/compartment/select") {
         await loadSelection();
         const previous = activeCompartment, switching = previous !== compartment;
-        if (switching) copilotTransitions.set(previous, (copilotTransitions.get(previous) ?? 0) + 1);
+        if (switching) { selectionGeneration++; copilotTransitions.set(previous, (copilotTransitions.get(previous) ?? 0) + 1); }
         try {
         if (activeCompartment !== compartment) {
           await copilot.stopCompartment?.(activeCompartment);
@@ -500,18 +515,20 @@ export function createSuite({ store = createSuiteStore(), platform = process.pla
       if (path === "/api/suite/intent") {
         if (Object.keys(body).some(k => !["compartment", "implementation", "roleId", "intent", "requestId", "workspaceBaseUrl"].includes(k))) throw new Error("Physical dispatch is outside the closed intent contract.");
         await loadSelection();
+        const selected = activeCompartment, context = selectedIntentContext(selected);
         if (Object.hasOwn(nativeFocusImplementations, body.implementation)) {
-          const native = nativeFocusImplementations[body.implementation], selected = activeCompartment;
+          const native = nativeFocusImplementations[body.implementation];
           const assertCurrent = async () => {
-            if (closed || copilotTransitions.has(selected) || selected !== activeCompartment || await store.selection() !== selected) throw new Error("The selected native client workspace changed; no alternate target was selected.");
+            await context.assertCurrent();
             await store.authorize(selected, { provider: native.provider });
+            context.assertCurrentState();
           };
           await assertCurrent();
           if (platform === "win32") return windowsNativeFocus.focus(selected, body.implementation, { requestId: body.requestId, assertCurrent });
           await this.authorizeConnection(selected, { implementation: body.implementation });
           return native.focus(hypr, { readProcess: nativeProcess, assertCurrent });
         }
-        if (body.implementation === "switchyard.role/v1") return this.dispatchRole(activeCompartment, body.roleId, body.intent, undefined, body.requestId);
+        if (body.implementation === "switchyard.role/v1") return this.dispatchRole(selected, body.roleId, body.intent, undefined, body.requestId, context);
         throw new Error("The physical intent is outside the closed implementation map.");
       }
       if (path === "/api/suite/snapshot") {
@@ -602,21 +619,23 @@ export function createSuite({ store = createSuiteStore(), platform = process.pla
       if (path === "/api/suite/route/check") { await store.route(compartment, body.destination, "synthetic-boundary-check", body.provider); return { allowed: true }; }
       throw new Error("That suite operation is unavailable. No alternate action was executed.");
     },
-    async dispatchRole(compartment, roleId, intent, content, requestId) {
+    async dispatchRole(compartment, roleId, intent, content, requestId, { assertCurrent: assertContextCurrent = async () => {}, assertCurrentState: assertContextState = () => {} } = {}) {
       const s = await store.snapshot(compartment), b = roleTarget(s, roleId, intent);
       const digest = roleBindingDigest(s, b);
       const assertCurrentState = state => {
+        assertContextState();
         const binding = state.roleBindings?.find(candidate => candidate.roleId === roleId && candidate.intent === intent);
         if (roleBindingDigest(state, binding) !== digest) throw new Error("The exact role binding changed before dispatch settled. Any command already queued remains with its original session; no alternate target or automatic retry was selected.");
       };
+      await assertContextCurrent();
       await store.authorize(compartment, { provider: b.provider });
       let result;
       if (b.targetKind === "client-surface") {
         if (content !== undefined) throw new Error("A homepage launch cannot receive workflow content, prompts or handoffs.");
-        result = await clientLaunch.launch(compartment, { compartment, id: b.targetId, requestId }, { digest, assertCurrent: async () => { const current = await store.snapshot(compartment); assertCurrentState(current); roleTarget(current, roleId, intent); } });
+        result = await clientLaunch.launch(compartment, { compartment, id: b.targetId, requestId }, { digest, assertCurrent: async () => { await assertContextCurrent(); const current = await store.snapshot(compartment); assertCurrentState(current); roleTarget(current, roleId, intent); } });
       }
       else if (b.targetKind === "coding-task") result = b.provider === "claude-code" ? await (intent === "summon" ? claudeCoding.focus(compartment, b.targetId) : claudeCoding.status(compartment, b.targetId)) : await (intent === "resume" ? coding.resume(compartment, b.targetId) : coding.status(compartment, b.targetId));
-      else if (b.provider === "custom-agent") result = await custom.dispatch(compartment, { agentId: b.targetId, intent, sessionId: b.sessionId, content, credentialEpoch: b.credentialEpoch ?? "legacy" }, { assertCurrentState });
+      else if (b.provider === "custom-agent") result = await custom.dispatch(compartment, { agentId: b.targetId, intent, sessionId: b.sessionId, content, credentialEpoch: b.credentialEpoch ?? "legacy" }, { assertCurrent: assertContextCurrent, assertCurrentState });
       else {
         const c = s.conversations.find((c) => c.id === b.targetId && c.provider === b.provider && c.sessionId === b.sessionId);
         if (!c) throw new Error("This exact role target changed or disappeared. Rebind it deliberately.");
@@ -629,7 +648,7 @@ export function createSuite({ store = createSuiteStore(), platform = process.pla
           result = await (b.provider === "microsoft-365-copilot" ? copilot : agents).design({ compartment, provider: b.provider, message, plan: s.profile.plan, conversationId: c.id });
         }
       }
-      await store.update(compartment, "role-intent-result", (state) => { assertCurrentState(state); if (b.targetKind === "coding-task") state.activeCodingSessionId = b.targetId; else if (b.targetKind !== "client-surface" && b.provider !== "custom-agent") state.activeConversationId = b.targetId; state.intentResults = [...(state.intentResults ?? []).slice(-31), { at: Date.now(), roleId, intent, result }]; }, { provider: b.provider });
+      await store.update(compartment, "role-intent-result", async (state) => { await assertContextCurrent(); assertCurrentState(state); if (b.targetKind === "coding-task") state.activeCodingSessionId = b.targetId; else if (b.targetKind !== "client-surface" && b.provider !== "custom-agent") state.activeConversationId = b.targetId; state.intentResults = [...(state.intentResults ?? []).slice(-31), { at: Date.now(), roleId, intent, result }]; }, { provider: b.provider });
       return result;
     },
     async authorizeConnection(compartment, connection = { implementation: "native-chatgpt.focus/v1" }) {
