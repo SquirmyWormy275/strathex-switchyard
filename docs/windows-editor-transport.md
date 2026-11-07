@@ -73,7 +73,13 @@ accepted retirement record.
 Fourteen focused groups pass **127 tests with three platform skips**; typecheck
 passes. Tests use real sockets with explicit provider/native-peer doubles,
 including cancellation during startup/acknowledgement and failed retirement.
-The composed connection is registered in Windows client CI. This evidence does
-not establish durable Windows task ownership, journal recovery, Suite routes,
+The composed connection now passes Windows client CI at `f1167c9`: twelve groups,
+127 tests and no skips. Its provider/peer doubles remain explicit; the separate
+carrier case uses actual native Windows queries.
+[Native composition evidence](evidence/windows-editor-connection-native-summary.json).
+This evidence does not establish durable Windows task ownership, journal recovery, Suite routes,
 VS Code launching or a live installed-account task.
 [Composition evidence](evidence/windows-editor-connection-source-summary.json).
+
+The next [persistent process layer](windows-owned-stdio.md) is implemented with
+separate source tests. Its actual Windows Job cases await CI acceptance.

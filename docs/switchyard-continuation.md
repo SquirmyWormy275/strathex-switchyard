@@ -40,22 +40,25 @@ instructions. Do not merge or release.
 
 ## Current installed and source checkpoint
 
-The Windows carrier now composes with the restricted exact-task protocol.
-An already retained provider client checks the original Windows repository,
-task and account; the task reply waits for durable acknowledgement. Cancellation
-joins startup and pending callbacks, and unconfirmed provider/helper exit cannot
-become accepted retirement. **Fourteen focused groups pass 127 tests with three
-platform skips**; typecheck passes. Real sockets use explicit provider/native-peer
-doubles. Durable Windows task ownership, journal recovery, Suite routes and
-VS Code launching remain unfinished.
-[Transport and composition contract](windows-editor-transport.md),
-[source evidence](evidence/windows-editor-connection-source-summary.json).
+The Windows persistent process layer is implemented: retained guardian and
+suspended-worker checkpoints, acknowledged bounded byte streams, parent-loss
+Job containment and independent retirement. **Seventeen focused groups pass
+142 tests with eleven declared platform skips**; typecheck and offline compilation
+of 35 C# sources pass without warnings. The exact 33-file, 1,561,459-byte compiler
+output is removed. No new SDK/runtime/dependency download was added. Three actual
+Windows Job cases await CI; local byte-stream cases use an explicit guardian
+double. Persistent Codex task ownership, durable journal recovery, Suite routes
+and VS Code launching remain unfinished.
+[Process contract](windows-owned-stdio.md),
+[source evidence](evidence/windows-owned-stdio-source-summary.json).
 
-Native Windows carrier acceptance passes at `233cd76`: **eleven client groups,
-119 tests, no skips**, including an authenticated round trip with an owned Windows
-process. Exact source/merge trees, artifact digest, original commands, bounds and
-cleanup verify. This source predates the new task-protocol composition.
-[Native carrier evidence](evidence/windows-editor-ingress-native-summary.json).
+The earlier editor transport and exact-task composition now pass native Windows
+client CI at `f1167c9`: **twelve groups, 127 tests, no skips**. Exact source/merge
+trees, artifact digest, original commands, bounds and cleanup verify. Composition
+uses explicit provider/peer doubles; the separate carrier round trip uses actual
+Windows process queries. This source predates the persistent process layer.
+[Native composition evidence](evidence/windows-editor-connection-native-summary.json),
+[editor contract](windows-editor-transport.md).
 
 Complete Linux `edb76de` passes **330 groups, 2,074 tests and 21 declared
 platform skips**, with zero failures or cancellations. Exact original inventory,

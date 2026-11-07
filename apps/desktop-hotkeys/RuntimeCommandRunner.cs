@@ -9,7 +9,7 @@ using Microsoft.Win32.SafeHandles;
 // Private stdio native-command protocol, separate from keyboard/window APIs.
 // Creation-time Job Object assignment prevents even a suspended orphan escaping
 // when the owner or this guardian disappears during CreateProcess.
-internal static class RuntimeCommandRunner
+internal static partial class RuntimeCommandRunner
 {
     private const string Schema = "switchyard-runtime-command/v1";
     private static readonly object Lifecycle = new();
@@ -62,13 +62,13 @@ internal static class RuntimeCommandRunner
         RequireWorkerApi(created, observation);
         read = createdRead; write = createdWrite;
     }
-    private static async Task<string?> ReadLineBounded(TextReader reader)
+    private static async Task<string?> ReadLineBounded(TextReader reader, int limit = 1048576)
     {
         var value = new StringBuilder(); var buffer = new char[1];
         while (await reader.ReadAsync(buffer.AsMemory()) != 0)
         {
             if (buffer[0] == '\n') return value.ToString();
-            if (buffer[0] == '\r' || value.Length >= 1048576) throw NativeError();
+            if (buffer[0] == '\r' || value.Length >= limit) throw NativeError();
             value.Append(buffer[0]);
         }
         return value.Length == 0 ? null : throw NativeError();
