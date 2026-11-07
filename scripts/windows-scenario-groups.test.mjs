@@ -75,7 +75,13 @@ test("native filesystem, setup and restricted exchange CI lanes preserve every o
   assert.equal(selectWindowsContractGroups(["tools/layout-studio/repository-windows-shield-licenses.test.mjs"], requiredGroups).length, 1);
   for (const name of ["copilot-account-binding", "copilot-lifecycle", "copilot-requests"]) assert.equal(selectWindowsContractGroups(["tools/layout-studio/" + name + ".test.mjs"], requiredGroups).length, 1);
   const save = "tools/layout-studio/windows-scanner-recipe-files.test.mjs";
-  assert.match(workflow, /task-owners, scanner-save, mixed-scanner, history-windows-scanner/);
+  assert.match(workflow, /task-owners, role-choices, scanner-save, mixed-scanner, history-windows-scanner/);
+  const roleFile = "tools/layout-studio/role-dispatch.test.mjs";
+  assert.ok(source.includes('"role-choices": "' + roleFile + '"'));
+  const roleGroups = selectWindowsContractGroups([roleFile], requiredGroups);
+  assert.equal(roleGroups.length, 1);
+  assert.strictEqual(roleGroups[0], requiredGroups.find(group => group.file === roleFile));
+  assert.equal(roleGroups[0].pattern, undefined);
   assert.ok(source.includes('"scanner-save": "' + save + '"'));
   const saveGroups = selectWindowsContractGroups([save], requiredGroups);
   assert.equal(saveGroups.length, 1); assert.ok(requiredGroups.includes(saveGroups[0]));

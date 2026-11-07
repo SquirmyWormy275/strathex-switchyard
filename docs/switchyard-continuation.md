@@ -103,6 +103,13 @@ the executed cleanup scripts. The newer guided role choices and scheduling-data
 refresh have separate focused acceptance.
 [Complete receipt](evidence/linux-7f2a52a-complete-summary.json).
 
+The Windows filesystem workflow now has an independent `role-choices` contract
+lane using the complete original role-dispatch group. Existing helper, deadlines,
+skip expectations and concurrency rules are unchanged. Two local groups/33 tests
+pass; native acceptance of this new lane remains pending. Normal branch events
+schedule it; no manual workflow dispatch is needed.
+[Lane evidence](evidence/role-choices-windows-lane-summary.json).
+
 Native Windows client `9d230ac` passes 25 groups/250 tests with zero skips.
 The exact source/merge trees, original deadlines, artifact hashes and cleanup
 verify. Native endpoint/file/process/socket checks are distinct from explicit
