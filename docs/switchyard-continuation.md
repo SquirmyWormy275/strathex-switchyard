@@ -69,14 +69,15 @@ foreign replacement and unknown committed outcomes still refuse admission.
    the later status-query diagnostics. At `841618d`, the 243-test client lane
    and restricted-storage owner checks also pass; native invalid-status-request
    coverage still belongs to the pending complete backend lane.
-2. Installed Linux now runs `51a73c7`, release `edf66107db84`, with `cb2df88680ca`
+2. Installed Linux now runs `738c1f7`, release `4cda61afefac`, with `edf66107db84`
    retained as rollback. All 54 semantic workspaces, selection, one pending
-   keyboard-only conversation and frozen frontend verify. The 76 metadata/
-   in-memory checks cover 44 exact modules, four profiles and 57 workflows.
-   Dated launcher backup and readback verify; the exact prepared 552-file,
-   4,813,488-byte bundle is removed. No browser reload, live task or hardware use.
-   Two stale hash references and five stale error assertions in host verification
-   are corrected; the original failures are retained. Do not repeat this update.
+   keyboard-only conversation and frozen frontend verify. The 84 metadata/
+   refusal checks cover 48 exact modules, four profiles and 57 workflows.
+   Dated launcher backup and readback verify; the exact prepared 553-file,
+   4,819,454-byte bundle is removed. Signed requests reject absent roles, wrong
+   PID/build, stale requests and caller-selected compartments without an effect.
+   No browser reload, native focus, live provider/task or hardware use occurred.
+   Do not repeat this update or remove its already-removed staging again.
 3. Windows project-context source is accepted in the native client lane. It
    retains the exact local workspace folder/generation, rejects replacement/
    reopen/ambiguity, retires the original carrier on departure and joins signed
@@ -107,7 +108,8 @@ foreign replacement and unknown committed outcomes still refuse admission.
    a later clock-rollback regression is also retained. Twenty-seven groups pass
    136 tests/one skip, plus one actual CLI-child case. Final focused protocol
    checks and typecheck cover the clock correction. No native key, provider or
-   installed application effect was used. This source is not yet installed.
+   installed application effect was used. Installed `738c1f7` now passes eight
+   additional signed refusal/metadata checks, with all workspaces preserved.
    Legacy servers refuse the new route; do not add a bearer fallback.
 
 Restricted-storage follow-up `3795217` passes eight ordinary owner checks,
@@ -120,11 +122,11 @@ process-query change has been made.
 
 ## Installed application and complete-suite baseline
 
-Installed Linux is `51a73c7`: 76 metadata/in-memory checks, 44 module hashes,
+Installed Linux is `738c1f7`: 84 metadata/refusal checks, 48 module hashes,
 all 54 semantic workspaces, four profiles, 57 workflows, selected state, pending
 keyboard-only conversation and frozen frontend preserved. The current release
 and one rollback remain; its exact prepared bundle has been removed.
-[Installed evidence](evidence/installed-codex-0167-summary.json).
+[Installed evidence](evidence/installed-signed-physical-intent-summary.json).
 
 The accepted complete Linux run is `c359cdf`: 348 groups, 2,218 passes
 and 32 declared platform skips. Its exact checkout, nine dependency aliases,

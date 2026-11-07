@@ -16,7 +16,7 @@ correction have separate focused evidence. [Complete receipt](evidence/linux-c35
 Codex source `9c3bccf` admits exact 0.166.0/0.167.0 with 42 feature exclusions
 and version-bound text review. Twelve groups pass 152 tests with two skips;
 actual 0.167 production initialization/config-read passes in an empty
-network-isolated home. Installed Linux `51a73c7` passes 76 metadata/in-memory
+network-isolated home. Installed Linux `738c1f7` passes 84 metadata/refusal
 checks and preserves every workspace. Live account/task/model/TUI acceptance
 remains separate. [Contract](codex-version-contract.md).
 
@@ -34,7 +34,8 @@ acceptance remain separate. [Linux project evidence](evidence/linux-editor-proje
 Physical CLI transport now binds signed requests/replies to the exact saved
 instance/build/PID and invocation, with replay/clock-rollback refusal and no bearer
 fallback. A real CLI child reaches encrypted Suite state through the signed route;
-external launch is doubled. This source is not yet installed.
+external launch is doubled. Installed `738c1f7` verifies eight signed refusal/metadata
+checks, with no provider, focus or key effect.
 [Physical dispatch](physical-intent-authentication.md).
 
 ## Requirement status

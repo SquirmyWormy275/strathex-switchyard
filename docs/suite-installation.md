@@ -2,7 +2,7 @@
 
 Switchyard's new suite can now be built as a small, self-contained application
 directory. It starts independently of the checkout and VS Code, using an existing
-Node **24.14.0** installation. The current Linux package is approximately 4.5 MiB (551 files at `51a73c7`).
+Node **24.14.0** installation. The current Linux package is approximately 4.5 MiB (552 files at `738c1f7`).
 The packaged first-party catalog provenance index uses a declared, bounded
 gzip JSON encoding. Every field and all upstream source/notice bytes are retained;
 source checkouts continue using JSON. [Packaging evidence](evidence/design-observations-source-summary.json).

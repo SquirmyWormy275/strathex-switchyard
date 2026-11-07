@@ -40,7 +40,19 @@ and verified cleanup.
 The CLI demonstration uses actual HTTP, the signed gateway, encrypted Suite
 state and a bounded native-launch double. Its child exits, and the invocation
 receipt matches the protected launch record. All sixteen installation/recovery
-scenarios and package bounds pass. Native Windows, installed-current-source and
-physical-key acceptance remain separate. The running installation is still
-`51a73c7`; the frozen frontend and F77 mapping have not changed.
+scenarios and package bounds pass. Installed `738c1f7` now passes eight additional
+metadata/refusal checks inside an 84-check update. All 54 workspaces, four profiles,
+57 workflows and the private review link are preserved. Native Windows and
+physical-key acceptance remain separate; the frontend and F77 mapping are unchanged.
 [Source evidence](evidence/signed-physical-intent-source-summary.json).
+
+The repeatable installed check starts no provider, focus or keyboard operation:
+
+```sh
+mise exec node@24.14.0 -- node scripts/verify-signed-intent-host.mjs --read-only-metadata
+```
+
+Its unsupported live-effect flags refuse before reading installed state. Two
+verifier/runner groups pass 31 tests with original bounds and process cleanup.
+The prepared package is removed after verified update/readback; only current and
+one rollback remain. [Installed evidence](evidence/installed-signed-physical-intent-summary.json).

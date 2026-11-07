@@ -36,3 +36,7 @@ test("installed Cargo metadata proof refuses resolution, builds, publication and
   const script = fileURLToPath(new URL("./verify-cargo-inventory-host.mjs", import.meta.url));
   for (const flags of [[], ["--synthetic"], ["--read-only-metadata", "--resolve"], ["--read-only-metadata", "--build"], ["--read-only-metadata", "--publish"], ["--read-only-metadata", "--registry=NEVER_CONTACT"], ["--read-only-metadata", "--approved"], ["--read-only-metadata", "--read-only-metadata"]]) await assert.rejects(execute(process.execPath, [script, ...flags], { timeout: 5000, maxBuffer: 32768 }), error => error.code === 1 && error.stdout === "" && /Usage on the pilot:/.test(error.stderr));
 });
+test("installed signed-intent proof refuses live focus, dispatch, account and approval flags before installed-state access",async()=>{
+ const script=fileURLToPath(new URL("./verify-signed-intent-host.mjs",import.meta.url));
+ for(const flags of [[],["--synthetic"],["--read-only-metadata","--focus"],["--read-only-metadata","--dispatch"],["--read-only-metadata","--role=NEVER_CONTACT"],["--read-only-metadata","--approved"],["--read-only-metadata","--read-only-metadata"]])await assert.rejects(execute(process.execPath,[script,...flags],{timeout:5000,maxBuffer:32768}),error=>error.code===1&&error.stdout===""&&/Usage on the pilot:/.test(error.stderr));
+});
