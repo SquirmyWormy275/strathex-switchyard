@@ -38,7 +38,7 @@ checks.push("thirty-nine-original-extras-and-preprocessing-facts");
 for (const marker of ["", 'extra == "tls"', 'unknown == "x"', 'python_version < "3" < "4"', 'os_name == "x\\y"', '('.repeat(17) + 'os_name=="x"' + ')'.repeat(17), Array(65).fill('os_name=="x"').join(' or ')]) assert.throws(() => parsePinnedRequirements("ordinary==1\ndemo==2; " + marker));
 checks.push("unsupported-context-and-over-budget-markers-refuse-the-whole-file");
 const fixturePath = "tools/layout-studio/test-support/shield-scanner-fixture.mjs";
-assert.equal(sha(await readFile(new URL("../" + fixturePath, import.meta.url))), markerEvidence.sourceFiles[fixturePath]);
+assert.equal(sha(await readFile(new URL("../" + fixturePath, import.meta.url))), installedEvidence.sourceFiles[fixturePath]);
 const { scannerFixture, pypiArtifactFixture } = await import("../tools/layout-studio/test-support/shield-scanner-fixture.mjs");
 const marker = 'python_version < "0" and platform_version == "NEVER_COPY_INSTALLED_MARKER_LITERAL"';
 const fixture = scannerFixture({ action: "release_shield", files: { "requirements.txt": "Demo[TLS]==1.2.3; " + marker }, advisory: [{ ecosystem: "PyPI", name: "demo", version: "1.2.3", advisories: [{ id: "SYNTHETIC-CONDITIONAL-PIN", severity: "high" }] }] });

@@ -34,5 +34,13 @@ verify. The empty owned test parent is removed. No npm invocation, extraction,
 package execution, new dependency download or live account/provider operation
 occurs. [Source evidence](evidence/npm-archive-license-source-summary.json).
 
-Installed acceptance and actual Windows execution remain separate checkpoints.
+Installed `b6f788b` passes 74 metadata/in-memory checks and 22 exact module hashes,
+including eight in-memory npm archive reports. All 54 semantic workspaces and the
+frozen frontend are preserved; dated backup and launcher readback verify. The
+exact 531-file, 5,186,925-byte prepared bundle is removed. A stale shared-fixture
+pin in the Python verifier initially refused its check; the verifier now pins the
+newly tested fixture while retaining the independent Python oracle pins. Its
+original failure and corrected 12-check pass are retained.
+[Installed evidence](evidence/installed-npm-archive-license-summary.json).
+Actual Windows execution remains a separate checkpoint.
 Frontend activation remains frozen for owner review.
