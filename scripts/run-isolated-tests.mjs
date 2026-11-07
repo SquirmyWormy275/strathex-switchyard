@@ -83,8 +83,8 @@ const extensionTests = ["commands", "companion-bridge", "controller", "named-pip
     ...(name === "controller" && process.platform !== "linux" ? { expectedSkipped: 3 } : {}),
     ...(name === "studio-windows-editor-files" && process.platform !== "win32" ? { expectedSkipped: 1 } : {}),
     ...(name === "studio-task-client" && process.platform !== "linux" ? { expectedSkipped: 12 } : {}),
-    ...(name === "studio-editor-session" && process.platform !== "linux" ? { expectedSkipped: 1 } : {}),
-    ...(name === "studio-editor-launch" && process.platform !== "linux" ? { expectedSkipped: 16 } : {}),
+    ...(name === "studio-editor-session" && process.platform !== "linux" ? { expectedSkipped: 2 } : {}),
+    ...(name === "studio-editor-launch" && process.platform !== "linux" ? { expectedSkipped: 22 } : {}),
     ...(name === "studio-terminal-process" && process.platform !== "linux" ? { expectedSkipped: 5 } : {}),
     ...(name === "named-pipe-transport" ? { timeoutMs: 120_000, expectedSkipped: process.platform === "win32" ? 1 : 7 } : {})
   }));

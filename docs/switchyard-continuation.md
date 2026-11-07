@@ -66,7 +66,9 @@ foreign replacement and unknown committed outcomes still refuse admission.
 
 1. Native Windows client `c359cdf` is audited: exact merge tree, 25 groups,
    243 tests, zero skips, original deadlines and verified cleanup. It predates
-   the later status-query diagnostics; those still need native CI acceptance.
+   the later status-query diagnostics. At `841618d`, the 243-test client lane
+   and restricted-storage owner checks also pass; native invalid-status-request
+   coverage still belongs to the pending complete backend lane.
 2. Installed Linux now runs `51a73c7`, release `edf66107db84`, with `cb2df88680ca`
    retained as rollback. All 54 semantic workspaces, selection, one pending
    keyboard-only conversation and frozen frontend verify. The 76 metadata/
@@ -88,10 +90,18 @@ foreign replacement and unknown committed outcomes still refuse admission.
    The exact checkout, nine aliases, 802 generated files (11,901,729 bytes),
    empty test parent and active marker are removed. Do not restart or reclean it.
    Later status diagnostics are outside this source.
-6. Full Windows `318fafc` completed all six backend shards, but the final release
+6. Full Windows `318fafc` completed all six backend shards (232 groups, 1,355
+   passes and 179 declared skips; original receipt audit passes), but the final release
    job stopped at a stale generated-documentation source digest. The checksum
    is now regenerated; all seven manual/demo outputs are byte-identical.
    Full Windows acceptance remains pending. Do not manually rerun workflows.
+7. Linux workspace lifecycle now passes eleven groups/123 tests and both
+   TypeScript checks. Six original regressions are retained. The signed-client,
+   protected-Suite demonstration verifies both peer exit and workspace departure
+   with real Linux carriers and a provider double. Original terminal/provider
+   preservation, uncertain retirement refusal and owned cleanup verify.
+   This source is not installed and postdates complete Linux `c359cdf`.
+   Command activation and frozen frontend remain unchanged.
 
 Restricted-storage follow-up `3795217` passes eight ordinary owner checks,
 eight restricted owner checks, 68 QUERY-only descendant registrations and

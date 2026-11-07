@@ -37,6 +37,27 @@ platform skips and both TypeScript checks pass. Native `c359cdf` now passes all
 243 client tests, including thirteen launcher cases; deadlines and cleanup verify.
 [Project-context evidence](evidence/windows-editor-project-context-summary.json).
 
+Linux now applies the same workspace identity and retirement boundaries. Six
+regressions reproduced the original faults; the correction passes eleven groups
+and 123 tests, with no skips and both TypeScript checks. The composed proof uses
+real Linux sockets, owned processes and encrypted state with a synthetic provider:
+workspace departure retires the original carrier and preserves the terminal and
+provider. This correction is not yet installed or covered by a complete-suite run.
+[Linux project evidence](evidence/linux-editor-project-context-summary.json).
+
+Native Windows `841618d` passes the 243-test client lane and restricted-storage
+owner checks after the bounded diagnostic change. Original restricted token
+policy, descendant QUERY access and fixture/service removal verify. No failure
+recurred, so the intermittent retirement cause remains unresolved. The native
+invalid-status-request case still needs the full backend lane.
+[Native diagnostic evidence](evidence/runtime-status-diagnostic-native-summary.json).
+
+All six Windows backend shards at `318fafc` pass: 232 groups, 1,355 tests and
+179 declared skips. The release job then failed on a stale documentation digest;
+`db6106d` corrects it without changing the manual or demo bytes. Full Windows
+release acceptance remains pending.
+[Backend evidence](evidence/windows-backend-318fafc-summary.json).
+
 ## Current evidence
 
 Each result belongs to its exact source revision. Test totals from different

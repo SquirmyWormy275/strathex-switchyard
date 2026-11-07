@@ -23,7 +23,9 @@ import { codexDesignConfig } from '../../../tools/layout-studio/agents.mjs';
 // @ts-expect-error Verify exact synthetic child exit.
 import { stopOwnedChild } from '../../../tools/layout-studio/owned-process.mjs';
 
-test('retained Terminal, signed client, protected Suite and real Linux carriers acknowledge one exact synthetic task', {skip:process.platform!=='linux'}, async t=>{
+for(const retirement of ['peer-exit','workspace-departure']) test(retirement==='peer-exit'
+ ? 'retained Terminal, signed client, protected Suite and real Linux carriers acknowledge one exact synthetic task'
+ : 'Linux workspace departure retires the original real carrier while preserving the provider and exact terminal', {skip:process.platform!=='linux'}, async t=>{
  const root=await mkdtemp(join(tmpdir(),'syes-')),runtime=await mkdtemp('/tmp/syes-'),repositoryRoot=join(root,'repository'),providerRoot=join(root,'provider'),children:ChildProcess[]=[];
  let launcher:StudioEditorLauncher|undefined,suite:any,server:any,provider:any;
  t.after(async()=>{
@@ -50,12 +52,19 @@ test('retained Terminal, signed client, protected Suite and real Linux carriers 
   const child=spawn(process.execPath,[fileURLToPath(new URL('../../../tools/layout-studio/test-support/editor-terminal-fixture.cjs',import.meta.url)),args[2]!.slice(7),target.sessionId,repositoryRoot],{stdio:'ignore'});children.push(child);
   const terminal:TerminalLike={name:options.name,processId:once(child,'spawn').then(()=>child.pid),show(){activeTerminal=terminal;for(const listener of activeListeners)listener(terminal);}};terminals.push(terminal);return terminal;
  },onDidChangeActiveTerminal(listener:(t:TerminalLike|undefined)=>unknown){activeListeners.add(listener);return{dispose(){activeListeners.delete(listener);}};},onDidCloseTerminal(listener:(t:TerminalLike)=>unknown){closeListeners.add(listener);return{dispose(){closeListeners.delete(listener);}};}};
- launcher=new StudioEditorLauncher({client:new StudioTaskClient({endpointPath}),host:{window,workspace:{workspaceFolders:[{uri:{fsPath:repositoryRoot}}]}} as unknown as Pick<VscodeLike,'window'|'workspace'>,executable:process.execPath,assertCurrent:async()=>{assert.equal(await store.selection(),'personal');}});
+ const workspaceListeners=new Set<()=>unknown>(),workspace={workspaceFolders:[{uri:{scheme:'file',fsPath:repositoryRoot}}],onDidChangeWorkspaceFolders(listener:()=>unknown){workspaceListeners.add(listener);return{dispose(){workspaceListeners.delete(listener);}};}};
+ launcher=new StudioEditorLauncher({client:new StudioTaskClient({endpointPath}),host:{window,workspace} as unknown as Pick<VscodeLike,'window'|'workspace'>,executable:process.execPath,assertCurrent:async()=>{assert.equal(await store.selection(),'personal');}});
  const review=await launcher.review(selected),result=await launcher.launch(review);assert.equal(result.protocolAcknowledgementObserved,true);assert.equal(result.nativeProcessObserved,true);assert.equal(result.ideAttached,false);assert.equal(result.modelPromptSubmitted,false);assert.equal(calls.length,1);assert.equal(bridges,1);
  const row=(await store.snapshot('personal')).codingEditorConnections[0];assert.equal(row.status,'acknowledged');assert.equal(row.peer.pid,children[0]!.pid);assert.equal(row.acknowledgement.accountAfterVerified,true);
  await assert.rejects(launcher.launch(review));assert.equal((await launcher.focus(review)).focusVerified,true);assert.equal(calls.length,1);
- assert.equal((await stopOwnedChild(children[0])).stopped,true);
+ const originalTerminal=terminals[0];
+ if(retirement==='workspace-departure'){
+  workspace.workspaceFolders=[];for(const listener of workspaceListeners)listener();
+  assert.equal(launcher.observation(review).protocolAcknowledgementObserved,false);assert.equal(launcher.observation(review).focusVerified,false);
+  await assert.rejects(launcher.focus(review));await launcher.close();
+  assert.equal(calls.length,1);assert.equal(terminals[0],originalTerminal);assert.equal(workspaceListeners.size,0);
+ }else assert.equal((await stopOwnedChild(children[0])).stopped,true);
  const deadline=Date.now()+5000;while((await store.snapshot('personal')).codingEditorConnections[0].status!=='stopped'){assert.ok(Date.now()<deadline);await new Promise(r=>setTimeout(r,15));}
- await launcher.close();assert.equal((await store.snapshot('personal')).codingEditorConnections[0].status,'stopped');assert.deepEqual(await readdir(runtime),[]);assert.equal(provider.closed,false);assert.equal(activeListeners.size,0);assert.equal(closeListeners.size,0);
+ await launcher.close();assert.equal((await store.snapshot('personal')).codingEditorConnections[0].status,'stopped');assert.deepEqual(await readdir(runtime),[]);assert.equal(provider.closed,false);assert.equal(activeListeners.size,0);assert.equal(closeListeners.size,0);assert.equal(workspaceListeners.size,0);
  const providerCalls=await readFile(join(providerRoot,'calls'),'utf8');assert.equal(providerCalls.split('\n').filter(line=>line==='thread/resume').length,1);assert.equal(providerCalls.includes('turn/start'),false);
 });

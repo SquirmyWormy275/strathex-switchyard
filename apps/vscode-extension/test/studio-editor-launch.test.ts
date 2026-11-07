@@ -47,10 +47,23 @@ async function fixture(t: TestContext, nativeImage = false) {
   const children: ChildProcess[] = [];
   const calls: TerminalOptionsLike[] = [], terminals: TerminalLike[] = [], state = {focused:true}; let activeTerminal: TerminalLike | undefined;
   const window = { state,terminals,get activeTerminal(){return activeTerminal;},createTerminal(options: TerminalOptionsLike){calls.push(options);if(controls.createThrows)throw Error("synthetic partial creation failure");const child=spawn(executable,nativeImage?["-e","setInterval(()=>{},1000)"]:["60"],{stdio:"ignore"});children.push(child);const terminal:TerminalLike={name:options.name,processId:controls.processPending?new Promise<number>(()=>{}):once(child,"spawn").then(()=>child.pid),show(){if(controls.showThrows)throw Error("synthetic focus failure");activeTerminal=terminal;for(const listener of activeListeners)listener(terminal);}};terminals.push(terminal);controls.afterCreate?.();return terminal;},onDidChangeActiveTerminal(listener:(t:TerminalLike|undefined)=>unknown){activeListeners.add(listener);return{dispose(){activeListeners.delete(listener);}};},onDidCloseTerminal(listener:(t:TerminalLike)=>unknown){closeListeners.add(listener);return{dispose(){closeListeners.delete(listener);}};}};
-  const workspace = {workspaceFolders:[{uri:{fsPath:repositoryRoot}}]},host = {window,workspace} as unknown as Pick<VscodeLike,"window"|"workspace">;
+  const workspaceListeners = new Set<() => unknown>(), workspace = {workspaceFolders:[{uri:{scheme:"file",fsPath:repositoryRoot}}], onDidChangeWorkspaceFolders(listener: () => unknown) { workspaceListeners.add(listener); return {dispose(){workspaceListeners.delete(listener);}}; }},host = {window,workspace} as unknown as Pick<VscodeLike,"window"|"workspace">;
   const launcher = new StudioEditorLauncher({client,host,executable,assertCurrent:async()=>{await controls.check?.();}});
-  t.after(async()=>{if(controls.expectUncertain)await assert.rejects(launcher.close());else await launcher.close();await auth.close();server.closeAllConnections();await new Promise<void>(resolve=>server.close(()=>resolve()));await new Promise<void>(resolve=>socket.close(()=>resolve()));await new Promise<void>(resolve=>ingress.close(()=>resolve()));for(const child of children)assert.equal((await stopOwnedChild(child)).stopped,true);assert.equal(activeListeners.size,0);assert.equal(closeListeners.size,0);await rm(root,{recursive:true});});
-  return {root,repositoryRoot,executable,socketPath,ingressPath,endpointPath,children,connectionRoutes,terminalClosed:(terminal:TerminalLike)=>{terminals.splice(terminals.indexOf(terminal),1);for(const listener of closeListeners)listener(terminal);},selected,target,client,store,launcher,controls,routes,calls,terminals,state,workspace,window};
+  t.after(async()=>{
+    const failures: unknown[] = [];
+    for (const cleanup of [
+      async()=>{if(controls.expectUncertain)await assert.rejects(launcher.close());else await launcher.close();},
+      async()=>{await auth.close();},
+      async()=>{server.closeAllConnections();await new Promise<void>(resolve=>server.close(()=>resolve()));},
+      async()=>{await new Promise<void>(resolve=>socket.close(()=>resolve()));},
+      async()=>{await new Promise<void>(resolve=>ingress.close(()=>resolve()));},
+      ...children.map(child=>async()=>{assert.equal((await stopOwnedChild(child)).stopped,true);}),
+      async()=>{assert.equal(activeListeners.size,0);assert.equal(closeListeners.size,0);assert.equal(workspaceListeners.size,0);},
+      async()=>{await rm(root,{recursive:true});},
+    ]) { try { await cleanup(); } catch(error) { failures.push(error); } }
+    if(failures.length)throw new AggregateError(failures,"Launcher fixture cleanup failed");
+  });
+  return {root,repositoryRoot,executable,socketPath,ingressPath,endpointPath,children,connectionRoutes,terminalClosed:(terminal:TerminalLike)=>{terminals.splice(terminals.indexOf(terminal),1);for(const listener of closeListeners)listener(terminal);},selected,target,client,store,launcher,controls,routes,calls,terminals,state,workspace,window,changeWorkspace:()=>{for(const listener of workspaceListeners)listener();}};
 }
 const linux = {skip:process.platform!=="linux"};
 test("reviewed signed permission reaches one exact Terminal object without claiming native attachment",linux,async t=>{
@@ -152,4 +165,46 @@ test("closing the exact retained terminal withdraws acknowledgement and joins on
 test("unconfirmed exact retirement is reported by joined launcher shutdown",linux,async t=>{
  const f=await fixture(t),review=await f.launcher.review(f.selected);await f.launcher.launch(review);f.controls.stopped=false;f.controls.expectUncertain=true;
  await assert.rejects(f.launcher.close(),/no longer current/);assert.equal(f.connectionRoutes.filter(a=>a==='stop').length,1);assert.equal(f.launcher.observation(review).protocolAcknowledgementObserved,false);
+});
+
+test('a removed and reopened Linux project requires a fresh review even at the same path',linux,async t=>{
+  const f=await fixture(t),review=await f.launcher.review(f.selected),original=f.workspace.workspaceFolders[0];
+  f.workspace.workspaceFolders=[];f.changeWorkspace();f.workspace.workspaceFolders=[original];f.changeWorkspace();
+  await assert.rejects(f.launcher.launch(review));assert.equal(f.calls.length,0);assert.equal(f.routes.includes('consume'),false);
+  const fresh=await f.launcher.review(f.selected);assert.equal((await f.launcher.launch(fresh)).protocolAcknowledgementObserved,true);assert.equal(f.calls.length,1);
+});
+test('Linux project identity is checked again after the signed review response',linux,async t=>{
+  const f=await fixture(t);f.controls.after=action=>{if(action==='review')f.changeWorkspace();};
+  await assert.rejects(f.launcher.review(f.selected));assert.equal(f.calls.length,0);assert.deepEqual(f.routes,['review']);
+});
+test('replaced, ambiguous and non-file workspace folders cannot inherit a Linux project review',linux,async t=>{
+  for(const drift of ['replacement','duplicate','remote']){
+    const f=await fixture(t),review=await f.launcher.review(f.selected);
+    if(drift==='replacement')f.workspace.workspaceFolders=[{uri:{scheme:'file',fsPath:f.target.repositoryRoot}}];
+    if(drift==='duplicate')f.workspace.workspaceFolders.push(f.workspace.workspaceFolders[0]);
+    if(drift==='remote')f.workspace.workspaceFolders[0].uri.scheme='vscode-remote';
+    await assert.rejects(f.launcher.launch(review));assert.equal(f.calls.length,0);assert.equal(f.connectionRoutes.length,0);
+  }
+});
+test('Linux workspace change during carrier open retires the original attempt before terminal creation',linux,async t=>{
+  const f=await fixture(t),review=await f.launcher.review(f.selected);f.controls.connectionAfter=action=>{if(action==='open')f.changeWorkspace();};
+  await assert.rejects(f.launcher.launch(review));assert.equal(f.calls.length,0);await f.launcher.close();assert.equal(f.connectionRoutes.filter(v=>v==='stop').length,1);
+});
+test('Linux project departure retires the retained carrier and preserves its exact user terminal',linux,async t=>{
+  for(const uncertain of [false,true]){
+    const f=await fixture(t),review=await f.launcher.review(f.selected);await f.launcher.launch(review);const terminal=f.terminals[0];
+    f.controls.stopped=!uncertain;f.controls.expectUncertain=uncertain;f.changeWorkspace();
+    assert.equal(f.launcher.observation(review).protocolAcknowledgementObserved,false);assert.equal(f.launcher.observation(review).focusVerified,false);
+    await assert.rejects(f.launcher.focus(review));if(uncertain)await assert.rejects(f.launcher.close());else await f.launcher.close();
+    assert.equal(f.connectionRoutes.filter(v=>v==='stop').length,1);assert.equal(f.calls.length,1);assert.equal(f.terminals[0],terminal);
+  }
+});
+
+test('shutdown joins an already-started signed terminal retirement response',linux,async t=>{
+  const f=await fixture(t),review=await f.launcher.review(f.selected);await f.launcher.launch(review);
+  let enter!:()=>void,release!:()=>void;const entered=new Promise<void>(r=>enter=r),held=new Promise<void>(r=>release=r);
+  f.controls.connectionAfter=async action=>{if(action==='stop'){enter();await held;}};f.terminalClosed(f.terminals[0]);await entered;
+  let closed=false;const closing=f.launcher.close().then(()=>{closed=true;});
+  try{await new Promise(r=>setImmediate(r));assert.equal(closed,false);}finally{release();}
+  await closing;assert.equal(f.connectionRoutes.filter(v=>v==='stop').length,1);assert.equal(f.calls.length,1);assert.equal(f.terminals.length,0);
 });

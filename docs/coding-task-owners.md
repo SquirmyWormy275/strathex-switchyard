@@ -621,3 +621,25 @@ Exact source/merge tree, artifact, commands, bounds and cleanup verify.
 [Native target evidence](evidence/windows-editor-target-native-summary.json).
 [Target source evidence](evidence/windows-editor-target-source-summary.json),
 [native channel evidence](evidence/retained-editor-client-native-summary.json).
+
+## Workspace lifecycle for reviewed editor launches
+
+Linux and Windows reviews retain the exact local VS Code workspace folder and
+its change generation. Removing and reopening the same path requires a new
+review. Replaced, ambiguous or remote folders cannot inherit the old permission.
+The launcher checks that context across target inspection, image readback, signed
+review, permission consumption, carrier opening, focus and process observation.
+
+Project departure clears focus/acknowledgement observations and retires only the
+original carrier. The exact terminal object and provider remain owned by their
+existing lifecycles. Shutdown closes new work, aborts pending process observation,
+then joins the original bounded signed exchanges before closing the transport.
+An uncertain retirement remains a failure and cannot authorize a replacement.
+
+The Linux correction passes 123 tests across eleven groups and both TypeScript
+checks. Two composed cases use actual Linux sockets/processes and encrypted Suite
+state with explicit Terminal/provider doubles. Windows has separate native client
+acceptance. Guided project selection, command activation and interactive native
+provider/TUI behavior remain unfinished.
+[Linux evidence](evidence/linux-editor-project-context-summary.json),
+[Windows evidence](evidence/windows-editor-project-context-native-summary.json).
