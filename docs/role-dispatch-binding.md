@@ -107,3 +107,38 @@ is change detection at existing boundaries, not a global selection lease across
 native effects. Manual restoration of byte-identical old selection files remains
 outside it. This correction is source-only after installed `384cf8b`.
 [Persisted selection evidence](evidence/persisted-selection-source-summary.json).
+
+
+## Choose a saved connection by name
+
+The authenticated `/api/suite/roles/choices` route accepts a saved `roleId`
+and stable `intent`. The Suite chooses its active workspace; callers cannot
+substitute a compartment. In companion mode it returns readable labels and local
+connection IDs for compatible coding tasks, configuration conversations, custom
+agents and documented homepage surfaces. Existing policy and action checks filter
+the list. Keyboard-only mode refuses; Copilot-only Work cannot offer personal
+providers. Stale custom agents and unsupported actions are omitted.
+
+Each row contains `provider`, `targetKind`, `targetId`, `label` and
+`choiceDigest`. Send the selection fields, without the display label, along
+with the original role/intent to `/api/suite/roles/bind-choice`. That route
+rechecks the saved state under its ordinary state lease before saving the local
+binding. It returns only the local binding identity and selection metadata.
+
+The digest detects changes to the role, policy, enrolled accounts, original
+session, capabilities, previous role binding or workspace-selection generation.
+It is a concurrency check, not an approval token. A heartbeat alone does not
+invalidate the choice; fresh capability/status checks still run before saving.
+Changed or replayed choices refuse without overwriting the replacement binding.
+
+Both results report `nativeObserved:false` and `authorityGranted:false`.
+No native session IDs, account fingerprints, credentials, prompts or reply text
+are returned. Listing writes nothing; binding changes only local configuration
+and never dispatches an agent command. Actual dispatch still performs its
+existing account/session/policy checks and action-specific reviews.
+
+Seven groups pass 101 tests with one declared platform skip, plus both TypeScript
+checks. The demonstration uses real encrypted storage and authenticated HTTP with
+explicit synthetic agent sessions. Frontend picker activation and live
+account/task/UI acceptance remain unfinished.
+[Source evidence](evidence/role-choices-source-summary.json).

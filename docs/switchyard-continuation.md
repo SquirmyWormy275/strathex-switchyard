@@ -40,7 +40,15 @@ instructions. Do not merge or release.
 
 ## Current backend state
 
-The latest feature is exact-project task choices. The Suite selects its active
+The latest source feature is guided role choices: readable saved connection labels
+and a digest-checked local binding route. It preserves selected-workspace, policy,
+original session/capability, role and prior-binding identity. Seven groups/101 tests
+pass with one declared platform skip and both TypeScript checks. It is not installed
+yet; the next normal update must verify the prepared pure and route-refusal checks.
+[Contract](role-dispatch-binding.md#choose-a-saved-connection-by-name),
+[source evidence](evidence/role-choices-source-summary.json).
+
+The preceding feature is exact-project task choices. The Suite selects its active
 workspace, checks persisted selection identity and lists bounded saved task labels
 with original owner/load/task IDs. It reads encrypted state without native
 inspection or writes. Both typed editor clients validate the signed result.
@@ -84,20 +92,16 @@ initialization caused an independent preservation assertion failure.
 
 ## Complete runs and native evidence
 
-A complete Linux run is active at source
-`7f2a52a064151fe2d6d80938aeefbb578098daaa`, including the task-choice and
-consent changes. Its private registration is
-`runtime-verification/linux-full-7f2a52a-run.json` under the application state.
-Use that marker for the exact detached checkout, runner, test parent, dependency
-aliases, progress/result files and systemd unit. No new dependencies were fetched.
-Do not start a duplicate run. Audit the final receipt against the original
-manifest/commands/bounds/skips and child cleanup, then remove only the owned
-staging after verifying its identities and retaining evidence.
-
-The last accepted complete Linux source is `0c025df`: 350 groups, 2,293
-passing tests and 32 declared skips. Its exact checkout, nine aliases, 802 generated
-files/11,904,762 bytes, test parent and marker are already removed.
-[Complete receipt](evidence/linux-0c025df-complete-summary.json).
+Complete Linux source `7f2a52a064151fe2d6d80938aeefbb578098daaa` is accepted:
+351 original groups, 2,302 passing tests, 32 declared platform skips. It covers
+installed runtime `9d230ac`, including consent and exact-project task choices.
+Receipt `a2e51d06-3bf6-4c33-99b6-4ee00da91814` retains original manifest,
+commands, bounds, skip counts and child/tree cleanup. The exact checkout, nine
+dependency aliases, 803 generated files/11,907,805 bytes, empty test parent and
+run marker have been removed. No complete local run is active. Do not rerun
+the executed cleanup scripts. The newer guided role choices and scheduling-data
+refresh have separate focused acceptance.
+[Complete receipt](evidence/linux-7f2a52a-complete-summary.json).
 
 Native Windows client `57af859` passes 25 groups/249 tests with zero skips.
 The exact source/merge trees, original deadlines, artifact hashes and cleanup
@@ -122,7 +126,7 @@ The scheduling fixture now uses 232 audited `e5a5781` native measurements,
 retaining a higher prior estimate for any existing group. Current batches estimate
 at most 891,633 ms; six jobs, 20-minute job limits, all original child bounds and
 the 60-second unknown-group fallback are unchanged. Three groups/35 tests pass.
-The active complete Linux run predates this test-data-only scheduling change.
+The accepted complete Linux run predates this scheduling-data change.
 [Scheduling evidence](evidence/windows-scheduling-refresh-summary.json).
 Re-read actual remote status before reporting a result. Never manually dispatch,
 cancel, retry or expand deadlines to turn a partial run into acceptance.

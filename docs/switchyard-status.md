@@ -20,8 +20,17 @@ requires a fresh target/review/permit flow. The composed fixture passes 34 group
 
 Home/catalog and editor command activation remain frozen for review. Unfinished
 software and checks requiring hardware/accounts are listed separately below.
-A fresh complete Linux run at `7f2a52a` is in progress; passing earlier
-checkpoints does not accept that run.
+Complete Linux `7f2a52a` now passes all 351 groups: 2,302 tests and 32
+declared skips. Its exact temporary checkout and 11.9 MB of generated output
+are removed. The newer guided role choices have separate focused evidence.
+
+Guided role setup now has backend choices with readable connection labels and
+a saved-state digest checked before binding. It reuses the existing provider,
+workspace and action limits, including Copilot-only Work. Seven groups/101 tests
+pass with one declared skip and both TypeScript checks. This source change is
+not installed yet; frontend activation remains frozen.
+[Contract](role-dispatch-binding.md#choose-a-saved-connection-by-name),
+[evidence](evidence/role-choices-source-summary.json).
 
 ## Current evidence
 
@@ -32,11 +41,11 @@ checkpoints are not cumulative acceptance of the latest suite.
 | --- | --- | --- |
 | Installed Linux `9d230ac` | **92 metadata/refusal checks; 56 exact module hashes.** All 54 semantic workspaces, four profiles, 57 workflows and frozen frontend preserved. [Receipt](evidence/installed-editor-task-choices-summary.json). | Exact-project saved task choices, recording consent generations, persisted selection generation, consented runtime status capture, original-role/provider-effect guards, signed CLI dispatch and Codex version contract included; editor command activation remains pending; no live scanner, provider task, account/model request, native focus or hardware acceptance. |
 | Native Windows client `57af859` | **25 groups; 249 tests; no skips.** Original manifest, commands, bounds and cleanup verified. [Receipt](evidence/selection-native-client-summary.json). | Terminal/provider doubles remain explicit; not the complete Windows suite, runtime-observation backend groups or live authenticated Codex turns. |
-| Complete Linux `0c025df` | **350 groups; 2,293 tests; 32 declared platform skips.** Original manifest, bounds and cleanup verified. [Receipt](evidence/linux-0c025df-complete-summary.json). | Covers runtime installed at `57af859`, including persisted selection and Codex status capture; later consent-generation/retirement fixes and task choices have separate focused and installed evidence. |
+| Complete Linux `7f2a52a` | **351 groups; 2,302 tests; 32 declared platform skips.** Original manifest, bounds and cleanup verified. [Receipt](evidence/linux-7f2a52a-complete-summary.json). | Covers installed runtime `9d230ac`, including consent/retirement corrections and signed project choices; the subsequent guided role choices and scheduling-data update have separate focused evidence. |
 | Complete Windows `dc755901` | **417 groups; 2,478 tests; 207 declared skips.** All six jobs and overall workflow passed. [Receipt](evidence/windows-complete-dc755901-summary.json). | Predates newer archive, scheduling, profile/workflow and observation corrections. |
 
 Complete Linux staging is removed: its exact checkout, nine dependency aliases,
-802 generated files (11,904,762 bytes), empty test parent and marker. Other
+803 generated files (11,907,805 bytes), empty test parent and marker. Other
 worktrees remain. The journal's earlier failed Windows runs remain recorded in
 the accepted receipt; the independent restricted-storage retirement failure
 remains unresolved.

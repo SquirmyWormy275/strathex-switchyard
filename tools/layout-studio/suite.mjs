@@ -23,6 +23,7 @@ import { runtimeEnvironment } from "./runtime-setup.mjs";
 import { resolveRuntimePaths } from "./runtime-storage.mjs";
 import { createCodingSessions } from "./coding-sessions.mjs";
 import { createCodingTaskOwners } from "./coding-task-owners.mjs";
+import { roleChoices, roleChoiceDigest } from "./role-choices.mjs";
 import { createCodexSubmissions } from "./codex-submissions.mjs";
 import { createClaudeSubmissions } from "./claude-submissions.mjs";
 import { stopOwnedChild } from "./owned-process.mjs";
@@ -159,7 +160,7 @@ export function createSuite({ store = createSuiteStore(), platform = process.pla
       assertCurrentState();
       if (saved.id !== selected || saved.digest !== original.digest) throw changed();
     };
-    return { assertCurrent, assertCurrentState };
+    return { assertCurrent, assertCurrentState, selectionDigest: original.digest };
   }
   function roleTarget(state, roleId, intent) {
     if (!agentIntents.includes(intent) || !state.workflow.roles.some((r) => r.id === roleId)) throw new Error("Choose an existing workflow role and supported intent.");
@@ -177,6 +178,26 @@ export function createSuite({ store = createSuiteStore(), platform = process.pla
       if (!a || a.enrollmentStatus === "revoked" || (a.credentialEpoch ?? "legacy") !== (binding.credentialEpoch ?? "legacy") || !a.capabilities.includes(intent) || !a.lastSeen || Date.now() - a.lastSeen > 30000 || a.reportedStatus === "stopped") throw new Error("This exact custom-agent target is missing, stale or does not support that intent.");
     } else if (!state.conversations.some((c) => c.id === binding.targetId && c.provider === binding.provider && c.sessionId === binding.sessionId)) throw new Error("This exact role target changed or disappeared. Rebind it deliberately.");
     return binding;
+  }
+  function saveRoleBinding(s, body) {
+    if (!agentIntents.includes(body.intent)) throw new Error("Choose a stable supported intent.");
+    const role = s.workflow.roles.find((r) => r.id === body.roleId); if (!role) throw new Error("Save an agent role in your workflow first.");
+    const provider = body.provider;
+    if (body.targetKind === "client-surface") {
+      if (Object.keys(body).some(k => !["compartment", "roleId", "intent", "provider", "targetKind", "targetId", "workspaceBaseUrl"].includes(k))) throw new Error("Client role binding accepts only an exact documented surface and summon intent; commands, content, session IDs and imported approvals are not accepted.");
+      const recipe = clientRecipe(body.targetId);
+      if (body.intent !== "summon" || recipe.provider !== provider || recipe.target.kind !== "https") throw new Error("This client surface supports a fixed homepage launch only; choose its exact provider and summon intent.");
+      const binding = { bindingId: randomUUID(), roleId: role.id, provider, targetKind: "client-surface", targetId: recipe.id, recipeDigest: recipe.digest, intent: "summon" };
+      s.roleBindings = [...(s.roleBindings ?? []).filter(b => b.roleId !== role.id || b.intent !== body.intent), binding]; roleTarget(s, role.id, body.intent); return binding;
+    }
+    if (!s.policy || !["codex", "claude-code", "microsoft-365-copilot", "custom-agent"].includes(provider)) throw new Error("Unknown role provider.");
+    const targetKind = body.targetKind ?? (provider === "custom-agent" ? "custom-agent" : "conversation");
+    if (!["coding-task", "custom-agent", "conversation"].includes(targetKind) || (targetKind === "custom-agent") !== (provider === "custom-agent")) throw new Error("Choose the exact target kind supported by this provider.");
+    const target = targetKind === "coding-task" ? s.codingSessions?.find((t) => t.id === body.targetId && t.provider === provider) : provider === "custom-agent" ? s.agents.find((a) => a.id === body.targetId) : s.conversations.find((c) => c.id === body.targetId && c.provider === provider);
+    if (!target?.sessionId) throw new Error("The role needs an exact connected session, not a window title or missing tool.");
+    s.roleBindings ??= []; const binding = { bindingId: randomUUID(), roleId: role.id, provider, targetKind, targetId: body.targetId, sessionId: target.sessionId, intent: body.intent };
+    if (provider === "custom-agent") binding.credentialEpoch = target.credentialEpoch ?? "legacy";
+    s.roleBindings = [...s.roleBindings.filter((b) => b.roleId !== role.id || b.intent !== body.intent), binding]; roleTarget(s, role.id, body.intent); return binding;
   }
   function roleBindingDigest(state, binding) { return createHash("sha256").update(JSON.stringify([binding, state.workflow.roles.find(r => r.id === binding?.roleId)])).digest("hex"); }
   const session = (s, id) => { const found = s.observations.find((o) => o.id === id); if (!found) throw new Error("That observation session is unavailable in this compartment."); return found; };
@@ -227,6 +248,26 @@ export function createSuite({ store = createSuiteStore(), platform = process.pla
         const choices = await codingTaskOwners.editorChoices(selected, body.repositoryRoot);
         await context.assertCurrent();
         return choices;
+      }
+      if (path === "/api/suite/roles/choices" || path === "/api/suite/roles/bind-choice") {
+        const binding = path.endsWith("/bind-choice");
+        const keys = ["roleId", "intent", "workspaceBaseUrl", ...(binding ? ["provider", "targetKind", "targetId", "choiceDigest"] : [])];
+        if (Object.keys(body).some(key => !keys.includes(key))) throw Error("Guided role setup accepts only the saved role, intent and exact connection choice.");
+        if (binding && (typeof body.choiceDigest !== "string" || !/^[a-f0-9]{64}$/.test(body.choiceDigest))) throw Error("Refresh and choose an exact saved role connection.");
+        await loadSelection();
+        const selected = activeCompartment, context = await selectedIntentContext(selected);
+        await context.assertCurrent();
+        if (!binding) {
+          const choices = roleChoices(await store.snapshot(selected), body, roleTarget, platform, context.selectionDigest);
+          await context.assertCurrent(); return choices;
+        }
+        return store.update(selected, "role-bind", async state => {
+          await context.assertCurrent();
+          if (roleChoiceDigest(state, body, context.selectionDigest) !== body.choiceDigest) throw Error("The saved role connection changed. Refresh the choices before binding; no alternate target was selected.");
+          const { choiceDigest, ...input } = body, saved = saveRoleBinding(state, input);
+          await context.assertCurrent();
+          return { schema: "switchyard-role-choice-binding/v1", bindingId: saved.bindingId, roleId: saved.roleId, intent: saved.intent, provider: saved.provider, targetKind: saved.targetKind, targetId: saved.targetId, bound: true, nativeObserved: false, authorityGranted: false };
+        }, { provider: body.provider });
       }
       if(path==="/api/suite/compartment/status"){
         if(Object.keys(body).some(key=>key!=="workspaceBaseUrl"))throw Error("Read only the selected workspace; selection arguments are refused.");
@@ -499,25 +540,7 @@ export function createSuite({ store = createSuiteStore(), platform = process.pla
       }
       if (path === "/api/suite/roles/bind") {
         if (!agentIntents.includes(body.intent)) throw new Error("Choose a stable supported intent.");
-        return store.update(compartment, "role-bind", (s) => {
-          const role = s.workflow.roles.find((r) => r.id === body.roleId); if (!role) throw new Error("Save an agent role in your workflow first.");
-          const provider = body.provider;
-          if (body.targetKind === "client-surface") {
-            if (Object.keys(body).some(k => !["compartment", "roleId", "intent", "provider", "targetKind", "targetId", "workspaceBaseUrl"].includes(k))) throw new Error("Client role binding accepts only an exact documented surface and summon intent; commands, content, session IDs and imported approvals are not accepted.");
-            const recipe = clientRecipe(body.targetId);
-            if (body.intent !== "summon" || recipe.provider !== provider || recipe.target.kind !== "https") throw new Error("This client surface supports a fixed homepage launch only; choose its exact provider and summon intent.");
-            const binding = { bindingId: randomUUID(), roleId: role.id, provider, targetKind: "client-surface", targetId: recipe.id, recipeDigest: recipe.digest, intent: "summon" };
-            s.roleBindings = [...(s.roleBindings ?? []).filter(b => b.roleId !== role.id || b.intent !== body.intent), binding]; roleTarget(s, role.id, body.intent); return binding;
-          }
-          if (!s.policy || !["codex", "claude-code", "microsoft-365-copilot", "custom-agent"].includes(provider)) throw new Error("Unknown role provider.");
-          const targetKind = body.targetKind ?? (provider === "custom-agent" ? "custom-agent" : "conversation");
-          if (!["coding-task", "custom-agent", "conversation"].includes(targetKind) || (targetKind === "custom-agent") !== (provider === "custom-agent")) throw new Error("Choose the exact target kind supported by this provider.");
-          const target = targetKind === "coding-task" ? s.codingSessions?.find((t) => t.id === body.targetId && t.provider === provider) : provider === "custom-agent" ? s.agents.find((a) => a.id === body.targetId) : s.conversations.find((c) => c.id === body.targetId && c.provider === provider);
-          if (!target?.sessionId) throw new Error("The role needs an exact connected session, not a window title or missing tool.");
-          s.roleBindings ??= []; const binding = { bindingId: randomUUID(), roleId: role.id, provider, targetKind, targetId: body.targetId, sessionId: target.sessionId, intent: body.intent };
-          if (provider === "custom-agent") binding.credentialEpoch = target.credentialEpoch ?? "legacy";
-          s.roleBindings = [...s.roleBindings.filter((b) => b.roleId !== role.id || b.intent !== body.intent), binding]; roleTarget(s, role.id, body.intent); return binding;
-        }, { provider: body.provider });
+        return store.update(compartment, "role-bind", state => saveRoleBinding(state, body), { provider: body.provider });
       }
       if (path === "/api/suite/roles/dispatch") {
         if (Object.keys(body).some(k => !["compartment", "roleId", "intent", "content", "requestId", "workspaceBaseUrl"].includes(k))) throw new Error("Role dispatch accepts only a bound role, intent, request identity and supported content.");

@@ -43,6 +43,12 @@ try {
   assert.equal(inventory.schema, "switchyard-compartment-inventory/v1"); assert.equal(inventory.complete, true); assert.equal(inventory.authorityGranted, false); assert.equal(inventory.providerObserved, false); assert.equal(inventory.activeCompartment, selected); assert.deepEqual(inventory.compartments, expectedCompartments); assert.ok(inventory.compartments.some(row => row.id === selected)); assert.ok(inventory.compartments.every(row => Object.keys(row).length === 1 && typeof row.id === "string"));
   await api("compartment/inventory", {}, 401, false); await api("compartment/inventory", { compartment: selected }, 409); await api("compartment/inventory", { replay: true }, 409);
   evidence.workspaceInventoryCount = inventory.compartments.length; evidence.checks.push("complete bounded workspace metadata includes the selected identity without content, provider observation or selection/replay fields");
+  const missingRole = "verification-missing-role-" + randomUUID();
+  assert.equal(before.workflow.roles.some(role => role.id === missingRole), false);
+  await api("roles/choices", { roleId: missingRole, intent: "status" }, 409);
+  await api("roles/choices", { roleId: missingRole, intent: "status", compartment: selected }, 409);
+  await api("roles/bind-choice", { roleId: missingRole, intent: "status", provider: "custom-agent", targetKind: "custom-agent", targetId: "missing", choiceDigest: "0".repeat(64) }, 409);
+  evidence.checks.push("installed guided role routes refuse unknown roles and caller-selected workspaces without saving bindings or dispatching commands");
   const prefix = "coding/codex/owners/", permitted = before.policy === "personal" && before.mode !== "keyboard-only";
   await api(prefix + "list", { compartment: selected }, 401, false); evidence.checks.push("unauthenticated owner inspection is refused");
   for (const [route, field] of [["list", "codingTaskOwners"], ["loads", "codingTaskLoads"]]) {
