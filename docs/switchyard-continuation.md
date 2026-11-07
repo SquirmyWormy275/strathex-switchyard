@@ -157,12 +157,12 @@ native helper/runtime bundle was downloaded locally.
    and restricted-storage owner checks also pass. The later `e5a5781` explicit
    native-helper guardian step passes the invalid-status-request case; its final
    complete bundle acceptance remains pending.
-2. Installed Linux now runs `eebfe05`, release `3760be8d85df`, with `d68481192c36`
+2. Installed Linux now runs `849b9b9`, release `5ee98aa4c930`, with `3760be8d85df`
    retained as rollback. All 54 semantic workspaces, selection, one pending
    keyboard-only conversation and frozen frontend verify. The 88 metadata/
    refusal checks cover 56 exact modules, four profiles and 57 workflows.
    Dated launcher backup and readback verify; the exact prepared 554-file,
-   4,830,564-byte bundle is removed. Signed requests reject absent roles, wrong
+   4,830,690-byte bundle is removed. Signed requests reject absent roles, wrong
    PID/build, stale requests and caller-selected compartments without an effect.
    No browser reload, native focus, live provider/task or hardware use occurred.
    Do not repeat this update or remove its already-removed staging again.
@@ -210,11 +210,11 @@ process-query change has been made.
 
 ## Installed application and complete-suite baseline
 
-Installed Linux is `eebfe05`: 88 metadata/refusal checks, 56 module hashes,
+Installed Linux is `849b9b9`: 88 metadata/refusal checks, 56 module hashes,
 all 54 semantic workspaces, four profiles, 57 workflows, selected state, pending
 keyboard-only conversation and frozen frontend preserved. The current release
 and one rollback remain; its exact prepared bundle has been removed.
-[Installed evidence](evidence/installed-foreground-consent-summary.json).
+[Installed evidence](evidence/installed-foreground-retirement-summary.json).
 
 The accepted complete Linux run is `0c7d918`: 350 groups, 2,274 passes
 and 32 declared platform skips. Its exact checkout, nine dependency aliases,
@@ -271,7 +271,7 @@ foreground-consent corrections. All 88 metadata/refusal checks and 56 exact modu
 hashes pass. Host-facing verifiers ran sequentially; all 54 semantic workspaces,
 four profiles, 57 workflows, selection, pending conversation, private link and
 frozen frontend verify. Current plus one rollback remain; the exact prepared
-554-file/4,830,564-byte bundle is removed. Its backup and readback are retained.
+554-file/4,830,690-byte bundle is removed. Its backup and readback are retained.
 Do not repeat those executed update/cleanup scripts.
 
 A further foreground-retirement regression exposed an old failure stopping a
@@ -280,3 +280,11 @@ source is now captured and retired before that awaited write. Eight groups pass
 124 tests with no skips; the original failing receipt remains. This source-only
 follow-up postdates installed `eebfe05` and running full Linux `0c025df`.
 [Retirement evidence](evidence/foreground-retirement-source-summary.json).
+
+Installed `849b9b9` now includes the final original-source retirement correction;
+88 metadata/refusal checks and 56 exact hashes pass with all original state and
+frozen frontend preserved. Its exact 554-file/4,830,690-byte prepared bundle is
+removed. Current `5ee98aa4c930` plus rollback `3760be8d85df` remain. All retirement
+update/readback/cleanup scripts have executed; do not repeat them. The ongoing
+complete Linux run is an independent exact `0c025df` checkout and predates these
+observation corrections. [Current installed proof](evidence/installed-foreground-retirement-summary.json).
