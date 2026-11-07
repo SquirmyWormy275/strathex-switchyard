@@ -75,8 +75,7 @@ passes **417 groups / 2,478 tests**, with 207 declared skips; it predates the
 latest backend work. Installed Linux `9d230ac` preserves all 54 workspaces and
 passes 92 distinct metadata/refusal checks, including exact-project task choices,
 original-role guards and recording-consent checks;
-[update](docs/evidence/installed-foreground-retirement-summary.json) and
-[consent follow-up](docs/evidence/installed-editor-task-choices-summary.json).
+[installed evidence](docs/evidence/installed-editor-task-choices-summary.json).
 Native Windows client checkpoint `57af859` passes
 **25 groups / 249 tests with no skips**, including the signed launcher
 demonstration with an exact synthetic task acknowledgement. Interactive

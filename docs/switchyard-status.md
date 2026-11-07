@@ -10,124 +10,18 @@ Start with the [README](../README.md) for the product and first run, the
 on [draft PR 20](https://github.com/SquirmyWormy275/strathex-switchyard/pull/20).
 No merge or public release has been accepted.
 
-The editor backend now lists saved task names for one exact project in the
-selected workspace through authenticated Linux/Windows clients. It exposes no
-native session/account secrets and grants no launch permission. The composed
-fixture reads real encrypted storage through the signed server and feeds the
-chosen identity into the existing fresh-review flow. All 34 focused groups pass
-87 tests with no skips, including the workspace-switch race and packaging, and
-both TypeScript checks pass. Frontend picker and command
-activation remain frozen. Installed `9d230ac` passes 92 metadata/refusal checks
-across 56 exact modules while preserving all 54 workspaces, four profiles and
-57 workflows. This does not establish live task or UI acceptance.
-[Installed evidence](evidence/installed-editor-task-choices-summary.json).
+The latest installed backend lists saved task names for one exact project through
+signed Linux/Windows editor clients. It exposes no native session/account secrets,
+makes no provider call and grants no launch permission. The chosen identity still
+requires a fresh target/review/permit flow. The composed fixture passes 34 groups,
+87 tests and both TypeScript checks.
 [Task-choice contract](coding-task-owners.md#find-saved-tasks-for-a-project),
 [source evidence](evidence/editor-task-choices-source-summary.json).
 
-The reviewed Windows launcher completes the signed-client, protected-journal and
-real-carrier demonstration with an exact synthetic task acknowledgement. Native
-Windows client checkpoint `c359cdf` passes all 25 groups: **243 tests, no skips**.
-Original deadlines, permissions and cleanup remain intact. Native endpoint,
-file, process/Job and socket checks run separately from the explicit
-Terminal/provider doubles in the composed demonstration. Command/frontend
-activation and live TUI/account/task acceptance remain unfinished.
-[Accepted native client evidence](evidence/windows-editor-project-context-native-summary.json).
-
-Codex source checkpoint `9c3bccf` admits exact 0.166.0 and 0.167.0 revisions with
-42 explicit feature exclusions and version-bound text review. Twelve focused
-groups pass 152 tests with two skips. The actual 0.167 binary passes production
-argument construction and hello/config validators in an empty network-isolated
-home. No account, thread or model request is sent; its original tree and 66
-generated files are removed. The native Windows client lane also passes all 237
-tests at this exact source. Installed Linux `384cf8b` includes this contract and
-passes 88 metadata/refusal checks while preserving all 54 workspace snapshots.
-[Version contract and evidence](codex-version-contract.md).
-
-Windows project reviews now bind the original local workspace folder and
-invalidate on workspace changes. Leaving the project retires the original carrier
-while preserving the user's terminal. Shutdown joins the signed retirement
-response before closing transport. Eight focused groups pass 67 tests with two
-platform skips and both TypeScript checks pass. Native `c359cdf` now passes all
-243 client tests, including thirteen launcher cases; deadlines and cleanup verify.
-[Project-context evidence](evidence/windows-editor-project-context-summary.json).
-
-Linux now applies the same workspace identity and retirement boundaries. Six
-regressions reproduced the original faults; the correction passes eleven groups
-and 123 tests, with no skips and both TypeScript checks. The composed proof uses
-real Linux sockets, owned processes and encrypted state with a synthetic provider:
-workspace departure retires the original carrier and preserves the terminal and
-provider. The editor command remains uninstalled/inactive and the correction is
-not covered by a complete-suite run.
-[Linux project evidence](evidence/linux-editor-project-context-summary.json).
-
-Native Windows `841618d` passes the 243-test client lane and restricted-storage
-owner checks after the bounded diagnostic change. Original restricted token
-policy, descendant QUERY access and fixture/service removal verify. No failure
-recurred, so the intermittent retirement cause remains unresolved. The later
-`e5a5781` release job passes its explicit native-helper guardian step, which runs
-the invalid-status-request case. Preliminary backend shards alone omit that
-native conditional; the final complete bundle check remains pending.
-[Native diagnostic evidence](evidence/runtime-status-diagnostic-native-summary.json).
-
-All six Windows backend shards at `e5a5781` pass: 232 groups, 1,356 tests and
-179 declared skips, with exact manifests, commands, bounds and cleanup audited.
-The earlier stale documentation digest is corrected: the generated documentation
-and PDF step now passes. The explicit native guardian step, fresh 49-package
-runtime/offline-model check and 30 native reviewed-input checks also pass. The
-disposable runtime is removed and the original owned volume is detached; no
-guest or user account was opened. The final complete bundle check is still
-running. [Newer Windows evidence](evidence/windows-backend-e5a5781-summary.json).
-
-Physical CLI dispatch now uses signed exact-instance requests and responses,
-without disclosing the browser token. Original instance/build/PID, active policy,
-nonce and invocation identity are checked; replay, clock rollback and uncertain
-outcomes cannot silently repeat an effect. The source checks include an actual
-CLI child correlated with encrypted launch state. Installed `738c1f7` passes
-eight additional signed refusal/metadata checks without an effect. The exact
-source passes all 247 native Windows client tests with no skips; complete Windows
-release and physical-key acceptance remain pending.
-[Physical dispatch contract](physical-intent-authentication.md).
-
-Custom-agent dispatch now checks its original role binding atomically with
-enqueue. Rebinding, editing or removing the role refuses a pending request;
-already queued commands remain with their original session. Seven new cases
-pass, including five reproduced regressions, and six focused groups pass 88 tests
-with one platform skip. The follow-up workspace fence passes seven groups and
-106 tests with one skip: departure attempts, round trips and shutdown cannot
-revive a pending custom-agent shortcut, and native-focus/client-launch callbacks
-receive the same generation guard. Claude's exact terminal-focus path now checks
-the role/workspace guard immediately before tmux navigation and compositor focus;
-ten focused groups pass 141 tests with one skip and both TypeScript checks.
-Legacy owned Codex coding-task resume also checks after task observation and
-after transport initialization, before sending. A late authorization cannot send
-after the original timeout; pending results cannot cross bindings. Thirteen
-focused groups pass 167 tests and one skip, with both TypeScript checks.
-Configuration-conversation resume, cancellation and Codex/Claude/Microsoft design
-submission now carry the guard to their effect boundaries and encrypted reply
-writes. Eighteen focused groups pass 226 tests with one skip; eleven final cases
-also verify preserved Microsoft delivery uncertainty. All provider responses are
-synthetic. Normal installed `384cf8b` verifies these exact modules and two
-in-memory role guard cases; full-suite and live-provider acceptance remain separate.
-[Role dispatch evidence and limitations](role-dispatch-binding.md).
-
-Owned Codex design and reviewed-text turns now capture fixed runtime status
-under existing observation consent, with original account/role/task checks at
-persistence. Queued events cannot cross recording, timeout or account boundaries.
-Twenty-seven groups pass 191 tests with no skips, plus both TypeScript checks;
-package/installer scenarios and encrypted-state demonstrations are included.
-Provider responses remain synthetic. Normal installed `384cf8b` verifies this
-change within 88 metadata/refusal checks and 56 exact modules, with every original
-workspace preserved. It postdates complete Linux `0c7d918`; broader external
-streams remain unfinished. [Installed receipt](evidence/installed-runtime-observation-summary.json).
-[Runtime observation contract](codex-runtime-observation.md).
-
-A later persisted selection generation also refuses physical requests after an
-independent store switches away and back, including same-name reselection. Legacy
-reads remain unchanged. Two original regressions are retained; seven groups pass
-111 tests with one skip, and both TypeScript checks pass. This correction was
-installed at `57af859` with 88 metadata/refusal checks and 56 module hashes.
-[Source evidence](evidence/persisted-selection-source-summary.json),
-[installed readback](evidence/installed-persisted-selection-summary.json).
+Home/catalog and editor command activation remain frozen for review. Unfinished
+software and checks requiring hardware/accounts are listed separately below.
+A fresh complete Linux run at `7f2a52a` is in progress; passing earlier
+checkpoints does not accept that run.
 
 ## Current evidence
 
@@ -138,7 +32,7 @@ checkpoints are not cumulative acceptance of the latest suite.
 | --- | --- | --- |
 | Installed Linux `9d230ac` | **92 metadata/refusal checks; 56 exact module hashes.** All 54 semantic workspaces, four profiles, 57 workflows and frozen frontend preserved. [Receipt](evidence/installed-editor-task-choices-summary.json). | Exact-project saved task choices, recording consent generations, persisted selection generation, consented runtime status capture, original-role/provider-effect guards, signed CLI dispatch and Codex version contract included; editor command activation remains pending; no live scanner, provider task, account/model request, native focus or hardware acceptance. |
 | Native Windows client `57af859` | **25 groups; 249 tests; no skips.** Original manifest, commands, bounds and cleanup verified. [Receipt](evidence/selection-native-client-summary.json). | Terminal/provider doubles remain explicit; not the complete Windows suite, runtime-observation backend groups or live authenticated Codex turns. |
-| Complete Linux `0c025df` | **350 groups; 2,293 tests; 32 declared platform skips.** Original manifest, bounds and cleanup verified. [Receipt](evidence/linux-0c025df-complete-summary.json). | Covers runtime installed at `57af859`, including persisted selection and Codex status capture; later consent-generation/retirement fixes have separate focused and installed evidence. |
+| Complete Linux `0c025df` | **350 groups; 2,293 tests; 32 declared platform skips.** Original manifest, bounds and cleanup verified. [Receipt](evidence/linux-0c025df-complete-summary.json). | Covers runtime installed at `57af859`, including persisted selection and Codex status capture; later consent-generation/retirement fixes and task choices have separate focused and installed evidence. |
 | Complete Windows `dc755901` | **417 groups; 2,478 tests; 207 declared skips.** All six jobs and overall workflow passed. [Receipt](evidence/windows-complete-dc755901-summary.json). | Predates newer archive, scheduling, profile/workflow and observation corrections. |
 
 Complete Linux staging is removed: its exact checkout, nine dependency aliases,
@@ -166,7 +60,7 @@ corrected complete native acceptance remains pending.
 [Retained interruption](evidence/windows-backend-e5a5781-summary.json),
 [reporting correction](evidence/full-suite-progress-source-summary.json).
 
-## Recent backend changes
+## Earlier backend checkpoints
 
 - **Storage retirement diagnostics:** failures now retain only a fixed status-query
   stage and numeric native error. The original query logic, access rights,

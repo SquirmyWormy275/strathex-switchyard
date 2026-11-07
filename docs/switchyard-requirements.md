@@ -1,97 +1,37 @@
 # Switchyard authoritative requirement ledger
 
-The full suite remains unfinished. Use the [current status](switchyard-status.md)
-for accepted revisions and the table below for implementation scope.
+Switchyard gives Model F keyboards guided setup and stable controls for returning
+to tasks, reviewing changes and handing work between tools. **The full Rev2 suite
+is unfinished.** The F77 is the pilot device, not a limit on the assignment.
 
-Implementation and validation are separate. The Controller targets row covers
-the implemented pinned Vial/original-xwhatsit protocol paths; physical controller
-lineage remains unverified. The Linux and Windows row covers implemented platform,
-build and installation paths; interactive Windows account/device/focus checks
-remain unaccepted. Unfinished UI and named-integration work stays in its own rows.
+Implementation and validation are separate. Each row names the actual code,
+entry point, evidence and remaining work. A hardware/account check does not excuse
+unfinished independent software. Read [current status](switchyard-status.md) for
+accepted checkpoints and [verification](verification.md) for reproducible checks.
 
-Owned Codex design and reviewed-text turns now capture fixed runtime status
-under existing observation consent, with original account/role/task checks at
-persistence. Queued events cannot cross recording, timeout or account boundaries.
-Twenty-seven groups pass 191 tests with no skips, plus both TypeScript checks;
-package/installer scenarios and encrypted-state demonstrations are included.
-Provider responses remain synthetic. Normal installed `384cf8b` verifies this
-change within 88 metadata/refusal checks and 56 exact modules, with every original
-workspace preserved. It postdates complete Linux `0c7d918`; broader external
-streams remain unfinished. [Installed receipt](evidence/installed-runtime-observation-summary.json).
-[Runtime observation contract](codex-runtime-observation.md).
-
-Native Windows client `0bb7fd4` passes all 25 groups, 249 tests and no skips,
-including the signed launcher demonstration and original cleanup. Native
-Terminal/provider doubles remain explicit; interactive acceptance is separate.
-[Native receipt](evidence/runtime-observation-native-client-summary.json).
-
-Source `0c7d918` adds role/workspace checks at custom-agent enqueue, native focus,
-Codex task resume and configuration-conversation effects/reply writes. Eighteen
-focused groups pass 226 tests with one skip, and both TypeScript checks pass.
-Its complete Linux run passes all 350 groups (2,274 tests, 32 declared skips). Normal installed `384cf8b` verifies 88 metadata/
-refusal checks, 56 exact modules and all original workspaces.
-[Installed receipt](evidence/installed-runtime-observation-summary.json).
-[Role boundaries and evidence](role-dispatch-binding.md).
-
-Windows `e5a5781` passes all six preliminary backend shards: 232 groups, 1,356
-tests and 179 declared skips. Documentation/PDF, explicit native guardian,
-fresh optional runtime and native reviewed-input steps pass. The final bundle
-check is still running. [Windows evidence](evidence/windows-backend-e5a5781-summary.json).
-
-Complete Linux `0c7d918` passes 350 groups, 2,274 tests and 32 declared platform
-skips. Exact temporary staging is removed. It covers the installed `08fa7ea`
-runtime, including original-role/workspace/provider-effect boundaries. Subsequent
-runtime-status capture has separate focused evidence. [Complete receipt](evidence/linux-0c7d918-complete-summary.json).
-
-Codex source `9c3bccf` admits exact 0.166.0/0.167.0 with 42 feature exclusions
-and version-bound text review. Twelve groups pass 152 tests with two skips;
-actual 0.167 production initialization/config-read passes in an empty
-network-isolated home. Installed Linux `384cf8b` passes 88 metadata/refusal
-checks and preserves every workspace. Live account/task/model/TUI acceptance
-remains separate. [Contract](codex-version-contract.md).
-
-The Windows editor now binds each review to its original local workspace folder
-and change generation. Departure retires the original carrier; shutdown preserves
-its signed retirement response. Eight groups pass 67 tests with two skips. Native `c359cdf` passes all 243 client tests; guided
-project-selection and command activation remain pending.
-[Project context](evidence/windows-editor-project-context-summary.json).
-
-Linux workspace lifecycle now has equivalent identity/reopen/retirement checks.
-Eleven groups pass 123 tests, including two composed real-carrier journeys with
-a synthetic provider. Both TypeScript checks pass; installed and interactive
-acceptance remain separate. [Linux project evidence](evidence/linux-editor-project-context-summary.json).
-
-Physical CLI transport now binds signed requests/replies to the exact saved
-instance/build/PID and invocation, with replay/clock-rollback refusal and no bearer
-fallback. A real CLI child reaches encrypted Suite state through the signed route;
-external launch is doubled. Installed `738c1f7` verifies eight signed refusal/metadata
-checks, with no provider, focus or key effect.
-[Physical dispatch](physical-intent-authentication.md).
-
-The current installed checkpoint is `849b9b9`: 88 metadata/refusal checks,
-56 exact module hashes and all 54 semantic workspaces preserved. Recording
-consent generations, peer-pause handling and original-source retirement pass
-124 focused tests, including encrypted-store regressions. Native Windows client
-`57af859` passes 249 tests; the later complete Windows `e5a5781` run was cancelled
-without a final receipt. These results do not accept the frozen UI, live provider
-handoff or physical device operations.
-[Installed proof](evidence/installed-foreground-retirement-summary.json),
-[recording corrections](evidence/foreground-retirement-source-summary.json),
-[Windows client](evidence/selection-native-client-summary.json).
-
-The editor backend now lists saved task names for one exact project in the
-selected workspace through authenticated Linux/Windows clients. It exposes no
-native session/account secrets and grants no launch permission. The composed
-fixture reads real encrypted storage through the signed server and feeds the
-chosen identity into the existing fresh-review flow. All 34 focused groups pass
-87 tests with no skips, including the workspace-switch race and packaging, and
-both TypeScript checks pass. Frontend picker and command
-activation remain frozen. Installed `9d230ac` passes 92 metadata/refusal checks
-across 56 exact modules while preserving all 54 workspaces, four profiles and
-57 workflows. This does not establish live task or UI acceptance.
+Installed Linux source `9d230ac` passes **92 metadata/refusal checks across 56
+exact modules**, preserving all 54 semantic workspaces, four profiles, 57 workflows,
+selection and the pending keyboard-only conversation. The temporary package is
+removed; current plus one rollback remain.
 [Installed evidence](evidence/installed-editor-task-choices-summary.json).
-[Task-choice contract](coding-task-owners.md#find-saved-tasks-for-a-project),
+
+The latest backend feature lists saved task names for one exact project through
+signed Linux/Windows clients. Its encrypted-store-to-client demonstration passes
+34 groups/87 tests and both TypeScript checks. Listing grants no task authority;
+the selected identity still requires fresh review. Frontend picker/command
+activation remains frozen for owner review.
+[Contract](coding-task-owners.md#find-saved-tasks-for-a-project),
 [source evidence](evidence/editor-task-choices-source-summary.json).
+
+Complete Linux `0c025df` passes 350 groups/2,293 tests with 32 declared skips.
+It predates the consent corrections and task choices; a complete run at
+`7f2a52a` is in progress. Native Windows client `57af859` passes 249 tests
+with no skips. The `e5a5781` complete Windows release was cancelled without
+a final receipt, despite passing all preliminary shards. These checkpoints do
+not establish live provider/task, interactive UI or physical-device acceptance.
+[Linux evidence](evidence/linux-0c025df-complete-summary.json),
+[Windows client](evidence/selection-native-client-summary.json),
+[Windows release interruption](evidence/windows-backend-e5a5781-summary.json).
 
 ## Requirement status
 
