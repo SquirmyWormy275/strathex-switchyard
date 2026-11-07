@@ -58,6 +58,14 @@ All six Windows backend shards at `318fafc` pass: 232 groups, 1,355 tests and
 release acceptance remains pending.
 [Backend evidence](evidence/windows-backend-318fafc-summary.json).
 
+Physical CLI dispatch now uses signed exact-instance requests and responses,
+without disclosing the browser token. Original instance/build/PID, active policy,
+nonce and invocation identity are checked; replay, clock rollback and uncertain
+outcomes cannot silently repeat an effect. The source checks include an actual
+CLI child correlated with encrypted launch state. Installed and native Windows
+acceptance remain pending.
+[Physical dispatch contract](physical-intent-authentication.md).
+
 ## Current evidence
 
 Each result belongs to its exact source revision. Test totals from different

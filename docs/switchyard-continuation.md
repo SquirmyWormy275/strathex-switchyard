@@ -102,6 +102,13 @@ foreign replacement and unknown committed outcomes still refuse admission.
    preservation, uncertain retirement refusal and owned cleanup verify.
    This source is not installed and postdates complete Linux `c359cdf`.
    Command activation and frozen frontend remain unchanged.
+8. Physical CLI dispatch now uses the signed instance gateway, never the browser
+   bearer token. Two regressions reproduce unsigned-listener and saved-PID faults;
+   a later clock-rollback regression is also retained. Twenty-seven groups pass
+   136 tests/one skip, plus one actual CLI-child case. Final focused protocol
+   checks and typecheck cover the clock correction. No native key, provider or
+   installed application effect was used. This source is not yet installed.
+   Legacy servers refuse the new route; do not add a bearer fallback.
 
 Restricted-storage follow-up `3795217` passes eight ordinary owner checks,
 eight restricted owner checks, 68 QUERY-only descendant registrations and

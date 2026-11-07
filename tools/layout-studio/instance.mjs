@@ -2,7 +2,8 @@
 import { createHmac, randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
 import { request as httpRequest } from "node:http";
 import { windowsTerminalProcessQuery } from "./windows-terminal-process.mjs";
-const routes = { probe: "/instance/v1/probe", stop: "/instance/v1/stop", editorTarget: "/instance/v1/editor-target", editorReview: "/instance/v1/editor-review", editorIssue: "/instance/v1/editor-issue", editorConsume: "/instance/v1/editor-consume", editorReturnTarget: "/instance/v1/editor-return-target" };
+import { physicalIntentDispatch } from "./physical-intent-contract.mjs";
+const routes = { physicalIntent: "/instance/v1/physical-intent", probe: "/instance/v1/probe", stop: "/instance/v1/stop", editorTarget: "/instance/v1/editor-target", editorReview: "/instance/v1/editor-review", editorIssue: "/instance/v1/editor-issue", editorConsume: "/instance/v1/editor-consume", editorReturnTarget: "/instance/v1/editor-return-target" };
 const editorActions = { editorReview: "review", editorIssue: "issue", editorConsume: "consume", editorReturnTarget: "return-target" };
 const connectionActions = { editorConnectionOpen: "open", editorConnectionPeer: "pin-peer", editorConnectionObserve: "observe", editorConnectionStop: "stop", editorConnectionRecover: "recover" };
 for (const [operation, action] of Object.entries(connectionActions)) routes[operation] = "/instance/v1/editor-connection-" + action;
@@ -16,9 +17,11 @@ export function endpointIdentity(endpoint) {
   if (endpoint.schema !== "switchyard-active-endpoint/v1" || !validIdentity(endpoint.instance) || !Number.isSafeInteger(endpoint.pid) || endpoint.pid < 1 || url.protocol !== "http:" || url.hostname !== "127.0.0.1" || url.pathname !== "/" || url.search || url.username || url.password || !token || +url.port < 1024 || +url.port > 65535) throw new Error("This endpoint has no supported authenticated application identity. Preserve the existing instance for inspection.");
   return { url, token, identity: endpoint.instance };
 }
-export function createInstanceGateway({ token, identity, onStop, onEditorTarget, onEditorAuthorization, onEditorConnection, now = () => Date.now() }) {
+export function createInstanceGateway({ token, identity, onStop, onEditorTarget, onEditorAuthorization, onEditorConnection, onPhysicalIntent, now = () => Date.now() }) {
   if (!validIdentity(identity) || !/^[A-Za-z0-9_-]{43}$/.test(token) || typeof onStop !== "function") throw new Error("A private application identity and owned stop handler are required.");
   let stopping = false;
+  const physicalNonces = new Map();
+  let physicalClock = null;
   return async (req, res, origin) => {
     const operation = Object.keys(routes).find((k) => routes[k] === req.url);
     const reject = () => { res.writeHead(403, { "Content-Type": "application/json" }); res.end(JSON.stringify({ error: "Local instance authentication or scope was rejected." })); };
@@ -29,10 +32,25 @@ export function createInstanceGateway({ token, identity, onStop, onEditorTarget,
       const raw = Buffer.concat(chunks), supplied = req.headers["x-switchyard-instance-request"];
       if (!same(supplied, mac(token, "REQUEST", req.url, raw))) throw new Error();
       const v = JSON.parse(raw.toString("utf8"));
-      const authorization = Object.hasOwn(editorActions, operation), returning = operation === "editorReturnTarget", connection = Object.hasOwn(connectionActions, operation);
-      const expected = ["at", "build", "instanceId", "nonce", "operation", "schema", ...(operation === "editorTarget" || authorization || connection ? ["selection"] : [])].sort();
+      const authorization = Object.hasOwn(editorActions, operation), returning = operation === "editorReturnTarget", connection = Object.hasOwn(connectionActions, operation), physical = operation === "physicalIntent";
+      const expected = ["at", "build", "instanceId", "nonce", "operation", "schema", ...(operation === "editorTarget" || authorization || connection || physical ? ["selection"] : []), ...(physical ? ["pid"] : [])].sort();
       if (JSON.stringify(Object.keys(v).sort()) !== JSON.stringify(expected) || v.schema !== schema || v.operation !== operation || v.instanceId !== identity.id || v.build !== identity.build || !/^[A-Za-z0-9_-]{43}$/.test(v.nonce) || !Number.isSafeInteger(v.at) || Math.abs(now() - v.at) > 10000) throw new Error();
-      let targetObservation, editorAuthorization, editorConnection;
+      let targetObservation, editorAuthorization, editorConnection, intentDispatch;
+      if (physical) {
+        if (stopping || typeof onPhysicalIntent !== "function" || v.pid !== process.pid) throw new Error();
+        const selection = physicalIntentDispatch(v.selection), at = now();
+        // A clock rollback must not revive a request whose nonce was pruned.
+        if (!Number.isSafeInteger(at) || Math.abs(at - v.at) > 10000 || physicalClock !== null && at < physicalClock) throw new Error();
+        physicalClock = at;
+        for (const [nonce, expires] of physicalNonces) if (expires < at) physicalNonces.delete(nonce);
+        if (physicalNonces.has(v.nonce) || physicalNonces.size >= 1024) throw new Error();
+        // Reserve before the effect. A lost reply cannot replay the same signed
+        // invocation during its freshness window, even while it is still pending.
+        physicalNonces.set(v.nonce, v.at + 10000);
+        try { intentDispatch = { requestId: selection.requestId, status: "accepted", result: await onPhysicalIntent(selection) }; }
+        catch { intentDispatch = { requestId: selection.requestId, status: "not-confirmed" }; }
+        if (stopping) throw new Error();
+      }
       if (operation === "editorTarget") {
         const s = v.selection;
         if (stopping || typeof onEditorTarget !== "function" || !s || typeof s !== "object" || Array.isArray(s) || Object.keys(s).sort().join() !== "compartment,loadRequestId,ownerRequestId" || typeof s.compartment !== "string" || !/^[a-z][a-z0-9-]{0,63}$/.test(s.compartment) || ![s.ownerRequestId, s.loadRequestId].every(id => typeof id === "string" && /^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/.test(id))) throw new Error();
@@ -63,8 +81,8 @@ export function createInstanceGateway({ token, identity, onStop, onEditorTarget,
         editorConnection = await onEditorConnection(connectionActions[operation], Object.freeze({ ...s }));
         if (stopping) throw new Error();
       }
-      const response = JSON.stringify({ schema, operation, nonce: v.nonce, instanceId: identity.id, build: identity.build, pid: process.pid, origin, status: operation === "stop" || stopping ? "stopping" : "ready", ...(operation === "editorTarget" || returning ? { targetObservation } : {}), ...(authorization && !returning ? { editorAuthorization } : {}), ...(connection ? { editorConnection } : {}) });
-      if (Buffer.byteLength(response) > 32768) throw new Error();
+      const response = JSON.stringify({ schema, operation, nonce: v.nonce, instanceId: identity.id, build: identity.build, pid: process.pid, origin, status: operation === "stop" || stopping ? "stopping" : "ready", ...(operation === "editorTarget" || returning ? { targetObservation } : {}), ...(authorization && !returning ? { editorAuthorization } : {}), ...(connection ? { editorConnection } : {}), ...(physical ? { intentDispatch } : {}) });
+      if (Buffer.byteLength(response) > (physical ? 256 * 1024 : 32768)) throw new Error();
       res.writeHead(200, { "Content-Type": "application/json", "X-Switchyard-Instance-Response": mac(token, "RESPONSE-200", req.url, response) });
       if (operation === "stop" && !stopping) { stopping = true; res.once("finish", () => { void Promise.resolve().then(onStop).catch(() => {}); }); }
       res.end(response);
@@ -88,4 +106,25 @@ export async function requestInstance(endpoint, { operation = "probe", now = () 
   const result = JSON.parse(response.raw);
   if (JSON.stringify(Object.keys(result).sort()) !== JSON.stringify(["build", "instanceId", "nonce", "operation", "origin", "pid", "schema", "status"]) || result.schema !== schema || result.operation !== operation || result.nonce !== nonce || result.instanceId !== identity.id || result.build !== identity.build || result.pid !== endpoint.pid || result.origin !== url.origin || !["ready", "stopping"].includes(result.status) || operation === "stop" && result.status !== "stopping") throw new Error("The local instance response did not match its exact request and saved identity.");
   return { authenticated: true, ...result };
+}
+
+/** A signed physical effect request never sends the browser token or retries. */
+export async function requestPhysicalIntent(endpoint, input, { now = () => Date.now(), timeoutMs = 125000 } = {}) {
+  const selection = physicalIntentDispatch(input), { url, token, identity } = endpointIdentity(endpoint), operation = "physicalIntent", route = routes[operation];
+  if (!Number.isSafeInteger(timeoutMs) || timeoutMs < 1 || timeoutMs > 125000) throw Error("Unsupported physical intent request bound.");
+  const nonce = randomBytes(32).toString("base64url"), raw = JSON.stringify({ schema, operation, nonce, at: now(), instanceId: identity.id, build: identity.build, pid: endpoint.pid, selection });
+  const response = await new Promise((resolve, reject) => {
+    const req = httpRequest(new URL(route, url.origin), { method: "POST", agent: false, headers: { "Content-Type": "application/json", "Content-Length": Buffer.byteLength(raw), "X-Switchyard-Instance-Request": mac(token, "REQUEST", route, raw) } }, res => {
+      const chunks = []; let length = 0;
+      res.on("data", b => { length += b.length; if (length > 256 * 1024) res.destroy(Error("Physical intent response exceeds its bound.")); else chunks.push(b); });
+      res.once("error", reject); res.once("end", () => resolve({ status: res.statusCode, signature: res.headers["x-switchyard-instance-response"], raw: Buffer.concat(chunks).toString("utf8") }));
+    });
+    const timer = setTimeout(() => req.destroy(Error("Physical intent outcome was not confirmed within its bound; no retry was sent.")), timeoutMs);
+    req.once("close", () => clearTimeout(timer)); req.once("error", reject); req.end(raw);
+  });
+  if (response.status !== 200 || !same(response.signature, mac(token, "RESPONSE-200", route, response.raw))) throw Error("The physical endpoint did not authenticate its response. Its access token was not disclosed; no retry was sent.");
+  const result = JSON.parse(response.raw), expected = ["build", "instanceId", "intentDispatch", "nonce", "operation", "origin", "pid", "schema", "status"], outcome = result.intentDispatch;
+  if (Object.keys(result).sort().join() !== expected.sort().join() || result.schema !== schema || result.operation !== operation || result.nonce !== nonce || result.instanceId !== identity.id || result.build !== identity.build || result.pid !== endpoint.pid || result.origin !== url.origin || result.status !== "ready" || !outcome || typeof outcome !== "object" || Array.isArray(outcome) || outcome.requestId !== selection.requestId || !["accepted", "not-confirmed"].includes(outcome.status) || Object.keys(outcome).sort().join() !== (outcome.status === "accepted" ? "requestId,result,status" : "requestId,status")) throw Error("The physical response did not match its exact invocation and saved instance.");
+  if (outcome.status !== "accepted") throw Error("The active compartment did not confirm this physical intent. Review its target and policy before another deliberate action.");
+  return outcome.result;
 }

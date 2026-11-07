@@ -2,12 +2,9 @@
 import { randomUUID, createHash } from "node:crypto";
 import { join } from "node:path";
 import { privateDirectory, privateRead, privateWrite } from "./suite-store.mjs";
-const intents = ["summon", "resume", "review", "handoff", "status", "cancel"];
-export function closedIntent(value) {
-  if (["native-chatgpt.focus/v1", "native-vscode.focus/v1"].includes(value?.implementation)) return { implementation: value.implementation };
-  if (value?.implementation === "switchyard.role/v1" && /^[A-Za-z0-9_.:-]{1,64}$/.test(value.roleId) && intents.includes(value.intent)) return { implementation: value.implementation, roleId: value.roleId, intent: value.intent };
-  throw new Error("Physical shortcut is outside the closed intent contract.");
-}
+import { closedIntent } from "./physical-intent-contract.mjs";
+import { requestPhysicalIntent } from "./instance.mjs";
+export { closedIntent } from "./physical-intent-contract.mjs";
 export function intentArguments(value) { const v = closedIntent(value); return ["intent", v.implementation, ...(v.roleId ? [v.roleId, v.intent] : [])]; }
 export const intentKey = (value) => createHash("sha256").update(JSON.stringify(closedIntent(value))).digest("hex");
 export function runtimeDirectory() {
@@ -32,7 +29,7 @@ export async function publishEndpoint(server, { root = runtimeDirectory(), revie
   await privateWrite(join(root, "active.json"), value);
   return url;
 }
-export async function dispatchPhysicalIntent(value, { root = runtimeDirectory(), fetcher = fetch } = {}) {
+export async function dispatchPhysicalIntent(value, { root = runtimeDirectory() } = {}) {
   const request = closedIntent(value); await privateDirectory(root);
   const endpoint = JSON.parse(await privateRead(join(root, "active.json"))), url = new URL(endpoint.url);
   const match = /^#access=([A-Za-z0-9_-]{43})$/.exec(url.hash);
@@ -40,21 +37,17 @@ export async function dispatchPhysicalIntent(value, { root = runtimeDirectory(),
   try { process.kill(endpoint.pid, 0); } catch { throw new Error("Switchyard is not running. The intent was not redirected or replayed."); }
   const invocationId = randomUUID(), at = Date.now(); let accepted = false;
   try {
-    const response = await fetcher(`${url.origin}/api/suite/intent`, { method: "POST", redirect: "error", signal: AbortSignal.timeout(125000), headers: { Authorization: `Bearer ${match[1]}`, Origin: url.origin, "Content-Type": "application/json" }, body: JSON.stringify({ ...request, requestId: invocationId }) });
-    const reader = response.body.getReader(); let size = 0; const chunks = [];
-    while (true) { const { done, value: chunk } = await reader.read(); if (done) break; size += chunk.byteLength; if (size > 256 * 1024) { await reader.cancel(); throw new Error("Intent response exceeds its bound."); } chunks.push(Buffer.from(chunk)); }
-    const result = JSON.parse(Buffer.concat(chunks).toString("utf8"));
-    if (!response.ok) throw new Error(result.error || "The active compartment rejected this physical intent.");
+    const result = await requestPhysicalIntent(endpoint, { ...request, requestId: invocationId });
     accepted = true; return result;
   } finally {
     const directory = join(root, "intent-receipts"); await privateDirectory(directory);
-    await privateWrite(join(directory, `${intentKey(request)}.json`), JSON.stringify({ schema: "switchyard-physical-intent-receipt/v1", invocationId, at, completedAt: Date.now(), processId: process.pid, intent: request, status: accepted ? "accepted" : "rejected", evidence: "authenticated local dispatch; external task completion and physical keyboard event not established" }));
+    await privateWrite(join(directory, `${intentKey(request)}.json`), JSON.stringify({ schema: "switchyard-physical-intent-receipt/v1", invocationId, at, completedAt: Date.now(), processId: process.pid, intent: request, status: accepted ? "accepted" : "not-confirmed", evidence: "signed exact-instance dispatch; unconfirmed outcomes are never retried; external task completion and physical keyboard event not established" }));
   }
 }
 export async function waitIntentReceipt(value, since, { root = runtimeDirectory(), timeoutMs = 130000 } = {}) {
   const path = join(root, "intent-receipts", `${intentKey(value)}.json`), deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
-    try { const receipt = JSON.parse(await privateRead(path)); if (receipt.schema === "switchyard-physical-intent-receipt/v1" && receipt.at >= since && JSON.stringify(receipt.intent) === JSON.stringify(closedIntent(value))) { if (receipt.status !== "accepted") throw new Error("The active compartment rejected the registered shortcut. Review its target and policy."); return receipt; } }
+    try { const receipt = JSON.parse(await privateRead(path)); if (receipt.schema === "switchyard-physical-intent-receipt/v1" && receipt.at >= since && JSON.stringify(receipt.intent) === JSON.stringify(closedIntent(value))) { if (receipt.status !== "accepted") throw new Error("The registered shortcut was not confirmed. Review its target and policy; an effect may already have occurred."); return receipt; } }
     catch (error) { if (error.code !== "ENOENT") throw error; }
     await new Promise((resolve) => setTimeout(resolve, 50));
   }

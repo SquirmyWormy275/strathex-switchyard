@@ -31,6 +31,12 @@ Eleven groups pass 123 tests, including two composed real-carrier journeys with
 a synthetic provider. Both TypeScript checks pass; installed and interactive
 acceptance remain separate. [Linux project evidence](evidence/linux-editor-project-context-summary.json).
 
+Physical CLI transport now binds signed requests/replies to the exact saved
+instance/build/PID and invocation, with replay/clock-rollback refusal and no bearer
+fallback. A real CLI child reaches encrypted Suite state through the signed route;
+external launch is doubled. This source is not yet installed.
+[Physical dispatch](physical-intent-authentication.md).
+
 ## Requirement status
 
 | Requirement | Implementation | Validation | Actual paths | UI entry | Tests | Remaining implementation / exact blocked validation |

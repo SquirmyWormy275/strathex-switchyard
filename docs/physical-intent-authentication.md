@@ -1,0 +1,46 @@
+# Authenticate a physical shortcut before dispatch
+
+The installed CLI dispatches a closed shortcut intent through a signed local
+instance exchange. It sends no browser access token, account, command, prompt,
+content or caller-selected compartment. The same Suite route resolves the active
+workspace and enforces its existing provider/role policy.
+
+The request binds the saved instance, build and PID, a fresh nonce, the exact
+invocation UUID and the closed intent. The server verifies these fields before
+calling the route. The response binds the same coordinates and origin; an
+unsigned, stale, substituted or mismatched reply cannot establish acceptance.
+Older servers without this route refuse the new dispatcher. There is no alternate
+bearer request, different target or automatic retry.
+
+## Preserve uncertainty and avoid duplicate effects
+
+A nonce is reserved before dispatch, including while its response is pending.
+The original ten-second freshness window and a 1,024-entry ceiling bound replay
+memory. Expired entries can be removed only as time advances; a backward clock
+adjustment refuses dispatch until the previous observed time is reached. Restart
+creates a different application identity, so an old signed request cannot carry
+over to the new instance.
+
+The request retains its 125-second total deadline and 256 KiB response ceiling.
+A timeout, disconnection, failed policy/action response or substituted listener
+records a `not-confirmed` private receipt. An effect may already have happened;
+the caller must inspect the original target before another deliberate action.
+Successful local dispatch still does not establish a physical keyboard event,
+external application focus, resumed task, model prompt or task completion.
+
+## Verification and current availability
+
+Twenty-seven focused groups pass 136 tests with one declared platform skip. A
+subsequent actual CLI-child case adds one distinct pass. Both TypeScript checks
+pass. The final protocol checks cover replay while pending, cache exhaustion,
+expiry, clock rollback, substituted response fields, response/time bounds and
+stop during delivery. Initial failures are retained with their original bounds
+and verified cleanup.
+
+The CLI demonstration uses actual HTTP, the signed gateway, encrypted Suite
+state and a bounded native-launch double. Its child exits, and the invocation
+receipt matches the protected launch record. All sixteen installation/recovery
+scenarios and package bounds pass. Native Windows, installed-current-source and
+physical-key acceptance remain separate. The running installation is still
+`51a73c7`; the frozen frontend and F77 mapping have not changed.
+[Source evidence](evidence/signed-physical-intent-source-summary.json).
