@@ -33,7 +33,7 @@ internal static class ReviewedHistoryInputs
         if(path.Length<1||path.Length>max||path.Any(char.IsControl)||path.IndexOfAny(new[]{'\\',':','*','?','[',']'})>=0||path.Split('/').Length>components||path.Split('/').Any(part=>part.Length==0||part is "." or ".."||part.Equals(".git",StringComparison.OrdinalIgnoreCase)||part.EndsWith(' ')||part.EndsWith('.')||Reserved.IsMatch(part)))throw Invalid();
         return path;
     }
-    internal static Packet Read(JsonElement packet,IReadOnlyDictionary<string,(string Sha256,int Size)> inputFiles)
+    internal static Packet Read(JsonElement packet,IReadOnlyDictionary<string,(string Sha256,int Size)> inputFiles,bool withIndex=false)
     {
         var buffers=new Dictionary<string,byte[]>(StringComparer.Ordinal);
         try
@@ -54,7 +54,7 @@ internal static class ReviewedHistoryInputs
                 string path=PathName(name,384,28);
                 if(path.StartsWith(Prefix,StringComparison.Ordinal)||path==Prefix.TrimEnd('/')||path.StartsWith(".switchyard-index/",StringComparison.Ordinal)||path==".switchyard-index"||!paths.Add(path)||!folded.Add(path)||previous!=null&&string.CompareOrdinal(previous,path)>=0)throw Invalid();previous=path;
             }
-            var rows=witness.GetProperty("rows");if(rows.ValueKind!=JsonValueKind.Array||rows.GetArrayLength() is <1 or >48||inputFiles.Keys.Any(path=>path.StartsWith(".switchyard-index/",StringComparison.Ordinal)))throw Invalid();
+            var rows=witness.GetProperty("rows");if(rows.ValueKind!=JsonValueKind.Array||rows.GetArrayLength() is <1 or >48||!withIndex&&inputFiles.Keys.Any(path=>path.StartsWith(".switchyard-index/",StringComparison.Ordinal)))throw Invalid();
             var sources=new Dictionary<string,Source>(StringComparer.Ordinal);var used=new HashSet<string>(StringComparer.Ordinal);var commits=new HashSet<string>(StringComparer.Ordinal);long total=0;
             foreach(var row in rows.EnumerateArray())
             {

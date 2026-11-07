@@ -42,7 +42,7 @@ test("authenticated draft assembly returns exact generated controls without sour
 
 test("draft selection rejects malformed feeds, commands and approvals before native inspection", async t => {
   const f = await fixture(t), before = f.counters().calls;
-  for (const extra of [{ scannerFixtureId: "../outside" }, { advisoryFixtureId: null }, { advisoryFixtureId: "synthetic-scanner" }, { executable: "sh" }, { args: [] }, { approved: true }, { paths: ["task.txt"] }, { compartment: "work" }, { includeIndex: true, historyDepth: 2 }]) await assert.rejects(f.service.prepareScannerDraft("personal", { ...input(f), ...extra }));
+  for (const extra of [{ scannerFixtureId: "../outside" }, { advisoryFixtureId: null }, { advisoryFixtureId: "synthetic-scanner" }, { executable: "sh" }, { args: [] }, { approved: true }, { paths: ["task.txt"] }, { compartment: "work" }]) await assert.rejects(f.service.prepareScannerDraft("personal", { ...input(f), ...extra }));
   assert.equal(f.counters().calls, before);
 });
 

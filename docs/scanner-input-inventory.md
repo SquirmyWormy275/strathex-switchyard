@@ -63,7 +63,7 @@ The returned descriptors can populate a separately reviewed Shield request and
 recipe allowlist. Preparation neither writes those files nor grants authority
 nor starts a scanner. Authority owns the original source paths; reserved aliases
 exist only inside disposable staging. Execution independently re-witnesses the
-bytes. Automatic recipe/feed assembly, broader history and frontend controls
+bytes. Broader history and frontend controls
 remain unfinished; this preparation does not establish complete security coverage.
 
 ## Include bounded history in the review
@@ -71,8 +71,8 @@ remain unfinished; this preparation does not establish complete security coverag
 For Codebase Audit or Release Shield, add `"historyDepth": 4` to prepare historical
 versions of the current tracked paths. Choose a depth from one to six. This uses
 the existing raw commit/tree/blob verifier; callers cannot import revisions,
-object IDs, paths or arbitrary Git commands. `includeIndex: true` cannot be combined
-with this option because mixed index/history execution remains unimplemented.
+object IDs, paths or arbitrary Git commands. Add `includeIndex: true` to include staged versions in the same review;
+[combined inputs](mixed-scanner-inputs.md) retain both witnesses and original bounds.
 
 The `bounded-current-and-history/v1` response adds `historyInputs` with the exact
 reserved paths and source descriptors for the [historical scanner](historical-shield-inputs.md).
@@ -86,7 +86,7 @@ outside this automatic authority path.
 At most eight tracked paths and 48 historical versions fit this preparation.
 The reader retains its 256 KiB per-blob and 448 KiB aggregate unique-byte limits.
 Windows also counts repeated versions against its 320 KiB transport limit.
-Current paths plus historical descriptors must fit the 256-file execution limit;
+Current paths, staged and historical descriptors must fit the 256-file execution limit;
 excess inputs are refused whole. A final target capture refuses intervening HEAD,
 index, worktree, task, account or selected-workspace changes before confirmation.
 
@@ -265,4 +265,10 @@ only audit metadata. Dated backup and launcher readback verify. Current plus one
 rollback remain, and the exact 532-file, 5,202,055-byte prepared bundle is removed.
 No installed scanner, native task, model/account request or hardware operation
 was performed. [Installed evidence](evidence/installed-scanner-history-review-summary.json).
-\n## Assemble the control-file draft\n\nUse the separate authenticated [scanner-draft route](scanner-recipe-drafts.md)\nto assemble the engine, selected signed feeds, request and recipe. It retains\nthese source witnesses and returns a reviewable draft without writing files\nor granting authority. Automatic reviewed saving and frontend activation remain\nunfinished.\n
+
+## Assemble and save the control-file draft
+
+Use the [scanner-draft route](scanner-recipe-drafts.md) to assemble the exact
+engine, feeds, request and recipe without writes or authority. Separately
+[reviewed saving](scanner-recipe-saving.md) materializes those controls.
+Frontend activation remains unfinished.

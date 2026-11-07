@@ -1,3 +1,4 @@
+import { withShieldGitInputs } from "../shield-git-inputs.mjs";
 import { cargoArchiveFixture } from "./cargo-archive-fixture.mjs";
 import { pypiWheelFixture } from "./pypi-wheel-fixture.mjs";
 import assert from "node:assert/strict";
@@ -13,25 +14,23 @@ import { scannerFixture, cargoLockFixture, pinnedRequirementsFixture, licenseDec
 import { connectedExecutionActions } from "../repository-execution-actions.mjs";
 import { scopeHash } from "../confirmations.mjs";
 import { scanShieldInputs } from "../shield-scanner-engine.mjs";
-import { shieldIndexStagingBytes } from "../shield-index-inputs.mjs";
 import { buildWindowsIndexPacket } from "../windows-index-inputs.mjs";
-import { shieldHistoryStagingBytes } from "../shield-history-inputs.mjs";
-import { buildWindowsHistoryPacket } from "../windows-history-inputs.mjs";
+import { buildWindowsHistoryPacket, windowsCombinedGitRequest } from "../windows-history-inputs.mjs";
 const sha = value => createHash("sha256").update(value).digest("hex");
 
 // Real task/Git/crypto/kernel boundaries; the Windows guest runner is doubled.
 export async function windowsExecutionFixture(t, { action = "run_target", pipelineReport = "complete", signedFeeds = false, shield = false, clean = false, ignoredSecrets = false, workspaceLock = false, ignoredBuildTree = false, advisorySeverity = "high", npmVersion = "1.0.0", npmAdvisory, packageArtifact, packageArchive, cargoArtifact, cargoArchive, pypiArtifact, pypiWheel, exceptions = false, stagedIndex = false, historyInputs = false, requirements = false, pythonVersions = {}, licenseExpressions = false, cargoLock = false, cargoVersion = "1.2.3", resolveScannerFixtures } = {}) {
   const f = await authorityFixture(t, { executionActions: connectedExecutionActions("win32") }), prerequisites = { helperSha256: "c".repeat(64), recipeRuntime: { path: "C:\\owned\\node.exe", sha256: "b".repeat(64) }, nodeVersion: "24.14.0" };
   const sample=shield?(cargoArchive?cargoArchiveFixture({action,archiveStatus:cargoArchive}):pypiWheel?pypiWheelFixture({action,archiveCase:pypiWheel}):pypiArtifact?pypiArtifactFixture({action,artifactStatus:pypiArtifact}):cargoArtifact?cargoArtifactFixture({action,artifactStatus:cargoArtifact}):packageArtifact?npmArtifactFixture({action,artifactStatus:packageArtifact,archiveStatus:packageArchive}):cargoLock?cargoLockFixture({action,clean,cargoVersion}):licenseExpressions?licenseDeclarationsFixture({action}):requirements?pinnedRequirementsFixture({action,clean,...pythonVersions}):scannerFixture({action,files:{...(ignoredSecrets?{".env":"-----BEGIN PRIVATE KEY-----\nsynthetic ignored secret"}:{}),"app.js":clean||ignoredSecrets?"const ordinary=1;":"-----BEGIN PRIVATE KEY-----\neval(untrusted);","package-lock.json":JSON.stringify({lockfileVersion:3,packages:{...(workspaceLock?{"packages/local":{name:"@synthetic/local",version:"2.0.0",license:"MIT",scripts:{install:"NEVER_EXECUTE_WORKSPACE_SCRIPT"}},"node_modules/local-alias":{resolved:"packages/local",link:true}}:{}),"node_modules/synthetic":{version:npmVersion,license:"MIT"}}})},advisory:[...(workspaceLock?[{ecosystem:"npm",name:"@synthetic/local",version:"2.0.0",advisories:[]}]:[]),{ecosystem:"npm",name:"synthetic",version:npmVersion,advisories:npmAdvisory??(clean?[]:[{id:"GHSA-synthetic-only",severity:advisorySeverity}])}]})):undefined;
-  if(stagedIndex){
-    assert.equal(shield,true);const staged=Buffer.from("-----BEGIN PRIVATE KEY-----\nSYNTHETIC_WINDOWS_STAGED_ONLY_SOURCE\neval(untrusted);\n");await writeFile(join(f.root,"app.js"),staged);await f.run("add","app.js");await writeFile(join(f.root,"app.js"),sample.content.get("app.js"));
-    const path=".switchyard-index/app.js",source={kind:"git-index",path:"app.js",objectId:(await f.run("rev-parse",":app.js")).trim(),mode:"100644"};sample.request.files.push({path,sha256:sha(staged),size:staged.length,source});sample.content.set(path,staged);
-  }
   if(historyInputs){
-    assert.equal(shield,true);assert.equal(stagedIndex,false);assert.ok(["shield_codebase_audit","release_shield"].includes(action));
+    assert.equal(shield,true);assert.ok(["shield_codebase_audit","release_shield"].includes(action));
     const old=Buffer.from("-----BEGIN PRIVATE KEY-----\nSYNTHETIC_WINDOWS_HISTORICAL_ONLY_SOURCE\n"),rows=[];
     for(const bytes of [old,sample.content.get("app.js")]){await writeFile(join(f.root,"app.js"),bytes);await f.run("add","app.js");await f.run("-c","commit.gpgsign=false","commit","-m","SYNTHETIC_HISTORY_MESSAGE_NEVER_RETURNED");rows.push({commit:(await f.run("rev-parse","HEAD")).trim(),objectId:(await f.run("rev-parse","HEAD:app.js")).trim(),bytes});}
     for(const row of rows.reverse()){const path=".switchyard-history/"+row.commit+"/app.js",source={kind:"git-history",path:"app.js",commit:row.commit,objectId:row.objectId,mode:"100644",depth:4};sample.request.files.push({path,sha256:sha(row.bytes),size:row.bytes.length,source});sample.content.set(path,row.bytes);}
+  }
+  if(stagedIndex){
+    assert.equal(shield,true);const staged=Buffer.from("-----BEGIN PRIVATE KEY-----\nSYNTHETIC_WINDOWS_STAGED_ONLY_SOURCE\neval(untrusted);\n");await writeFile(join(f.root,"app.js"),staged);await f.run("add","app.js");await writeFile(join(f.root,"app.js"),sample.content.get("app.js"));
+    const path=".switchyard-index/app.js",source={kind:"git-index",path:"app.js",objectId:(await f.run("rev-parse",":app.js")).trim(),mode:"100644"};sample.request.files.push({path,sha256:sha(staged),size:staged.length,source});sample.content.set(path,staged);
   }
   if(sample)sample.content.set("request.json",Buffer.from(JSON.stringify(sample.request)));
   const program=shield?await readFile(new URL("../shield-scanner-engine.mjs",import.meta.url)):Buffer.from("process.stdout.write('synthetic Windows recipe')"),catalog=Buffer.from(JSON.stringify({schema:"sxsy-b122.windows-sandbox-catalog",version:1,recipes:[{id:action,executable:"C:\\B122\\tools\\node.exe",executableSha256:prerequisites.recipeRuntime.sha256,arguments:shield?["{INPUT_ROOT}\\program.mjs","request.json"]:["{INPUT_ROOT}\\program.mjs"],workingRoot:shield?"input":"work",workingDirectory:".",environment:action==="run_target"?{}:{NODE_ENV:"test"},timeoutMs:5000,maxOutputBytes:shield?524288:4096,artifacts:[]}]}));
@@ -63,8 +62,14 @@ export async function windowsExecutionFixture(t, { action = "run_target", pipeli
       if(artifacts || action !== "run_target"){
         const root=join(f.stage,"execution","windows",c,"results",context.operationId,"sandbox-11111111-2222-4333-8444-555555555555");await mkdir(root,{recursive:true});result[backendStatus==="failed"?"diagnosticRoot":"resultRoot"]=root;result.programExitCode=backendStatus==="failed"?7:0;result.validatedOutputs=[];result.resultManifestSha256="e".repeat(64);result.recipeCatalogSha256=sha(catalog);result.sandboxHelperSha256=prerequisites.helperSha256;
         const report = { schema: "sxsy-b122.windows-repository-recipe-result", version: 1, coverage: ["correctness", ...(action === "pipeline_clean_reproduction" ? ["reproduction"] : []), "isolation", "production_data", "ambient_credentials"].map(dimension => ({ dimension, status: pipelineReport === "unavailable" && dimension === "correctness" ? "unavailable" : "covered", fixtureId: "approved:synthetic-program" })), scannerFixtureIds: signedFeeds ? ["synthetic-scanner"] : [], advisoryFixtureIds: signedFeeds ? ["synthetic-advisory"] : [] };
-        const historical=historyInputs?await indexOptions.useHistoryInputs(["app.js"],4,async(report,privateBytes)=>{const historyBytes=shieldHistoryStagingBytes(review.shield,report,privateBytes);buildWindowsHistoryPacket({action,historyWitness:plan.historyWitness,historyBytes,inputFiles:JSON.parse(bytes).inputFiles});return scanShieldInputs(sample.request,{readInput:async path=>historyBytes.has(path)?Buffer.from(historyBytes.get(path).bytes):readFile(join(f.root,path))});}):undefined;
-        const scanned=historical??(sample?(stagedIndex?await indexOptions.useIndexInputs(["app.js"],async(report,privateBytes)=>{const indexBytes=shieldIndexStagingBytes(review.shield,report,privateBytes);buildWindowsIndexPacket({action,indexWitness:plan.indexWitness,indexBytes,inputFiles:JSON.parse(bytes).inputFiles});return scanShieldInputs(sample.request,{readInput:async path=>indexBytes.has(path)?Buffer.from(indexBytes.get(path).bytes):readFile(join(f.root,path))});}):await sample.scan()):report);
+        const scanned=sample && (historyInputs || stagedIndex) ? await withShieldGitInputs(review.shield,indexOptions,async options=>{
+          const inputFiles=JSON.parse(bytes).inputFiles,indexPacket=stagedIndex?buildWindowsIndexPacket({action,indexWitness:plan.indexWitness,indexBytes:options.indexBytes,inputFiles}):undefined,historyPacket=historyInputs?buildWindowsHistoryPacket({action,historyWitness:plan.historyWitness,historyBytes:options.historyBytes,inputFiles,indexWitness:plan.indexWitness}):undefined;
+          if(indexPacket&&historyPacket)windowsCombinedGitRequest({inputFiles},indexPacket,historyPacket);
+          return scanShieldInputs(sample.request,{readInput:async path=>{
+            const privateFile=options.indexBytes?.get(path)??options.historyBytes?.get(path);
+            return privateFile?Buffer.from(privateFile.bytes):readFile(join(f.root,path));
+          }});
+        }):sample?await sample.scan():report;
         for(const [path,text] of [["process.stdout.txt", action === "run_target" ? "synthetic output\nAuthorization: Bearer synthetic-value-123456789" : pipelineReport === "malformed" ? "untyped output" : JSON.stringify(scanned)],["process.stderr.txt","synthetic diagnostic"]]){const bytes=Buffer.from(text);await writeFile(join(root,path),bytes);result.validatedOutputs.push({path,size:bytes.length,sha256:sha(bytes)});}
       }
       await f.store.update(c,"synthetic-Windows-native-result",state=>{const row=state.repositoryWindowsRuns.find(row=>row.operationId===context.operationId);row.status="settled";row.cleanupPending=false;row.nativeExitVerified=true;row.result=result;row.backendObservation=result;});return result;

@@ -49,6 +49,7 @@ export function createWindowsRepositoryExecution({ store, authority, stateDirect
       selected.indexWitness=shield.indexWitness;
     }
     if(shield?.historyWitness){
+      if ((shield.indexWitness?.rows ?? []).concat(shield.historyWitness.rows).reduce((sum,row)=>sum+row.size,0)>windowsIndexRawLimit)throw Error("Combined Windows Git inputs exceed the original 320 KiB transport subset.");
       if(shield.historyWitness.rows.reduce((sum,row)=>sum+row.size,0)>320*1024)throw Error("Windows historical input staging supports at most 320 KiB inside its original bounded transport.");
       selected.historyWitness=shield.historyWitness;
     }
@@ -110,7 +111,7 @@ export function createWindowsRepositoryExecution({ store, authority, stateDirect
           try {
             if (control.signal.aborted) return { status: control.reason() === "deadline" ? "timed_out" : control.reason() === "unavailable" ? "unavailable" : "cancelled", effectDisposition: "not_started", summary: "Windows Run refused an expired, cancelled or unverifiable durable operation." };
             const guard = async () => { await check(); const checked = await request.effectGuard.assertCurrent({ action: request.action, operationId: request.operationId, target: request.target, ...(request.session ? { session: request.session } : {}), ...(request.authority ? { authority: request.authority } : {}) }); if (!checked.allowed) throw Error(checked.reason); };
-            const result = await runner.run(c, { operationId: request.operationId, scopeDigest: review.scopeDigest, provider: resolved.task.provider }, review.plan, guard, control.signal, review.action, review.shield?.historyWitness?{useHistoryInputs:(paths,depth,consume)=>authority.useHistoryInputs(c,review.authorityId,review.action,paths,depth,consume)}:review.shield?.indexWitness ? { useIndexInputs:(paths,consume)=>authority.useIndexInputs(c,review.authorityId,review.action,paths,consume) } : undefined);
+            const result = await runner.run(c, { operationId: request.operationId, scopeDigest: review.scopeDigest, provider: resolved.task.provider }, review.plan, guard, control.signal, review.action, review.shield?.historyWitness || review.shield?.indexWitness ? { ...(review.shield.indexWitness ? { useIndexInputs:(paths,consume)=>authority.useIndexInputs(c,review.authorityId,review.action,paths,consume) } : {}), ...(review.shield.historyWitness ? { useHistoryInputs:(paths,depth,consume)=>authority.useHistoryInputs(c,review.authorityId,review.action,paths,depth,consume) } : {}) } : undefined);
             const state = await store.snapshot(c), guest = state.repositoryWindowsGuests?.find(row => row.operationId === request.operationId);
             const uncertainStart = state.repositoryWindowsGuestCommands?.some(row => row.operationId === request.operationId && row.action === "start" && row.startAcknowledged === true && row.result?.effectStarted !== false);
             const effectDisposition = result.status === "incomplete" ? "ambiguous" : ["blocked", "unavailable"].includes(result.status) ? guest?.startVerified === true ? "committed" : uncertainStart ? "ambiguous" : "not_started" : "committed";

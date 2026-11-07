@@ -1,5 +1,22 @@
 # Switchyard authoritative requirement ledger
 
+Combined current, staged and historical scanner inputs are implemented. The
+latest accepted results across **56 focused groups pass 348 tests with five
+declared skips**, including a real Linux mixed scan, replay refusal, original
+repository preservation and native/staging retirement. Typecheck and all 34
+native sources compile offline with zero warnings/errors. Original bounds remain;
+the owned 33-file, 1,486,912-byte compiler output and empty test parent are removed.
+Mixed NTFS staging is implemented but native acceptance is pending.
+[Contract](mixed-scanner-inputs.md), [source evidence](evidence/scanner-mixed-input-source-summary.json).
+
+Windows scanner saving passes **15 native tests, no skips**, at `5ec16fe`,
+including four actual NTFS cases. Source/merge tree, artifact, commands, bounds
+and cleanup verify. The overall workflow failed a separate restricted-storage
+owner's final retirement assertion after seven checks. That software failure
+remains unresolved and its original fixture is preserved.
+[Native saving evidence](evidence/windows-scanner-save-native-summary.json),
+[retained failure](evidence/windows-restricted-storage-retirement-failure-summary.json).
+
 Complete Linux `b320506` passes all **328 groups: 2,049 tests and sixteen declared
 skips**, with zero failures or cancellations. This source includes scanner drafting
 and reviewed Linux saving. Exact original inventory, commands, bounds, skips and
@@ -12,7 +29,7 @@ Windows scanner saving is implemented through the fixed NTFS helper and the same
 review/apply/recovery API. Forty-one focused groups pass 275 tests with ten declared
 platform skips; typecheck and offline compilation of all 34 native sources pass.
 Four actual NTFS cases are registered in the complete inventory and independent
-`scanner-save` CI lane. Native Windows acceptance is pending; frozen frontend
+`scanner-save` CI lane. Native Windows saving now has the passing receipt above; frozen frontend
 controls remain unfinished. Original owner retirement, lost acknowledgements and
 Linux save/scan regressions verify. The owned 1,479,448-byte compiler output and
 empty test parent are removed. [Windows source evidence](evidence/windows-scanner-recipe-save-source-summary.json).

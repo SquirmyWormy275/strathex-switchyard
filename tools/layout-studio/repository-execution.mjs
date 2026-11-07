@@ -1,3 +1,6 @@
+import { withShieldGitInputs } from "./shield-git-inputs.mjs";
+import { shieldIndexFiles } from "./shield-index-inputs.mjs";
+import { shieldHistoryFiles } from "./shield-history-inputs.mjs";
 /** Separately reviewed task execution through existing policy, budget and receipt ledgers. */
 import { createHash } from "node:crypto";
 import { join } from "node:path";
@@ -20,8 +23,6 @@ import { connectedExecutionActions, linuxPipelineActions, linuxShieldActions } f
 import { pipelineEvidence, pipelineDependencies } from "./repository-pipeline.mjs";
 import { validateShieldRecipe, shieldDependencies, shieldReceiptEvidence } from "./repository-shield.mjs";
 import { shieldIndexPrefix, shieldHistoryPrefix } from "./shield-scanner-engine.mjs";
-import { shieldIndexFiles, shieldIndexStagingBytes } from "./shield-index-inputs.mjs";
-import { shieldHistoryFiles, shieldHistoryStagingBytes } from "./shield-history-inputs.mjs";
 const uuid=v=>typeof v==="string"&&/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/.test(v);
 const sha=v=>typeof v==="string"&&/^[a-f0-9]{64}$/.test(v), tokenHash=v=>createHash("sha256").update(v).digest("hex");
 const budget={version:"suite-reviewed-execution/v2",commandClasses:Object.fromEntries(connectedExecutionActions("linux").map(action=>[action,{maxConcurrent:1,timeoutMs:600000,maxAttempts:1,windowMs:3600000,maxClaimsPerWindow:20,maxCostUnitsPerWindow:20,defaultCostUnits:1}]))};
@@ -82,13 +83,11 @@ export function createRepositoryExecution({store,authority,stateDirectory,platfo
         repositoryRuntime=new RepositoryRuntime(loaded.verified,{processSupervisor:sandbox,temporaryBuilds:true,executionRoots:{prepare:async input=>{
           const row=(await store.snapshot(c)).repositoryExecutionReviews?.find(r=>r.requestId===review.requestId);if(!row?.operationId)throw Error("Execution staging requires its protected checkpoint operation.");
           const context={operationId:row.operationId,scopeDigest:review.scopeDigest};
-          if(review.shield?.historyWitness){
-            try{return await authority.useHistoryInputs(c,review.authorityId,review.action,review.shield.historyWitness.paths,review.shield.historyWitness.requestedDepth,(report,bytes)=>staging.prepare(c,context,input,check,{historyBytes:shieldHistoryStagingBytes(review.shield,report,bytes)}));}
-            catch(error){await staging.cleanup(c,row.operationId);throw error;}
-          }
-          if(!review.shield?.indexWitness)return staging.prepare(c,context,input,check);
           try {
-            return await authority.useIndexInputs(c,review.authorityId,review.action,review.shield.indexWitness.rows.map(row=>row.path),(report,bytes)=>staging.prepare(c,context,input,check,{indexBytes:shieldIndexStagingBytes(review.shield,report,bytes)}));
+            return await withShieldGitInputs(review.shield, {
+              useIndexInputs: (paths, consume) => authority.useIndexInputs(c, review.authorityId, review.action, paths, consume),
+              useHistoryInputs: (paths, depth, consume) => authority.useHistoryInputs(c, review.authorityId, review.action, paths, depth, consume)
+            }, options => staging.prepare(c, context, input, check, options));
           } catch(error) { await staging.cleanup(c,row.operationId); throw error; }
         }}});
         const broker=new RepositoryRuntimeExecutionBroker({resolve:async root=>{if(root!==review.repositoryRoot)throw Error("The execution repository changed.");return repositoryRuntime;}}),execution=new InMemoryExecutionBroker(context.policy),marker=repositoryRuntimeExecutionRecipe(review.action,resolved.snapshot);

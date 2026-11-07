@@ -17,9 +17,9 @@ review. It writes no repository files, grants no authority and starts no scan.
 ```
 
 Use actual task and installed feed identities. The advisory field is optional.
-Add `includeIndex: true` or `historyDepth: 1..6` for the supported independent
-[staged/history selections](scanner-input-inventory.md). Mixed index/history
-execution remains unsupported. Commands, paths, imported approvals and arbitrary
+Add `includeIndex: true`, `historyDepth: 1..6`, or both for supported
+[staged/history selections](scanner-input-inventory.md). Combined inputs retain
+[separate witnesses and original bounds](mixed-scanner-inputs.md). Commands, paths, imported approvals and arbitrary
 feed URLs cannot override this route.
 
 The response contains UTF-8 generated `files`, each with its exact path, size and
@@ -54,9 +54,9 @@ including all package/update/recovery scenarios. A reproduced directory-depth
 defect and initial TypeScript annotation failure remain recorded; both are fixed.
 [Source evidence](evidence/scanner-recipe-draft-source-summary.json).
 
-[Reviewed Linux saving and interruption recovery](scanner-recipe-saving.md) are
-now implemented as separate authenticated routes. Windows saving and frozen
-frontend controls remain unfinished. This draft API does not establish a normal
+[Reviewed Linux/Windows saving and interruption recovery](scanner-recipe-saving.md) are
+now implemented as separate authenticated routes. Frozen frontend controls
+remain unfinished. This draft API does not establish a normal
 UI setup journey, a real Windows guest scan, broad security coverage or a complete
 passing Shield gate.
 

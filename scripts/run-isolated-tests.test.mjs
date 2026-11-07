@@ -164,6 +164,7 @@ test("only explicitly slow integration or release groups extend the bounded defa
       ["tools/layout-studio/scanner-review.test.mjs", process.platform === "win32" ? 240_000 : 120_000],
       ["tools/layout-studio/scanner-index-review.test.mjs", process.platform === "win32" ? 240_000 : 120_000],
       ["tools/layout-studio/scanner-history-review.test.mjs", process.platform === "win32" ? 300_000 : 120_000],
+      ["tools/layout-studio/scanner-mixed-review.test.mjs", process.platform === "win32" ? 300_000 : 120_000],
       ["tools/layout-studio/scanner-recipe-draft.test.mjs", process.platform === "win32" ? 300_000 : 120_000],
       ["tools/layout-studio/scanner-recipe-save.test.mjs", process.platform === "win32" ? 300_000 : 120_000],
       ["tools/layout-studio/windows-scanner-recipe-files.test.mjs", process.platform === "win32" ? 300_000 : 120_000],

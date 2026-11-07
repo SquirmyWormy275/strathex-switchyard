@@ -119,7 +119,7 @@ export function createTaskAuthority({ store, checkNative, isActive = async () =>
   async function prepareScanner(c, input, generation) {
       if (!input || Object.keys(input).some(key => !["taskId", "compartment", "action", "planRevision", "lifetimeMinutes", "includeIndex", "historyDepth"].includes(key)) || input.compartment !== undefined && input.compartment !== c || Object.hasOwn(input, "includeIndex") && typeof input.includeIndex !== "boolean" || !linuxShieldActions.includes(input.action)) throw Error("Prepare only one connected Shield action for one exact task; includeIndex must be a boolean, and custom paths, exclusions and imported approvals require their separate review.");
       if (Object.hasOwn(input, "historyDepth")) {
-        if (typeof input.historyDepth !== "number" || input.includeIndex === true || !["shield_codebase_audit", "release_shield"].includes(input.action)) throw Error("Historical preparation requires an exact bounded depth and Codebase Audit or Release Shield; combined index/history execution is not connected.");
+        if (typeof input.historyDepth !== "number" || !["shield_codebase_audit", "release_shield"].includes(input.action)) throw Error("Historical preparation requires an exact bounded depth and Codebase Audit or Release Shield.");
         historySelection(["placeholder"], input.historyDepth);
       }
       // Validate action/revision/lifetime before any native query; real paths
@@ -166,11 +166,11 @@ export function createTaskAuthority({ store, checkNative, isActive = async () =>
         const witnessed = await inspection.historyInputs(c, result.task, selected.paths, selected.depth, authorize);
         await authorize(); await checkNative(c, result.task); await authorize();
         if (witnessed.head !== result.snapshot.head || JSON.stringify(witnessed.paths) !== JSON.stringify(selected.paths) || witnessed.requestedDepth !== selected.depth) throw Error("The witnessed historical target changed from the exact reviewed task. Review again.");
-        if (proposed.paths.length + witnessed.versions.length > 256) throw Error("The combined current and historical scanner inputs exceed the 256-file bound.");
-        if (process.platform === "win32" && witnessed.versions.reduce((sum, row) => sum + row.size, 0) > gitHistoryWindowsRawLimit) throw Error("The historical scanner inputs exceed the Windows 320 KiB transport subset.");
+        if (proposed.paths.length + (preparation.indexInputs?.length ?? 0) + witnessed.versions.length > 256) throw Error("The combined current, staged and historical scanner inputs exceed the 256-file bound.");
+        if (process.platform === "win32" && witnessed.versions.reduce((sum, row) => sum + row.size, 0) + (preparation.indexInputs ?? []).reduce((sum, row) => sum + row.size, 0) > gitHistoryWindowsRawLimit) throw Error("The combined Git scanner inputs exceed the Windows 320 KiB transport subset.");
         const refreshed = await capture(c, proposed, generation);
         if (refreshed.snapshot.id !== result.snapshot.id || refreshed.binding !== result.binding || refreshed.workspace !== result.workspace) throw Error("The scanner target changed after historical witnessing. Review again.");
-        Object.assign(preparation, { policy: "bounded-current-and-history/v1", historyHead: witnessed.head, historyPaths: selected.paths, historyDepth: selected.depth,
+        Object.assign(preparation, { policy: preparation.indexInputs ? "bounded-current-index-and-history/v1" : "bounded-current-and-history/v1", historyHead: witnessed.head, historyPaths: selected.paths, historyDepth: selected.depth,
           historyMetadataSha256: witnessed.historyMetadataSha256, historyStopping: witnessed.stopping, historyShallow: witnessed.shallow, historyAbsent: witnessed.absent, historyGaps: witnessed.gaps,
           historyInputs: witnessed.versions.map(row => ({ path: ".switchyard-history/" + row.commit + "/" + row.path, sha256: row.sha256, size: row.size, source: { kind: "git-history", path: row.path, commit: row.commit, objectId: row.objectId, mode: row.mode, depth: selected.depth } })) });
       }

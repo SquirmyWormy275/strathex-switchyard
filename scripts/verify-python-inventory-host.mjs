@@ -18,8 +18,9 @@ const root = join(installationRoot(), "versions", app.build), manifest = await v
 assert.equal(manifest.development, false);
 const sourceEvidence = JSON.parse(await readFile(new URL("../docs/evidence/pypi-wheel-record-source-summary.json", import.meta.url), "utf8")), markerEvidence = JSON.parse(await readFile(new URL("../docs/evidence/pypi-markers-source-summary.json", import.meta.url), "utf8")), moduleDigests = {}, checks = [];
 const installedEvidence = JSON.parse(await readFile(new URL("../docs/evidence/pypi-wheel-license-source-summary.json", import.meta.url), "utf8"));
+const mixedEvidence = JSON.parse(await readFile(new URL("../docs/evidence/scanner-mixed-input-source-summary.json", import.meta.url)));
 for (const name of ["tools/layout-studio/shield-scanner-engine.mjs", "tools/layout-studio/repository-shield.mjs"]) {
-  const digest = sha(await readFile(join(root, name))); assert.equal(digest, installedEvidence.sourceFiles[name]); moduleDigests[name] = digest;
+  const digest = sha(await readFile(join(root, name))); assert.equal(digest, (name.endsWith("/shield-scanner-engine.mjs") ? mixedEvidence : installedEvidence).sourceFiles[name]); moduleDigests[name] = digest;
 }
 checks.push("two-exact-tested-installed-inventory-module-hashes");
 const load = name => import(pathToFileURL(join(root, name)).href);

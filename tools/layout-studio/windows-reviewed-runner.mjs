@@ -1,3 +1,4 @@
+import { withShieldGitInputs } from "./shield-git-inputs.mjs";
 /** Host-only Windows Run orchestration; policy admission belongs to its caller. */
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -14,8 +15,6 @@ import { createWindowsBrokerExchanges } from "./windows-broker-exchanges.mjs";
 import { createWindowsSandboxSessions } from "./windows-sandbox-sessions.mjs";
 import { createWindowsSandboxNativeCalls, validateWindowsStoragePrerequisites } from "./windows-sandbox-native.mjs";
 import { shieldIndexPrefix, shieldHistoryPrefix } from "./shield-scanner-engine.mjs";
-import { shieldIndexStagingBytes } from "./shield-index-inputs.mjs";
-import { shieldHistoryStagingBytes } from "./shield-history-inputs.mjs";
 
 const schema = "switchyard-windows-reviewed-runner/v1";
 const helperPath = fileURLToPath(new URL("../../runtime/hotkeys/Switchyard.Hotkeys.exe", import.meta.url));
@@ -143,8 +142,10 @@ export function createWindowsReviewedRunner({ store, stateDirectory, platform = 
       context = structuredClone(context); plan = structuredClone(plan);
       const withIndex=plan&&Object.hasOwn(plan,"indexWitness"),withHistory=plan&&Object.hasOwn(plan,"historyWitness");
       if (!connectedExecutionActions("win32").includes(action) || platform !== "win32" || !context || Object.keys(context).sort().join() !== "operationId,provider,scopeDigest" || !uuid(context.operationId) || !digest(context.scopeDigest) || !["codex", "claude-code"].includes(context.provider) || typeof authorize !== "function"
-        || !plan || withIndex&&withHistory || Object.keys(plan).sort().join() !== (withHistory?"allowedFiles,historyWitness,manifestPath,manifestSha256,repositoryRoot,sourceIdentity":withIndex?"allowedFiles,indexWitness,manifestPath,manifestSha256,repositoryRoot,sourceIdentity":"allowedFiles,manifestPath,manifestSha256,repositoryRoot,sourceIdentity")) throw Error("Bind Windows Run only to one host-admitted task operation and exact reviewed file plan.");
-      if(withIndex&&(!windowsShieldActions.includes(action)||!gitOptions||Object.keys(gitOptions).join()!=="useIndexInputs"||typeof gitOptions.useIndexInputs!=="function")||withHistory&&(!["shield_codebase_audit","release_shield"].includes(action)||!gitOptions||Object.keys(gitOptions).join()!=="useHistoryInputs"||typeof gitOptions.useHistoryInputs!=="function")||!withIndex&&!withHistory&&gitOptions!==undefined)throw Error("Reserved Windows Git inputs require their private current Shield consumer; no worktree fallback is permitted.");
+        || !plan || Object.keys(plan).sort().join() !== (withIndex&&withHistory?"allowedFiles,historyWitness,indexWitness,manifestPath,manifestSha256,repositoryRoot,sourceIdentity":withHistory?"allowedFiles,historyWitness,manifestPath,manifestSha256,repositoryRoot,sourceIdentity":withIndex?"allowedFiles,indexWitness,manifestPath,manifestSha256,repositoryRoot,sourceIdentity":"allowedFiles,manifestPath,manifestSha256,repositoryRoot,sourceIdentity")) throw Error("Bind Windows Run only to one host-admitted task operation and exact reviewed file plan.");
+      if (withIndex && withHistory && (typeof plan.indexWitness?.head !== "string" || plan.indexWitness.head !== plan.historyWitness?.head)) throw Error("Combined Windows Git inputs require one reviewed HEAD before orchestration.");
+      const gitKeys = [...(withIndex ? ["useIndexInputs"] : []), ...(withHistory ? ["useHistoryInputs"] : [])].sort();
+      if (withIndex && !windowsShieldActions.includes(action) || withHistory && !["shield_codebase_audit","release_shield"].includes(action) || gitKeys.length && (!gitOptions || Object.keys(gitOptions).sort().join() !== gitKeys.join() || gitKeys.some(key => typeof gitOptions[key] !== "function")) || !gitKeys.length && gitOptions !== undefined) throw Error("Reserved Windows Git inputs require their private current Shield consumers; no worktree fallback is permitted.");
       if (closed || [...resources.values()].some(resource => resource.compartment === c)) throw Error("Wait for the current owned Windows Run; no concurrent replacement was started.");
       const id = context.operationId, operationKey = key(c, id), planDigest = scopeHash(plan), resource = { compartment: c, controller: new AbortController(), consumerReleased: false, done: null };
       resources.set(operationKey, resource); seen.add(c);
@@ -184,14 +185,13 @@ export function createWindowsReviewedRunner({ store, stateDirectory, platform = 
           }, 500); pollTimer.unref?.();
           const inputRequest={repositoryRoot:plan.repositoryRoot,sourceIdentity:plan.sourceIdentity,inputFiles:loaded.manifest.inputFiles};
           if(windowsShieldActions.includes(action)&&loaded.manifest.inputFiles.some(file=>!withIndex&&file.path.startsWith(shieldIndexPrefix)||!withHistory&&file.path.startsWith(shieldHistoryPrefix)))throw Error("Windows scanner aliases cannot use physical worktree input staging.");
-          let input;
-          if(withHistory){
-            const request={files:plan.historyWitness.rows.map(row=>({path:shieldHistoryPrefix+row.commit+"/"+row.path,sha256:row.sha256,size:row.size,source:{kind:"git-history",path:row.path,commit:row.commit,objectId:row.objectId,mode:row.mode,depth:plan.historyWitness.requestedDepth}}))};
-            input=await gitOptions.useHistoryInputs(plan.historyWitness.paths,plan.historyWitness.requestedDepth,(report,bytes)=>p.inputs.prepare(c,context,inputRequest,check,{action,historyWitness:plan.historyWitness,historyBytes:shieldHistoryStagingBytes({request,historyWitness:plan.historyWitness},report,bytes)}));
-          }else if(withIndex){
-            const request={files:plan.indexWitness.rows.map(row=>({path:shieldIndexPrefix+row.path,sha256:row.sha256,size:row.size,source:{kind:"git-index",path:row.path,objectId:row.objectId,mode:row.mode}}))};
-            input=await gitOptions.useIndexInputs(plan.indexWitness.rows.map(row=>row.path),(report,bytes)=>p.inputs.prepare(c,context,inputRequest,check,{action,indexWitness:plan.indexWitness,indexBytes:shieldIndexStagingBytes({request,indexWitness:plan.indexWitness},report,bytes)}));
-          }else input=await p.inputs.prepare(c,context,inputRequest,check);
+          const request={files:[
+            ...(plan.indexWitness?.rows ?? []).map(row=>({path:shieldIndexPrefix+row.path,sha256:row.sha256,size:row.size,source:{kind:"git-index",path:row.path,objectId:row.objectId,mode:row.mode}})),
+            ...(plan.historyWitness?.rows ?? []).map(row=>({path:shieldHistoryPrefix+row.commit+"/"+row.path,sha256:row.sha256,size:row.size,source:{kind:"git-history",path:row.path,commit:row.commit,objectId:row.objectId,mode:row.mode,depth:plan.historyWitness.requestedDepth}}))
+          ]};
+          const input = await withShieldGitInputs({request,indexWitness:plan.indexWitness,historyWitness:plan.historyWitness},gitOptions,options=>p.inputs.prepare(c,context,inputRequest,check,gitKeys.length?{
+            action,...(withIndex?{indexWitness:plan.indexWitness}:{}),...(withHistory?{historyWitness:plan.historyWitness}:{}),...options
+          }:undefined));
           await check();
           await update(c, id, "windows-run-inputs-ready", row => { row.phase = "inputs"; });
           const tools = await p.tools.prepare(c, context, { expectedSha256: p.identities.helperSha256 }, check); await tools.assertCurrent(); await check();

@@ -40,6 +40,24 @@ instructions. Do not merge or release.
 
 ## Current installed and source checkpoint
 
+Combined current, staged and historical scanner inputs are implemented. The
+latest accepted results across **56 focused groups pass 348 tests with five
+declared skips**, including a real Linux mixed scan, replay refusal, original
+repository preservation and native/staging retirement. Typecheck and all 34
+native sources compile offline with zero warnings/errors. Original bounds remain;
+the owned 33-file, 1,486,912-byte compiler output and empty test parent are removed.
+Mixed NTFS staging is implemented but native acceptance is pending.
+[Contract](mixed-scanner-inputs.md), [source evidence](evidence/scanner-mixed-input-source-summary.json).
+
+Windows scanner saving passes **15 native tests, no skips**, at `5ec16fe`,
+including four actual NTFS cases. Source/merge tree, artifact, commands, bounds
+and cleanup verify. The overall workflow failed a separate restricted-storage
+owner's final retirement assertion after seven checks. That software failure
+remains unresolved and its original fixture is preserved.
+[Native saving evidence](evidence/windows-scanner-save-native-summary.json),
+[retained failure](evidence/windows-restricted-storage-retirement-failure-summary.json).
+
+
 Installed `6ab9b1e` verifies scan-draft assembly within **76 metadata/in-memory
 checks and 30 exact module hashes**. All 54 semantic workspaces, selection,
 pending keyboard-only conversation and frozen frontend are preserved; 53 sealed
@@ -313,14 +331,11 @@ native Windows profile correction acceptance remains separate.
 [Installed evidence](evidence/installed-profile-identity-summary.json).
 [Source evidence](evidence/profile-identity-source-summary.json).
 
-1. Complete reviewed scanner draft saving/installation. The authenticated
-   scanner-draft route now assembles engine/request/feed/recipe files and exact
-   proposed authority scope. It returns generated control text, no repository
-   source content, approval token or effect. Preserve its fresh trust/expiry and
-   task/account/workspace checks while adding exact new-file ownership, separate
-   approval, durable interrupted-save recovery and a fresh target review after
-   materialization. Frontend controls remain frozen. Mixed index/history
-   execution is still unsupported.
+1. Install combined current/index/history support through the normal update path
+   and verify metadata and all original workspace semantics. Linux and Windows
+   reviewed saving are implemented; Windows saving has native acceptance.
+   Mixed NTFS staging still needs its exact native receipt. Diagnose the retained
+   restricted-storage final retirement assertion without changing permissions.
 2. Continue Windows project and task-specific IDE integration, broader external
    observation streams and the remaining ledger gaps. Inspect available native
    receipts separately: workflow completion alone is insufficient without exact

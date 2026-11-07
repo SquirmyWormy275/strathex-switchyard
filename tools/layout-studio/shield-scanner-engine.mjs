@@ -818,7 +818,7 @@ export function validateShieldRequest(v) {
   });
   if (!files.length || files.reduce((n, f) => n + f.size, 0) > 16 * 1024 * 1024 || new Set(files.map(f => f.path.toLowerCase())).size !== files.length) throw Error("Invalid scanner input inventory.");
   const history=files.filter(file=>file.source?.kind==="git-history");
-  if(history.length&&(!["shield_codebase_audit","release_shield"].includes(v.action)||history.length>48||new Set(history.map(file=>file.source.path)).size>8||new Set(history.map(file=>file.source.depth)).size!==1||files.some(file=>file.source?.kind==="git-index")))throw Error("Historical scans require one bounded depth and a separate Codebase Audit or Release scope; mixed index/history requests are not connected.");
+  if(history.length&&(!["shield_codebase_audit","release_shield"].includes(v.action)||history.length>48||new Set(history.map(file=>file.source.path)).size>8||new Set(history.map(file=>file.source.depth)).size!==1))throw Error("Historical scans require one bounded depth and Codebase Audit or Release scope.");
   const scanner = feed(v.scanner), advisory = v.advisory === null ? null : feed(v.advisory);
   if (advisory && (advisory.id === scanner.id || advisory.path.toLowerCase() === scanner.path.toLowerCase()) || files.some(f => [scanner.path, advisory?.path].includes(f.path))) throw Error("Ambiguous scanner inputs.");
   let packageArtifacts;

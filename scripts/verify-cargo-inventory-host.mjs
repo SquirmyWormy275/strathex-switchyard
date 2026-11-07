@@ -15,8 +15,9 @@ if (process.platform !== "linux" || flags.length !== 1 || flags[0] !== "--read-o
 const sha = b => createHash("sha256").update(b).digest("hex"), app = await applicationStatus(); assert.equal(app.status, "ready");
 const root = join(installationRoot(), "versions", app.build), manifest = await verifySuiteRelease(root, { expectedId: app.build, platform: "linux", checkRuntime: true }); assert.equal(manifest.development, false);
 const source = JSON.parse(await readFile(new URL("../docs/evidence/pypi-wheel-license-source-summary.json", import.meta.url))), moduleDigests = {}, checks = [];
+const mixedEvidence = JSON.parse(await readFile(new URL("../docs/evidence/scanner-mixed-input-source-summary.json", import.meta.url)));
 for (const path of ["tools/layout-studio/shield-scanner-engine.mjs", "tools/layout-studio/repository-shield.mjs"]) {
-  const digest = sha(await readFile(join(root, path))); assert.equal(digest, source.sourceFiles[path]); moduleDigests[path] = digest;
+  const digest = sha(await readFile(join(root, path))); assert.equal(digest, (path.endsWith("/shield-scanner-engine.mjs") ? mixedEvidence : source).sourceFiles[path]); moduleDigests[path] = digest;
 }
 const fixturePath = "tools/layout-studio/test-support/shield-scanner-fixture.mjs";
 assert.equal(sha(await readFile(new URL("../" + fixturePath, import.meta.url))), source.sourceFiles[fixturePath]);

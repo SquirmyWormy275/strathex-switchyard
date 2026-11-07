@@ -1,5 +1,8 @@
 # Scan the index and worktree separately
 
+Current, staged and historical versions can also share one scan through the
+[combined-input contract](mixed-scanner-inputs.md), with separate provenance.
+
 Linux Shield can now scan explicitly reviewed Git index blobs alongside the
 working versions of the same files. A secret staged before the working file was
 cleaned remains detectable. Each report records which input came from the index;

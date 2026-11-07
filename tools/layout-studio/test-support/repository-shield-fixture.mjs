@@ -26,18 +26,18 @@ export async function repositoryShieldFixture(t, { action = "shield_change_scan"
   }
   const engine = await readFile(new URL("../shield-scanner-engine.mjs", import.meta.url)); sample.content.set("engine.mjs", engine); sample.content.set("request.json", Buffer.from(JSON.stringify(sample.request)));
   for (const [path, bytes] of sample.content) await writeFile(join(f.root, path), bytes);
+  if(historyInputs){
+    assert.ok(["shield_codebase_audit","release_shield"].includes(action));
+    const old=Buffer.from("-----BEGIN PRIVATE KEY-----\nSYNTHETIC_HISTORICAL_ONLY_SECRET\n"),current=sample.content.get("app.js"),rows=[];
+    for(const content of [old,current]){await writeFile(join(f.root,"app.js"),content);await f.run("add","app.js");await f.run("-c","commit.gpgsign=false","commit","-m","SYNTHETIC_HISTORY_MESSAGE_NEVER_RETURNED");rows.push({commit:(await f.run("rev-parse","HEAD")).trim(),objectId:(await f.run("rev-parse","HEAD:app.js")).trim(),content});}
+    for(const row of rows.reverse()){const path=".switchyard-history/"+row.commit+"/app.js",source={kind:"git-history",path:"app.js",commit:row.commit,objectId:row.objectId,mode:"100644",depth:4};sample.request.files.push({path,sha256:sha(row.content),size:row.content.length,source});sample.content.set(path,row.content);}
+    sample.content.set("request.json",Buffer.from(JSON.stringify(sample.request)));await writeFile(join(f.root,"request.json"),sample.content.get("request.json"));
+  }
   if(stagedIndex){
     const staged=Buffer.from("-----BEGIN PRIVATE KEY-----\nSYNTHETIC_STAGED_ONLY_SECRET\neval(untrusted);\n");
     await writeFile(join(f.root,"app.js"),staged);await f.run("add","app.js");await writeFile(join(f.root,"app.js"),sample.content.get("app.js"));
     const path=".switchyard-index/app.js",source={kind:"git-index",path:"app.js",objectId:(await f.run("rev-parse",":app.js")).trim(),mode:"100644"};
     sample.request.files.push({path,sha256:sha(staged),size:staged.length,source});sample.content.set(path,staged);
-    sample.content.set("request.json",Buffer.from(JSON.stringify(sample.request)));await writeFile(join(f.root,"request.json"),sample.content.get("request.json"));
-  }
-  if(historyInputs){
-    assert.equal(stagedIndex,false);assert.ok(["shield_codebase_audit","release_shield"].includes(action));
-    const old=Buffer.from("-----BEGIN PRIVATE KEY-----\nSYNTHETIC_HISTORICAL_ONLY_SECRET\n"),current=sample.content.get("app.js"),rows=[];
-    for(const content of [old,current]){await writeFile(join(f.root,"app.js"),content);await f.run("add","app.js");await f.run("-c","commit.gpgsign=false","commit","-m","SYNTHETIC_HISTORY_MESSAGE_NEVER_RETURNED");rows.push({commit:(await f.run("rev-parse","HEAD")).trim(),objectId:(await f.run("rev-parse","HEAD:app.js")).trim(),content});}
-    for(const row of rows.reverse()){const path=".switchyard-history/"+row.commit+"/app.js",source={kind:"git-history",path:"app.js",commit:row.commit,objectId:row.objectId,mode:"100644",depth:4};sample.request.files.push({path,sha256:sha(row.content),size:row.content.length,source});sample.content.set(path,row.content);}
     sample.content.set("request.json",Buffer.from(JSON.stringify(sample.request)));await writeFile(join(f.root,"request.json"),sample.content.get("request.json"));
   }
   if(ignoredSecrets||ignoredBuildTree)await writeFile(join(f.root,".gitignore"),"cache.txt\n"+(ignoredSecrets?".env\n":"")+(ignoredBuildTree?"node_modules/\n":""));

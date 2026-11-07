@@ -26,7 +26,7 @@ Complete Linux `b320506` has zero failures or cancellations. Every original
 command, deadline, declared skip and child/tree retirement verifies. The owned
 checkout, nine dependency aliases, 788 generated files (11,809,393 bytes), empty
 test parent and marker are removed; other worktrees remain. Windows saving has
-later focused and installed evidence; actual Windows acceptance is pending.
+later focused, installed and native saving evidence; full Windows acceptance remains separate.
 
 The latest installation includes 17 wheel license-header cases, 112 Cargo
 manifest reference cases, and eight in-memory policy reports for each of wheels,
@@ -39,14 +39,20 @@ storage reduces the package payload to 4,595,591 bytes without changing exports.
 
 ## Recent backend changes
 
+- **Combined scanner inputs:** current, staged and bounded historical versions can
+  share one reviewed scan with separate provenance and authority checks. Fifty-six
+  focused groups pass 348 tests with five declared skips. Actual Linux scanning
+  passes; mixed native NTFS acceptance remains pending.
+  [Contract](mixed-scanner-inputs.md), [evidence](evidence/scanner-mixed-input-source-summary.json).
+
 - **Reviewed scanner setup saving:** the authenticated Linux backend now reviews,
   saves and recovers exact generated controls. A real demonstration saves through
   this API before fresh authority and execution review. Thirty-five focused groups
   pass 221 tests, including interrupted-save recovery and all installation cases.
   The package stays below its original 5 MiB limit with lossless template storage
   and identical exports. Windows saving is now connected through an owned NTFS
-  helper; 41 focused groups pass 275 tests with ten platform skips. Four native
-  cases are wired into Windows CI and await acceptance. Frozen frontend controls
+  helper; 41 focused groups pass 275 tests with ten platform skips. Fifteen native tests now pass at `5ec16fe`, including four actual NTFS cases.
+  [Native evidence](evidence/windows-scanner-save-native-summary.json). Frozen frontend controls
   remain unfinished. [Contract](scanner-recipe-saving.md),
   [Windows evidence](evidence/windows-scanner-recipe-save-source-summary.json),
   [evidence](evidence/scanner-recipe-save-source-summary.json).
@@ -105,7 +111,7 @@ storage reduces the package payload to 4,595,591 bytes without changing exports.
   Home/catalog and editor activation remain frozen for owner review.
 - Windows project selection and task-specific IDE attachment; native application
   focus alone does not establish a task or account binding.
-- Broader Shield syntax, frontend scanner setup and mixed-source history coverage, general
+- Broader Shield syntax, frontend scanner setup and broader history coverage, general
   exclusions, dependency/feature/target resolution, complete archive contents,
   license-text inspection, publisher provenance and verified local vulnerability
   context.
@@ -119,11 +125,18 @@ storage reduces the package payload to 4,595,591 bytes without changing exports.
 | F77 physical behavior | Cached VIA 9/Vial 4 readout and pinned `wcass:f77` source checks pass. New typing, hotplug and writes remain unperformed. No new HID, unlock, reset, flash, bootloader, solenoid or electrical operation is authorized here. Preserve firmware Dvorak and US host input. |
 | B122 and cap fit | Hardware is unavailable; all 27 physical gates remain open. |
 | Microsoft work Copilot | No approved work tenant is available. Synthetic checks do not establish tenant, license or account acceptance. |
-| Windows ordinary-user/UAC/guest behavior | Headless CI and guest doubles do not accept interactive journeys. Restricted storage ownership separately passes its original checks with TOKEN_QUERY mask 8. |
+| Windows ordinary-user/UAC/guest behavior | Headless CI and guest doubles do not accept interactive journeys. Earlier restricted storage passes remain scoped to their revisions. The latest restricted owner fails final retirement after seven checks with TOKEN_QUERY mask 8 unchanged. |
 | Native provider/task/IDE interaction | No live login changes, model requests or new native task create/resume are authorized during backend checks. The Claude/tmux attempt stopped at trust and retired its processes. Installed Codex 0.167.0 remains outside the reviewed 0.166.0 gate. |
 | Home/catalog and microphone interaction | Frozen frontend and backend transcription evidence do not establish visual or live microphone acceptance. |
 
 ## Retained failures and unresolved causes
+
+The `5ec16fe` Windows workflow failed a separate restricted-storage owner check
+at final native/fixture retirement after seven passing checks. The exact assertion
+is not yet identified; original ownership and fixture data are preserved. Native
+scanner saving passed in that workflow. This is an unresolved software/native CI
+failure, not unavailable hardware or an account blocker.
+[Retained failure](evidence/windows-restricted-storage-retirement-failure-summary.json).
 
 The earlier complete Linux [49a5053 failure](evidence/linux-49a5053-failed-summary.json)
 and [39db1fe scheduling failure](evidence/linux-39db1fe-scheduling-failed-summary.json)

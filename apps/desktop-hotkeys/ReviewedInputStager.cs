@@ -163,9 +163,8 @@ internal static partial class ReviewedInputStager
             using var document = JsonDocument.Parse(text.ToString()); var request = document.RootElement;
             bool withIndex = request.TryGetProperty("indexInputs", out var indexInputs);
             bool withHistory = request.TryGetProperty("historyInputs", out var historyInputs);
-            if(withIndex && withHistory) throw Invalid();
             var fields = new[] { "schema", "operationId", "sourceRoot", "sourceIdentity", "stagingRoot", "stagingIdentity", "inputFiles", "inputManifestSha256" };
-            Exact(request, fields.Concat(withIndex ? new[] { "indexInputs" } : withHistory ? new[] { "historyInputs" } : Array.Empty<string>()).ToArray());
+            Exact(request, fields.Concat(withIndex ? new[] { "indexInputs" } : Array.Empty<string>()).Concat(withHistory ? new[] { "historyInputs" } : Array.Empty<string>()).ToArray());
             if (request.GetProperty("schema").GetString() != Schema || !Guid.TryParseExact(request.GetProperty("operationId").GetString(), "D", out var operation)) throw Invalid();
             string sourceRoot = Absolute(request.GetProperty("sourceRoot")), stageRoot = Absolute(request.GetProperty("stagingRoot"));
             if (sourceRoot.Equals(stageRoot, StringComparison.OrdinalIgnoreCase) || Inside(sourceRoot, stageRoot) || Inside(stageRoot, sourceRoot) || Path.GetFileName(stageRoot) != "inputs-" + operation.ToString("D")) throw Invalid();
@@ -173,7 +172,11 @@ internal static partial class ReviewedInputStager
             string manifestDigest = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(request.GetProperty("inputFiles").GetRawText()))).ToLowerInvariant();
             if (request.GetProperty("inputManifestSha256").GetString() != manifestDigest) throw Invalid();
             if (withIndex) indexPacket = ReviewedIndexInputs.Read(indexInputs, inputs.ToDictionary(file => file.Path, file => (file.Sha256, file.Size), StringComparer.Ordinal));
-            if (withHistory) historyPacket = ReviewedHistoryInputs.Read(historyInputs, inputs.ToDictionary(file => file.Path, file => (file.Sha256, file.Size), StringComparer.Ordinal));
+            if (withHistory) historyPacket = ReviewedHistoryInputs.Read(historyInputs, inputs.ToDictionary(file => file.Path, file => (file.Sha256, file.Size), StringComparer.Ordinal), withIndex);
+            if (indexPacket != null && historyPacket != null && (
+                indexInputs.GetProperty("action").GetString() != historyInputs.GetProperty("action").GetString()
+                || indexInputs.GetProperty("witness").GetProperty("head").GetString() != historyInputs.GetProperty("witness").GetProperty("head").GetString()
+                || indexPacket.Files.Values.Sum(bytes => (long)bytes.Length) + historyPacket.Files.Values.Sum(bytes => (long)bytes.Length) > 320 * 1024)) throw Invalid();
             var sourceHandle = PinDirectories(sourceRoot, handles);
             var stageHandle = PinDirectories(stageRoot, handles, WriteDac | ReadControl);
             var sourceIdentity = Information(sourceHandle, true); var stagingIdentity = Information(stageHandle, true);
@@ -190,7 +193,7 @@ internal static partial class ReviewedInputStager
                 {
                     if (indexPacket != null && indexPacket.Files.TryGetValue(file.Path, out var indexed)) bytes = indexed;
                     else if (historyPacket != null && historyPacket.Files.TryGetValue(file.Path, out var historical)) bytes = historical;
-                    else if (file.Path.StartsWith(".switchyard-history/", StringComparison.Ordinal)) throw Invalid();
+                    else if (file.Path.StartsWith(".switchyard-history/", StringComparison.Ordinal) || file.Path.StartsWith(".switchyard-index/", StringComparison.Ordinal)) throw Invalid();
                     else
                     {
                         PinDirectories(Path.GetDirectoryName(source)!, parents);
@@ -209,7 +212,8 @@ internal static partial class ReviewedInputStager
                 finally { if (bytes != null) CryptographicOperations.ZeroMemory(bytes); input?.Dispose(); foreach (var parent in parents.AsEnumerable().Reverse()) parent.Dispose(); }
             }
             if (!Matches(Information(sourceHandle, true), request.GetProperty("sourceIdentity")) || !Matches(Information(stageHandle, true), request.GetProperty("stagingIdentity"))) throw Invalid();
-            if(historyPacket != null) Console.WriteLine(JsonSerializer.Serialize(new { schema = Schema, operationId = operation.ToString("D"), sourceIdentity = Identity(sourceIdentity), stagingIdentity = Identity(stagingIdentity), inputManifestSha256 = manifestDigest, files = inputs.Length, bytes = total, privateAclReadbackVerified = true, classification = "reviewed-non-production-bytes", sandboxEnforced = false, historyPacketSha256 = historyPacket.Digest, historyWitnessSha256 = historyPacket.WitnessDigest }));
+            if(indexPacket != null && historyPacket != null) Console.WriteLine(JsonSerializer.Serialize(new { schema = Schema, operationId = operation.ToString("D"), sourceIdentity = Identity(sourceIdentity), stagingIdentity = Identity(stagingIdentity), inputManifestSha256 = manifestDigest, files = inputs.Length, bytes = total, privateAclReadbackVerified = true, classification = "reviewed-non-production-bytes", sandboxEnforced = false, indexPacketSha256 = indexPacket.Digest, indexWitnessSha256 = indexPacket.WitnessDigest, historyPacketSha256 = historyPacket.Digest, historyWitnessSha256 = historyPacket.WitnessDigest }));
+            else if(historyPacket != null) Console.WriteLine(JsonSerializer.Serialize(new { schema = Schema, operationId = operation.ToString("D"), sourceIdentity = Identity(sourceIdentity), stagingIdentity = Identity(stagingIdentity), inputManifestSha256 = manifestDigest, files = inputs.Length, bytes = total, privateAclReadbackVerified = true, classification = "reviewed-non-production-bytes", sandboxEnforced = false, historyPacketSha256 = historyPacket.Digest, historyWitnessSha256 = historyPacket.WitnessDigest }));
             else if (indexPacket == null) Console.WriteLine(JsonSerializer.Serialize(new { schema = Schema, operationId = operation.ToString("D"), sourceIdentity = Identity(sourceIdentity), stagingIdentity = Identity(stagingIdentity), inputManifestSha256 = manifestDigest, files = inputs.Length, bytes = total, privateAclReadbackVerified = true, classification = "reviewed-non-production-bytes", sandboxEnforced = false }));
             else Console.WriteLine(JsonSerializer.Serialize(new { schema = Schema, operationId = operation.ToString("D"), sourceIdentity = Identity(sourceIdentity), stagingIdentity = Identity(stagingIdentity), inputManifestSha256 = manifestDigest, files = inputs.Length, bytes = total, privateAclReadbackVerified = true, classification = "reviewed-non-production-bytes", sandboxEnforced = false, indexPacketSha256 = indexPacket.Digest, indexWitnessSha256 = indexPacket.WitnessDigest }));
             return 0;

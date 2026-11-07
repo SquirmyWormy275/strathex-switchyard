@@ -46,8 +46,8 @@ buffers are cleared on success and failure. Historical bytes use a separate
 `historyBytes` channel; they are never labeled as Git index bytes. Original
 repository aliases are never created, and physical aliases cannot substitute.
 General Run/pipelines, other Shield actions, nested aliases and control/feed files
-cannot use this channel. Combined index/history requests remain unimplemented
-and refuse explicitly. The [Windows historical scanner connection](windows-history-staging.md) now passes
+cannot use this channel. [Combined index/history requests](mixed-scanner-inputs.md)
+now retain both independent witnesses and original aggregate transport limits. The [Windows historical scanner connection](windows-history-staging.md) now passes
 software contracts with the guest doubled; native NTFS/guest/installed acceptance
 remains separate. An unconnected host refuses instead of using current files.
 
@@ -57,15 +57,15 @@ Reports preserve original historical source descriptors, redact values, and bind
 gate. Other refs, non-first-parent branches, messages, renames, unselected paths
 and versions beyond the bounded/shallow boundary remain uninspected. Deleted
 historical paths can be witnessed, but a path absent from the current grant cannot
-yet be scanned through this connection. Complete recipe/feed assembly, broader history,
-full scanners and user-facing review remain unfinished software.
+yet be scanned through this connection. [Recipe/feed assembly](scanner-recipe-drafts.md) and reviewed saving are implemented.
+Broader history, full scanners and user-facing review remain unfinished software.
 
 Five focused cases pass, including an actual isolated scanner finding a synthetic
 secret removed from the current file, authenticated commit/blob provenance,
 exact replay, unchanged original index/worktree/HEAD, verified native exit and
 staging cleanup. A late-HEAD-change case removes staged copies and starts no
-scanner. Pure contracts refuse invented/omitted/changed versions and unsupported
-mixed sources; a real private-staging case rejects general execution, wrong bytes
+scanner. At that checkpoint, contracts refused invented/omitted/changed versions and
+unsupported mixed sources; a real private-staging case rejects general execution, wrong bytes
 and physical alias fallback. Private-consumer tests independently verify borrowed
 buffer clearing on both success and late revision failure. Six isolated scanner/
 history/index/runner groups pass all 60 checks with child cleanup

@@ -88,8 +88,10 @@ platform skips, plus typecheck and offline compilation of 34 native sources with
 zero warnings/errors. The focused run includes Linux saving regressions, Windows
 composition/proof-substitution doubles and uncertain native-owner recovery. Four
 real NTFS cases are wired into the complete Windows inventory and the independent
-`scanner-save` CI lane under the original bounds. They remain unaccepted until a
-Windows receipt verifies. The exact 34-file, 1,479,448-byte compiler output and
+`scanner-save` CI lane under the original bounds. Native source `5ec16fe` now
+passes all 15 tests without skips, including those four NTFS cases. Source/merge
+tree, artifact, commands, bounds and cleanup verify.
+[Native receipt](evidence/windows-scanner-save-native-summary.json). The exact 34-file, 1,479,448-byte compiler output and
 empty test parent were removed. [Windows source evidence](evidence/windows-scanner-recipe-save-source-summary.json).
 
 The full Linux package stays below its existing 5 MiB test limit by storing the
@@ -99,7 +101,7 @@ formats remain byte-for-byte equivalent; exported-package rebuilding also retain
 the template through the full 640-file recovery drill. Earlier failed assertions,
 package size and exported-package regression receipts remain recorded.
 
-This does not establish a completed frontend setup journey, native Windows acceptance,
+This does not establish a completed frontend setup journey, full Windows acceptance,
 live provider/account commissioning, hardware acceptance or complete security
 coverage. Earlier complete-suite receipts remain tied to their original revisions.
 

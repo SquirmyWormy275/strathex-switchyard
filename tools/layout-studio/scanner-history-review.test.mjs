@@ -39,10 +39,10 @@ test("authenticated automatic history preparation derives immutable versions and
   assert.deepEqual(await readFile(join(f.root, ".git/index")), original); assert.equal((await f.run("rev-parse", "HEAD")).trim(), head);
 });
 
-test("automatic history preparation refuses malformed, mixed or unsupported requests before native queries", async t => {
+test("automatic history preparation refuses malformed or unsupported requests before native queries", async t => {
   const f = await fixture(t);
   for (const historyDepth of [undefined, null, "4", 0, 7, 1.5, {}, []]) await assert.rejects(f.service.reviewScanner("personal", { ...input(f), historyDepth }));
-  for (const extra of [{ includeIndex: true }, { action: "shield_change_scan" }, { action: "shield_supply_chain" }, { paths: ["app.js"] }, { commits: [f.old] }, { ref: "main" }]) await assert.rejects(f.service.reviewScanner("personal", { ...input(f), ...extra }));
+  for (const extra of [{ includeIndex: "yes" }, { action: "shield_change_scan" }, { action: "shield_supply_chain" }, { paths: ["app.js"] }, { commits: [f.old] }, { ref: "main" }]) await assert.rejects(f.service.reviewScanner("personal", { ...input(f), ...extra }));
   assert.equal(f.counters().calls, 0); assert.equal((await f.store.snapshot("personal")).confirmationJournal?.length ?? 0, 0);
 });
 
