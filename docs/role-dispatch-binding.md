@@ -32,9 +32,8 @@ works normally. Commands already queued keep their original session.
 Five additional cases reproduced the earlier workspace race. The expanded check
 passes seven groups, 106 tests and one declared platform skip, with both
 TypeScript checks. It includes authenticated HTTP native-focus doubles, round-trip
-workspace changes and a failed departure. The generation belongs to the running
-Suite; a separate process rewriting selection away and back entirely between
-reads is outside this generation check.
+workspace changes and a failed departure. The local generation belongs to the running Suite; persisted
+selection identity now supplies the additional cross-instance check below.
 [Workspace lifecycle evidence](evidence/physical-workspace-lifecycle-source-summary.json).
 
 Claude's exact interactive-task focus now carries the same role and workspace
@@ -92,3 +91,19 @@ keyboard-only conversation are preserved. The dated launcher backup and readback
 verify; the 553-file temporary package is removed, leaving current plus one
 rollback. This installed check makes no live provider, model, native focus or
 keyboard request. [Installed evidence](evidence/installed-role-boundaries-summary.json).
+
+Each deliberate saved workspace selection now receives a fresh generation,
+including a same-name selection by another store/instance. Physical dispatch
+captures the complete persisted selection digest, so an intervening committed
+round trip cannot revive the old request. Legacy and absent selection records
+remain read-only until a deliberate selection; ordinary callers still receive
+the selected name. A queued original command stays intact, while stale result
+attribution is refused. A fresh request uses the final saved identity normally.
+
+Two cases reproduced the earlier bug. Seven focused groups pass 111 tests and
+one declared platform skip, plus both TypeScript checks. Independent stores share
+real temporary encrypted files; agent messages are authenticated fixtures. This
+is change detection at existing boundaries, not a global selection lease across
+native effects. Manual restoration of byte-identical old selection files remains
+outside it. This correction is source-only after installed `384cf8b`.
+[Persisted selection evidence](evidence/persisted-selection-source-summary.json).

@@ -144,17 +144,20 @@ export function createSuite({ store = createSuiteStore(), platform = process.pla
     selectionLoading ??= (async () => { await initialize("personal"); activeCompartment = await store.selection(); await initialize(activeCompartment); selectionLoaded = true; })().finally(() => { selectionLoading = null; });
     await selectionLoading;
   }
-  function selectedIntentContext(selected) {
+  async function selectedIntentContext(selected) {
     const generation = selectionGeneration;
     const changed = () => new Error("The selected shortcut workspace changed; no alternate target or automatic retry was selected.");
     const assertCurrentState = () => {
       if (closed || generation !== selectionGeneration || copilotTransitions.has(selected) || selected !== activeCompartment) throw changed();
     };
+    const original = await store.selectionWitness();
+    assertCurrentState();
+    if (original.id !== selected) throw changed();
     const assertCurrent = async () => {
       assertCurrentState();
-      const saved = await store.selection();
+      const saved = await store.selectionWitness();
       assertCurrentState();
-      if (saved !== selected) throw changed();
+      if (saved.id !== selected || saved.digest !== original.digest) throw changed();
     };
     return { assertCurrent, assertCurrentState };
   }
@@ -515,7 +518,7 @@ export function createSuite({ store = createSuiteStore(), platform = process.pla
       if (path === "/api/suite/intent") {
         if (Object.keys(body).some(k => !["compartment", "implementation", "roleId", "intent", "requestId", "workspaceBaseUrl"].includes(k))) throw new Error("Physical dispatch is outside the closed intent contract.");
         await loadSelection();
-        const selected = activeCompartment, context = selectedIntentContext(selected);
+        const selected = activeCompartment, context = await selectedIntentContext(selected);
         if (Object.hasOwn(nativeFocusImplementations, body.implementation)) {
           const native = nativeFocusImplementations[body.implementation];
           const assertCurrent = async () => {

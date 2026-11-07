@@ -69,8 +69,8 @@ regressions are retained separately from fixture corrections. Eighteen groups
 pass 226 tests with one skip and both TypeScript checks; eleven final cases
 verify retained Microsoft uncertainty. Normal installed `384cf8b` verifies
 these modules and two in-memory role guards; full suite and real provider/tenant
-acceptance remain separate. The in-memory
-generation cannot observe external selection round trips entirely between reads.
+acceptance remain separate. The later persisted-selection correction below additionally detects committed
+round trips by independent stores.
 [Role dispatch contract](role-dispatch-binding.md).
 
 Native Windows client source `738c1f7` is audited: workflow `42372481436`, helper
@@ -119,6 +119,15 @@ deadlines, artifact/receipt hashes and process cleanup verify. Only the 3,534-by
 receipt ZIP was read in memory; the native helper was not downloaded. This lane
 does not include the new runtime-observation backend groups or interactive
 provider/desktop acceptance. [Receipt](evidence/runtime-observation-native-client-summary.json).
+
+Persisted selection now gives every deliberate saved choice a fresh generation,
+including a same-name choice by another store. Physical intents compare the saved
+digest at their existing boundaries; local failed-departure invalidation remains.
+Missing/legacy reads remain unchanged and already queued commands are preserved.
+Two original regressions are retained; seven groups pass 111 tests with one skip
+and both TypeScript checks. This is source-only after installed `384cf8b`; it does
+not introduce a global selection lock across native operations.
+[Evidence](evidence/persisted-selection-source-summary.json).
 
 ## Outstanding verification and implementation
 

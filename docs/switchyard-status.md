@@ -107,6 +107,12 @@ workspace preserved. It postdates complete Linux `0c7d918`; broader external
 streams remain unfinished. [Installed receipt](evidence/installed-runtime-observation-summary.json).
 [Runtime observation contract](codex-runtime-observation.md).
 
+A later persisted selection generation also refuses physical requests after an
+independent store switches away and back, including same-name reselection. Legacy
+reads remain unchanged. Two original regressions are retained; seven groups pass
+111 tests with one skip, and both TypeScript checks pass. This correction is not
+yet installed. [Evidence and limits](evidence/persisted-selection-source-summary.json).
+
 ## Current evidence
 
 Each result belongs to its exact source revision. Test totals from different

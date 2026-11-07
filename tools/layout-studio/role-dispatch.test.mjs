@@ -1,19 +1,20 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, rm, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { createSuiteStore } from "./suite-store.mjs";
+import { createSuiteStore, privateWrite } from "./suite-store.mjs";
 import { createSuite } from "./suite.mjs";
 import { agentRoutes, agentMessageSchema, requestMac, responseMac } from "../../integrations/agent-protocol.mjs";
 
 async function fixture(fn, overrides = {}) {
   const root = await mkdtemp(join(tmpdir(), "switchyard-role-dispatch-"));
   const keys = new Map(), pending = new Set();
-  const store = createSuiteStore({ root, secrets: {
+  const secrets = {
     get: async (id, purpose) => keys.get(`${id}:${purpose}`),
     set: async (id, purpose, value) => { keys.set(`${id}:${purpose}`, value); }
-  } });
+  };
+  const store = createSuiteStore({ root, secrets }), peer = createSuiteStore({ root, secrets });
   const update = store.update.bind(store);
   let gate;
   store.update = async (id, operation, ...args) => {
@@ -58,7 +59,7 @@ async function fixture(fn, overrides = {}) {
       await send(id, agentRoutes.event, { event: { status: "ready" } });
     }
     await bind();
-    await fn({ suite, store, bind, dispatch, pause, send });
+    await fn({ suite, store, peer, root, bind, dispatch, pause, send });
   } finally {
     for (const release of releases) release();
     await Promise.allSettled(pending);
@@ -124,13 +125,15 @@ test("unrebound legacy role bindings remain usable until deliberately replaced",
   assert.equal((await dispatch()).value.status, "queued");
 }));
 
-for (const change of ["another workspace", "away and back", "saved selection", "shutdown"]) {
-  test(`a physical role intent refuses ${change} before enqueue`, () => fixture(async ({ suite, store, dispatch, pause }) => {
+for (const change of ["another workspace", "away and back", "saved selection", "saved selection round trip", "saved same selection", "shutdown"]) {
+  test(`a physical role intent refuses ${change} before enqueue`, () => fixture(async ({ suite, store, peer, dispatch, pause }) => {
     await suite.handle("/api/suite/compartment/create", { compartment: "second" });
     const held = pause("agent-intent"), result = dispatch(true);
     await held.entered;
     if (change === "shutdown") await suite.close();
     else if (change === "saved selection") await store.selection("second");
+    else if (change === "saved selection round trip") { await peer.selection("second"); await peer.selection("personal"); }
+    else if (change === "saved same selection") await peer.selection("personal");
     else {
       await suite.handle("/api/suite/compartment/select", { compartment: "second" });
       if (change === "away and back") await suite.handle("/api/suite/compartment/select", { compartment: "personal" });
@@ -176,3 +179,27 @@ test("an unsuccessful workspace departure cannot revive an earlier physical inte
   assert.match((await result).error?.message ?? "command was accepted", /workspace changed/);
   assert.equal((await store.snapshot("personal")).agents.every(agent => agent.commands.length === 0), true);
 }, { codingTaskOwners: { stopCompartment: async () => ({ stopped: false }), close: async () => [] } }));
+
+test("missing and legacy selection witnesses are read-only; independent deliberate writes get fresh identities", () => fixture(async ({ store, peer, root }) => {
+  const path = join(root, "active-compartment.json"), missing = await store.selectionWitness();
+  assert.equal(missing.id, "personal"); assert.deepEqual(await peer.selectionWitness(), missing);
+  await assert.rejects(readFile(path), { code: "ENOENT" });
+  await privateWrite(path, '{"id":"personal"}'); const bytes = await readFile(path), legacy = await store.selectionWitness();
+  assert.equal(legacy.id, "personal"); assert.notEqual(legacy.digest, missing.digest); assert.deepEqual(await peer.selectionWitness(), legacy); assert.deepEqual(await readFile(path), bytes);
+  await peer.selection("personal"); const first = await store.selectionWitness(); assert.notEqual(first.digest, legacy.digest);
+  await peer.selection("personal"); const second = await store.selectionWitness(); assert.notEqual(second.digest, first.digest); assert.equal(await store.selection(), "personal");
+  assert.equal(typeof JSON.parse(await readFile(path, "utf8")).generation, "string");
+}));
+test("a peer selection round trip after enqueue keeps the original command but refuses stale result attribution", () => fixture(async ({ suite, store, peer, dispatch, pause, send }) => {
+  await suite.handle("/api/suite/compartment/create", { compartment: "second" });
+  const held = pause("role-intent-result"), result = dispatch(true); await held.entered;
+  const original = structuredClone((await store.snapshot("personal")).agents.find(agent => agent.id === "alpha").commands[0]);
+  await peer.selection("second"); await peer.selection("personal"); held.release();
+  assert.match((await result).error?.message ?? "stale result accepted", /workspace changed/);
+  const state = await store.snapshot("personal"); assert.deepEqual(state.agents.find(agent => agent.id === "alpha").commands, [original]); assert.equal(state.intentResults?.length ?? 0, 0);
+  assert.equal((await send("alpha", agentRoutes.poll)).command.id, original.id); assert.equal((await send("alpha", agentRoutes.poll)).command, null);
+}));
+test("a fresh physical request uses the final peer selection identity", () => fixture(async ({ suite, peer, dispatch }) => {
+  await suite.handle("/api/suite/compartment/create", { compartment: "second" }); await peer.selection("second"); await peer.selection("personal");
+  const result = await dispatch(true); assert.equal(result.error, undefined); assert.equal(result.value.status, "queued");
+}));

@@ -127,7 +127,18 @@ export function createSuiteStore({ root = join(process.env.XDG_STATE_HOME || (pr
     if (JSON.stringify(s).length > 4 * 1024 * 1024) throw new Error("Saved profile storage limit reached. Existing state is preserved.");
     return s.profile;
   }
+  async function selectionWitness() {
+    try {
+      const raw = await privateRead(join(root, "active-compartment.json")), selected = JSON.parse(raw);
+      validate(selected.id);
+      return { id: selected.id, digest: createHash("sha256").update(raw).digest("hex") };
+    } catch (error) {
+      if (error.code === "ENOENT") return { id: "personal", digest: createHash("sha256").update("switchyard-absent-selection/v1").digest("hex") };
+      throw error;
+    }
+  }
   return {
+    selectionWitness,
     async withResourceLock(kind, identity, fn) {
       if (!["voice-cpu", "repository-effects", "repository-execution", "client-launch", "windows-storage", "copilot-request", "coding-task", "native-focus"].includes(kind) || typeof identity !== "string" || identity.length > 1024) throw new Error("Unsupported private resource lease.");
       return withStateLock(root, `${kind}-${createHash("sha256").update(identity).digest("hex").slice(0, 40)}`, fn);
@@ -138,7 +149,14 @@ export function createSuiteStore({ root = join(process.env.XDG_STATE_HOME || (pr
       try { return { acquired: true, value: await withStateLock(root, `${kind}-${createHash("sha256").update(identity).digest("hex").slice(0, 40)}`, lease => { entered = true; return fn(lease); }, { nonBlocking: true }) }; }
       catch (error) { if (!entered && error.code === "STATE_LOCK_BUSY") return { acquired: false }; throw error; }
     },
-    async selection(value) { const selected = join(root, "active-compartment.json"); if (value === undefined) { try { const s = JSON.parse(await privateRead(selected)); validate(s.id); return s.id; } catch (error) { if (error.code === "ENOENT") return "personal"; throw error; } } validate(value); await read(value); await privateWrite(selected, JSON.stringify({ id: value })); return value; },
+    async selection(value) {
+      if (value === undefined) return (await selectionWitness()).id;
+      validate(value); await read(value);
+      // Each deliberate selection gets a new identity, including a same-name
+      // selection made by another Suite/store instance. Legacy reads stay pure.
+      await privateWrite(join(root, "active-compartment.json"), JSON.stringify({ id: value, generation: randomUUID() }));
+      return value;
+    },
     async initialize(id = "personal", policy) {
       validate(id); if (policy !== undefined && (typeof policy !== "string" || !Object.hasOwn(templates, policy))) throw new Error("Choose Personal or Copilot-only Work policy.");
       return serializeState(root, id, () => withStateLock(root, id, async (lease) => {
