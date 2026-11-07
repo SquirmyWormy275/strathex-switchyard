@@ -70,6 +70,22 @@ try {
   try {
     const unusedProject = join(homedir(), "switchyard-metadata-only-" + randomUUID());
     if (permitted) {
+      const projects = await editor.editorProjects();
+      assert.equal(projects.compartment, selected); assert.equal(projects.complete, true);
+      assert.equal(projects.nativeObserved, false); assert.equal(projects.authorityGranted, false); assert.equal(projects.freshReviewRequired, true);
+      assert.ok(Object.isFrozen(projects) && Object.isFrozen(projects.projects));
+      assert.ok(projects.projects.length <= 64);
+      for (const project of projects.projects) assert.ok(Object.isFrozen(project) && project.repositoryRoot.startsWith("/") && Number.isSafeInteger(project.taskCount) && project.taskCount > 0);
+      evidence.projectInventory = { permitted: true, projectCount: projects.projects.length, complete: projects.complete, nativeObserved: projects.nativeObserved, authorityGranted: projects.authorityGranted };
+    } else {
+      await assert.rejects(editor.editorProjects());
+      evidence.projectInventory = { permitted: false, policyRefusalVerified: true };
+    }
+    evidence.checks.push("signed saved-project inventory obeys selected-workspace policy without provider inspection, task authority or a filesystem crawl");
+    await api("coding/codex/editor-projects", {}, 401, false);
+    for (const selection of [{ compartment: selected }, { repositoryRoot: unusedProject }, { prompt: "never" }]) await api("coding/codex/editor-projects", selection, 409);
+    evidence.checks.push("project discovery refuses unauthenticated calls and caller-selected workspace, project and effect fields");
+    if (permitted) {
       const choices = await editor.editorChoices(unusedProject);
       assert.equal(choices.compartment, selected); assert.equal(choices.repositoryRoot, unusedProject);
       assert.deepEqual(choices.choices, []); assert.equal(choices.complete, true);

@@ -52,15 +52,15 @@ checkpoints are not cumulative acceptance of the latest suite.
 
 | Scope | Verified result | What it does not establish |
 | --- | --- | --- |
-| Installed Linux `2c6497f` | **97 metadata/refusal checks; 57 exact module hashes.** All 54 semantic workspaces, four profiles, 57 workflows, selection, pending keyboard-only conversation and frozen frontend preserved. [Evidence](evidence/installed-external-agent-consent-summary.json). | Live task/model/account operations, editor command activation, hardware or microphone acceptance. |
-| Complete Linux `cf3bb4c` | **356 groups; 2,326 passing tests; 32 declared skips.** Original manifest, commands, deadlines and cleanup audited. Covers project inventory, connected demo, guided roles, consent fences and paired-runner contracts. [Evidence](evidence/linux-cf3bb4c-complete-summary.json). | Installed runtime remains `2c6497f`. Native Windows, live accounts, interactive UI and physical devices remain separate. Later fixture diagnostics have their own focused evidence. |
+| Installed Linux `90fa879` | **99 metadata/refusal checks; 58 exact module hashes.** All 54 semantic workspaces, four profiles, 57 workflows, selection, pending keyboard-only conversation and frozen frontend preserved. [Evidence](evidence/installed-project-discovery-summary.json). | Live task/model/account operations, editor command activation, hardware or microphone acceptance. |
+| Complete Linux `cf3bb4c` | **356 groups; 2,326 passing tests; 32 declared skips.** Original manifest, commands, deadlines and cleanup audited. Covers project inventory, connected demo, guided roles, consent fences and paired-runner contracts. [Evidence](evidence/linux-cf3bb4c-complete-summary.json). | Installed `90fa879` has separate metadata/refusal acceptance. Native Windows, live accounts, interactive UI and physical devices remain separate. Later fixture diagnostics have their own focused evidence. |
 | Complete Windows source `45c34e5` | **460 groups; 2,899 passing tests; 246 declared skips.** All 21 original worker receipts and the native collector pass; all 23 jobs succeed. Source/tree/tool identities, commands, bounds and cleanup are independently audited. [Evidence](evidence/complete-windows-45c34e5-summary.json). | Package, live-host and later project-inventory acceptance. Earlier intermittent retirement failures remain unresolved. |
 | Native Windows contracts `b38ff759` | **Role/dispatch: 24 tests across two complete files. External-agent consent: 51 tests across three files.** Exact source/merge trees, original bounds and cleanup verified. [Roles](evidence/role-choices-native-b38-summary.json), [consent](evidence/agent-consent-native-b38-summary.json). | Complete Windows suite/package acceptance or live provider behavior. |
 | Native Windows client `9d230ac` | **25 groups; 250 tests; zero skips.** Signed launcher composition plus native endpoint/process/socket contracts. [Evidence](evidence/editor-task-choices-native-client-summary.json). | Terminal/provider doubles do not establish interactive task handoff. |
 | Earlier complete Windows `dc755901` | **417 groups; 2,478 tests; 207 declared skips.** All workflow jobs passed. [Evidence](evidence/windows-complete-dc755901-summary.json). | This revision predates later backend changes. |
 
-The installed payload contains 554 files/4,746,666 bytes. Dated backup and launcher
-readback verify; current plus one rollback remain. Its exact 555-file prepared
+The installed payload contains 554 files/4,749,012 bytes. Dated backup and launcher
+readback verify; current plus one rollback remain. Its exact 555-file/4,848,496-byte prepared
 bundle is removed. The complete Linux checkout, nine dependency aliases and
 803 generated files/11,907,805 bytes are also removed. The latest `cf3bb4c`
 checkout, nine aliases and 803 generated files/11,910,385 bytes are removed too;

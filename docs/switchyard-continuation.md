@@ -96,24 +96,26 @@ a replacement. Eight groups/124 tests and installed metadata checks cover them.
 
 ## Installed checkpoint
 
-- Source: `2c6497f8c2829fbd29026fe98f13de9ecade1d65`.
-- Release: `ce4da39419d1bdc55565a39c8650a98ca01d45569df8585568349616bb23e83c`.
-- Rollback: `d470f3d1d4ffe27a1781d201afe61cbad7ab545a07dda4849ce09b87634b7ed7`.
+- Source: `90fa879d776c0b7756f66d37180fb8c3049b3fc4`.
+- Release: `fcbd26b5c6703d3d5b0296211ca0b31234d862a759396a6e85ee7f53f8d4c696`.
+- Rollback: `ce4da39419d1bdc55565a39c8650a98ca01d45569df8585568349616bb23e83c`.
 - Frozen frontend: `24100ef601b810efb0cda95e4fe0842d2944560734b02c4cf482c25e19150543`.
-- 97 metadata/refusal checks, 57 exact module hashes; all 54 semantic workspaces,
+- 99 metadata/refusal checks, 58 exact module hashes; all 54 semantic workspaces,
   four profiles, 57 workflows, selection and one pending keyboard-only conversation
   preserved. 53 sealed files are byte-identical; one changes audit metadata only.
 - Dated backup and launcher readback verify. Current plus one rollback remain.
-  The exact temporary package, 555 files/4,846,150 bytes, is already removed.
-  Do not repeat the executed installation or cleanup scripts.
+  Installed payload: 554 files/4,749,012 bytes. The exact temporary package,
+  555 files/4,848,496 bytes, is removed.
+  Do not repeat executed installation or cleanup scripts.
 
-The signed-intent verifier initially pinned the previous shared instance module.
-It refused before dispatch and preserved state. Its gateway/server pins now use
-the accepted task-choice evidence; the corrected verifier passes all eight checks.
-The original failure remains in the installed evidence. Host-facing task-owner,
-Copilot-journal and signed-intent verifiers must run sequentially; earlier parallel
-initialization caused an independent preservation assertion failure.
-[Installed receipt](evidence/installed-external-agent-consent-summary.json).
+The selected personal workspace returns a complete empty project inventory without
+native observation or task authority. Unauthenticated and malformed requests
+refuse. Source and native contracts cover populated inventory separately. No
+provider/task/model, live agent, hardware or microphone operation ran. Verifier
+gateway/Suite pins now use the accepted project-inventory source evidence.
+Host-facing task-owner, Copilot-journal and signed-intent verifiers run sequentially;
+earlier parallel initialization failures remain in historical evidence.
+[Installed receipt](evidence/installed-project-discovery-summary.json).
 
 ## Complete runs and native evidence
 
@@ -136,7 +138,7 @@ without changing a test or bound. Do not rerun executed start/audit/cleanup scri
 
 Complete Linux source `2c6497f8c2829fbd29026fe98f13de9ecade1d65` is accepted:
 351 original groups, 2,312 passing tests and 32 declared platform skips. It covers
-the current installed runtime, guided roles and external-agent consent.
+the preceding installed runtime, guided roles and external-agent consent.
 Receipt `4be21e52-4d54-4cea-b06e-944b3aaee8fe` retains original manifest,
 commands, bounds, skip counts and child/tree cleanup. The exact checkout, nine
 dependency aliases, 803 generated files/11,907,805 bytes, empty test parent and
@@ -224,7 +226,7 @@ Focus retirement now reports only fixed phase/reason tags. A deterministic origi
 two-second deadline test retains the pending write and blocks replacement until
 that exact write completes. No Windows root-cause repair is claimed; use new native
 evidence to distinguish record deadlines from rejection. Keep original bounds,
-permissions and refusal assertions. The installed runtime remains `2c6497f`.
+permissions and refusal assertions. The installed runtime now includes these diagnostics at `90fa879`.
 [Evidence](evidence/complete-windows-source-lane-summary.json).
 
 Native `b38ff759` external-agent consent passes three original groups/51 tests,

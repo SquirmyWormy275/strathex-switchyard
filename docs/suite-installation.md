@@ -172,15 +172,18 @@ from outside the checkout after the primary loader was removed. Linux shortcut
 batch tests use a synthetic compositor with actual subprocess/kernel-lease loss;
 they do not establish physical key or live-desktop removal acceptance.
 
-The pilot normal installation is source **7dec739**; runtime adoption originally
-passed at **7fe13c0**, and the newer backend update/reuse checks also passed. Verified app update,
-in-place adoption of the existing shared runtime, 48 exact dependencies and
-offline CPU model load, exact app restart and unchanged runtime reuse passed
-on October 30, 2026. Saved definitions/package/modes, private review URL and
-frozen Home bytes were preserved. Selected-runtime synthetic CPU/HTTP voice and
-14 ms worker exit after abrupt parent loss passed too. No microphone or physical
-keyboard write was used. Disposable bundles and compiler staging were removed;
-the installed current/rollback pair occupies about 6.2 MiB.
+The pilot normal installation is source **90fa879**, with 554 files/4,749,012 bytes.
+Its normal update passes **99 metadata/refusal checks across 58 exact modules**.
+All 54 semantic workspaces, four profiles, 57 workflows, selected compartment,
+pending keyboard-only conversation, private review link and frozen frontend are
+preserved. Dated launcher backups and persistent-file readback verify; only the
+current version and one rollback remain. The exact temporary bundle is removed.
+[Installed update evidence](evidence/installed-project-discovery-summary.json).
+
+The existing optional runtime is reused. Earlier adoption verified 48 exact
+dependencies, offline CPU model load, synthetic CPU/HTTP voice and owned worker
+retirement. This update introduces no runtime/model downloads and makes no live
+account, provider/task/model, agent, keyboard or microphone request.
 
 The complete Windows release passed **212 groups** at `4cab102`, including the
 previously failing alias/bootstrap/automation cases and native task/controller

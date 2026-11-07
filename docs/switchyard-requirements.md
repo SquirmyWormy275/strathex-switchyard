@@ -9,11 +9,11 @@ entry point, evidence and remaining work. A hardware/account check does not excu
 unfinished independent software. Read [current status](switchyard-status.md) for
 accepted checkpoints and [verification](verification.md) for reproducible checks.
 
-Installed Linux source `2c6497f` passes **97 metadata/refusal checks across 57
+Installed Linux source `90fa879` passes **99 metadata/refusal checks across 58
 exact modules**, preserving all 54 semantic workspaces, four profiles, 57 workflows,
 selection and the pending keyboard-only conversation. The temporary package is
 removed; current plus one rollback remain.
-[Installed evidence](evidence/installed-external-agent-consent-summary.json).
+[Installed evidence](evidence/installed-project-discovery-summary.json).
 
 The latest backend feature lists eligible saved projects and distinct task counts
 through signed Linux/Windows clients, followed by existing exact-project task
