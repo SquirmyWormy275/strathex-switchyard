@@ -40,18 +40,18 @@ instructions. Do not merge or release.
 
 ## Current installed and source checkpoint
 
-Installed a97a835 passes **61 metadata/in-memory checks**: thirteen task-owner,
+Installed 6609353 passes **66 metadata/in-memory checks**: thirteen task-owner,
 seven Copilot-journal, fourteen agent/helper/SDK, twelve Python, ten Cargo and
-five workflow checks. Fifteen exact installed module hashes verify; all 57 saved
+five workflow and five profile checks. Sixteen exact installed module hashes verify; all 57 saved
 workflows validate. All 54 semantic workspace snapshots, selection, pending
 keyboard-only conversation and frozen frontend are preserved. Fifty-three sealed
 files are byte-identical; one changes only audit metadata during the update.
 Dated backup, launcher readback and current plus one rollback verify. The exact
-528-file, 5,230,101-byte prepared bundle is removed. The repeatable workflow
+528-file, 5,230,348-byte prepared bundle is removed. The repeatable workflow
 verifier independently repeats its five checks with all 54 sealed files unchanged.
 No scanner process, native task, agent action, model request, account change or
 hardware operation is performed.
-[Installed evidence](evidence/installed-workflow-identity-summary.json).
+[Installed evidence](evidence/installed-profile-identity-summary.json).
 
 Run only the current repeatable metadata verifiers, each with
 `--read-only-metadata`: `verify-task-owner-host.mjs`,
@@ -93,7 +93,7 @@ compatibility checks accept all 57 saved workflows across 54 workspaces and
 preserve all 54 sealed files byte-for-byte. Typecheck, original package bounds
 and exact cleanup pass. Installed workflow correction acceptance now passes five additional metadata
 checks; native Windows acceptance remains separate.
-[Installed evidence](evidence/installed-workflow-identity-summary.json). [Source and compatibility evidence](evidence/workflow-identity-source-summary.json).
+[Installed evidence](evidence/installed-profile-identity-summary.json). [Source and compatibility evidence](evidence/workflow-identity-source-summary.json).
 
 The earlier 39db1fe full failure remains recorded. Five native backend jobs
 preserve original group objects, measurements, child bounds, twenty-minute job
@@ -122,12 +122,13 @@ encrypted arrangement. Two regressions reproduce the original defect; five
 focused groups/81 checks plus six verifier guards pass. All four saved profile
 documents remain compatible and all 54 sealed workspace files are unchanged.
 Legacy Studio-plan migration and intentional helper defaults still work.
-Typecheck, original package bounds and exact owned cleanup pass. Installed and
-native Windows profile correction acceptance remain pending.
+Typecheck, original package bounds and exact owned cleanup pass. Five installed profile checks now pass in the 66-check metadata update;
+native Windows profile correction acceptance remains separate.
+[Installed evidence](evidence/installed-profile-identity-summary.json).
 [Source evidence](evidence/profile-identity-source-summary.json).
 
-1. Publish the profile-import identity correction and adopt it through the normal
-   versioned update with read-only installed checks and snapshot preservation.
+1. Profile-import identity correction is published and installed. Continue the
+   independently executable ledger gaps with focused source and installed checks.
    Keep later Cargo/workflow focused evidence separate from complete aafb476.
    A new full run must use clean, published immutable source and a short owned
    temporary parent; verify exact final inventory/exit before removing its files.

@@ -53,8 +53,9 @@ encrypted arrangement. Two regressions reproduce the original defect; five
 focused groups/81 checks plus six verifier guards pass. All four saved profile
 documents remain compatible and all 54 sealed workspace files are unchanged.
 Legacy Studio-plan migration and intentional helper defaults still work.
-Typecheck, original package bounds and exact owned cleanup pass. Installed and
-native Windows profile correction acceptance remain pending.
+Typecheck, original package bounds and exact owned cleanup pass. Five installed profile checks now pass in the 66-check metadata update;
+native Windows profile correction acceptance remains separate.
+[Installed evidence](evidence/installed-profile-identity-summary.json).
 [Source evidence](evidence/profile-identity-source-summary.json).
 
 ## Boundaries and resumable external checks

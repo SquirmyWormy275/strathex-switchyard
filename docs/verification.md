@@ -1,5 +1,14 @@
 # What has actually been verified
 
+Installed `6609353` passes **66 metadata/in-memory checks**, adding five exact
+profile-identity checks to the preceding 61. Sixteen module hashes verify. All
+four saved profiles and 57 workflows remain compatible; all 54 semantic
+workspaces, selection, pending conversation and frozen frontend are preserved.
+Normal dated backup/readback and current plus one rollback verify. The exact
+528-file, 5,230,348-byte prepared bundle is removed. No live task, account,
+agent command, model, scanner process or hardware operation is performed.
+[Installed profile evidence](evidence/installed-profile-identity-summary.json).
+
 Installed a97a835 passes **61 metadata/in-memory checks**: thirteen task-owner,
 seven Copilot-journal, fourteen agent/helper/SDK, twelve Python, ten Cargo and
 five workflow checks. Fifteen exact installed module hashes verify; all 57 saved
@@ -19,8 +28,9 @@ encrypted arrangement. Two regressions reproduce the original defect; five
 focused groups/81 checks plus six verifier guards pass. All four saved profile
 documents remain compatible and all 54 sealed workspace files are unchanged.
 Legacy Studio-plan migration and intentional helper defaults still work.
-Typecheck, original package bounds and exact owned cleanup pass. Installed and
-native Windows profile correction acceptance remain pending.
+Typecheck, original package bounds and exact owned cleanup pass. Five installed profile checks now pass in the 66-check metadata update;
+native Windows profile correction acceptance remains separate.
+[Installed evidence](evidence/installed-profile-identity-summary.json).
 [Source evidence](evidence/profile-identity-source-summary.json).
 
 Complete Linux aafb476 passes **317 groups, 1,923 tests and sixteen declared
