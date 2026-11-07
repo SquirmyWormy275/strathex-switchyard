@@ -1,3 +1,4 @@
+import { recordCodexRuntimeStatus } from "./codex-runtime-observation.mjs";
 /** Concrete, tool-restricted design adapters. Account state stays with installed CLIs. */
 import { spawn } from "node:child_process";
 import { appendAgentObservation } from "./agent-observation.mjs";
@@ -339,7 +340,11 @@ export function createAgentService({ store, runtimeRoot, codexFactory = (exe, cw
           await store.claimSession(compartment, { provider, sessionId });
           currentGeneration(compartment, generation);
           const controller = new AbortController(); running.set(key, { provider, sessionId, controller, turnId: null });
-          const turn = await runRestrictedCodexTurn({ client, threadId: sessionId, text: contextText, outputSchema: designResponseSchema, signal: controller.signal, stopChild, beforeSubmit: checkObservations, checkCurrent: () => currentGeneration(compartment, generation), onStarted: async (turnId) => { running.get(key).turnId = turnId; } });
+          const turn = await runRestrictedCodexTurn({ client, threadId: sessionId, text: contextText, outputSchema: designResponseSchema, signal: controller.signal, stopChild, beforeSubmit: checkObservations, checkCurrent: () => currentGeneration(compartment, generation),
+            onRuntimeStatus: (event, turnScope) => recordCodexRuntimeStatus({ store, compartment, subjectId: "design-conversation:" + id, ...event, assertCurrentState(state) {
+              turnScope.assertCurrent(); assertCurrentState(state); const bound = state.conversations.find(c => c.id === id);
+              if (!bound || bound.provider !== "codex" || bound.sessionId !== sessionId || bound.accountFingerprint !== accountFingerprint) throw Error("The original design runtime binding changed.");
+            } }), onStarted: async (turnId) => { running.get(key).turnId = turnId; } });
           assertReplyCurrent = () => assertCodexResultCurrent(client, turn);
           try { response = JSON.parse(turn.text); } catch { throw new Error("Codex did not return a valid structured proposal."); }
         } else if (provider === "claude-code") {

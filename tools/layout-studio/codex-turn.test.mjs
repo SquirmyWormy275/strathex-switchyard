@@ -3,6 +3,44 @@ import { EventEmitter } from "node:events";
 import test from "node:test";
 import { runRestrictedCodexTurn } from "./codex-turn.mjs";
 const tick = () => new Promise((r) => setImmediate(r));
+test("owned turn status notifications are fixed, ordered and joined before reply completion", async () => {
+  const f = fixture(), rows = []; let release, entered;
+  const gate = new Promise(r => { release = r; }), ready = new Promise(r => { entered = r; });
+  let done = false;
+  const result = f.run({ onRuntimeStatus: async (event, scope) => { entered(); await gate; scope.assertCurrent(); rows.push(event); } }).then(r => { done = true; return r; });
+  await tick();
+  const status = (value, threadId = "thread-1") => f.client.emit("notification", { method: "thread/status/changed", params: { threadId, status: value, secret: "NEVER_RETAIN" } });
+  status({ type: "active", activeFlags: [] }); status({ type: "active", activeFlags: [] });
+  status({ type: "idle" }, "another-thread"); status({ type: "toString" }); status({ type: "active", activeFlags: ["unknown"] });
+  status({ type: "active", activeFlags: ["waitingOnApproval"] }); status({ type: "idle" });
+  f.message("Ready"); f.complete(); await ready; await tick(); assert.equal(done, false);
+  release(); assert.equal((await result).text, "Ready");
+  assert.deepEqual(rows.map(row => row.status), ["active", "waiting-on-approval", "idle"]);
+  assert(rows.every(row => Number.isSafeInteger(row.at) && Object.keys(row).sort().join() === "at,status"));
+  assert.equal(JSON.stringify(rows).includes("NEVER_RETAIN"), false); assert.equal(f.stops, 0);
+  assert.equal(f.client.listenerCount("notification"), 0);
+});
+test("failed runtime observation keeps turn uncertainty and never submits a replacement", async () => {
+  const f = fixture(), result = f.run({ onRuntimeStatus: async () => { throw Error("Synthetic storage failure"); } });
+  const refused = assert.rejects(result, { code: "OBSERVATION_UNCONFIRMED", stopVerified: true }); await tick();
+  f.client.emit("notification", { method: "thread/status/changed", params: { threadId: "thread-1", status: { type: "active", activeFlags: [] } } });
+  await refused; assert.equal(f.stops, 1); assert.equal(f.calls.filter(call => call.method === "turn/start").length, 1);
+});
+test("runtime status queue is bounded without changing the original native turn deadline", async () => {
+  const f = fixture(), result = f.run({ onRuntimeStatus: async () => {} });
+  const refused = assert.rejects(result, { code: "OBSERVATION_BOUND", stopVerified: true }); await tick();
+  for (let i = 0; i < 65; i++) f.client.emit("notification", { method: "thread/status/changed", params: { threadId: "thread-1", status: i % 2 ? { type: "idle" } : { type: "active", activeFlags: [] } } });
+  await refused; assert.equal(f.stops, 1); assert.equal(f.calls.filter(call => call.method === "turn/start").length, 1);
+});
+for (const ending of ["timeout", "account-change"]) test(`late runtime observation cannot persist after ${ending}`, async () => {
+  const f = fixture(); let release, entered, writes = 0;
+  const gate = new Promise(r => { release = r; }), ready = new Promise(r => { entered = r; });
+  const result = f.run({ timeoutMs: ending === "timeout" ? 30 : 1000, onRuntimeStatus: async (_event, scope) => { entered(); await gate; scope.assertCurrent(); writes++; } });
+  const refused = assert.rejects(result, { code: ending === "timeout" ? "TURN_TIMEOUT" : "ACCOUNT_UNCONFIRMED" }); await tick();
+  f.client.emit("notification", { method: "thread/status/changed", params: { threadId: "thread-1", status: { type: "idle" } } });
+  await ready; if (ending === "account-change") f.client.emit("notification", { method: "account/updated", params: { authMode: "chatgpt" } });
+  await refused; release(); await tick(); assert.equal(writes, 0); assert.equal(f.stops, 1);
+});
 test("submission review follows account verification and refuses before a native prompt", async () => {
   const f = fixture(), order = [];
   f.client.recheckAccount = async () => { order.push("account"); return f.client.accountFingerprint; };

@@ -96,6 +96,15 @@ synthetic. Normal installed `08fa7ea` now verifies these exact modules and two
 in-memory role guard cases; full-suite and live-provider acceptance remain separate.
 [Role dispatch evidence and limitations](role-dispatch-binding.md).
 
+Owned Codex design and reviewed-text turns now capture fixed runtime status
+under existing observation consent, with original account/role/task checks at
+persistence. Queued events cannot cross recording, timeout or account boundaries.
+Twenty-seven groups pass 191 tests with no skips, plus both TypeScript checks;
+package/installer scenarios and encrypted-state demonstrations are included.
+Provider responses remain synthetic. This source change is not yet installed and
+postdates complete Linux `0c7d918`; broader external streams remain unfinished.
+[Runtime observation contract](codex-runtime-observation.md).
+
 ## Current evidence
 
 Each result belongs to its exact source revision. Test totals from different
@@ -105,11 +114,11 @@ checkpoints are not cumulative acceptance of the latest suite.
 | --- | --- | --- |
 | Installed Linux `08fa7ea` | **86 metadata/refusal checks; 54 exact module hashes.** All 54 semantic workspaces, four profiles, 57 workflows and frozen frontend preserved. [Receipt](evidence/installed-role-boundaries-summary.json). | Original-role/provider-effect guards, signed CLI dispatch and Codex version contract included; editor command activation remains pending; no live scanner, provider task, account/model request, native focus or hardware acceptance. |
 | Native Windows client `c359cdf` | **25 groups; 243 tests; no skips.** Original manifest, commands, bounds and cleanup verified. [Receipt](evidence/windows-editor-project-context-native-summary.json). | Terminal/provider doubles remain explicit; not the complete Windows suite, later storage diagnostics or authenticated Codex turns. |
-| Complete Linux `c359cdf` | **348 groups; 2,218 tests; 32 declared platform skips.** Original manifest, bounds and cleanup verified. [Receipt](evidence/linux-c359cdf-complete-summary.json). | Includes journal, Codex 0.167 and workspace lifecycle corrections; predates later status-query diagnostics. |
+| Complete Linux `0c7d918` | **350 groups; 2,274 tests; 32 declared platform skips.** Original manifest, bounds and cleanup verified. [Receipt](evidence/linux-0c7d918-complete-summary.json). | Covers the installed `08fa7ea` runtime, including role/workspace/provider-effect boundaries; predates subsequent runtime-status capture. |
 | Complete Windows `dc755901` | **417 groups; 2,478 tests; 207 declared skips.** All six jobs and overall workflow passed. [Receipt](evidence/windows-complete-dc755901-summary.json). | Predates newer archive, scheduling, profile/workflow and observation corrections. |
 
 Complete Linux staging is removed: its exact checkout, nine dependency aliases,
-802 generated files (11,901,729 bytes), empty test parent and marker. Other
+802 generated files (11,904,762 bytes), empty test parent and marker. Other
 worktrees remain. The journal's earlier failed Windows runs remain recorded in
 the accepted receipt; the independent restricted-storage retirement failure
 remains unresolved.

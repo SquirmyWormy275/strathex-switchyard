@@ -112,3 +112,11 @@ test("deletion during the final native account check prevents observed context f
   assert.equal(f.calls.some(c => c.method === "turn/start"), false); assert.equal(f.client.closed, true);
   assert.equal((await f.store.snapshot("personal")).conversations[0].status, "failed");
 });
+
+test("native runtime metadata requires its original source and a separate aggregate design review", () => {
+  const s = state(); s.observations[0].events = [{ kind: "status", provenance: "native-provider-runtime-notification", at: 20, subjectDigest: "PRIVATE_SUBJECT" }];
+  const review = reviewDesignObservations(s, "codex", ["selected"]);
+  assert.deepEqual(review.context.sessions[0].eventCounts, [{ kind: "status", provenance: "native-provider-runtime-notification", count: 1 }]);
+  assert.equal(JSON.stringify(review.context).includes("PRIVATE_SUBJECT"), false);
+  s.observations[0].sources = ["deliberate"]; assert.throws(() => reviewedDesignObservations(s, "codex", confirmation(review)));
+});

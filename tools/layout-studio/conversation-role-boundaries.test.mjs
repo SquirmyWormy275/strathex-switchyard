@@ -17,7 +17,7 @@ async function fixture(fn) {
     set: async (id, purpose, value) => { keys.set(`${id}:${purpose}`, value); }
   } });
   const plan = newPlan(parseBoardProfile({ schema: "sxsy-board-profile/v1", name: "Synthetic", layout: "one", keys: [{ id: "one", label: "A", matrix: [0, 0], x: 0, y: 0, baseKeycode: "KC_A" }] }));
-  const hooks = { account: async () => {}, resumed: async () => {}, reply: async () => {}, holdTurn: false };
+  const hooks = { account: async () => {}, resumed: async () => {}, reply: async () => {}, holdTurn: false, statuses: [] };
   const client = new EventEmitter();
   Object.assign(client, { closed: false, nativeVersion: "0.166.0", accountFingerprint: "a".repeat(64), restrictionsVerified: true,
     initialize: async () => {}, close: () => { client.closed = true; },
@@ -33,6 +33,7 @@ async function fixture(fn) {
       if (!hooks.holdTurn) setImmediate(async () => {
         try {
           await hooks.reply();
+          for (const status of hooks.statuses) client.emit("notification", { method: "thread/status/changed", params: { threadId: "exact-thread", status } });
           client.emit("notification", { method: "item/completed", params: { threadId: "exact-thread", turnId: "exact-turn", item: { type: "agentMessage", text: JSON.stringify({ reply: "SYNTHETIC_REPLY", summary: "Review", actions: [], steps: ["Review evidence"], roles: ["Reviewer"] }) } } });
           client.emit("notification", { method: "turn/completed", params: { threadId: "exact-thread", turn: { id: "exact-turn", status: "completed" } } });
         } catch (error) { client.emit("disconnected", error); }
@@ -61,6 +62,27 @@ async function fixture(fn) {
     finally { await Promise.allSettled(pending); await rm(root, { recursive: true, force: true }); }
   }
 }
+
+test("configuration conversations retain consented native runtime metadata independently from reply content", () => fixture(async ({ store, hooks, bind, dispatch, calls }) => {
+  await bind("review"); // Initialize recovery before starting this recording.
+  await store.update("personal", "synthetic-recording", state => { state.observations = [{ id: "runtime", status: "recording", sources: ["agent-events"], exclusions: [], events: [], createdAt: Date.now() - 1000, updatedAt: Date.now() }]; });
+  hooks.statuses = [{ type: "active", activeFlags: [] }, { type: "idle" }];
+  await bind("review"); assert.equal((await dispatch("review")).reply, "SYNTHETIC_REPLY");
+  const rows = (await store.snapshot("personal")).observations[0].events.filter(row => row.phase === "runtime-status-observed");
+  assert.deepEqual(rows.map(row => row.status), ["active", "idle"]); assert(rows.every(row => row.provenance === "native-provider-runtime-notification" && !row.taskCompletionVerified));
+  for (const value of ["exact-thread", "original", "SYNTHETIC_REPLY"]) assert.equal(JSON.stringify(rows).includes(value), false);
+  assert.equal(calls.filter(call => call.method === "turn/start").length, 1);
+}));
+test("a role change before the encrypted runtime write preserves uncertainty instead of stale observation or reply", () => fixture(async ({ store, hooks, bind, dispatch, calls }) => {
+  await bind("review"); // Initialize recovery before starting this recording.
+  await store.update("personal", "synthetic-recording", state => { state.observations = [{ id: "runtime", status: "recording", sources: ["agent-events"], exclusions: [], events: [], createdAt: Date.now() - 1000, updatedAt: Date.now() }]; });
+  hooks.statuses = [{ type: "active", activeFlags: [] }]; await bind("review");
+  const update = store.update.bind(store); let changed = false;
+  store.update = async (id, operation, ...args) => { if (operation === "codex-runtime-observation" && !changed) { changed = true; await bind("review"); } return update(id, operation, ...args); };
+  await assert.rejects(dispatch("review"), { code: "OBSERVATION_UNCONFIRMED" });
+  const state = await store.snapshot("personal"); assert.equal(JSON.stringify(state).includes("SYNTHETIC_REPLY"), false); assert.equal(state.observations[0].events.some(row => row.phase === "runtime-status-observed"), false);
+  assert.equal(calls.filter(call => call.method === "turn/start").length, 1);
+}));
 
 for (const boundary of ["same-role-rebind", "workspace-round-trip"]) {
   test(`conversation resume refuses ${boundary} after the account check`, () => fixture(async ({ suite, hooks, calls, bind, dispatch }) => {

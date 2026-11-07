@@ -1,3 +1,4 @@
+import { recordCodexRuntimeStatus } from "./codex-runtime-observation.mjs";
 /** Reviewed text-only coding turns on private owned native connections. No tool authority. */
 import { lstat } from "node:fs/promises";
 import { join } from "node:path";
@@ -109,6 +110,10 @@ export function createReviewedTaskText({ store, adapter, stopChild = stopOwnedCh
           await native.prepareTurn(); await authorize();
           await store.update(c, "coding-text-submitting", (s) => { current(); const t = s.codingTurns.find((t) => t.id === requestId); t.status = "submitting"; t.updatedAt = now(); }, { provider }); attempted = true;
           const result = await native.runTurn({ recovery, text, signal: resource.controller.signal, checkCurrent: current,
+            ...(provider === "codex" ? { onRuntimeStatus: (event, turnScope) => recordCodexRuntimeStatus({ store, compartment: c, subjectId: "coding-text:" + requestId, ...event, assertCurrentState(state) {
+              turnScope.assertCurrent(); current(); const bound = taskIn(state, taskId, recovery), turn = state.codingTurns?.find(row => row.id === requestId);
+              if (taskDigest(bound) !== taskDigest(task) || !turn || turn.taskId !== taskId || turn.sessionId !== task.sessionId || turn.accountFingerprint !== task.accountFingerprint) throw Error("The original text runtime binding changed.");
+            } }) } : {}),
             onContainment: async frame => { const scope = guardianScope(frame); await store.update(c, "coding-text-guardian", (s) => { current(); const t = s.codingTurns.find((t) => t.id === requestId); if (t.ownedRuntime && scopeHash(t.ownedRuntime) !== scopeHash(scope)) throw new Error("The saved owned guardian identity changed before start."); t.ownedRuntime = scope; t.ownedRuntimeStoppedVerified = false; }, { provider }); },
             onContainmentStopped: async frame => { const scope = guardianScope(frame); await store.update(c, "coding-text-guardian-exit", (s) => { const t = s.codingTurns.find((t) => t.id === requestId); if (!t || scopeHash(t.ownedRuntime) !== scopeHash(scope)) throw new Error("The exact saved guardian exit could not be recorded."); t.ownedRuntimeStoppedVerified = true; }); },
             onStarted: async (turnId) => { await store.update(c, "coding-text-identity", (s) => { const t = s.codingTurns.find((t) => t.id === requestId); t.turnId = turnId; t.status = "submitted"; t.updatedAt = now(); observe(s, requestId, "text-identity-bound", "active"); }); } });

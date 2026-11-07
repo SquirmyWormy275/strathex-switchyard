@@ -195,3 +195,11 @@ provenance. It shares the original explicit agent-event consent, exclusion,
 pause/interval, privacy and capacity fences. It neither verifies an external
 outcome nor resends work. [Recovery contract](custom-agent-revocation.md#review-an-uncertain-claim),
 [source evidence](evidence/custom-agent-outcome-source-summary.json).
+
+Owned Codex design and reviewed-text turns now also accept fixed native runtime
+status notifications under the original recording consent and account/role/task
+binding. This is separate from local lifecycle events and does not create a
+subscription or provider request. Twenty-seven groups pass 191 tests, including
+encrypted-state demonstrations and package/installer checks. Broader external
+streams and live-provider acceptance remain separate.
+[Runtime status contract](codex-runtime-observation.md).

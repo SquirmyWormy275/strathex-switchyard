@@ -4,6 +4,37 @@ import { appendAgentObservation } from "./agent-observation.mjs";
 import { observationAcceptsEventAt } from "./workflow.mjs";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
+import { codexRuntimeStatus, recordCodexRuntimeStatus } from "./codex-runtime-observation.mjs";
+
+test("native runtime status accepts only fixed supported metadata and no prototype fields", () => {
+  for (const [input, expected] of [[{ type: "idle" }, "idle"], [{ type: "notLoaded" }, "not-observed"], [{ type: "systemError" }, "error"], [{ type: "active", activeFlags: [] }, "active"], [{ type: "active", activeFlags: ["waitingOnApproval"] }, "waiting-on-approval"]]) assert.equal(codexRuntimeStatus(input), expected);
+  for (const input of [null, [], { type: "toString" }, { type: "__proto__" }, { type: "active" }, { type: "idle", content: "NEVER_RETAIN" }, { type: "active", activeFlags: ["unknown"] }, { type: "active", activeFlags: ["waitingOnApproval", "waitingOnApproval"] }]) assert.equal(codexRuntimeStatus(input), null);
+});
+
+function runtimeFixture(changes = {}) {
+  let value = state(changes), writes = 0, beforeWrite = () => {}, valid = true;
+  const store = { async snapshot() { return structuredClone(value); }, async update(_id, _operation, mutation) { beforeWrite(value); const draft = structuredClone(value), result = mutation(draft); value = draft; writes++; return result; } };
+  const record = (overrides = {}) => recordCodexRuntimeStatus({ store, compartment: "personal", subjectId: "private-runtime-subject", status: "active", at: 20, assertCurrentState() { if (!valid) throw Error("Original binding changed"); }, ...overrides });
+  return { record, get value() { return value; }, get writes() { return writes; }, beforeWrite(fn) { beforeWrite = fn; }, invalidate() { valid = false; } };
+}
+test("runtime recording preserves fixed provenance, private correlation and duplicate suppression", async () => {
+  const f = runtimeFixture(); assert.equal(await f.record(), 1); assert.equal(await f.record(), 0); assert.equal(await f.record({ status: "idle", at: 21 }), 1);
+  const rows = f.value.observations[0].events;
+  assert.deepEqual(rows.map(row => row.status), ["active", "idle"]); assert.equal(rows[0].subjectDigest, rows[1].subjectDigest);
+  assert(rows.every(row => row.provenance === "native-provider-runtime-notification" && row.taskCompletionVerified === false && row.timeSavingMeasured === false));
+  assert.equal(JSON.stringify(rows).includes("private-runtime-subject"), false);
+});
+test("runtime recording without source consent, in Work, or outside the recording interval does not write", async () => {
+  for (const changes of [{ policy: "work" }, { mode: "keyboard-only" }, { observations: [] }, { observations: [session({ sources: ["deliberate"] })] }, { observations: [session({ status: "paused" })] }, { observations: [session({ exclusions: ["codex"] })] }, { observations: [session({ createdAt: 21 })] }, { observations: [session({ recordingSince: 21 })] }]) { const f = runtimeFixture(changes); assert.equal(await f.record(), 0); assert.equal(f.writes, 0); }
+});
+test("queued runtime metadata cannot enter a resumed or newly added recording", async () => {
+  const f = runtimeFixture(); f.beforeWrite(value => { value.observations[0].recordingSince = 20; value.observations.push(session({ id: "new", createdAt: 10 })); });
+  assert.equal(await f.record(), 0); assert(f.value.observations.every(row => row.events.length === 0));
+  const paused = runtimeFixture(); paused.beforeWrite(value => { value.observations[0].status = "paused"; }); assert.equal(await paused.record(), 0); assert.equal(paused.value.observations[0].events.length, 0);
+});
+test("runtime binding change under the encrypted mutation refuses before storing metadata", async () => {
+  const f = runtimeFixture(); f.beforeWrite(() => f.invalidate()); await assert.rejects(f.record(), /Original binding changed/); assert.equal(f.writes, 0); assert.equal(f.value.observations[0].events.length, 0);
+});
 
 const session = changes => ({ id: "observation", status: "recording", sources: ["agent-events"], exclusions: [], events: [], updatedAt: 10, ...changes });
 const state = changes => ({ id: "personal", policy: "personal", mode: "personal-companion", observations: [session()], ...changes });

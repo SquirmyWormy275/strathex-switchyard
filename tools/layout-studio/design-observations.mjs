@@ -7,7 +7,7 @@ const categories = ["terminal", "vscode", "chatgpt", "claude", "codex", "browser
 const sources = ["deliberate", "foreground-category", "agent-events", "host-action-events", "editor-events"];
 const provenance = new Map([
   ["user-marked", "deliberate"], ["authenticated-agent-self-report", "agent-events"],
-  ["native-provider-status-observation", "agent-events"], ["switchyard-local-lifecycle", "agent-events"],
+  ["native-provider-status-observation", "agent-events"], ["native-provider-runtime-notification", "agent-events"], ["switchyard-local-lifecycle", "agent-events"],
   ["switchyard-local-host-action", "host-action-events"], ["switchyard-editor-journal", "editor-events"]
 ]);
 const refuse = () => { throw new Error("Choose stopped or paused observations from this personal workspace and review their exact summary for this designer. No observation context was sent."); };

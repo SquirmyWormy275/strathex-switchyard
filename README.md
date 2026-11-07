@@ -68,7 +68,7 @@ execution, offline repository scans and recoverable installation. The Home and
 Model F catalog provide the starting experience; complete task/IDE attachment,
 role/device controls and full scanner coverage remain unfinished.
 
-Complete Linux checkpoint `c359cdf` passes **348 groups / 2,218 tests**, with
+Complete Linux checkpoint `0c7d918` passes **350 groups / 2,274 tests**, with
 32 declared platform skips. Its temporary checkout and 11.9 MB of build output
 have been removed after verification. Complete Windows checkpoint `dc755901`
 passes **417 groups / 2,478 tests**, with 207 declared skips; it predates the

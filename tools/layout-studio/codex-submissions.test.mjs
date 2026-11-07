@@ -53,6 +53,21 @@ test("the observed Codex revision is bound into text review and a changed versio
   assert.equal((await submit(current)).status,'provider-turn-completed');
   assert.equal((await store.snapshot('personal')).codingTurns.at(-1).nativeVersion,'0.167.0');
 }));
+test("already authorized Codex text turns record exact runtime status through encrypted consented storage", () => fixture(async ({ store, task, settings, input, approve, submit, calls }) => {
+  await store.update("personal", "synthetic-recording", s => { s.observations = [{ id: "runtime", status: "recording", sources: ["agent-events"], exclusions: [], events: [], createdAt: Date.now() - 1000, updatedAt: Date.now() }]; });
+  settings.onTurn = (client, params) => {
+    const emit = status => client.emit("notification", { method: "thread/status/changed", params: { threadId: params.threadId, status, privateText: "NEVER_RECORD" } });
+    emit({ type: "active", activeFlags: [] }); emit({ type: "active", activeFlags: [] });
+    setImmediate(() => { emit({ type: "idle" }); client.emit("notification", { method: "turn/completed", params: { threadId: params.threadId, turn: { id: "runtime-turn", status: "completed" } } }); });
+    return { turn: { id: "runtime-turn" } };
+  };
+  const result = await submit(await approve()), state = await store.snapshot("personal"), rows = state.observations[0].events.filter(row => row.phase === "runtime-status-observed");
+  assert.equal(result.status, "provider-turn-completed"); assert.deepEqual(rows.map(row => row.status), ["active", "idle"]);
+  assert(rows.every(row => row.provenance === "native-provider-runtime-notification" && row.taskCompletionVerified === false));
+  for (const secret of [task.sessionId, task.accountFingerprint, task.repositoryRoot, input.text, "NEVER_RECORD"]) assert.equal(JSON.stringify(rows).includes(secret), false);
+  assert.equal(calls.filter(call => call.method === "turn/start").length, 1); assert.equal(calls.filter(call => call.method === "thread/resume").length, 1);
+}));
+
 test("reviewed text uses one exact owned restricted turn, retains its acknowledgement and prevents durable duplicate submission", () => fixture(async ({ root, store, task, calls, clients, service, options, input, approve, submit }) => {
   await store.update("personal", "synthetic-observation", s => { s.observations = [{ id: "text-events", status: "recording", sources: ["agent-events"], exclusions: [], events: [], updatedAt: Date.now() }]; appendAgentObservation(s, { provider: "codex", subjectId: task.id, phase: "identity-bound", status: "idle", at: Date.now() }); });
   const review = await approve(); assert.equal(review.modelPromptSubmitted, false); assert.equal(calls.some((c) => c.method === "thread/resume" || c.method === "turn/start"), false);

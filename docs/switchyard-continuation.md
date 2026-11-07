@@ -101,13 +101,23 @@ kernel leases, and shares only overlapping unfinished checks with no intervening
 queued mutation. Settled results and failures are never cached. Retirement,
 foreign replacement and unknown committed outcomes still refuse admission.
 
+Owned Codex design and reviewed-text turns now capture fixed runtime status
+under existing observation consent, with original account/role/task checks at
+persistence. Queued events cannot cross recording, timeout or account boundaries.
+Twenty-seven groups pass 191 tests with no skips, plus both TypeScript checks;
+package/installer scenarios and encrypted-state demonstrations are included.
+Provider responses remain synthetic. This source change is not yet installed and
+postdates complete Linux `0c7d918`; broader external streams remain unfinished.
+[Runtime observation contract](codex-runtime-observation.md).
+
 ## Outstanding verification and implementation
 
-Complete Linux source `0c7d918` is now running in one fresh owned worktree, with
-350 original groups and existing dependencies only. Its active marker is
-`linux-full-0c7d918-run.json` in the private runtime-verification directory.
-Audit that receipt and exact ownership before removing staging; do not start a
-duplicate or reuse the already-cleaned `c359cdf` paths.
+Complete Linux `0c7d918` is audited: 350 groups, 2,274 tests and 32 declared
+skips. Receipt `8c7d09bd-5b5d-48e2-97b5-fe96cba0f01e` retains the original
+manifest, commands, bounds and process exits. Its exact temporary checkout, nine
+dependency aliases, 802 generated files (11,904,762 bytes), empty test parent
+and active marker are removed. Do not rerun the executed cleanup scripts.
+[Complete evidence](evidence/linux-0c7d918-complete-summary.json).
 
 Windows source `e5a5781` is audited through all six preliminary backend shards:
 232 groups, 1,356 passes and 179 declared skips. Exact source/merge trees,
@@ -144,7 +154,7 @@ native helper/runtime bundle was downloaded locally.
 5. Complete Linux `c359cdf` is audited and cleaned: 348 groups, 2,218 passes
    and 32 declared skips. Receipt `05f399ed-8f7b-4c33-8e70-e355b91ccf0e`
    preserves the original manifest, commands, deadlines and child cleanup.
-   The exact checkout, nine aliases, 802 generated files (11,901,729 bytes),
+   The exact checkout, nine aliases, 802 generated files (11,904,762 bytes),
    empty test parent and active marker are removed. Do not restart or reclean it.
    Later status diagnostics are outside this source.
 6. Full Windows `318fafc` completed all six backend shards (232 groups, 1,355
@@ -184,12 +194,12 @@ keyboard-only conversation and frozen frontend preserved. The current release
 and one rollback remain; its exact prepared bundle has been removed.
 [Installed evidence](evidence/installed-role-boundaries-summary.json).
 
-The accepted complete Linux run is `c359cdf`: 348 groups, 2,218 passes
+The accepted complete Linux run is `0c7d918`: 350 groups, 2,274 passes
 and 32 declared platform skips. Its exact checkout, nine dependency aliases,
-802 generated files (11,901,729 bytes), empty test parent and marker are removed.
+802 generated files (11,904,762 bytes), empty test parent and marker are removed.
 The preceding accepted complete Windows run is `dc755901`: 417 groups,
 2,478 passes and 207 declared skips. The Windows revision predates current editor work; Linux includes it.
-[Linux evidence](evidence/linux-c359cdf-complete-summary.json),
+[Linux evidence](evidence/linux-0c7d918-complete-summary.json),
 [Windows evidence](evidence/windows-complete-dc755901-summary.json).
 
 Combined current/index/history scanner inputs, exact reviewed recipe saving,
