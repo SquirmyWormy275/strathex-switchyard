@@ -75,7 +75,7 @@ exit and fixture/service retirement. Complete Windows source `dc755901` passes
 **417 groups / 2,478 tests**, with 207 declared skips, exact cleanup and a green
 overall workflow. Newer changes retain separate focused evidence.
 The latest agent and helper ownership corrections have focused checks and a
-66-check installed metadata demonstration; a
+71-check installed metadata demonstration; a
 recurring first-install shortcut timeout remains under investigation. Source,
 installed, interactive, hardware and account acceptance remain separate.
 [Current status and exact evidence](docs/switchyard-status.md).

@@ -40,18 +40,14 @@ instructions. Do not merge or release.
 
 ## Current installed and source checkpoint
 
-Installed 6609353 passes **66 metadata/in-memory checks**: thirteen task-owner,
-seven Copilot-journal, fourteen agent/helper/SDK, twelve Python, ten Cargo and
-five workflow and five profile checks. Sixteen exact installed module hashes verify; all 57 saved
-workflows validate. All 54 semantic workspace snapshots, selection, pending
-keyboard-only conversation and frozen frontend are preserved. Fifty-three sealed
-files are byte-identical; one changes only audit metadata during the update.
-Dated backup, launcher readback and current plus one rollback verify. The exact
-528-file, 5,230,348-byte prepared bundle is removed. The repeatable workflow
-verifier independently repeats its five checks with all 54 sealed files unchanged.
-No scanner process, native task, agent action, model request, account change or
-hardware operation is performed.
-[Installed evidence](evidence/installed-profile-identity-summary.json).
+Installed `1cbe7a3` passes **71 metadata/in-memory checks** and verifies 21 exact
+module hashes. The observation preview/confirmation checks use synthetic state
+only. All 54 semantic workspaces, selection, the pending keyboard-only
+conversation and frozen frontend are preserved; 53 sealed files are byte-identical
+and one changes only audit metadata. All four saved profiles and 57 workflows
+remain compatible. Dated backup/readback and current plus one rollback verify.
+The exact 530-file, 5,152,756-byte prepared package is removed.
+[Installed evidence](evidence/installed-observation-design-summary.json).
 
 Run only the current repeatable metadata verifiers, each with
 `--read-only-metadata`: `verify-task-owner-host.mjs`,
@@ -131,8 +127,9 @@ requests send no observation context; work-policy export stays refused.
 The first package check exceeded its original limit by 4,711 bytes. Lossless
 compression of the first-party catalog index restores the bound, with all sixteen
 installation/recovery scenarios passing. No upstream source or frozen frontend
-bytes change. Installed/new native acceptance and frontend selection controls
-remain pending. [Contract](observation-assisted-design.md),
+bytes change. Five installed observation metadata checks pass in the 71-check update;
+new native acceptance and frontend selection controls remain pending.
+[Installed evidence](evidence/installed-observation-design-summary.json). [Contract](observation-assisted-design.md),
 [source evidence](evidence/design-observations-source-summary.json).
 
 Portable imports and local role connections now require literal string identities.
@@ -146,9 +143,9 @@ native Windows profile correction acceptance remains separate.
 [Installed evidence](evidence/installed-profile-identity-summary.json).
 [Source evidence](evidence/profile-identity-source-summary.json).
 
-1. Publish reviewed observation design context and the compressed catalog package,
-   then adopt through the normal versioned update. Current verifier pins target
-   that new source; do not bypass an older installed module mismatch.
+1. Reviewed observation design context and the compressed catalog package are
+   published and installed. Continue independent ledger gaps; keep installed
+   in-memory proof separate from live model/UI acceptance.
    Keep later Cargo/workflow focused evidence separate from complete aafb476.
    A new full run must use clean, published immutable source and a short owned
    temporary parent; verify exact final inventory/exit before removing its files.

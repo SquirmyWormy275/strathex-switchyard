@@ -66,5 +66,6 @@ Upstream source files, notices and frozen frontend bytes remain unchanged.
 The complete synthetic package is 5,163,619 bytes; all sixteen installation and
 recovery scenarios pass. The limit was not raised.
 
-Installed metadata acceptance and native Windows acceptance of this change
-remain pending. See [current status](switchyard-status.md) for broader limits.
+Installed metadata acceptance passes five observation checks in the 71-check
+update, with all original workspaces preserved. Native Windows acceptance of
+this change remains pending. [Installed evidence](evidence/installed-observation-design-summary.json). See [current status](switchyard-status.md) for broader limits.

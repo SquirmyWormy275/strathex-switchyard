@@ -16,7 +16,7 @@ No merge or public release has been accepted.
 | --- | --- | --- |
 | Complete Linux `aafb476` | **317 groups, 1,923 passing tests, sixteen declared skips**; exact original inventory, commands, bounds, child/tree and owned staging cleanup. [Receipt](evidence/linux-aafb476-complete-summary.json). | Later Cargo archive identity and workflow-ID corrections have separate focused evidence. |
 | Complete Windows `dc755901` | **417 groups, 2,478 passing tests and 207 declared skips**; all six jobs and the overall workflow succeed, with exact packet/source/merge inventory, bounds and cleanup. [Receipt](evidence/windows-complete-dc755901-summary.json). | Predates wheel RECORD, five-job scheduling, Cargo archive and workflow/profile/observation corrections. Interactive Windows acceptance remains separate. |
-| Installed Linux `6609353` | 66 metadata/in-memory checks and sixteen exact installed module hashes. All 54 semantic workspace snapshots, selection, pending keyboard-only conversation and frozen frontend are preserved. [Receipt](evidence/installed-profile-identity-summary.json). | These checks start no scanner process, Cargo process, live task, agent, account action, model request or hardware operation. |
+| Installed Linux `1cbe7a3` | 71 metadata/in-memory checks and 21 exact module hashes. All 54 semantic workspaces, selection, pending conversation and frozen frontend are preserved. [Receipt](evidence/installed-observation-design-summary.json). | No live scanner, provider task, agent command, account action, model request or hardware operation is performed. |
 | Complete Linux `39db1fe` | **Failed:** 313/314 groups, 1,910 passing tests, sixteen declared skips and one failed scheduling-budget assertion. Exact owned cleanup verifies. [Receipt](evidence/linux-39db1fe-scheduling-failed-summary.json). | A nearly passing run is not complete acceptance. |
 
 Complete Linux aafb476 passes **317 groups, 1,923 tests and sixteen declared
@@ -29,7 +29,7 @@ changes and predates Cargo archive identity and the workflow-ID correction.
 [Complete receipt](evidence/linux-aafb476-complete-summary.json).
 
 The installed update verifies a dated backup and launcher readback. It retains
-current plus one rollback and removes the exact 528-file, 5,230,348-byte prepared
+current plus one rollback and removes the exact 530-file, 5,152,756-byte prepared
 bundle. Fifty-three sealed workspace files are byte-identical; one changes only
 audit metadata. It preserves the repaired native ChatGPT main window, hidden
 overlay, saved artwork and workstation guard.
@@ -58,8 +58,9 @@ requests send no observation context; work-policy export stays refused.
 The first package check exceeded its original limit by 4,711 bytes. Lossless
 compression of the first-party catalog index restores the bound, with all sixteen
 installation/recovery scenarios passing. No upstream source or frozen frontend
-bytes change. Installed/new native acceptance and frontend selection controls
-remain pending. [Contract](observation-assisted-design.md),
+bytes change. Five installed observation metadata checks pass in the 71-check update;
+new native acceptance and frontend selection controls remain pending.
+[Installed evidence](evidence/installed-observation-design-summary.json). [Contract](observation-assisted-design.md),
 [source evidence](evidence/design-observations-source-summary.json).
 
 Portable imports and local role connections now require literal string identities.

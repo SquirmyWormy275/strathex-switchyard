@@ -1,5 +1,14 @@
 # What has actually been verified
 
+Installed `1cbe7a3` passes **71 metadata/in-memory checks** and verifies 21 exact
+module hashes. The observation preview/confirmation checks use synthetic state
+only. All 54 semantic workspaces, selection, the pending keyboard-only
+conversation and frozen frontend are preserved; 53 sealed files are byte-identical
+and one changes only audit metadata. All four saved profiles and 57 workflows
+remain compatible. Dated backup/readback and current plus one rollback verify.
+The exact 530-file, 5,152,756-byte prepared package is removed.
+[Installed evidence](evidence/installed-observation-design-summary.json).
+
 Complete Windows `dc755901` now passes **417 groups, 2,478 tests and 207
 declared skips**. The overall workflow and all six jobs succeed. Exact source/merge
 trees, packet digest, original group inventory, command arguments, bounds and
@@ -16,8 +25,9 @@ requests send no observation context; work-policy export stays refused.
 The first package check exceeded its original limit by 4,711 bytes. Lossless
 compression of the first-party catalog index restores the bound, with all sixteen
 installation/recovery scenarios passing. No upstream source or frozen frontend
-bytes change. Installed/new native acceptance and frontend selection controls
-remain pending. [Contract](observation-assisted-design.md),
+bytes change. Five installed observation metadata checks pass in the 71-check update;
+new native acceptance and frontend selection controls remain pending.
+[Installed evidence](evidence/installed-observation-design-summary.json). [Contract](observation-assisted-design.md),
 [source evidence](evidence/design-observations-source-summary.json).
 
 Installed `6609353` passes **66 metadata/in-memory checks**, adding five exact
