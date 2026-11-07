@@ -45,13 +45,35 @@ test("stopping a pending category initialization prevents a later read from revi
 });
 async function suiteFixture(fn, { foregroundOverride } = {}) {
   const root = await mkdtemp(join(tmpdir(), "switchyard-foreground-")), keys = new Map(), timers = new Set(); let reads = 0, stops = 0, next = frame;
-  const store = createSuiteStore({ root, secrets: { get: async (c, p) => keys.get(`${c}:${p}`), set: async (c, p, v) => keys.set(`${c}:${p}`, v) } });
+  const secrets = { get: async (c, p) => keys.get(`${c}:${p}`), set: async (c, p, v) => keys.set(`${c}:${p}`, v) };
+  const store = createSuiteStore({ root, secrets }), peer = createSuiteStore({ root, secrets });
   const foreground = foregroundOverride ?? { implemented: true, read: async (c, authorize) => { await authorize(); reads++; return next; }, stopCompartment: async () => { stops++; return { stopped: true }; }, close: async () => {} };
   const suite = createSuite({ store, foreground, scheduleForeground: (callback, ms) => { assert.equal(ms, 2000); const timer = { callback, unref() {} }; timers.add(timer); return timer; }, clearForeground: (timer) => timers.delete(timer), agents: { discovery: async () => [], close() {} }, voice: { discovery: async () => ({ available: false }) } });
-  try { await suite.handle("/api/suite/bootstrap"); await fn({ suite, store, root, timers, readCount: () => reads, stopCount: () => stops, next: (value) => { next = value; }, sample: async () => { const timer = [...timers][0]; assert.ok(timer); await timer.callback(); } }); }
+  try { await suite.handle("/api/suite/bootstrap"); await fn({ suite, store, peer, root, timers, readCount: () => reads, stopCount: () => stops, next: (value) => { next = value; }, sample: async () => { const timer = [...timers][0]; assert.ok(timer); await timer.callback(); } }); }
   finally { await suite.close(); await rm(root, { recursive: true, force: true, maxRetries: 6, retryDelay: 50 }); }
 }
 const start = (suite, extra = {}) => suite.handle("/api/suite/observation/start", { consent: true, sources: ["foreground-category"], exclusions: ["browser"], ...extra });
+test("a peer pause retires the original sampler before another foreground read", () => suiteFixture(async ({ suite, peer, sample, timers, readCount, stopCount }) => {
+  await suite.handle("/api/suite/mode", { mode: "personal-companion" }); await start(suite);
+  await peer.update("personal", "synthetic-peer-pause", s => { s.observations[0].status = "paused"; });
+  const before = (await peer.snapshot("personal")).observations;
+  await sample();
+  assert.equal(readCount(), 0); assert.equal(stopCount(), 1); assert.equal(timers.size, 0);
+  assert.deepEqual((await peer.snapshot("personal")).observations, before);
+}));
+for (const fails of [false, true]) test(`an old foreground ${fails ? "failure" : "reply"} cannot change a peer's renewed recording`, async () => {
+  const entered = gate(), release = gate(); let stops = 0;
+  const foregroundOverride = { implemented: true, async read(_c, authorize) { await authorize(); entered.resolve(); await release.promise; if (fails) throw Error("SYNTHETIC_OLD_SOURCE_FAILURE"); return frame; }, async stopCompartment() { stops++; return { stopped: true }; }, async close() {} };
+  try { await suiteFixture(async ({ suite, peer, sample, timers }) => {
+    await suite.handle("/api/suite/mode", { mode: "personal-companion" }); await start(suite);
+    const pending = sample(); await entered.promise;
+    await peer.update("personal", "synthetic-peer-resume", s => { s.observations[0].recordingGeneration = "synthetic-renewed-consent"; });
+    const before = (await peer.snapshot("personal")).observations;
+    release.resolve(); await pending;
+    assert.deepEqual((await peer.snapshot("personal")).observations, before);
+    assert.equal(timers.size, 0); assert.equal(stops, 1);
+  }, { foregroundOverride }); } finally { release.resolve(); }
+});
 test("foreground recording needs consent and an allowed companion policy; exclusions, pause and mode-off fence samples", () => suiteFixture(async ({ suite, store, timers, sample, next, readCount, stopCount, root }) => {
   await assert.rejects(start(suite), /Keyboard-only/); assert.equal(readCount(), 0);
   await suite.handle("/api/suite/mode", { mode: "personal-companion" }); await assert.rejects(start(suite, { consent: false }), /explicitly start/);

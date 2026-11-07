@@ -24,3 +24,17 @@ Live monitoring of Codex/ChatGPT or Claude requires an authorized adapter that b
 The Suite's separate Windows category observer retains ownership of its read-only
 helper until exact exit. Uncertain shutdown blocks replacement and cannot produce
 a successful Suite close. [Lifecycle and source verification](foreground-helper-lifecycle.md).
+
+### Foreground consent across instances
+
+A category sampler belongs to the exact recording generation that started it.
+Every sample rechecks that persisted consent before native observation, after the
+reply and at the encrypted write. A pause saved through another store instance
+retires the original sampler before its next read. Late replies and errors from
+an old generation cannot populate or pause a newly resumed recording.
+
+Three original regressions reproduce those failures. Eight focused groups now
+pass 123 tests with no skips, using independent encrypted stores and controlled
+category replies. The existing native source's bounded retry and owned-stop
+contracts remain unchanged. This source-only proof does not read actual windows
+or accept the frozen UI. [Evidence](evidence/foreground-consent-source-summary.json).

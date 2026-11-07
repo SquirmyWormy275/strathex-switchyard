@@ -379,3 +379,17 @@ native metadata across same-clock renewals. Two original failures are retained;
 eight groups pass 120 tests with no skips and an actual encrypted-state API
 scenario. This source correction postdates installed `57af859` and the running
 complete Linux `0c025df` check. [Evidence](evidence/consent-generation-source-summary.json).
+
+Foreground category sampling now also binds its original persisted recording
+generation. A peer pause stops the next read; stale replies and errors cannot
+alter renewed consent. Three original regressions are retained; eight focused
+groups pass 123 tests with no skips and independent encrypted stores. This
+postdates installed `57af859` and complete Linux `0c025df`.
+[Foreground consent evidence](evidence/foreground-consent-source-summary.json).
+
+Native Windows client source `57af859` now passes 25 original groups/249 tests
+with no skips; exact source/merge trees, artifact and receipt hashes, commands,
+bounds and process cleanup verify. The metadata-only manifest projection's scratch
+files are removed. This lane excludes the new selection/consent backend groups
+and does not accept the complete Windows release.
+[Native client evidence](evidence/selection-native-client-summary.json).

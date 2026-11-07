@@ -182,11 +182,16 @@ export function createSuite({ store = createSuiteStore(), platform = process.pla
   const session = (s, id) => { const found = s.observations.find((o) => o.id === id); if (!found) throw new Error("That observation session is unavailable in this compartment."); return found; };
   const voiceSession = (s, id) => { const found = s.voice.find((o) => o.id === id); if (!found) throw new Error("That voice session is unavailable in this compartment."); return found; };
   function pauseMonitor(compartment) { if (monitors.has(compartment)) clearForeground(monitors.get(compartment)); monitors.delete(compartment); }
-  function monitor(compartment, id) {
+  function monitor(compartment, id, recordingGeneration) {
     pauseMonitor(compartment);
     let pending = false, last = Date.now(), unavailable = 0;
     const current = () => !closed && monitors.get(compartment) === timer;
-    const authorize = async () => { if (!current()) throw new Error("Observation stopped."); await store.authorize(compartment, { operation: "record" }); if (!current()) throw new Error("Observation stopped."); };
+    const sameConsent = o => o?.status === "recording" && o.sources.includes("foreground-category") && o.recordingGeneration === recordingGeneration;
+    const authorize = async () => {
+      if (!current()) throw new Error("Observation stopped.");
+      const state = await store.snapshot(compartment, { operation: "record" });
+      if (!current() || !sameConsent(state.observations.find(o => o.id === id))) throw new Error("Observation stopped or its consent changed.");
+    };
     const timer = scheduleForeground(async () => {
       if (pending) return; pending = true;
       try {
@@ -194,11 +199,11 @@ export function createSuite({ store = createSuiteStore(), platform = process.pla
         if (!result.available) { last = at; if (++unavailable < 3) return; throw new Error("Foreground unavailable."); }
         if (!["terminal", "vscode", "chatgpt", "claude", "codex", "browser", "other"].includes(result.category)) throw new Error("Unsupported foreground category.");
         unavailable = 0;
-        await store.update(compartment, "focus-category", (s) => { const o = session(s, id); if (!current() || o.status !== "recording" || !o.sources.includes("foreground-category")) return; o.sourceStates ??= {}; o.sourceStates["foreground-category"] = { status: "sampling", provenance: result.provenance, at, timing: "two-second sampled category estimate; no task or content inference" }; if (!o.exclusions.includes(result.category)) o.focusCategories[result.category] = (o.focusCategories[result.category] ?? 0) + Math.max(0, Math.min(60000, at - last)); o.updatedAt = at; }, { operation: "record" }); last = at;
+        await store.update(compartment, "focus-category", (s) => { const o = session(s, id); if (!current() || !sameConsent(o)) return; o.sourceStates ??= {}; o.sourceStates["foreground-category"] = { status: "sampling", provenance: result.provenance, at, timing: "two-second sampled category estimate; no task or content inference" }; if (!o.exclusions.includes(result.category)) o.focusCategories[result.category] = (o.focusCategories[result.category] ?? 0) + Math.max(0, Math.min(60000, at - last)); o.updatedAt = at; }, { operation: "record" }); last = at;
       } catch {
         if (current()) {
           pauseMonitor(compartment);
-          try { await store.update(compartment, "focus-unavailable", (s) => { const o = session(s, id); o.sourceStates ??= {}; o.sourceStates["foreground-category"] = { status: "unavailable", reason: "Foreground categories are unavailable. Pause and deliberately resume to retry.", at: Date.now() }; if (o.sources.length === 1 && o.status === "recording") o.status = "paused"; }, { operation: "record" }); } catch { /* A policy change or deletion wins over a late sample. */ }
+          try { await store.update(compartment, "focus-unavailable", (s) => { const o = session(s, id); if (!sameConsent(o)) return; o.sourceStates ??= {}; o.sourceStates["foreground-category"] = { status: "unavailable", reason: "Foreground categories are unavailable. Pause and deliberately resume to retry.", at: Date.now() }; if (o.sources.length === 1) o.status = "paused"; }, { operation: "record" }); } catch { /* A policy change or deletion wins over a late sample. */ }
           try { await foreground.stopCompartment?.(compartment); } catch { /* The source is already marked unavailable; no automatic restart. */ }
         }
       }
@@ -601,11 +606,11 @@ export function createSuite({ store = createSuiteStore(), platform = process.pla
         if (!foreground.implemented && sources.includes("foreground-category")) throw new Error("Foreground category sampling requires the supported native platform adapter. Deliberate and agent-event observation remain available.");
         const at = Date.now(), o = { id: randomUUID(), status: "recording", sources, exclusions: body.exclusions, events: [], focusCategories: {}, createdAt: at, recordingSince: at, recordingGeneration: randomUUID(), updatedAt: at };
         await store.update(compartment, "observation-start", (s) => { if (s.observations.some((o) => ["recording", "paused"].includes(o.status))) throw new Error("Stop or resume the existing session first."); s.observations.push(o); }, { operation: "record" });
-        if (sources.includes("foreground-category")) monitor(compartment, o.id);
+        if (sources.includes("foreground-category")) monitor(compartment, o.id, o.recordingGeneration);
         return o;
       }
       if (path === "/api/suite/observation/mark") return store.update(compartment, "observation-mark", (s) => { const o = session(s, body.id); if (o.status !== "recording" || !o.sources.includes("deliberate") || !kinds.includes(body.kind)) throw new Error("Start deliberate observation and choose a supported event kind."); if (o.events.length >= 2000) throw new Error("Session event limit reached. Stop and review this session."); o.events.push({ kind: body.kind, provenance: "user-marked", at: Date.now() }); o.updatedAt = Date.now(); return observationSummary(o); }, { operation: "record" });
-      if (path === "/api/suite/observation/state") { let shouldMonitor = false; const result = await store.update(compartment, "observation-state", (s) => { const o = session(s, body.id); if (!["paused", "recording", "stopped"].includes(body.status) || (o.status === "stopped" && body.status !== "stopped")) throw new Error("That session transition is unavailable."); const at = Date.now(); if (body.status === "recording" && o.status !== "recording") { o.recordingSince = Math.max(at, o.createdAt ?? 0, o.recordingSince ?? 0); o.recordingGeneration = randomUUID(); } o.status = body.status; o.updatedAt = at; shouldMonitor = o.status === "recording" && o.sources.includes("foreground-category"); return observationSummary(o); }, body.status === "recording" ? { operation: "record" } : {}); pauseMonitor(compartment); if (shouldMonitor) monitor(compartment, body.id); else await foreground.stopCompartment?.(compartment); return result; }
+      if (path === "/api/suite/observation/state") { let shouldMonitor = false, recordingGeneration; const result = await store.update(compartment, "observation-state", (s) => { const o = session(s, body.id); if (!["paused", "recording", "stopped"].includes(body.status) || (o.status === "stopped" && body.status !== "stopped")) throw new Error("That session transition is unavailable."); const at = Date.now(); if (body.status === "recording" && o.status !== "recording") { o.recordingSince = Math.max(at, o.createdAt ?? 0, o.recordingSince ?? 0); o.recordingGeneration = randomUUID(); } o.status = body.status; o.updatedAt = at; shouldMonitor = o.status === "recording" && o.sources.includes("foreground-category"); recordingGeneration = o.recordingGeneration; return observationSummary(o); }, body.status === "recording" ? { operation: "record" } : {}); pauseMonitor(compartment); if (shouldMonitor) monitor(compartment, body.id, recordingGeneration); else await foreground.stopCompartment?.(compartment); return result; }
       if (path === "/api/suite/observation/delete") return store.update(compartment, "observation-delete", (s) => { const o = session(s, body.id); if (o.status === "recording") throw new Error("Stop the session before deleting its data."); s.observations = s.observations.filter((o) => o.id !== body.id); return { deleted: true }; });
       if (path === "/api/suite/voice/start") {
         await store.authorize(compartment, { operation: "record", provider: "local-transcription" });

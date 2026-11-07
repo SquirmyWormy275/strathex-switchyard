@@ -1,0 +1,50 @@
+{
+  "schema": "switchyard-selection-native-client-summary/v1",
+  "sourceCommit": "57af85939b47735daaaf47a6af47e54305f6163c",
+  "mergeCommit": "a31cc69be720e743337b6a9d4b831172577b2bd2",
+  "tree": "63468deb6a3803a2e21cff4dbe9ae0dd83f6ec76",
+  "sourceAndMergeTreesEqual": true,
+  "workflowRun": 42380183475,
+  "jobs": {
+    "helper": 128425965217,
+    "client": 128426173286,
+    "conclusion": "success"
+  },
+  "artifact": {
+    "id": 13577069692,
+    "bytes": 3526,
+    "sha256": "63f078e9243cfe93de45547e7eb4607c9504310a4761d591f7bcef139045b6fc",
+    "zipRetained": false,
+    "nativeHelperDownloaded": false
+  },
+  "receipt": {
+    "id": "2b592ccf-7b1c-4893-9c13-709952fd4c2b",
+    "file": "ci-artifact-13577069692-0.json",
+    "sha256": "012dabfd7f1af9b7e0c72daa3b17ca0957128e16d11a3749be7ca82d0d34ac4c"
+  },
+  "totals": {
+    "required": 25,
+    "passed": 25,
+    "failed": 0,
+    "tests": 249,
+    "passedTests": 249,
+    "failedTests": 0,
+    "skippedTests": 0,
+    "cancelledTests": 0,
+    "todoTests": 0
+  },
+  "originalManifestCommandsBoundsSkipsAndCleanupVerified": true,
+  "metadataOnlyPlatformProjection": true,
+  "projectionStartedNoTestProcesses": true,
+  "projectionStagingRemoved": true,
+  "sourceFiles": {
+    "scripts/run-isolated-tests.mjs": "1033187440dd6e21f3a9470426b255ac04c0a69bc86c4332c0e992b84e7fee1e",
+    "scripts/windows-scenario-groups.mjs": "055963bbaa3da60ef7afed7207d5177f7b49a376aa4157099eb8eded3f62bac4",
+    "scripts/test-support/process-tree.mjs": "a480913dcafb50351ac4544d07e184ea4b21c53eb5b13a59b245952e63d859e6",
+    "scripts/verify-client-platform.mjs": "7c85086841008e6fc409ffa8afbf9e87951f7e59689cbb49bce33d8b9be90ff4"
+  },
+  "limitations": [
+    "The native client lane does not include persisted-selection or consent-generation backend tests and does not accept the complete Windows release.",
+    "Terminal/provider doubles remain explicit; this does not accept live accounts, TUI handoff, interactive desktop, keyboard or microphone behavior. Editor command activation remains frozen."
+  ]
+}
