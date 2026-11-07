@@ -176,7 +176,12 @@ every original manifest group. Builds, PowerShell verification and the compiled
 companion/editor consumers stay together. The collector requires all 21 exact
 same-source/toolchain receipts, unchanged commands/child limits/skips and cleanup.
 Five local groups/45 tests pass; both new YAML files parse with existing tools.
-Native execution is queued in run `42390824164`; inspect actual status.
+Native run `42390824164` exposed one dependency failure in worker 11: the
+packaged TLS test could not find the compiled provider-host `dist`. The original
+failed receipt and cleanup are retained. Both original TLS scenarios now move
+with the existing companion/editor build consumers onto the assembly worker; five local
+groups/45 tests pass. Native correction acceptance remains pending.
+[Failure and correction](evidence/complete-windows-dependency-fix-summary.json).
 The original 90-minute package verification remains unchanged. Distributed source
 acceptance is explicitly not package, hardware or live-account acceptance.
 [Evidence](evidence/complete-windows-source-lane-summary.json).

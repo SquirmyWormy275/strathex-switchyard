@@ -68,6 +68,13 @@ execution remains pending; this does not replace package acceptance. The origina
 receipt. [Workflow evidence](evidence/complete-windows-source-lane-summary.json),
 [latest release interruption](evidence/windows-6727054-full-interruption-summary.json).
 
+The first distributed native run at `754660e` found a missing provider-host build
+dependency: its packaged TLS lifecycle scenario ran on an independent worker
+without `dist`. The exact failed receipt and successful child cleanup are retained.
+Both original TLS scenarios now follow the provider build on the assembly worker;
+five local groups/45 tests pass. Native acceptance of the correction is pending.
+[Failure and correction](evidence/complete-windows-dependency-fix-summary.json).
+
 Each result belongs to its exact source revision. Test totals from different
 checkpoints are not cumulative acceptance of the latest suite.
 

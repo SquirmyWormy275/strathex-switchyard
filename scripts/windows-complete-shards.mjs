@@ -25,7 +25,8 @@ for (const row of costs.groups) {
 export const completeWindowsCost = group => estimates.get(key(group)) ?? costs.fallbackCostMs;
 const builtOutputConsumers = new Set([
   "apps/windows-companion/test/packaged-runtime.test.ts",
-  "apps/windows-companion/test/main-shutdown.test.ts"
+  "apps/windows-companion/test/main-shutdown.test.ts",
+  "apps/provider-adapter-host/test/tls-network-e2e.test.ts"
 ]);
 const requiresAssembly = group => Boolean(group.args) || builtOutputConsumers.has(group.file);
 

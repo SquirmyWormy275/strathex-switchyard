@@ -40,13 +40,14 @@ test("complete Windows workers cover the original manifest once, preserving buil
   const selections = completeWindowsShards.map(shard => selectCompleteWindowsShard(shard)), all = selections.flat();
   assert.equal(all.length, requiredGroups.length); assert.equal(new Set(all).size, requiredGroups.length);
   assert.deepEqual(new Set(all), new Set(requiredGroups));
-  const consumers = new Set(["apps/windows-companion/test/packaged-runtime.test.ts", "apps/windows-companion/test/main-shutdown.test.ts"]);
+  const consumers = new Set(["apps/windows-companion/test/packaged-runtime.test.ts", "apps/windows-companion/test/main-shutdown.test.ts", "apps/provider-adapter-host/test/tls-network-e2e.test.ts"]);
   const assembly = selections.at(-1);
   assert.deepEqual(assembly, requiredGroups.filter(g => g.args || consumers.has(g.file)));
   for (const file of consumers) {
     const index = assembly.findIndex(g => g.file === file);
     assert(index > assembly.findIndex(g => g.file === "build:companion"));
     assert(index > assembly.findIndex(g => g.file === "build:vscode"));
+    assert(index > assembly.findIndex(g => g.file === "build:provider-host"));
   }
   assert(selections.slice(0, -1).every(groups => groups.length > 0 && groups.every(g => !g.args && !consumers.has(g.file))));
   assert(selections.slice(0, -1).every(groups => groups.reduce((n, g) => n + completeWindowsCost(g), 0) <= 950000));
