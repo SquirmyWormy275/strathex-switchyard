@@ -343,10 +343,16 @@ export class WindowsProviderDesktopProcessPort implements ProviderDesktopProcess
 
   private async retire(owner: OwnedHelper): Promise<ProviderDesktopHelperExit> {
     const session = owner.session;
-    let phase = "exit";
-    const unconfirmed = () => Object.assign(new Error(phase === "exit" ? "The original provider helper exit is unconfirmed. No replacement was started." : "The original provider helper retirement record is unconfirmed. No replacement was started."), { code: phase === "exit" ? "PROVIDER_HELPER_EXIT_UNCONFIRMED" : "PROVIDER_HELPER_RETIREMENT_UNCONFIRMED" });
+    let phase = "exit", reason = "rejected";
+    const unconfirmed = () => {
+      const message = phase === "exit" ? "The original provider helper exit is unconfirmed. No replacement was started." : "The original provider helper retirement record is unconfirmed. No replacement was started.";
+      return Object.assign(new Error(`${message} (${phase}-${reason})`), {
+        code: phase === "exit" ? "PROVIDER_HELPER_EXIT_UNCONFIRMED" : "PROVIDER_HELPER_RETIREMENT_UNCONFIRMED",
+        retirementPhase: phase, retirementReason: reason
+      });
+    };
     let timer: ReturnType<typeof setTimeout> | undefined;
-    const deadline = new Promise<never>((_resolve, reject) => { timer = setTimeout(() => reject(unconfirmed()), helperRetirementMs); });
+    const deadline = new Promise<never>((_resolve, reject) => { timer = setTimeout(() => { reason = "deadline"; reject(unconfirmed()); }, helperRetirementMs); });
     // Termination errors cannot erase ownership. An independent close event may
     // still prove that this exact child has already exited.
     void Promise.resolve().then(() => session.terminate()).catch(() => undefined);
@@ -355,7 +361,7 @@ export class WindowsProviderDesktopProcessPort implements ProviderDesktopProcess
         Promise.resolve().then(() => session.wait()),
         deadline
       ]);
-      if (!exit || !Number.isSafeInteger(exit.code) || exit.code < -1 || exit.code > 0xffffffff || !(exit.signal === null || typeof exit.signal === "string")) throw unconfirmed();
+      if (!exit || !Number.isSafeInteger(exit.code) || exit.code < -1 || exit.code > 0xffffffff || !(exit.signal === null || typeof exit.signal === "string")) { reason = "invalid-exit"; throw unconfirmed(); }
       phase = "record";
       if (owner.identity) {
         // Join even a failed/in-flight owner write before recording retirement.

@@ -45,8 +45,8 @@ The repeatable [connected backend demo](backend-demonstration.md) runs with
 normal encrypted stores, authenticated API and signed SDK with a synthetic agent
 and simulated second host. Four original groups/21 tests pass; original receipts
 are copied privately and temporary demo state is removed. This does not change
-the installed runtime or freeze boundaries. Native Windows demo acceptance is
-pending. [Evidence](evidence/backend-connected-demo-summary.json).
+the installed runtime or freeze boundaries. The same public command passes two native Windows tests at `864fe0d` with
+zero skips and exact cleanup; see [native evidence](evidence/backend-connected-demo-native-summary.json). [Evidence](evidence/backend-connected-demo-summary.json).
 
 The latest source correction preserves external-agent report time and recording
 generation across Node/Python SDK queues and encrypted-state waits. Nine groups/
@@ -180,10 +180,25 @@ Native run `42390824164` exposed one dependency failure in worker 11: the
 packaged TLS test could not find the compiled provider-host `dist`. The original
 failed receipt and cleanup are retained. Both original TLS scenarios now move
 with the existing companion/editor build consumers onto the assembly worker; five local
-groups/45 tests pass. Native correction acceptance remains pending.
+groups/45 tests pass. Native `646f2c6` assembly now passes; 20 of 21 workers pass.
+The remaining worker fails one focus refusal because its original helper retirement
+record is unconfirmed; the final collector rejects acceptance.
+[Retained failure](evidence/native-focus-retirement-failure-summary.json).
 [Failure and correction](evidence/complete-windows-dependency-fix-summary.json).
-The original 90-minute package verification remains unchanged. Distributed source
-acceptance is explicitly not package, hardware or live-account acceptance.
+The original 90-minute package bound remains. The package now invokes
+`npm test -- --windows-pairs`: ordered builds/compiled consumers followed by at
+most two independent children, all original groups and bounds retained. Both public
+CLI entry points validate arguments. Seven groups/74 tests and five concurrently
+executed backend groups/91 tests pass, along with TypeScript checking. Original
+failed fixture expectations are retained privately. Native package acceptance is
+pending; distributed source acceptance is explicitly not package, hardware or
+live-account acceptance. [Paired evidence](evidence/windows-paired-verification-summary.json).
+
+Focus retirement now reports only fixed phase/reason tags. A deterministic original
+two-second deadline test retains the pending write and blocks replacement until
+that exact write completes. No Windows root-cause repair is claimed; use new native
+evidence to distinguish record deadlines from rejection. Keep original bounds,
+permissions and refusal assertions. The installed runtime remains `2c6497f`.
 [Evidence](evidence/complete-windows-source-lane-summary.json).
 
 Native `b38ff759` external-agent consent passes three original groups/51 tests,

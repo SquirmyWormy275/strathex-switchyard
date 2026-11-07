@@ -2152,3 +2152,31 @@ deadlines and skip allowances are unchanged. Existing runner tests pass 23 cases
 including reporting faults and cleanup. This makes future interruptions observable;
 it does not accept the cancelled run or establish its cause. No manual workflow
 rerun or deadline increase was used. [Source proof](evidence/full-suite-progress-source-summary.json).
+
+
+## Bounded Windows package scheduling and native focus diagnostics — 2026-11-07
+
+The full package command now uses `npm test -- --windows-pairs`. Both public test
+entry points validate this native-Windows-only option. Shared build steps and
+compiled-output consumers run in original dependency order, then at most two
+independent groups run at once. Every original group, child command, timeout,
+skip allowance, strict environment, tree cleanup and manifest-ordered receipt
+remains required. The package job stays at 90 minutes; distributed source workers
+still run serially and cannot replace package acceptance.
+
+Seven focused groups pass 74 tests, zero skips. A separate real paired run passes
+five original backend groups/91 tests covering encrypted Suite state, leases,
+native focus with provider doubles, helper ownership and the public demo. The
+TypeScript check passes. Original failing expectation receipts are retained.
+[Scheduling evidence](evidence/windows-paired-verification-summary.json).
+
+Native source `646f2c6` passes 20 of 21 workers, including the corrected TLS
+assembly dependency. Worker 13 fails one focus refusal: durable helper retirement
+was unconfirmed instead of the expected target-count refusal. The exact failed
+receipt, 45-second group bound, commands and cleanup verify. The collector rejects
+complete acceptance. Fixed phase/reason diagnostics now distinguish exit/record
+and deadline/rejection; they do not expose underlying callback messages. A
+controlled clock proves the existing two-second deadline retains the original
+pending write and blocks replacement until it completes. Root cause and native
+package acceptance remain unresolved.
+[Native failure](evidence/native-focus-retirement-failure-summary.json).

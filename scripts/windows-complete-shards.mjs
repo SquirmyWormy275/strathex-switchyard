@@ -5,7 +5,7 @@ import { execFileSync } from "node:child_process";
 import { mkdir, readFile, writeFile, lstat, readdir } from "node:fs/promises";
 import { resolve, join, isAbsolute } from "node:path";
 import { fileURLToPath } from "node:url";
-import { requiredGroups, assertRequiredTestManifest, effectiveGroupTimeout, runVerification, root } from "./run-isolated-tests.mjs";
+import { requiredGroups, assertRequiredTestManifest, effectiveGroupTimeout, runVerification, root, requiresVerificationBuild } from "./run-isolated-tests.mjs";
 import costs from "./fixtures/windows-backend-costs.json" with { type: "json" };
 
 const hash = value => createHash("sha256").update(value).digest("hex");
@@ -23,12 +23,7 @@ for (const row of costs.groups) {
   estimates.set(key(row), row.costMs);
 }
 export const completeWindowsCost = group => estimates.get(key(group)) ?? costs.fallbackCostMs;
-const builtOutputConsumers = new Set([
-  "apps/windows-companion/test/packaged-runtime.test.ts",
-  "apps/windows-companion/test/main-shutdown.test.ts",
-  "apps/provider-adapter-host/test/tls-network-e2e.test.ts"
-]);
-const requiresAssembly = group => Boolean(group.args) || builtOutputConsumers.has(group.file);
+const requiresAssembly = requiresVerificationBuild;
 
 export function selectCompleteWindowsShard(shard, groups = requiredGroups) {
   assert(completeWindowsShards.includes(shard), "Select an exact complete Windows shard.");

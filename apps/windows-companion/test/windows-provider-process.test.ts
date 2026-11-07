@@ -161,12 +161,35 @@ test("failed owner persistence cannot send a request and failed retirement persi
     async onHelperOwned() { if (++owned === 1) throw Error("synthetic owner write failure"); },
     async onHelperStopped() { if (!allowRetirement) throw Error("synthetic retirement write failure"); }
   });
-  await assert.rejects(processPort.listRunning(setup.identity, new AbortController().signal), /retirement.*unconfirmed/i);
+  await assert.rejects(processPort.listRunning(setup.identity, new AbortController().signal), { code: "PROVIDER_HELPER_RETIREMENT_UNCONFIRMED", retirementPhase: "record", retirementReason: "rejected" });
   assert.equal(transport.sessions[0]!.writes.length, 0);
-  await assert.rejects(processPort.listRunning(setup.identity, new AbortController().signal), /retirement.*unconfirmed/i);
+  await assert.rejects(processPort.listRunning(setup.identity, new AbortController().signal), { code: "PROVIDER_HELPER_RETIREMENT_UNCONFIRMED", retirementPhase: "record", retirementReason: "rejected" });
   assert.equal(transport.invocations.length, 1);
   allowRetirement = true;
   assert.deepEqual(await processPort.listRunning(setup.identity, new AbortController().signal), []); assert.equal(transport.invocations.length, 2);
+});
+
+test("retirement deadline identifies its phase and reuses the original pending record before replacement", async context => {
+  const setup = await fixture(context), transport = new FakeTransport();
+  let started!: () => void, release!: () => void, stopped = 0;
+  const entered = new Promise<void>(resolve => { started = resolve; });
+  const gate = new Promise<void>(resolve => { release = resolve; });
+  transport.configure = session => { session.responses.push(ownerHello()); session.onWrite = request => session.responses.push(envelope(request, "result", { observations: [] })); };
+  const processPort = port(setup.helperPath, digest("fixed native helper"), transport, true, {
+    async onHelperStopped() { stopped++; started(); await gate; }
+  });
+  context.mock.timers.enable({ apis: ["setTimeout"] });
+  const pending = processPort.listRunning(setup.identity, new AbortController().signal);
+  const refused = assert.rejects(pending, { code: "PROVIDER_HELPER_RETIREMENT_UNCONFIRMED", retirementPhase: "record", retirementReason: "deadline" });
+  await entered;
+  context.mock.timers.tick(2000); await refused;
+  assert.equal(transport.invocations.length, 1); assert.equal(stopped, 1);
+  const replacement = processPort.listRunning(setup.identity, new AbortController().signal);
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(transport.invocations.length, 1); assert.equal(stopped, 1);
+  release();
+  assert.deepEqual(await replacement, []);
+  assert.equal(transport.invocations.length, 2); assert.equal(stopped, 2);
 });
 
 test("cancellation joins pending owner persistence before recording helper retirement", async context => {

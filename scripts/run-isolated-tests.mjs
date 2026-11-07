@@ -404,6 +404,12 @@ export const requiredGroups = [
 /** Linux omits Windows-only runtime contracts and includes the portable native Git transactions. */
 export const linuxGroups = requiredGroups
   .filter((group) => (group.file === "apps/windows-companion/test/mediated-git.test.ts" || !group.file.startsWith("apps/windows-companion/")) && !group.file.startsWith("deployment/windows/"));
+const compiledOutputConsumers = new Set([
+  "apps/windows-companion/test/packaged-runtime.test.ts",
+  "apps/windows-companion/test/main-shutdown.test.ts",
+  "apps/provider-adapter-host/test/tls-network-e2e.test.ts"
+]);
+export const requiresVerificationBuild = group => Boolean(group.args) || compiledOutputConsumers.has(group.file);
 const limit = 64 * 1024;
 const diagnosticLimit = 4096;
 function failureDiagnostic(chunks) {
@@ -606,9 +612,11 @@ async function cleanupIsolatedRoot(cleanup, testRoot, testParent) {
 }
 
 async function writeReceipt(directory, receipt) { await mkdir(directory, { recursive: true }); const finalPath = join(directory, `isolated-test-${receipt.runId}.json`); const temporaryPath = `${finalPath}.${randomUUID()}.tmp`; try { await writeFile(temporaryPath, JSON.stringify(receipt, null, 2), { encoding: "utf8", mode: 0o600 }); await rename(temporaryPath, finalPath); return finalPath; } finally { await rm(temporaryPath, { force: true }).catch(() => {}); } }
-export async function runVerification({ groups = requiredGroups, cwd = root, outputDirectory = receiptDirectory, executable = process.execPath, timeoutMs, cleanup, sourceEnvironment, receiptWriter = writeReceipt, onProgress } = {}) {
+export async function runVerification({ groups = requiredGroups, cwd = root, outputDirectory = receiptDirectory, executable = process.execPath, timeoutMs, cleanup, sourceEnvironment, receiptWriter = writeReceipt, onProgress, scheduling = "serial" } = {}) {
   if (groups === requiredGroups) assertRequiredTestManifest(groups);
   if (onProgress !== undefined && typeof onProgress !== "function") throw Error("Verification progress requires a reporter function.");
+  if (!["serial", "windows-pairs"].includes(scheduling)) throw Error("Choose the serial or bounded windows-pairs verification schedule.");
+  if (scheduling === "windows-pairs" && new Set(groups.map(g => JSON.stringify([g.file, g.pattern ?? null]))).size !== groups.length) throw Error("Parallel verification requires each exact group once.");
   // Reject a bad later allowance before launching any earlier test processes.
   for (const group of groups) effectiveGroupTimeout(group, timeoutMs);
   const runId = randomUUID(); const startedAt = new Date().toISOString(); const children = []; let progressFailed = false;
@@ -618,10 +626,28 @@ export async function runVerification({ groups = requiredGroups, cwd = root, out
       file: group.file, pattern: group.pattern ?? null, ...(child ? { groupAccepted: child.success, durationMs: child.durationMs } : {}) });
     try { await onProgress(progress); } catch { progressFailed = true; }
   };
-  for (const [index, group] of groups.entries()) {
+  const execute = async index => {
+    const group = groups[index];
     await report("started", group, index);
-    const child = await runChild(group, { cwd, executable, timeoutMs, cleanup, sourceEnvironment }); children.push(child);
+    const child = await runChild(group, { cwd, executable, timeoutMs, cleanup, sourceEnvironment }); children[index] = child;
     await report("exited", group, index, child);
+  };
+  if (scheduling === "serial") {
+    for (let index = 0; index < groups.length; index++) await execute(index);
+  } else {
+    // Shared compiled outputs are prepared/consumed in original dependency
+    // order. Other children retain their own strict environment and temp root;
+    // at most two run concurrently. The final receipt stays in manifest order.
+    const independent = [];
+    for (let index = 0; index < groups.length; index++) {
+      if (requiresVerificationBuild(groups[index])) await execute(index);
+      else independent.push(index);
+    }
+    let next = 0;
+    const worker = async () => { while (next < independent.length) { const index = independent[next++]; await execute(index); } };
+    const results = await Promise.allSettled([worker(), worker()]);
+    const failures = results.filter(result => result.status === "rejected");
+    if (failures.length) throw new AggregateError(failures.map(result => result.reason), "Independent verification startup failed after joining both workers.");
   }
   const passed = children.filter((item) => item.success).length;
   const tests = children.reduce((total, child) => total + (child.testCounts?.total ?? 0), 0);
@@ -631,19 +657,26 @@ export async function runVerification({ groups = requiredGroups, cwd = root, out
   const cancelledTests = children.reduce((total, child) => total + (child.testCounts?.cancelled ?? 0), 0);
   const todoTests = children.reduce((total, child) => total + (child.testCounts?.todo ?? 0), 0);
   const receipt = { version: 1, runId, startedAt, endedAt: new Date().toISOString(), requiredGroups: groups, children, totals: { required: groups.length, passed, failed: groups.length - passed, tests, passedTests, failedTests, skippedTests, cancelledTests, todoTests }, receiptWrite: { completed: true, error: null }, success: passed === groups.length };
+  if (scheduling === "windows-pairs") receipt.execution = { scheduling, maxConcurrentChildren: 2, buildDependenciesOrdered: true };
   if (onProgress) receipt.progressWrite = { completed: !progressFailed, error: progressFailed ? "progress-reporter-failed" : null };
   if (progressFailed) receipt.success = false;
   try { return { receipt, receiptPath: await receiptWriter(outputDirectory, receipt) }; }
   catch { receipt.receiptWrite = { completed: false, error: "atomic-receipt-write-failed" }; receipt.success = false; return { receipt, receiptPath: null }; }
 }
+export function verificationCommandOptions(arguments_, platform = process.platform) {
+  if (arguments_.length === 0) return { scheduling: "serial", help: false };
+  if (arguments_.length === 1 && arguments_[0] === "--help") return { scheduling: "serial", help: true };
+  if (arguments_.length === 1 && arguments_[0] === "--windows-pairs" && platform === "win32") return { scheduling: "windows-pairs", help: false };
+  throw Error("Use no arguments, --help, or --windows-pairs on native Windows only.");
+}
+export const verificationUsage = "Usage: node scripts/run-platform-tests.mjs [--help | --windows-pairs]\nRun the complete platform manifest with no arguments; --windows-pairs is native Windows only and retains ordered builds and at most two independent children. For selected groups, use the exported runVerification API.\n";
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  const arguments_ = process.argv.slice(2);
-  if (arguments_.length) {
-    const help = arguments_.length === 1 && arguments_[0] === "--help";
-    process[help ? "stdout" : "stderr"].write("Usage: node scripts/run-isolated-tests.mjs [--help]\nRun the complete required manifest with no arguments. For selected groups, use the exported runVerification API.\n");
-    process.exitCode = help ? 0 : 2;
-  } else {
-    const { receipt, receiptPath } = await runVerification({ onProgress: event => console.log("SXSY-TEST-PROGRESS " + JSON.stringify(event)) });
+  let options;
+  try { options = verificationCommandOptions(process.argv.slice(2)); }
+  catch { process.stderr.write(verificationUsage); process.exitCode = 2; }
+  if (options?.help) process.stdout.write(verificationUsage);
+  else if (options) {
+    const { receipt, receiptPath } = await runVerification({ scheduling: options.scheduling, onProgress: event => console.log("SXSY-TEST-PROGRESS " + JSON.stringify(event)) });
     for (const child of receipt.children) {
       process.stdout.write(`${child.success ? "PASS" : "FAIL"} ${child.file}${child.pattern ? ` :: ${child.pattern}` : ""}\n`);
       if (!child.success) process.stdout.write(`FAIL_DETAIL ${JSON.stringify({ file: child.file, pattern: child.pattern, exitCode: child.exitCode, signal: child.signal, timeout: child.timeout, spawnError: child.spawnError, cleanupCompleted: child.cleanupCompleted, cleanupError: child.cleanupError, processTreeTermination: child.processTreeTermination, testCounts: child.testCounts ?? null, safeTrace: child.safeTrace, diagnostic: child.failureDiagnostic })}\n`);

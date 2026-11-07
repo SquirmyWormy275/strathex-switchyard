@@ -369,7 +369,7 @@ $npmVersion=(Invoke-B122IsolatedCapture -Executable $node.FullName -Arguments @(
   Write-Utf8NoBom (Join-Path $output 'state-lease-test-helper.json') ([ordered]@{ schema='switchyard-state-lease-test-helper/v1'; sourceCommit=$sourceCommit; sha256=$stateLeaseDigest; bytes=$stateLeaseItem.Length; sourceAssembly='git-archive'; copiedBytesVerified=$true; nativeAcceptance=$false } | ConvertTo-Json)
 if (-not $SkipVerification) {
   Invoke-B122PinnedNpm -Arguments @('run','typecheck') -FailureMessage 'Typecheck failed.'
-  Invoke-B122PinnedNpm -Arguments @('test') -FailureMessage 'Test verification failed.'
+  Invoke-B122PinnedNpm -Arguments @('test','--','--windows-pairs') -FailureMessage 'Complete bounded test verification failed.'
   if ((Get-FileHash -LiteralPath $TestPythonPath -Algorithm SHA256).Hash.ToLowerInvariant() -cne $testPython.executableSha256) { throw 'The verification Python image changed during tests.' }
   $firmwareVerificationReceipt = Join-Path $output 'firmware-verification.json'
   Assert-Child $output $firmwareVerificationReceipt

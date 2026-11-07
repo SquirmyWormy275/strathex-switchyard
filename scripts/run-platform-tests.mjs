@@ -1,14 +1,20 @@
-import { linuxGroups, requiredGroups, runVerification } from "./run-isolated-tests.mjs";
+import { linuxGroups, requiredGroups, runVerification, verificationCommandOptions, verificationUsage } from "./run-isolated-tests.mjs";
 
 if (process.versions.node.split(".")[0] !== "24") {
   throw new Error("SXSY-B122 source tests require the reviewed Node.js 24 runtime; run them through mise exec node@24.14.0 -- npm test.");
 }
 
+let options;
+try { options = verificationCommandOptions(process.argv.slice(2)); }
+catch { process.stderr.write(verificationUsage); process.exitCode = 2; }
+if (options?.help) process.stdout.write(verificationUsage);
+else if (options) {
 const groups = process.platform === "linux" ? linuxGroups : requiredGroups;
-const { receipt, receiptPath } = await runVerification({ groups, onProgress: event => console.log("SXSY-TEST-PROGRESS " + JSON.stringify(event)) });
+const { receipt, receiptPath } = await runVerification({ groups, scheduling: options.scheduling, onProgress: event => console.log("SXSY-TEST-PROGRESS " + JSON.stringify(event)) });
 for (const child of receipt.children) {
   process.stdout.write(`${child.success ? "PASS" : "FAIL"} ${child.file}${child.pattern ? ` :: ${child.pattern}` : ""}${child.testCounts?.skipped ? ` (${child.testCounts.skipped} skipped)` : ""}\n`);
   if (!child.success) process.stdout.write(`FAIL_DETAIL ${JSON.stringify({ file: child.file, timeout: child.timeout, effectiveTimeoutMs: child.effectiveTimeoutMs, durationMs: child.durationMs, exitCode: child.exitCode, signal: child.signal, cleanupCompleted: child.cleanupCompleted, diagnostic: child.failureDiagnostic, testCounts: child.testCounts ?? null })}\n`);
 }
 process.stdout.write(`${receiptPath ? "RECEIPT" : "RECEIPT_WRITE_FAILED"} ${receipt.runId}${receiptPath ? ` ${receiptPath}` : ""}\n`);
 process.exitCode = receipt.success ? 0 : 1;
+}

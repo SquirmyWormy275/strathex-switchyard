@@ -36,3 +36,8 @@ record exact source hashes. The [requirement ledger](switchyard-requirements.md)
 separately tracks the rest of the suite, native platform checks and physical
 acceptance. [Read the product introduction](../README.md) to start with the UI.
 
+The same public CLI and argument-refusal checks also pass on native Windows at
+`864fe0d`: two tests, no skips, within the original 45-second group limit, with
+original process-tree and temporary-state cleanup. This accepts the named demo,
+not the complete Windows release. [Native evidence](evidence/backend-connected-demo-native-summary.json).
+

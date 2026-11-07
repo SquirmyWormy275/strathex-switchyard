@@ -3,13 +3,96 @@ import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import assert from "node:assert/strict";
 import test from "node:test";
-import { mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
+import { access, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { assertRequiredTestManifest, createStrictTestEnvironment, linuxGroups, requiredGroups, runVerification, nativeTestOverrides, effectiveGroupTimeout } from "./run-isolated-tests.mjs";
+import { assertRequiredTestManifest, createStrictTestEnvironment, linuxGroups, requiredGroups, runVerification, nativeTestOverrides, effectiveGroupTimeout, verificationCommandOptions } from "./run-isolated-tests.mjs";
 const executable = process.execPath;
 async function group(directory, name, code) { const file = join(directory, `${name}.test.mjs`); await writeFile(file, code, "utf8"); return { file }; }
 async function verify(groups, outputDirectory, timeoutMs = 1_000) { return runVerification({ groups, outputDirectory, timeoutMs, executable: process.execPath }); }
+
+test("both public test commands validate native paired scheduling before launching verification", () => {
+  assert.deepEqual(verificationCommandOptions([], "win32"), { scheduling: "serial", help: false });
+  assert.deepEqual(verificationCommandOptions(["--windows-pairs"], "win32"), { scheduling: "windows-pairs", help: false });
+  for (const platform of ["linux", "darwin"]) assert.throws(() => verificationCommandOptions(["--windows-pairs"], platform));
+  for (const args of [["--skip"], ["--windows-pairs", "--skip"], ["--help", "--windows-pairs"]]) assert.throws(() => verificationCommandOptions(args, "win32"));
+  for (const command of ["scripts/run-platform-tests.mjs", "scripts/run-isolated-tests.mjs"]) {
+    assert.match(execFileSync(executable, [command, "--help"], { encoding: "utf8" }), /complete platform manifest/);
+    assert.throws(() => execFileSync(executable, [command, "--windows-pairs", "--skip"], { stdio: "pipe" }), error => error.status === 2);
+  }
+});
+
+test("paired verification prepares shared builds first, bounds concurrency at two and retains original receipt order and isolated homes", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "sxsy-pairs-")), events = [];
+  const marker = join(directory, "built");
+  try {
+    const tests = [];
+    for (let i = 0; i < 4; i++) {
+      const peer = i % 2 ? i - 1 : i + 1;
+      tests.push(await group(directory, "pair-" + i,
+        "import test from 'node:test';import assert from 'node:assert/strict';import{writeFile,access}from'node:fs/promises';" +
+        "test('real paired child',async()=>{await access(" + JSON.stringify(marker) + ");" +
+        "assert.equal(process.env.SXSY_PAIR_SECRET,undefined);" +
+        "await writeFile(" + JSON.stringify(join(directory, "entered-" + i)) + ",process.env.SXSY_TEST_ROOT);" +
+        "const deadline=Date.now()+5000;while(true){try{await access(" + JSON.stringify(join(directory, "entered-" + peer)) + ");break;}catch{if(Date.now()>deadline)throw Error('The paired peer never ran concurrently');await new Promise(r=>setTimeout(r,10));}}" +
+        "});"));
+    }
+    const build = { file: "build:fixture", args: ["-e", "require('node:fs').writeFileSync(" + JSON.stringify(marker) + ",'ready')"] };
+    const groups = [tests[0], build, ...tests.slice(1)];
+    let active = 0, maximum = 0;
+    const result = await runVerification({ groups, scheduling: "windows-pairs", outputDirectory: directory, timeoutMs: 10000,
+      sourceEnvironment: { ...process.env, SXSY_PAIR_SECRET: "must-not-reach-child" },
+      onProgress: event => { events.push(event); active += event.phase === "started" ? 1 : -1; maximum = Math.max(maximum, active); }
+    });
+    assert.equal(result.receipt.success, true); assert.equal(maximum, 2); assert.equal(active, 0);
+    assert.equal(events[0].file, build.file); assert.equal(events[1].phase, "exited");
+    assert.deepEqual(result.receipt.requiredGroups, groups); assert.deepEqual(result.receipt.children.map(c => c.file), groups.map(g => g.file));
+    assert.equal(result.receipt.totals.required, 5); assert.equal(result.receipt.totals.passedTests, 4);
+    assert.deepEqual(result.receipt.execution, { scheduling: "windows-pairs", maxConcurrentChildren: 2, buildDependenciesOrdered: true });
+    assert(result.receipt.children.every(c => c.cleanupCompleted && c.processTreeTermination.completed && c.effectiveTimeoutMs === 10000));
+    const homes = await Promise.all(tests.map((_, i) => readFile(join(directory, "entered-" + i), "utf8")));
+    assert.equal(new Set(homes).size, 4);
+    for (const home of homes) await assert.rejects(access(home), { code: "ENOENT" });
+    assert.deepEqual(JSON.parse(await readFile(result.receiptPath, "utf8")), JSON.parse(JSON.stringify(result.receipt)));
+  } finally { await rm(directory, { recursive: true, force: true }); }
+});
+
+test("paired verification retains failed builds, tests, progress and cleanup without skipping other original groups", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "sxsy-pair-failure-"));
+  try {
+    const passed = await group(directory, "pass", "import test from 'node:test';test('pass',()=>{});");
+    const failed = await group(directory, "fail", "import test from 'node:test';test('fail',()=>{throw Error('synthetic assertion')});");
+    const build = { file: "build:failed-fixture", args: ["-e", "process.exit(3)"] };
+    const result = await runVerification({ groups: [passed, build, failed], outputDirectory: directory, scheduling: "windows-pairs",
+      onProgress: () => { throw Error("synthetic reporting failure"); }
+    });
+    assert.equal(result.receipt.success, false); assert.equal(result.receipt.children.length, 3);
+    assert.deepEqual(result.receipt.children.map(c => c.exitCode), [0, 3, 1]);
+    assert.equal(result.receipt.totals.passedTests, 1); assert.equal(result.receipt.totals.failedTests, 1);
+    assert.equal(result.receipt.progressWrite.completed, false);
+    assert(result.receipt.children.every(c => c.cleanupCompleted && c.processTreeTermination.completed));
+    const cleanupFailed = await runVerification({ groups: [passed, failed], outputDirectory: directory, scheduling: "windows-pairs",
+      cleanup: async (path, options) => { await rm(path, options); throw Error("synthetic cleanup acknowledgement failure"); }
+    });
+    assert.equal(cleanupFailed.receipt.success, false);
+    assert(cleanupFailed.receipt.children.every(c => c.cleanupCompleted === false && c.success === false && c.processTreeTermination.completed));
+  } finally { await rm(directory, { recursive: true, force: true }); }
+});
+
+test("invalid parallel schedules and repeated groups refuse before any child can start", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "sxsy-pair-refusal-")), marker = join(directory, "unexpected");
+  try {
+    const g = { file: "build:must-not-run", args: ["-e", "require('node:fs').writeFileSync(" + JSON.stringify(marker) + ",'unexpected')"] };
+    for (const scheduling of ["parallel", "windows-pairs=3", 2, null]) await assert.rejects(runVerification({ groups: [g], scheduling, outputDirectory: directory }), /schedule/);
+    await assert.rejects(runVerification({ groups: [g, g], scheduling: "windows-pairs", outputDirectory: directory }), /each exact group once/);
+    await assert.rejects(readFile(marker), { code: "ENOENT" });
+    const build = await readFile(new URL("../deployment/windows/Build-B122Release.ps1", import.meta.url), "utf8");
+    assert.match(build, /Invoke-B122PinnedNpm -Arguments @\('test','--','--windows-pairs'\)/);
+    const workflow = await readFile(new URL("../.github/workflows/b122-windows.yml", import.meta.url), "utf8");
+    assert.match(workflow, /timeout-minutes: 90/); assert.doesNotMatch(workflow, /-SkipVerification/);
+  } finally { await rm(directory, { recursive: true, force: true }); }
+});
+
 
 test("progress identifies the active exact group without exposing child output or accepting incomplete verification", async () => {
   const directory = await mkdtemp(join(tmpdir(), "sxsy-progress-")), events = [];
@@ -62,7 +145,7 @@ test("runner CLI help and unsupported arguments never start the default verifica
   const entry = fileURLToPath(new URL("./run-isolated-tests.mjs", import.meta.url));
   const run = args => execFileSync(process.execPath, [entry, ...args], { encoding: "utf8", timeout: 5000, stdio: ["ignore", "pipe", "pipe"] });
   assert.match(run(["--help"]), /^Usage:/);
-  for (const args of [["--unknown"], ["--help", "unexpected"]]) {
+  for (const args of [["--unknown"], ["--help", "unexpected"], ["--windows-pairs", "--skip"], ...(process.platform === "win32" ? [] : [["--windows-pairs"]])]) {
     assert.throws(() => run(args), error => error.status === 2 && error.stdout === "" && /^Usage:/.test(error.stderr));
   }
 });
