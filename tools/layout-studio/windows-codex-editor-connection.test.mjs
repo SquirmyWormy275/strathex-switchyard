@@ -7,6 +7,7 @@ import { codexAccountFingerprint, codexDesignConfig } from './agents.mjs';
 import { editorServerFrame } from './editor-websocket-frames.mjs';
 import { openWindowsCodexEditorConnection } from './windows-codex-editor-connection.mjs';
 import { createRetainedCodexEditorClient } from './codex-retained-editor-client.mjs';
+import { queryIntentForOwner } from './windows-query-ownership.mjs';
 
 const gate = () => { let resolve; const promise = new Promise(r => { resolve = r; }); return { promise, resolve }; };
 const account = { type: 'chatgpt', email: 'synthetic-editor@example.invalid' };
@@ -50,6 +51,7 @@ async function fixture(t, options = {}) {
   let checks = 0,queryHooks;
   const probe = { close: async () => ({ stoppedVerified: options.helperStopped !== false }), inspectPeer: async (selected, context) => {
     const ownership={schema:'switchyard-windows-query-owner/v1',requestId:randomUUID(),role:'peer',scope:{schema:'switchyard-runtime-command/v1',id:randomUUID(),guardianPid:500,birth:'638000000000000001',containment:'windows-job'},helper:{path:'C:\\Synthetic\\Helper.exe',sha256:'e'.repeat(64)}};
+    await queryHooks.onIntent(queryIntentForOwner(ownership));
     try {
       await queryHooks.onOwner(ownership);checks++; await context.assertCurrent(); await options.peerCheck?.();
       return { schema: 'switchyard-editor-terminal-peer-result/v1', requestId: randomUUID(), processId: selected.processId, birth: selected.expectedBirth, image: { ...selected.image }, connection: { ...selected.connection }, connectionVerified: true, currentUserVerified: true, currentSessionVerified: true, processAccessMask: 0x101000, tokenAccessMask: 8, processTerminated: false, windowFocused: false, taskAttached: false, accountVerified: false };
@@ -79,8 +81,8 @@ test('Windows transport and exact-task protocol complete one real socket exchang
   const token = f.owner.privateEndpoint.authToken, publicValue = JSON.stringify(f.owner.observation());
   for (const value of [token, account.email, target.accountFingerprint, target.sessionId, target.repositoryRoot]) assert.equal(publicValue.includes(value), false);
   assert.equal(JSON.stringify(f.records).includes(token), false);
-  const queries=f.records.filter(r=>r.kind.startsWith('query-'));assert.equal(queries.length,f.checks()*2);
-  for(let i=0;i<queries.length;i+=2){assert.equal(queries[i].kind,'query-ready');assert.equal(queries[i+1].kind,'query-retired');assert.deepEqual(queries[i].ownership,queries[i+1].ownership);}
+  const queries=f.records.filter(r=>r.kind.startsWith('query-'));assert.equal(queries.length,f.checks()*3);
+  for(let i=0;i<queries.length;i+=3){assert.equal(queries[i].kind,'query-intent');assert.equal(queries[i+1].kind,'query-ready');assert.equal(queries[i+2].kind,'query-retired');assert.deepEqual(queries[i].ownership,queryIntentForOwner(queries[i+1].ownership));assert.deepEqual(queries[i+1].ownership,queries[i+2].ownership);}
   for (const key of ['nativeTaskLoaded','terminalLaunched','ideAttached','authorityGranted','completionVerified']) assert.equal(f.owner.observation()[key], false);
   assert.equal((await f.owner.stop()).stopped, true); assert.equal(f.retired.length, 1); assert.equal(f.owner.observation().protocolAcknowledged, false);
 });

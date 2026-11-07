@@ -198,3 +198,25 @@ installed-state update was needed.
 
 The next step is production lifecycle composition and native recovery of the
 saved host and carrier query helper, followed by Suite/VS Code integration.
+
+
+## Startup interruption and read-only recovery
+
+The Windows journal saves a query intent before invoking a native command. It
+then records the original guardian and helper identity before acknowledging the
+worker. A no-start checkpoint is allowed only when no child was observed; a
+spawn without captured guardian coordinates remains uncertain. A pending
+intent prevents a successful retirement claim.
+
+`windows-editor-recovery.mjs` observes the saved host PID and birth through the
+existing bounded native owner-status command. It never signals that host, its
+provider or the terminal. Host exit retires the same-process logical connection
+and listener. Any original unretired query additionally requires the saved
+helper digest and original Job status. Recovery joins its own observer children.
+Old records lacking startup intents remain conservative once ingress began.
+
+Source checks pass 87 tests across nine groups, with four Windows-only skips.
+Actual Windows recovery awaits CI. Production lifecycle, Suite routing and
+VS Code activation remain separate unfinished work. The prior query ownership
+checkpoint passes 170 native client tests at `47c80be`; its separate restricted
+storage lane failed and does not establish a clean release.

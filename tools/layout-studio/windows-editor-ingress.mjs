@@ -8,10 +8,10 @@ const require = value => { if (!value) throw Error("The original Windows editor 
 const deferred = () => { let resolve, reject; const promise = new Promise((a, b) => { resolve = a; reject = b; }); void promise.catch(() => {}); return { promise, resolve, reject }; };
 
 export async function openWindowsEditorIngress({ requestId, assertCurrent, onMessage, onOwnership, signal, platform = process.platform, probeFactory = createWindowsTerminalProcessProbe,
-  onQueryOwner = async () => {}, onQueryRetired = async () => {} } = {}) {
+  onQueryIntent = async () => {}, onQueryOwner = async () => {}, onQueryRetired = async () => {}, onQueryNotStarted = async () => {} } = {}) {
   require(platform === "win32" && typeof requestId === "string" && /^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/.test(requestId));
-  require([assertCurrent, onMessage, onOwnership, probeFactory, onQueryOwner, onQueryRetired].every(f => typeof f === "function") && signal instanceof AbortSignal);
-  const probe = probeFactory({ onOwner: onQueryOwner, onRetired: onQueryRetired }), controller = new AbortController(), pinned = deferred(), admitted = deferred(), ended = deferred(), listenerEnded = deferred(), socketEnded = deferred();
+  require([assertCurrent, onMessage, onOwnership, probeFactory, onQueryIntent, onQueryOwner, onQueryRetired, onQueryNotStarted].every(f => typeof f === "function") && signal instanceof AbortSignal);
+  const probe = probeFactory({ onIntent: onQueryIntent, onOwner: onQueryOwner, onRetired: onQueryRetired, onNotStarted: onQueryNotStarted }), controller = new AbortController(), pinned = deferred(), admitted = deferred(), ended = deferred(), listenerEnded = deferred(), socketEnded = deferred();
   const frames = createEditorClientFrames(), operations = new Set(), capability = randomBytes(32);
   const capabilitySha256 = createHash("sha256").update(capability).digest("hex");
   let closed = false, phase = "reserved", socket, socketExited = false, endpoint, selected, peerAttempted = false, candidate = false, verified = false, listening = false, stopping, failure;

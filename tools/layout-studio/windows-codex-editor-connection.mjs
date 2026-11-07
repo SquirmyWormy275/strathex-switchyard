@@ -75,8 +75,10 @@ export async function openWindowsCodexEditorConnection({ requestId, target, clie
         await onAcknowledged(value, abortSignal); await current(); require(ingress.observation().peerVerified === true);
       } });
     ingress = await openWindowsEditorIngress({ requestId, platform, ...(probeFactory ? { probeFactory } : {}), signal: controller.signal, assertCurrent: current,
+      onQueryIntent: async ownership => { await onOwnership({kind:'query-intent',requestId,ownership}); await current(); },
       onQueryOwner: async ownership => { await onOwnership({kind:'query-ready',requestId,ownership}); await current(); },
       onQueryRetired: ownership => onOwnership({kind:'query-retired',requestId,ownership}),
+      onQueryNotStarted: ownership => onOwnership({kind:'query-not-started',requestId,ownership}),
       onMessage: message => relay.receive(message), onOwnership: async ownership => {
         // Stopped evidence is retained during retirement, after admission closes.
         if (ownership.phase !== 'stopped') await current();

@@ -18,7 +18,7 @@ checkpoints are not cumulative acceptance of the latest suite.
 | Checkpoint | Verified result | Limit |
 | --- | --- | --- |
 | Installed Linux `edb76de` | **76 metadata/in-memory checks; 42 exact module hashes.** All 54 semantic workspaces and frozen frontend preserved. [Receipt](evidence/installed-mixed-scanner-input-summary.json). | No live scanner, provider task, account/model request, native focus or hardware operation. |
-| Native Windows client `75fd0b1` | **Sixteen groups; 165 passing tests; no skips.** Journal uses real protected state/leases with native/recovery doubles; separate native process/Job/carrier/target cases pass. Exact source/merge tree, artifact, commands, bounds and cleanup verify. [Receipt](evidence/windows-editor-journal-native-summary.json). | Predates durable query-helper callbacks and production editor lifecycle integration. |
+| Native Windows client `47c80be` | **Sixteen groups; 170 passing tests; no skips.** Actual Windows carrier query ownership callbacks and native task/target/transport checks pass. [Receipt](evidence/windows-query-ownership-native-summary.json). | Predates startup intents and the new recovery verifier. Separate restricted storage failed; see below. |
 | Complete Linux `edb76de` | **330 groups; 2,074 passing tests; 21 declared platform skips.** Original inventory, commands, bounds and owned cleanup verified. [Receipt](evidence/linux-edb76de-complete-summary.json). | Includes combined inputs and Windows saving source; predates terminal/peer probes. |
 | Complete Windows `dc755901` | **417 groups; 2,478 passing tests; 207 declared skips.** All six jobs and overall workflow passed with verified packet/source/cleanup. [Receipt](evidence/windows-complete-dc755901-summary.json). | Predates newer archive, scheduling, profile/workflow and observation corrections. |
 
@@ -38,11 +38,23 @@ storage reduces the package payload to 4,599,483 bytes without changing exports.
 
 ## Recent backend changes
 
+- **Windows editor recovery:** durable query startup intents cover the interval
+  before guardian identity is captured. Read-only recovery observes the exact
+  saved host and original query Job; unknown startup or observer cleanup remains
+  uncertain. Nine focused groups pass 87 tests with four Windows-only skips;
+  typecheck passes. The actual Windows recovery case awaits CI.
+  [Source evidence](evidence/windows-editor-recovery-source-summary.json).
+- **Restricted storage remains unresolved:** run 42357835746 failed at
+  `native-exit-owner-14-guardian` after seven owner checks. QUERY masks remain
+  eight. The original protected installation was preserved; this is a software
+  verification failure, not missing hardware/account acceptance.
+  [Failure evidence](evidence/restricted-storage-47c80be-failure-summary.json).
+
 - **Windows query-helper ownership:** original guardian/helper checkpoints precede
   worker acknowledgement and remain joined through retirement. The journal
   refuses an unretired replacement or false cleanup claim. Fourteen groups pass
   150 tests with four platform skips; typecheck passes. Native-query doubles are
-  explicit locally; extended native callback assertions await CI.
+  explicit locally; extended native callbacks pass at `47c80be`.
   [Contract](windows-editor-transport.md),
   [source evidence](evidence/windows-query-ownership-source-summary.json).
 - **Windows editor journal contract:** native client CI passes sixteen groups,

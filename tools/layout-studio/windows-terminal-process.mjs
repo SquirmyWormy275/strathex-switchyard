@@ -88,10 +88,10 @@ async function packagedHelper() {
 }
 
 export function createWindowsTerminalProcessProbe({ platform = process.platform, helper = packagedHelper, command = runRuntimeCommand, guardianStopped = runtimeGuardianStopped,
-  onOwner = async () => {}, onRetired = async () => {} } = {}) {
-  require(typeof onOwner === "function" && typeof onRetired === "function");
+  onIntent = async () => {}, onOwner = async () => {}, onRetired = async () => {}, onNotStarted = async () => {} } = {}) {
+  require([onIntent,onOwner,onRetired,onNotStarted].every(fn=>typeof fn==='function'));
   const resource = { clients: new Set(), controller: new AbortController() };
-  let pending, closed = false, uncertain = false;
+  let pending, closed = false, uncertain = false, unrecordedSpawn = false, unstartedIntent;
   function inspect(peer, input, { assertCurrent, signal } = {}) {
       require(exact(input, ["processId", "expectedBirth", "image", ...(peer ? ["connection"] : [])]));
       const family = peer ? "peer" : "process", query = peer ? windowsTerminalPeerQuery : windowsTerminalProcessQuery;
@@ -104,9 +104,11 @@ export function createWindowsTerminalProcessProbe({ platform = process.platform,
       // Reserve pending before invoking any caller callback, including a
       // synchronous context check that re-enters this probe.
       const work = Promise.resolve().then(async () => {
-        let owner, stopped = false, native, ownership;
+        let owner, stopped = false, native, ownership, intent;
         try {
           await current(); native = await helper(); require(native && typeof native.path === "string" && hash(native.sha256)); await current();
+          intent={schema:'switchyard-windows-query-intent/v1',requestId:request.requestId,role:family,helper:{path:native.path,sha256:native.sha256}};
+          await onIntent(structuredClone(intent)); await current();
           const observeExit = frame => guardianStopped(frame, { windowsHelper: native.path });
           const result = await runOwnedNativeCommand({ executable: native.path, args: [`--editor-terminal-${family}-v1`], cwd: dirname(native.path), env: desktopEnvironment(),
             text: JSON.stringify(request) + "\n", timeout: 10000, maxOutputBytes: 16384, captureStderrBytes: 0, expectedExecutableSha256: native.sha256,
@@ -122,8 +124,13 @@ export function createWindowsTerminalProcessProbe({ platform = process.platform,
           return (peer ? windowsTerminalPeerResult : windowsTerminalProcessResult)(JSON.parse(result.stdout), request);
         } finally {
           signal.removeEventListener("abort", abort); resource.controller.signal.removeEventListener("abort", abort);
+          const spawned=[...resource.clients].some(client=>!!client.child);
           const exits = await Promise.all([...resource.clients].map(client => client.stop().catch(() => false)));
-          uncertain = exits.some(value => !value) || !!owner && !stopped;
+          if(intent && !owner) {
+            if(spawned) unrecordedSpawn=true;
+            else try { await onNotStarted(structuredClone(intent)); } catch { unstartedIntent=structuredClone(intent); }
+          }
+          uncertain = exits.some(value => !value) || !!owner && !stopped || unrecordedSpawn || !!unstartedIntent;
           if (!uncertain) resource.clients.clear();
         }
       });
@@ -137,7 +144,8 @@ export function createWindowsTerminalProcessProbe({ platform = process.platform,
     async close() {
       closed = true; resource.controller.abort(); await pending?.catch(() => {});
       const exits = await Promise.all([...resource.clients].map(client => client.stop().catch(() => false)));
-      require(exits.every(Boolean)); resource.clients.clear(); return { stoppedVerified: true, targetProcessTerminated: false };
+      if(unstartedIntent){await onNotStarted(structuredClone(unstartedIntent));unstartedIntent=undefined;}
+      require(exits.every(Boolean) && !unrecordedSpawn); resource.clients.clear(); return { stoppedVerified: true, targetProcessTerminated: false };
     }
   });
 }

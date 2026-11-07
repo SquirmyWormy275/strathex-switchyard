@@ -4,7 +4,7 @@ import { posix } from 'node:path';
 import { appendEditorObservation } from './editor-observation.mjs';
 import { windowsCodexBinding } from './windows-codex-binding.mjs';
 import { windowsEditorHost, changeWindowsEditorJournal, windowsEditorRetirementFields, windowsEditorJournalStates } from './windows-editor-journal-contract.mjs';
-import { windowsQueryOwnership } from './windows-query-ownership.mjs';
+import { windowsQueryOwnership, windowsQueryIntent, queryIntentForOwner } from './windows-query-ownership.mjs';
 
 const field = 'codingEditorConnections';
 const uuid = v => typeof v === 'string' && /^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/.test(v);
@@ -105,7 +105,7 @@ export function createCodingEditorJournal({ store, authorizations, now=Date.now,
           const previous=rowFor(state,s);if(previous){saved=structuredClone(previous);return;}
           freshAuthorization(state,s,original);
           const rows=state[field]??=[];require(rows.length<64 && !rows.some(row=>row.status!=='stopped' && !leases.has(key(c,row))));
-          saved={schema,...s,...(host?{host}:{}),taskId:original.target.taskId,targetDigest:original.targetDigest,policyDigest:original.policyDigest,status:'reserved',revision:0,createdAt:now()};rows.push(saved);appendEditorObservation(state,saved);inserted=true;
+          saved={schema,...s,...(host?{host}:{}),...(windows?{queryTracking:'original-helper-intent/v1'}:{}),taskId:original.target.taskId,targetDigest:original.targetDigest,policyDigest:original.policyDigest,status:'reserved',revision:0,createdAt:now()};rows.push(saved);appendEditorObservation(state,saved);inserted=true;
         },{provider:'codex'});
         // A saved row, including a stopped or interrupted one, never issues a
         // new handle after a lost reply or across host instances.
@@ -119,20 +119,32 @@ export function createCodingEditorJournal({ store, authorizations, now=Date.now,
           observation:()=>view(lease.row),
           assertCurrent:()=>track(async()=>{require(!['stopped','uncertain'].includes(lease.row.status));await current(c,s,original);matches(await store.snapshot(c));}),
           recordQuery(event) {
-            let copy;try{require(windows && exact(event,['kind','ownership']) && ['query-ready','query-retired'].includes(event.kind));copy={kind:event.kind,ownership:windowsQueryOwnership(event.ownership)};}catch(error){return Promise.reject(error);}
-            const retiring=copy.kind==='query-retired';
+            let copy;try{require(windows && exact(event,['kind','ownership']) && ['query-intent','query-ready','query-retired','query-not-started'].includes(event.kind));copy={kind:event.kind,ownership:['query-intent','query-not-started'].includes(event.kind)?windowsQueryIntent(event.ownership):windowsQueryOwnership(event.ownership)};}catch(error){return Promise.reject(error);}
+            const retiring=['query-retired','query-not-started'].includes(copy.kind);
             return track(()=>store.withResourceLock('client-launch',ownershipKey,async owned=>{
               // Query admission is already inside the caller's target check.
               // Do not recursively launch another native inspection from this
               // helper checkpoint. Retirement remains possible after revocation.
               await store.authorize(c,retiring?{}:{provider:'codex'});const state=await store.snapshot(c);matches(state);owned.assert();
-              const next=structuredClone(lease.row),previous=next.queryOwner;
-              if(retiring){require(previous && hash(previous.ownership)===hash(copy.ownership));if(previous.stopped)return{recorded:true,duplicatePrevented:true};previous.stopped=true;}
-              else {
+              const next=structuredClone(lease.row),previous=next.queryOwner;require(next.queryTracking==='original-helper-intent/v1');
+              if(!retiring) {
                 require(!closed && !['stopped','uncertain'].includes(next.status) && policy(state)===original.policyDigest && (!previous || previous.stopped));
-                require(!previous || previous.ownership.requestId!==copy.ownership.requestId && previous.ownership.scope.id!==copy.ownership.scope.id);
+              }
+              if(copy.kind==='query-intent') {
+                require(!next.queryIntent && next.lastQueryId!==copy.ownership.requestId);
                 const sequence=(next.querySequence??0)+1;require(Number.isSafeInteger(sequence) && sequence<=1000000);
-                next.querySequence=sequence;next.queryOwner={ownership:copy.ownership,stopped:false};
+                next.querySequence=sequence;next.lastQueryId=copy.ownership.requestId;next.queryIntent=copy.ownership;next.queryNotStarted=null;
+              } else if(copy.kind==='query-ready') {
+                require(next.queryIntent && hash(next.queryIntent)===hash(queryIntentForOwner(copy.ownership)));
+                require(!previous || previous.ownership.scope.id!==copy.ownership.scope.id);next.queryOwner={ownership:copy.ownership,stopped:false};
+              } else if(copy.kind==='query-retired') {
+                if(previous && hash(previous.ownership)===hash(copy.ownership) && previous.stopped && !next.queryIntent)return{recorded:true,duplicatePrevented:true};
+                require(next.queryIntent && hash(next.queryIntent)===hash(queryIntentForOwner(copy.ownership)) && (!previous || previous.stopped || hash(previous.ownership)===hash(copy.ownership)));
+                next.queryOwner={ownership:copy.ownership,stopped:true};next.queryIntent=null;
+              } else {
+                if(!next.queryIntent && next.queryNotStarted && hash(next.queryNotStarted)===hash(copy.ownership))return{recorded:true,duplicatePrevented:true};
+                require(next.queryIntent && hash(next.queryIntent)===hash(copy.ownership) && (!previous || previous.stopped));
+                next.queryIntent=null;next.queryNotStarted=copy.ownership;
               }
               next.revision++;next.updatedAt=now();
               await store.update(c,'coding-editor-query-'+(retiring?'retire':'reserve'),state=>{
@@ -155,7 +167,7 @@ export function createCodingEditorJournal({ store, authorizations, now=Date.now,
             return track(()=>store.withResourceLock('client-launch',ownershipKey,async owned=>{
               await store.authorize(c);const state=await store.snapshot(c);matches(state);owned.assert();
               if(lease.row.status==='stopped')return {...view(lease.row),duplicatePrevented:true};
-              if(windows && copy.queryHelpersExitVerified)require(!lease.row.queryOwner || lease.row.queryOwner.stopped===true);
+              if(windows && copy.queryHelpersExitVerified)require(!lease.row.queryIntent && (!lease.row.queryOwner || lease.row.queryOwner.stopped===true));
               const next={...structuredClone(lease.row),status:Object.values(copy).every(Boolean)?'stopped':'uncertain',retirement:copy,revision:lease.row.revision+1,updatedAt:now()};
               await store.update(c,'coding-editor-connection-retire',state=>{owned.assert();matches(state);const row=rowFor(state,s);Object.assign(row,next);appendEditorObservation(state,row);});lease.row=next;return view(next);
             }));

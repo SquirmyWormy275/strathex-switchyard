@@ -97,7 +97,7 @@ test("actual Windows carrier authenticates an owned Node peer and completes a JS
   const query = makeProbe(), received = deferred(), queryRecords=[]; let owner, child;
   t.after(async () => { try { await owner?.stop(); await query.close(); } finally { if (child) assert.equal((await stopOwnedChild(child)).stopped, true); } });
   owner = await openWindowsEditorIngress({ requestId: randomUUID(), probeFactory: makeProbe, signal: new AbortController().signal, assertCurrent: async () => {}, onOwnership: async () => {},
-    onQueryOwner:async value=>queryRecords.push(['owner',value]),onQueryRetired:async value=>queryRecords.push(['retired',value]),
+    onQueryIntent:async value=>queryRecords.push(['intent',value]),onQueryOwner:async value=>queryRecords.push(['owner',value]),onQueryRetired:async value=>queryRecords.push(['retired',value]),
     onMessage: async m => { assert.deepEqual(m, { id: 1 }); await owner.send({ id: 1, result: true }); received.resolve(); } });
   const endpoint = owner.privateEndpoint;
   const program = 'const net=require("node:net"),url=new URL(process.env.SWITCHYARD_TEST_URL),s=net.connect({host:"127.0.0.1",port:Number(url.port)});let b=Buffer.alloc(0),up=false;s.on("error",()=>process.exit(3));s.on("connect",()=>s.write("GET / HTTP/1.1\\r\\nHost: "+url.host+"\\r\\nUpgrade: websocket\\r\\nConnection: Upgrade\\r\\nSec-WebSocket-Version: 13\\r\\nSec-WebSocket-Key: BwcHBwcHBwcHBwcHBwcHBw==\\r\\nAuthorization: Bearer "+process.env.SWITCHYARD_TEST_TOKEN+"\\r\\n\\r\\n"));s.on("data",x=>{b=Buffer.concat([b,x]);if(!up){const n=b.indexOf("\\r\\n\\r\\n");if(n<0)return;if(!b.toString().startsWith("HTTP/1.1 101 "))process.exit(4);up=true;b=b.subarray(n+4);const p=Buffer.from(JSON.stringify({id:1})),mask=Buffer.from([1,2,3,4]);for(let i=0;i<p.length;i++)p[i]^=mask[i%4];s.write(Buffer.concat([Buffer.from([129,128+p.length]),mask,p]));}if(up&&b.length>=2&&b.length>=2+b[1]){const v=JSON.parse(b.subarray(2,2+b[1]).toString());if(v.id!==1||v.result!==true)process.exit(5);b=b.subarray(2+b[1]);process.stdout.write("roundtrip\\n");}});setInterval(()=>{},1000);';
@@ -106,7 +106,7 @@ test("actual Windows carrier authenticates an owned Node peer and completes a JS
   const observed = await query.inspect({ processId: child.pid, expectedBirth: null, image }, { assertCurrent: async () => {}, signal: new AbortController().signal });
   assert.equal((await owner.pinPeer({ processId: child.pid, expectedBirth: observed.birth, image })).peerVerified, true);
   await received.promise; assert.equal((await completed)[0].toString(), "roundtrip\n"); assert.equal(owner.observation().ideAttached, false);
-  await owner.stop();assert.ok(queryRecords.length>=6);assert.equal(queryRecords.length%2,0);
-  for(let i=0;i<queryRecords.length;i+=2){assert.equal(queryRecords[i][0],'owner');assert.equal(queryRecords[i+1][0],'retired');assert.deepEqual(queryRecords[i][1],queryRecords[i+1][1]);assert.equal(queryRecords[i][1].helper.sha256,helperSha256);}
+  await owner.stop();assert.ok(queryRecords.length>=9);assert.equal(queryRecords.length%3,0);
+  for(let i=0;i<queryRecords.length;i+=3){assert.equal(queryRecords[i][0],'intent');assert.equal(queryRecords[i+1][0],'owner');assert.equal(queryRecords[i+2][0],'retired');assert.equal(queryRecords[i][1].requestId,queryRecords[i+1][1].requestId);assert.deepEqual(queryRecords[i+1][1],queryRecords[i+2][1]);assert.equal(queryRecords[i+1][1].helper.sha256,helperSha256);}
   assert.equal(JSON.stringify(queryRecords).includes(endpoint.authToken),false);
 });

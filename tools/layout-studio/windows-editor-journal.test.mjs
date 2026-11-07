@@ -7,7 +7,7 @@ import { join } from 'node:path';
 import { createSuiteStore } from './suite-store.mjs';
 import { createCodingEditorAuthorizations } from './coding-editor-authorizations.mjs';
 import { createCodingEditorJournal } from './coding-editor-journal.mjs';
-import { windowsQueryOwnership } from './windows-query-ownership.mjs';
+import { windowsQueryOwnership, queryIntentForOwner } from './windows-query-ownership.mjs';
 
 const hash=v=>createHash('sha256').update(JSON.stringify(v)).digest('hex');
 const clean={clientConnectionRetired:true,carrierExitVerified:true,queryHelpersExitVerified:true};
@@ -15,6 +15,7 @@ const ack={schema:'switchyard-codex-editor-protocol/v1',stage:'acknowledged',rea
 const image=(name,sha)=>({path:'C:\\Synthetic\\'+name,sha256:sha.repeat(64),device:'0',inode:'9007199254740993',size:'512'});
 const host=()=>({schema:'switchyard-editor-terminal-process-result/v1',requestId:randomUUID(),processId:101,birth:'133000000000000001',image:image('node.exe','a'),currentUserVerified:true,currentSessionVerified:true,processAccessMask:0x101000,tokenAccessMask:8,processTerminated:false,windowFocused:false,taskAttached:false,accountVerified:false});
 const queryOwner=()=>({schema:'switchyard-windows-query-owner/v1',requestId:randomUUID(),role:'peer',scope:{schema:'switchyard-runtime-command/v1',id:randomUUID(),guardianPid:500,birth:'638000000000000001',containment:'windows-job'},helper:{path:'C:\\Synthetic\\Helper.exe',sha256:'e'.repeat(64)}});
+async function completedQuery(handle){const ownership=queryOwner();await handle.recordQuery({kind:'query-intent',ownership:queryIntentForOwner(ownership)});await handle.recordQuery({kind:'query-ready',ownership});await handle.recordQuery({kind:'query-retired',ownership});}
 async function fixture(t) {
   const root=await mkdtemp(join(tmpdir(),'sywj-')),keys=new Map(),services=[];
   const store=createSuiteStore({root,secrets:{get:async(c,p)=>keys.get(c+p),set:async(c,p,v)=>keys.set(c+p,v)}});await store.initialize('personal');await store.update('personal','fixture-mode',s=>{s.mode='personal-companion';});
@@ -30,7 +31,7 @@ async function fixture(t) {
   const ingress=phase=>({kind:'ingress',ownership:{schema:'switchyard-windows-editor-ingress-owner/v1',requestId:selected.requestId,phase,hostPid:originalHost.processId,endpoint:phase==='reserved'?null:'ws://127.0.0.1:43179/',listenerClosed:['reserved','connected'].includes(phase),socketClosed:phase!=='connected',capabilitySha256:'d'.repeat(64)}});
   const upstream=()=>({kind:'upstream',binding:structuredClone(binding)}),peer=()=>({kind:'peer',processId:400,expectedBirth:'133000000000000003',image:image('codex.exe','b')});
   const ready=async handle=>{for(const e of [upstream(),ingress('reserved'),ingress('ready')])await handle.record(e);};
-  const connected=async handle=>{await ready(handle);for(const e of [peer(),ingress('peer-requested'),ingress('connected')])await handle.record(e);};
+  const connected=async handle=>{await ready(handle);for(const e of [peer(),ingress('peer-requested')])await handle.record(e);await completedQuery(handle);await handle.record(ingress('connected'));};
   return{root,store,selected,target,binding,host:originalHost,api,service,consume,ingress,upstream,peer,ready,connected,set active(v){active=v;},set hook(v){hook=v;}};
 }
 
@@ -60,7 +61,7 @@ test('Windows journal refuses foreign processes, changed capability or endpoint 
   for(const processId of [101,200,300])await assert.rejects(handle.record({...f.peer(),processId}));await assert.rejects(handle.record({...f.peer(),image:image('different.exe','e')}));
   await handle.record(f.peer());
   for(const patch of [{capabilitySha256:'e'.repeat(64)},{hostPid:999},{endpoint:'ws://127.0.0.1:43180/'},{endpoint:'ws://localhost:43179/'},{authToken:'never-retain'}]){const event=f.ingress('peer-requested');Object.assign(event.ownership,patch);await assert.rejects(handle.record(event));}
-  await handle.record(f.ingress('peer-requested'));await handle.record(f.ingress('connected'));await assert.rejects(handle.record(f.ingress('connected')));
+  await handle.record(f.ingress('peer-requested'));await assert.rejects(handle.record(f.ingress('connected')));await completedQuery(handle);await handle.record(f.ingress('connected'));await assert.rejects(handle.record(f.ingress('connected')));
   assert.equal(JSON.stringify((await f.store.snapshot('personal')).codingEditorConnections).includes('never-retain'),false);
 });
 
@@ -97,18 +98,30 @@ test('Windows query ownership refuses extra fields, alternate helper paths and u
 
 test('each Windows query keeps its exact helper until durable retirement and cannot manufacture successful cleanup',async t=>{
   const f=await fixture(t);await f.consume();const {handle}=await f.api.reserve('personal',f.selected,{host:f.host});const first=queryOwner(),second=queryOwner();
+  await handle.recordQuery({kind:'query-intent',ownership:queryIntentForOwner(first)});
   const event={kind:'query-ready',ownership:structuredClone(first)},saving=handle.recordQuery(event);event.ownership.helper.path='C:\\Changed.exe';await saving;
   assert.deepEqual((await f.store.snapshot('personal')).codingEditorConnections[0].queryOwner,{ownership:first,stopped:false});
   await assert.rejects(handle.recordQuery({kind:'query-ready',ownership:second}));await assert.rejects(handle.recordQuery({kind:'query-retired',ownership:second}));await assert.rejects(handle.retire(clean));
   await handle.recordQuery({kind:'query-retired',ownership:first});assert.equal((await handle.recordQuery({kind:'query-retired',ownership:first})).duplicatePrevented,true);
-  await assert.rejects(handle.recordQuery({kind:'query-ready',ownership:first}));await handle.recordQuery({kind:'query-ready',ownership:second});f.active=false;
+  await assert.rejects(handle.recordQuery({kind:'query-ready',ownership:first}));await handle.recordQuery({kind:'query-intent',ownership:queryIntentForOwner(second)});await handle.recordQuery({kind:'query-ready',ownership:second});f.active=false;
   await handle.recordQuery({kind:'query-retired',ownership:second});await handle.retire(clean);const row=(await f.store.snapshot('personal')).codingEditorConnections[0];assert.equal(row.querySequence,2);assert.equal(row.queryOwner.stopped,true);assert.equal(row.status,'stopped');
   await assert.rejects(handle.recordQuery({kind:'query-ready',ownership:queryOwner()}));
 });
 
 test('query retirement preserves a substituted journal and native recovery receives the original unretired helper',async t=>{
-  const f=await fixture(t);await f.consume();const {handle}=await f.api.reserve('personal',f.selected,{host:f.host}),ownership=queryOwner();await handle.recordQuery({kind:'query-ready',ownership});
+  const f=await fixture(t);await f.consume();const {handle}=await f.api.reserve('personal',f.selected,{host:f.host}),ownership=queryOwner();await handle.recordQuery({kind:'query-intent',ownership:queryIntentForOwner(ownership)});await handle.recordQuery({kind:'query-ready',ownership});
   const recovery=f.service();await recovery.recover('personal',f.selected,async row=>{assert.deepEqual(row.queryOwner.ownership,ownership);assert.equal(row.queryOwner.stopped,false);return{hostExitVerified:true,...clean,queryHelpersExitVerified:false};});
   await assert.rejects(handle.recordQuery({kind:'query-retired',ownership}));assert.equal((await f.store.snapshot('personal')).codingEditorConnections[0].status,'uncertain');
   assert.equal((await recovery.recover('personal',f.selected,async row=>{assert.deepEqual(row.queryOwner.ownership,ownership);return{hostExitVerified:true,...clean};})).stoppedVerified,true);
+});
+
+test('a Windows startup intent remains explicit until its original scope retires or no-start is verified',async t=>{
+  const f=await fixture(t);await f.consume();const {handle}=await f.api.reserve('personal',f.selected,{host:f.host}),ownership=queryOwner(),intent=queryIntentForOwner(ownership);
+  await handle.recordQuery({kind:'query-intent',ownership:intent});await assert.rejects(handle.retire(clean));await assert.rejects(handle.recordQuery({kind:'query-intent',ownership:queryIntentForOwner(queryOwner())}));
+  await assert.rejects(handle.recordQuery({kind:'query-not-started',ownership:queryIntentForOwner(queryOwner())}));
+  await handle.recordQuery({kind:'query-not-started',ownership:intent});assert.equal((await handle.recordQuery({kind:'query-not-started',ownership:intent})).duplicatePrevented,true);
+  await assert.rejects(handle.recordQuery({kind:'query-intent',ownership:intent}));const second=queryOwner();await handle.recordQuery({kind:'query-intent',ownership:queryIntentForOwner(second)});
+  // A verified retirement may supply the original scope when the readiness
+  // checkpoint itself was refused, without replaying the native operation.
+  await handle.recordQuery({kind:'query-retired',ownership:second});await handle.retire(clean);assert.equal(handle.observation().stoppedVerified,true);
 });

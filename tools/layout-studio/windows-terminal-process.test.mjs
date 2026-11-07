@@ -40,7 +40,7 @@ function fixture(t, options = {}) {
     return { status: "completed", exitCode: 0, treeExitVerified: true, inputDelivered: true, stdout: JSON.stringify(options.proof ? options.proof(proof(request)) : proof(request)) };
   };
   const service = createWindowsTerminalProcessProbe({ platform: "win32", helper: async () => ({ path: process.execPath, sha256: "b".repeat(64) }), command, guardianStopped: async scope => { assert.deepEqual(scope, scopes.find(row => row.id === scope.id)); return exited; },
-    ...(options.onOwner ? { onOwner: options.onOwner } : {}), ...(options.onRetired ? { onRetired: options.onRetired } : {}) });
+    ...(options.onIntent ? { onIntent: options.onIntent } : {}), ...(options.onOwner ? { onOwner: options.onOwner } : {}), ...(options.onRetired ? { onRetired: options.onRetired } : {}), ...(options.onNotStarted ? { onNotStarted: options.onNotStarted } : {}) });
   t.after(async () => { exited = true; assert.equal((await service.close()).stoppedVerified, true); });
   return { service, calls, context: { signal: new AbortController().signal, assertCurrent: async () => {} }, exited: v => { exited = v; } };
 }
@@ -74,10 +74,25 @@ test("a synchronous context callback cannot re-enter the reserved process probe"
 });
 
 test("Windows query ownership is retained before worker acknowledgement and retirement reports the same original helper", async t => {
-  const records=[],f=fixture(t,{onOwner:async value=>{records.push(['owner',structuredClone(value)]);value.helper.sha256='changed callback copy';},afterReady:async()=>{assert.equal(records.length,1);},onRetired:async value=>records.push(['retired',value])});
-  await f.service.inspect(input(),f.context);assert.deepEqual(records.map(r=>r[0]),['owner','retired']);assert.deepEqual(records[0][1],records[1][1]);
-  const owner=records[0][1];assert.equal(owner.schema,'switchyard-windows-query-owner/v1');assert.equal(owner.role,'process');assert.equal(owner.scope.containment,'windows-job');assert.equal(owner.helper.sha256,'b'.repeat(64));
+  const records=[],f=fixture(t,{onIntent:async value=>records.push(['intent',value]),onOwner:async value=>{records.push(['owner',structuredClone(value)]);value.helper.sha256='changed callback copy';},afterReady:async()=>{assert.equal(records.length,2);},onRetired:async value=>records.push(['retired',value])});
+  await f.service.inspect(input(),f.context);assert.deepEqual(records.map(r=>r[0]),['intent','owner','retired']);assert.deepEqual(records[1][1],records[2][1]);assert.equal(records[0][1].requestId,records[1][1].requestId);
+  const owner=records[1][1];assert.equal(owner.schema,'switchyard-windows-query-owner/v1');assert.equal(owner.role,'process');assert.equal(owner.scope.containment,'windows-job');assert.equal(owner.helper.sha256,'b'.repeat(64));
   assert.deepEqual(Object.keys(owner).sort(),['helper','requestId','role','schema','scope']);
+});
+
+test('a held Windows query startup intent is retained before any command and can verify that no helper started',async t=>{
+  let enter,release;const entered=new Promise(r=>enter=r),held=new Promise(r=>release=r),records=[];
+  const f=fixture(t,{onIntent:async intent=>{records.push(['intent',intent]);enter();await held;},onNotStarted:async intent=>records.push(['not-started',intent])}),abort=new AbortController();
+  const pending=f.service.inspect(input(),{...f.context,signal:abort.signal}),refused=assert.rejects(pending);await entered;assert.equal(f.calls.length,0);abort.abort();let closed=false;const closing=f.service.close().then(()=>{closed=true;});await new Promise(r=>setImmediate(r));assert.equal(closed,false);
+  release();await refused;await closing;assert.equal(f.calls.length,0);assert.deepEqual(records.map(r=>r[0]),['intent','not-started']);assert.deepEqual(records[0][1],records[1][1]);
+});
+
+test('a spawned query with no observed guardian scope cannot masquerade as an unstarted helper',async t=>{
+  let child,notStarted=0;
+  const service=createWindowsTerminalProcessProbe({platform:'win32',helper:async()=>({path:process.execPath,sha256:'b'.repeat(64)}),onNotStarted:async()=>{notStarted++;},
+    command:async(_exe,_args,options)=>{child=spawn(process.execPath,['-e','setInterval(()=>{},1000)'],{stdio:'ignore'});options.onGuardianChild(child);throw Error('synthetic interruption before guardian readiness');}});
+  t.after(async()=>{if(child)assert.equal((await stopOwnedChild(child)).stopped,true);await assert.rejects(service.close());});
+  await assert.rejects(service.inspect(input(),{assertCurrent:async()=>{},signal:new AbortController().signal}));assert.equal(notStarted,0);assert.throws(()=>service.inspect(input(),{assertCurrent:async()=>{},signal:new AbortController().signal}));await assert.rejects(service.close());
 });
 
 test("Windows query ownership callbacks remain joined during cancellation and failed retirement stays uncertain", async t => {
