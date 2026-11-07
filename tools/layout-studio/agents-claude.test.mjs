@@ -58,6 +58,22 @@ async function fixture(fn) {
   try { await fn({ store, agents, settings, calls, design, root, spawnProcess, options }); }
   finally { settings.guardianVerified = true; await agents.close(); for (const child of children) await stopOwnedChild(child); await rm(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 50 }); }
 }
+
+for (const boundary of ["guardian-readiness", "returned-reply"]) {
+  test(`Claude configuration design rechecks its trusted role guard at ${boundary}`, () => fixture(async ({ store, agents, settings, calls }) => {
+    let revoked = false;
+    if (boundary === "guardian-readiness") settings.beforeReady = () => { revoked = true; };
+    else settings.afterDesign = () => { revoked = true; };
+    await assert.rejects(agents.design({ compartment: "personal", provider: "claude-code", message: "Synthetic role boundary", plan: plan() }, {
+      assertCurrent: async () => { if (revoked) throw Error("Synthetic role authorization changed"); }
+    }), /role authorization changed/);
+    assert.equal(calls.filter(call => call.args.includes("-p")).length, boundary === "guardian-readiness" ? 0 : 1);
+    const state = await store.snapshot("personal");
+    assert.equal(state.conversations[0].status, "failed");
+    assert.equal(state.conversations[0].messages.length, 1);
+    assert.equal(JSON.stringify(state).includes(response.reply), false);
+  }));
+}
 test("native Claude design verifies first-party login, exact resume and stable account scope without inheriting provider keys", () => fixture(async ({ store, agents, settings, calls, design }) => {
   await store.update("personal", "synthetic-observation", s => { s.observations = [{ id: "design-observation", status: "recording", sources: ["agent-events"], exclusions: [], events: [], updatedAt: Date.now() }]; });
   await assert.rejects(agents.design({ compartment: "company", provider: "claude-code", message: "Denied", plan: plan() }), /prohibited/); assert.equal(calls.length, 0);

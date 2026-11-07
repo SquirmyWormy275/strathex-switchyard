@@ -61,10 +61,15 @@ and followups check immediately before send; a late guard cannot revive a closed
 or timed-out transport. Pending resume results cannot cross binding digests.
 Three original regressions remain; thirteen groups pass 167 tests with one skip
 and both TypeScript checks. The socket proof uses an actual local transport and
-synthetic daemon. These corrections are source-only. Configuration-conversation
-resume, cancellation and design effect checks still need implementation; the
-in-memory generation cannot observe external selection round trips entirely
-between reads.
+synthetic daemon. Configuration-conversation resume, cancellation and design now
+carry the original role/workspace guard into Codex thread/turn requests, Claude
+guardian readiness and Microsoft fetch/response checks. Reply writes also check
+the binding under the encrypted lease. Five conversation and three Microsoft
+regressions are retained separately from fixture corrections. Eighteen groups
+pass 226 tests with one skip and both TypeScript checks; eleven final cases
+verify retained Microsoft uncertainty. These corrections are source-only; full
+suite and real provider/tenant acceptance remain separate. The in-memory
+generation cannot observe external selection round trips entirely between reads.
 [Role dispatch contract](role-dispatch-binding.md).
 
 Native Windows client source `738c1f7` is audited: workflow `42372481436`, helper

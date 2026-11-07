@@ -83,8 +83,12 @@ Legacy owned Codex coding-task resume also checks after task observation and
 after transport initialization, before sending. A late authorization cannot send
 after the original timeout; pending results cannot cross bindings. Thirteen
 focused groups pass 167 tests and one skip, with both TypeScript checks.
-Configuration-conversation resume, cancellation and design effect boundaries
-remain separate work. These corrections are not installed yet.
+Configuration-conversation resume, cancellation and Codex/Claude/Microsoft design
+submission now carry the guard to their effect boundaries and encrypted reply
+writes. Eighteen focused groups pass 226 tests with one skip; eleven final cases
+also verify preserved Microsoft delivery uncertainty. All provider responses are
+synthetic. These corrections are not installed yet; full-suite and live-provider
+acceptance remain separate.
 [Role dispatch evidence and limitations](role-dispatch-binding.md).
 
 ## Current evidence

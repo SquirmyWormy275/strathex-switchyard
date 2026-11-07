@@ -64,8 +64,23 @@ both TypeScript checks. Its real Unix socket/WebSocket fixture uses a synthetic
 daemon and verifies refusal, timeout, late authorization and successful resume.
 [Codex resume evidence](evidence/codex-task-resume-role-boundary-source-summary.json).
 
-Configuration-conversation resume, cancellation and design submission still need
-equivalent checks at their own effect boundaries. The shared final history check
-prevents stale attribution, but does not prevent an earlier native effect.
+Configuration conversations now carry the guard through resume and cancellation,
+Codex thread/turn submission, Claude guardian readiness and Microsoft request
+delivery. Reply storage checks the original binding under the encrypted state
+lease. A stale reply cannot become the replacement role's proposal or history.
+Microsoft delivery already attempted remains `outcome-unconfirmed`, with no
+automatic retry or claim that a remote request was cancelled.
+
+Five conversation regressions and three Microsoft regressions reproduced the
+earlier behavior. Eighteen focused groups pass 226 tests and one platform skip,
+with both TypeScript checks. Eleven final conversation cases also verify the
+retained delivery journal. Claude fixtures use bounded Node children; all native
+providers, accounts and model responses are synthetic. Initial fixture mistakes
+and the existing submission-error wrapper are classified separately from the
+product regressions in the [conversation evidence](evidence/conversation-role-boundaries-source-summary.json).
+
+These checks do not undo effects that happened before a role changed. Original
+commands, uncertain delivery records and owned-process cleanup stay intact.
 Windows task-window focus remains unsupported. No live account, model, installed
-agent, keyboard or frontend operation was used for this verification.
+agent, keyboard or frontend operation was used for this verification. The full
+suite and real provider/tenant/hardware acceptance remain separate.

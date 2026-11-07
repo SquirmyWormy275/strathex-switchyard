@@ -18,12 +18,12 @@ function validateCredential(value) {
 export function createCopilot({ store, fetcher = fetch, now = () => Date.now(), isActive = async () => true }) {
   const logins = new Map(), busy = new Set(), generations = new Map(), operations = new Set(); let closed = false;
   const requests = createCopilotRequests({ store, now, isActive: async c => !closed && await isActive(c) });
-  function operation(compartment) {
+  function operation(compartment, assertRoleCurrent = async () => {}) {
     if (closed) throw new Error("The Microsoft request service is closed.");
     const generation = generations.get(compartment) ?? 0, controller = new AbortController(); let finish;
     const scope = { compartment, generation, signal: controller.signal, done: new Promise(resolve => { finish = resolve; }),
       assert() { this.resourceAssert?.(); if (closed || generation !== (generations.get(compartment) ?? 0) || controller.signal.aborted) throw new Error("The Microsoft request was stopped. Remote cancellation is unverified; no follow-up or response was accepted."); },
-      async current() { this.assert(); if (!await isActive(compartment)) throw new Error("The Microsoft workspace is no longer active."); await store.authorize(compartment, { provider }); await this.requestCheck?.(); this.assert(); },
+      async current() { this.assert(); if (!await isActive(compartment)) throw new Error("The Microsoft workspace is no longer active."); await store.authorize(compartment, { provider }); await this.requestCheck?.(); await assertRoleCurrent(); this.assert(); },
       abort() { controller.abort(); }, finish() { operations.delete(scope); finish(); }
     };
     operations.add(scope); return scope;
@@ -141,12 +141,12 @@ export function createCopilot({ store, fetcher = fetch, now = () => Date.now(), 
         return { status: "connected", account: c.account };
       } finally { login.polling = false; scope.finish(); }
     },
-    async design({ compartment, message, plan: input, conversationId, requestId }) {
+    async design({ compartment, message, plan: input, conversationId, requestId }, { assertCurrent: assertRoleCurrent = async () => {}, assertCurrentState: assertRoleState = () => {} } = {}) {
       await store.authorize(compartment, { provider }); const plan = parsePlan(input);
       if (typeof message !== "string" || !message.trim() || message.length > 12000) throw new Error("Enter a bounded design request.");
       const state = await store.snapshot(compartment), existing = conversationId ? state.conversations.find((c) => c.id === conversationId && c.provider === provider) : null;
       if (conversationId && !existing) throw new Error("That exact Microsoft conversation is not owned by this compartment.");
-      const id = existing?.id ?? randomUUID(); if (busy.has(`${compartment}:${id}`)) throw new Error("This Microsoft conversation already has a pending request."); const scope = operation(compartment); busy.add(`${compartment}:${id}`);
+      const id = existing?.id ?? randomUUID(); if (busy.has(`${compartment}:${id}`)) throw new Error("This Microsoft conversation already has a pending request."); const scope = operation(compartment, assertRoleCurrent); busy.add(`${compartment}:${id}`);
       try {
         await scope.current(); const c = await credential(compartment, scope);
         if (existing && existing.account !== c.account) throw new Error("This Microsoft conversation belongs to a different or unverified account. Reconnect its exact approved account; no conversation was continued.");
@@ -191,7 +191,7 @@ export function createCopilot({ store, fetcher = fetch, now = () => Date.now(), 
         catch { design = { reply, proposal: null, workflow: state.workflow, limitation: "The Chat API does not guarantee a structured response. This reply is displayed as text; no layout change was inferred." }; }
         await assertCredential(compartment, c);
         const saved = await store.update(compartment, "m365-design", (s) => {
-          assertCurrent(); requests.assertOwned(s, operationId, "submitting"); const current = s.conversations.find(row => row.id === id);
+          assertCurrent(); assertRoleState(s); requests.assertOwned(s, operationId, "submitting"); const current = s.conversations.find(row => row.id === id);
           if (existing ? !current || current.provider !== provider || current.sessionId !== remoteId || current.account !== c.account : current) throw new Error("The exact Microsoft conversation binding changed before its response could be saved.");
           const saved = { id, provider, sessionId: remoteId, account: r.account, updatedAt: now(), messages: [...(existing?.messages ?? []), { role: "user", text: message }, { role: "assistant", text: design.reply }].slice(-40), proposal: design.proposal, workflow: design.workflow, limitation: design.limitation ?? null, lastCopilotRequestId: operationId };
           s.conversations = [...s.conversations.filter((row) => row.id !== id), saved]; return structuredClone(saved);

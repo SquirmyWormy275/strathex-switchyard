@@ -645,13 +645,13 @@ export function createSuite({ store = createSuiteStore(), platform = process.pla
       else {
         const c = s.conversations.find((c) => c.id === b.targetId && c.provider === b.provider && c.sessionId === b.sessionId);
         if (!c) throw new Error("This exact role target changed or disappeared. Rebind it deliberately.");
-        if (["summon", "resume"].includes(intent)) result = b.provider === "microsoft-365-copilot" ? { status: "selected-for-continuation", sessionId: b.sessionId, provenance: "Owned Graph conversation selected; next message continues it. Desktop focus and runtime completion are not observed." } : await agents.resume(compartment, c.id);
+        if (["summon", "resume"].includes(intent)) result = b.provider === "microsoft-365-copilot" ? { status: "selected-for-continuation", sessionId: b.sessionId, provenance: "Owned Graph conversation selected; next message continues it. Desktop focus and runtime completion are not observed." } : await agents.resume(compartment, c.id, { assertCurrent });
         else if (intent === "status") result = b.provider === "microsoft-365-copilot" ? { status: "not-observed", sessionId: b.sessionId, provenance: "Stored Graph conversation identity, not live task status" } : await agents.status(compartment, c.id);
-        else if (intent === "cancel") { if (b.provider === "microsoft-365-copilot") throw new Error("The selected Graph contract does not provide task cancellation. No cancellation was claimed."); result = await agents.cancel(compartment, c.id); }
+        else if (intent === "cancel") { if (b.provider === "microsoft-365-copilot") throw new Error("The selected Graph contract does not provide task cancellation. No cancellation was claimed."); result = await agents.cancel(compartment, c.id, { assertCurrent }); }
         else {
           if (!s.profile) throw new Error("Save the current profile before reviewing or handing off its workflow.");
           const message = intent === "review" ? "Review this configuration workflow and key arrangement. Propose improvements without applying anything." : `Review this deliberate handoff within the same compartment: ${typeof content === "string" ? content.slice(0, 12000) : "Continue from the saved workflow, roles and key arrangement."}`;
-          result = await (b.provider === "microsoft-365-copilot" ? copilot : agents).design({ compartment, provider: b.provider, message, plan: s.profile.plan, conversationId: c.id });
+          result = await (b.provider === "microsoft-365-copilot" ? copilot : agents).design({ compartment, provider: b.provider, message, plan: s.profile.plan, conversationId: c.id }, { assertCurrent, assertCurrentState });
         }
       }
       await store.update(compartment, "role-intent-result", async (state) => { await assertContextCurrent(); assertCurrentState(state); if (b.targetKind === "coding-task") state.activeCodingSessionId = b.targetId; else if (b.targetKind !== "client-surface" && b.provider !== "custom-agent") state.activeConversationId = b.targetId; state.intentResults = [...(state.intentResults ?? []).slice(-31), { at: Date.now(), roleId, intent, result }]; }, { provider: b.provider });

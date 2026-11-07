@@ -297,7 +297,8 @@ export function createAgentService({ store, runtimeRoot, codexFactory = (exe, cw
     async discovery() {
       return Promise.all(["codex", "claude-code"].map(async (id) => { try { await resolveCli(id); return { id, installed: true, capabilities: ["design-conversation", "exact-owned-session", "status", "cancel"], auth: "checked-on-use", provenance: "fixed native CLI installation" }; } catch { return { id, installed: false, capabilities: [], auth: "unavailable" }; } }));
     },
-    async design({ compartment, provider, message, plan: input, conversationId, observationReview }) {
+    async design({ compartment, provider, message, plan: input, conversationId, observationReview }, { assertCurrent = async () => {}, assertCurrentState = () => {} } = {}) {
+      await assertCurrent();
       const generation = generations.get(compartment) ?? 0; currentGeneration(compartment, generation);
       await store.authorize(compartment, { provider });
       await settleUnconfirmed(compartment);
@@ -305,7 +306,7 @@ export function createAgentService({ store, runtimeRoot, codexFactory = (exe, cw
       if (typeof message !== "string" || !message.trim() || message.length > 12000) throw new Error("Describe the workflow in 1–12000 characters.");
       const plan = parsePlan(input), state = await store.snapshot(compartment);
       const observations = reviewedDesignObservations(state, provider, observationReview);
-      const checkObservations = async () => { if (observationReview !== undefined) reviewedDesignObservations(await store.snapshot(compartment, { provider }), provider, observationReview); };
+      const checkObservations = async () => { if (observationReview !== undefined) reviewedDesignObservations(await store.snapshot(compartment, { provider }), provider, observationReview); await assertCurrent(); };
       currentGeneration(compartment, generation);
       const conversation = conversationId ? state.conversations.find((c) => c.id === conversationId && c.provider === provider) : null;
       if (conversationId && !conversation) throw new Error("That conversation is not bound to this compartment and provider.");
@@ -318,7 +319,7 @@ export function createAgentService({ store, runtimeRoot, codexFactory = (exe, cw
       busy.add(key);
       let sessionId = conversation?.sessionId ?? null, accountFingerprint = conversation?.accountFingerprint ?? null, ownedRuntime = null;
       try {
-        await store.update(compartment, "design-draft", (s) => { currentGeneration(compartment, generation); reviewedDesignObservations(s, provider, observationReview); s.conversations = [...s.conversations.filter((c) => c.id !== id), { ...conversation, id, provider, sessionId: conversation?.sessionId ?? null, updatedAt: Date.now(), messages: [...(conversation?.messages ?? []), { role: "user", text: message }].slice(-40), status: "pending" }]; observeDesign(s, provider, id, "design-request-reserved"); }, { provider });
+        await store.update(compartment, "design-draft", (s) => { currentGeneration(compartment, generation); assertCurrentState(s); reviewedDesignObservations(s, provider, observationReview); s.conversations = [...s.conversations.filter((c) => c.id !== id), { ...conversation, id, provider, sessionId: conversation?.sessionId ?? null, updatedAt: Date.now(), messages: [...(conversation?.messages ?? []), { role: "user", text: message }].slice(-40), status: "pending" }]; observeDesign(s, provider, id, "design-request-reserved"); }, { provider });
         currentGeneration(compartment, generation);
         let response, assertReplyCurrent = () => {};
         if (provider === "codex") {
@@ -329,6 +330,7 @@ export function createAgentService({ store, runtimeRoot, codexFactory = (exe, cw
           accountFingerprint = client.accountFingerprint;
           const restricted = { sandbox: "read-only", approvalPolicy: "never", config: codexDesignConfig(client.serverNames), baseInstructions: "Only design a keyboard configuration from supplied text. Never call a tool. Return the required JSON schema." };
           let native;
+          await assertCurrent(); currentGeneration(compartment, generation);
           if (sessionId) { native = await client.request("thread/resume", { ...restricted, threadId: sessionId }); if (native.thread?.id !== sessionId) throw new Error("Codex resumed a different thread."); }
           else { native = await client.request("thread/start", { ...restricted, cwd: join(runtimeRoot, compartment), serviceName: "switchyard-design" }); sessionId = native.thread?.id; }
           if (typeof sessionId !== "string" || !/^[A-Za-z0-9_-]{1,128}$/.test(sessionId)) throw new Error("Codex returned an invalid thread identity.");
@@ -377,9 +379,10 @@ export function createAgentService({ store, runtimeRoot, codexFactory = (exe, cw
           if (afterLogin.version !== login.version) throw new Error("The native Claude version changed before retaining the reply. Saved context was preserved.");
           response = value.structured_output;
         } else throw new Error("This provider does not offer a configured design route. No fallback provider was selected.");
+        await assertCurrent(); currentGeneration(compartment, generation);
         const reviewed = validateDesignResponse(response, plan);
         const saved = { id, provider, sessionId, accountFingerprint, ...(ownedRuntime ? { ownedRuntime, ownedRuntimeStoppedVerified: true } : {}), updatedAt: Date.now(), messages: [...(conversation?.messages ?? []), { role: "user", text: message }, { role: "assistant", text: reviewed.reply }].slice(-40), proposal: reviewed.proposal, workflow: reviewed.workflow };
-        await store.update(compartment, "design-conversation", (s) => { currentGeneration(compartment, generation); assertReplyCurrent(); s.conversations = [...s.conversations.filter((c) => c.id !== id), saved]; observeDesign(s, provider, id, "design-reply-recorded"); }, { provider });
+        await store.update(compartment, "design-conversation", (s) => { currentGeneration(compartment, generation); assertCurrentState(s); assertReplyCurrent(); s.conversations = [...s.conversations.filter((c) => c.id !== id), saved]; observeDesign(s, provider, id, "design-reply-recorded"); }, { provider });
         return { ...reviewed, conversationId: id, sessionId, provider, ...(ownedRuntime ? { ownedRuntime, ownedRuntimeStoppedVerified: true } : {}), provenance: "provider-returned exact session; design output independently validated" };
       } catch (error) {
         const uncertain = provider === "codex" && error.stopVerified === false ? clients.get(compartment)?.child : null;
@@ -388,11 +391,12 @@ export function createAgentService({ store, runtimeRoot, codexFactory = (exe, cw
         throw error;
       } finally { const active = running.get(key); const owned = [...(active?.resource?.clients ?? []), ...(active?.child ? [active.child] : [])]; for (const client of owned) if (!(await confirmStop(client))) retainUnconfirmed(compartment, client); busy.delete(key); running.delete(key); }
     },
-    async cancel(compartment, id) {
+    async cancel(compartment, id, { assertCurrent = async () => {} } = {}) {
       const matching = [...running.entries()].filter(([key]) => key.startsWith(`${compartment}:`));
       const current = id ? running.get(`${compartment}:${id}`) : matching.length === 1 ? matching[0][1] : null;
-      if (!current) { const pending = [...busy].filter((key) => key.startsWith(`${compartment}:`) && (!id || key === `${compartment}:${id}`)); if (pending.length !== 1) throw new Error("No exact active turn is owned by this conversation."); await store.snapshot(compartment); const result = await stopCompartment(compartment); return { status: result.stopped ? "owned-startup-stopped" : "stop-unconfirmed", completionVerified: false }; }
+      if (!current) { const pending = [...busy].filter((key) => key.startsWith(`${compartment}:`) && (!id || key === `${compartment}:${id}`)); if (pending.length !== 1) throw new Error("No exact active turn is owned by this conversation."); await store.snapshot(compartment); await assertCurrent(); const result = await stopCompartment(compartment); return { status: result.stopped ? "owned-startup-stopped" : "stop-unconfirmed", completionVerified: false }; }
       await store.snapshot(compartment);
+      await assertCurrent();
       if (current.provider === "codex") { const client = clients.get(compartment); if (!client || client.closed || !current.controller) throw new Error("The original Codex runtime is unavailable; cancellation is unconfirmed. No replacement was launched."); current.controller.abort(); }
       else { current.controller?.abort(); for (const client of current.resource?.clients ?? []) if (!await confirmStop(client)) { retainUnconfirmed(compartment, client); throw new Error("The exact owned Claude design guardian has not verified exit. Cancellation is unconfirmed."); } }
       return { status: "cancellation-requested", completionVerified: false };
@@ -412,7 +416,8 @@ export function createAgentService({ store, runtimeRoot, codexFactory = (exe, cw
       }
       return { sessionId: c.sessionId, status: running.has(`${compartment}:${id}`) ? "running-owned-process" : "not-observed", provenance: "Claude process lifecycle; not task completion" };
     },
-    async resume(compartment, id) {
+    async resume(compartment, id, { assertCurrent = async () => {} } = {}) {
+      await assertCurrent();
       const generation = generations.get(compartment) ?? 0;
       const state = await store.snapshot(compartment), c = state.conversations.find((c) => c.id === id);
       if (!c?.sessionId) throw new Error("Choose an exact owned conversation before resuming.");
@@ -420,13 +425,24 @@ export function createAgentService({ store, runtimeRoot, codexFactory = (exe, cw
       await store.authorize(compartment, { provider: c.provider });
       await settleUnconfirmed(compartment);
       currentGeneration(compartment, generation);
-      if (c.provider === "codex") { if (!/^[a-f0-9]{64}$/.test(c.accountFingerprint ?? "")) throw new Error("Review this legacy conversation's native account binding before resuming. Its saved context is preserved."); const client = await codex(compartment); await client.recheckAccount(); currentGeneration(compartment, generation); if (c.accountFingerprint !== client.accountFingerprint) throw new Error("The native account changed. No saved context was resumed or rerouted."); await store.claimSession(compartment, { provider: c.provider, sessionId: c.sessionId }); const r = await client.request("thread/resume", { threadId: c.sessionId, sandbox: "read-only", approvalPolicy: "never", config: codexDesignConfig(client.serverNames) }); if (r.thread?.id !== c.sessionId || r.sandbox?.type !== "readOnly" || r.approvalPolicy !== "never" || r.modelProvider !== "openai") throw new Error("The resumed thread identity, first-party provider or permissions did not match."); return { sessionId: c.sessionId, status: "resumed", provenance: "Exact account-bound Codex configuration conversation resumed; no prompt submitted or task outcome inferred" }; }
+      if (c.provider === "codex") {
+        if (!/^[a-f0-9]{64}$/.test(c.accountFingerprint ?? "")) throw new Error("Review this legacy conversation's native account binding before resuming. Its saved context is preserved.");
+        const client = await codex(compartment); await client.recheckAccount(); currentGeneration(compartment, generation);
+        if (c.accountFingerprint !== client.accountFingerprint) throw new Error("The native account changed. No saved context was resumed or rerouted.");
+        await store.claimSession(compartment, { provider: c.provider, sessionId: c.sessionId });
+        await assertCurrent(); currentGeneration(compartment, generation);
+        const r = await client.request("thread/resume", { threadId: c.sessionId, sandbox: "read-only", approvalPolicy: "never", config: codexDesignConfig(client.serverNames) });
+        if (r.thread?.id !== c.sessionId || r.sandbox?.type !== "readOnly" || r.approvalPolicy !== "never" || r.modelProvider !== "openai") throw new Error("The resumed thread identity, first-party provider or permissions did not match.");
+        await assertCurrent(); currentGeneration(compartment, generation);
+        return { sessionId: c.sessionId, status: "resumed", provenance: "Exact account-bound Codex configuration conversation resumed; no prompt submitted or task outcome inferred" };
+      }
       if (c.provider !== "claude-code" || !/^[a-f0-9]{64}$/.test(c.accountFingerprint ?? "")) throw new Error("Review this legacy conversation's native account binding before continuing. Saved context is preserved.");
       const cwd = join(runtimeRoot, compartment); await privateDirectory(cwd);
       const executable = await resolveCli("claude-code"), login = await claudeLogin(compartment, executable, cwd, generation);
       currentGeneration(compartment, generation);
       if (c.accountFingerprint !== login.fingerprint) throw new Error("The native Claude account changed. No saved context was resumed or rerouted.");
       await store.claimSession(compartment, { provider: c.provider, sessionId: c.sessionId });
+      await assertCurrent(); currentGeneration(compartment, generation);
       return { sessionId: c.sessionId, status: "selected-for-continuation", provenance: "Exact account-bound Claude configuration conversation selected. Its next message uses --resume; external runtime state is not observed." };
     },
     async close() { closed = true; const results = await Promise.all([...new Set([...clients.keys(), ...probes.keys(), ...unconfirmed.keys(), ...connecting.keys(), ...auxiliaryChildren.keys(), ...running.keys()].map((key) => key.split(":")[0]))].map(stopCompartment)); if (results.some((r) => r.stopped !== true)) throw new Error("An owned design process has not verified exit during shutdown."); return results; }
