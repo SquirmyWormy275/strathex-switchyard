@@ -1,7 +1,9 @@
-/** Explicit Linux task-owner registry. Loading needs an exact one-use review; no model or IDE authority. */
+/** Explicit task-owner registry. Loading needs an exact one-use review; no model or IDE authority. */
 import { createHash } from "node:crypto";
 import { join, posix } from "node:path";
 import { createCodexUnixTasks } from "./codex-unix-tasks.mjs";
+import { createCodexWindowsTasks } from "./codex-windows-tasks.mjs";
+import { retireStoppedWindowsCodexOwner } from "./codex-windows-owner.mjs";
 import { retireStoppedCodexListener } from "./codex-owned-listener.mjs";
 import { verifyRepositoryIdentity } from "./coding-task-identity.mjs";
 import { suiteConfirmations } from "./confirmations.mjs";
@@ -12,7 +14,9 @@ function binding(task) {
   return { taskId: task.id, sessionId: task.sessionId, accountFingerprint: task.accountFingerprint, repositoryRoot: task.repositoryRoot, repositoryIdentity: structuredClone(task.repositoryIdentity), taskSchema: task.schema ?? null, launchPolicy: task.launchPolicy ?? null, nativeTransport: task.nativeTransport ?? null };
 }
 const view = row => ({ requestId: row.requestId, taskId: row.taskId, status: row.status, stoppedVerified: row.stoppedVerified, metadataObserved: row.status === "bound", nativeTaskLoaded: false, ideAttached: false, completionVerified: false });
-export function createCodingTaskOwners({ store, root, runtimeRoot, resolveCli, resolveMcp, driverFactory = createCodexUnixTasks, retire = retireStoppedCodexListener, platform = process.platform, now = Date.now, isActive = async () => true } = {}) {
+export function createCodingTaskOwners({ store, root, runtimeRoot, resolveCli, resolveMcp, driverFactory, retire, platform = process.platform, now = Date.now, isActive = async () => true } = {}) {
+  driverFactory ??= platform === "win32" ? createCodexWindowsTasks : createCodexUnixTasks;
+  retire ??= platform === "win32" ? retireStoppedWindowsCodexOwner : retireStoppedCodexListener;
   const live = new Map(), pending = new Map(), generations = new Map(); let closed = false;
   const key = (c, id) => `${c}:${id}`;
   const generation = c => generations.get(c) ?? 0;
@@ -68,6 +72,7 @@ export function createCodingTaskOwners({ store, root, runtimeRoot, resolveCli, r
   }
 
   async function editorObservation(c, { ownerRequestId, loadRequestId }, returning = false) {
+    if (platform !== "linux") throw Error("Windows task metadata ownership is available; its durable editor target integration is not yet implemented.");
     if (![ownerRequestId, loadRequestId].every(uuid)) throw Error("Choose the original owner and acknowledged load UUIDs.");
     const resource = live.get(key(c, ownerRequestId)); if (!resource) throw Error("This host does not own the original live task connection.");
     const boundary = async () => {
@@ -94,7 +99,7 @@ export function createCodingTaskOwners({ store, root, runtimeRoot, resolveCli, r
     async list(c) { await store.authorize(c, { provider: "codex" }); return ((await store.snapshot(c)).codingTaskOwners ?? []).map(view); },
     async listLoads(c) { await store.authorize(c, { provider: "codex" }); return ((await store.snapshot(c)).codingTaskLoads ?? []).map(row => loadView(row)); },
     async open(c, { requestId, taskId }) {
-      if (platform !== "linux") throw Error("Persistent task metadata owners currently require Linux.");
+      if (!["linux", "win32"].includes(platform)) throw Error("Persistent task metadata owners require a supported Linux or Windows host.");
       if (!uuid(requestId) || !uuid(taskId)) throw Error("Choose exact task and owner request UUIDs.");
       const g = generation(c), operationKey = key(c, requestId); current(c, g);
       if (pending.has(operationKey)) return pending.get(operationKey);

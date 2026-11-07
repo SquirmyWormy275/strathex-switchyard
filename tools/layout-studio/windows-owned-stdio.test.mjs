@@ -7,7 +7,7 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { once } from 'node:events';
-import { openWindowsOwnedStdio, windowsOwnedStdioRequest } from './windows-owned-stdio.mjs';
+import { openWindowsOwnedStdio, windowsOwnedStdioRequest, retireStoppedWindowsStdio } from './windows-owned-stdio.mjs';
 import { stopOwnedChild } from './owned-process.mjs';
 
 const sha = bytes => createHash('sha256').update(bytes).digest('hex');
@@ -107,6 +107,8 @@ test('actual Windows Job streams an owned Node worker and verifies exact scope r
     signal: new AbortController().signal, assertCurrent: async () => {}, onOwner: async value => { owner = value; }, onReady: async () => {}, onWorker: async () => {}, helper: async () => ({ path: nativePath, sha256: nativeHash }) });
   const bytes = Buffer.from('owned native byte stream '.repeat(2000)), received = bytesFrom(owner.child.stdout, bytes.length);
   await write(owner.child.stdin, bytes); assert.deepEqual(await received, bytes); assert.equal((await owner.stop()).treeExitVerified, true);
+  assert.equal((await retireStoppedWindowsStdio(owner.scope, owner.privateOwnership)).guardianExitVerified, true);
+  await assert.rejects(retireStoppedWindowsStdio(owner.scope, { ...owner.privateOwnership, requestId: randomUUID() }));
 });
 
 test('actual Windows guardian loss retires its original worker Job without adopting another PID', { skip: process.platform !== 'win32' }, async t => {

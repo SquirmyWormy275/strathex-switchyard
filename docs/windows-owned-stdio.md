@@ -2,8 +2,9 @@
 
 `openWindowsOwnedStdio()` provides a bounded byte stream backed by one original
 Windows Job. It is the process layer needed for persistent Codex task ownership.
-The provider, task registry, durable editor journal and Suite routes are still
-separate integration work. This primitive grants no model or account authority.
+The [Windows task adapter](coding-task-owners.md) now uses it for metadata and
+reviewed loading. Durable editor journal and editor routes remain separate
+integration work. This primitive grants no model or account authority.
 
 The packaged helper's new `--owned-stdio` role reuses the existing Job creation,
 creation-time child assignment, suspended startup, private anonymous pipes and
@@ -45,8 +46,10 @@ runtime, dependency or model download was added.
 Linux checks use an explicitly named guardian double and actual owned child
 processes. Three actual Windows CI cases cover byte exchange, abrupt guardian
 loss with a descendant, and stopping while worker input/output are blocked.
-Their acceptance is pending. They use synthetic Node workers, never a live
-provider, account or saved task.
+All three pass in Windows client CI at `45fe70e`: thirteen groups, 139 tests
+and no skips. Exact source/merge tree, artifact, commands, bounds and cleanup
+verify. These use synthetic Node workers, never a live provider, account or saved
+task. [Native evidence](evidence/windows-owned-stdio-native-summary.json).
 
 The earlier authenticated editor transport and task-protocol composition pass
 twelve Windows client groups at `f1167c9`: 127 tests and no skips. The composition
@@ -54,3 +57,10 @@ uses provider/peer doubles; the separate carrier case uses actual Windows proces
 queries. That source predates this persistent process layer.
 [Native composition evidence](evidence/windows-editor-connection-native-summary.json),
 [editor contract](windows-editor-transport.md).
+
+The private ownership record retains only the request, executable digest, neutral
+working directory, helper digest and observed worker identity. Recovery validates
+those saved fields and the original Job scope, verifies the recorded helper bytes,
+and independently queries retirement. Query children also retire on failure; no
+worker is adopted or killed by an inferred identity. Arguments and environment
+bytes are not retained.

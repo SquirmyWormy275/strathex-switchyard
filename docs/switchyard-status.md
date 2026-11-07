@@ -18,7 +18,7 @@ checkpoints are not cumulative acceptance of the latest suite.
 | Checkpoint | Verified result | Limit |
 | --- | --- | --- |
 | Installed Linux `edb76de` | **76 metadata/in-memory checks; 42 exact module hashes.** All 54 semantic workspaces and frozen frontend preserved. [Receipt](evidence/installed-mixed-scanner-input-summary.json). | No live scanner, provider task, account/model request, native focus or hardware operation. |
-| Native Windows client `f1167c9` | **Twelve groups; 127 passing tests; no skips.** Includes authenticated carrier and exact-task composition; source/merge tree, artifact, original commands/bounds and cleanup verify. [Receipt](evidence/windows-editor-connection-native-summary.json). | Composition uses provider/peer doubles; separate carrier uses actual native queries. Predates persistent stdio ownership. |
+| Native Windows client `45fe70e` | **Thirteen groups; 139 passing tests; no skips.** All three persistent Job cases pass; source/merge tree, artifact, commands, bounds and cleanup verify. [Receipt](evidence/windows-owned-stdio-native-summary.json). | Synthetic workers; predates Windows Codex task adapter integration. |
 | Complete Linux `edb76de` | **330 groups; 2,074 passing tests; 21 declared platform skips.** Original inventory, commands, bounds and owned cleanup verified. [Receipt](evidence/linux-edb76de-complete-summary.json). | Includes combined inputs and Windows saving source; predates terminal/peer probes. |
 | Complete Windows `dc755901` | **417 groups; 2,478 passing tests; 207 declared skips.** All six jobs and overall workflow passed with verified packet/source/cleanup. [Receipt](evidence/windows-complete-dc755901-summary.json). | Predates newer archive, scheduling, profile/workflow and observation corrections. |
 
@@ -38,21 +38,26 @@ storage reduces the package payload to 4,599,483 bytes without changing exports.
 
 ## Recent backend changes
 
-- **Persistent Windows process layer:** one original Job carries bounded,
-  acknowledged stdio with retained suspended startup and independent retirement.
-  Seventeen focused groups pass 142 tests with eleven platform skips; typecheck
-  and 35-source offline C# compilation pass. The exact compiler output is removed.
-  Three actual Windows Job cases await CI. Codex task ownership and durable
-  journal/Suite/editor integration remain unfinished.
+- **Windows Codex task ownership:** protected metadata and one-use reviewed load
+  now use the original persistent Job. Configuration discovery has its own
+  supervised Job and must retire first. Fifty focused groups pass 279 tests with
+  twelve platform skips; typecheck passes. Local provider/transport doubles are
+  explicit; the actual Windows synthetic app-server case awaits CI. Windows editor
+  targets, logical channels, durable journal/recovery and Suite/VS Code editor
+  integration remain unfinished. [Contract](coding-task-owners.md),
+  [source evidence](evidence/windows-codex-owners-source-summary.json).
+- **Persistent Windows process layer:** all three actual native Job cases pass at
+  `45fe70e` within thirteen client groups: 139 tests, no skips. The earlier
+  35-source offline compile passed; its exact compiler output is removed.
   [Contract](windows-owned-stdio.md),
-  [source evidence](evidence/windows-owned-stdio-source-summary.json).
+  [native evidence](evidence/windows-owned-stdio-native-summary.json).
 - **Windows exact-task editor protocol:** the authenticated carrier now composes
   with one retained provider client, exact Windows repository/task/account checks,
   durable acknowledgement and joined retirement. Fourteen focused groups pass
   127 tests with three platform skips; typecheck passes. Provider/native-peer
   behavior is explicitly doubled in these real-socket tests. Windows client
-  acceptance passes 127 tests at `f1167c9`, with the provider/peer doubles explicit. Durable task ownership,
-  journal recovery, Suite routes and VS Code launching remain unfinished.
+  acceptance passes 127 tests at `f1167c9`, with the provider/peer doubles explicit. Durable editor
+  journal recovery, Suite editor routes and VS Code launching remain unfinished.
   [Contract](windows-editor-transport.md),
   [source evidence](evidence/windows-editor-connection-source-summary.json).
 - **Windows terminal connection identity:** a held accepted socket now supplies

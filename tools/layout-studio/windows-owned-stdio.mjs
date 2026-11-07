@@ -81,6 +81,8 @@ export async function openWindowsOwnedStdio({ executable, args, cwd, expectedExe
     child, observation, whenClosed: exited.promise,
     get scope() { return scope && { ...scope }; },
     get worker() { return worker && { ...worker }; },
+    get privateOwnership() { return Object.freeze({ schema: 'switchyard-windows-owned-stdio-owner/v1', requestId: request.id,
+      executable, executableSha256: expectedExecutableSha256, cwd, helper: native ? Object.freeze({ ...native }) : null, worker: worker ? Object.freeze({ ...worker }) : null }); },
     get closed() { return closed; },
     close() {
       if (closed) return; closed = true; controller.abort(); clearTimeout(timer); signal.removeEventListener('abort', fail);
@@ -162,4 +164,21 @@ export async function openWindowsOwnedStdio({ executable, args, cwd, expectedExe
     failure ??= error; owner.close(); startup.resolve();
     try { await owner.stop(); } catch { error.retirementUnconfirmed = true; } throw error;
   }
+}
+
+/** Previously retained identity only. This query never adopts or terminates a worker. */
+export async function retireStoppedWindowsStdio(scope, ownership, { platform = process.platform, verify = runtimeGuardianStopped, stopChild = stopOwnedChild } = {}) {
+  require(platform === 'win32' && exact(scope, ['schema','id','guardianPid','birth','containment']) && scope.containment === 'windows-job'); guardianScope(scope);
+  require(exact(ownership, ['schema','requestId','executable','executableSha256','cwd','helper','worker']) && ownership.schema === 'switchyard-windows-owned-stdio-owner/v1'
+    && ownership.requestId === scope.id && path(ownership.executable) && path(ownership.cwd) && digest(ownership.executableSha256)
+    && exact(ownership.helper, ['path','sha256']) && path(ownership.helper.path) && digest(ownership.helper.sha256));
+  if (ownership.worker !== null) require(exact(ownership.worker, ['pid','birth','executableSha256']) && Number.isSafeInteger(ownership.worker.pid) && ownership.worker.pid > 0 && ownership.worker.pid <= 0xffffffff
+    && typeof ownership.worker.birth === 'string' && /^[1-9][0-9]{0,18}$/.test(ownership.worker.birth) && ownership.worker.executableSha256 === ownership.executableSha256);
+  const helper = Object.freeze({ ...ownership.helper }), queries = new Set(), hash = createHash('sha256');
+  for await (const bytes of createReadStream(helper.path)) hash.update(bytes); require(hash.digest('hex') === helper.sha256);
+  let exited = false, queriesStopped = true;
+  try { exited = await verify(Object.freeze({ ...scope }), { windowsHelper: helper.path, onGuardianChild: child => { queries.add(child); } }); }
+  finally { for (const child of queries) try { if ((await stopChild(child)).stopped !== true) queriesStopped = false; } catch { queriesStopped = false; } }
+  require(exited === true && queriesStopped);
+  return { stopped: true, guardianExitVerified: true, treeExitVerified: true, processAdopted: false, workerTerminated: false };
 }

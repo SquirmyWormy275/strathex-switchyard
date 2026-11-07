@@ -42,7 +42,7 @@ export function createCodexStdioTasks({ store, root = join(process.env.XDG_STATE
           const cwd = join(root, c); await privateDirectory(cwd); await authorize();
           const executable = await resolveCli("codex"); await authorize();
           let names;
-          try { names = await resolveMcp(executable, cwd, { onProbe: (probe) => { probes.set(c, probe); } }); }
+          try { names = await resolveMcp(executable, cwd, { authorize, compartment: c, onProbe: (probe) => { probes.set(c, probe); } }); }
           finally { const probe = probes.get(c); if (probe) { const result = await dispose(c, probe); if (result.stopped && probes.get(c) === probe) probes.delete(c); if (!result.stopped) throw new Error("The owned Codex configuration probe has not verified exit. No replacement was launched."); } }
           await authorize();
           let owned;

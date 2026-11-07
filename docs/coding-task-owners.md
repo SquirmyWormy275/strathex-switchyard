@@ -1,6 +1,6 @@
 # Preserve the original coding-task owner
 
-The explicit Linux `createCodingTaskOwners` service holds an owned native
+The Linux and Windows `createCodingTaskOwners` service holds an owned native
 connection for one registered Codex task. Its protected record binds the original
 thread, account fingerprint, repository directory and native listener. It does
 not create a thread, submit a prompt, attach an IDE, or grant task authority.
@@ -43,6 +43,34 @@ create no real provider task and do not establish live account or IDE acceptance
 Retirement also compares the protected native identity with the original live
 owner. A substituted saved owner stays uncertain even if the in-memory process
 has exited. [Final guard evidence](evidence/random-access-owner-retirement-summary.json).
+
+## Windows task ownership
+
+The Windows adapter uses one original Job-backed stdio connection and the shared
+encrypted registry, task leases and reviewed-load rules. A separate configuration
+probe is retained before startup, rechecks permission and must retire before the
+task owner starts. It uses the existing restricted Codex arguments and reviewed
+0.166.0 protocol gate; a project instruction directory cannot become startup cwd.
+
+Guardian identity is saved before worker creation. Later records add the exact
+worker and authenticated account; absent earlier fields are not treated as a
+different owner. Account drift closes that original connection. Recovery checks
+the saved helper digest and original Job scope without adopting or terminating a
+guessed process. Uncertain probe or task exit blocks replacement.
+
+Fifty focused groups pass **279 tests with twelve declared platform skips**, plus
+typecheck. Tests cover protected registry routing, exact one-use load, replay
+refusal, permission withdrawal during a held probe, account drift and failed
+post-start persistence. Local provider/transport doubles are explicit. An actual
+Windows Job plus synthetic app-server RPC and saved-identity recovery case is
+registered in CI and pending acceptance. The underlying native Job layer already
+passes at `45fe70e`: thirteen groups, 139 tests and no skips.
+
+Windows editor-target preparation deliberately refuses: logical editor channels,
+durable editor journals/recovery and Suite/VS Code editor integration remain
+unfinished implementation, separate from live-account acceptance.
+[Source evidence](evidence/windows-codex-owners-source-summary.json),
+[native Job evidence](evidence/windows-owned-stdio-native-summary.json).
 
 ## Review and load an existing task
 

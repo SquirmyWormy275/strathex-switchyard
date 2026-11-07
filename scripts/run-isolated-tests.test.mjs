@@ -172,6 +172,7 @@ test("only explicitly slow integration or release groups extend the bounded defa
       ["tools/layout-studio/windows-terminal-peer.test.mjs", process.platform === "win32" ? 120_000 : 45_000],
       ["tools/layout-studio/windows-editor-ingress.test.mjs", process.platform === "win32" ? 120_000 : 45_000],
       ["tools/layout-studio/windows-owned-stdio.test.mjs", process.platform === "win32" ? 120_000 : 45_000],
+      ["tools/layout-studio/codex-windows-tasks.test.mjs", process.platform === "win32" ? 120_000 : 45_000],
       ["apps/provider-adapter-host/test/tls-network-e2e.test.ts", 300_000],
       ["apps/vscode-extension/test/named-pipe-transport.test.ts", 120_000],
       ...(process.platform === "win32" ? [["tools/layout-studio/task-authority.test.mjs", 240_000], ["tools/layout-studio/task-authority-ignored-inputs.test.mjs", 240_000], ["tools/layout-studio/receipt-authority-state.test.mjs", 240_000]] : []),

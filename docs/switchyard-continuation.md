@@ -40,17 +40,27 @@ instructions. Do not merge or release.
 
 ## Current installed and source checkpoint
 
-The Windows persistent process layer is implemented: retained guardian and
-suspended-worker checkpoints, acknowledged bounded byte streams, parent-loss
-Job containment and independent retirement. **Seventeen focused groups pass
-142 tests with eleven declared platform skips**; typecheck and offline compilation
-of 35 C# sources pass without warnings. The exact 33-file, 1,561,459-byte compiler
-output is removed. No new SDK/runtime/dependency download was added. Three actual
-Windows Job cases await CI; local byte-stream cases use an explicit guardian
-double. Persistent Codex task ownership, durable journal recovery, Suite routes
-and VS Code launching remain unfinished.
+Windows Codex task ownership now uses the original persistent Job for metadata
+and a separately reviewed, one-use load. Configuration discovery runs in its own
+supervised Job and must retire before task startup. Protected registry recovery
+verifies the saved helper digest and original Job scope without adopting a process.
+**Fifty focused groups pass 279 tests with twelve declared platform skips**;
+typecheck passes. Local provider/transport doubles are explicit. An actual Windows
+Job with a synthetic app-server RPC and saved-identity recovery case is registered
+in CI; its acceptance is pending. Windows editor targets, logical editor channels,
+durable editor journal/recovery, Suite editor routes and VS Code launching remain
+unfinished. No live account, model, hardware or installed application was changed.
+[Task ownership contract](coding-task-owners.md),
+[source evidence](evidence/windows-codex-owners-source-summary.json).
+
+The underlying persistent process layer passes Windows client CI at `45fe70e`:
+**thirteen groups, 139 tests and no skips**, including all three actual native Job
+cases. Source/merge tree, artifact digest, original commands, bounds and cleanup
+verify. Its 35 C# sources previously compiled offline without warnings; the exact
+33-file, 1,561,459-byte compiler output is removed. No new local SDK/runtime or
+dependency download was added.
 [Process contract](windows-owned-stdio.md),
-[source evidence](evidence/windows-owned-stdio-source-summary.json).
+[native process evidence](evidence/windows-owned-stdio-native-summary.json).
 
 The earlier editor transport and exact-task composition now pass native Windows
 client CI at `f1167c9`: **twelve groups, 127 tests, no skips**. Exact source/merge
