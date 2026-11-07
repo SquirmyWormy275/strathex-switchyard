@@ -164,6 +164,7 @@ test("only explicitly slow integration or release groups extend the bounded defa
       ["tools/layout-studio/scanner-review.test.mjs", process.platform === "win32" ? 240_000 : 120_000],
       ["tools/layout-studio/scanner-index-review.test.mjs", process.platform === "win32" ? 240_000 : 120_000],
       ["tools/layout-studio/scanner-history-review.test.mjs", process.platform === "win32" ? 300_000 : 120_000],
+      ["tools/layout-studio/scanner-recipe-draft.test.mjs", process.platform === "win32" ? 300_000 : 120_000],
       ["apps/provider-adapter-host/test/tls-network-e2e.test.ts", 300_000],
       ["apps/vscode-extension/test/named-pipe-transport.test.ts", 120_000],
       ...(process.platform === "win32" ? [["tools/layout-studio/task-authority.test.mjs", 240_000], ["tools/layout-studio/task-authority-ignored-inputs.test.mjs", 240_000], ["tools/layout-studio/receipt-authority-state.test.mjs", 240_000]] : []),

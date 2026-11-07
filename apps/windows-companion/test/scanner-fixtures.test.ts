@@ -81,6 +81,19 @@ test("installed signed scanner and advisory fixtures are rehashed and SLA-checke
   await assert.rejects(setup.registry.resolve({ scannerFixtureIds: ["scanner-feed-1"], advisoryFixtureIds: [], observedAt }), /digest/i);
 });
 
+test("draft feed reads return only verified content without journal writes and reject tampering", async context => {
+  const setup = await fixture(context);
+  await setup.administration.installFixture(await signedManifest(setup, "draft-feed", "scanner"));
+  const input = { scannerFixtureIds: ["draft-feed"], advisoryFixtureIds: [], observedAt };
+  const before = await setup.store.readEntries(), content = await setup.registry.readResolvedContent(input);
+  assert.equal(content.length, 1); assert.equal(createHash("sha256").update(content[0]!.bytes).digest("hex"), content[0]!.fixture.contentSha256);
+  assert.deepEqual(JSON.parse(Buffer.from(content[0]!.bytes).toString("utf8")), { feed: "draft-feed", findings: [] });
+  assert.deepEqual(await setup.store.readEntries(), before); content[0]!.bytes.fill(0);
+  await assert.rejects(setup.registry.readResolvedContent({ ...input, scannerFixtureIds: [] }), /one scanner/);
+  await writeFile(join(setup.state, "scanner-fixtures/draft-feed/content.bin"), "changed public content");
+  await assert.rejects(setup.registry.readResolvedContent(input), /digest/);
+});
+
 test("resolved evidence expires at the earliest signed SLA, trust or absolute deadline, including its exact boundary", async context => {
   for (const [label, trustSeconds, absoluteSeconds, expectedSeconds] of [["sla", 300, 300, 60], ["trust", 30, 300, 30], ["absolute", 300, 20, 20]] as const) {
     const setup = await fixture(context, new Date(observedAt.getTime() + trustSeconds * 1000).toISOString());

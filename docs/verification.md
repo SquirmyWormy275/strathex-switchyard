@@ -1,5 +1,16 @@
 # What has actually been verified
 
+Scanner setup now has an authenticated draft route that assembles the exact
+engine, signed feed content, request and recipe without repository writes or
+approval. It rechecks task/account/workspace, source hashes, feed trust/revocation
+and expiry. The latest results across **31 focused groups pass 154 tests**,
+including a real Linux scan after separately saving and approving the generated
+setup. Typecheck, original bounds, package/recovery checks and owned cleanup pass.
+Automatic reviewed saving, frozen frontend controls and native Windows acceptance
+remain separate unfinished work or unaccepted checks.
+[Contract](scanner-recipe-drafts.md),
+[source evidence](evidence/scanner-recipe-draft-source-summary.json).
+
 Installed `e1c2f38` verifies the historical-preparation and read-only index
 modules within **76 metadata/in-memory checks and 27 exact module hashes**.
 All 54 semantic workspaces, selection, pending keyboard-only conversation and

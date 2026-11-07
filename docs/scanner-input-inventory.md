@@ -265,3 +265,4 @@ only audit metadata. Dated backup and launcher readback verify. Current plus one
 rollback remain, and the exact 532-file, 5,202,055-byte prepared bundle is removed.
 No installed scanner, native task, model/account request or hardware operation
 was performed. [Installed evidence](evidence/installed-scanner-history-review-summary.json).
+\n## Assemble the control-file draft\n\nUse the separate authenticated [scanner-draft route](scanner-recipe-drafts.md)\nto assemble the engine, selected signed feeds, request and recipe. It retains\nthese source witnesses and returns a reviewable draft without writing files\nor granting authority. Automatic reviewed saving and frontend activation remain\nunfinished.\n

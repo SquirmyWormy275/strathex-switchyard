@@ -8,6 +8,7 @@ import { connectedExecutionActions, linuxShieldActions } from "./repository-exec
 import { ignoredTreeRoots } from "./ignored-tree-policy.mjs";
 import { gitIndexPaths, gitIndexTreeFromEntries, gitIndexWindowsRawLimit } from "./git-index-inputs.mjs";
 import { historySelection, gitHistoryWindowsRawLimit } from "./git-history-inputs.mjs";
+import { assembleScannerRecipeDraft } from "./scanner-recipe-draft.mjs";
 const uuid = v => typeof v === "string" && /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/.test(v);
 const taskDigest = t => scopeHash([t.id, t.provider, t.sessionId, t.repositoryRoot, t.repositoryIdentity, t.accountFingerprint, t.status, t.nativeTransport, t.nativeIdentityVerified, t.launchPolicy]);
 const workspaceDigest = s => scopeHash([s.id, s.policy, s.mode, s.modeSelectedAt ?? null, s.accounts, s.taskAuthorityEpoch ?? 0]);
@@ -63,7 +64,7 @@ export async function assertTaskAuthorityReceiptState(state, review, receipt, no
   const decision=await ledger(state,now).evaluate({authorityId:record.id,repositoryRoot:task.repositoryRoot,sessionId:task.sessionId,taskId:task.id,planRevision:record.grant.planRevision,action:review.action});
   if(!decision.allowed)throw Error("The exact execution authority was revoked, expired or changed before receipt commit.");
 }
-export function createTaskAuthority({ store, checkNative, isActive = async () => true, inspection = createRepositoryInspection({ store, ownerKind: "task-authority" }), localCommitExecutionImplemented = false, executionActions = [], now = () => Date.now() } = {}) {
+export function createTaskAuthority({ store, checkNative, isActive = async () => true, inspection = createRepositoryInspection({ store, ownerKind: "task-authority" }), localCommitExecutionImplemented = false, executionActions = [], readScannerSources, resolveScannerFixtures, now = () => Date.now() } = {}) {
   if (!Array.isArray(executionActions) || new Set(executionActions).size!==executionActions.length || executionActions.some(a => !connectedExecutionActions("linux").includes(a))) throw new Error("Choose only execution actions connected by this host implementation.");
   const generations = new Map(), pending = new Set(), seen = new Set(); let closed = false;
   const current = (c, generation) => { if (closed || generation !== (generations.get(c) ?? 0)) throw new Error("This task authority operation was stopped."); };
@@ -115,8 +116,7 @@ export function createTaskAuthority({ store, checkNative, isActive = async () =>
       reason: "Authorize only the displayed connected host actions for these literal files, plan revision, native task/account and repository snapshot. Explicitly included ignored files are read-only inputs to the pinned Shield scanner, never commit or general execution inputs. Provider tools and native permissions stay unchanged. Every effect still needs its separate exact review." + (result.proposed.classifications.excludedIgnoredTrees?.length ? " The displayed ignored generated trees are excluded by explicit Shield-only policy: their directory identities are witnessed, their contents are not scanned or hashed, and this cannot establish a complete security pass." : ""), reauthenticated: false });
     current(c, generation); return { status: "requires-confirmation", confirmation, scope: { ...result.proposed, provider: result.task.provider, sessionId: result.task.sessionId, accountFingerprint: result.task.accountFingerprint, repositoryRoot: result.task.repositoryRoot, repositoryIdentity: result.task.repositoryIdentity, targetSnapshot: result.snapshot, allowedActions: result.proposed.actions }, nativePermissionsChanged: false };
   }
-  return {
-    async reviewScanner(c, input) { return exclusive(c, async generation => {
+  async function prepareScanner(c, input, generation) {
       if (!input || Object.keys(input).some(key => !["taskId", "compartment", "action", "planRevision", "lifetimeMinutes", "includeIndex", "historyDepth"].includes(key)) || input.compartment !== undefined && input.compartment !== c || Object.hasOwn(input, "includeIndex") && typeof input.includeIndex !== "boolean" || !linuxShieldActions.includes(input.action)) throw Error("Prepare only one connected Shield action for one exact task; includeIndex must be a boolean, and custom paths, exclusions and imported approvals require their separate review.");
       if (Object.hasOwn(input, "historyDepth")) {
         if (typeof input.historyDepth !== "number" || input.includeIndex === true || !["shield_codebase_audit", "release_shield"].includes(input.action)) throw Error("Historical preparation requires an exact bounded depth and Codebase Audit or Release Shield; combined index/history execution is not connected.");
@@ -174,7 +174,35 @@ export function createTaskAuthority({ store, checkNative, isActive = async () =>
           historyMetadataSha256: witnessed.historyMetadataSha256, historyStopping: witnessed.stopping, historyShallow: witnessed.shallow, historyAbsent: witnessed.absent, historyGaps: witnessed.gaps,
           historyInputs: witnessed.versions.map(row => ({ path: ".switchyard-history/" + row.commit + "/" + row.path, sha256: row.sha256, size: row.size, source: { kind: "git-history", path: row.path, commit: row.commit, objectId: row.objectId, mode: row.mode, depth: selected.depth } })) });
       }
+      return { result, preparation };
+  }
+  return {
+    async reviewScanner(c, input) { return exclusive(c, async generation => {
+      const { result, preparation } = await prepareScanner(c, input, generation);
       return { ...await reviewCaptured(c, result, generation), preparation };
+    }); },
+    async prepareScannerDraft(c, input) { return exclusive(c, async generation => {
+      const identifier = v => typeof v === "string" && /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/.test(v);
+      if (!input || !identifier(input.scannerFixtureId) || Object.hasOwn(input, "advisoryFixtureId") && !identifier(input.advisoryFixtureId) || input.scannerFixtureId === input.advisoryFixtureId) throw Error("Choose one exact installed scanner feed and an optional distinct advisory feed.");
+      const { scannerFixtureId, advisoryFixtureId, ...selection } = input;
+      if (typeof readScannerSources !== "function" || typeof resolveScannerFixtures !== "function") throw Error("Verified installed feed content is unavailable for draft assembly.");
+      const { result, preparation } = await prepareScanner(c, selection, generation);
+      const authorize = async () => {
+        const fresh = await access(c, result.task.id, generation, result.task.provider);
+        if (taskDigest(fresh.task) !== result.binding || workspaceDigest(fresh.state) !== result.workspace) throw Error("The exact task, account or workspace changed during scanner draft assembly.");
+      };
+      const feedInput = () => ({ scannerFixtureIds: [scannerFixtureId], advisoryFixtureIds: advisoryFixtureId ? [advisoryFixtureId] : [], observedAt: new Date(now()) });
+      await authorize(); const sources = await readScannerSources(c, feedInput());
+      try {
+        const expected = [[scannerFixtureId, "scanner"], ...(advisoryFixtureId ? [[advisoryFixtureId, "advisory"]] : [])];
+        if (JSON.stringify(sources.map(item => [item.fixture.id, item.fixture.kind])) !== JSON.stringify(expected)) throw Error("The resolved draft feeds differ from the selected identities.");
+        const draft = await assembleScannerRecipeDraft({ result, preparation, sources, authorize });
+        const refreshed = await capture(c, result.proposed, generation);
+        if (refreshed.snapshot.id !== result.snapshot.id || refreshed.binding !== result.binding || refreshed.workspace !== result.workspace) throw Error("The scanner target changed while assembling the draft.");
+        const freshFeeds = await resolveScannerFixtures(c, feedInput());
+        if (JSON.stringify(freshFeeds) !== JSON.stringify(sources.map(item => item.fixture))) throw Error("The installed feed trust, content or expiry changed during draft assembly.");
+        await authorize(); return draft;
+      } finally { for (const item of sources) item.bytes.fill(0); }
     }); },
     async historyInputs(c,input){return exclusive(c,async generation=>{
       if(!input||Object.keys(input).some(key=>!["taskId","compartment","paths","depth"].includes(key))||!uuid(input.taskId)||input.compartment!==undefined&&input.compartment!==c)throw Error("Witness only named bounded history inputs for one bound task; arbitrary commits, refs, commands and policies are refused.");

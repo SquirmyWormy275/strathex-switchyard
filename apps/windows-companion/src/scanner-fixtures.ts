@@ -259,6 +259,24 @@ export class DurableScannerFixtureRegistry implements ScannerFixtureResolver {
     return result;
   }
 
+  /** Borrow bounded public feed bytes for a draft; this grants no execution authority. */
+  async readResolvedContent(input: Readonly<{ scannerFixtureIds: readonly string[]; advisoryFixtureIds: readonly string[]; observedAt: Date }>): Promise<readonly { fixture: VerifiedScannerFixture; bytes: Uint8Array }[]> {
+    if (input.scannerFixtureIds.length !== 1 || input.advisoryFixtureIds.length > 1) throw new Error("Draft preparation requires one scanner and at most one advisory feed.");
+    const resolved = await this.resolve(input), installed = await this.fixtures();
+    const result: { fixture: VerifiedScannerFixture; bytes: Uint8Array }[] = [];
+    try {
+      for (const fixture of resolved) {
+        const candidate = installed.find(item => item.id === fixture.id && item.kind === fixture.kind && item.status === "active" && item.manifestSha256 === fixture.manifestSha256);
+        if (!candidate) throw new Error("The draft feed changed after verification.");
+        const content = await concreteFile(resolve(candidate.packageRoot, "content.bin"), 2 * 1024 * 1024, "draft scanner content");
+        if (sha256(content.bytes) !== fixture.contentSha256) { content.bytes.fill(0); throw new Error("The verified draft feed content changed."); }
+        result.push({ fixture, bytes: content.bytes });
+      }
+      if (JSON.stringify(await this.resolve(input)) !== JSON.stringify(resolved)) throw new Error("The draft feed trust or installed identity changed while reading content.");
+      return result;
+    } catch (error) { for (const item of result) item.bytes.fill(0); throw error; }
+  }
+
   private async verifyInstalledAt(root: string, observedAt: Date): Promise<VerifiedScannerFixture> {
     const canonicalRoot = await realpath(root);
     const manifestFile = await concreteFile(resolve(canonicalRoot, "manifest.json"), maximumManifestBytes, "installed scanner manifest");

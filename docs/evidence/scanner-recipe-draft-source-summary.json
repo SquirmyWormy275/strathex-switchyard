@@ -1,0 +1,327 @@
+{
+  "schema": "switchyard-scanner-recipe-draft-source-summary/v1",
+  "at": "2026-11-07T05:22:38.812Z",
+  "baseCommit": "d09645a138f6b3a15bf0982c4685099b8a049efb",
+  "sourceFiles": {
+    "apps/windows-companion/src/repository-inputs.ts": "d88df1c10b8e3e860e798ed4d220ad54b099a621f68e550a9f8a8a6a2c288576",
+    "apps/windows-companion/src/scanner-fixture-files.ts": "6a9b7ad0c50157a6b18455ad228b8338219ed160e8a91a26787a8488b4018a29",
+    "apps/windows-companion/src/scanner-fixtures.ts": "31f4eafa61ec9cb8092b37adf62735eab74b3f35ef41c91763e493640268acb3",
+    "apps/windows-companion/test/scanner-fixtures.test.ts": "358a1eeed8048f9dbe149faa71b90a859b511c58c52a0b2c0af5d248c8b50217",
+    "deployment/suite/installation.test.mjs": "9d9f10b0591817d1c23abaf87efacf79b695d14934a5b4e09537a1a4aa36779f",
+    "deployment/suite/release.test.mjs": "cc0beb00fc7bcf0121904a821700e3aaded4f20af961572889219dcc5df3e7bd",
+    "deployment/suite/test-support/fixture.mjs": "2689dd64366544cbe221645eca4858ea2780c0cd094e6069c231d99225cf3a0e",
+    "scripts/run-isolated-tests.mjs": "4cd67b6dde305554d1b639b11a9d7499b2179ee59a8a5a114d6d745a3489546c",
+    "scripts/run-isolated-tests.test.mjs": "4ff4d012663ed377a5aa07d7466914f425478e21b1b7db46b22729c2c1195ab8",
+    "scripts/verify-agent-security-host.mjs": "bfe8ba21f557a88f08d67afd014b5f2cee3891d820e74ee71d214cdc62e4173e",
+    "scripts/windows-backend-shards.test.mjs": "2025ce872294426df0bab0c3b5fa367c9d2a18471568a3a4043109f55eae6234",
+    "scripts/windows-scenario-groups.test.mjs": "513550b7b199fb410c9ce3cffdb94b84dfa041cf3a4e7962162eb0e5a1ca3d9f",
+    "tools/layout-studio/repository-shield.mjs": "486d8432f3a6afd8e9a8b16ca12bf502945775ee53747bda4880ca2ebb60c3ca",
+    "tools/layout-studio/scanner-fixture-invalidation.test.mjs": "c8ace6c94c73d232d1ae5c1577d15db14544608d3c76b2657993acbc73f7ddb2",
+    "tools/layout-studio/scanner-fixture-removal.test.mjs": "4b336348a99bccbc01116856bb7192ac3c04f30ec51c76ad34126c5781993499",
+    "tools/layout-studio/scanner-fixtures.mjs": "56340103c4f01295212acc3ffb3cb1043932af6c2f36b2863ce8af6f59ca2d9f",
+    "tools/layout-studio/scanner-fixtures.test.mjs": "f7f758b1b2b2f3cb958c42baa3143b6da979c8690a69fa5f257d96aa5c2df9ea",
+    "tools/layout-studio/scanner-history-review.test.mjs": "786503ed3b9eeab43f85fce35e9322713223f53f51587b4db39d4b17647fd704",
+    "tools/layout-studio/scanner-index-review.test.mjs": "22749b1d735fff5720a06c19bea00ba2279662cee828f542c1d284c54c403232",
+    "tools/layout-studio/scanner-recipe-draft.mjs": "28d7a2ea74611355b086d106a786b4185f5a103f3a4b1d5031a66aa3c95538a9",
+    "tools/layout-studio/scanner-recipe-draft.test.mjs": "6cefca071f6b55a8e33f6c0952a7509450d766f1ae58da7a03c0cc20175b39c4",
+    "tools/layout-studio/scanner-review.test.mjs": "4e38267c6568dd6d9f57f96cb8b8fbb622dd1dd59828e09d8080e5a093bfc1af",
+    "tools/layout-studio/shield-scanner-engine.mjs": "18910cd38711a7facbdc053cd725a721c1a0cacdf62c2be81587cf4173aedc64",
+    "tools/layout-studio/suite.mjs": "6764fd782a06dec70cccaa9020f872f524f8fe4f122ae081e95516a90ebe98e1",
+    "tools/layout-studio/task-authority-ignored-inputs.test.mjs": "698731e6edfb5a404fd0b785f0428f517e93ff7f0fabdc59ec542dfc22ad80cf",
+    "tools/layout-studio/task-authority-ignored-trees.test.mjs": "33da04d08c6af41e0ac9a994cc30a1272dbb1f051b57cb8369fc8932b3477cba",
+    "tools/layout-studio/task-authority.mjs": "6c214015e553334b4631a7cdeef4ac0b1b350879467dfd393327ff1174497d20",
+    "tools/layout-studio/task-authority.test.mjs": "97ac82bba826d37c3913ef3c4653c762577e241ff5620848602706d7697ff3ae",
+    "tools/layout-studio/test-support/repository-shield-fixture.mjs": "e6be112389c80937b6f6bd4d04b41290326e63da9120f5b7dd5d3c30b2af6904",
+    "tools/layout-studio/test-support/task-authority-fixture.mjs": "6e951c3aa0da586268f4f3086dff752e15d1b7b9961f560f02cad0f2c0e35d23",
+    "tools/layout-studio/test-support/windows-execution-fixture.mjs": "3e31919070bdd774a87d4993977c20d0c5a1b524026f03b8f2bddafab2d160d0"
+  },
+  "initialEightCases": {
+    "name": "isolated-test-a485be54-ff5b-41d2-a63a-36e069223617.json",
+    "sha256": "29d38381d0d8220651f8ef8d23448e0ee84bda2c436ffa4bb4be6e38f360c6a8",
+    "success": true,
+    "totals": {
+      "required": 1,
+      "passed": 1,
+      "failed": 0,
+      "tests": 8,
+      "passedTests": 8,
+      "failedTests": 0,
+      "skippedTests": 0,
+      "cancelledTests": 0,
+      "todoTests": 0
+    }
+  },
+  "broaderFocused": {
+    "name": "isolated-test-666ca648-46b0-4430-a37e-2f00c7bf1994.json",
+    "sha256": "8fc013c1953aa5243a35743a6814ef24b1fe0768bd66e39fa9cef588f728d811",
+    "success": true,
+    "totals": {
+      "required": 31,
+      "passed": 31,
+      "failed": 0,
+      "tests": 153,
+      "passedTests": 153,
+      "failedTests": 0,
+      "skippedTests": 0,
+      "cancelledTests": 0,
+      "todoTests": 0
+    }
+  },
+  "depthBoundaryRed": {
+    "name": "isolated-test-797c5e62-b79f-47f1-925a-ef65d097931c.json",
+    "sha256": "a1713a481946d1a9f4d9382c70667c9df98db029b7e6d15757a2d9a8bbf37017",
+    "success": false,
+    "totals": {
+      "required": 1,
+      "passed": 0,
+      "failed": 1,
+      "tests": 12,
+      "passedTests": 11,
+      "failedTests": 1,
+      "skippedTests": 0,
+      "cancelledTests": 0,
+      "todoTests": 0
+    }
+  },
+  "correctedDraftAndPackaging": {
+    "name": "isolated-test-a4e17000-982a-4ab0-a6b7-866687572da8.json",
+    "sha256": "02cb3439dc5434a0c36b3e5070655c6eb2dd339f18e484e320906b3317dd42aa",
+    "success": true,
+    "totals": {
+      "required": 18,
+      "passed": 18,
+      "failed": 0,
+      "tests": 33,
+      "passedTests": 33,
+      "failedTests": 0,
+      "skippedTests": 0,
+      "cancelledTests": 0,
+      "todoTests": 0
+    }
+  },
+  "finalDistinctGroups": 31,
+  "finalDistinctTests": 154,
+  "acceptedGroupSources": [
+    {
+      "receipt": "isolated-test-666ca648-46b0-4430-a37e-2f00c7bf1994.json",
+      "file": "scripts/windows-backend-shards.test.mjs"
+    },
+    {
+      "receipt": "isolated-test-666ca648-46b0-4430-a37e-2f00c7bf1994.json",
+      "file": "scripts/run-isolated-tests.test.mjs"
+    },
+    {
+      "receipt": "isolated-test-666ca648-46b0-4430-a37e-2f00c7bf1994.json",
+      "file": "scripts/windows-scenario-groups.test.mjs"
+    },
+    {
+      "receipt": "isolated-test-a4e17000-982a-4ab0-a6b7-866687572da8.json",
+      "file": "deployment/suite/release.test.mjs"
+    },
+    {
+      "receipt": "isolated-test-a4e17000-982a-4ab0-a6b7-866687572da8.json",
+      "file": "deployment/suite/installation.test.mjs",
+      "pattern": "installation keeps current and one rollback version, records dated backups, preserves data and removes only owned entries",
+      "timeoutMs": 120000
+    },
+    {
+      "receipt": "isolated-test-a4e17000-982a-4ab0-a6b7-866687572da8.json",
+      "file": "deployment/suite/installation.test.mjs",
+      "pattern": "unowned or edited desktop entries and corrupted new releases preserve the current application",
+      "timeoutMs": 120000
+    },
+    {
+      "receipt": "isolated-test-a4e17000-982a-4ab0-a6b7-866687572da8.json",
+      "file": "deployment/suite/installation.test.mjs",
+      "pattern": "a failed persistent write restores every earlier launcher and the exact previous installation record",
+      "timeoutMs": 120000
+    },
+    {
+      "receipt": "isolated-test-a4e17000-982a-4ab0-a6b7-866687572da8.json",
+      "file": "deployment/suite/installation.test.mjs",
+      "pattern": "forced owner exit leaves a durable journal; another installer restores the exact before state without touching unrelated files",
+      "timeoutMs": 120000
+    },
+    {
+      "receipt": "isolated-test-a4e17000-982a-4ab0-a6b7-866687572da8.json",
+      "file": "deployment/suite/installation.test.mjs",
+      "pattern": "recovery preflights all edits before writing, and respects a committed update whose pending marker survived",
+      "timeoutMs": 120000
+    },
+    {
+      "receipt": "isolated-test-a4e17000-982a-4ab0-a6b7-866687572da8.json",
+      "file": "deployment/suite/installation.test.mjs",
+      "pattern": "active host connections block uninstall before any application stop or persistent mutation",
+      "timeoutMs": 120000
+    },
+    {
+      "receipt": "isolated-test-a4e17000-982a-4ab0-a6b7-866687572da8.json",
+      "file": "deployment/suite/installation.test.mjs",
+      "pattern": "uninstall verifies exact owner exit and restores host connections before removing persistent program entries",
+      "timeoutMs": 120000
+    },
+    {
+      "receipt": "isolated-test-a4e17000-982a-4ab0-a6b7-866687572da8.json",
+      "file": "deployment/suite/installation.test.mjs",
+      "pattern": "a restoration conflict retains all program entries and resumes the previous running application",
+      "timeoutMs": 120000
+    },
+    {
+      "receipt": "isolated-test-a4e17000-982a-4ab0-a6b7-866687572da8.json",
+      "file": "deployment/suite/installation.test.mjs",
+      "pattern": "a second registered instance blocks uninstall without stopping either owner",
+      "timeoutMs": 120000
+    },
+    {
+      "receipt": "isolated-test-a4e17000-982a-4ab0-a6b7-866687572da8.json",
+      "file": "deployment/suite/installation.test.mjs",
+      "pattern": "unconfirmed owner exit leaves a durable removal journal and blocks restoration until recovery",
+      "timeoutMs": 120000
+    },
+    {
+      "receipt": "isolated-test-a4e17000-982a-4ab0-a6b7-866687572da8.json",
+      "file": "deployment/suite/installation.test.mjs",
+      "pattern": "a failed uninstall write restores the owned program and keeps restart recovery durable",
+      "timeoutMs": 120000
+    },
+    {
+      "receipt": "isolated-test-a4e17000-982a-4ab0-a6b7-866687572da8.json",
+      "file": "deployment/suite/installation.test.mjs",
+      "pattern": "a dated verified recovery entry restores an interrupted uninstall even after the main loader was removed",
+      "timeoutMs": 120000
+    },
+    {
+      "receipt": "isolated-test-a4e17000-982a-4ab0-a6b7-866687572da8.json",
+      "file": "deployment/suite/installation.test.mjs",
+      "pattern": "an explicit no-start update stops the previous generation without restarting the new one",
+      "timeoutMs": 120000
+    },
+    {
+      "receipt": "isolated-test-a4e17000-982a-4ab0-a6b7-866687572da8.json",
+      "file": "deployment/suite/installation.test.mjs",
+      "pattern": "the stable installed loader verifies and addresses the actual application across update and rollback",
+      "timeoutMs": 120000
+    },
+    {
+      "receipt": "isolated-test-a4e17000-982a-4ab0-a6b7-866687572da8.json",
+      "file": "deployment/suite/installation.test.mjs",
+      "pattern": "pre-promotion owner loss recovers only verified staging copies and exact incomplete source prefixes",
+      "timeoutMs": 120000
+    },
+    {
+      "receipt": "isolated-test-a4e17000-982a-4ab0-a6b7-866687572da8.json",
+      "file": "deployment/suite/installation.test.mjs",
+      "pattern": "interrupted installation recovery accepts the full release file ceiling plus its manifest and preserves unrelated edits",
+      "timeoutMs": 120000
+    },
+    {
+      "receipt": "isolated-test-666ca648-46b0-4430-a37e-2f00c7bf1994.json",
+      "file": "tools/layout-studio/scanner-fixtures.test.mjs"
+    },
+    {
+      "receipt": "isolated-test-666ca648-46b0-4430-a37e-2f00c7bf1994.json",
+      "file": "tools/layout-studio/scanner-fixture-invalidation.test.mjs"
+    },
+    {
+      "receipt": "isolated-test-666ca648-46b0-4430-a37e-2f00c7bf1994.json",
+      "file": "tools/layout-studio/scanner-fixture-removal.test.mjs"
+    },
+    {
+      "receipt": "isolated-test-666ca648-46b0-4430-a37e-2f00c7bf1994.json",
+      "file": "tools/layout-studio/scanner-review.test.mjs",
+      "timeoutMs": 120000,
+      "expectedSkipped": 0
+    },
+    {
+      "receipt": "isolated-test-666ca648-46b0-4430-a37e-2f00c7bf1994.json",
+      "file": "tools/layout-studio/scanner-index-review.test.mjs",
+      "timeoutMs": 120000,
+      "expectedSkipped": 0
+    },
+    {
+      "receipt": "isolated-test-666ca648-46b0-4430-a37e-2f00c7bf1994.json",
+      "file": "tools/layout-studio/scanner-history-review.test.mjs",
+      "timeoutMs": 120000,
+      "expectedSkipped": 0
+    },
+    {
+      "receipt": "isolated-test-a4e17000-982a-4ab0-a6b7-866687572da8.json",
+      "file": "tools/layout-studio/scanner-recipe-draft.test.mjs",
+      "timeoutMs": 120000,
+      "expectedSkipped": 0
+    },
+    {
+      "receipt": "isolated-test-666ca648-46b0-4430-a37e-2f00c7bf1994.json",
+      "file": "tools/layout-studio/task-authority-ignored-trees.test.mjs",
+      "timeoutMs": 120000
+    },
+    {
+      "receipt": "isolated-test-666ca648-46b0-4430-a37e-2f00c7bf1994.json",
+      "file": "tools/layout-studio/task-authority-ignored-inputs.test.mjs"
+    },
+    {
+      "receipt": "isolated-test-666ca648-46b0-4430-a37e-2f00c7bf1994.json",
+      "file": "tools/layout-studio/task-authority.test.mjs"
+    },
+    {
+      "receipt": "isolated-test-666ca648-46b0-4430-a37e-2f00c7bf1994.json",
+      "file": "apps/windows-companion/test/scanner-fixtures.test.ts",
+      "currentUserProfile": false
+    }
+  ],
+  "originalCommandsBoundsSkipsAndCleanupVerified": true,
+  "typecheck": {
+    "command": "npm run typecheck",
+    "node": "24.14.0",
+    "passed": true,
+    "initialFailure": "TS2740: verified content is Uint8Array; its draft return type was corrected from Buffer"
+  },
+  "corrections": [
+    "An additional 33-component input test reproduced a usable-looking draft that execution would refuse. Draft assembly now applies the shared repository-input validator before returning files."
+  ],
+  "scope": {
+    "authenticatedHttpAndNormalSuiteFactory": true,
+    "exactShippedEngineAndSignedFeedContent": true,
+    "feedTrustExpiryAndRevocationRechecked": true,
+    "currentIndexOrHistoryDescriptors": true,
+    "noRepositorySourceTextReturned": true,
+    "noDraftRepositoryWrites": true,
+    "noDraftApprovalOrAuthority": true,
+    "changedWorktreeIndexAccountOrFeedRefused": true,
+    "separateSaveAuthorityAndExecutionSteps": true,
+    "actualLinuxGeneratedRecipeSecretScan": true,
+    "replayRefusedAndNativeExitVerified": true,
+    "originalIndexHeadAndSourcePreserved": true,
+    "packagingUpdateRollbackAndOriginalBudgetPassed": true
+  },
+  "bounds": {
+    "scannerFileBytes": 2097152,
+    "scannerSourceBytes": 16777216,
+    "feedBytes": 2097152,
+    "controlJsonBytes": 131072,
+    "recipeInputs": 256,
+    "authorityPaths": 256,
+    "pathComponents": 32
+  },
+  "limitations": [
+    "This assembles a draft; automatic reviewed saving/installation of its generated control files is unfinished.",
+    "Frontend controls remain frozen; no normal UI draft-save journey is accepted.",
+    "Windows native draft and guest execution acceptance remain separate.",
+    "Mixed index/history execution, broader security coverage and complete repository scan gates remain unfinished.",
+    "Earlier complete Linux evidence is pinned to its pre-draft source."
+  ],
+  "effects": {
+    "modelPrompts": 0,
+    "installedNativeTasks": 0,
+    "accountChanges": 0,
+    "hidOpened": false,
+    "frontendChanged": false,
+    "liveInstalledScanner": false,
+    "newRuntimeDownloads": false
+  },
+  "cleanup": {
+    "emptyOwnedParentVerified": true,
+    "removed": true
+  },
+  "success": true
+}

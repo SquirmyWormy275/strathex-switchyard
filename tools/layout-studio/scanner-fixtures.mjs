@@ -188,6 +188,13 @@ export function createScannerFixtures({ store, stateDirectory, isActive = async 
       const initial = await state(c), before = await registryDigest(c); const result = await registry(c).resolve(input);
       if (workspace(await state(c)) !== workspace(initial) || await registryDigest(c) !== before) throw Error("The fixture evidence workspace or installed registry changed during resolution."); return result;
     },
+    async readSources(c, input) {
+      const initial = await state(c), before = await registryDigest(c), result = await registry(c).readResolvedContent(input);
+      try {
+        if (workspace(await state(c)) !== workspace(initial) || await registryDigest(c) !== before) throw Error("The draft feed workspace or installed registry changed while reading.");
+        return result;
+      } catch (error) { for (const item of result) item.bytes.fill(0); throw error; }
+    },
     async stopCompartment(c) { generations.set(c, (generations.get(c) ?? 0) + 1); await Promise.allSettled([pending.get(c)].filter(Boolean)); return { stopped: true }; },
     async close() { if (closed) return; for (const c of seen) await this.stopCompartment(c); closed = true; }
   };

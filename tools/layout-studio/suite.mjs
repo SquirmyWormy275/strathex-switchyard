@@ -81,7 +81,7 @@ export function createSuite({ store = createSuiteStore(), platform = process.pla
   };
   copilot ??= copilotFactory({ store, isActive: async c => { await loadSelection(); return !closed && !copilotTransitions.has(c) && c === activeCompartment && await store.selection() === c; } });
   const matrixDiagnostics = createMatrixDiagnostics({ store, devices, isActive: async (c) => { await loadSelection(); return c === activeCompartment; } });
-  taskAuthority ??= taskAuthorityFactory({ store, localCommitExecutionImplemented: true, executionActions: connectedExecutionActions(platform), isActive: async c => { await loadSelection(); return c === activeCompartment; }, checkNative: (c, task) => task.provider === "codex" ? coding.status(c, task.id) : claudeCoding.status(c, task.id) });
+  taskAuthority ??= taskAuthorityFactory({ store, localCommitExecutionImplemented: true, executionActions: connectedExecutionActions(platform), isActive: async c => { await loadSelection(); return c === activeCompartment; }, checkNative: (c, task) => task.provider === "codex" ? coding.status(c, task.id) : claudeCoding.status(c, task.id), readScannerSources: (c, input) => fixtureAdministration.readSources(c, input), resolveScannerFixtures: (c, input) => fixtureAdministration.resolve(c, input) });
   const repositoryDirectory = join(process.env.XDG_STATE_HOME || process.env.LOCALAPPDATA || join(homedir(), ".local/state"), "strathex-switchyard/repository-effects");
   repositoryCommits ??= createRepositoryCommits({ store, authority: taskAuthority, stateDirectory: repositoryDirectory });
   fixtureAdministration ??= createScannerFixtures({ store, stateDirectory: join(repositoryDirectory, "fixtures"), isActive: async c => { await loadSelection(); return c === activeCompartment; } });
@@ -273,6 +273,10 @@ export function createSuite({ store = createSuiteStore(), platform = process.pla
       if (path === "/api/suite/coding/authority/scanner-review") {
         const { workspaceBaseUrl, ...input } = body;
         return taskAuthority.reviewScanner(compartment, input);
+      }
+      if (path === "/api/suite/coding/authority/scanner-draft") {
+        const { workspaceBaseUrl, ...input } = body;
+        return taskAuthority.prepareScannerDraft(compartment, input);
       }
       if (path === "/api/suite/coding/authority/scanner-inputs") {
         const { workspaceBaseUrl, ...input } = body;

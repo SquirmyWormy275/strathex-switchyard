@@ -40,6 +40,17 @@ instructions. Do not merge or release.
 
 ## Current installed and source checkpoint
 
+Scanner setup now has an authenticated draft route that assembles the exact
+engine, signed feed content, request and recipe without repository writes or
+approval. It rechecks task/account/workspace, source hashes, feed trust/revocation
+and expiry. The latest results across **31 focused groups pass 154 tests**,
+including a real Linux scan after separately saving and approving the generated
+setup. Typecheck, original bounds, package/recovery checks and owned cleanup pass.
+Automatic reviewed saving, frozen frontend controls and native Windows acceptance
+remain separate unfinished work or unaccepted checks.
+[Contract](scanner-recipe-drafts.md),
+[source evidence](evidence/scanner-recipe-draft-source-summary.json).
+
 Installed `e1c2f38` verifies the historical-preparation and read-only index
 modules within **76 metadata/in-memory checks and 27 exact module hashes**.
 All 54 semantic workspaces, selection, pending keyboard-only conversation and
@@ -282,25 +293,25 @@ native Windows profile correction acceptance remains separate.
 [Installed evidence](evidence/installed-profile-identity-summary.json).
 [Source evidence](evidence/profile-identity-source-summary.json).
 
-1. Cargo quoted/array/inline manifest coverage is published and installed; full
-   Linux `94a0135` is accepted and its exact staging is removed. Continue independent
-   ledger gaps. Keep later Python wheel-license work separate from
-   that full checkpoint, and installed in-memory proof separate
-   from live model/UI acceptance. Use immutable published source and a short
-   owned temporary parent for any new complete run.
-2. Inspect available native Windows receipts. The new five-shard schedule and
-   later helper, SDK, Python/Cargo work require their own final results.
-   Retain original failures and distinguish guest doubles from actual guests.
-3. Windows ChatGPT review, owner records, dispatch and read-only recovery are
-   installed as source at `6fdc6bd`, including separately reviewed VS Code.
-   Keep native Windows owner/window acceptance separate. Continue project and
-   task-specific IDE integration without weakening identity/foreground proof;
-   frontend controls remain frozen. Also continue broader Shield syntax/coverage
-   and dependency
-   resolution, complete archive/license inspection, publisher provenance,
-   verified local vulnerability context and external observation streams.
-   The current Cargo manifest parser is deliberately a closed TOML subset;
-   unsupported syntax stays incomplete. Do not claim it handles all crates.
+1. Finish the complete Linux run at `d09645a`, started from an immutable clean
+   checkout after installed history verification. Its private ownership marker is
+   `linux-full-d09645a-active.json`. Audit the exact 326-group manifest, original
+   commands/bounds/skips and all child/tree exits before accepting it. Remove only
+   the recorded owned checkout, dependency aliases, generated files and test root.
+   Retain any failure and fix it without widening test allowances.
+2. Complete reviewed scanner draft saving/installation. The authenticated
+   scanner-draft route now assembles engine/request/feed/recipe files and exact
+   proposed authority scope. It returns generated control text, no repository
+   source content, approval token or effect. Preserve its fresh trust/expiry and
+   task/account/workspace checks while adding exact new-file ownership, separate
+   approval, durable interrupted-save recovery and a fresh target review after
+   materialization. Frontend controls remain frozen. Mixed index/history
+   execution is still unsupported.
+3. Continue Windows project and task-specific IDE integration, broader external
+   observation streams and the remaining ledger gaps. Inspect available native
+   receipts separately: workflow completion alone is insufficient without exact
+   source, packet, command, original bounds and cleanup verification. Native focus
+   alone does not establish a project, task, account or foreground binding.
 4. Keep remaining guided role/device wiring and editor activation explicit as
    unfinished implementation while frontend review is frozen. The composed
    editor proof uses real encrypted state and Linux carriers with provider and
