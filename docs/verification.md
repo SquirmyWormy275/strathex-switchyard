@@ -1,5 +1,14 @@
 # What has actually been verified
 
+Complete Linux `a6a6618` passes **321 groups, 1,949 tests and sixteen declared
+skips**, with zero failures/cancellations. Exact original commands, bounds, skip
+inventory and every child/tree retirement verify. Its checkout, nine dependency
+aliases, 782 generated files (11,766,823 bytes), empty temporary parent and marker
+are removed; other worktrees remain. This accepts Cargo archive, workflow/profile
+identity and observation design changes at that source. Later quoted Cargo
+manifests and Windows provider birth checks have separate focused evidence.
+[Complete receipt](evidence/linux-a6a6618-complete-summary.json).
+
 Quoted Cargo manifest keys/tables and literal strings pass **58 independent
 Python reference cases** and **ten focused groups/96 tests**, including six
 actual Linux scanner journeys and six Windows guest doubles. Original package
@@ -18,14 +27,14 @@ cross-platform fixture failures remain recorded. The exact 25-file, 417,149-byte
 owned staging is removed. Real Windows windows and Suite focus wiring remain
 separate. [Source evidence](evidence/provider-process-birth-source-summary.json).
 
-Installed `1cbe7a3` passes **71 metadata/in-memory checks** and verifies 21 exact
-module hashes. The observation preview/confirmation checks use synthetic state
-only. All 54 semantic workspaces, selection, the pending keyboard-only
-conversation and frozen frontend are preserved; 53 sealed files are byte-identical
-and one changes only audit metadata. All four saved profiles and 57 workflows
-remain compatible. Dated backup/readback and current plus one rollback verify.
-The exact 530-file, 5,152,756-byte prepared package is removed.
-[Installed evidence](evidence/installed-observation-design-summary.json).
+Installed `9eec9cd` passes **71 metadata/in-memory checks** and verifies 21 exact
+module hashes, including all 58 Cargo manifest reference cases. All 54 semantic
+workspaces, selection, pending keyboard-only conversation and frozen frontend are
+preserved; 53 sealed files are byte-identical and one changes only audit metadata.
+All four profiles and 57 workflows remain compatible. Dated backup and launcher
+readback verify; current plus one rollback remain. The exact 530-file,
+5,155,176-byte prepared bundle is removed.
+[Installed evidence](evidence/installed-cargo-quoted-manifest-summary.json).
 
 Complete Windows `dc755901` now passes **417 groups, 2,478 tests and 207
 declared skips**. The overall workflow and all six jobs succeed. Exact source/merge

@@ -16,7 +16,8 @@ Cargo archive identity now accepts quoted platform tables, quoted field keys and
 single-line literal strings while detecting duplicate aliases and scalar/table
 conflicts. Fifty-eight independent reference cases and ten groups/96 tests pass,
 including actual Linux scans and Windows guest doubles. Package bounds and exact
-cleanup pass. Installed acceptance remains pending; dependency resolution and
+cleanup pass. Ten installed Cargo checks pass in the 71-check metadata update;
+dependency resolution and
 broader archive/license inspection remain unfinished.
 [Contract](cargo-archive-identity.md),
 [source evidence](evidence/cargo-quoted-manifest-source-summary.json).
@@ -29,14 +30,20 @@ Suite Windows focus wiring remains unfinished.
 [Contract](../apps/windows-companion/provider-desktop-helper/README.md),
 [evidence](evidence/provider-process-birth-source-summary.json).
 
-A full 321-group Linux run from published `a6a6618` is active; no result is
-claimed until its final receipt and cleanup verify.
+Complete Linux `a6a6618` passes **321 groups, 1,949 tests and sixteen declared
+skips**, with zero failures/cancellations. Exact original commands, bounds, skip
+inventory and every child/tree retirement verify. Its checkout, nine dependency
+aliases, 782 generated files (11,766,823 bytes), empty temporary parent and marker
+are removed; other worktrees remain. This accepts Cargo archive, workflow/profile
+identity and observation design changes at that source. Later quoted Cargo
+manifests and Windows provider birth checks have separate focused evidence.
+[Complete receipt](evidence/linux-a6a6618-complete-summary.json).
 
 | Checkpoint | Completed result | What it does not establish |
 | --- | --- | --- |
-| Complete Linux `aafb476` | **317 groups, 1,923 passing tests, sixteen declared skips**; exact original inventory, commands, bounds, child/tree and owned staging cleanup. [Receipt](evidence/linux-aafb476-complete-summary.json). | Later Cargo archive identity and workflow-ID corrections have separate focused evidence. |
+| Complete Linux `a6a6618` | **321 groups, 1,949 passing tests, sixteen declared skips**; exact original inventory, commands, bounds and cleanup. [Receipt](evidence/linux-a6a6618-complete-summary.json). | Later quoted Cargo manifests and Windows provider identity checks have separate focused evidence. |
 | Complete Windows `dc755901` | **417 groups, 2,478 passing tests and 207 declared skips**; all six jobs and the overall workflow succeed, with exact packet/source/merge inventory, bounds and cleanup. [Receipt](evidence/windows-complete-dc755901-summary.json). | Predates wheel RECORD, five-job scheduling, Cargo archive and workflow/profile/observation corrections. Interactive Windows acceptance remains separate. |
-| Installed Linux `1cbe7a3` | 71 metadata/in-memory checks and 21 exact module hashes. All 54 semantic workspaces, selection, pending conversation and frozen frontend are preserved. [Receipt](evidence/installed-observation-design-summary.json). | No live scanner, provider task, agent command, account action, model request or hardware operation is performed. |
+| Installed Linux `9eec9cd` | 71 metadata/in-memory checks and 21 exact module hashes, including 58 Cargo manifest reference cases. All 54 semantic workspaces, selection, pending conversation and frozen frontend are preserved. [Receipt](evidence/installed-cargo-quoted-manifest-summary.json). | No live scanner, provider task, agent command, account action, model request or hardware operation is performed. |
 | Complete Linux `39db1fe` | **Failed:** 313/314 groups, 1,910 passing tests, sixteen declared skips and one failed scheduling-budget assertion. Exact owned cleanup verifies. [Receipt](evidence/linux-39db1fe-scheduling-failed-summary.json). | A nearly passing run is not complete acceptance. |
 
 Complete Linux aafb476 passes **317 groups, 1,923 tests and sixteen declared
@@ -49,7 +56,7 @@ changes and predates Cargo archive identity and the workflow-ID correction.
 [Complete receipt](evidence/linux-aafb476-complete-summary.json).
 
 The installed update verifies a dated backup and launcher readback. It retains
-current plus one rollback and removes the exact 530-file, 5,152,756-byte prepared
+current plus one rollback and removes the exact 530-file, 5,155,176-byte prepared
 bundle. Fifty-three sealed workspace files are byte-identical; one changes only
 audit metadata. It preserves the repaired native ChatGPT main window, hidden
 overlay, saved artwork and workstation guard.

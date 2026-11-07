@@ -44,10 +44,9 @@ Cargo archive quoted keys/tables and single-line literal strings now pass 58
 independent Python references and ten focused groups/96 tests, including six
 actual Linux scans and six Windows guest doubles. Typecheck, original package
 bounds and exact owned cleanup pass. Current Python/Cargo metadata verifiers pin
-`cargo-quoted-manifest-source-summary.json`; they must not be run against the
-older installed engine and bypassed on mismatch. Install the tested published
-checkpoint normally, then run only permitted metadata checks and compare all 54
-workspaces/frozen frontend. [Contract](cargo-archive-identity.md),
+`cargo-quoted-manifest-source-summary.json` and pass against installed `9eec9cd`.
+Its 71-check read-only/in-memory update verifies all 54 workspaces and the frozen
+frontend. No installed scanner, task, account action or model request occurred. [Contract](cargo-archive-identity.md),
 [source evidence](evidence/cargo-quoted-manifest-source-summary.json).
 
 The commissioned Windows provider adapter now carries exact process creation
@@ -60,14 +59,14 @@ Actual Windows native checks remain pending; Suite Windows focus wiring is still
 unfinished. [Contract](../apps/windows-companion/provider-desktop-helper/README.md),
 [evidence](evidence/provider-process-birth-source-summary.json).
 
-Installed `1cbe7a3` passes **71 metadata/in-memory checks** and verifies 21 exact
-module hashes. The observation preview/confirmation checks use synthetic state
-only. All 54 semantic workspaces, selection, the pending keyboard-only
-conversation and frozen frontend are preserved; 53 sealed files are byte-identical
-and one changes only audit metadata. All four saved profiles and 57 workflows
-remain compatible. Dated backup/readback and current plus one rollback verify.
-The exact 530-file, 5,152,756-byte prepared package is removed.
-[Installed evidence](evidence/installed-observation-design-summary.json).
+Installed `9eec9cd` passes **71 metadata/in-memory checks** and verifies 21 exact
+module hashes, including all 58 Cargo manifest reference cases. All 54 semantic
+workspaces, selection, pending keyboard-only conversation and frozen frontend are
+preserved; 53 sealed files are byte-identical and one changes only audit metadata.
+All four profiles and 57 workflows remain compatible. Dated backup and launcher
+readback verify; current plus one rollback remain. The exact 530-file,
+5,155,176-byte prepared bundle is removed.
+[Installed evidence](evidence/installed-cargo-quoted-manifest-summary.json).
 
 Run only the current repeatable metadata verifiers, each with
 `--read-only-metadata`: `verify-task-owner-host.mjs`,
@@ -109,16 +108,14 @@ changes and predates Cargo archive identity and the workflow-ID correction.
 
 No full Linux test service or temporary marker remains from that run.
 
-A newer full **321-group** Linux run is active from immutable published
-`a6a6618ab22bb51d6d19d40d3676208c7fa75092` (tree
-`99e6a98f196d759057639a16b190787cbeac5273`). Its unit is
-`switchyard-verification-a6a6618-1794013677.service`; exact checkout, dependency
-aliases and temporary-parent identities are in
-`~/.cache/switchyard-full-linux-path.json`. Preserve that marker and its owned
-paths until final exit and exact inventory/cleanup verification. It uses the
-original command, timeout and skip manifest and existing toolchains. New Windows
-provider changes and quoted Cargo manifests have separate focused evidence and
-are outside this source.
+Complete Linux `a6a6618` passes **321 groups, 1,949 tests and sixteen declared
+skips**, with zero failures/cancellations. Exact original commands, bounds, skip
+inventory and every child/tree retirement verify. Its checkout, nine dependency
+aliases, 782 generated files (11,766,823 bytes), empty temporary parent and marker
+are removed; other worktrees remain. This accepts Cargo archive, workflow/profile
+identity and observation design changes at that source. Later quoted Cargo
+manifests and Windows provider birth checks have separate focused evidence.
+[Complete receipt](evidence/linux-a6a6618-complete-summary.json).
 
 Workflow editing now rejects non-string role/step IDs and repeated dependency
 edges before persistence. Two regressions reproduce the previous acceptance of
@@ -174,12 +171,12 @@ native Windows profile correction acceptance remains separate.
 [Installed evidence](evidence/installed-profile-identity-summary.json).
 [Source evidence](evidence/profile-identity-source-summary.json).
 
-1. Reviewed observation design context and the compressed catalog package are
-   published and installed. Continue independent ledger gaps; keep installed
-   in-memory proof separate from live model/UI acceptance.
-   Keep later Cargo/workflow focused evidence separate from complete aafb476.
-   A new full run must use clean, published immutable source and a short owned
-   temporary parent; verify exact final inventory/exit before removing its files.
+1. Quoted Cargo manifest coverage is published and installed; full Linux
+   `a6a6618` is accepted and its exact staging is removed. Continue independent
+   ledger gaps. Keep the later quoted-manifest and Windows-provider corrections
+   separate from that full checkpoint, and installed in-memory proof separate
+   from live model/UI acceptance. Use immutable published source and a short
+   owned temporary parent for any new complete run.
 2. Inspect available native Windows receipts. The new five-shard schedule and
    later helper, SDK, Python/Cargo work require their own final results.
    Retain original failures and distinguish guest doubles from actual guests.

@@ -12,8 +12,11 @@ Python TOML/USTAR/gzip cases. Ten focused groups pass 96 tests, including six ac
 Linux Cargo scanner journeys and six Windows guest doubles. Original package
 bounds, typecheck, unchanged input/Git state and exact child/tree cleanup pass;
 the owned test root is removed. The previous rejection remains recorded.
-Installed acceptance of this grammar expansion and native Windows guest checks
-remain separate. [Current source evidence](evidence/cargo-quoted-manifest-source-summary.json).
+Installed `9eec9cd` passes all 58 reference cases in ten Cargo metadata checks
+inside the 71-check update. It preserves all 54 semantic workspaces and the frozen
+frontend; no live installed scan occurs. Native Windows guest acceptance remains
+separate. [Installed receipt](evidence/installed-cargo-quoted-manifest-summary.json).
+[Current source evidence](evidence/cargo-quoted-manifest-source-summary.json).
 
 Use the existing [Cargo artifact selection](cargo-artifact-integrity.md). No new
 authority or selection format is required. Both the lockfile and archive must be
