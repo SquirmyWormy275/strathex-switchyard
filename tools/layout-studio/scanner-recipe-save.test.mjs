@@ -36,9 +36,9 @@ linux("authenticated save review writes nothing; exact save is durable and repea
   assert.deepEqual(await readFile(join(f.root, ".git/index")), before.index); assert.equal(await f.run("rev-parse", "HEAD"), before.head); assert.equal((await f.service.list("personal")).length, 0);
 });
 
-test("Windows save is explicitly unavailable before native inspection or filesystem effects", async () => {
-  let calls = 0; const saver = createScannerRecipeSave({ platform: "win32", store: { snapshot: async () => { calls++; } }, authority: { prepareScannerDraft: async () => { calls++; } } });
-  await assert.rejects(saver.review("personal", {}), /only on Linux/); assert.equal(calls, 0); await saver.close();
+test("unsupported save platforms refuse before native inspection or filesystem effects", async () => {
+  let calls = 0; const saver = createScannerRecipeSave({ platform: "darwin", store: { snapshot: async () => { calls++; } }, authority: { prepareScannerDraft: async () => { calls++; } } });
+  await assert.rejects(saver.review("personal", {}), /supported Linux or Windows/); assert.equal(calls, 0); await saver.close();
 });
 
 linux("save rejects caller path, content, command and approval overrides", async t => {

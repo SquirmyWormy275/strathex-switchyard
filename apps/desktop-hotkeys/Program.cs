@@ -139,6 +139,7 @@ internal static class Program
         if (args.SequenceEqual(new[] { "--inspect-bounded-exchange-image" })) return OperatingSystem.IsWindows() ? ReviewedInputStager.RunBoundedImage(inspect: true) : 2;
         if (args.SequenceEqual(new[] { "--bounded-exchange-volume" })) return OperatingSystem.IsWindows() ? ReviewedInputStager.RunBoundedVolume() : 2;
         if (args.SequenceEqual(new[] { "--stage-reviewed-inputs" })) return OperatingSystem.IsWindows() ? ReviewedInputStager.Run() : 2;
+        if (args.SequenceEqual(new[] { "--scanner-recipe-files" })) return OperatingSystem.IsWindows() ? ReviewedInputStager.RunScannerSave() : 2;
         if (args.SequenceEqual(new[] { "--windows-sandbox-cli" })) return OperatingSystem.IsWindows() ? WindowsSandboxCli.Run() : 2;
         if (args.SequenceEqual(new[] { "--windows-storage-broker" })) return OperatingSystem.IsWindows() ? WindowsStorageBroker.Run() : 2;
         if (args.SequenceEqual(new[] { "--windows-storage-broker-service" })) return OperatingSystem.IsWindows() ? WindowsStorageBrokerService.Run() : 2;

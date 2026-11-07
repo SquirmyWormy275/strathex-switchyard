@@ -1,5 +1,29 @@
 # What has actually been verified
 
+## Windows scanner save implementation
+
+The fixed NTFS helper now provides exclusive generated-directory/file creation
+and read-only recovery inspection behind the existing review/apply API. Durable
+original helper ownership prevents replacement while exit is uncertain. Closed
+proofs bind exact request, root, directory, file identities and content hashes.
+No token, privilege or ACL boundary changes.
+
+Receipt `ec1beb65-6695-41c1-bb42-65db9fef1aed` passes 275 tests across 41 groups
+with ten declared platform skips. Follow-up `ba22eb68-0438-4566-82a3-b207f4959a8d`
+passes all 35 harness/CI-selection tests after registering the independent Windows
+`scanner-save` lane. Typecheck and offline compilation of 34 native sources pass
+with zero warnings/errors using the existing SDK and no package sources. Exact
+commands, bounds, skip counts, child/tree retirement and cleanup verify. The
+34-file, 1,479,448-byte compiler tree and empty owned test parent are removed.
+
+Windows composition and refusal tests use doubles here. Four actual NTFS cases
+(successful save, existing-directory refusal, junction substitution and hard-link
+substitution) are implemented but skipped on Linux; native Windows acceptance is
+pending. Frontend activation, live accounts/hardware and current complete-suite
+acceptance remain separate. [Source receipt](evidence/windows-scanner-recipe-save-source-summary.json),
+[behavior and bounds](scanner-recipe-saving.md).
+
+
 Installed Linux `b320506` verifies reviewed-save source within **76 metadata/in-memory
 checks and 34 exact module hashes**. All 54 semantic workspaces, selection, pending
 keyboard-only conversation and frozen frontend are preserved; 53 sealed files

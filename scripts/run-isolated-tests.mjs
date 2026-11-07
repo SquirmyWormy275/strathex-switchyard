@@ -253,6 +253,7 @@ export const requiredGroups = [
   { file: "tools/layout-studio/scanner-history-review.test.mjs", timeoutMs: process.platform === "win32" ? 300_000 : 120_000, expectedSkipped: process.platform === "linux" ? 0 : 1 },
   { file: "tools/layout-studio/scanner-recipe-draft.test.mjs", timeoutMs: process.platform === "win32" ? 300_000 : 120_000, expectedSkipped: process.platform === "linux" ? 0 : 1 },
   { file: "tools/layout-studio/scanner-recipe-save.test.mjs", timeoutMs: process.platform === "win32" ? 300_000 : 120_000, expectedSkipped: process.platform === "linux" ? 0 : 22 },
+  { file: "tools/layout-studio/windows-scanner-recipe-files.test.mjs", timeoutMs: process.platform === "win32" ? 300_000 : 120_000, expectedSkipped: process.platform === "win32" ? 0 : 4 },
   { file: "tools/layout-studio/git-index-inputs.test.mjs" },
   { file: "tools/layout-studio/git-history-inputs.test.mjs" },
   { file: "tools/layout-studio/task-history-inputs.test.mjs", ...nativeTestOverrides("tools/layout-studio/task-history-inputs.test.mjs"), expectedSkipped: process.platform === "linux" ? 0 : 1 },

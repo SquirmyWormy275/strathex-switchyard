@@ -44,8 +44,11 @@ storage reduces the package payload to 4,581,074 bytes without changing exports.
   this API before fresh authority and execution review. Thirty-five focused groups
   pass 221 tests, including interrupted-save recovery and all installation cases.
   The package stays below its original 5 MiB limit with lossless template storage
-  and identical exports. Windows saving and frozen frontend controls remain
-  unfinished. [Contract](scanner-recipe-saving.md),
+  and identical exports. Windows saving is now connected through an owned NTFS
+  helper; 41 focused groups pass 275 tests with ten platform skips. Four native
+  cases are wired into Windows CI and await acceptance. Frozen frontend controls
+  remain unfinished. [Contract](scanner-recipe-saving.md),
+  [Windows evidence](evidence/windows-scanner-recipe-save-source-summary.json),
   [evidence](evidence/scanner-recipe-save-source-summary.json).
 - **History preparation and read-only inspection:** bounded historical descriptors
   now come from the exact bound task. Protected capture computes Git tree identity
@@ -102,7 +105,7 @@ storage reduces the package payload to 4,581,074 bytes without changing exports.
   Home/catalog and editor activation remain frozen for owner review.
 - Windows project selection and task-specific IDE attachment; native application
   focus alone does not establish a task or account binding.
-- Broader Shield syntax, reviewed draft installation/mixed-source history coverage, general
+- Broader Shield syntax, frontend scanner setup and mixed-source history coverage, general
   exclusions, dependency/feature/target resolution, complete archive contents,
   license-text inspection, publisher provenance and verified local vulnerability
   context.

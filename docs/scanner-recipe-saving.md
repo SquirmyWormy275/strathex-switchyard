@@ -1,8 +1,9 @@
 # Review and save a scanner setup
 
-The Linux backend can now save the exact generated scanner setup after a separate,
-one-use review. Saving does not grant task authority or execute the scanner.
-Windows saving and the frozen frontend controls remain unfinished implementation.
+The backend saves the exact generated scanner setup after a separate, one-use
+review. Saving does not grant task authority or execute the scanner. Linux has
+actual save-and-scan evidence. The Windows implementation is connected and
+software-tested; actual NTFS acceptance is pending. Frontend controls remain frozen.
 
 Start with the task and installed feed selection described in
 [scanner drafts](scanner-recipe-drafts.md). Send that selection to authenticated
@@ -33,6 +34,19 @@ exclusive creation, owner/link checks, file synchronization, content readback an
 name/descriptor identity checks detect observed replacement. These checks do not
 isolate a compromised process using the same operating-system identity.
 
+On Windows, the fixed native helper pins NTFS ancestors and verifies the original
+root, directory and file identities. Each operation uses closed request/result
+schemas. New files use exclusive creation, flush and exact hash readback; verified
+files stay open against replacement during that operation. The helper permits
+only generated control names and refuses junctions, hard links, foreign contents
+and existing destinations. Each control file is limited to 320 KiB within the
+existing 512 KiB private-pipe request limit. Larger drafts refuse before approval.
+No privileges, token access or ACLs are changed.
+
+Every Windows helper has durable ownership recorded before readiness. A replacement
+cannot start until the original guardian proves retirement. Uncertain exit or
+missing file acknowledgement preserves output and ownership for inspection.
+
 Task/account/workspace and installed feed trust, revocation and freshness are
 checked between writes. A mode change or stopped operation fences subsequent
 writes. The result records only saving: use its `authorityProposal` for a **fresh**
@@ -61,13 +75,22 @@ Review uncertain output separately; automatic cleanup is not implemented.
 
 ## Evidence and limits
 
-The latest focused results pass **221 tests across 35 groups**, including 23 save
+The Linux save checkpoint passes **221 tests across 35 groups**, including 23 save
 cases, authenticated routes, changed-source/account/feed refusals, interrupted
 creation/write/acknowledgement, active-owner exclusion and a real Linux scan after
 backend saving and separate authority/execution reviews. Original index/HEAD and
 source files are preserved. Typecheck, original test bounds, process retirement,
 package/update/rollback/recovery checks and owned test-root cleanup verify.
 [Source evidence](evidence/scanner-recipe-save-source-summary.json).
+
+The Windows addition passes **275 tests across 41 groups**, with ten declared
+platform skips, plus typecheck and offline compilation of 34 native sources with
+zero warnings/errors. The focused run includes Linux saving regressions, Windows
+composition/proof-substitution doubles and uncertain native-owner recovery. Four
+real NTFS cases are wired into the complete Windows inventory and the independent
+`scanner-save` CI lane under the original bounds. They remain unaccepted until a
+Windows receipt verifies. The exact 34-file, 1,479,448-byte compiler output and
+empty test parent were removed. [Windows source evidence](evidence/windows-scanner-recipe-save-source-summary.json).
 
 The full Linux package stays below its existing 5 MiB test limit by storing the
 retained upstream print template losslessly compressed. Bounded decoding verifies
@@ -76,7 +99,7 @@ formats remain byte-for-byte equivalent; exported-package rebuilding also retain
 the template through the full 640-file recovery drill. Earlier failed assertions,
 package size and exported-package regression receipts remain recorded.
 
-This does not establish a completed frontend setup journey, Windows save support,
+This does not establish a completed frontend setup journey, native Windows acceptance,
 live provider/account commissioning, hardware acceptance or complete security
 coverage. Earlier complete-suite receipts remain tied to their original revisions.
 

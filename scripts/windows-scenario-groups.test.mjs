@@ -74,6 +74,13 @@ test("native filesystem, setup and restricted exchange CI lanes preserve every o
   assert.match(source, /"license-scanner": "tools\/layout-studio\/repository-windows-shield-licenses\.test\.mjs"/);
   assert.equal(selectWindowsContractGroups(["tools/layout-studio/repository-windows-shield-licenses.test.mjs"], requiredGroups).length, 1);
   for (const name of ["copilot-account-binding", "copilot-lifecycle", "copilot-requests"]) assert.equal(selectWindowsContractGroups(["tools/layout-studio/" + name + ".test.mjs"], requiredGroups).length, 1);
+  const save = "tools/layout-studio/windows-scanner-recipe-files.test.mjs";
+  assert.match(workflow, /task-owners, scanner-save, history-windows-scanner/);
+  assert.ok(source.includes('"scanner-save": "' + save + '"'));
+  const saveGroups = selectWindowsContractGroups([save], requiredGroups);
+  assert.equal(saveGroups.length, 1); assert.ok(requiredGroups.includes(saveGroups[0]));
+  assert.equal(saveGroups[0].timeoutMs, process.platform === "win32" ? 300000 : 120000);
+  assert.equal(saveGroups[0].expectedSkipped ?? 0, process.platform === "win32" ? 0 : 4);
 });
 test("fresh native and contract lanes queue by exact ref and matrix identity instead of waiting for an unrelated whole workflow", async () => {
   const workflow = await readFile(new URL("../.github/workflows/switchyard-windows-filesystem.yml", import.meta.url), "utf8");

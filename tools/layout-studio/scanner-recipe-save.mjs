@@ -1,6 +1,7 @@
 /** One-use reviewed scanner setup save; execution and task authority remain separate. */
 import { scopeHash, suiteConfirmations } from "./confirmations.mjs";
 import { scannerSaveRoot, writeScannerRecipeFiles, inspectScannerRecipeFiles } from "./scanner-recipe-files.mjs";
+import { createWindowsScannerRecipeFiles } from "./windows-scanner-recipe-files.mjs";
 
 const version = "switchyard-scanner-recipe-save/v1", action = "save_scanner_recipe";
 const uuid = v => typeof v === "string" && /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/.test(v);
@@ -10,7 +11,9 @@ const view = r => ({ id: r.id, status: r.status, draft: structuredClone(r.draft)
 const saved = r => ({ id: r.id, status: "saved", directory: r.draft.directory, manifestPath: r.draft.manifestPath, manifestSha256: r.draft.manifestSha256, authorityProposal: r.draft.authorityProposal, filesWritten: true, authorityGranted: false, scanPerformed: false, targetCurrentness: "requires-fresh-authority-review", nextStep: "Obtain fresh task authority, then a separate execution review. Saving never starts a scan." });
 const uncertain = (r, reason) => ({ id: r.id, status: "outcome-unconfirmed", directory: r.draft.directory, filesWritten: "unconfirmed", reason, preserved: true, replayed: false, authorityGranted: false, scanPerformed: false });
 
-export function createScannerRecipeSave({ store, authority, platform = process.platform, isActive = async () => true, now = Date.now, writer = writeScannerRecipeFiles, inspector = inspectScannerRecipeFiles } = {}) {
+export function createScannerRecipeSave({ store, authority, platform = process.platform, isActive = async () => true, now = Date.now, writer, inspector, filesystem } = {}) {
+  filesystem ??= platform === "win32" ? createWindowsScannerRecipeFiles({ store, platform }) : { root: scannerSaveRoot, write: writeScannerRecipeFiles, inspect: inspectScannerRecipeFiles };
+  writer ??= filesystem.write; inspector ??= filesystem.inspect;
   const pending = new Map(), generations = new Map(); let closed = false;
   const key = c => scopeHash([version, c]);
   const rowIn = (s, id) => { const row = s.scannerRecipeSaves?.find(r => r.id === id); if (!row || row.schema !== version) throw Error("The exact protected scanner save review is unavailable."); return row; };
@@ -20,7 +23,7 @@ export function createScannerRecipeSave({ store, authority, platform = process.p
     return s;
   }
   async function exclusive(c, fn) {
-    if (platform !== "linux") throw Error("Reviewed scanner saving is implemented only on Linux; Windows saving remains unavailable.");
+    if (!["linux", "win32"].includes(platform)) throw Error("Reviewed scanner saving requires a supported Linux or Windows filesystem boundary.");
     await active(c); if (pending.has(c)) throw Error("Wait for the current scanner save or review to settle.");
     const generation = generations.get(c) ?? 0;
     const work = store.withResourceLock("repository-execution", key(c), lease => fn(generation, lease));
@@ -34,14 +37,19 @@ export function createScannerRecipeSave({ store, authority, platform = process.p
   async function recover(c) {
     const s = await store.snapshot(c);
     if (!(s.scannerRecipeSaves ?? []).some(r => ["applying", "outcome-unconfirmed"].includes(r.status))) return { stopped: true, replayed: false };
-    if (platform !== "linux" || s.policy !== "personal") return { stopped: true, replayed: false, preserved: true, recoveryImplemented: false };
+    if (!["linux", "win32"].includes(platform) || s.policy !== "personal") return { stopped: true, replayed: false, preserved: true, recoveryImplemented: false };
     if (pending.has(c)) return { stopped: false, replayed: false };
     const result = await store.tryWithResourceLock("repository-execution", key(c), async lease => {
+      let stopped = true;
       for (const row of (await store.snapshot(c)).scannerRecipeSaves ?? []) {
         if (!["applying", "outcome-unconfirmed"].includes(row.status)) continue;
         if (row.schema !== version || !uuid(row.id) || row.scopeDigest !== scope(c, row.draft, row.rootIdentity)) throw Error("Preserve the unfamiliar scanner save recovery record.");
         lease.assert(); let complete = false;
-        try { complete = (await inspector(row.draft, row.rootIdentity, row.progress)).complete === true; } catch { /* Preserve changed, missing, linked or unknown output. */ }
+        try {
+          if ((await filesystem.retire?.(c))?.stopped === false) stopped = false;
+          else { const inspected = await inspector(row.draft, row.rootIdentity, row.progress, { compartment: c, authorize: async () => lease.assert() }); complete = inspected.complete === true; if (inspected.stopped === false) stopped = false; }
+        } catch { /* Preserve changed, missing, linked or unknown output. */ }
+        if ((await filesystem.retire?.(c))?.stopped === false) stopped = false;
         lease.assert();
         // Recovery needs no native account query and performs no repository mutation.
         await store.update(c, "scanner-save-recovery", s => {
@@ -50,14 +58,15 @@ export function createScannerRecipeSave({ store, authority, platform = process.p
           current.result = complete ? { ...saved(current), recoveredWithoutReplay: true } : uncertain(current, "Interrupted or changed output is preserved. No files were written, removed or replayed during recovery.");
         });
       }
-      return { stopped: true, replayed: false };
+      return { stopped, replayed: false };
     });
     return result.acquired ? result.value : { stopped: false, replayed: false };
   }
   return {
     async review(c, input) { return exclusive(c, async (generation, lease) => {
       if (((await store.snapshot(c)).scannerRecipeSaves ?? []).length >= 32) throw Error("The scanner save history is full; existing reviews and uncertain output were preserved.");
-      const draft = await authority.prepareScannerDraft(c, input), rootIdentity = await scannerSaveRoot(draft.repositoryRoot);
+      const draft = await authority.prepareScannerDraft(c, input); await filesystem.preflight?.(draft);
+      const rootIdentity = await filesystem.root(draft.repositoryRoot);
       const row = { schema: version, id: draft.id, status: "reviewed", selection: structuredClone(input), draft: metadata(draft), rootIdentity, scopeDigest: scope(c, draft, rootIdentity), createdAt: new Date(now()).toISOString(), expiresAt: new Date(now() + 300000).toISOString(), progress: { files: {} } };
       await guard(c, row, generation, lease);
       const confirmation = await suiteConfirmations(store, c, draft.binding.provider, now).issue({ action, targetSnapshotId: draft.targetSnapshotId, sessionId: draft.binding.sessionId, scopeDigest: row.scopeDigest, reason: "Save only these exact scanner control files into this new directory. Existing paths are never replaced. This grants no task authority and starts no scan; interrupted output is preserved without replay.", reauthenticated: false });
@@ -73,7 +82,8 @@ export function createScannerRecipeSave({ store, authority, platform = process.p
         if (Date.parse(row.expiresAt) <= now()) throw Error("The scanner save review expired. Prepare a fresh review.");
         await guard(c, row, generation, lease);
         const draft = await authority.prepareScannerDraft(c, row.selection, { id: row.id });
-        if (scope(c, draft, await scannerSaveRoot(draft.repositoryRoot)) !== row.scopeDigest) throw Error("The scanner save target, account, inputs, feed trust or exact generated bytes changed. Review again.");
+        await filesystem.preflight?.(draft);
+        if (scope(c, draft, await filesystem.root(draft.repositoryRoot)) !== row.scopeDigest) throw Error("The scanner save target, account, inputs, feed trust or exact generated bytes changed. Review again.");
         await guard(c, row, generation, lease);
         const decision = await suiteConfirmations(store, c, draft.binding.provider, now).consume({ token: input.token, action, sessionId: draft.binding.sessionId, targetSnapshotId: draft.targetSnapshotId, scopeDigest: row.scopeDigest });
         if (!decision.allowed) throw Error(decision.reason);
@@ -89,9 +99,9 @@ export function createScannerRecipeSave({ store, authority, platform = process.p
             else if (["file-created", "file-verified"].includes(event.kind)) actual.progress.files[event.path] = { status: event.kind === "file-created" ? "created" : "verified", identity: event.identity };
             else throw Error("Unsupported scanner save progress event.");
           });
-          await writer(draft, row.rootIdentity, record, authorize); await authorize();
+          await writer(draft, row.rootIdentity, record, authorize, { compartment: c }); await authorize();
           const current = rowIn(await store.snapshot(c), row.id);
-          if (!(await inspector(current.draft, current.rootIdentity, current.progress)).complete) throw Error("The exact saved control files could not be verified.");
+          if (!(await inspector(current.draft, current.rootIdentity, current.progress, { compartment: c, authorize })).complete) throw Error("The exact saved control files could not be verified.");
           await authorize();
           return await update(c, row, "scanner-save-completed", actual => { actual.status = "saved"; return actual.result = saved(actual); });
         } catch {
@@ -104,7 +114,11 @@ export function createScannerRecipeSave({ store, authority, platform = process.p
     },
     async list(c) { await active(c); return ((await store.snapshot(c)).scannerRecipeSaves ?? []).map(view); },
     recover,
-    async stopCompartment(c) { generations.set(c, (generations.get(c) ?? 0) + 1); await pending.get(c)?.catch(() => {}); return recover(c); },
-    async close() { closed = true; for (const c of pending.keys()) generations.set(c, (generations.get(c) ?? 0) + 1); await Promise.allSettled(pending.values()); }
+    async stopCompartment(c) {
+      generations.set(c, (generations.get(c) ?? 0) + 1); const nativeStop = filesystem.stopCompartment?.(c);
+      await pending.get(c)?.catch(() => {}); if ((await nativeStop)?.stopped === false) return { stopped: false, replayed: false };
+      return recover(c);
+    },
+    async close() { closed = true; for (const c of pending.keys()) generations.set(c, (generations.get(c) ?? 0) + 1); const retiring = filesystem.close?.(); await Promise.allSettled(pending.values()); await retiring; }
   };
 }
