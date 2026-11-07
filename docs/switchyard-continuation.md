@@ -55,9 +55,16 @@ verification, the final process/window observation and tmux socket validation
 before navigation. A change after pane selection prevents compositor focus and
 does not reverse/repeat the earlier effect. Three original regressions remain;
 ten focused groups pass 141 tests with one skip and both TypeScript checks.
-These corrections are source-only. Codex/conversation resume, cancellation and
-design effect checks still need implementation; the in-memory generation cannot
-observe external selection round trips entirely between reads.
+Legacy owned Codex coding-task resume also checks the role/workspace after exact
+task observation and forwards the guard into the Unix socket handshake. Commands
+and followups check immediately before send; a late guard cannot revive a closed
+or timed-out transport. Pending resume results cannot cross binding digests.
+Three original regressions remain; thirteen groups pass 167 tests with one skip
+and both TypeScript checks. The socket proof uses an actual local transport and
+synthetic daemon. These corrections are source-only. Configuration-conversation
+resume, cancellation and design effect checks still need implementation; the
+in-memory generation cannot observe external selection round trips entirely
+between reads.
 [Role dispatch contract](role-dispatch-binding.md).
 
 Native Windows client source `738c1f7` is audited: workflow `42372481436`, helper

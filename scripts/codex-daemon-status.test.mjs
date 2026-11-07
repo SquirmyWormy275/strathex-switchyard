@@ -94,6 +94,19 @@ test("daemon inventory, exact thread scope and local login metadata keep bounded
     await readCodexDaemonConfiguration(path, Object.create({ afterResult: () => { inheritedFollowup = true; return { id: 3, method: "thread/start" }; } }));
     assert.equal(inheritedFollowup, false); assert.deepEqual(methods.slice(-3), ["initialize", "initialized", "config/read"]);
     const resumed = await resumeExactCodexDaemonThread(path, "created-thread", "/exact/repository"); assert.equal(resumed.id, "created-thread"); assert.equal(resumed.modelPromptSubmitted, false);
+    const beforeGuardRefusal = methods.filter(method => method === "thread/resume").length;
+    let guardCalls = 0;
+    await assert.rejects(resumeExactCodexDaemonThread(path, "created-thread", "/exact/repository", { beforeCommand: async () => { guardCalls++; throw Error("Synthetic role authorization changed"); } }), /role authorization changed/);
+    assert.equal(guardCalls, 1); assert.equal(methods.filter(method => method === "thread/resume").length, beforeGuardRefusal);
+    let releaseGuard;
+    const heldGuard = new Promise(resolve => { releaseGuard = resolve; });
+    try {
+      await assert.rejects(resumeExactCodexDaemonThread(path, "created-thread", "/exact/repository", { deadlineMs: 100, beforeCommand: () => heldGuard }), /timed out/);
+    } finally { releaseGuard(); }
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(methods.filter(method => method === "thread/resume").length, beforeGuardRefusal, "A late guard cannot send after the original deadline closed transport");
+    await resumeExactCodexDaemonThread(path, "created-thread", "/exact/repository", { beforeCommand: async () => { guardCalls++; } });
+    assert.equal(guardCalls, 2); assert.equal(methods.filter(method => method === "thread/resume").length, beforeGuardRefusal + 1);
     badResume = true; await assert.rejects(resumeExactCodexDaemonThread(path, "created-thread", "/exact/repository"), /read-only permissions/);
     for (badStart of ["thread-cwd", "cwd", "sandbox", "approval"]) {
       await assert.rejects(startCodexDaemonThread(path, "/exact/repository", "task-7"), error => error.createdThreadId === "created-thread" && /read-only\/on-request/.test(error.message));

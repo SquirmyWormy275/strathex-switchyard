@@ -48,7 +48,23 @@ both TypeScript checks. Process, provider, window and tmux observations are
 explicit doubles. [Claude focus evidence](evidence/claude-focus-role-boundary-source-summary.json).
 
 These are source-level corrections; the installed application remains `738c1f7`.
-Codex/conversation resume, cancellation and design submission still need
+Legacy owned Codex coding-task resume now checks the same role/workspace guard
+after observing the exact task and again after transport initialization, just
+before sending the command. An authorization check that settles after the
+original deadline or disconnection cannot send. A pending acknowledgement cannot
+be shared with a different binding; ordinary requests with the same authority
+still share one pending result. The original exact thread, repository and
+read-only permission checks remain. As the [official app-server contract](https://learn.chatgpt.com/docs/app-server)
+describes, reopening a thread and starting a model turn are separate operations;
+this path adds no model prompt.
+
+Three regressions reproduced stale resume effects and a missing transport guard.
+The corrected thirteen-group check passes 167 tests and one platform skip, with
+both TypeScript checks. Its real Unix socket/WebSocket fixture uses a synthetic
+daemon and verifies refusal, timeout, late authorization and successful resume.
+[Codex resume evidence](evidence/codex-task-resume-role-boundary-source-summary.json).
+
+Configuration-conversation resume, cancellation and design submission still need
 equivalent checks at their own effect boundaries. The shared final history check
 prevents stale attribution, but does not prevent an earlier native effect.
 Windows task-window focus remains unsupported. No live account, model, installed

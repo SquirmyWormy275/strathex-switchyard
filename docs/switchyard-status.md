@@ -79,8 +79,12 @@ revive a pending custom-agent shortcut, and native-focus/client-launch callbacks
 receive the same generation guard. Claude's exact terminal-focus path now checks
 the role/workspace guard immediately before tmux navigation and compositor focus;
 ten focused groups pass 141 tests with one skip and both TypeScript checks.
-Codex/conversation resume, cancellation and design effect boundaries remain
-separate work. These corrections are not installed yet.
+Legacy owned Codex coding-task resume also checks after task observation and
+after transport initialization, before sending. A late authorization cannot send
+after the original timeout; pending results cannot cross bindings. Thirteen
+focused groups pass 167 tests and one skip, with both TypeScript checks.
+Configuration-conversation resume, cancellation and design effect boundaries
+remain separate work. These corrections are not installed yet.
 [Role dispatch evidence and limitations](role-dispatch-binding.md).
 
 ## Current evidence

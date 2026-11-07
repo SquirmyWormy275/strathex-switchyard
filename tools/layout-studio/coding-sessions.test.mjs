@@ -135,6 +135,47 @@ test("external session ownership is compartment-scoped, authenticated and retain
   await assert.rejects(store.claimSession("personal", { provider: "codex", sessionId: "synthetic-thread" }), /failed authentication/);
 }));
 
+test("pending Codex resume acknowledgements cannot be shared with a replacement authorization", () => fixture(async ({ service, options, repositoryRoot, idle, calls }) => {
+  const task = await service.create("personal", { requestId: randomUUID(), repositoryRoot, label: "Synthetic shared resume" }); idle();
+  let entered, release;
+  const ready = new Promise(resolve => { entered = resolve; }), held = new Promise(resolve => { release = resolve; });
+  const resume = options.daemon.resume;
+  options.daemon.resume = async (...args) => { assert.equal(typeof args[3].beforeCommand, "function"); await args[3].beforeCommand(); entered(); await held; return resume(...args); };
+  const original = service.resume("personal", task.id, { authorizationKey: "original-binding" });
+  try {
+    await ready;
+    await assert.rejects(service.resume("personal", task.id, { authorizationKey: "replacement-binding" }), /different authorization/);
+    assert.equal(calls.includes("resume"), false);
+  } finally { release(); await original; }
+  assert.equal(calls.filter(call => call === "resume").length, 1);
+}));
+
+for (const boundary of ["same-role-rebind", "workspace-round-trip"]) {
+  test(`Codex runtime resume refuses ${boundary} after its exact status read`, () => fixture(async ({ service, repositoryRoot, store, options, idle, calls }) => {
+    const task = await service.create("personal", { requestId: randomUUID(), repositoryRoot, label: "Synthetic owned runtime" }); idle();
+    const suite = createSuite({ store, coding: service, agents: { discovery: async () => [], close() {} }, voice: { discovery: async () => ({ available: false }) } });
+    const binding = { roleId: "builder", intent: "resume", provider: "codex", targetKind: "coding-task", targetId: task.id };
+    try {
+      await suite.handle("/api/suite/bootstrap");
+      await store.saveWorkflow("personal", { name: "Synthetic resume", roles: [{ id: "builder", label: "Builder" }], steps: [] });
+      await suite.handle("/api/suite/roles/bind", binding);
+      const read = options.daemon.read;
+      options.daemon.read = async (...args) => {
+        const result = await read(...args); options.daemon.read = read;
+        if (boundary === "same-role-rebind") await suite.handle("/api/suite/roles/bind", binding);
+        else {
+          await suite.handle("/api/suite/compartment/select", { compartment: "other-client" });
+          await suite.handle("/api/suite/compartment/select", { compartment: "personal" });
+        }
+        return result;
+      };
+      await assert.rejects(suite.handle("/api/suite/intent", { implementation: "switchyard.role/v1", roleId: "builder", intent: "resume" }), /role binding changed|workspace changed/);
+      assert.equal(calls.includes("resume"), false);
+      assert.equal((await store.snapshot("personal")).intentResults?.length ?? 0, 0);
+    } finally { await suite.close(); }
+  }));
+}
+
 test("the authenticated suite routes an exact coding role to runtime status and cannot reinterpret it as a configuration conversation", () => fixture(async ({ service, repositoryRoot, store }) => {
   const task = await service.bind("personal", existing(repositoryRoot));
   await store.saveWorkflow("personal", { name: "Coding loop", roles: [{ id: "builder", label: "Builder" }], steps: [] });

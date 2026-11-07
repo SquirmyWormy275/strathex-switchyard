@@ -37,10 +37,11 @@ function encodeFrame(value) {
   return Buffer.concat([header, masked]);
 }
 
-async function requestCodexDaemon(socketPath, command, parseResult, { deadlineMs = defaultDeadlineMs, afterResult } = {}) {
+async function requestCodexDaemon(socketPath, command, parseResult, { deadlineMs = defaultDeadlineMs, afterResult, beforeCommand = async () => {} } = {}) {
   if (platform() === "win32") throw new Error("The local Codex Unix socket is unavailable on Windows.");
   if (typeof socketPath !== "string" || !isAbsolute(socketPath) || /[\0\r\n]/.test(socketPath)) throw new Error("Codex socket path must be absolute.");
   if (!Number.isSafeInteger(deadlineMs) || deadlineMs < 100 || deadlineMs > 30_000) throw new Error("Codex observation deadline is invalid.");
+  if (typeof beforeCommand !== "function") throw new Error("Codex command authorization guard is invalid.");
   const socket = await stat(socketPath);
   if (!socket.isSocket() || socket.uid !== userInfo().uid || (socket.mode & 0o077) !== 0) throw new Error("Codex socket is not a private current-user socket.");
   const key = randomBytes(16).toString("base64");
@@ -68,14 +69,22 @@ async function requestCodexDaemon(socketPath, command, parseResult, { deadlineMs
       } else resolve(result);
     }
     function send(value) { connection.write(encodeFrame(value)); }
+    function sendChecked(value, nextPhase) {
+      phase = "authorizing";
+      Promise.resolve().then(beforeCommand).then(() => {
+        if (settled || connection.destroyed) return;
+        phase = nextPhase;
+        send(value);
+      }).catch(error => finish(error));
+    }
     function message(data) {
       let value;
       try { value = JSON.parse(data.toString("utf8")); } catch { finish(new Error("Codex daemon returned malformed JSON.")); return; }
       if (phase === "initialize" && value.id === 1) {
         if (value.error || !value.result) { finish(new Error("Codex daemon initialization was unavailable.")); return; }
-        phase = "list";
+        phase = "authorizing";
         send({ method: "initialized", params: {} });
-        send(command);
+        sendChecked(command, "list");
       } else if (phase === "list" && value.id === 2) {
         if (value.error) { finish(new Error("Codex daemon request was unavailable.")); return; }
         try {
@@ -83,8 +92,7 @@ async function requestCodexDaemon(socketPath, command, parseResult, { deadlineMs
           if (afterResult) {
             const followup = afterResult(parsedResult);
             if (!followup || followup.id !== 3) throw new Error("Codex daemon follow-up request was invalid.");
-            phase = "followup";
-            send(followup);
+            sendChecked(followup, "followup");
           } else finish(undefined, parsedResult);
         }
         catch (error) { finish(error); }

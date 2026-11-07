@@ -24,7 +24,7 @@ async function repository(value) {
 export function createCodingSessions({ store, resolveCli = trustedCli, platform = process.platform, now = () => Date.now(), daemon, taskDriverFactory, socketPath = join(homedir(), ".codex/app-server-control/app-server-control.sock") } = {}) {
   const adapter = { id: "switchyard.codex-stdio", version: 2, platform, testedApplicationVersion: "0.166.0", detection: "installed native CLI; owned restricted metadata connection and separately exited task creators", accountScope: "local login fingerprint; organization unverified" };
   const injected = daemon != null;
-  const legacy = daemon ?? (platform === "linux" ? { account: () => readCodexDaemonAccount(socketPath), resume: (sessionId, root) => resumeExactCodexDaemonThread(socketPath, sessionId, root) } : null);
+  const legacy = daemon ?? (platform === "linux" ? { account: () => readCodexDaemonAccount(socketPath), resume: (sessionId, root, _compartment, options) => resumeExactCodexDaemonThread(socketPath, sessionId, root, options) } : null);
   daemon ??= createCodexStdioTasks({ store, resolveCli });
   taskDriverFactory ??= injected ? null : () => createCodexStdioTasks({ store, resolveCli });
   const taskDrivers = new Map(), generations = new Map(); let closed = false;
@@ -152,10 +152,16 @@ export function createCodingSessions({ store, resolveCli = trustedCli, platform 
       await verifyRepositoryIdentity(task);
       return store.update(compartment, "coding-session-status", (s) => { const current = s.codingSessions.find((t) => t.id === id); if (current.sessionId !== task.sessionId || current.repositoryRoot !== task.repositoryRoot || current.accountFingerprint !== task.accountFingerprint) throw new Error("The exact task binding changed during observation."); current.observation = observation; if (["creating", "creation-uncertain"].includes(current.status)) current.status = "registered"; observe(s, current, "status-observed"); return view(current); }, { provider: "codex" });
     },
-    async resume(compartment, id) {
-      await store.authorize(compartment, { provider: "codex" });
+    async resume(compartment, id, { assertCurrent = async () => {}, authorizationKey } = {}) {
+      const generation = generations.get(compartment) ?? 0;
+      const checkCurrent = async () => { assertGeneration(compartment, generation); await store.authorize(compartment, { provider: "codex" }); await assertCurrent(); assertGeneration(compartment, generation); };
+      await checkCurrent();
       const key = `${compartment}:${id}`;
-      if (resuming.has(key)) return resuming.get(key);
+      if (resuming.has(key)) {
+        const existing = resuming.get(key);
+        if (existing.authorizationKey !== authorizationKey) throw new Error("A resume under a different authorization is still pending. Its original result must settle before another deliberate request.");
+        const result = await existing.pending; await checkCurrent(); return result;
+      }
       const pending = (async () => {
         const login = await account(compartment), task = (await store.snapshot(compartment)).codingSessions?.find((t) => t.id === id);
         if (!task?.sessionId || task.schema !== "switchyard-coding-session/v1" || task.provider !== "codex" || task.status !== "registered" || task.launchPolicy !== "read-only/on-request") throw new Error("Runtime resume is implemented only for exact read-only tasks created by Switchyard. Existing task permissions are not changed.");
@@ -167,10 +173,12 @@ export function createCodingSessions({ store, resolveCli = trustedCli, platform 
         if (["active", "waiting-on-approval"].includes(before.status)) throw new Error("This exact task is already active or awaiting approval. Its running permissions were preserved.");
         try {
           if (legacy?.account && (await legacy.account(compartment)).fingerprint !== login.fingerprint) throw new Error("The original native runtime account changed. No saved context was resumed in it.");
-          const result = await (legacy ?? daemon).resume(task.sessionId, task.repositoryRoot, compartment);
+          await checkCurrent();
+          const result = await (legacy ?? daemon).resume(task.sessionId, task.repositoryRoot, compartment, { beforeCommand: checkCurrent });
           if (result.id !== task.sessionId || result.repositoryRoot !== task.repositoryRoot || result.permissions !== task.launchPolicy || result.modelPromptSubmitted !== false || !states.includes(result.observation)) throw new Error("Codex did not verify the exact resumed runtime and permissions.");
           if ((await account(compartment)).fingerprint !== login.fingerprint) throw new Error("The local login changed during resume.");
           await verifyRepositoryIdentity(task);
+          await checkCurrent();
           return store.update(compartment, "coding-runtime-resume", (s) => {
             const current = s.codingSessions.find((t) => t.id === id);
             if (current.sessionId !== task.sessionId || current.repositoryRoot !== task.repositoryRoot || current.accountFingerprint !== task.accountFingerprint) throw new Error("The saved task binding changed during resume.");
@@ -183,8 +191,8 @@ export function createCodingSessions({ store, resolveCli = trustedCli, platform 
           throw error;
         }
       })();
-      resuming.set(key, pending);
-      try { return await pending; } finally { if (resuming.get(key) === pending) resuming.delete(key); }
+      resuming.set(key, { pending, authorizationKey });
+      try { return await pending; } finally { if (resuming.get(key)?.pending === pending) resuming.delete(key); }
     },
     async stopCompartment(c) { generations.set(c, (generations.get(c) ?? 0) + 1); const results = await Promise.all([daemon.stopCompartment?.(c) ?? { stopped: true }, ...[...taskDrivers.values()].filter((r) => r.compartment === c).map(async (r) => { const exits = await r.driver.close(); return { stopped: Array.isArray(exits) && exits.every((e) => e.stopped) }; })]); return { stopped: results.every((r) => r.stopped === true), sharedRuntimePreserved: true }; },
     async close() { closed = true; const results = await Promise.all([...new Set([...taskDrivers.values()].map((r) => r.compartment))].map((c) => this.stopCompartment(c))); await daemon.close?.(); return results; }
