@@ -47,10 +47,13 @@ async function fixture(t, options = {}) {
       : method === 'thread/resume' ? { thread, cwd: target.repositoryRoot, sandbox: { type: 'readOnly' }, approvalPolicy: 'on-request', modelProvider: 'openai' } : { thread };
     await options.reply?.(method, result); return result;
   };
-  let checks = 0;
+  let checks = 0,queryHooks;
   const probe = { close: async () => ({ stoppedVerified: options.helperStopped !== false }), inspectPeer: async (selected, context) => {
-    checks++; await context.assertCurrent(); await options.peerCheck?.();
-    return { schema: 'switchyard-editor-terminal-peer-result/v1', requestId: randomUUID(), processId: selected.processId, birth: selected.expectedBirth, image: { ...selected.image }, connection: { ...selected.connection }, connectionVerified: true, currentUserVerified: true, currentSessionVerified: true, processAccessMask: 0x101000, tokenAccessMask: 8, processTerminated: false, windowFocused: false, taskAttached: false, accountVerified: false };
+    const ownership={schema:'switchyard-windows-query-owner/v1',requestId:randomUUID(),role:'peer',scope:{schema:'switchyard-runtime-command/v1',id:randomUUID(),guardianPid:500,birth:'638000000000000001',containment:'windows-job'},helper:{path:'C:\\Synthetic\\Helper.exe',sha256:'e'.repeat(64)}};
+    try {
+      await queryHooks.onOwner(ownership);checks++; await context.assertCurrent(); await options.peerCheck?.();
+      return { schema: 'switchyard-editor-terminal-peer-result/v1', requestId: randomUUID(), processId: selected.processId, birth: selected.expectedBirth, image: { ...selected.image }, connection: { ...selected.connection }, connectionVerified: true, currentUserVerified: true, currentSessionVerified: true, processAccessMask: 0x101000, tokenAccessMask: 8, processTerminated: false, windowFocused: false, taskAttached: false, accountVerified: false };
+    } finally { await queryHooks.onRetired(ownership); }
   } };
   let connectionClient = client;
   if (options.retained) {
@@ -58,7 +61,7 @@ async function fixture(t, options = {}) {
     client.initializationEvidence = { clientName: 'switchyard_tasks', result: { userAgent: 'switchyard_tasks/0.166.0 (synthetic retained owner)' } };
     connectionClient = createRetainedCodexEditorClient({ client, target, assertCurrent: async () => {} });
   }
-  const owner = await openWindowsCodexEditorConnection({ requestId: randomUUID(), target, client: connectionClient, platform: 'win32', signal: abort.signal, probeFactory: () => probe,
+  const owner = await openWindowsCodexEditorConnection({ requestId: randomUUID(), target, client: connectionClient, platform: 'win32', signal: abort.signal, probeFactory: callbacks => { queryHooks=callbacks;return probe; },
     assertCurrent: options.assertCurrent ?? (async () => {}), onOwnership: async value => { records.push(value); await options.onOwnership?.(value); },
     onAcknowledged: async (value, signal) => { acknowledged.push(value); await options.onAcknowledged?.(value, signal); },
     retireClient: async original => { assert.equal(original, connectionClient); retired.push(original); await options.retire?.(); return options.retained ? connectionClient.stop() : { stopped: options.upstreamStopped !== false }; } });
@@ -76,6 +79,8 @@ test('Windows transport and exact-task protocol complete one real socket exchang
   const token = f.owner.privateEndpoint.authToken, publicValue = JSON.stringify(f.owner.observation());
   for (const value of [token, account.email, target.accountFingerprint, target.sessionId, target.repositoryRoot]) assert.equal(publicValue.includes(value), false);
   assert.equal(JSON.stringify(f.records).includes(token), false);
+  const queries=f.records.filter(r=>r.kind.startsWith('query-'));assert.equal(queries.length,f.checks()*2);
+  for(let i=0;i<queries.length;i+=2){assert.equal(queries[i].kind,'query-ready');assert.equal(queries[i+1].kind,'query-retired');assert.deepEqual(queries[i].ownership,queries[i+1].ownership);}
   for (const key of ['nativeTaskLoaded','terminalLaunched','ideAttached','authorityGranted','completionVerified']) assert.equal(f.owner.observation()[key], false);
   assert.equal((await f.owner.stop()).stopped, true); assert.equal(f.retired.length, 1); assert.equal(f.owner.observation().protocolAcknowledged, false);
 });

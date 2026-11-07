@@ -163,6 +163,38 @@ The earlier target implementation passes Windows CI at `2d1cc65`: fifteen
 groups, 159 tests, no skips, including real process reinspection and protected
 target/client registration against a synthetic app server.
 [Native target evidence](evidence/windows-editor-target-native-summary.json).
-The newer journal's Windows run is pending. Its production lifecycle still must
-retain every active query helper, verify native host/helper retirement after
-interruption, and connect the Suite and VS Code editor paths.
+The journal passes Windows CI at `75fd0b1`: sixteen groups, 165 tests and no
+skips, with native/recovery doubles explicit in journal cases.
+[Native journal evidence](evidence/windows-editor-journal-native-summary.json).
+Production lifecycle composition, native host/helper recovery and the Suite/VS Code
+editor paths remain unfinished.
+
+
+## Retain each carrier query helper
+
+The read-only process probe now calls `onOwner` before acknowledging worker
+startup and `onRetired` only after independent guardian/Job retirement verifies.
+A closed ownership record contains the query UUID, role, original guardian scope
+and helper path/digest. Callback values are copies. A held or failed checkpoint
+remains joined during cancellation; uncertain retirement prevents replacement.
+
+The Windows carrier forwards these records through the composed connection.
+`handle.recordQuery()` retains one current query at a time, with a bounded
+sequence counter. A new query cannot overwrite an unretired one. Retirement must
+name the exact saved helper and can still be recorded after permission withdrawal.
+Normal editor retirement cannot claim helper exit while that record is active.
+Recovery receives the original unretired helper rather than inferring cleanup
+from the parent host. These are the editor carrier's queries; task metadata
+probes remain part of their separate task-owner lifecycle.
+
+Fourteen focused groups pass **150 tests with four platform skips**, plus
+typecheck. Checks cover original callback identity/order, held registration,
+checkpoint refusal, helper replacement, record substitution and successful-
+cleanup refusal. Real socket composition uses explicit native-query doubles.
+The actual Windows carrier test now verifies original helper checkpoint pairs;
+its new CI acceptance is pending. No C# change, compilation, new dependency or
+installed-state update was needed.
+[Source evidence](evidence/windows-query-ownership-source-summary.json).
+
+The next step is production lifecycle composition and native recovery of the
+saved host and carrier query helper, followed by Suite/VS Code integration.

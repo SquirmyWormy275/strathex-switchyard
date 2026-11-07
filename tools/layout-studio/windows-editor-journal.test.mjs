@@ -7,12 +7,14 @@ import { join } from 'node:path';
 import { createSuiteStore } from './suite-store.mjs';
 import { createCodingEditorAuthorizations } from './coding-editor-authorizations.mjs';
 import { createCodingEditorJournal } from './coding-editor-journal.mjs';
+import { windowsQueryOwnership } from './windows-query-ownership.mjs';
 
 const hash=v=>createHash('sha256').update(JSON.stringify(v)).digest('hex');
 const clean={clientConnectionRetired:true,carrierExitVerified:true,queryHelpersExitVerified:true};
 const ack={schema:'switchyard-codex-editor-protocol/v1',stage:'acknowledged',reason:null,accountBeforeVerified:true,exactResumeRequested:true,exactResumeReplyVerified:true,accountAfterVerified:true,protocolAcknowledged:true,transportPeerVerified:false,terminalProcessVerified:false,ideAttached:false,authorityGranted:false,completionVerified:false};
 const image=(name,sha)=>({path:'C:\\Synthetic\\'+name,sha256:sha.repeat(64),device:'0',inode:'9007199254740993',size:'512'});
 const host=()=>({schema:'switchyard-editor-terminal-process-result/v1',requestId:randomUUID(),processId:101,birth:'133000000000000001',image:image('node.exe','a'),currentUserVerified:true,currentSessionVerified:true,processAccessMask:0x101000,tokenAccessMask:8,processTerminated:false,windowFocused:false,taskAttached:false,accountVerified:false});
+const queryOwner=()=>({schema:'switchyard-windows-query-owner/v1',requestId:randomUUID(),role:'peer',scope:{schema:'switchyard-runtime-command/v1',id:randomUUID(),guardianPid:500,birth:'638000000000000001',containment:'windows-job'},helper:{path:'C:\\Synthetic\\Helper.exe',sha256:'e'.repeat(64)}});
 async function fixture(t) {
   const root=await mkdtemp(join(tmpdir(),'sywj-')),keys=new Map(),services=[];
   const store=createSuiteStore({root,secrets:{get:async(c,p)=>keys.get(c+p),set:async(c,p,v)=>keys.set(c+p,v)}});await store.initialize('personal');await store.update('personal','fixture-mode',s=>{s.mode='personal-companion';});
@@ -86,4 +88,27 @@ test('Windows journal shutdown joins pending checkpoints and preserves the origi
   let enter,release;const entered=new Promise(r=>enter=r),held=new Promise(r=>release=r);f.hook=async()=>{enter();await held;};
   const pending=handle.record(f.upstream()),rejected=assert.rejects(pending);await entered;let closed=false;const closing=f.api.close().then(()=>{closed=true;});await new Promise(r=>setImmediate(r));assert.equal(closed,false);release();await rejected;await closing;
   assert.equal(handle.observation().status,'reserved');await handle.retire(clean);assert.equal(handle.observation().stoppedVerified,true);
+});
+
+test('Windows query ownership refuses extra fields, alternate helper paths and unknown guardian coordinates',()=>{
+  const original=queryOwner();assert.deepEqual(windowsQueryOwnership(original),original);
+  for(const patch of [{role:'execute'},{requestId:'00000000-0000-0000-0000-000000000000'},{command:'never-run'},{scope:{...original.scope,containment:'owned-linux-session'}},{scope:{...original.scope,birth:'0'}},{helper:{...original.helper,path:'\\\\server\\share\\helper.exe'}},{helper:{...original.helper,path:'C:\\Synthetic\\Helper.exe:extra'}},{helper:{...original.helper,sha256:'E'.repeat(64)}}])assert.throws(()=>windowsQueryOwnership({...original,...patch}));
+});
+
+test('each Windows query keeps its exact helper until durable retirement and cannot manufacture successful cleanup',async t=>{
+  const f=await fixture(t);await f.consume();const {handle}=await f.api.reserve('personal',f.selected,{host:f.host});const first=queryOwner(),second=queryOwner();
+  const event={kind:'query-ready',ownership:structuredClone(first)},saving=handle.recordQuery(event);event.ownership.helper.path='C:\\Changed.exe';await saving;
+  assert.deepEqual((await f.store.snapshot('personal')).codingEditorConnections[0].queryOwner,{ownership:first,stopped:false});
+  await assert.rejects(handle.recordQuery({kind:'query-ready',ownership:second}));await assert.rejects(handle.recordQuery({kind:'query-retired',ownership:second}));await assert.rejects(handle.retire(clean));
+  await handle.recordQuery({kind:'query-retired',ownership:first});assert.equal((await handle.recordQuery({kind:'query-retired',ownership:first})).duplicatePrevented,true);
+  await assert.rejects(handle.recordQuery({kind:'query-ready',ownership:first}));await handle.recordQuery({kind:'query-ready',ownership:second});f.active=false;
+  await handle.recordQuery({kind:'query-retired',ownership:second});await handle.retire(clean);const row=(await f.store.snapshot('personal')).codingEditorConnections[0];assert.equal(row.querySequence,2);assert.equal(row.queryOwner.stopped,true);assert.equal(row.status,'stopped');
+  await assert.rejects(handle.recordQuery({kind:'query-ready',ownership:queryOwner()}));
+});
+
+test('query retirement preserves a substituted journal and native recovery receives the original unretired helper',async t=>{
+  const f=await fixture(t);await f.consume();const {handle}=await f.api.reserve('personal',f.selected,{host:f.host}),ownership=queryOwner();await handle.recordQuery({kind:'query-ready',ownership});
+  const recovery=f.service();await recovery.recover('personal',f.selected,async row=>{assert.deepEqual(row.queryOwner.ownership,ownership);assert.equal(row.queryOwner.stopped,false);return{hostExitVerified:true,...clean,queryHelpersExitVerified:false};});
+  await assert.rejects(handle.recordQuery({kind:'query-retired',ownership}));assert.equal((await f.store.snapshot('personal')).codingEditorConnections[0].status,'uncertain');
+  assert.equal((await recovery.recover('personal',f.selected,async row=>{assert.deepEqual(row.queryOwner.ownership,ownership);return{hostExitVerified:true,...clean};})).stoppedVerified,true);
 });

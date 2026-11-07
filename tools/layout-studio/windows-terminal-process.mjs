@@ -13,14 +13,14 @@ const require = v => { if (!v) throw Error("The exact Windows terminal process e
 const uuid = v => typeof v === "string" && /^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/.test(v) && v !== "00000000-0000-0000-0000-000000000000";
 const decimal = (v, zero = false) => typeof v === "string" && (zero ? /^(?:0|[1-9][0-9]{0,19})$/ : /^[1-9][0-9]{0,19}$/).test(v) && BigInt(v) <= 0xffffffffffffffffn;
 const hash = v => typeof v === "string" && /^[a-f0-9]{64}$/.test(v);
-const path = v => typeof v === "string" && /^[A-Za-z]:\\/.test(v) && win32.normalize(v) === v && Buffer.byteLength(v) <= 4096
+export const windowsLocalExecutablePath = v => typeof v === "string" && /^[A-Za-z]:\\/.test(v) && win32.normalize(v) === v && Buffer.byteLength(v) <= 4096
   && !/[\x00-\x1f\x7f<>:"/|?*]/.test(v.slice(3)) && v.slice(3).split("\\").every(p => p && !/[. ]$/.test(p) && !/^(?:CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])(?:\.|$)/i.test(p));
 
 export function windowsTerminalProcessQuery(value) {
   require(exact(value, ["schema", "requestId", "processId", "expectedBirth", "image"]) && value.schema === "switchyard-editor-terminal-process-query/v1" && uuid(value.requestId)
     && Number.isSafeInteger(value.processId) && value.processId > 0 && value.processId <= 0x7fffffff && (value.expectedBirth === null || decimal(value.expectedBirth)));
   const image = value.image;
-  require(exact(image, ["path", "sha256", "device", "inode", "size"]) && path(image.path) && hash(image.sha256) && decimal(image.device, true) && BigInt(image.device) <= 0xffffffffn
+  require(exact(image, ["path", "sha256", "device", "inode", "size"]) && windowsLocalExecutablePath(image.path) && hash(image.sha256) && decimal(image.device, true) && BigInt(image.device) <= 0xffffffffn
     && decimal(image.inode) && decimal(image.size) && BigInt(image.size) <= 512n * 1024n * 1024n);
   return Object.freeze({ ...value, image: Object.freeze({ ...image }) });
 }
@@ -87,7 +87,9 @@ async function packagedHelper() {
   return { path: join(root, image.path), sha256: image.sha256 };
 }
 
-export function createWindowsTerminalProcessProbe({ platform = process.platform, helper = packagedHelper, command = runRuntimeCommand, guardianStopped = runtimeGuardianStopped } = {}) {
+export function createWindowsTerminalProcessProbe({ platform = process.platform, helper = packagedHelper, command = runRuntimeCommand, guardianStopped = runtimeGuardianStopped,
+  onOwner = async () => {}, onRetired = async () => {} } = {}) {
+  require(typeof onOwner === "function" && typeof onRetired === "function");
   const resource = { clients: new Set(), controller: new AbortController() };
   let pending, closed = false, uncertain = false;
   function inspect(peer, input, { assertCurrent, signal } = {}) {
@@ -102,15 +104,19 @@ export function createWindowsTerminalProcessProbe({ platform = process.platform,
       // Reserve pending before invoking any caller callback, including a
       // synchronous context check that re-enters this probe.
       const work = Promise.resolve().then(async () => {
-        let owner, stopped = false, native;
+        let owner, stopped = false, native, ownership;
         try {
           await current(); native = await helper(); require(native && typeof native.path === "string" && hash(native.sha256)); await current();
           const observeExit = frame => guardianStopped(frame, { windowsHelper: native.path });
           const result = await runOwnedNativeCommand({ executable: native.path, args: [`--editor-terminal-${family}-v1`], cwd: dirname(native.path), env: desktopEnvironment(),
             text: JSON.stringify(request) + "\n", timeout: 10000, maxOutputBytes: 16384, captureStderrBytes: 0, expectedExecutableSha256: native.sha256,
             resource, signal: controller.signal, command: (exe, args, options) => command(exe, args, { ...options, windowsHelper: native.path }), guardianStopped: observeExit,
-            onReady: async scope => { require(scope.containment === "windows-job"); owner = scope; await current(); },
-            onStopped: async scope => { require(await observeExit(scope)); stopped = true; }
+            onReady: async scope => {
+              require(scope.containment === "windows-job"); owner = scope;
+              ownership = { schema: "switchyard-windows-query-owner/v1", requestId: request.requestId, role: family, scope: { ...scope }, helper: { path: native.path, sha256: native.sha256 } };
+              await onOwner(structuredClone(ownership)); await current();
+            },
+            onStopped: async scope => { require(await observeExit(scope)); require(ownership); await onRetired(structuredClone(ownership)); stopped = true; }
           });
           await current(); require(owner && stopped && result.status === "completed" && result.exitCode === 0);
           return (peer ? windowsTerminalPeerResult : windowsTerminalProcessResult)(JSON.parse(result.stdout), request);

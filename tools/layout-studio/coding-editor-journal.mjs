@@ -4,6 +4,7 @@ import { posix } from 'node:path';
 import { appendEditorObservation } from './editor-observation.mjs';
 import { windowsCodexBinding } from './windows-codex-binding.mjs';
 import { windowsEditorHost, changeWindowsEditorJournal, windowsEditorRetirementFields, windowsEditorJournalStates } from './windows-editor-journal-contract.mjs';
+import { windowsQueryOwnership } from './windows-query-ownership.mjs';
 
 const field = 'codingEditorConnections';
 const uuid = v => typeof v === 'string' && /^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/.test(v);
@@ -117,6 +118,28 @@ export function createCodingEditorJournal({ store, authorizations, now=Date.now,
         const handle=Object.freeze({
           observation:()=>view(lease.row),
           assertCurrent:()=>track(async()=>{require(!['stopped','uncertain'].includes(lease.row.status));await current(c,s,original);matches(await store.snapshot(c));}),
+          recordQuery(event) {
+            let copy;try{require(windows && exact(event,['kind','ownership']) && ['query-ready','query-retired'].includes(event.kind));copy={kind:event.kind,ownership:windowsQueryOwnership(event.ownership)};}catch(error){return Promise.reject(error);}
+            const retiring=copy.kind==='query-retired';
+            return track(()=>store.withResourceLock('client-launch',ownershipKey,async owned=>{
+              // Query admission is already inside the caller's target check.
+              // Do not recursively launch another native inspection from this
+              // helper checkpoint. Retirement remains possible after revocation.
+              await store.authorize(c,retiring?{}:{provider:'codex'});const state=await store.snapshot(c);matches(state);owned.assert();
+              const next=structuredClone(lease.row),previous=next.queryOwner;
+              if(retiring){require(previous && hash(previous.ownership)===hash(copy.ownership));if(previous.stopped)return{recorded:true,duplicatePrevented:true};previous.stopped=true;}
+              else {
+                require(!closed && !['stopped','uncertain'].includes(next.status) && policy(state)===original.policyDigest && (!previous || previous.stopped));
+                require(!previous || previous.ownership.requestId!==copy.ownership.requestId && previous.ownership.scope.id!==copy.ownership.scope.id);
+                const sequence=(next.querySequence??0)+1;require(Number.isSafeInteger(sequence) && sequence<=1000000);
+                next.querySequence=sequence;next.queryOwner={ownership:copy.ownership,stopped:false};
+              }
+              next.revision++;next.updatedAt=now();
+              await store.update(c,'coding-editor-query-'+(retiring?'retire':'reserve'),state=>{
+                owned.assert();matches(state);if(!retiring)require(!closed && policy(state)===original.policyDigest);Object.assign(rowFor(state,s),next);
+              },retiring?{}:{provider:'codex'});lease.row=next;return{recorded:true,duplicatePrevented:false};
+            }));
+          },
           record(event) {
             let copy;try {require(object(event) && Buffer.byteLength(JSON.stringify(event))<=16384);copy=structuredClone(event);if(!windows && copy.kind==='ingress' && object(copy.ownership))copy.ownership.socketIdentity??=null;}catch(error){return Promise.reject(error);}
             return track(()=>store.withResourceLock('client-launch',ownershipKey,async owned=>{
@@ -132,6 +155,7 @@ export function createCodingEditorJournal({ store, authorizations, now=Date.now,
             return track(()=>store.withResourceLock('client-launch',ownershipKey,async owned=>{
               await store.authorize(c);const state=await store.snapshot(c);matches(state);owned.assert();
               if(lease.row.status==='stopped')return {...view(lease.row),duplicatePrevented:true};
+              if(windows && copy.queryHelpersExitVerified)require(!lease.row.queryOwner || lease.row.queryOwner.stopped===true);
               const next={...structuredClone(lease.row),status:Object.values(copy).every(Boolean)?'stopped':'uncertain',retirement:copy,revision:lease.row.revision+1,updatedAt:now()};
               await store.update(c,'coding-editor-connection-retire',state=>{owned.assert();matches(state);const row=rowFor(state,s);Object.assign(row,next);appendEditorObservation(state,row);});lease.row=next;return view(next);
             }));

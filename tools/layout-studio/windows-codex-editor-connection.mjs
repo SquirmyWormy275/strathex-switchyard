@@ -48,15 +48,18 @@ export async function openWindowsCodexEditorConnection({ requestId, target, clie
         // A caller can cancel while listener creation or retention is awaiting.
         // Join startup before deciding which original resources need retirement.
         await started;
-        const facts = { relayJoined: false, carrierExitVerified: false, clientConnectionRetired: false, upstreamExitVerified: false };
+        const facts = { relayJoined: false, carrierExitVerified: false, queryHelpersExitVerified: false, clientConnectionRetired: false, upstreamExitVerified: false };
         try { if (relay) await relay.stop(); facts.relayJoined = true; } catch {}
-        try { if (ingress) facts.carrierExitVerified = (await ingress.stop()).stopped === true; else facts.carrierExitVerified = !failure?.retirementUnconfirmed; } catch {}
+        try {
+          if (ingress) { const result=await ingress.stop();facts.carrierExitVerified=result.stopped===true;facts.queryHelpersExitVerified=result.helperExitVerified===true; }
+          else facts.carrierExitVerified=facts.queryHelpersExitVerified=!failure?.retirementUnconfirmed;
+        } catch {}
         try {
           const result = await retireClient(client);
           facts.clientConnectionRetired = result?.stopped === true && (!logicalClient || result.logicalClientRetired === true && result.nativeProcessTerminated === false);
           facts.upstreamExitVerified = !logicalClient && facts.clientConnectionRetired;
         } catch {}
-        require(facts.relayJoined && facts.carrierExitVerified && facts.clientConnectionRetired && (logicalClient || facts.upstreamExitVerified));
+        require(facts.relayJoined && facts.carrierExitVerified && facts.queryHelpersExitVerified && facts.clientConnectionRetired && (logicalClient || facts.upstreamExitVerified));
         const result = Object.freeze({ stopped: true, ...facts, terminalProcessTerminated: false });
         await onOwnership({ kind: 'retired', requestId, ...result }); return result;
       })(); return stopping;
@@ -72,6 +75,8 @@ export async function openWindowsCodexEditorConnection({ requestId, target, clie
         await onAcknowledged(value, abortSignal); await current(); require(ingress.observation().peerVerified === true);
       } });
     ingress = await openWindowsEditorIngress({ requestId, platform, ...(probeFactory ? { probeFactory } : {}), signal: controller.signal, assertCurrent: current,
+      onQueryOwner: async ownership => { await onOwnership({kind:'query-ready',requestId,ownership}); await current(); },
+      onQueryRetired: ownership => onOwnership({kind:'query-retired',requestId,ownership}),
       onMessage: message => relay.receive(message), onOwnership: async ownership => {
         // Stopped evidence is retained during retirement, after admission closes.
         if (ownership.phase !== 'stopped') await current();

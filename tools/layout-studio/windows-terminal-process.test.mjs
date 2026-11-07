@@ -39,7 +39,8 @@ function fixture(t, options = {}) {
     await config.onGuardianReady(scope); await options.afterReady?.();
     return { status: "completed", exitCode: 0, treeExitVerified: true, inputDelivered: true, stdout: JSON.stringify(options.proof ? options.proof(proof(request)) : proof(request)) };
   };
-  const service = createWindowsTerminalProcessProbe({ platform: "win32", helper: async () => ({ path: process.execPath, sha256: "b".repeat(64) }), command, guardianStopped: async scope => { assert.deepEqual(scope, scopes.find(row => row.id === scope.id)); return exited; } });
+  const service = createWindowsTerminalProcessProbe({ platform: "win32", helper: async () => ({ path: process.execPath, sha256: "b".repeat(64) }), command, guardianStopped: async scope => { assert.deepEqual(scope, scopes.find(row => row.id === scope.id)); return exited; },
+    ...(options.onOwner ? { onOwner: options.onOwner } : {}), ...(options.onRetired ? { onRetired: options.onRetired } : {}) });
   t.after(async () => { exited = true; assert.equal((await service.close()).stoppedVerified, true); });
   return { service, calls, context: { signal: new AbortController().signal, assertCurrent: async () => {} }, exited: v => { exited = v; } };
 }
@@ -70,6 +71,22 @@ test("a synchronous context callback cannot re-enter the reserved process probe"
     if (!checked) { checked = true; assert.throws(() => f.service.inspect(input(), f.context)); assert.equal(f.calls.length, 0); }
   } });
   assert.ok(checked); assert.equal(observed.processId, 321); assert.equal(f.calls.length, 1);
+});
+
+test("Windows query ownership is retained before worker acknowledgement and retirement reports the same original helper", async t => {
+  const records=[],f=fixture(t,{onOwner:async value=>{records.push(['owner',structuredClone(value)]);value.helper.sha256='changed callback copy';},afterReady:async()=>{assert.equal(records.length,1);},onRetired:async value=>records.push(['retired',value])});
+  await f.service.inspect(input(),f.context);assert.deepEqual(records.map(r=>r[0]),['owner','retired']);assert.deepEqual(records[0][1],records[1][1]);
+  const owner=records[0][1];assert.equal(owner.schema,'switchyard-windows-query-owner/v1');assert.equal(owner.role,'process');assert.equal(owner.scope.containment,'windows-job');assert.equal(owner.helper.sha256,'b'.repeat(64));
+  assert.deepEqual(Object.keys(owner).sort(),['helper','requestId','role','schema','scope']);
+});
+
+test("Windows query ownership callbacks remain joined during cancellation and failed retirement stays uncertain", async t => {
+  let enter,release;const entered=new Promise(r=>enter=r),held=new Promise(r=>release=r);let retired=false;
+  const f=fixture(t,{onOwner:async()=>{enter();await held;},onRetired:async()=>{retired=true;}}),abort=new AbortController();
+  const pending=f.service.inspect(input(),{...f.context,signal:abort.signal}),refused=assert.rejects(pending);await entered;abort.abort();let closed=false;const closing=f.service.close().then(()=>{closed=true;});
+  await new Promise(r=>setImmediate(r));assert.equal(closed,false);release();await refused;await closing;assert.equal(retired,true);
+  let fail=true;const g=fixture(t,{onRetired:async()=>{if(fail)throw Error('retirement checkpoint refused');}});await assert.rejects(g.service.inspect(input(),g.context));assert.throws(()=>g.service.inspect(input(),g.context));fail=false;await g.service.close();
+  let started=false;const h=fixture(t,{onOwner:async()=>{throw Error('ownership checkpoint refused');},afterReady:async()=>{started=true;}});await assert.rejects(h.service.inspect(input(),h.context));assert.equal(started,false);await h.service.close();
 });
 
 test("cancellation joins held context reads and platform/input refusal precedes helper startup", async t => {

@@ -40,26 +40,25 @@ instructions. Do not merge or release.
 
 ## Current installed and source checkpoint
 
-The protected editor journal now has a Windows contract for the original native
-host, Job-owned task binding, logical editor client, loopback listener capability
-hash and exact terminal peer. Retirement keeps logical-client, carrier and query
-helper evidence separate, and never invents provider-process exit. **Thirty-eight
-focused groups pass 164 tests with one declared platform skip**; typecheck passes.
-These checks use real encrypted state/kernel leases and explicit native/recovery
-doubles, alongside Linux journal/recovery regressions.
-[Journal contract](windows-editor-transport.md),
-[source evidence](evidence/windows-editor-journal-source-summary.json).
+Windows editor query helpers now expose their original guardian, helper digest,
+request identity and role before worker acknowledgement. The carrier forwards
+those checkpoints to the protected journal, which refuses replacement until
+retirement is recorded. Revocation does not prevent cleanup, and an active helper
+cannot produce a successful live-retirement claim. **Fourteen focused groups
+pass 150 tests with four declared platform skips**; typecheck passes. Local
+native-query behavior is explicitly doubled; the actual Windows carrier case is
+extended with callback assertions and awaits CI.
+[Query ownership contract](windows-editor-transport.md),
+[source evidence](evidence/windows-query-ownership-source-summary.json).
 
-The earlier Windows target implementation passes native client CI at `2d1cc65`:
-**fifteen groups, 159 tests and no skips**. Actual original-worker process
-reinspection and protected target/logical-client registration pass with a
-synthetic app server. Source/merge tree, artifact, original commands, bounds and
-cleanup verify. The later journal contract awaits Windows execution. The Windows
-lifecycle still needs durable query-helper ownership, native host/helper recovery,
-Suite editor connection routing and VS Code launching; those are unfinished
-implementation rather than hardware/account blockers.
-[Native target evidence](evidence/windows-editor-target-native-summary.json),
-[target contract](coding-task-owners.md).
+The earlier journal contract passes Windows client CI at `75fd0b1`:
+**sixteen groups, 165 tests and no skips**. Journal cases use actual protected
+storage/leases and explicit native/recovery-verifier doubles; separate cases
+exercise actual process, Job, carrier and target/registry composition.
+Source/merge tree, artifact, original commands, bounds and cleanup verify.
+Production Windows lifecycle composition, native host/helper recovery, Suite
+editor connection routing and VS Code launching remain unfinished implementation.
+[Native journal evidence](evidence/windows-editor-journal-native-summary.json).
 
 The underlying persistent process layer passes Windows client CI at `45fe70e`:
 **thirteen groups, 139 tests and no skips**, including all three actual native Job
