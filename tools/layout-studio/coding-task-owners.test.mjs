@@ -253,6 +253,54 @@ async function editorFixture(t) {
   await f.api("load", load);
   return { ...f, owner, load, input: { ownerRequestId: owner.requestId, loadRequestId: load.requestId }, endpoint };
 }
+test("project task choices preserve exact scope and refuse stale or invalid metadata without native effects", async t => {
+  // project task choices return labels and exact saved selections without native inspection or writes
+  {
+    const f = await editorFixture(t);
+    await f.store.update("personal", "synthetic-label", state => { state.codingSessions[0].label = "Review the parser"; });
+    const before = await f.store.snapshot("personal"), calls = [...f.calls];
+    const result = await f.suite.handle("/api/suite/coding/codex/editor-choices", { repositoryRoot: f.task.repositoryRoot });
+    assert.equal(result.schema, "switchyard-editor-task-choices/v1"); assert.equal(result.compartment, "personal"); assert.equal(result.repositoryRoot, f.task.repositoryRoot);
+    assert.deepEqual(result.choices, [{ ...f.input, taskId: f.task.id, label: "Review the parser", loadedAt: before.codingTaskLoads[0].updatedAt }]);
+    assert.equal(result.complete, true); assert.equal(result.nativeObserved, false); assert.equal(result.authorityGranted, false); assert.equal(result.freshReviewRequired, true);
+    for (const privateValue of [f.task.sessionId, f.task.accountFingerprint, f.endpoint.socketPath, f.load.token]) assert.equal(JSON.stringify(result).includes(privateValue), false);
+    assert.deepEqual(f.calls, calls); assert.deepEqual(await f.store.snapshot("personal"), before);
+    assert.deepEqual((await f.suite.handle("/api/suite/coding/codex/editor-choices", { repositoryRoot: join(f.root, "other-project") })).choices, []);
+    await f.api("stop", { ownerRequestId: f.owner.requestId });
+    assert.deepEqual((await f.suite.handle("/api/suite/coding/codex/editor-choices", { repositoryRoot: f.task.repositoryRoot })).choices, []);
+  }
+  // project task choices reject unrelated fields and cannot substitute a compartment or a relative path
+  {
+    const f = await editorFixture(t), select = body => f.suite.handle("/api/suite/coding/codex/editor-choices", body), calls = [...f.calls];
+    for (const extra of [{ compartment: "personal" }, { prompt: "never" }, { token: randomUUID() }, { requestId: randomUUID() }]) await assert.rejects(select({ repositoryRoot: f.task.repositoryRoot, ...extra }), /only the exact/);
+    for (const repositoryRoot of [undefined, null, "relative", f.task.repositoryRoot + "\n", "x".repeat(4097)]) await assert.rejects(select({ repositoryRoot }), /exact normalized/);
+    assert.deepEqual(f.calls, calls);
+    await f.store.update("personal", "synthetic-policy-change", state => { state.mode = "keyboard-only"; });
+    await assert.rejects(select({ repositoryRoot: f.task.repositoryRoot }));
+  }
+  // project task choices omit stale load bindings and refuse duplicate protected identities
+  {
+    const f = await editorFixture(t), select = () => f.suite.handle("/api/suite/coding/codex/editor-choices", { repositoryRoot: f.task.repositoryRoot });
+    const original = structuredClone((await f.store.snapshot("personal")).codingTaskLoads[0]);
+    await f.store.update("personal", "synthetic-load-drift", state => { state.codingTaskLoads[0].acknowledgedThreadId = randomUUID(); });
+    assert.deepEqual((await select()).choices, []);
+    await f.store.update("personal", "synthetic-load-collision", state => { state.codingTaskLoads = [original, structuredClone(original)]; });
+    await assert.rejects(select(), /ambiguous|partial inventory/);
+  }
+  // A same-name selection made by another store invalidates an in-flight listing.
+  {
+    const f = await editorFixture(t), snapshot = f.store.snapshot.bind(f.store), calls = [...f.calls];
+    let changed = false;
+    f.store.snapshot = async (...args) => {
+      const state = await snapshot(...args);
+      if (!changed) { changed = true; await f.store.selection("personal"); }
+      return state;
+    };
+    try { await assert.rejects(f.suite.handle("/api/suite/coding/codex/editor-choices", { repositoryRoot: f.task.repositoryRoot }), /workspace changed/); }
+    finally { f.store.snapshot = snapshot; }
+    assert.equal(changed, true); assert.deepEqual(f.calls, calls);
+  }
+});
 test("a dedicated editor client uses only the original acknowledged task owner and rechecks after registration", async t => {
   const f=await fixture(t),service=f.service();f.controls.allowResume=true;f.task.sessionId=randomUUID();await f.store.update('personal','fixture-editor-id',s=>{s.codingSessions[0].sessionId=f.task.sessionId;});
   const request=f.request();await service.open('personal',request);const owner=f.owners[0];owner.binding={socketPath:'/tmp/synthetic-editor',socketDevice:'1',socketInode:'3',peerPid:1234,peerBirth:'1',peerExecutableSha256:'c'.repeat(64)};owner.inspectBinding=async()=>structuredClone(owner.binding);
@@ -327,7 +375,13 @@ test("the editor client authenticates the real Studio route and reads original p
   await writeFile(endpointPath, JSON.stringify({ schema: "switchyard-active-endpoint/v1", instance, pid: process.pid, url: origin + "/#access=" + token }), { mode: 0o600 });
   const client = new StudioTaskClient({ endpointPath });
   f.beforeCleanup(async () => { client.close(); await new Promise((resolve, reject) => server.close(error => error ? reject(error) : resolve())); await server.cleanup(); });
-  const before = await f.store.snapshot("personal"), result = await client.editorTarget({ compartment: "personal", ...f.input });
+  const inventoryBefore = await f.store.snapshot("personal"), callsBefore = [...f.calls];
+  const choices = await client.editorChoices(f.task.repositoryRoot);
+  assert.deepEqual(choices.choices, [{ ...f.input, taskId: f.task.id, label: "Codex task", loadedAt: inventoryBefore.codingTaskLoads[0].updatedAt }]);
+  assert.equal(choices.nativeObserved, false); assert.equal(choices.authorityGranted, false); assert.equal(choices.freshReviewRequired, true);
+  assert.deepEqual(f.calls, callsBefore); assert.deepEqual(await f.store.snapshot("personal"), inventoryBefore);
+  const choice = choices.choices[0];
+  const before = await f.store.snapshot("personal"), result = await client.editorTarget({ compartment: choices.compartment, ownerRequestId: choice.ownerRequestId, loadRequestId: choice.loadRequestId });
   assert.equal(result.target.sessionId, f.task.sessionId); assert.equal(result.target.repositoryRoot, f.task.repositoryRoot); assert.deepEqual(result.target.endpoint, f.endpoint); assert.equal(result.authorityGranted, false); assert.equal(result.ideAttached, false);
   assert.equal(f.calls.filter(c => c === "resume").length, 1); assert.deepEqual(await f.store.snapshot("personal"), before);
   const selected = { compartment: "personal", ...f.input, requestId: randomUUID(), editorId: randomUUID() };

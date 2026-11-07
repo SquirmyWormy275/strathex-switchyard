@@ -25,7 +25,7 @@ test("six Windows backend shards preserve every original file and exact manifest
   const expected = requiredGroups.filter(group => files.has(group.file));
   assert.equal(all.length, expected.length); assert.deepEqual(new Set(all), new Set(expected));
   assert.equal(all.filter(group => group.file === "deployment/suite/installation.test.mjs").length, 16);
-  assert.equal(all.filter(group => group.file === "tools/layout-studio/coding-task-owners.test.mjs").length, 26);
+  assert.equal(all.filter(group => group.file === "tools/layout-studio/coding-task-owners.test.mjs").length, 27);
   for (const shard of [0, 7, 1.5, "1", undefined, null]) assert.throws(() => selectWindowsBackendShard(shard));
   for (const groups of [requiredGroups.filter(group => group.file !== "tools/layout-studio/state-lock.test.mjs"), [...requiredGroups, expected[0]], requiredGroups.map(group => group === expected[0] ? { ...group, pattern: ".*" } : group)]) assert.throws(() => selectWindowsBackendShard(1, groups));
 });

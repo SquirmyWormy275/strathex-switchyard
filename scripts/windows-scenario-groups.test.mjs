@@ -137,7 +137,7 @@ test("every task-owner case runs once with the original bound and only its own n
   const source = await readFile(new URL("../" + file, import.meta.url), "utf8");
   const names = [...source.matchAll(/^test\("([^"\n]+)"/gm)].map(match => match[1]);
   const native = [...source.matchAll(/^test\("([^"\n]+)",\s*\{\s*skip:\s*process.platform\s*!==\s*"linux"\s*\}/gm)].map(match => match[1]);
-  assert.equal(names.length, 26); assert.equal(new Set(names).size, 26);
+  assert.equal(names.length, 27); assert.equal(new Set(names).size, 27);
   const workflow = await readFile(new URL("../.github/workflows/switchyard-windows-filesystem.yml", import.meta.url), "utf8");
   const matrix = workflow.match(/^        suite: \[([^\]\n]+)\]$/m)?.[1].split(",").map(value => value.trim());
   assert.equal(matrix.filter(suite => suite === "task-owners").length, 1);

@@ -62,6 +62,18 @@ try {
   evidence.checks.push("unknown owner and unexpected effect fields refuse before provider start or task resume");
   const { StudioTaskClient } = await import("../apps/vscode-extension/src/studio-task-client.ts"), editor = new StudioTaskClient({ endpointPath: endpointFile, assertCurrent: current });
   try {
+    const unusedProject = join(homedir(), "switchyard-metadata-only-" + randomUUID());
+    if (permitted) {
+      const choices = await editor.editorChoices(unusedProject);
+      assert.equal(choices.compartment, selected); assert.equal(choices.repositoryRoot, unusedProject);
+      assert.deepEqual(choices.choices, []); assert.equal(choices.complete, true);
+      assert.equal(choices.nativeObserved, false); assert.equal(choices.authorityGranted, false); assert.equal(choices.freshReviewRequired, true);
+    } else await assert.rejects(editor.editorChoices(unusedProject));
+    evidence.checks.push("signed exact-project choices are empty for an unused project or refuse by policy without native inspection or task authority");
+    await api("coding/codex/editor-choices", { repositoryRoot: unusedProject, compartment: selected }, 409);
+    await api("coding/codex/editor-choices", { repositoryRoot: unusedProject, prompt: "never" }, 409);
+    await assert.rejects(editor.editorChoices("relative"));
+    evidence.checks.push("task-choice selection and effect fields and relative project paths refuse without creating a project or native task");
     await assert.rejects(editor.editorTarget({ compartment: selected, ownerRequestId: missing, loadRequestId: randomUUID() }), /^Error: The original Switchyard instance did not authenticate or validate\.$/);
     const input = { compartment: selected, ownerRequestId: missing, loadRequestId: randomUUID(), requestId: randomUUID(), editorId: randomUUID() };
     assert.equal((before.codingEditorAuthorizations ?? []).some(row => row.requestId === input.requestId), false);

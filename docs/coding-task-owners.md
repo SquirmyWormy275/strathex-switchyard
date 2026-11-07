@@ -143,6 +143,34 @@ listener exit cannot upgrade an uncertain bridge exit. The owner stays retained
 and replacement remains blocked. Twenty registry cases and typecheck pass with
 exact cleanup. [Correction evidence](evidence/independent-task-owner-stop-summary.json).
 
+## Find saved tasks for a project
+
+The editor can request candidates with `editorChoices(repositoryRoot)` on either
+typed client. The signed `/instance/v1/editor-choices` operation reaches
+`/api/suite/coding/codex/editor-choices` with only an exact normalized local
+`repositoryRoot`. The Suite chooses its currently selected workspace; callers
+cannot substitute a compartment. A persisted workspace change, including a
+same-name reselection, invalidates an in-flight result.
+
+The response contains the workspace, project and up to 64 saved choices. Each
+choice has a local task label, task ID, original owner/load IDs and load timestamp.
+Only an existing in-memory owner with matching protected task, load, policy and
+ownership records is eligible. Closed owners and stale bindings are omitted;
+ambiguous identities or an oversized inventory refuse the entire response.
+Account fingerprints, native session IDs, socket addresses, prompts, credentials
+and review tokens are absent.
+
+These are saved candidates, not current native observations.
+`nativeObserved:false`, `authorityGranted:false` and
+`freshReviewRequired:true` are mandatory. Listing does not inspect a provider,
+resume a task or write state. A chosen row still goes through `editorTarget`,
+review, issue and consume with the original identity. The clients validate and
+freeze the complete bounded response and recheck the signed endpoint.
+
+The encrypted-store-to-client demonstration uses an explicit synthetic provider.
+Frontend picker/command activation and live account/TUI acceptance remain
+unfinished. [Source evidence](evidence/editor-task-choices-source-summary.json).
+
 ## Prepare an exact editor target
 
 The authenticated `editor-target` operation accepts only the original

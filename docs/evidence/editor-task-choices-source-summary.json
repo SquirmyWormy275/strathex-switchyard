@@ -1,0 +1,148 @@
+{
+  "schema": "switchyard-editor-task-choices-source-summary/v1",
+  "baseCommit": "68466dbf1b3dd29c40e33357e3e5e113dea4f867",
+  "sourceFiles": {
+    "tools/layout-studio/suite.mjs": "4e944a44e52716466f9f5aaf08a52dfb17e248a4436e4e841d4728503947cbab",
+    "tools/layout-studio/coding-task-owners.mjs": "bd010971e0e01cd8a1b111eb02fd5462137edcbf2cb2ad15dd2f0f4d16ef49a7",
+    "tools/layout-studio/coding-task-owners.test.mjs": "ef99360ab20182ea58b8d7a52026c7e742b5aa11a71fafb8d623b59a0b080f1a",
+    "tools/layout-studio/instance.mjs": "325ef5c80c563713cf693878a2b7e08f08a8491d5335a7fdd659e1fbf17e4458",
+    "tools/layout-studio/serve.mjs": "284383e66f8d4738b7e5ffac27554633ff880274b6feee3b7c30e9c6f8f68639",
+    "apps/vscode-extension/src/studio-editor-choices.ts": "f193fb22a8b11e265459cde1ae39699cb88be443ebf33bcd06d6e7570536518d",
+    "apps/vscode-extension/src/studio-instance-transport.ts": "8ae8bbfa3c5300985112fe35f828aa7df4e68eaea99c9db69a5fbd58ca747c28",
+    "apps/vscode-extension/src/studio-task-client.ts": "654649971e40e20e8fcaf327451dbb396124bcb4721d844af359c1d43c453e08",
+    "apps/vscode-extension/src/studio-windows-task-client.ts": "526b85c8cb10f0574e0a091ad26bcf09a431117d16783a0bcf771e15904f8085",
+    "apps/vscode-extension/test/studio-task-client.test.ts": "54b34bf32c217bb169245bb5946435494d4182f9ca647363e9268163c586032b",
+    "apps/vscode-extension/test/studio-windows-task-client.test.ts": "527d89967c2b4705db9a3f7cd98f1038aae893f06abd5a25b8401f48746f40c1",
+    "scripts/windows-scenario-groups.mjs": "bf9e991f1d3ccf5a36db7af6d01d375dc205b665b9177bbaf179e245d9e9f3b7",
+    "scripts/windows-scenario-groups.test.mjs": "fe804860724d0e6bac4dd0a6fcc508b7382e12966edb672251178ab475ba8e35",
+    "scripts/windows-backend-shards.test.mjs": "e2c8a291ddfd0e2b227e83cda1173b7ca48266bf77c5ff4fa2f2cb815d59c057",
+    "scripts/verify-task-owner-host.mjs": "aa43a92ec146b07d6ec69d2a768f94f961273d88fda8a2c50b72679a904d5f84"
+  },
+  "receipts": [
+    {
+      "id": "526fc841-13c0-4e50-ab1e-164b142c51a6",
+      "kind": "initial-owner-contracts",
+      "sha256": "5860c025272b2bfdab32d664a98c0fd46af544f45e64ad448937fad929342aa6",
+      "totals": {
+        "required": 29,
+        "passed": 29,
+        "failed": 0,
+        "tests": 29,
+        "passedTests": 29,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "commandsBoundsSkipsAndCleanupVerified": true
+    },
+    {
+      "id": "37671cbd-46b1-46b4-be8a-fbbafcba8e6d",
+      "kind": "manifest-and-scheduling-failure",
+      "sha256": "3e1c33250d286cdd96bc6fc58c087d6149b014ef86b7f2870508dc48f71f6b88",
+      "totals": {
+        "required": 34,
+        "passed": 32,
+        "failed": 2,
+        "tests": 79,
+        "passedTests": 76,
+        "failedTests": 3,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "commandsBoundsSkipsAndCleanupVerified": true
+    },
+    {
+      "id": "5a0d5013-8443-4692-9ad0-73062156962f",
+      "kind": "partial-registration-edit",
+      "sha256": "8adde1b02e5dc4388c857d8e588235f7963c8a921c51daf69fe0c7efb6cec637",
+      "totals": {
+        "required": 34,
+        "passed": 29,
+        "failed": 5,
+        "tests": 79,
+        "passedTests": 76,
+        "failedTests": 3,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "commandsBoundsSkipsAndCleanupVerified": true
+    },
+    {
+      "id": "1916dd5e-2d47-48a0-b8bd-d12dbb327593",
+      "kind": "scenario-order-failure",
+      "sha256": "182e1a5ae3f59e21a6ae5ed5d0cff864d616afc5dfae8eeb443309d280d93f16",
+      "totals": {
+        "required": 32,
+        "passed": 31,
+        "failed": 1,
+        "tests": 77,
+        "passedTests": 76,
+        "failedTests": 1,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "commandsBoundsSkipsAndCleanupVerified": true
+    },
+    {
+      "id": "51bf1bcd-0f8f-45eb-a89b-019317253fe7",
+      "kind": "focused-accepted",
+      "sha256": "02c4a56810d755bbad2febc05bc92d4b9ffff59fdd5e61fb859f1f2627d7abf9",
+      "totals": {
+        "required": 32,
+        "passed": 32,
+        "failed": 0,
+        "tests": 77,
+        "passedTests": 77,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "commandsBoundsSkipsAndCleanupVerified": true
+    },
+    {
+      "id": "9d1c660d-16ff-4a8c-91be-cf01b6c24ec9",
+      "kind": "accepted-with-selection-race-and-packaging",
+      "sha256": "466b7557371b2b902129ac5f7cfe0095a4ad2d51057650a8b864728c6ff35b9d",
+      "totals": {
+        "required": 34,
+        "passed": 34,
+        "failed": 0,
+        "tests": 87,
+        "passedTests": 87,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "commandsBoundsSkipsAndCleanupVerified": true
+    }
+  ],
+  "accepted": {
+    "groups": 34,
+    "passedTests": 87,
+    "skippedTests": 0,
+    "rootTypecheck": true,
+    "extensionTypecheck": true
+  },
+  "scope": [
+    "Exact-project saved task candidates pass from encrypted Suite storage through the actual Studio signed HTTP gateway into typed Linux and Windows consumers.",
+    "Labels, original owner/load/task IDs and load time are bounded metadata. No account fingerprint, native session, socket, credentials, prompt or launch/review token is returned.",
+    "Stale owners/bindings are omitted; ambiguous loads, policy refusal, same-name persisted selection changes, forged replies, endpoint drift and injected effect fields refuse.",
+    "The chosen identity feeds the existing target/review/issue/consume composition with an explicit synthetic provider. Listing itself makes no native call or state write.",
+    "All pre-existing test cases remain. Three new inventory fixtures share one declared scenario under the original 45-second child bound; six Windows preliminary jobs retain their 20-minute budgets and unchanged fallback estimates."
+  ],
+  "retainedFailures": [
+    "Initial route/client checks passed; exact scenario counts/order and the Windows historical scheduling estimate failed after three new independently scheduled cases were added.",
+    "A partial development registration edit yielded three zero-test selections; the verifier rejected them. The complete final manifest and all 34 groups pass."
+  ],
+  "limitations": [
+    "Windows client contracts run here with explicit native-reader doubles; this is not a native Windows host acceptance.",
+    "Installed 849b9b9 predates the feature; added installed checks have not run yet.",
+    "No editor command/frontend activation, live account/task resume, model prompt, microphone or keyboard effect was performed."
+  ]
+}

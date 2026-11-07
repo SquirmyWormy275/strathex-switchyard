@@ -10,6 +10,17 @@ Start with the [README](../README.md) for the product and first run, the
 on [draft PR 20](https://github.com/SquirmyWormy275/strathex-switchyard/pull/20).
 No merge or public release has been accepted.
 
+The editor backend now lists saved task names for one exact project in the
+selected workspace through authenticated Linux/Windows clients. It exposes no
+native session/account secrets and grants no launch permission. The composed
+fixture reads real encrypted storage through the signed server and feeds the
+chosen identity into the existing fresh-review flow. All 34 focused groups pass
+87 tests with no skips, including the workspace-switch race and packaging, and
+both TypeScript checks pass. Frontend picker and command
+activation remain frozen; this is source acceptance, not a live task demonstration.
+[Task-choice contract](coding-task-owners.md#find-saved-tasks-for-a-project),
+[source evidence](evidence/editor-task-choices-source-summary.json).
+
 The reviewed Windows launcher completes the signed-client, protected-journal and
 real-carrier demonstration with an exact synthetic task acknowledgement. Native
 Windows client checkpoint `c359cdf` passes all 25 groups: **243 tests, no skips**.

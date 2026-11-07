@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { constants } from "node:fs";
 import { lstat, open, realpath } from "node:fs/promises";
+import { studioEditorChoices, type StudioEditorChoices } from "./studio-editor-choices.ts";
 import { StudioInstanceTransport } from "./studio-instance-transport.ts";
 import { homedir } from "node:os";
 import { dirname, isAbsolute, join, normalize } from "node:path";
@@ -172,6 +173,10 @@ export class StudioTaskClient {
       bytes = data.subarray(0, read.bytesRead).toString("utf8");
     } finally { await file.close(); }
     await this.current(); return bytes;
+  }
+  async editorChoices(repositoryRoot: string): Promise<StudioEditorChoices> {
+    requireValue(typeof repositoryRoot === "string" && isAbsolute(repositoryRoot) && normalize(repositoryRoot) === repositoryRoot && Buffer.byteLength(repositoryRoot) <= 4096 && !/[\\\x00-\x1f\x7f]/.test(repositoryRoot));
+    return studioEditorChoices(await this.transport.exchange("editorChoices", Object.freeze({ repositoryRoot })), repositoryRoot);
   }
   async editorTarget(input: StudioEditorSelection): Promise<StudioEditorObservation> {
     requireValue(object(input) && keys(input as unknown as Record<string, unknown>, ["compartment", "ownerRequestId", "loadRequestId"]) && /^[a-z][a-z0-9-]{0,63}$/.test(input.compartment) && uuid(input.ownerRequestId) && uuid(input.loadRequestId));

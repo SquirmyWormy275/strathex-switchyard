@@ -6,6 +6,7 @@ import { once } from "node:events";
 import { mkdtemp, writeFile, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { StudioInstanceTransport } from "../src/studio-instance-transport.ts";
 import { StudioWindowsTaskClient,windowsEditorBinding,windowsEditorPeer } from "../src/studio-windows-task-client.ts";
 // File reads below are explicit native endpoint-reader doubles in owned fixtures.
 // @ts-expect-error Exercise the actual shipped JavaScript instance protocol.
@@ -16,9 +17,13 @@ async function fixture(t: TestContext) {
   const selected = { compartment: "personal", ownerRequestId: randomUUID(), loadRequestId: randomUUID() };
   const target = { schema: "switchyard-codex-editor-target/v1", ownerRequestId: selected.ownerRequestId, loadRequestId: selected.loadRequestId, taskId: randomUUID(), sessionId: randomUUID(), repositoryRoot: "C:\\exact repository", repositoryIdentity: { device: "0", inode: "9007199254740993" }, accountFingerprint: "b".repeat(64), permissions: "read-only/on-request", endpoint: { schema: "switchyard-windows-codex-stdio-binding/v1", scope: {schema:"switchyard-runtime-command/v1",id:randomUUID(),guardianPid:1233,birth:"638000000000000001",containment:"windows-job"}, peerPid: 1234, peerBirth: "133000000000000001", peerExecutableSha256: "c".repeat(64) } };
   const result = () => ({ target, targetDigest: createHash("sha256").update(JSON.stringify(target)).digest("hex"), metadataObserved: true, nativeLoadAcknowledged: true, nativeTaskLoaded: false, authorityGranted: false, terminalLaunched: false, ideAttached: false, modelPromptSubmitted: false, completionVerified: false });
-  const controls: { forged: boolean; afterProbe?: () => Promise<void> | void; alter?: (value: ReturnType<typeof result>) => unknown; alterAuthorization?: (value: any) => unknown; alterConnection?: (value: any) => unknown; hold?: boolean; routeStatus?: number; readerUnavailable?: boolean } = { forged: false };
+  const controls: { forged: boolean; afterProbe?: () => Promise<void> | void; alter?: (value: ReturnType<typeof result>) => unknown; alterAuthorization?: (value: any) => unknown; alterConnection?: (value: any) => unknown; alterChoices?: (value: any) => unknown; hold?: boolean; routeStatus?: number; readerUnavailable?: boolean } = { forged: false };
   const calls: { path: string; bearer: boolean; payload?: unknown }[] = [];
-  const gateway = createInstanceGateway({ token, identity, onStop: () => { throw Error("Stop is outside this read-only client"); }, onEditorTarget: async (selection: unknown) => {
+  const gateway = createInstanceGateway({ token, identity, onStop: () => { throw Error("Stop is outside this read-only client"); }, onEditorChoices: async (selection: { repositoryRoot: string }) => {
+    calls.at(-1)!.payload = selection; if (controls.afterProbe) await controls.afterProbe();
+    const value = { schema: "switchyard-editor-task-choices/v1", compartment: selected.compartment, repositoryRoot: selection.repositoryRoot, choices: [{ ownerRequestId: selected.ownerRequestId, loadRequestId: selected.loadRequestId, taskId: target.taskId, label: "Review parser", loadedAt: 42 }], complete: true, nativeObserved: false, authorityGranted: false, freshReviewRequired: true };
+    return controls.alterChoices ? controls.alterChoices(value) : value;
+  }, onEditorTarget: async (selection: unknown) => {
     calls.at(-1)!.payload = selection;
     if (controls.afterProbe) await controls.afterProbe();
     const value = result(); return controls.alter ? controls.alter(value) : value;
@@ -43,7 +48,7 @@ async function fixture(t: TestContext) {
   let origin: string;
   const server = createServer(async (req, res) => {
     calls.push({ path: req.url ?? "", bearer: Boolean(req.headers.authorization) });
-    assert.ok(["/instance/v1/editor-target", "/instance/v1/editor-review", "/instance/v1/editor-issue", "/instance/v1/editor-consume", "/instance/v1/editor-return-target", ...["open", "pin-peer", "observe", "stop", "recover"].map(action => "/instance/v1/editor-connection-"+action)].includes(req.url!)); assert.equal(req.headers.authorization, undefined); assert.equal(req.headers.origin, undefined);
+    assert.ok(["/instance/v1/editor-choices", "/instance/v1/editor-target", "/instance/v1/editor-review", "/instance/v1/editor-issue", "/instance/v1/editor-consume", "/instance/v1/editor-return-target", ...["open", "pin-peer", "observe", "stop", "recover"].map(action => "/instance/v1/editor-connection-"+action)].includes(req.url!)); assert.equal(req.headers.authorization, undefined); assert.equal(req.headers.origin, undefined);
     if (controls.hold) return;
     if (controls.forged) { res.end(JSON.stringify({ status: "ready" })); return; }
     await gateway(req, res, origin);
@@ -61,6 +66,14 @@ test("Windows editor client authenticates the shipped instance protocol and reta
   assert.deepEqual(result.target, f.target); assert.equal(result.authorityGranted, false); assert.equal(result.ideAttached, false); assert.equal(result.terminalLaunched, false);
   assert.deepEqual(f.calls.map(row => [row.path, row.bearer]), [["/instance/v1/editor-target", false]]); assert.deepEqual(f.calls[0].payload, f.selected);
   for (const value of [result, result.target, result.target.endpoint, result.target.repositoryIdentity]) assert.ok(Object.isFrozen(value));
+  const choices = await f.client.editorChoices(f.target.repositoryRoot);
+  assert.equal(choices.repositoryRoot, f.target.repositoryRoot); assert.equal(choices.compartment, f.selected.compartment);
+  assert.deepEqual(choices.choices, [{ ownerRequestId: f.selected.ownerRequestId, loadRequestId: f.selected.loadRequestId, taskId: f.target.taskId, label: "Review parser", loadedAt: 42 }]);
+  assert.equal(choices.freshReviewRequired, true); assert.equal(choices.nativeObserved, false); assert.equal(choices.authorityGranted, false);
+  assert.deepEqual(f.calls.at(-1)!.payload, { repositoryRoot: f.target.repositoryRoot });
+  for (const value of [choices, choices.choices, choices.choices[0]]) assert.ok(Object.isFrozen(value));
+  for (const value of [f.target.sessionId, f.target.accountFingerprint]) assert.equal(JSON.stringify(choices).includes(value), false);
+
 });
 test("an unauthenticated or changed saved instance never receives the API bearer or returns trusted metadata", async t => {
   for (const drift of ["forged", "file", "selection"]) {
@@ -184,4 +197,29 @@ test("Windows bindings and peers preserve 64-bit strings and reject widened or m
  const peer={processId:600,expectedBirth:"133000000000000003",image:{path:"C:\\Synthetic\\codex.exe",sha256:"b".repeat(64),device:"0",inode:"9007199254740993",size:"512"}};
  assert.deepEqual(windowsEditorPeer(peer),peer);
  for(const patch of [{expectedBirth:null},{expectedBirth:"01"},{processId:2147483648},{image:{...peer.image,device:"4294967296"}},{image:{...peer.image,inode:9007199254740992}},{image:{...peer.image,size:"536870913"}},{image:{...peer.image,path:"C:\\NUL.exe"}},{pid:600}])assert.throws(()=>windowsEditorPeer({...peer,...patch}));
+});
+
+test("signed project choices refuse malformed inventories, substituted projects and unsafe requests before granting any authority", async t => {
+  const f = await fixture(t);
+  for (const root of ["relative", "C:\\repo\\..\\other", "C:\\repo\n", "C:\\" + "x".repeat(4097), null]) {
+    const before = f.calls.length; await assert.rejects(f.client.editorChoices(root as string)); assert.equal(f.calls.length, before);
+  }
+  for (const alter of [
+    (v: any) => ({ ...v, repositoryRoot: "C:\\foreign" }), (v: any) => ({ ...v, complete: false }),
+    (v: any) => ({ ...v, authorityGranted: true }), (v: any) => ({ ...v, nativeObserved: true }),
+    (v: any) => ({ ...v, freshReviewRequired: false }), (v: any) => ({ ...v, token: "never" }),
+    (v: any) => ({ ...v, choices: [...v.choices, ...v.choices] }),
+    (v: any) => ({ ...v, choices: [{ ...v.choices[0], sessionId: randomUUID() }] }),
+    (v: any) => ({ ...v, choices: [{ ...v.choices[0], label: "unsafe\nlabel" }] }),
+    (v: any) => ({ ...v, choices: [{ ...v.choices[0], taskId: "00000000-0000-0000-0000-000000000000" }] }),
+    (v: any) => ({ ...v, choices: [{ ...v.choices[0], loadedAt: -1 }] })
+  ]) { f.controls.alterChoices = alter; await assert.rejects(f.client.editorChoices(f.target.repositoryRoot)); }
+  f.controls.alterChoices = undefined;
+  const longRoot = "C:\\" + "p".repeat(3000); assert.equal((await f.client.editorChoices(longRoot)).repositoryRoot, longRoot);
+  const transport = new StudioInstanceTransport({ readEndpoint: () => readFile(f.endpointPath, "utf8"), assertCurrent() {} }); t.after(() => transport.close());
+  for (const selection of [{ repositoryRoot: f.target.repositoryRoot, compartment: "other" }, { repositoryRoot: f.target.repositoryRoot, prompt: "never" }, { repositoryRoot: "x".repeat(4097) }]) await assert.rejects(transport.exchange("editorChoices", selection));
+  f.controls.forged = true; await assert.rejects(f.client.editorChoices(f.target.repositoryRoot)); f.controls.forged = false;
+  f.controls.afterProbe = () => writeFile(f.endpointPath, JSON.stringify({ ...f.endpoint, pid: process.pid + 1 }));
+  await assert.rejects(f.client.editorChoices(f.target.repositoryRoot));
+  assert.equal(f.calls.some(row => row.bearer), false);
 });

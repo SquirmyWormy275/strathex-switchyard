@@ -219,6 +219,15 @@ export function createSuite({ store = createSuiteStore(), platform = process.pla
     async handle(path, body = {}) {
       if (closed) throw new Error("This local suite is closed.");
       const compartment = body.compartment ?? "personal";
+      if (path === "/api/suite/coding/codex/editor-choices") {
+        if (Object.keys(body).some(key => !["repositoryRoot", "workspaceBaseUrl"].includes(key))) throw Error("Project task choices accept only the exact local project directory.");
+        await loadSelection();
+        const selected = activeCompartment, context = await selectedIntentContext(selected);
+        await context.assertCurrent();
+        const choices = await codingTaskOwners.editorChoices(selected, body.repositoryRoot);
+        await context.assertCurrent();
+        return choices;
+      }
       if(path==="/api/suite/compartment/status"){
         if(Object.keys(body).some(key=>key!=="workspaceBaseUrl"))throw Error("Read only the selected workspace; selection arguments are refused.");
         await loadSelection();if(await store.selection()!==activeCompartment)throw Error("The saved workspace changed outside this active instance; select it through the application before inspecting.");

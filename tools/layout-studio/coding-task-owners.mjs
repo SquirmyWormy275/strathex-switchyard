@@ -1,6 +1,6 @@
 /** Explicit task-owner registry. Loading needs an exact one-use review; no model or IDE authority. */
 import { createHash } from "node:crypto";
-import { join, posix } from "node:path";
+import { join, posix, isAbsolute, normalize } from "node:path";
 import { createCodexUnixTasks } from "./codex-unix-tasks.mjs";
 import { createCodexWindowsTasks } from "./codex-windows-tasks.mjs";
 import { retireStoppedWindowsCodexOwner } from "./codex-windows-owner.mjs";
@@ -99,6 +99,32 @@ export function createCodingTaskOwners({ store, root, runtimeRoot, resolveCli, r
   }
 
   return {
+    async editorChoices(c, repositoryRoot) {
+      if (!["linux", "win32"].includes(platform) || typeof repositoryRoot !== "string" || !isAbsolute(repositoryRoot) || normalize(repositoryRoot) !== repositoryRoot || Buffer.byteLength(repositoryRoot) > 4096 || /[\x00-\x1f\x7f]/.test(repositoryRoot)) throw Error("Choose one exact normalized local project directory.");
+      const g = generation(c); current(c, g);
+      if (!await isActive(c)) throw Error("Select the original task workspace before inspecting editor choices.");
+      const state = await store.snapshot(c, { provider: "codex" }); current(c, g);
+      if (!await isActive(c)) throw Error("The original task workspace changed during editor inventory.");
+      current(c, g);
+      const owners = state.codingTaskOwners ?? [], loads = state.codingTaskLoads ?? [], tasks = state.codingSessions ?? [];
+      if (!Array.isArray(owners) || !Array.isArray(loads) || !Array.isArray(tasks) || owners.length > 64 || loads.length > 64 || tasks.length > 256) throw Error("Editor choice inventory exceeds its complete bounded contract.");
+      const choices = [], seen = new Set();
+      for (const load of loads) {
+        if (load.status !== "loaded") continue;
+        const owner = owners.find(row => row.requestId === load.ownerRequestId), resource = live.get(key(c, load.ownerRequestId));
+        const task = tasks.find(row => row.id === load.taskId);
+        if (!owner || !resource?.owner || resource.owner.closed || resource.stopping || resource.g !== g || owner.status !== "bound" || owner.repositoryRoot !== repositoryRoot || !task || task.repositoryRoot !== repositoryRoot || task.launchPolicy !== "read-only/on-request" || !uuid(task.sessionId)) continue;
+        let original; try { original = binding(task); } catch { continue; }
+        if (owner.bindingDigest !== digest(original) || owner.bindingDigest !== digest(resource.original) || owner.ownershipDigest !== digest([resource.owner.scope, resource.owner.privateOwnership]) || owner.ownershipDigest !== digest([owner.scope, owner.privateOwnership]) || load.schema !== "switchyard-coding-task-load/v1" || load.taskId !== owner.taskId || load.acknowledgedThreadId !== owner.sessionId || load.bindingDigest !== owner.bindingDigest || load.ownershipDigest !== owner.ownershipDigest || load.scopeDigest !== digest(loadScope(c, owner, state))) continue;
+        const label = task.label ?? "Codex task";
+        if (![owner.requestId, load.requestId, task.id].every(uuid) || typeof label !== "string" || !label.trim() || label.length > 100 || /[\x00-\x1f\x7f]/.test(label) || !Number.isSafeInteger(load.updatedAt) || load.updatedAt < 0 || seen.has(load.requestId)) throw Error("A saved editor choice is ambiguous or invalid; no partial inventory was returned.");
+        seen.add(load.requestId);
+        choices.push({ ownerRequestId: owner.requestId, loadRequestId: load.requestId, taskId: task.id, label, loadedAt: load.updatedAt });
+      }
+      const result = { schema: "switchyard-editor-task-choices/v1", compartment: c, repositoryRoot, choices, complete: true, nativeObserved: false, authorityGranted: false, freshReviewRequired: true };
+      if (Buffer.byteLength(JSON.stringify(result)) > 24576) throw Error("Editor choices exceed their bounded response; no partial inventory was returned.");
+      return result;
+    },
     async list(c) { await store.authorize(c, { provider: "codex" }); return ((await store.snapshot(c)).codingTaskOwners ?? []).map(view); },
     async listLoads(c) { await store.authorize(c, { provider: "codex" }); return ((await store.snapshot(c)).codingTaskLoads ?? []).map(row => loadView(row)); },
     async open(c, { requestId, taskId }) {

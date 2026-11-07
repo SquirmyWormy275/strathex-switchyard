@@ -51,6 +51,7 @@ export const windowsTaskOwnerScenarios = Object.freeze([
   "keyboard-only mode joins task-owner shutdown and preserves failed retirement without enabling new starts",
   "an external workspace change during native project setup refuses the late task effect",
   "a failed bridge close still attempts original native owner retirement and cannot upgrade the uncertain bridge exit",
+  "project task choices preserve exact scope and refuse stale or invalid metadata without native effects",
   "a dedicated editor client uses only the original acknowledged task owner and rechecks after registration",
   "authenticated editor routes consume one reviewed launch permission without launching a terminal or exposing its protected record",
   "editor target preparation binds the acknowledged load and original endpoint without another resume, launch or authority claim",
