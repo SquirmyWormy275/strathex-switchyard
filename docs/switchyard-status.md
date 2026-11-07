@@ -27,8 +27,8 @@ are removed. The newer guided role choices have separate focused evidence.
 Guided role setup now has backend choices with readable connection labels and
 a saved-state digest checked before binding. It reuses the existing provider,
 workspace and action limits, including Copilot-only Work. Seven groups/101 tests
-pass with one declared skip and both TypeScript checks. This source change is
-not installed yet; frontend activation remains frozen.
+pass with one declared skip and both TypeScript checks. Installed `7393da1` verifies these routes within 95 metadata/refusal checks
+and 57 exact module hashes; frontend activation remains frozen.
 [Contract](role-dispatch-binding.md#choose-a-saved-connection-by-name),
 [evidence](evidence/role-choices-source-summary.json).
 
@@ -39,8 +39,8 @@ checkpoints are not cumulative acceptance of the latest suite.
 
 | Checkpoint | Verified result | Limit |
 | --- | --- | --- |
-| Installed Linux `9d230ac` | **92 metadata/refusal checks; 56 exact module hashes.** All 54 semantic workspaces, four profiles, 57 workflows and frozen frontend preserved. [Receipt](evidence/installed-editor-task-choices-summary.json). | Exact-project saved task choices, recording consent generations, persisted selection generation, consented runtime status capture, original-role/provider-effect guards, signed CLI dispatch and Codex version contract included; editor command activation remains pending; no live scanner, provider task, account/model request, native focus or hardware acceptance. |
-| Native Windows client `57af859` | **25 groups; 249 tests; no skips.** Original manifest, commands, bounds and cleanup verified. [Receipt](evidence/selection-native-client-summary.json). | Terminal/provider doubles remain explicit; not the complete Windows suite, runtime-observation backend groups or live authenticated Codex turns. |
+| Installed Linux `7393da1` | **95 metadata/refusal checks; 57 exact module hashes.** All 54 semantic workspaces, four profiles, 57 workflows and frozen frontend preserved. [Receipt](evidence/installed-guided-role-choices-summary.json). | Guided role choices, exact-project saved task choices, recording consent generations, persisted selection generation, consented runtime status capture, original-role/provider-effect guards, signed CLI dispatch and Codex version contract included; editor command activation remains pending; no live scanner, provider task, account/model request, native focus or hardware acceptance. |
+| Native Windows client `9d230ac` | **25 groups; 250 tests; no skips.** Original manifest, commands, bounds and cleanup verified. [Receipt](evidence/editor-task-choices-native-client-summary.json). | Terminal/provider doubles remain explicit; not the complete Windows suite, runtime-observation backend groups or live authenticated Codex turns. |
 | Complete Linux `7f2a52a` | **351 groups; 2,302 tests; 32 declared platform skips.** Original manifest, bounds and cleanup verified. [Receipt](evidence/linux-7f2a52a-complete-summary.json). | Covers installed runtime `9d230ac`, including consent/retirement corrections and signed project choices; the subsequent guided role choices and scheduling-data update have separate focused evidence. |
 | Complete Windows `dc755901` | **417 groups; 2,478 tests; 207 declared skips.** All six jobs and overall workflow passed. [Receipt](evidence/windows-complete-dc755901-summary.json). | Predates newer archive, scheduling, profile/workflow and observation corrections. |
 
@@ -57,7 +57,7 @@ only audit metadata. An earlier signed-route preservation check overlapped other
 metadata verifiers and failed; its sequential follow-up passed. The latest update
 also retained a stale shared-gateway verifier pin failure before dispatch; after
 referencing the accepted gateway evidence, all eight signed-intent checks pass. Dated backup and launcher readback verify. Only current
-plus one rollback remain; the exact 554-file, 4,835,483-byte prepared bundle is
+plus one rollback remain; the exact 555-file, 4,844,712-byte prepared bundle is
 removed. The installed payload is 4,731,342 bytes across 553 files.
 
 Windows `e5a5781` passed all six preliminary backend shards and 27 native guardian

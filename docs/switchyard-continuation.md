@@ -43,8 +43,8 @@ instructions. Do not merge or release.
 The latest source feature is guided role choices: readable saved connection labels
 and a digest-checked local binding route. It preserves selected-workspace, policy,
 original session/capability, role and prior-binding identity. Seven groups/101 tests
-pass with one declared platform skip and both TypeScript checks. It is not installed
-yet; the next normal update must verify the prepared pure and route-refusal checks.
+pass with one declared platform skip and both TypeScript checks. It is installed at `7393da1`; all 95 metadata/refusal checks and 57 exact
+module hashes pass, including the pure role contracts and installed route refusals.
 [Contract](role-dispatch-binding.md#choose-a-saved-connection-by-name),
 [source evidence](evidence/role-choices-source-summary.json).
 
@@ -71,15 +71,15 @@ a replacement. Eight groups/124 tests and installed metadata checks cover them.
 
 ## Installed checkpoint
 
-- Source: `9d230acf4bdec18293f9c64424e41a25b0b59517`.
-- Release: `e23a6a4687d31d148c7b5e2fcfa8243e02f34d7751f2e4b996c635c263d2eae6`.
-- Rollback: `5ee98aa4c93005b9cd025e90e2347ca6605008e00f1b00830084003267efbca2`.
+- Source: `7393da1106f769ef84f479a98405909306b06f0f`.
+- Release: `d470f3d1d4ffe27a1781d201afe61cbad7ab545a07dda4849ce09b87634b7ed7`.
+- Rollback: `e23a6a4687d31d148c7b5e2fcfa8243e02f34d7751f2e4b996c635c263d2eae6`.
 - Frozen frontend: `24100ef601b810efb0cda95e4fe0842d2944560734b02c4cf482c25e19150543`.
-- 92 metadata/refusal checks, 56 exact module hashes; all 54 semantic workspaces,
+- 95 metadata/refusal checks, 57 exact module hashes; all 54 semantic workspaces,
   four profiles, 57 workflows, selection and one pending keyboard-only conversation
   preserved. 53 sealed files are byte-identical; one changes audit metadata only.
 - Dated backup and launcher readback verify. Current plus one rollback remain.
-  The exact temporary package, 554 files/4,835,483 bytes, is already removed.
+  The exact temporary package, 555 files/4,844,712 bytes, is already removed.
   Do not repeat the executed installation or cleanup scripts.
 
 The signed-intent verifier initially pinned the previous shared instance module.
@@ -88,7 +88,7 @@ the accepted task-choice evidence; the corrected verifier passes all eight check
 The original failure remains in the installed evidence. Host-facing task-owner,
 Copilot-journal and signed-intent verifiers must run sequentially; earlier parallel
 initialization caused an independent preservation assertion failure.
-[Installed receipt](evidence/installed-editor-task-choices-summary.json).
+[Installed receipt](evidence/installed-guided-role-choices-summary.json).
 
 ## Complete runs and native evidence
 
@@ -103,11 +103,11 @@ the executed cleanup scripts. The newer guided role choices and scheduling-data
 refresh have separate focused acceptance.
 [Complete receipt](evidence/linux-7f2a52a-complete-summary.json).
 
-Native Windows client `57af859` passes 25 groups/249 tests with zero skips.
+Native Windows client `9d230ac` passes 25 groups/250 tests with zero skips.
 The exact source/merge trees, original deadlines, artifact hashes and cleanup
 verify. Native endpoint/file/process/socket checks are distinct from explicit
 Terminal/provider doubles in the composed launch tests.
-[Native evidence](evidence/selection-native-client-summary.json).
+[Native evidence](evidence/editor-task-choices-native-client-summary.json).
 
 Windows `e5a5781` passes all six preliminary shards: 232 groups, 1,356 passes,
 179 declared skips. Documentation/PDF, native guardian, reviewed-input and fresh

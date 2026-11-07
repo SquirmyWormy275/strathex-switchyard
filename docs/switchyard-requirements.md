@@ -9,11 +9,11 @@ entry point, evidence and remaining work. A hardware/account check does not excu
 unfinished independent software. Read [current status](switchyard-status.md) for
 accepted checkpoints and [verification](verification.md) for reproducible checks.
 
-Installed Linux source `9d230ac` passes **92 metadata/refusal checks across 56
+Installed Linux source `7393da1` passes **95 metadata/refusal checks across 57
 exact modules**, preserving all 54 semantic workspaces, four profiles, 57 workflows,
 selection and the pending keyboard-only conversation. The temporary package is
 removed; current plus one rollback remain.
-[Installed evidence](evidence/installed-editor-task-choices-summary.json).
+[Installed evidence](evidence/installed-guided-role-choices-summary.json).
 
 The latest backend feature lists saved task names for one exact project through
 signed Linux/Windows clients. Its encrypted-store-to-client demonstration passes
@@ -26,12 +26,12 @@ activation remains frozen for owner review.
 Complete Linux `7f2a52a` passes 351 groups/2,302 tests with 32 declared skips.
 It includes the installed consent corrections and task choices. The newer guided
 role choices pass seven focused groups/101 tests with one declared skip; their
-frontend picker remains frozen. Native Windows client `57af859` passes 249 tests
+frontend picker remains frozen. Native Windows client `9d230ac` passes 250 tests
 with no skips. The `e5a5781` complete Windows release was cancelled without
 a final receipt, despite passing all preliminary shards. These checkpoints do
 not establish live provider/task, interactive UI or physical-device acceptance.
 [Linux evidence](evidence/linux-7f2a52a-complete-summary.json),
-[Windows client](evidence/selection-native-client-summary.json),
+[Windows client](evidence/editor-task-choices-native-client-summary.json),
 [Windows release interruption](evidence/windows-backend-e5a5781-summary.json).
 
 ## Requirement status
