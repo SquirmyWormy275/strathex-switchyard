@@ -195,3 +195,10 @@ Typecheck, installation recovery and the original 5 MiB package limit pass.
 Owned temporary test staging is removed. Live installed scanning, actual Windows
 guest behavior and frontend controls are not accepted by these source tests.
 [Evidence](evidence/scanner-index-review-source-summary.json).
+
+Installed `ba172a1` verifies the exact staged-preparation modules within 76
+metadata/in-memory checks and preserves all 54 semantic workspaces and frozen
+frontend bytes. The prepared bundle is removed after normal versioned update.
+This is installed source/compatibility verification; it starts no installed
+scanner or native provider task.
+[Installed evidence](evidence/installed-scanner-index-review-summary.json).

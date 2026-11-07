@@ -11,6 +11,15 @@ separate unfinished work or unaccepted checks.
 [Contract](scanner-input-inventory.md#include-staged-versions-in-the-review),
 [source evidence](evidence/scanner-index-review-source-summary.json).
 
+Installed `ba172a1` now passes 76 metadata/in-memory checks and verifies 23 exact
+module hashes, including the staged-preparation source. All 54 semantic workspaces,
+selection, pending keyboard-only conversation and frozen frontend are preserved;
+53 sealed files are byte-identical and one changes only audit metadata. The dated
+backup and launcher readback verify. Current plus one rollback remain; the exact
+531-file, 5,196,099-byte prepared bundle is removed. No installed scanner, native
+task, model/account request or hardware operation was performed.
+[Installed evidence](evidence/installed-scanner-index-review-summary.json).
+
 Native Windows client contracts now pass all **seven groups and 94 tests** at
 `4f56477`, with no skips. Exact source/merge tree, artifact digest, original
 commands/deadlines and every child/tree cleanup verify. This closes the earlier
