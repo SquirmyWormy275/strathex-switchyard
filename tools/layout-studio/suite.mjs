@@ -10,6 +10,7 @@ import { createSuiteStore } from "./suite-store.mjs";
 import { createAgentService } from "./agents.mjs";
 import { localVoice } from "./voice.mjs";
 import { parseWorkflow, observationSummary } from "./workflow.mjs";
+import { reviewDesignObservations } from "./design-observations.mjs";
 import { surfaceForClass } from "../../scripts/workflow-monitor.mjs";
 import { runHypr, nativeFocusImplementations } from "./host.mjs";
 import { createDeviceService } from "./devices.mjs";
@@ -535,7 +536,11 @@ export function createSuite({ store = createSuiteStore(), platform = process.pla
       if (path === "/api/suite/integrations/recipe") { const { workspaceBaseUrl, ...proposal } = body; return clients.recipe(compartment, proposal); }
       if (path === "/api/suite/copilot/login") return copilot.beginLogin(compartment, body);
       if (path === "/api/suite/copilot/poll") return copilot.pollLogin(compartment, body.loginId);
-      if (path === "/api/suite/design") { await store.authorize(compartment, { provider: body.provider }); return (body.provider === "microsoft-365-copilot" ? copilot : agents).design({ compartment, provider: body.provider, message: body.message, plan: body.plan, conversationId: body.conversationId, ...(body.provider === "microsoft-365-copilot" ? { requestId: body.requestId } : {}) }); }
+      if (path === "/api/suite/design/observations/review") {
+        if (Object.keys(body).some(key => !["compartment", "workspaceBaseUrl", "provider", "sessionIds"].includes(key))) throw new Error("Review only the selected observation sessions and intended designer.");
+        return reviewDesignObservations(await store.snapshot(compartment, { provider: body.provider }), body.provider, body.sessionIds);
+      }
+      if (path === "/api/suite/design") { await store.authorize(compartment, { provider: body.provider }); if (body.provider === "microsoft-365-copilot" && body.observationReview !== undefined) throw new Error("Work Copilot observation export is not enabled by this workspace's policy. No fallback provider was selected."); return (body.provider === "microsoft-365-copilot" ? copilot : agents).design({ compartment, provider: body.provider, message: body.message, plan: body.plan, conversationId: body.conversationId, ...(body.provider === "microsoft-365-copilot" ? { requestId: body.requestId } : { observationReview: body.observationReview }) }); }
       if (path === "/api/suite/design/cancel") return agents.cancel(compartment, body.conversationId);
       if (path === "/api/suite/design/status") return agents.status(compartment, body.conversationId);
       if (path === "/api/suite/conversation/binding/review") return agents.reviewLegacyBinding(compartment, body.conversationId);

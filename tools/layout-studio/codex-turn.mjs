@@ -6,7 +6,7 @@ const identity = (v) => typeof v === "string" && /^[A-Za-z0-9_-]{1,128}$/.test(v
 export function assertCodexResultCurrent(client, result) {
   if (client.closed || (client.accountEpoch ?? 0) !== result.accountEpoch) throw Object.assign(new Error("The native Codex account/connection changed before reply persistence."), { code: "ACCOUNT_UNCONFIRMED" });
 }
-export function runRestrictedCodexTurn({ client, threadId, text, outputSchema, onStarted = async () => {}, checkCurrent = () => {}, signal, timeoutMs = 120000, maxOutputBytes = 512 * 1024, stopChild = stopOwnedChild } = {}) {
+export function runRestrictedCodexTurn({ client, threadId, text, outputSchema, onStarted = async () => {}, beforeSubmit = async () => {}, checkCurrent = () => {}, signal, timeoutMs = 120000, maxOutputBytes = 512 * 1024, stopChild = stopOwnedChild } = {}) {
   if (!client || client.closed || client.nativeVersion !== "0.166.0" || client.restrictionsVerified !== true || typeof client.recheckAccount !== "function" || !/^[a-f0-9]{64}$/.test(client.accountFingerprint ?? "") || !identity(threadId) || typeof text !== "string" || !text.trim() || Buffer.byteLength(text) > 1024 * 1024 || !Number.isInteger(timeoutMs) || timeoutMs < 10 || timeoutMs > 120000 || !Number.isInteger(maxOutputBytes) || maxOutputBytes < 128 || maxOutputBytes > 512 * 1024) throw new Error("An exact reviewed native connection and bounded text turn are required.");
   checkCurrent();
   const accountEpoch = client.accountEpoch ?? 0;
@@ -63,7 +63,10 @@ export function runRestrictedCodexTurn({ client, threadId, text, outputSchema, o
     client.on("notification", notification); client.on("disconnected", disconnected); signal?.addEventListener("abort", aborted, { once: true });
     if (signal?.aborted) { aborted(); return; }
     try { checkCurrent(); } catch { void stop("The native request was stopped before submission.", "TURN_STOPPED"); return; }
-    (async () => { await client.recheckAccount(); checkCurrent(); if (stopping || settled) return null; return client.request("turn/start", { threadId, input: [{ type: "text", text }], approvalPolicy: "never", approvalsReviewer: "user", sandboxPolicy: { type: "readOnly", networkAccess: false }, ...(outputSchema ? { outputSchema } : {}) }); })().then(async (value) => {
+    (async () => { await client.recheckAccount(); checkCurrent(); if (stopping || settled) return null;
+      try { await beforeSubmit(); } catch { await stop("The reviewed context could not be confirmed. No prompt was submitted.", "SUBMISSION_BLOCKED"); return null; }
+      checkCurrent(); if (stopping || settled) return null;
+      return client.request("turn/start", { threadId, input: [{ type: "text", text }], approvalPolicy: "never", approvalsReviewer: "user", sandboxPolicy: { type: "readOnly", networkAccess: false }, ...(outputSchema ? { outputSchema } : {}) }); })().then(async (value) => {
       if (settled || stopping) return;
       if (!identity(value?.turn?.id)) { await stop("The native runtime did not acknowledge an exact turn.", "INVALID_ACKNOWLEDGEMENT"); return; }
       turnId = value.turn.id;

@@ -15,7 +15,7 @@ No merge or public release has been accepted.
 | Checkpoint | Completed result | What it does not establish |
 | --- | --- | --- |
 | Complete Linux `aafb476` | **317 groups, 1,923 passing tests, sixteen declared skips**; exact original inventory, commands, bounds, child/tree and owned staging cleanup. [Receipt](evidence/linux-aafb476-complete-summary.json). | Later Cargo archive identity and workflow-ID corrections have separate focused evidence. |
-| Complete Windows `cadbccd` | 416 groups, 2,443 passing tests and 204 declared skips; packet hashes, source/merge trees, inventory, deadlines and cleanup verify. [Receipt](evidence/windows-complete-cadbccd-summary.json). | The overall workflow failed because preliminary backend shard 3 was cancelled without a final receipt. Later changes are outside this checkpoint. |
+| Complete Windows `dc755901` | **417 groups, 2,478 passing tests and 207 declared skips**; all six jobs and the overall workflow succeed, with exact packet/source/merge inventory, bounds and cleanup. [Receipt](evidence/windows-complete-dc755901-summary.json). | Predates wheel RECORD, five-job scheduling, Cargo archive and workflow/profile/observation corrections. Interactive Windows acceptance remains separate. |
 | Installed Linux `6609353` | 66 metadata/in-memory checks and sixteen exact installed module hashes. All 54 semantic workspace snapshots, selection, pending keyboard-only conversation and frozen frontend are preserved. [Receipt](evidence/installed-profile-identity-summary.json). | These checks start no scanner process, Cargo process, live task, agent, account action, model request or hardware operation. |
 | Complete Linux `39db1fe` | **Failed:** 313/314 groups, 1,910 passing tests, sixteen declared skips and one failed scheduling-budget assertion. Exact owned cleanup verifies. [Receipt](evidence/linux-39db1fe-scheduling-failed-summary.json). | A nearly passing run is not complete acceptance. |
 
@@ -49,6 +49,18 @@ overlay, saved artwork and workstation guard.
 | Installation and recovery | Versioned private bundles, integrity checks, installation/update/rollback and interrupted-install recovery. [Installation](suite-installation.md), [recovery](suite-release-recovery.md). |
 
 ## Latest changes and limits
+
+Selected observation summaries now reach the existing Codex/Claude designer only
+after explicit source selection and confirmation. Twenty-eight focused groups
+pass **154 distinct checks**, including authenticated local HTTP, real encrypted
+state, provider doubles, final-boundary deletion and cancellation. Ordinary
+requests send no observation context; work-policy export stays refused.
+The first package check exceeded its original limit by 4,711 bytes. Lossless
+compression of the first-party catalog index restores the bound, with all sixteen
+installation/recovery scenarios passing. No upstream source or frozen frontend
+bytes change. Installed/new native acceptance and frontend selection controls
+remain pending. [Contract](observation-assisted-design.md),
+[source evidence](evidence/design-observations-source-summary.json).
 
 Portable imports and local role connections now require literal string identities.
 Malformed v1 imports can no longer acquire helper defaults or replace the current

@@ -311,6 +311,7 @@ export const requiredGroups = [
   { file: "tools/layout-studio/codex-unix-transport.test.mjs", ...(process.platform !== "linux" ? { expectedSkipped: 6 } : {}) },
   { file: "tools/layout-studio/codex-owned-listener.test.mjs", ...(process.platform !== "linux" ? { expectedSkipped: 13 } : {}) },
   { file: "tools/layout-studio/codex-turn.test.mjs" },
+  { file: "tools/layout-studio/design-observations.test.mjs" },
   // Protected Windows fault matrices each start many short native lock helpers.
   // Keep their cold-process allowance bounded without relaxing assertions/skips.
   { file: "tools/layout-studio/agents-claude.test.mjs", ...nativeTestOverrides("tools/layout-studio/agents-claude.test.mjs") },

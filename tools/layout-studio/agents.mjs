@@ -1,6 +1,7 @@
 /** Concrete, tool-restricted design adapters. Account state stays with installed CLIs. */
 import { spawn } from "node:child_process";
 import { appendAgentObservation } from "./agent-observation.mjs";
+import { reviewedDesignObservations } from "./design-observations.mjs";
 import { EventEmitter } from "node:events";
 import { codexAccountBoundary, deniedCodexServerRequest } from "./codex-requests.mjs";
 import { assertCodexResultCurrent, runRestrictedCodexTurn } from "./codex-turn.mjs";
@@ -288,25 +289,28 @@ export function createAgentService({ store, runtimeRoot, codexFactory = (exe, cw
     async discovery() {
       return Promise.all(["codex", "claude-code"].map(async (id) => { try { await resolveCli(id); return { id, installed: true, capabilities: ["design-conversation", "exact-owned-session", "status", "cancel"], auth: "checked-on-use", provenance: "fixed native CLI installation" }; } catch { return { id, installed: false, capabilities: [], auth: "unavailable" }; } }));
     },
-    async design({ compartment, provider, message, plan: input, conversationId }) {
+    async design({ compartment, provider, message, plan: input, conversationId, observationReview }) {
       const generation = generations.get(compartment) ?? 0; currentGeneration(compartment, generation);
       await store.authorize(compartment, { provider });
       await settleUnconfirmed(compartment);
       currentGeneration(compartment, generation);
       if (typeof message !== "string" || !message.trim() || message.length > 12000) throw new Error("Describe the workflow in 1–12000 characters.");
       const plan = parsePlan(input), state = await store.snapshot(compartment);
+      const observations = reviewedDesignObservations(state, provider, observationReview);
+      const checkObservations = async () => { if (observationReview !== undefined) reviewedDesignObservations(await store.snapshot(compartment, { provider }), provider, observationReview); };
       currentGeneration(compartment, generation);
       const conversation = conversationId ? state.conversations.find((c) => c.id === conversationId && c.provider === provider) : null;
       if (conversationId && !conversation) throw new Error("That conversation is not bound to this compartment and provider.");
       const id = conversation?.id ?? randomUUID(), key = `${compartment}:${id}`;
       if ([...busy].some((k) => k.startsWith(`${compartment}:`))) throw new Error("A design turn is already running in this workspace. Wait or cancel before sending again.");
       const context = { instruction: "You are Switchyard's configuration designer. Improve the process before mapping it. Return only the response schema. Never run tools, read files, contact services, or apply a change. Use actual supplied key IDs. Preserve ordinary typing; use modified chords. Do not invent device, completion, time-saving or capability evidence. Estimates default to zero. Explain questions in reply. Return the full desired action list, editable process steps and agent role labels. Keep stable action IDs when revising. The output is an untrusted proposal requiring independent review.", currentPlan: plan, currentWorkflow: state.workflow, conversation: (conversation?.messages ?? []).slice(-12), request: message };
+      if (observations !== undefined) context.observations = observations;
       const contextText = JSON.stringify(context);
       if (provider === "claude-code" && Buffer.byteLength(contextText) > 524288) throw new Error("The complete designer context exceeds 512 KiB. Shorten the saved conversation or workflow before sending; no model prompt was submitted.");
       busy.add(key);
       let sessionId = conversation?.sessionId ?? null, accountFingerprint = conversation?.accountFingerprint ?? null, ownedRuntime = null;
       try {
-        await store.update(compartment, "design-draft", (s) => { currentGeneration(compartment, generation); s.conversations = [...s.conversations.filter((c) => c.id !== id), { ...conversation, id, provider, sessionId: conversation?.sessionId ?? null, updatedAt: Date.now(), messages: [...(conversation?.messages ?? []), { role: "user", text: message }].slice(-40), status: "pending" }]; observeDesign(s, provider, id, "design-request-reserved"); }, { provider });
+        await store.update(compartment, "design-draft", (s) => { currentGeneration(compartment, generation); reviewedDesignObservations(s, provider, observationReview); s.conversations = [...s.conversations.filter((c) => c.id !== id), { ...conversation, id, provider, sessionId: conversation?.sessionId ?? null, updatedAt: Date.now(), messages: [...(conversation?.messages ?? []), { role: "user", text: message }].slice(-40), status: "pending" }]; observeDesign(s, provider, id, "design-request-reserved"); }, { provider });
         currentGeneration(compartment, generation);
         let response, assertReplyCurrent = () => {};
         if (provider === "codex") {
@@ -325,7 +329,7 @@ export function createAgentService({ store, runtimeRoot, codexFactory = (exe, cw
           await store.claimSession(compartment, { provider, sessionId });
           currentGeneration(compartment, generation);
           const controller = new AbortController(); running.set(key, { provider, sessionId, controller, turnId: null });
-          const turn = await runRestrictedCodexTurn({ client, threadId: sessionId, text: contextText, outputSchema: designResponseSchema, signal: controller.signal, stopChild, checkCurrent: () => currentGeneration(compartment, generation), onStarted: async (turnId) => { running.get(key).turnId = turnId; } });
+          const turn = await runRestrictedCodexTurn({ client, threadId: sessionId, text: contextText, outputSchema: designResponseSchema, signal: controller.signal, stopChild, beforeSubmit: checkObservations, checkCurrent: () => currentGeneration(compartment, generation), onStarted: async (turnId) => { running.get(key).turnId = turnId; } });
           assertReplyCurrent = () => assertCodexResultCurrent(client, turn);
           try { response = JSON.parse(turn.text); } catch { throw new Error("Codex did not return a valid structured proposal."); }
         } else if (provider === "claude-code") {
@@ -348,6 +352,7 @@ export function createAgentService({ store, runtimeRoot, codexFactory = (exe, cw
               await store.update(compartment, "design-guardian-ready", (s) => { currentGeneration(compartment, generation); const c = s.conversations.find((c) => c.id === id); if (!c || c.sessionId !== sessionId || c.accountFingerprint !== accountFingerprint) throw new Error("The exact designer conversation changed before start."); c.ownedRuntime = scope; c.ownedRuntimeStoppedVerified = false; }, { provider });
               ownedRuntime = scope;
               await store.authorize(compartment, { provider }); currentGeneration(compartment, generation);
+              await checkObservations(); currentGeneration(compartment, generation);
             },
             onStopped: async (scope) => {
               await store.update(compartment, "design-guardian-stopped", (s) => { const c = s.conversations.find((c) => c.id === id); if (!c?.ownedRuntime) return; if (scopeHash(c.ownedRuntime) !== scopeHash(scope)) throw new Error("The exact designer guardian changed before exit acknowledgement."); c.ownedRuntimeStoppedVerified = true; });

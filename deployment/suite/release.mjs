@@ -4,6 +4,7 @@ import { constants } from "node:fs";
 import { mkdir, lstat, open, readFile, readdir, realpath, rename, rm, writeFile } from "node:fs/promises";
 import { dirname, join, relative, resolve, sep } from "node:path";
 import { userInfo } from "node:os";
+import { gzipSync } from "node:zlib";
 
 // Full keyboard catalog plus the complete Windows helper/setup source closure.
 // The byte ceiling stays fixed; this bounded inventory allows the added files.
@@ -84,11 +85,10 @@ export async function buildSuiteRelease({ sourceRoot, sourceFiles, outputRoot, f
   if ([...frontendOnly].some(name => !front.files.some(file => file.file === name))) throw new Error("The frozen frontend is missing its browser module closure.");
   for (const name of await walk(join(sourceRoot, "tools/layout-studio"))) if (!frontendOnly.has(name) && !name.endsWith(".test.mjs") && !name.endsWith(".pyc") && !name.startsWith("test-support/")) await add(`tools/layout-studio/${name}`);
   for (const prefix of ["integrations", "examples/custom-agent", "examples/langchain-agent", "deployment/suite", "third_party/model-f-catalog"]) for (const name of await walk(join(sourceRoot, prefix))) if (!name.endsWith(".test.mjs") && !name.endsWith(".pyc") && !name.startsWith("test-support/")) await add(`${prefix}/${name}`);
-  // This first-party provenance index is parsed as JSON by every consumer.
-  // Ship every field without formatting whitespace; pinned upstream files and
-  // the independently frozen frontend remain byte-for-byte unchanged.
+  // Compress only the first-party metadata index. Its declared encoding has a
+  // bounded decoder; every field, upstream byte and frozen frontend is retained.
   const catalogProvenance = "third_party/model-f-catalog/SOURCES.json";
-  if (inputs.has(catalogProvenance)) inputs.set(catalogProvenance, Buffer.from(JSON.stringify(JSON.parse(inputs.get(catalogProvenance).toString("utf8"))) + "\n"));
+  if (inputs.has(catalogProvenance)) { inputs.set(catalogProvenance + ".gz", gzipSync(Buffer.from(JSON.stringify(JSON.parse(inputs.get(catalogProvenance).toString("utf8"))) + "\n"))); inputs.delete(catalogProvenance); }
   // Only the suite runtime dependency closure, not unrelated entry points.
   // workflow-artifacts is referenced only by an erased type import here; its
   // context-packages/voice implementations belong to the separate companion.
@@ -98,7 +98,7 @@ export async function buildSuiteRelease({ sourceRoot, sourceFiles, outputRoot, f
   for (const name of ["apps/vscode-extension/src/codex-daemon-status.cjs", "scripts/setup-switchyard-runtime.mjs", "scripts/workflow-monitor.mjs", "scripts/workflow-capture.mjs", "ATTRIBUTION.md"]) await add(name);
   for (const name of ["pure-template.svg", "template-faces.json", "pure-template.pdf", "README.md", "ReadMe.txt"]) await add(`third-party/cyber_engineer/${name}`);
   // A minimal package boundary is sufficient: the application has no npm runtime dependencies.
-  inputs.set("package.json", Buffer.from(JSON.stringify({ name: "strathex-switchyard-private-suite", type: "module", private: true, license: "UNLICENSED", engines: { node: nodeVersion } }) + "\n"));
+  inputs.set("package.json", Buffer.from(JSON.stringify({ name: "strathex-switchyard-private-suite", type: "module", private: true, license: "UNLICENSED", engines: { node: nodeVersion }, catalogProvenance: "gzip-json/v1" }) + "\n"));
   for (const f of front.files) { portableName(f.file); if (f.file.includes("/")) throw new Error("The frontend review file contract changed."); const b = await bytes(join(frontendRoot, f.file)); if (hash(b) !== f.sha256) throw new Error("A frozen frontend asset changed."); inputs.set(`frontend/${f.file}`, b); }
   if (platform === "win32") {
     if (!windowsHotkeys) throw new Error("The Windows suite bundle requires the built native hotkey helper.");

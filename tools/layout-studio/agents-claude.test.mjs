@@ -10,11 +10,13 @@ import { claudeAccount, readClaudeDesignLogin } from "./claude-account.mjs";
 import { createSuiteStore } from "./suite-store.mjs";
 import { newPlan, parseBoardProfile } from "./model.mjs";
 import { stopOwnedChild } from "./owned-process.mjs";
+import { reviewDesignObservations } from "./design-observations.mjs";
 
 const plan = () => newPlan(parseBoardProfile({ schema: "sxsy-board-profile/v1", name: "Synthetic", layout: "one", keys: [{ id: "one", label: "A", matrix: [0, 0], x: 0, y: 0, baseKeycode: "KC_A" }] }));
 const response = { reply: "Synthetic reviewed process", summary: "Review", actions: [], steps: ["Review evidence"], roles: ["Reviewer"] };
 function metadataCommand(spawnProcess, settings = {}) {
   return async (exe, args, options) => {
+    if (args.includes("-p")) { settings.contexts?.push(JSON.parse(options.inputText)); await settings.beforeReady?.(); }
     await options.onGuardianReady({ schema: "switchyard-runtime-command/v1", id: randomUUID(), guardianPid: 1234, birth: "1", containment: process.platform === "win32" ? "windows-job" : "owned-linux-session" });
     const print = args.includes("-p"), child = spawnProcess(exe, args, { cwd: options.cwd, shell: false, windowsHide: true, stdio: [print ? "pipe" : "ignore", "pipe", "ignore"], env: options.env }); options.onGuardianChild(child);
     let stdout = ""; child.stdout.setEncoding("utf8"); child.stdout.on("data", b => { stdout += b; });
@@ -24,6 +26,20 @@ function metadataCommand(spawnProcess, settings = {}) {
     finally { options.signal.removeEventListener("abort", abort); }
   };
 }
+test("Claude design receives only reviewed aggregates and rechecks deletion at guardian readiness", () => fixture(async ({ store, agents, settings, calls }) => {
+  settings.contexts = [];
+  const selected = { id: "selected-demo", status: "stopped", sources: ["deliberate"], exclusions: [], events: [{ kind: "review", provenance: "user-marked", at: 1, content: "NEVER_SEND" }], updatedAt: Date.now() };
+  await store.update("personal", "synthetic-demo", s => { s.observations = [selected]; });
+  const review = reviewDesignObservations(await store.snapshot("personal"), "claude-code", [selected.id]);
+  const observationReview = { sessionIds: review.sessionIds, reviewId: review.reviewId, confirmed: true };
+  const first = await agents.design({ compartment: "personal", provider: "claude-code", message: "Use my reviewed demonstration", plan: plan(), observationReview });
+  assert.deepEqual(settings.contexts[0].observations, review.context); assert.equal(JSON.stringify(settings.contexts[0]).includes("NEVER_SEND"), false);
+  const prints = calls.filter(c => c.args.includes("-p")).length;
+  settings.beforeReady = () => store.update("personal", "synthetic-delete", s => { s.observations = []; });
+  await assert.rejects(agents.design({ compartment: "personal", provider: "claude-code", conversationId: first.conversationId, message: "Refuse a deleted demonstration", plan: plan(), observationReview }), /No observation context was sent/);
+  assert.equal(calls.filter(c => c.args.includes("-p")).length, prints);
+  assert.equal((await store.snapshot("personal")).conversations[0].status, "failed");
+}));
 async function fixture(fn) {
   const root = await mkdtemp(join(tmpdir(), "switchyard-claude-design-")), keys = new Map(), calls = [], children = [];
   const store = createSuiteStore({ root: join(root, "state"), secrets: { get: async (c, p) => keys.get(`${c}:${p}`), set: async (c, p, v) => keys.set(`${c}:${p}`, v) } });

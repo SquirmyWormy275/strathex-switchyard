@@ -46,7 +46,27 @@ workflows++;
 }assert.deepEqual(await readFile(p),before);
 }checks.push("all-saved-workflows-validate-with-byte-identical-sealed-files");
 
-const r={schema:"switchyard-installed-workflow-identity-metadata/v1",at:new Date().toISOString(),sourceCommit:manifest.sourceCommit,applicationRelease:manifest.id,moduleDigests:{[path]:digest},verifierSourceSha256:sha(await readFile(new URL(import.meta.url))),checks,success:true,workspaces:ids.length,workflows,unchangedSealedFiles:ids.length,metadataOnly:true,workflowEdits:0,providerOrModelRequests:0,liveAccountChanges:0,hardwareOperations:0};
+const designPath = "tools/layout-studio/design-observations.mjs", designDigest = sha(await readFile(join(root, designPath)));
+const designSource = JSON.parse(await readFile(new URL("../docs/evidence/design-observations-source-summary.json", import.meta.url), "utf8"));
+assert.equal(designDigest, designSource.sourceFiles[designPath]);
+const { reviewDesignObservations, reviewedDesignObservations } = await import(pathToFileURL(join(root, designPath)).href);
+checks.push("exact-tested-installed-observation-design-module");
+const synthetic = { id: "synthetic", policy: "personal", mode: "personal-companion", accounts: [], observations: [{ id: "chosen", status: "stopped", sources: ["deliberate"], exclusions: [], events: [{ kind: "review", provenance: "user-marked", content: "NEVER_SEND", at: 1 }] }] };
+const before = structuredClone(synthetic), preview = reviewDesignObservations(synthetic, "codex", ["chosen"]), confirmation = { sessionIds: preview.sessionIds, reviewId: preview.reviewId, confirmed: true };
+assert.deepEqual(reviewedDesignObservations(synthetic, "codex", confirmation), preview.context);
+assert.deepEqual(synthetic, before); assert.equal(JSON.stringify(preview.context).includes("NEVER_SEND"), false); assert.equal(JSON.stringify(preview.context).includes("chosen"), false);
+checks.push("pure-preview-and-confirmation-exclude-raw-content-and-identities");
+assert.equal(reviewedDesignObservations(synthetic, "codex", undefined), undefined);
+for (const change of [{ confirmed: false }, { context: preview.context }, { reviewId: "a".repeat(64) }]) assert.throws(() => reviewedDesignObservations(synthetic, "codex", { ...confirmation, ...change }));
+checks.push("no-implicit-observation-context-or-unconfirmed-substitution");
+assert.throws(() => reviewedDesignObservations(synthetic, "claude-code", confirmation));
+for (const change of [{ id: "foreign" }, { accounts: ["changed"] }, { observations: [] }]) assert.throws(() => reviewedDesignObservations({ ...synthetic, ...change }, "codex", confirmation));
+checks.push("stale-selection-provider-account-and-workspace-refusals");
+for (const change of [{ policy: "work" }, { mode: "keyboard-only" }, { observations: [{ ...synthetic.observations[0], status: "recording" }] }]) assert.throws(() => reviewDesignObservations({ ...synthetic, ...change }, "codex", ["chosen"]));
+assert.throws(() => reviewDesignObservations(synthetic, "microsoft-365-copilot", ["chosen"])); assert.throws(() => reviewDesignObservations(synthetic, "codex", ["chosen", "chosen"]));
+checks.push("recording-work-and-duplicate-selections-cannot-widen-consent");
+
+const r={schema:"switchyard-installed-workflow-identity-metadata/v2",at:new Date().toISOString(),sourceCommit:manifest.sourceCommit,applicationRelease:manifest.id,moduleDigests:{[path]:digest,[designPath]:designDigest},verifierSourceSha256:sha(await readFile(new URL(import.meta.url))),checks,success:true,workspaces:ids.length,workflows,unchangedSealedFiles:ids.length,workflowMetadataChecks:5,designObservationMetadataChecks:5,metadataOnly:true,workflowEdits:0,observationEdits:0,providerOrModelRequests:0,liveAccountChanges:0,hardwareOperations:0};
 const out=join(homedir(),".local/state/strathex-switchyard/runtime-verification/installed-workflow-identity-metadata-"+Date.now()+".json");
 await writeFile(out,JSON.stringify(r,null,2)+"\n",{flag:"wx",mode:0o600});
 console.log(JSON.stringify({receipt:out,checks:checks.length,success:true,workspaces:ids.length,workflows,unchangedSealedFiles:ids.length}));

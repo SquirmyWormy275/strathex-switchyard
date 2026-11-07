@@ -74,6 +74,14 @@ now registered in the existing 120-second Linux/300-second Windows class.
 
 ## Complete verification checkpoints
 
+Complete Windows `dc755901` now passes **417 groups, 2,478 tests and 207
+declared skips**. The overall workflow and all six jobs succeed. Exact source/merge
+trees, packet digest, original group inventory, command arguments, bounds and
+child/tree cleanup verify. Nine non-TAP build exits are checked separately.
+This checkpoint predates wheel RECORD, five-job scheduling, Cargo archive
+identity, workflow/profile identity and observation-context changes.
+[Native receipt](evidence/windows-complete-dc755901-summary.json).
+
 Complete Linux aafb476 passes **317 groups, 1,923 tests and sixteen declared
 skips**, with zero failures/cancellations. The exact original manifest, commands,
 deadlines and skip inventory verify, along with every child/tree retirement.
@@ -101,11 +109,10 @@ limits and the 950-second estimated-workload ceiling.
 [Failed full run](evidence/linux-39db1fe-scheduling-failed-summary.json),
 [scheduling correction](evidence/windows-five-shards-source-summary.json).
 
-The last complete Windows packet `cadbccd` passes 416 groups, 2,443 tests and
-204 declared skips. The overall workflow fails because a preliminary shard was
-cancelled without a final receipt. Native Windows work remains source-specific:
-a passing complete packet does not turn that workflow green.
-[Complete packet](evidence/windows-complete-cadbccd-summary.json).
+The earlier `cadbccd` complete packet remains separately accepted, while its
+overall workflow failed after a cancelled preliminary shard. The later green
+`dc755901` workflow does not erase that failure.
+[Earlier packet](evidence/windows-complete-cadbccd-summary.json).
 
 Windows workflow concurrency preserves one active full run and queues the newest
 checkpoint. Superseded pending runs may be cancelled. Do not manually cancel,
@@ -115,6 +122,18 @@ bounds and cleanup before accepting downloaded evidence. Retain small JSON
 receipts; remove downloaded archives.
 
 ## Continue independent implementation
+
+Selected observation summaries now reach the existing Codex/Claude designer only
+after explicit source selection and confirmation. Twenty-eight focused groups
+pass **154 distinct checks**, including authenticated local HTTP, real encrypted
+state, provider doubles, final-boundary deletion and cancellation. Ordinary
+requests send no observation context; work-policy export stays refused.
+The first package check exceeded its original limit by 4,711 bytes. Lossless
+compression of the first-party catalog index restores the bound, with all sixteen
+installation/recovery scenarios passing. No upstream source or frozen frontend
+bytes change. Installed/new native acceptance and frontend selection controls
+remain pending. [Contract](observation-assisted-design.md),
+[source evidence](evidence/design-observations-source-summary.json).
 
 Portable imports and local role connections now require literal string identities.
 Malformed v1 imports can no longer acquire helper defaults or replace the current
@@ -127,8 +146,9 @@ native Windows profile correction acceptance remains separate.
 [Installed evidence](evidence/installed-profile-identity-summary.json).
 [Source evidence](evidence/profile-identity-source-summary.json).
 
-1. Profile-import identity correction is published and installed. Continue the
-   independently executable ledger gaps with focused source and installed checks.
+1. Publish reviewed observation design context and the compressed catalog package,
+   then adopt through the normal versioned update. Current verifier pins target
+   that new source; do not bypass an older installed module mismatch.
    Keep later Cargo/workflow focused evidence separate from complete aafb476.
    A new full run must use clean, published immutable source and a short owned
    temporary parent; verify exact final inventory/exit before removing its files.

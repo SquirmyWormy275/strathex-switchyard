@@ -1,5 +1,5 @@
 /** Pinned build declarations describe source support; they never authorize device control. */
-import sourceManifest from "../../third_party/model-f-catalog/SOURCES.json" with { type: "json" };
+import sourceManifest from "./catalog-source.mjs";
 import protocolAudits from "../../third_party/model-f-catalog/HAPTIC_PROTOCOL_AUDIT.json" with { type: "json" };
 import { identifyCatalogSnapshot } from "./catalog-identity.mjs";
 

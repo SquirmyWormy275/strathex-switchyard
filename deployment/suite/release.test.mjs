@@ -16,6 +16,8 @@ test("release verification rejects a different adjacent 64-bit file identity bef
 });
 test("suite bundles contain the actual offline backend, frozen frontend and licenses without private data, tests or copied runtimes", () => fixture(async ({ bundle, options }) => {
   const manifest = await verifySuiteRelease(bundle.directory, { expectedId: bundle.id, platform: "linux", checkRuntime: true });
+  const { reviewDesignObservations } = await import(pathToFileURL(join(bundle.directory, "tools/layout-studio/design-observations.mjs")).href);
+  assert.equal(typeof reviewDesignObservations, "function");
   for (const name of ["index.html", "style.css", "app.mjs", "home.mjs", "shell.mjs", "keyboard-view.mjs", "suite-ui.mjs", "device-ui.mjs", "model-f-catalog.json", "connection.mjs", "sample-info.json", "sample-keymap.json", "sample-study-report.json"]) {
     assert.equal(manifest.files.some(file => file.path === `tools/layout-studio/${name}`), false, "Browser-only modules and static assets must ship once in the frozen frontend.");
     assert.ok(manifest.files.some(file => file.path === `frontend/${name}`));
@@ -52,7 +54,9 @@ test("suite bundles contain the actual offline backend, frozen frontend and lice
   assert.deepEqual(JSON.parse(manifestBytes), manifest);
   assert.ok(bundle.bytes + manifestBytes.length < 5 * 1024 * 1024, "The full Linux package, including its integrity manifest, must stay below the original budget.");
   const provenancePath = "third_party/model-f-catalog/SOURCES.json", provenance = JSON.parse(await readFile(join(options.sourceRoot, provenancePath), "utf8"));
-  assert.equal(await readFile(join(bundle.directory, provenancePath), "utf8"), JSON.stringify(provenance) + "\n", "Compact provenance retains every source revision, hash, notice and metadata field.");
+  const { default: decodedProvenance } = await import(pathToFileURL(join(bundle.directory, "tools/layout-studio/catalog-source.mjs")).href);
+  assert.deepEqual(decodedProvenance, provenance, "Compressed provenance retains every source revision, hash, notice and metadata field.");
+  assert.ok(manifest.files.some(f => f.path === provenancePath + ".gz")); assert.equal(manifest.files.some(f => f.path === provenancePath), false);
   assert.ok(manifest.files.some((f) => f.path.endsWith("mymakercorner/LICENSE"))); assert.ok(manifest.files.some((f) => f.path === "integrations/switchyard_agent.py"));
   for (const name of ["pure-template.svg", "template-faces.json", "pure-template.pdf", "README.md", "ReadMe.txt"]) assert.ok(manifest.files.some((f) => f.path === `third-party/cyber_engineer/${name}`));
   assert.equal(manifest.files.some((f) => /(?:\.test\.|test-support\/|\.sealed\.|\.git\/|node_modules\/|\.venv\/|__pycache__\/|\.pyc$|base\.en\/)/.test(f.path)), false);

@@ -1,5 +1,25 @@
 # What has actually been verified
 
+Complete Windows `dc755901` now passes **417 groups, 2,478 tests and 207
+declared skips**. The overall workflow and all six jobs succeed. Exact source/merge
+trees, packet digest, original group inventory, command arguments, bounds and
+child/tree cleanup verify. Nine non-TAP build exits are checked separately.
+This checkpoint predates wheel RECORD, five-job scheduling, Cargo archive
+identity, workflow/profile identity and observation-context changes.
+[Native receipt](evidence/windows-complete-dc755901-summary.json).
+
+Selected observation summaries now reach the existing Codex/Claude designer only
+after explicit source selection and confirmation. Twenty-eight focused groups
+pass **154 distinct checks**, including authenticated local HTTP, real encrypted
+state, provider doubles, final-boundary deletion and cancellation. Ordinary
+requests send no observation context; work-policy export stays refused.
+The first package check exceeded its original limit by 4,711 bytes. Lossless
+compression of the first-party catalog index restores the bound, with all sixteen
+installation/recovery scenarios passing. No upstream source or frozen frontend
+bytes change. Installed/new native acceptance and frontend selection controls
+remain pending. [Contract](observation-assisted-design.md),
+[source evidence](evidence/design-observations-source-summary.json).
+
 Installed `6609353` passes **66 metadata/in-memory checks**, adding five exact
 profile-identity checks to the preceding 61. Sixteen module hashes verify. All
 four saved profiles and 57 workflows remain compatible; all 54 semantic

@@ -71,9 +71,9 @@ role/device controls and full scanner coverage remain unfinished.
 The accepted complete Linux checkpoint `aafb476` passes **317 groups / 1,923
 tests**, with sixteen declared skips and verified owned cleanup. The restricted
 Windows storage journey now passes all eight original checks, including exact
-exit and fixture/service retirement. Complete Windows source `cadbccd` passes its separate
-**416-group / 2,443-test packet**, with 204 declared skips and exact cleanup; its
-overall workflow still fails because a preliminary shard was cancelled.
+exit and fixture/service retirement. Complete Windows source `dc755901` passes
+**417 groups / 2,478 tests**, with 207 declared skips, exact cleanup and a green
+overall workflow. Newer changes retain separate focused evidence.
 The latest agent and helper ownership corrections have focused checks and a
 66-check installed metadata demonstration; a
 recurring first-install shortcut timeout remains under investigation. Source,

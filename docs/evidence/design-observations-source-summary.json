@@ -1,0 +1,192 @@
+{
+  "schema": "switchyard-design-observations-source/v1",
+  "at": "2026-11-07T01:03:46.896278+00:00",
+  "baseSource": "76facc920f3282a4206b81482e8edf8d9b0dce82",
+  "sourceFiles": {
+    "tools/layout-studio/suite.mjs": "0ae7557a608ff56099d30f035cf57ceda8a6b43b04a15bcff1d438f22dc6aabc",
+    "tools/layout-studio/agents.mjs": "602046c06cc019c1b34dc8dd447fb6966bd9bfde897cc25336acf9da84fdcc10",
+    "tools/layout-studio/codex-turn.mjs": "5a7ee8aaf7d244a50550ee32637ac4845337e012ceca35c4435939026232dbc1",
+    "tools/layout-studio/design-observations.mjs": "ad16bcca061436d4fc2c69b191ac8929c57e16fe4a05ee6161e68b0985580836",
+    "tools/layout-studio/catalog-source.mjs": "84b61bf3a8cfcbb4af5f878db1ae056f9a19fdc2c579928907cc215ac7fa474f",
+    "tools/layout-studio/haptic-capabilities.mjs": "9f3ee37d3f0e6a8fab58993dcaef24e9adaef9325f18f2c7f64fdfca5735f1b3",
+    "deployment/suite/release.mjs": "76338e98523c85cb736823db5f611dba11fcd04ab179a64a52d61a8d2a378ded",
+    "tools/layout-studio/design-observations.test.mjs": "c1b13b48c4514051d4c7867e6afe891ae018a51703db5c3d39b1bd09de88c996",
+    "tools/layout-studio/agents-claude.test.mjs": "8f55aa735b75c7dc4c33244b881213976a26e545fb261c1460aff20d6936b7d8",
+    "tools/layout-studio/codex-turn.test.mjs": "03bc2c0f83510269561d609b2186905a3d752d9bcee6235a97c55d025db53935",
+    "tools/layout-studio/haptic-capabilities.test.mjs": "b24a4dc29d385abae6f9cb11df4ee65e0649466e4ac2d975f3bbd568912f25b7",
+    "deployment/suite/release.test.mjs": "598f20d42a8ec5962082905c593fecf00fdfcce6b18479799287d2e5dd094856",
+    "scripts/run-isolated-tests.mjs": "d3f66c2d6bd1404bfe0bf3147a7311da9c2e7f3284ee28dbe089c241ea48095d",
+    "scripts/verify-agent-security-host.mjs": "009e151c8030d4f8b37700b5e63c649ed0733a8d1c27cfa02b9c37dedeff4440",
+    "scripts/verify-workflow-host.mjs": "1fb06f613971604280ed13eca61e251bbd5c2cf4a99b74286857de061ebd16b4"
+  },
+  "receipts": [
+    {
+      "name": "isolated-test-a31e6a26-a5dc-4b1f-9dad-a4a5b5419255.json",
+      "sha256": "50f30fe1b1b87d776c8f212af03f2d44893fa6a669dfaf0cddf3e5a63dbdfb1e",
+      "success": false,
+      "totals": {
+        "required": 1,
+        "passed": 0,
+        "failed": 1,
+        "tests": 6,
+        "passedTests": 3,
+        "failedTests": 3,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "name": "isolated-test-b5c68514-60a0-43db-a390-4ec2740b2564.json",
+      "sha256": "cc2d2ebae6935159fc59bd8e6df94c3a8938d3812bd764717e5e13b62cfcc273",
+      "success": false,
+      "totals": {
+        "required": 1,
+        "passed": 0,
+        "failed": 1,
+        "tests": 6,
+        "passedTests": 5,
+        "failedTests": 1,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "name": "isolated-test-03e8e2e6-8256-4b53-a7c2-8454decfcda4.json",
+      "sha256": "3300da2593b5fbd26cced85a7ff2fe1c5577c614d278a4cca7ba793265370628",
+      "success": true,
+      "totals": {
+        "required": 1,
+        "passed": 1,
+        "failed": 0,
+        "tests": 6,
+        "passedTests": 6,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "name": "isolated-test-7019c75b-afcf-4a22-817a-8ee25fdd18c8.json",
+      "sha256": "80e148e66c4925b29009e85834f615e5399ad8ff6aa454a5baa129531f60df71",
+      "success": true,
+      "totals": {
+        "required": 7,
+        "passed": 7,
+        "failed": 0,
+        "tests": 115,
+        "passedTests": 115,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "name": "isolated-test-cfbfbcf9-47d7-4d0e-9f39-1b250e494e3d.json",
+      "sha256": "8f6de4cc703e75cf73fab47d9ea27825f127bb048fd71c4c432761f50ea73510",
+      "success": false,
+      "totals": {
+        "required": 3,
+        "passed": 2,
+        "failed": 1,
+        "tests": 14,
+        "passedTests": 13,
+        "failedTests": 1,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "name": "isolated-test-5eb99e40-909e-45fa-a0c6-13ee5803bbfe.json",
+      "sha256": "a3ddbc283dca1c1978c4ba46f83d721ce8c0120f2bb08819971a0c1cebcb8922",
+      "success": true,
+      "totals": {
+        "required": 20,
+        "passed": 20,
+        "failed": 0,
+        "tests": 36,
+        "passedTests": 36,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "name": "isolated-test-ba554a94-f91a-40a0-afe2-34efebfbdc28.json",
+      "sha256": "e1612008f4e755bd8e877a6e047c9fdb6e9ce3544141bcc940e2a8d2c1ce4896",
+      "success": true,
+      "totals": {
+        "required": 2,
+        "passed": 2,
+        "failed": 0,
+        "tests": 9,
+        "passedTests": 9,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "name": "isolated-test-17b4c78e-a30e-431d-ba5e-96dcc0d0d6aa.json",
+      "sha256": "9143f0f890f42f00c44e91a782abf19d3b6ba1e5be25305073b0acacaed7826b",
+      "success": true,
+      "totals": {
+        "required": 1,
+        "passed": 1,
+        "failed": 0,
+        "tests": 6,
+        "passedTests": 6,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    }
+  ],
+  "acceptedDistinctGroups": 28,
+  "acceptedDistinctTests": 154,
+  "authenticatedLocalHttpDemonstration": true,
+  "actualEncryptedState": true,
+  "providerExecution": "Codex protocol and Claude process doubles; no live account or model",
+  "observationsExplicitlySelectedAndConfirmed": true,
+  "rawObservationContentExported": false,
+  "automaticObservationContext": false,
+  "workPolicyExportEnabled": false,
+  "sourceDeletionAtFinalSubmissionRefuses": true,
+  "cancellationDuringReviewRefuses": true,
+  "firstFixtureFailures": [
+    "Synthetic timestamps predated retention; fixed fixture clock preserves the intended test observations.",
+    "Read-only byte comparison ran before normal suite initialization; initialize before taking the baseline."
+  ],
+  "originalPackageFailure": {
+    "receipt": "isolated-test-cfbfbcf9-47d7-4d0e-9f39-1b250e494e3d.json",
+    "overBudgetBytes": 4711,
+    "ceilingRaised": false
+  },
+  "packageCorrection": {
+    "encoding": "gzip-json/v1",
+    "firstPartyIndexOnly": true,
+    "everySourceFieldPreserved": true,
+    "corruptAndOversizedPayloadsRefused": true,
+    "upstreamFilesAndFrozenFrontendUnchanged": true,
+    "totalSyntheticPackageBytes": 5163619,
+    "originalCeilingBytes": 5242880,
+    "headroomBytes": 79261,
+    "compressedCatalogBytes": 12989,
+    "sixteenInstallationRecoveryScenariosPassed": true
+  },
+  "typecheck": true,
+  "allChildAndTreeCleanupVerified": true,
+  "exactOwnedRootRemoved": true,
+  "installedCorrectionAcceptance": false,
+  "nativeWindowsCorrectionAcceptance": false,
+  "frontendSelectionUiImplemented": false,
+  "liveAccountOrModelRequest": false,
+  "hardwareOperations": 0
+}

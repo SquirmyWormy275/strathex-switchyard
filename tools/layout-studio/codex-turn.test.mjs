@@ -3,6 +3,19 @@ import { EventEmitter } from "node:events";
 import test from "node:test";
 import { runRestrictedCodexTurn } from "./codex-turn.mjs";
 const tick = () => new Promise((r) => setImmediate(r));
+test("submission review follows account verification and refuses before a native prompt", async () => {
+  const f = fixture(), order = [];
+  f.client.recheckAccount = async () => { order.push("account"); return f.client.accountFingerprint; };
+  await assert.rejects(f.run({ beforeSubmit: async () => { order.push("review"); throw Error("Synthetic source revoked"); } }), e => e.code === "SUBMISSION_BLOCKED" && e.turnId === null && e.stopVerified === true);
+  assert.deepEqual(order, ["account", "review"]); assert.deepEqual(f.calls, []); assert.equal(f.stops, 1);
+});
+test("cancellation while a submission review awaits cannot send a late prompt", async () => {
+  const f = fixture(), controller = new AbortController(); let release, entered;
+  const gate = new Promise(r => { release = r; }), ready = new Promise(r => { entered = r; });
+  const result = f.run({ signal: controller.signal, beforeSubmit: async () => { entered(); await gate; } });
+  const rejected = assert.rejects(result, { code: "CANCELLED" }); await ready; controller.abort(); await rejected;
+  release(); await tick(); assert.deepEqual(f.calls, []); assert.equal(f.stops, 1);
+});
 function fixture({ start, stopped = true } = {}) {
   const client = new EventEmitter(), calls = []; let stops = 0;
   Object.assign(client, { closed: false, nativeVersion: "0.166.0", accountFingerprint: "a".repeat(64), recheckAccount: async () => "a".repeat(64), restrictionsVerified: true, close() { if (this.closed) return; this.closed = true; this.emit("disconnected"); }, request(method, params) { calls.push({ method, params }); return method === "turn/start" ? start?.(client) ?? Promise.resolve({ turn: { id: "turn-1" } }) : Promise.resolve({}); } });
