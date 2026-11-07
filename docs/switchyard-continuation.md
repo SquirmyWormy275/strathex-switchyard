@@ -40,12 +40,20 @@ instructions. Do not merge or release.
 
 ## Current backend state
 
+The repeatable [connected backend demo](backend-demonstration.md) runs with
+`node scripts/demo-switchyard-backend.mjs --synthetic`. Seven stages pass using
+normal encrypted stores, authenticated API and signed SDK with a synthetic agent
+and simulated second host. Four original groups/21 tests pass; original receipts
+are copied privately and temporary demo state is removed. This does not change
+the installed runtime or freeze boundaries. Native Windows demo acceptance is
+pending. [Evidence](evidence/backend-connected-demo-summary.json).
+
 The latest source correction preserves external-agent report time and recording
 generation across Node/Python SDK queues and encrypted-state waits. Nine groups/
 141 tests pass; a signed HTTP demonstration composes two real encrypted stores.
 Two original failing consent regressions are retained. The new `agent-consent`
 Windows lane selects the three complete original contract files; native
-acceptance remains pending. The normal installed update passes 97 metadata/refusal checks across 57 exact modules.
+acceptance at `b38ff759` passes all three original groups/51 tests with exact commands, bounds and cleanup. The normal installed update passes 97 metadata/refusal checks across 57 exact modules.
 [Evidence](evidence/external-agent-consent-source-summary.json).
 
 The latest source feature is guided role choices: readable saved connection labels
@@ -100,17 +108,15 @@ initialization caused an independent preservation assertion failure.
 
 ## Complete runs and native evidence
 
-Complete Linux source `7f2a52a064151fe2d6d80938aeefbb578098daaa` is accepted:
-351 original groups, 2,302 passing tests, 32 declared platform skips. It covers
-installed runtime `9d230ac`, including consent and exact-project task choices.
-Receipt `a2e51d06-3bf6-4c33-99b6-4ee00da91814` retains original manifest,
+Complete Linux source `2c6497f8c2829fbd29026fe98f13de9ecade1d65` is accepted:
+351 original groups, 2,312 passing tests and 32 declared platform skips. It covers
+the current installed runtime, guided roles and external-agent consent.
+Receipt `4be21e52-4d54-4cea-b06e-944b3aaee8fe` retains original manifest,
 commands, bounds, skip counts and child/tree cleanup. The exact checkout, nine
 dependency aliases, 803 generated files/11,907,805 bytes, empty test parent and
-run marker have been removed. Do not rerun
-the executed cleanup scripts. A new complete run at installed source 2c6497f
-is active under its owned unit; see the active-run record below. The newer guided role choices and scheduling-data
-refresh have separate focused acceptance.
-[Complete receipt](evidence/linux-7f2a52a-complete-summary.json).
+run marker are removed. No complete Linux run is active. Do not rerun any
+executed audit, installation or cleanup script.
+[Complete receipt](evidence/linux-2c6497f-complete-summary.json).
 
 The Windows filesystem workflow now has an independent `role-choices` contract
 lane using the complete original role-dispatch group. Existing helper, deadlines,
@@ -124,7 +130,7 @@ child deadline. Receipt `d489d6df-793c-4bfa-abe9-68ec083e4e72` preserves the fai
 and verified cleanup; partial TAP output is not group acceptance. Guided setup
 and dispatch now occupy two complete files with all 24 assertion bodies and the
 shared encrypted fixture preserved. Each keeps the original child deadline and
-zero skips. Six local groups/64 tests pass; native acceptance remains pending.
+zero skips. Six local groups/64 tests pass. Native `b38ff759` now passes both complete files, all 24 tests, and original cleanup within the unchanged 45-second child bounds. [Native receipt](evidence/role-choices-native-b38-summary.json).
 [Isolation evidence](evidence/role-contract-isolation-summary.json).
 
 Native Windows client `9d230ac` passes 25 groups/250 tests with zero skips.
@@ -162,16 +168,22 @@ declared skips. It predates subsequent changes. The intermittent restricted-stor
 retirement failure remains unresolved despite passing follow-ups; retain native
 phase/error diagnostics and keep all process/token permissions unchanged.
 
-## Active complete Linux run
+## Complete Windows source workflow
 
-Source `2c6497f8c2829fbd29026fe98f13de9ecade1d65` runs all 351 original Linux
-groups with existing dependencies and unchanged bounds. The private ownership
-record is `linux-full-2c6497f-run.json` in the usual runtime-verification directory;
-unit `switchyard-verification-2c6497f-1794066762.service`. Receipt ID observed in
-progress: `4be21e52-4d54-4cea-b06e-944b3aaee8fe`. Read actual result/progress before
-reporting completion. Preserve the owned checkout until the final receipt and
-exact generated-file/alias inventory have been audited, then clean only that
-recorded staging. No new dependency or runtime download was made.
+Source `754660e0c97bd115eb229b536240671a9dbfd863` adds an independent
+complete-source workflow: 20 test workers and an ordered assembly worker retain
+every original manifest group. Builds, PowerShell verification and the compiled
+companion/editor consumers stay together. The collector requires all 21 exact
+same-source/toolchain receipts, unchanged commands/child limits/skips and cleanup.
+Five local groups/45 tests pass; both new YAML files parse with existing tools.
+Native execution is queued in run `42390824164`; inspect actual status.
+The original 90-minute package verification remains unchanged. Distributed source
+acceptance is explicitly not package, hardware or live-account acceptance.
+[Evidence](evidence/complete-windows-source-lane-summary.json).
+
+Native `b38ff759` external-agent consent passes three original groups/51 tests,
+including actual encrypted state, authenticated SDK HTTP and consent generation
+fences. Providers remain doubles. [Native receipt](evidence/agent-consent-native-b38-summary.json).
 
 ## Continue independently executable work
 

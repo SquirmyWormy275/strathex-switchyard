@@ -34,19 +34,29 @@ and 57 exact module hashes; frontend activation remains frozen.
 
 ## Current evidence
 
+The [connected backend demonstration](backend-demonstration.md) now completes
+seven stages through the normal authenticated API, encrypted stores and signed
+SDK: F77 preset, named role, stable control, consented observation, workflow
+refinement, portable import and Work policy refusals. The agent and second host
+are explicit fixtures. Four original groups/21 tests pass; temporary servers and
+state are removed. [Evidence](evidence/backend-connected-demo-summary.json).
+
 The latest source correction prevents delayed external-agent status or
 acknowledgement reports from entering a resumed recording. Original report time
 and recording generation survive SDK and state-lease waits. Nine groups/141 tests
 pass, including real encrypted storage and authenticated HTTP. The installed
-update passes all 97 metadata/refusal checks. Native Windows acceptance remains
-pending receipt audit; the complete Linux run at the installed source passes.
+update passes all 97 metadata/refusal checks. Native Windows `b38ff759` passes all three original groups/51 tests with
+verified cleanup; the complete Linux run at the installed source also passes.
+[Native consent](evidence/agent-consent-native-b38-summary.json).
 [Consent evidence](evidence/external-agent-consent-source-summary.json).
 
 The native guided-role lane at `f74a380` reached its 45-second whole-file child
 deadline. Its failed receipt and exact cleanup are retained. Guided-choice and
 dispatch contracts now run as two complete files, preserving all 24 test bodies,
 the shared fixture and original child limits. Six local groups/64 tests pass;
-native Windows acceptance of the split remains pending.
+native Windows `b38ff759` passes both files/all 24 tests under the original
+45-second bounds, with exact cleanup.
+[Native roles](evidence/role-choices-native-b38-summary.json).
 [Evidence](evidence/role-contract-isolation-summary.json).
 
 A separate complete Windows source workflow now distributes the original manifest

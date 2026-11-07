@@ -62,6 +62,11 @@ Copilot-only policy. Imported layouts never enable providers or recording.
 
 ## What works, and what remains
 
+Try the [connected backend demonstration](docs/backend-demonstration.md) without
+accounts or keyboard access: preset → named role → signed control → observation
+and refinement → portable import. It runs against isolated encrypted state and
+removes its temporary servers and data afterward.
+
 This is a **partial development suite**, built and exercised on Omarchy Linux.
 The backend connects protected compartments, exact task identities, reviewed
 execution, offline repository scans and recoverable installation. The Home and
