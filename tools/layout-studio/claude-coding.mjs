@@ -1,5 +1,5 @@
 /** Actual Claude Code CLI inventory and owned background sessions; no title matching. */
-import { appendAgentObservation } from "./agent-observation.mjs";
+import { appendAgentObservation, captureAgentObservation } from "./agent-observation.mjs";
 import { randomUUID } from "node:crypto";
 import { claudeAccount, reviewedClaudeVersions } from "./claude-account.mjs";
 export { claudeAccount } from "./claude-account.mjs";
@@ -92,16 +92,19 @@ export function createClaudeCoding({ store, resolveCli = trustedCli, run, comman
   }
   function taskIn(s, id) { const task = s.codingSessions?.find((t) => t.id === id && t.provider === "claude-code" && t.schema === "switchyard-coding-session/v1"); if (!task) throw new Error("Choose an exact saved Claude coding task."); return task; }
   async function exact(c, id, generation = fence(c)) {
-    const login = await account(c, generation), task = taskIn(await store.snapshot(c), id);
+    const login = await account(c, generation), state = await store.snapshot(c), task = taskIn(state, id);
     if (task.accountFingerprint !== login) throw new Error("The local Claude login changed. This task was not redirected to another account.");
     await verifyRepositoryIdentity(task);
     if (!task.sessionId && !task.backgroundId) throw new Error("No exact Claude session identity was returned. Review native inventory and deliberately bind an identified session; this request will not guess or relaunch.");
     const rows = await inventory(c, task.repositoryRoot, generation), row = rows.find((r) => task.backgroundId ? r.backgroundId === task.backgroundId : r.sessionId === task.sessionId);
+    // Preserve the inventory's arrival time and the consent present before it
+    // was requested. Ownership/account checks and the state lock may wait.
+    const observed = observation(row), recordObservation = captureAgentObservation(state, { provider: "claude-code", at: observed.observedAt });
     if (row && task.sessionId && row.sessionId !== task.sessionId) throw new Error("The exact Claude session identity changed; review this binding deliberately.");
     if (row?.sessionId) await store.claimSession(c, { provider: "claude-code", sessionId: row.sessionId });
     if (await account(c, generation) !== login) throw new Error("The local Claude login changed during observation.");
     await verifyRepositoryIdentity(task);
-    current(c, generation); return { task, row };
+    current(c, generation); return { task, row, observed, recordObservation };
   }
   const reviewed = (c, t, r) => ({ action: "stop_managed_run", sessionId: t.sessionId, targetSnapshotId: scopeHash(["claude-owned-background-stop/v1", c, t.id, t.sessionId, t.backgroundId, t.repositoryRoot, t.accountFingerprint, t.startedAt, r.pid]), scopeDigest: scopeHash([t.launchPolicy, r]) });
   async function performCleanup(c) {
@@ -209,8 +212,8 @@ export function createClaudeCoding({ store, resolveCli = trustedCli, run, comman
         await verifyRepositoryIdentity(saved); current(c, generation);
         return { ...view(saved), observation: { status: saved.nativeIdentityVerified ? "saved-conversation" : saved.status === "creation-uncertain" ? "creation-unconfirmed" : "reserved-locally", observedAt: now(), completionVerified: false, provenance: "Protected local reviewed-turn record; no live provider activity or task completion is inferred" } };
       }
-      const { task, row } = await exact(c, id);
-      return store.update(c, "claude-coding-status", (s) => { const t = taskIn(s, id); if (t.sessionId !== task.sessionId || t.backgroundId !== task.backgroundId || t.accountFingerprint !== task.accountFingerprint) throw new Error("The saved Claude task changed during observation."); t.observation = observation(row); if (row?.sessionId) { t.sessionId = row.sessionId; t.startedAt = row.startedAt; t.status = "registered"; } observe(s, t, "status-observed"); return view(t); }, { provider: "claude-code" });
+      const { task, row, observed, recordObservation } = await exact(c, id);
+      return store.update(c, "claude-coding-status", (s) => { const t = taskIn(s, id); if (t.sessionId !== task.sessionId || t.backgroundId !== task.backgroundId || t.accountFingerprint !== task.accountFingerprint) throw new Error("The saved Claude task changed during observation."); t.observation = observed; if (row?.sessionId) { t.sessionId = row.sessionId; t.startedAt = row.startedAt; t.status = "registered"; } recordObservation(s, { subjectId: t.id, phase: "status-observed", status: observed.status }); return view(t); }, { provider: "claude-code" });
     },
     async reviewStop(c, id) {
       const { task, row } = await exact(c, id);

@@ -40,6 +40,8 @@ instructions. Do not merge or release.
 
 ## Current Claude version work
 
+The latest source correction preserves Claude status arrival time and the recording generation captured before inventory. Two original failures are retained; seven original groups/113 tests and typecheck pass. The normal installed update is next. No recording or native task is started by this correction. [Evidence](evidence/claude-status-consent-summary.json).
+
 The later task-adapter admission fix now uses that same exact list instead of a broad version range. Preserve the original failing 2.1.309 discovery regression and the corrected six-group/94-test receipt. Source and typecheck pass. Installed source `526c5f2` passes 102 metadata/refusal checks across 59 exact modules, including the new pure task-version refusal. Its exact prepared bundle is removed. No live task operation is authorized by this correction. [Evidence](evidence/claude-version-admission-summary.json).
 
 The installed native CLI has updated to 2.1.319. Its original exact designer

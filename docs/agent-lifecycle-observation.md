@@ -24,7 +24,7 @@ command queue/claim/retirement use local-lifecycle provenance. Every event keeps
 turn does not establish completion of the user's task.
 
 Identical status polls collapse; a changed status produces another observation.
-Unknown status text becomes `unknown`, and stale status observations are ignored.
+Unknown status text becomes `unknown`. Claude task status older than 30 seconds is displayed as stale; waiting for storage does not refresh its native observation time.
 The event count describes retained observations, not every provider poll or user
 action. At the existing 2,000-event ceiling the session pauses without discarding
 its original events. Existing review, deletion, workspace suspension and retention
@@ -33,6 +33,12 @@ continue to apply. No event creates task authority or starts another provider.
 This covers operations seen by the named task adapters. Broader external agent
 event streams and exact IDE tab attachments remain separate implementation work.
 Work policy continues to prohibit recording.
+
+## Claude status and recording changes
+
+Claude status polling captures the recording generation before requesting native inventory and timestamps the result when it arrives. Ownership/account verification and storage can then wait without moving the event into a resumed or replacement recording. Paused sessions, later opt-in and exclusions cannot inherit that result. With unchanged consent, history keeps the original timestamp even if the task's displayed status has become stale.
+
+Two original failing regressions are retained. Seven complete groups/113 tests and TypeScript checking pass with an explicit CLI double and real encrypted stores. This adds no background polling or native task authority. [Evidence](evidence/claude-status-consent-summary.json).
 
 ## Custom-agent command history
 

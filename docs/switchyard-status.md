@@ -68,6 +68,8 @@ other worktrees remain.
 
 ## Current Claude Code compatibility
 
+Claude status now preserves its native arrival time and original recording consent across delayed ownership/account checks and storage. Two retained regressions exposed recording after same-clock pause/resume and stale status being refreshed by a write delay. Seven groups/113 tests and TypeScript checking pass; installed adoption is pending this source checkpoint. [Evidence](evidence/claude-status-consent-summary.json).
+
 The task adapter now shares the designer's **exact reviewed-version list**. A retained regression showed the old range incorrectly advertised task controls for unreviewed 2.1.309. The correction passes six original groups/94 tests with zero skips, rejecting unknown versions before account inspection, task reservation or launch commands. The installed update passes 102 metadata/refusal checks across 59 exact modules, including rejection before account inspection. [Regression and correction](evidence/claude-version-admission-summary.json).
 
 The pilot CLI is now **2.1.319**. The designer's prior exact-version guard refused

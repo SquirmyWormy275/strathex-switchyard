@@ -31,6 +31,43 @@ async function fixture(fn) {
   finally { await service.close(); await rm(root, { recursive: true, force: true }); }
 }
 
+test("queued Claude status cannot inherit renewed, newly started or replaced observation consent", async () => {
+  for (const change of ["renewed", "new", "started", "paused", "excluded"]) await fixture(async ({ store, service, input, options }) => {
+    const task = await service.create("personal", input()), at = options.now();
+    const recording = { id: "observed", status: change === "started" ? "paused" : "recording", sources: ["agent-events"], exclusions: [], events: [], createdAt: at - 2, recordingSince: at - 1, recordingGeneration: "original", updatedAt: at - 1 };
+    await store.update("personal", "synthetic-observation", s => { s.observations = [recording]; });
+    const update = store.update.bind(store);
+    store.update = async (c, operation, mutate, request) => {
+      if (operation === "claude-coding-status") await update(c, "synthetic-consent-change", s => {
+        if (change === "renewed") s.observations[0].recordingGeneration = "resumed-with-the-same-clock";
+        if (change === "new") s.observations = [{ ...recording, id: "new-recording" }];
+        if (change === "started") s.observations[0].status = "recording";
+        if (change === "paused") s.observations[0].status = "paused";
+        if (change === "excluded") s.observations[0].exclusions = ["claude"];
+      });
+      return update(c, operation, mutate, request);
+    };
+    try {
+      await service.status("personal", task.id);
+      assert.equal((await store.snapshot("personal")).observations[0].events.length, 0, change);
+    } finally { store.update = update; }
+  });
+});
+
+test("delayed Claude status retains its actual observation time and becomes stale while waiting for storage", () => fixture(async ({ store, service, input, options, advance }) => {
+  const task = await service.create("personal", input()), at = options.now();
+  await store.update("personal", "synthetic-observation", s => { s.observations = [{ id: "observed", status: "recording", sources: ["agent-events"], exclusions: [], events: [], createdAt: at - 2, recordingSince: at - 1, recordingGeneration: "original", updatedAt: at - 1 }]; });
+  const update = store.update.bind(store);
+  store.update = async (c, operation, mutate, request) => { if (operation === "claude-coding-status") advance(40000); return update(c, operation, mutate, request); };
+  try {
+    const result = await service.status("personal", task.id), saved = await store.snapshot("personal");
+    assert.equal(result.observation.status, "stale"); assert.equal(result.observation.observedAt, at);
+    assert.equal(saved.codingSessions.find(t => t.id === task.id).observation.observedAt, at);
+    assert.equal(saved.observations[0].events.length, 1); assert.equal(saved.observations[0].events[0].at, at);
+    assert.equal(saved.observations[0].events[0].provenance, "native-provider-status-observation");
+  } finally { store.update = update; }
+}));
+
 test("Claude's actual versioned inventory distinguishes process state from task completion and ignores unrelated directory rows", () => {
   const row = { cwd: "/one", kind: "background", id: "1234abcd", startedAt: 10, pid: 12, status: "idle", sessionId: randomUUID(), state: "done", name: "not retained", prompt: "not retained" };
   const result = claudeInventory([row, { ...row, cwd: "/one/child" }], "/one");
