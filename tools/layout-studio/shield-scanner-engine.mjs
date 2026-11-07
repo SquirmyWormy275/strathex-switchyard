@@ -208,10 +208,11 @@ export function validateCargoComponent(c) {
   cargoRequire(['registry','crates.io'].includes(c.sourceKind)?cargoDigest(c.declaredSha256):c.declaredSha256===null);
   if(c.sourceKind==='crates.io'){cratesIoIdentity(c.name,c.version);cargoRequire(c.sourceSha256===cargoPublicSourceSha256);}else cargoRequire(c.sourceSha256!==cargoPublicSourceSha256);
   if (Object.hasOwn(c, "artifact")) {
-    const a = c.artifact; exact(a, ["path", "sha256", "size", "algorithm", "expectedSha256", "status"]);
+    const a = c.artifact; exact(a, ["path", "sha256", "size", "algorithm", "expectedSha256", "status", "archive"]);
     scannerPath(a.path);
     cargoRequire(["registry", "crates.io"].includes(c.sourceKind) && cargoDigest(a.sha256) && Number.isSafeInteger(a.size) && a.size > 0 && a.size <= 2 * 1024 * 1024
       && a.algorithm === "sha256" && a.expectedSha256 === c.declaredSha256 && a.status === (a.sha256 === a.expectedSha256 ? "matched" : "mismatched"));
+    validateCargoArchiveObservation(a.archive, c.name, c.version);
   }
   return c;
 }
@@ -222,7 +223,7 @@ export function cargoCycloneDxComponent(c) {
       {name:'switchyard:ecosystem',value:'Cargo'},{name:'switchyard:lockfile',value:c.lockPath},{name:'switchyard:cargo-source-kind',value:c.sourceKind},
       ...(c.sourceSha256?[{name:'switchyard:declared-source-sha256',value:c.sourceSha256}]:[]),...(c.declaredSha256?[{name:'switchyard:declared-sha256',value:c.declaredSha256}]:[]),
       {name:'switchyard:declared-dependencies-sha256',value:c.dependenciesSha256},{name:'switchyard:cargo-resolution',value:'not-performed'},
-      ...(c.artifact ? [{name:'switchyard:artifact-path',value:c.artifact.path},{name:'switchyard:artifact-sha256',value:c.artifact.sha256},{name:'switchyard:artifact-integrity',value:c.artifact.status},{name:'switchyard:artifact-content',value:'not-inspected'}] : [])
+      ...(c.artifact ? [{name:'switchyard:artifact-path',value:c.artifact.path},{name:'switchyard:artifact-sha256',value:c.artifact.sha256},{name:'switchyard:artifact-integrity',value:c.artifact.status},{name:'switchyard:artifact-content',value:'not-inspected'},...archiveProperties(c.artifact.archive)] : [])
     ]};
 }
 
@@ -407,7 +408,7 @@ function archiveManifest(bytes) {
   return { name: value.name, version: value.version, manifestSha256: sha(bytes) };
 }
 /** Metadata comparison only. Never extracts paths or executes archive contents. */
-export function inspectNpmArchive(bytes, budget = { remaining: archiveLimit }) {
+function inspectTarArchive(bytes, budget, cargo = false) {
   try {
     if (!Number.isSafeInteger(budget.remaining) || budget.remaining < 0 || budget.remaining > 32 * 1024 * 1024) archiveRefuse("bounds");
     if (!Buffer.isBuffer(bytes) || bytes.length === 0 || bytes.length > 2 * 1024 * 1024) archiveRefuse("bounds");
@@ -422,7 +423,7 @@ export function inspectNpmArchive(bytes, budget = { remaining: archiveLimit }) {
     catch (error) { archiveRefuse(error.code === "ERR_BUFFER_TOO_LARGE" ? allowance < archiveLimit ? "budget" : "bounds" : "compression"); }
     budget.remaining += allowance - tar.length;
     if (tar.length < 1536 || tar.length % 512 !== 0) archiveRefuse("format");
-    let offset = 0, entries = 0, manifest = null, terminated = false;
+    let offset = 0, entries = 0, manifest = null, terminated = false, archiveRoot = cargo ? null : "package";
     const paths = new Map();
     while (offset + 512 <= tar.length) {
       const header = tar.subarray(offset, offset + 512);
@@ -450,20 +451,22 @@ export function inspectNpmArchive(bytes, budget = { remaining: archiveLimit }) {
       const rawPath = prefix ? prefix + "/" + name : name, directory = kind === 53;
       const path = directory && rawPath.endsWith("/") ? rawPath.slice(0, -1) : rawPath;
       const parts = path.split("/");
-      if (parts[0] !== "package" || parts.length > 32 || parts.some(p => !p || p === "." || p === ".." || /[\\:\x00-\x1f]/.test(p))
-          || !directory && (path === "package" || rawPath.endsWith("/")) || directory && size !== 0) archiveRefuse("paths");
+      if (archiveRoot === null) { if (!/^[A-Za-z_][A-Za-z0-9_.+-]{0,320}$/.test(parts[0])) archiveRefuse("paths"); archiveRoot = parts[0]; }
+      if (parts[0] !== archiveRoot || parts.length > 32 || parts.some(p => !p || p === "." || p === ".." || /[\\:\x00-\x1f]/.test(p))
+          || !directory && (path === archiveRoot || rawPath.endsWith("/")) || directory && size !== 0) archiveRefuse("paths");
       const identity = path.toLowerCase();
       if (paths.has(identity)) archiveRefuse("paths");
       paths.set(identity, directory);
       const end = offset + 512 + size, next = offset + 512 + Math.ceil(size / 512) * 512;
       if (end > tar.length || next > tar.length || tar.subarray(end, next).some(b => b !== 0)) archiveRefuse("format");
-      if (identity === "package/package.json") {
-        if (path !== identity || directory || size === 0 || size > 65536) archiveRefuse("manifest");
-        manifest = archiveManifest(tar.subarray(offset + 512, end));
+      const manifestPath = archiveRoot + (cargo ? "/Cargo.toml" : "/package.json");
+      if (identity === manifestPath.toLowerCase()) {
+        if (path !== manifestPath || directory || size === 0 || size > 65536) archiveRefuse("manifest");
+        manifest = (cargo ? cargoArchiveManifest : archiveManifest)(tar.subarray(offset + 512, end));
       }
       offset = next;
     }
-    if (!terminated || !manifest) archiveRefuse("manifest");
+    if (!terminated || !manifest || cargo && archiveRoot !== manifest.name + "-" + manifest.version) archiveRefuse("manifest");
     for (const path of paths.keys()) {
       const parts = path.split("/");
       for (let i = 1; i < parts.length; i++) if (paths.get(parts.slice(0, i).join("/")) === false) archiveRefuse("paths");
@@ -474,10 +477,54 @@ export function inspectNpmArchive(bytes, budget = { remaining: archiveLimit }) {
     return { status: "unsupported", reason: error.archiveReason };
   }
 }
+export const inspectNpmArchive = (bytes, budget = { remaining: archiveLimit }) => inspectTarArchive(bytes, budget);
+export const inspectCargoArchive = (bytes, budget = { remaining: archiveLimit }) => inspectTarArchive(bytes, budget, true);
+/** Closed TOML subset: basic strings, string arrays, booleans, decimal integers,
+ * bare keys and ordinary bare-key tables. Unsupported syntax refuses the whole
+ * manifest, including metadata after the package identity. Never a resolver. */
+function cargoArchiveManifest(bytes) {
+  try {
+    const text = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(bytes);
+    cargoRequire(!/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]|\r(?!\n)/.test(text));
+    const lines = text.replaceAll("\r\n", "\n").split("\n"), tables = new Set(), scalars = new Set(), identity = {};
+    cargoRequire(lines.length <= 2048 && lines.every(line => line.length <= 8192));
+    let table = "", pending = "", key;
+    const store = (name, value) => {
+      const path = table ? table + "." + name : name;
+      cargoRequire(!scalars.has(path) && !tables.has(path) && ![...tables, ...scalars].some(p => p.startsWith(path + ".")));
+      let parsed;
+      if (value.startsWith('"')) parsed = cargoString(value);
+      else if (value.startsWith("[")) parsed = cargoDependencyList(value);
+      else if (["true", "false"].includes(value)) parsed = value === "true";
+      else { cargoRequire(/^[+-]?(?:0|[1-9][0-9]{0,18})$/.test(value)); const n = BigInt(value); cargoRequire(n >= -9223372036854775808n && n <= 9223372036854775807n); }
+      scalars.add(path); if (table === "package" && ["name", "version"].includes(name)) { cargoRequire(typeof parsed === "string"); identity[name] = parsed; }
+    };
+    for (const raw of lines) {
+      const line = cargoUncomment(raw); if (!line) continue;
+      if (pending) { cargoRequire(pending.length + line.length <= 65536); pending += " " + line; if (line.endsWith("]")) { store(key, pending); pending = ""; } continue; }
+      const section = /^\[([A-Za-z0-9_-]+(?:\.[A-Za-z0-9_-]+){0,15})\]$/.exec(line);
+      if (section) {
+        table = section[1]; cargoRequire(!tables.has(table));
+        const parts = table.split("."); for (let i = 1; i <= parts.length; i++) cargoRequire(!scalars.has(parts.slice(0, i).join(".")));
+        tables.add(table); continue;
+      }
+      const field = /^([A-Za-z0-9_-]+)\s*=\s*(.+)$/.exec(line); cargoRequire(field); key = field[1];
+      if (field[2].startsWith("[") && !field[2].endsWith("]")) pending = field[2]; else store(key, field[2]);
+    }
+    cargoRequire(!pending && tables.has("package")); cargoIdentity(identity.name, identity.version);
+    return { ...identity, manifestSha256: sha(bytes) };
+  } catch { archiveRefuse("manifest"); }
+}
+export function validateCargoArchiveObservation(value, name, version) {
+  validateTarArchiveObservation(value, name, version, (n, v) => { try { cargoIdentity(n, v); return true; } catch { return false; } });
+}
 export function validateNpmArchiveObservation(value, name, version) {
+  return validateTarArchiveObservation(value, name, version, (n, v) => npmName(n) && npmVersion(v));
+}
+function validateTarArchiveObservation(value, name, version, identity) {
   if (value?.status === "unsupported") { exact(value, ["status", "reason"]); if (!archiveReasons.includes(value.reason)) throw Error("Invalid archive coverage gap."); return; }
   exact(value, ["status", "name", "version", "manifestSha256", "entries", "expandedBytes"]);
-  if (!npmName(value.name) || !npmVersion(value.version) || !/^[a-f0-9]{64}$/.test(value.manifestSha256 ?? "")
+  if (!identity(value.name, value.version) || !/^[a-f0-9]{64}$/.test(value.manifestSha256 ?? "")
       || !Number.isSafeInteger(value.entries) || value.entries < 1 || value.entries > 1024
       || !Number.isSafeInteger(value.expandedBytes) || value.expandedBytes < (value.entries + 3) * 512 || value.expandedBytes > archiveLimit || value.expandedBytes % 512
       || value.status !== (value.name === name && value.version === version ? "matched" : "mismatched")) throw Error("Archive identity observation is inconsistent.");
@@ -719,12 +766,13 @@ export async function scanShieldInputs(proposed, { readInput }) {
   const policy = parseRules(await readFeed(request.scanner)), advisory = request.advisory ? parseAdvisories(await readFeed(request.advisory)) : [];
   const advisoryByIdentity = new Map(advisory.map(entry => [advisoryIdentityKey(entry), entry]));
   const add = finding => { if (findings.length < 512) findings.push(finding); else gaps.add("finding_limit"); };
-  const artifacts = new Map((request.packageArtifacts ?? []).map(row => [shieldArtifactReferenceKey(row), row])), consumedArtifacts = new Set(), artifactDigests = new Map(), archiveIdentities = new Map(), wheelIdentities = new Map();
-  const npmArtifacts = new Set([...artifacts.values()].filter(row => !row.ecosystem).map(row => row.path)), pythonArtifacts = new Set([...artifacts.values()].filter(row => row.ecosystem === "PyPI").map(row => row.path)), archiveBudget = { remaining: 32 * 1024 * 1024 };
+  const artifacts = new Map((request.packageArtifacts ?? []).map(row => [shieldArtifactReferenceKey(row), row])), consumedArtifacts = new Set(), artifactDigests = new Map(), archiveIdentities = new Map(), wheelIdentities = new Map(), cargoIdentities = new Map();
+  const npmArtifacts = new Set([...artifacts.values()].filter(row => !row.ecosystem).map(row => row.path)), pythonArtifacts = new Set([...artifacts.values()].filter(row => row.ecosystem === "PyPI").map(row => row.path)), archiveBudget = { remaining: 32 * 1024 * 1024 }, cargoArtifacts = new Set([...artifacts.values()].filter(row => row.ecosystem === "Cargo").map(row => row.path));
   for (const row of artifacts.values()) if (!artifactDigests.has(row.path)) {
     const file = request.files.find(file => file.path === row.path), bytes = await readInput(file.path, file.size);
     if (bytes.length !== file.size || sha(bytes) !== file.sha256) throw Error("Reviewed artifact bytes changed.");
     artifactDigests.set(row.path, { path: file.path, sha256: file.sha256, size: file.size, observedSha512: createHash("sha512").update(bytes).digest("hex") });
+    if (cargoArtifacts.has(row.path)) cargoIdentities.set(row.path, inspectCargoArchive(bytes, archiveBudget));
     if (npmArtifacts.has(row.path)) archiveIdentities.set(row.path, inspectNpmArchive(bytes, archiveBudget));
     if (pythonArtifacts.has(row.path)) wheelIdentities.set(row.path, inspectPypiWheel(bytes, archiveBudget));
   }
@@ -756,7 +804,10 @@ export async function scanShieldInputs(proposed, { readInput }) {
         if (reference) {
           if (!["registry", "crates.io"].includes(component.sourceKind)) throw Error("Only Cargo registry declarations can compare a package artifact.");
           const observed = artifactDigests.get(reference.path), status = observed.sha256 === component.declaredSha256 ? "matched" : "mismatched";
-          component.artifact = { path: observed.path, sha256: observed.sha256, size: observed.size, algorithm: "sha256", expectedSha256: component.declaredSha256, status };
+          const inspected = cargoIdentities.get(reference.path), archive = inspected.status === "unsupported" ? inspected : { ...inspected, status: inspected.name === component.name && inspected.version === component.version ? "matched" : "mismatched" };
+          component.artifact = { path: observed.path, sha256: observed.sha256, size: observed.size, algorithm: "sha256", expectedSha256: component.declaredSha256, status, archive };
+          if (archive.status !== "matched") gaps.add("cargo_archive_identity_not_verified");
+          if (archive.status === "mismatched") add({ ruleId: "artifact.identity-mismatch", dimension: "provenance", severity: "high", path: file.path, line: null, fingerprint: sha(["artifact.identity-mismatch", "Cargo", file.path, file.sha256, component.name, component.version, component.sourceSha256, observed.path, observed.sha256, archive.manifestSha256].join("\0")) });
           consumedArtifacts.add(referenceKey);
           if (status === "mismatched") {
             gaps.add("package_artifact_not_verified");

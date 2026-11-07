@@ -55,8 +55,10 @@ Missing, substituted or inconsistent observations refuse. The 512-finding ceilin
 still applies and remains explicit when reached.
 
 CycloneDX retains namespaced artifact metadata, with unknown composition and no
-claim of a verified installed-component hash. Archive format/contents, embedded
-package identity, resolution, licenses and publisher provenance remain unverified.
+claim of a verified installed-component hash. Supported selected gzip/USTAR
+archives now receive a separate [embedded identity check](cargo-archive-identity.md).
+Complete archive contents, resolution, licenses and publisher provenance remain
+unverified.
 A checksum match alone does not establish that a package is trustworthy.
 
 ## Demonstration and evidence
@@ -74,8 +76,9 @@ requests, missing references, altered bytes, report tampering and finding-limit
 behavior are checked. The dedicated Windows CI lane retains a 300-second bound;
 native Windows host execution at c367dff passes nine tests with two declared
 Linux-only skips and verified cleanup. [Native receipt](evidence/cargo-artifact-windows-native-summary.json).
-Installed acceptance and real guest,
-hardware or account journeys are separate. No runtime/dependency downloads or
-installed application changes were made.
+The original byte-comparison checkpoint is separate from the newer archive
+identity checks. Installed aafb476 passes eight in-memory Cargo checks inside
+its 54-check update and predates archive identity. Real guest, hardware and account
+journeys remain separate. No runtime/dependency downloads were made.
 
 [Exact source and verification receipts](evidence/cargo-artifact-integrity-summary.json).

@@ -37,7 +37,9 @@ availability are not resolved or verified. All Cargo results retain
 `cargo_resolution_not_performed`, incomplete repository scope and unverified
 publisher provenance. Nonempty inventories also retain missing license and
 artifact-integrity coverage. Broader Cargo syntax, selected features/targets,
-dependency graphs, licenses and artifact/publisher verification remain unfinished.
+dependency graphs, licenses and publisher verification remain unfinished.
+Selected bytes and supported embedded identities have separate
+[artifact](cargo-artifact-integrity.md) and [archive](cargo-archive-identity.md) checks.
 
 ## Advisory and BOM boundaries
 

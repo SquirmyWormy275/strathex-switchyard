@@ -14,7 +14,7 @@ if (process.platform !== "linux" || flags.length !== 1 || flags[0] !== "--read-o
   throw Error("Usage on the pilot: node scripts/verify-cargo-inventory-host.mjs --read-only-metadata");
 const sha = b => createHash("sha256").update(b).digest("hex"), app = await applicationStatus(); assert.equal(app.status, "ready");
 const root = join(installationRoot(), "versions", app.build), manifest = await verifySuiteRelease(root, { expectedId: app.build, platform: "linux", checkRuntime: true }); assert.equal(manifest.development, false);
-const source = JSON.parse(await readFile(new URL("../docs/evidence/cargo-inventory-verifier-source-summary.json", import.meta.url))), moduleDigests = {}, checks = [];
+const source = JSON.parse(await readFile(new URL("../docs/evidence/cargo-archive-source-summary.json", import.meta.url))), moduleDigests = {}, checks = [];
 for (const path of ["tools/layout-studio/shield-scanner-engine.mjs", "tools/layout-studio/repository-shield.mjs"]) {
   const digest = sha(await readFile(join(root, path))); assert.equal(digest, source.sourceFiles[path]); moduleDigests[path] = digest;
 }
@@ -22,7 +22,7 @@ const fixturePath = "tools/layout-studio/test-support/shield-scanner-fixture.mjs
 assert.equal(sha(await readFile(new URL("../" + fixturePath, import.meta.url))), source.sourceFiles[fixturePath]);
 checks.push("two-exact-tested-installed-module-hashes-and-source-fixture");
 const load = path => import(pathToFileURL(join(root, path)).href);
-const { parseCargoLock, parseCargoVersion, compareCargoVersions, cargoPublicSource, cargoCycloneDxComponent, scanShieldInputs } = await load("tools/layout-studio/shield-scanner-engine.mjs"), { parseShieldScannerReport } = await load("tools/layout-studio/repository-shield.mjs");
+const { parseCargoLock, parseCargoVersion, compareCargoVersions, cargoPublicSource, cargoCycloneDxComponent, scanShieldInputs, inspectCargoArchive } = await load("tools/layout-studio/shield-scanner-engine.mjs"), { parseShieldScannerReport } = await load("tools/layout-studio/repository-shield.mjs");
 const { cargoLockFixture, cargoArtifactFixture } = await import("../tools/layout-studio/test-support/shield-scanner-fixture.mjs");
 const declaration = (source = cargoPublicSource) => '[[package]]\nname = "example"\nversion = "1.2.3-rc.1+build.7"\n' + (source ? 'source = ' + JSON.stringify(source) + '\n' + (source.startsWith("registry+") ? 'checksum = "' + "a".repeat(64) + '"\n' : "") : "");
 const privateSource = "git+ssh://NEVER_RETAIN_PRIVATE_CARGO/repository#" + "b".repeat(40), privateRegistry = "registry+https://NEVER_RETAIN_PRIVATE_REGISTRY/index";
@@ -69,7 +69,27 @@ for (const mutate of [r => { r.sbom.components[0].artifact.status = "matched"; }
   const changed = structuredClone(artifactMismatch.r); mutate(changed); assert.throws(() => parseShieldScannerReport(JSON.stringify(changed), artifactMismatch.context, artifactMismatch.action));
 }
 checks.push("forged-cargo-byte-and-failure-observations-refuse-admission");
-const evidence = { schema: "switchyard-installed-cargo-inventory-metadata/v1", at: new Date().toISOString(), sourceCommit: manifest.sourceCommit, applicationRelease: manifest.id, moduleDigests, verifierSourceSha256: sha(await readFile(new URL(import.meta.url))), fixtureSha256: source.sourceFiles[fixturePath], checks, success: true, pureInMemoryOnly: true, actualScannerProcesses: 0, cargoProcesses: 0, dependencyResolution: false, archiveExtractionOrExecution: false, providerOrModelRequests: 0, publicRequests: 0, liveAccountChanges: 0, hardwareOperations: 0 };
+const archiveOraclePath = "scripts/fixtures/cargo-archive-oracle.json", archiveOracleBytes = await readFile(new URL("../" + archiveOraclePath, import.meta.url)), archiveOracle = JSON.parse(archiveOracleBytes);
+assert.equal(sha(archiveOracleBytes), source.sourceFiles[archiveOraclePath]); assert.equal(archiveOracle.cases.length, 26);
+for (const row of archiveOracle.cases) {
+  const bytes = Buffer.from(row.bytesBase64, "base64"); assert.equal(sha(bytes), row.sha256);
+  const a = inspectCargoArchive(bytes); assert.equal(a.status, row.supported ? "inspected" : "unsupported");
+  if (row.supported) { assert.equal(row.toml.parsed, true); assert.equal(a.name, row.toml.name); assert.equal(a.version, row.toml.version); assert.equal(a.manifestSha256, row.manifestSha256); assert.equal(a.expandedBytes, row.expandedBytes); }
+}
+checks.push("twenty-six-independent-toml-ustar-gzip-facts-without-extraction");
+for (const path of ["tools/layout-studio/test-support/cargo-archive-fixture.mjs", "tools/layout-studio/test-support/npm-archive-fixture.mjs"]) assert.equal(sha(await readFile(new URL("../" + path, import.meta.url))), source.sourceFiles[path]);
+const { cargoArchiveFixture } = await import("../tools/layout-studio/test-support/cargo-archive-fixture.mjs");
+for (const action of ["shield_supply_chain", "release_shield"]) for (const archiveStatus of ["matched", "mismatched", "unsupported"]) {
+  const f = cargoArchiveFixture({ action, archiveStatus }), r = await scanShieldInputs(f.request, { readInput: f.readInput }), context = { engine: r.engine, requestSha256: r.requestSha256, request: f.request };
+  assert.equal(r.sbom.components[0].artifact.archive.status, archiveStatus); assert.equal(r.outcome, archiveStatus === "mismatched" ? "failed" : "incomplete");
+  assert.deepEqual(parseShieldScannerReport(JSON.stringify(r), context, action), r);
+  if (archiveStatus === "mismatched") {
+    const forged = structuredClone(r); forged.findings = []; forged.outcome = "incomplete"; forged.coverage.forEach(c => c.findings = 0);
+    assert.throws(() => parseShieldScannerReport(JSON.stringify(forged), context, action));
+  }
+}
+checks.push("six-in-memory-crate-reports-retain-mismatches-gaps-and-forgery-refusal");
+const evidence = { schema: "switchyard-installed-cargo-inventory-metadata/v2", at: new Date().toISOString(), sourceCommit: manifest.sourceCommit, applicationRelease: manifest.id, moduleDigests, verifierSourceSha256: sha(await readFile(new URL(import.meta.url))), fixtureSha256: source.sourceFiles[fixturePath], archiveOracleSha256: sha(archiveOracleBytes), checks, success: true, pureInMemoryOnly: true, actualScannerProcesses: 0, cargoProcesses: 0, dependencyResolution: false, archiveExtractionOrExecution: false, providerOrModelRequests: 0, publicRequests: 0, liveAccountChanges: 0, hardwareOperations: 0 };
 const { privateDirectory } = await import("../tools/layout-studio/private-fs.mjs"), outputRoot = join(process.env.XDG_STATE_HOME || join(homedir(), ".local/state"), "strathex-switchyard/runtime-verification"); await privateDirectory(outputRoot);
 const out = join(outputRoot, "installed-cargo-inventory-metadata-" + Date.now() + ".json"); await writeFile(out, JSON.stringify(evidence, null, 2) + "\n", { flag: "wx", mode: 0o600 });
 console.log(JSON.stringify({ receipt: out, checks: checks.length, success: true, pureInMemoryOnly: true }));

@@ -31,6 +31,20 @@ evidence, not instructions to reset. Publish regular commits. Do not merge or re
 
 ## Current implementation and evidence
 
+Selected Cargo archives now receive bounded gzip/USTAR manifest identity checks.
+A matching declared checksum cannot hide a different embedded name or literal
+version. Thirteen focused groups yield **132 distinct passes**, including six
+actual Linux scans, six Windows guest doubles and 26 independent Python
+TOML/USTAR/gzip cases. Host/BOM binding, source-separated findings, original
+Git/files, replay refusal and exact cleanup verify. The original package bound,
+typecheck and five verifier guards pass. The first composed run failed one
+timeout-inventory assertion; registering the two new files in the original
+integration class resolves it, with no existing deadline extended. No extraction,
+Cargo invocation, build, dependency resolution or publisher verification occurs.
+Installed and native Windows archive acceptance remain pending.
+[Archive contract](cargo-archive-identity.md),
+[source evidence](evidence/cargo-archive-source-summary.json).
+
 Installed aafb476 passes **54 metadata/synthetic checks**: thirteen task-owner,
 seven Copilot-journal, fourteen agent/helper/SDK, twelve Python and eight Cargo
 checks. Fourteen exact installed module hashes verify. The Cargo verifier exercises

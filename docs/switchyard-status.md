@@ -1,392 +1,130 @@
 # Switchyard implementation and acceptance
 
-Switchyard gives a Model F keyboard stable controls for returning to tasks,
-reviewing changes and handing work between tools. **The full Rev2 suite is still
-a partial implementation.** The F77 is the pilot device; it does not limit scope.
+Switchyard gives Model F keyboards guided setup and stable controls for returning
+to tasks, reviewing changes and handing work between tools. **The full Rev2 suite
+is not finished.** The F77 is the pilot device; it does not limit the assignment.
 
-The Linux backend has a passing complete test checkpoint, and a versioned
-application has separately verified installed metadata checks. Later archive
-identity work has focused source acceptance.
-The complete Linux `68bcc76` run passes all 310 groups, 1,875 tests and sixteen
-declared skips, including stopped-agent recovery, foreground-helper ownership,
-compact provenance and measured Windows scheduling. The later shortcut-helper
-correction has separate 89-check focused and 33-check installed evidence.
-The restricted Windows storage owner now passes all eight original checks with
-verified retirement. Complete Windows source `cadbccd` passes its separate 416-group packet: 2,443 tests
-and 204 declared skips. The workflow still fails because of a cancelled preliminary
-backend shard. Later stopped-agent/helper/SDK/scanner changes remain separate. Hardware,
-account and visual acceptance remain separate from those implementation results.
+Start with the [README](../README.md) for the product and first run, the
+[requirement ledger](switchyard-requirements.md) for scope, and the
+[verification record](verification.md) for source-specific evidence.
+Work is published on [draft PR 20](https://github.com/SquirmyWormy275/strathex-switchyard/pull/20).
+No merge or public release has been accepted.
 
-Use the [requirement ledger](switchyard-requirements.md) for the complete scope,
-[verification record](verification.md) for evidence, and
-[continuation notes](switchyard-continuation.md) to resume engineering work.
-The [README](../README.md) explains the product and first run.
-Work is published on [draft PR 20](https://github.com/SquirmyWormy275/strathex-switchyard/pull/20);
-there is no merge or public release acceptance.
+## Current checkpoints
 
-## Current evidence
-
-Installed aafb476 passes **54 metadata/synthetic checks**: thirteen task-owner,
-seven Copilot-journal, fourteen agent/helper/SDK, twelve Python and eight Cargo
-checks. Fourteen exact installed module hashes verify. The Cargo verifier exercises
-sixteen fixed in-memory reports, source separation, SemVer bounds, declared-byte
-comparisons and forged-report refusals without starting Cargo or a scanner process.
-All 54 semantic workspaces, selection, pending keyboard-only conversation and frozen
-frontend remain intact; 53 sealed files are byte-identical and one changes only
-audit metadata. Dated backup/readback and current plus one rollback verify.
-The exact 528-file, 5,224,475-byte prepared bundle is removed.
-[Installed evidence](evidence/installed-cargo-inventory-summary.json).
-
-A new immutable **317-group** complete Linux run is active on aafb476, with pinned
-Node first on PATH, a short owned temporary parent and the original test bounds.
-Progress is not accepted as a final result.
-
-Complete Linux 39db1fe finishes **313/314 groups**: 1,910 passing tests,
-sixteen declared skips and one failed historical scheduling-budget assertion.
-Builds and the private-permission fixture now pass. Every child/tree retires;
-the exact checkout, nine aliases, 782 generated files, short temporary parent
-and marker are removed. This remains a failed complete run.
-[Failed receipt](evidence/linux-39db1fe-scheduling-failed-summary.json).
-
-The expanded native backend inventory now uses five independent jobs. All 207
-groups occur exactly once, preserving their original objects, child bounds,
-twenty-minute job limits and 950-second estimated-workload ceiling. Historical
-placement estimates about 799 seconds per batch; no measurements were lowered.
-Three groups/35 checks and typecheck pass. Native acceptance remains pending.
-[Scheduling evidence](evidence/windows-five-shards-source-summary.json).
-
-Cargo host admission now requires its unresolved dependency, license and source
-coverage gaps. A regression proves the previous host admitted their omission;
-six focused groups/46 checks now pass, including four actual Linux artifact
-journeys, four Windows guest doubles, wheel/package regression and five verifier
-flag guards. A new repeatable installed Cargo verifier has eight in-memory checks;
-all eight now pass against the normal installed build. No Cargo resolution or archive inspection is
-added. [Source evidence](evidence/cargo-inventory-verifier-source-summary.json).
-
-Normal installed 7dbb0b8 passes **46 metadata/synthetic checks**: thirteen
-task-owner, seven Copilot-journal, fourteen agent/helper/SDK and twelve Python
-inventory/archive checks. Fourteen exact installed module hashes, thirty RECORD
-reference cases and six in-memory RECORD reports verify. All 54 semantic
-workspaces, selected state, pending keyboard-only conversation and frozen frontend
-remain intact; 53 sealed files are byte-identical and one changes only audit
-metadata. Dated backup/readback, current plus one rollback and removal of the
-528-file, 5,224,239-byte prepared bundle verify. No live scanner process, provider
-task, agent, account, model request or hardware operation starts.
-[Installed evidence](evidence/installed-python-records-summary.json).
-
-The agent metadata verifier initially refused the newly tested package-builder
-hash because it still referenced older scanner-review evidence. It now pins the
-builder to its new passing package/installation evidence; four guard tests and
-all fourteen installed checks pass. No validation bypass or broader permissions
-were introduced. [Verifier correction](evidence/installed-record-verifier-pin-summary.json).
-
-Selected Python wheel RECORD declarations now compare supported SHA-256/384/512
-hashes and sizes against every required member in memory. A matching outer hash
-and package identity cannot conceal an internal mismatch. Thirty independent
-ZIP/CSV/hash cases and 30 focused groups yield **147 distinct passing checks**,
-including six new actual Linux scanner journeys and six Windows guest doubles.
-The original package limit initially failed; removing duplicate browser files and
-a build-only recipe restores the full synthetic bundle to 5,234,726 bytes. Exact
-frozen-asset HTTP readback, all sixteen installation/recovery scenarios, typecheck
-and owned cleanup pass. No extraction, package execution, signature verification
-or complete safety claim occurs. Installed metadata acceptance now passes; native Windows RECORD acceptance
-remains pending. [Contract](python-wheel-records.md),
-[source evidence](evidence/pypi-wheel-record-source-summary.json).
-
-Windows fixture-registry source 2ab67fc fails one of twenty tests because its
-native Python path-spelling probe reaches the original five-second startup
-deadline. The unchanged test at 39db1fe subsequently passes all twenty checks,
-with original bounds, equal source/merge trees, artifact/receipt digests and
-child/tree cleanup verified. The cause is unknown; no repair or deadline change
-is claimed. Other PyPI/OSV jobs in the follow-up workflow were cancelled and
-contribute zero accepted checks. [Native follow-up](evidence/windows-fixture-registry-followup-summary.json).
-
-Normal installed 39db1fe passes **44 metadata/synthetic checks**: thirteen
-task-owner, seven Copilot-journal, fourteen agent/helper/SDK and ten Python
-inventory checks. Fourteen exact installed module hashes verify. The Python
-checks include fifteen independent ZIP fixtures, six in-memory wheel reports
-and forged-report refusals; no scanner process, extraction or package execution
-starts. All 54 semantic workspace snapshots, selection, pending keyboard-only
-conversation and frozen frontend bytes remain intact. Fifty-three sealed files
-are byte-identical; one changes only audit metadata. Dated backup/readback and
-current plus one rollback verify. The exact 533-file, 5,231,889-byte prepared
-bundle is removed. [Installed evidence](evidence/installed-python-wheels-summary.json).
-
-The deliberately public VS Code endpoint fixture now applies and reads back its
-intended mode explicitly, so a private test-runner umask cannot turn the fixture
-into a private file. Production transport permissions are unchanged. With umask
-0077, its file passes five tests and seven declared Windows-only skips; four
-installed-verifier guard tests also pass. A separate initial follow-up hit the
-Unix socket path limit and remains recorded; the corrected short test parent
-passes and both owned roots are removed. Typecheck passes. The expanded installed
-Python verifier now passes all ten installed in-memory checks.
-[Verification repair](evidence/private-runner-verification-source-summary.json).
-
-Selected Python wheels now receive bounded ZIP/metadata identity checks alongside
-their declared byte hash. A different embedded package name/version produces a
-failed provenance finding even when the byte hash matches. Eight focused groups
-plus a final unit follow-up pass 101 distinct checks, including six actual Linux
-scanner journeys and six Windows guest doubles. Fifteen independent Python ZIP
-fixtures, malformed inputs, expansion limits, protected receipts and exact cleanup
-verify; typecheck and the original package budget pass. No extraction or execution
-occurs. That identity-only checkpoint left RECORD hashes unverified; the newer source
-checks above cover supported hashes. Compatibility tags, license/code contents
-and publisher provenance remain unverified. Installed metadata acceptance now passes; native Windows wheel acceptance remains pending.
-[Wheel contract](python-wheel-identity.md),
-[source evidence](evidence/pypi-wheel-identity-source-summary.json).
-
-Complete Windows source cadbccd now passes its separate full verification packet:
-**416 test/build groups, 2,443 passing tests, 204 declared skips and no failures**.
-The source/merge trees, artifact/receipt digests, original source group inventory,
-child deadlines and cleanup all verify. The overall workflow nevertheless failed
-at final enforcement because preliminary backend shard 3 was cancelled without
-a receipt. That shard remains unaccepted; the passing complete packet does not
-turn the workflow green. This checkpoint includes credential/revocation/outcome
-work and predates stopped-agent, helper, SDK, automatic-review and marker changes.
-[Native complete evidence](evidence/windows-complete-cadbccd-summary.json).
-
-The supervised Linux retry at 49a5053 finished **306/311 groups**, with 1,889
-passing tests, sixteen declared skips, four failed build groups and one failed
-test. It is not a complete pass. The temporary job inherited mise shims for nested
-builds; no trust settings were changed. Its UMask=0077 also made a deliberately
-public permission fixture private, unlike the normal shell's 0022 mask. All child
-and process-tree cleanup verified; the owned checkout, nine aliases, empty test
-parent and marker were removed. The last complete Linux pass remains 68bcc76.
-Future supervised launches must put the existing pinned Node binary directory
-first on PATH and preserve the deliberate permission fixture's intended mode.
-[Failed run and cleanup](evidence/linux-49a5053-failed-summary.json).
-
-Normal installed aa98c91 passes **41 metadata/synthetic checks**: 13 task-owner,
-seven Copilot-journal, fourteen agent/helper/SDK and seven Python-inventory checks.
-Fourteen tested module hashes and both verifier hashes bind the running build.
-The Python checks use 87 marker and 39 original reference cases plus fixed
-in-memory reports/artifact comparisons; they evaluate no condition and start
-no scanner process. All 54 semantic workspaces, selected state, pending
-keyboard-only conversation and frozen frontend remain preserved; 53 sealed files
-are byte-identical and one changes only audit metadata. Dated backup/readback
-and current plus one rollback verify. The exact 533-file, 5,221,413-byte prepared
-bundle is removed. [Installed evidence](evidence/installed-python-markers-summary.json).
-
-Conditional Python pins now retain a private marker digest and sorted environment
-variable names. Conditions are parsed without evaluation; matching declared-pin
-advisories and selected artifact comparisons remain visible, with mandatory
-unevaluated/unresolved gaps. Eight focused groups pass 115 checks, including
-two new actual Linux scanner journeys, two Windows guest doubles and six artifact
-combinations. An independent 87-case pip/PyPA fixture covers the grammar and
-preprocessing. Typecheck, original package budget and owned scratch cleanup pass.
-Installed metadata checks now pass separately; native Windows marker acceptance remains pending.
-[Contract](python-supply-chain.md#conditional-pins),
-[source evidence](evidence/pypi-markers-source-summary.json).
-
-| Boundary | Verified result | Still open |
+| Checkpoint | Completed result | What it does not establish |
 | --- | --- | --- |
-| Complete Linux source | `68bcc76`: **310 groups, 1,875 passing tests, sixteen declared skips, zero failures.** Exact child/tree exit and owned checkout, nine aliases, 782 generated files, temporary parent and marker cleanup verify; all three other worktrees remain. [Receipt](evidence/linux-68bcc76-complete-summary.json). | Provider/guest doubles remain explicit. The later shortcut-helper correction has separate 89-check focused and 33-check installed metadata/synthetic acceptance. |
-| Complete Windows release | `9f35961`: **414 groups, 2,398 passing tests, 202 declared skips, zero failures.** Archive/receipt digests, source/merge tree equality, original bounds and all child/tree cleanup verify. [Receipt](evidence/windows-complete-9f35961-summary.json). | Later credential ownership, revocation and outcome changes are outside this checkpoint. Provider/guest doubles and interactive acceptance remain separate. |
-| Windows backend batches | `9f35961`: **198 groups, 1,022 passing tests, 142 declared skips, zero failures.** Four digests, source/merge tree equality and all child/tree cleanup verify. [Receipts](evidence/windows-backend-9f35961-native-summary.json). | The combined release now passes separately above. Older `dbbcce8` backend and complete-release failures remain recorded; later passing batches do not relabel them. [Historical backend](evidence/windows-backend-dbbc-native-summary.json), [complete failure](evidence/windows-complete-dbbc-failed-summary.json). |
-| Restricted Windows owner | `6e967a3`: **8/8 original owner checks pass**, with 68 exact QUERY-mask-8 registrations, native tree exit, token recheck, private-desktop closure and fixture/service/file retirement. All six GUI setup checks pass. [Owner receipt](evidence/windows-restricted-owner-accepted-summary.json), [setup](evidence/setup-final-native-summary.json). | This controlled native CI proof does not accept an ordinary user account, interactive UAC or actual guest journey. |
-| Installation and runtime | All sixteen original Windows installation/recovery cases pass at `b600a6d`; its independent fresh runtime installs 49 packages and loads/rechecks the offline CPU model, then removes its temporary runtime. [Installation](evidence/installation-scenarios-native-summary.json), [runtime](evidence/windows-runtime-b600-native-summary.json). | Complete Windows `9f35961` now passes separately; ordinary-user/guest journeys remain open. |
-| Latest diagnostic source | Seven focused groups pass 69 tests with five Windows-only skips. Two managed builds, 2,101 portable checks, typecheck and exact owned cleanup pass. [Receipt](evidence/worker-start-observation-source-summary.json). | Actual Windows `d15285b` passes all eight acknowledgement/refusal tests without skips. [Native receipt](evidence/worker-start-refusal-native-summary.json). The full restricted-owner journey is now separately accepted above. |
-| Windows index/history/leases | Native NTFS index and history packets each pass six checks and three independent guardian exits. Both Windows scanner files pass two cases with guest execution doubled; lease groups pass 24 tests and one Linux-only skip. [Evidence](evidence/native-history-index-leases-summary.json). | Packet Git witnesses are synthetic. Actual guest, installed Windows and ordinary-user acceptance remain separate. |
-| Installed app | Linux source `aafb476` passes **54 metadata/synthetic checks** and fourteen exact module hashes. All 54 semantic snapshots and frozen frontend verify. Current plus one rollback remain; the 5,224,475-byte prepared bundle is removed. [Evidence](evidence/installed-cargo-inventory-summary.json). | Pure in-memory examples start no scanner process, Cargo process, live task, agent or account action. Frontend/editor activation remains frozen. |
-| Windows npm archive identity | Corrected `55515d1` completes ten archive tests plus eight original byte-comparison tests, each file with two original Linux-only skips inside its original 300-second bound; guest execution is doubled. [Archive](evidence/npm-archive-native-summary.json), [bytes](evidence/npm-artifact-split-native-summary.json). | Complete Windows release remains separate. |
-| Windows shortcut retirement | `80601e9` passes all sixteen original installation/recovery scenarios and twelve writer checks, no skips and verified cleanup. The fixed stage diagnostics execute with the original bounds. [Native pass](evidence/shortcut-stage-diagnostics-native-summary.json). | `9193471` and `4b2daed` each fail the first installation scenario at the original ten-second shortcut deadline: 24/25 tests pass, all cleanup verifies. The latest pass does not reproduce or establish the cause of the intermittent timeout. [Recurring failures](evidence/windows-shortcut-recurring-timeout-summary.json), [diagnostic source](evidence/shortcut-stage-diagnostics-source-summary.json). |
-| Credential worker retirement | Six groups/69 checks pass, including ten worker tests and two controlled real children. Errors join exact-child retirement; unconfirmed exit blocks replacement. Installed pure synthetic checks also pass within the 27-check update. [Contract](credential-worker-lifecycle.md), [source](evidence/credential-process-source-summary.json), [installed](evidence/installed-agent-security-summary.json). | Live credential failure injection and native Windows acceptance remain separate. No user key is replaced. |
+| Complete Linux `68bcc76` | 310 groups, 1,875 passing tests, sixteen declared skips; exact child/tree and owned staging cleanup. [Receipt](evidence/linux-68bcc76-complete-summary.json). | Later helper, SDK, scanner-input, Python and Cargo changes are outside this checkpoint. |
+| Complete Windows `cadbccd` | 416 groups, 2,443 passing tests and 204 declared skips; packet hashes, source/merge trees, inventory, deadlines and cleanup verify. [Receipt](evidence/windows-complete-cadbccd-summary.json). | The overall workflow failed because preliminary backend shard 3 was cancelled without a final receipt. Later changes are outside this checkpoint. |
+| Installed Linux `aafb476` | 54 metadata/in-memory checks and fourteen exact installed module hashes. All 54 semantic workspace snapshots, selection, pending keyboard-only conversation and frozen frontend are preserved. [Receipt](evidence/installed-cargo-inventory-summary.json). | These checks start no scanner process, Cargo process, live task, agent, account action, model request or hardware operation. |
+| Complete Linux `39db1fe` | **Failed:** 313/314 groups, 1,910 passing tests, sixteen declared skips and one failed scheduling-budget assertion. Exact owned cleanup verifies. [Receipt](evidence/linux-39db1fe-scheduling-failed-summary.json). | A nearly passing run is not complete acceptance. |
 
-Failed runs remain failed evidence. Partial test output is excluded when the
-final plan is missing. Provider and guest doubles are explicitly identified in
-their receipts. The [verification record](verification.md) retains the detailed
-chronology; the [requirement ledger](switchyard-requirements.md) tracks the full
-Rev2 scope independently of these checkpoints.
+An immutable **317-group Linux run on aafb476 is active**. It uses the existing
+pinned Node binary, a short owned temporary parent and the original bounds.
+Progress is not a final result. Later Cargo archive work has its own focused
+checks and is outside this immutable run.
 
-The corrected native Windows preliminary backend now passes all 198 groups: 1,022
-passing tests and 142 declared skips. Four archive digests, source/merge tree
-equality and every child/tree cleanup are verified. This is separate from the
-combined Windows release, which now passes 414 groups. [Backend receipts](evidence/windows-backend-9f35961-native-summary.json).
+The installed update verifies a dated backup and launcher readback. It retains
+current plus one rollback and removes the exact 528-file, 5,224,475-byte prepared
+bundle. Fifty-three sealed workspace files are byte-identical; one changes only
+audit metadata. It preserves the repaired native ChatGPT main window, hidden
+overlay, saved artwork and workstation guard.
 
-Bundled-agent retirement now preserves uncertain exact children, refuses replacement
-across mode changes and reports unconfirmed shutdown. Seven groups/72 checks pass,
-including two real authenticated Node sessions and confirmed exits. Installed metadata/module verification passes without starting an example. Native
-Windows and live installed example acceptance remain pending.
-[Contract](bundled-agent-lifecycle.md), [source evidence](evidence/bundled-example-lifecycle-source-summary.json).
+## What is implemented
 
-Custom-agent commands now contribute opted-in queue/claim/retirement/acknowledgement
-metadata, with local versus authenticated self-report provenance and no raw content.
-Seven groups/92 checks pass, including actual encrypted HTTP/bundled-agent execution,
-privacy, rollback and pause/replay fences. Six installed pure checks pass within
-the 26-check update; native Windows and live installed command execution remain separate. [Contract](agent-lifecycle-observation.md#custom-agent-command-history),
-[evidence](evidence/custom-agent-command-observation-summary.json).
-
-## What the backend does
-
-Automatic scanner review now gathers bounded current files, includes recognized
-ignored secrets and proposes explicit generated-directory exclusions. It captures
-file hashes before returning the existing one-use review; unknown ignored paths,
-missing files and file/revision/account drift refuse. The new path grants nothing
-and performs no scan until the separate established confirmations. Twenty-five
-groups pass 100 checks, followed by five composed review cases (102 distinct
-checks), including one actual Linux scanner exit and one Windows guest double.
-All sixteen installation scenarios and the original package budget pass.
-Installed exact-module/preflight verification now passes within 34 metadata
-checks; live task/scanner use and native Windows acceptance remain separate.
-[Guide](scanner-input-inventory.md), [evidence](evidence/scanner-review-source-summary.json).
-
-Custom-agent SDKs now complete sequence persistence before transmission. Node
-awaits asynchronous saves; Python accepts a synchronous persistence hook, rejects
-awaitables/nested sends and keeps its validated enrollment immutable. A failed
-save sends nothing and consumes its local counter; restart resumes above saved
-state. Two regressions reproduce before correction. Four focused groups pass
-66 distinct checks, and a final 15-check integration pass includes two actual
-Python processes against controlled loopback servers. Typecheck, original
-package bounds and exact cleanup pass. Installed exact-module/preflight verification passes; live-agent and native
-Windows acceptance remain separate.
-[SDK contract](../integrations/README.md), [source evidence](evidence/sdk-persistence-source-summary.json).
-
-Windows shortcut helpers now retain uncertain ownership, share initialization and
-bind operations to their exact native owner. Failed registration needs verified
-absence or exact exit before rollback; uncertain records stay recovery-pending
-and are never automatically hydrated. Six regressions pass within eight groups/
-89 checks, including two real controlled children. Typecheck/package/cleanup pass;
-installed synthetic checks now pass within the 33-check update; actual Windows interaction remains separate.
-[Contract](windows-shortcut-helper-lifecycle.md).
-
-Windows foreground observation now retains an uncertain exact helper, joins
-overlapping stops and refuses replacement until exit. Late replies cannot survive
-pause/shutdown, and Suite shutdown reports an unconfirmed owner. Ten source groups
-pass 87 checks, with two controlled real Node children; a final eleven-check
-foreground pass verifies recovery after exact close. Catalog provenance ships
-as equivalent compact JSON to preserve the original package budget. Installed
-synthetic ownership and complete provenance comparison now pass; actual native
-Windows acceptance remains separate.
-[Contract](foreground-helper-lifecycle.md), [evidence](evidence/foreground-owner-source-summary.json).
-
-Authenticated custom-agent stop events now retire pending commands atomically:
-unclaimed work cancels locally, claimed outcomes remain uncertain, and a fresh
-session identity is required before accepting new work. Exact late acknowledgements
-remain self-reports and cannot revive readiness. Three regressions fail before
-correction; eight focused groups/94 tests, typecheck, package bounds and cleanup
-pass. Installed pure stop/recovery checks now pass within the 30-check update;
-live installed agent operation and native Windows acceptance remain separate.
-[Contract](custom-agent-revocation.md#an-adapter-that-reports-stopped),
-[evidence](evidence/agent-stop-retirement-source-summary.json).
-
-Custom-agent authorization now has a reviewed revoke-and-reenroll path. Exact
-roles are retired, unclaimed commands cancel locally and claimed outcomes remain
-uncertain. New credentials cannot inherit old claims or role authority. Eight
-groups/86 checks pass, including actual authenticated HTTP and two new bundled
-Node processes with confirmed exits. Failed credential/state commits and stop
-journals remain explicit. Installed pure synthetic/module checks also pass inside
-the 27-check update; native Windows, live installed revocation and frontend
-acceptance remain separate. [Contract](custom-agent-revocation.md),
-[evidence](evidence/custom-agent-revocation-source-summary.json).
-
-Uncertain claims from retired custom-agent sessions now have a separate one-use
-review path. Reviewed records remain explicitly unverified, become eligible for
-the existing bounded history retention and never resend provider commands. Five
-new recovery cases pass within eight groups/91 checks, including authenticated
-HTTP, late-ack races, rollback and capacity preservation. Installed pure recovery
-checks also pass inside the 29-check update; live installed recovery and native
-Windows acceptance remain separate.
-[Contract](custom-agent-revocation.md#review-an-uncertain-claim),
-[evidence](evidence/custom-agent-outcome-source-summary.json).
-
-| Capability | Implemented behavior and reference |
+| Capability | Behavior and engineering reference |
 | --- | --- |
+| Keyboard configuration | Model F catalog and portable profiles; reviewed device proposals, protected baselines, readback/recovery and firmware capability gates. [Configuration](switchyard-configuration.md), [profiles](portable-profiles.md), [F77 source audit](solenoid-capability-audit.md). |
 | Protected workspaces | Compartment-scoped encrypted state, fresh policy checks, bounded OS locks, exact approvals and durable replay refusal. [State locks](private-state-locking.md), [receipt authority](receipt-authority-commit.md). |
-| Reviewed execution | Linux Run and pipelines bind reviewed task inputs to native guardians and disposable build workspaces. [Execution](reviewed-task-execution.md), [bounded builds](bounded-build-workspace.md). |
-| Repository review | Read-only inspection, worktree/index/history witnesses and explicitly selected scanner inputs. [Inspector](inspect-cli.md), [staged inputs](staged-shield-inputs.md), [history](historical-shield-inputs.md). |
-| Shield and supply chain | Pinned offline scans, signed advisory/rule feeds with inclusive last-affected and whole-range limits, scoped exceptions, CycloneDX inventories, npm/Python/Rust declarations and CVSS 2/3/4 scoring. [Scanner](shield-baseline-scanner.md), [Python](python-supply-chain.md), [Rust](cargo-supply-chain.md), [severity](cvss-severity.md). |
-| Coding tools and editor connection | Distinct Codex/Claude task APIs, reviewed text, signed editor requests, one-use launch permits, protected lifecycle history and joined cleanup. [Native tasks](native-coding-tasks.md), [Terminal demonstration](evidence/editor-terminal-connection-summary.json), [retirement](evidence/editor-retired-stop-summary.json). |
-| Observation and navigation | Native VS Code/ChatGPT focus plus separately consented deliberate, category, agent, host-action and editor metadata. [Focus](native-client-focus.md), [recording](workflow-capture.md), [editor history](editor-workflow-observation.md). |
-| Installation and recovery | Versioned bundles, integrity checks, installation/update/rollback and interrupted-install recovery. [Installation](suite-installation.md), [recovery](suite-release-recovery.md). |
+| Coding tools and editors | Distinct Codex/Claude task APIs, reviewed text, signed editor requests, one-use launch permits and protected lifecycle history. [Native tasks](native-coding-tasks.md), [task ownership](coding-task-owners.md), [editor demonstration](evidence/editor-terminal-connection-summary.json). |
+| Custom agents | Authenticated enrollment, generation-bound commands, reviewed revocation, replacement credentials, exact retirement and recovery of uncertain outcomes. SDKs persist sequence state before sending. [Revocation and recovery](custom-agent-revocation.md), [SDK evidence](evidence/sdk-persistence-source-summary.json). |
+| Reviewed execution | Exact task inputs, independent approval, supervised native processes and disposable build workspaces. [Execution](reviewed-task-execution.md), [bounded builds](bounded-build-workspace.md). |
+| Repository review | Read-only inspection, worktree/index/history witnesses, explicit ignored secret inputs and reviewed generated-tree exclusions. [Inspector](inspect-cli.md), [scanner input review](scanner-input-inventory.md), [staged inputs](staged-shield-inputs.md), [history](historical-shield-inputs.md). |
+| Shield and supply chain | Pinned offline scans, signed feeds, scoped exceptions, CycloneDX inventories, npm/Python/Rust declarations and CVSS 2/3/4 scoring. Results retain exact coverage gaps. [Scanner](shield-baseline-scanner.md), [Rust](cargo-supply-chain.md), [Python](python-supply-chain.md), [severity](cvss-severity.md). |
+| Observation and voice | Separately consented deliberate, category, agent, host-action and editor metadata; encrypted recording state and recoverable local transcription queue. [Recording](workflow-capture.md), [editor history](editor-workflow-observation.md), [local runtime](optional-runtime.md). |
+| Installation and recovery | Versioned private bundles, integrity checks, installation/update/rollback and interrupted-install recovery. [Installation](suite-installation.md), [recovery](suite-release-recovery.md). |
+
+## Latest changes and limits
+
+Python wheels now receive bounded ZIP/metadata identity checks and supported
+SHA-256/384/512 RECORD member comparisons without extraction or execution.
+Thirty independent RECORD reference cases and thirty focused groups yield
+147 distinct passes, including six actual Linux scans and six Windows guest
+doubles. Package HTTP readback, all sixteen installation/recovery scenarios and
+the original package budget pass. Installed Python metadata checks pass; native
+Windows RECORD acceptance remains separate.
+[Contract](python-wheel-records.md), [source evidence](evidence/pypi-wheel-record-source-summary.json).
+
+Cargo host admission refuses omitted unresolved dependency, license and source
+gaps. Six groups/46 checks pass, including four actual Linux artifact journeys
+and four Windows guest doubles. Eight Cargo metadata checks pass in the installed
+54-check update. [Source evidence](evidence/cargo-inventory-verifier-source-summary.json).
+
+Selected Cargo archives now receive bounded gzip/USTAR manifest identity checks.
+A matching declared checksum cannot hide a different embedded name or literal
+version. Thirteen focused groups yield **132 distinct passes**, including six
+actual Linux scans, six Windows guest doubles and 26 independent Python
+TOML/USTAR/gzip cases. Host/BOM binding, source-separated findings, original
+Git/files, replay refusal and exact cleanup verify. The original package bound,
+typecheck and five verifier guards pass. The first composed run failed one
+timeout-inventory assertion; registering the two new files in the original
+integration class resolves it, with no existing deadline extended. No extraction,
+Cargo invocation, build, dependency resolution or publisher verification occurs.
+Installed and native Windows archive acceptance remain pending.
+[Archive contract](cargo-archive-identity.md),
+[source evidence](evidence/cargo-archive-source-summary.json).
+
+The Windows backend scheduler now uses five jobs for all 207 groups, preserving
+the original group objects, child bounds, twenty-minute job limits and 950-second
+estimated-workload ceiling. Historical placement estimates about 799 seconds per
+job; three groups/35 checks pass. Native acceptance remains pending.
+[Scheduling evidence](evidence/windows-five-shards-source-summary.json).
 
 ## Unfinished implementation
 
-The Windows preliminary scheduler now balances exact groups using accepted native
-timings and reports bounded start/exit progress. Four source groups/40 checks pass,
-preserving all child limits and four twenty-minute jobs. The cancelled run remains
-unaccepted; the correction still needs native Windows acceptance.
-[Contract](windows-backend-scheduling.md).
+- Remaining guided role/device wiring, editor command activation and frontend
+  exposure. Home/catalog and command activation are frozen for owner review.
+- Broader Shield syntax and coverage, dependency/feature/target resolution,
+  complete archive and license-text inspection, publisher provenance and
+  verified local vulnerability context.
+- Broader external observation streams and remaining portability, controller
+  and conversation work identified in the [requirement ledger](switchyard-requirements.md).
+  One passing adapter does not complete the corresponding suite requirement.
 
-- Native Windows verification of changes newer than the passing `9f35961`
-  complete release; the restricted storage-owner journey is separately accepted
-  in controlled native CI.
-  The shortcut cleanup race is corrected: failures join the writer's exit before
-  removing its owned output, and unconfirmed exits preserve staging. Twenty-three
-  focused groups/69 distinct checks and all 25 native Windows checks pass.
-  [Cleanup evidence](evidence/shortcut-writer-retirement-source-summary.json).
-  The original shortcut startup timeout recurs in two later checkpoints; cleanup
-  remains verified, but the cause is unresolved. Fixed bounded stage diagnostics
-  now pass all 28 native checks without reproducing the timeout.
-  [Failures](evidence/windows-shortcut-recurring-timeout-summary.json),
-  [latest pass](evidence/shortcut-stage-diagnostics-native-summary.json).
-- Production editor command activation and remaining guided role/device wiring.
-  Frontend and command activation are deliberately frozen for owner review.
-- Broader Shield coverage and dependency syntax/resolution, publisher provenance,
-  complete archive contents, actual license texts and verified local vulnerability context.
-  Exact Python pins now retain bounded normalized extras and process continuations
-  before comments. Ten groups/106 checks and 39 independent pip/PyPA cases pass,
-  including actual Linux scans and Windows guest doubles. Optional dependencies
-  remain explicitly unresolved. Five installed extras metadata checks pass. Native Windows `9193471` now passes
-  four composed scanner and ten artifact tests, with two declared Linux-only
-  skips and guest execution doubled. [Native evidence](evidence/pypi-extras-native-summary.json).
-  [Python evidence](evidence/pypi-extras-source-summary.json).
-  Selected npm archive identity comparison is implemented with bounded, non-extracting
-  gzip/USTAR parsing: six groups/78 checks plus one exact alias/version check pass.
-  Native Windows hit the original combined-file deadline; the corrected split
-  passes 53 distinct source checks and ten native Windows tests with two declared
-  Linux-only skips. The original byte-comparison lane is verified separately.
-  Complete Linux `7e45654` also hits that combined-file deadline: 305/306 groups,
-  1,783 accepted tests and sixteen declared skips. Owned staging was removed
-  after exit verification. [Failed receipt](evidence/linux-7e45654-timeout-summary.json).
-  [Artifact contract](npm-artifact-integrity.md).
-  Pinned SPDX identifier membership now passes source and native Windows host
-  checks (guest execution doubled), with explicit unknown
-  and deprecated metadata. [Catalog](npm-license-declarations.md).
-- Remaining portability, controller, conversation, observation and platform work
-  identified individually in the [requirement ledger](switchyard-requirements.md).
-  Passing one adapter or provider does not complete those requirements.
+## Failed or unaccepted software checks
 
-The composed editor demonstration uses real encrypted state and Linux carriers
-with a controlled provider and terminal. It verifies exact process identity,
-acknowledgement, replay refusal, focus and retirement. Native TUI/account/IDE
-acceptance is still open. Installed Codex 0.167.0 is outside the reviewed 0.166.0
-adapter gate; static schema generation does not justify changing that gate.
+These are engineering or verification issues, separate from unavailable hardware
+and accounts.
 
-## Checks requiring hardware, accounts or another permitted environment
+- The older complete Linux `49a5053` retry failed four builds and one permission
+  fixture. The pinned-Node launch and explicit fixture mode corrections are
+  implemented; the later `39db1fe` run passes those checks but fails scheduling.
+  Both original failures and exact cleanup remain recorded.
+  [Linux failure](evidence/linux-49a5053-failed-summary.json).
+- Windows shortcut startup intermittently reaches its original bound. The
+  confirmed cleanup race is repaired and has native acceptance; subsequent
+  passing diagnostics do not establish the startup cause or stability.
+  [Cleanup](evidence/shortcut-writer-native-summary.json),
+  [recurring failures](evidence/windows-shortcut-recurring-timeout-summary.json).
+- Windows fixture-registry `2ab67fc` reaches the original five-second Python
+  startup bound. Its unchanged `39db1fe` follow-up passes all twenty tests.
+  Cause remains unknown; separate cancelled PyPI/OSV jobs contribute no accepted
+  checks. [Failure and follow-up](evidence/windows-fixture-registry-followup-summary.json).
+- Newer native Windows results require their own exact final receipts. Queued
+  runs, cancellations and partial output do not count as acceptance.
 
-| Check | Current boundary |
+## Checks requiring hardware, accounts or interactive access
+
+| Check | Exact boundary |
 | --- | --- |
-| F77 physical behavior | Cached read-only discovery and complete readout pass: VIA 9, Vial 4, three 8 × 11 layers and pinned `wcass:f77` identity. New typing/hotplug/write/readback acceptance is unperformed; no new HID, unlock, reset, flash or solenoid operation is authorized in this backend work. Preserve firmware Dvorak and US host input. [Source audit](solenoid-capability-audit.md). |
-| B122 hardware and cap fit | Exact hardware is unavailable. All 27 physical gates remain open. |
-| Microsoft work Copilot | No approved work tenant is available. Synthetic Graph/policy checks do not establish tenant, license or account acceptance. [Request boundary](copilot-request-recovery.md). |
-| Windows user/guest journeys | Headless CI does not establish interactive UAC, ordinary-user setup or complete guest behavior. The passing restricted-owner CI journey does not establish these interactive checks. |
-| Claude/tmux and native task attachment | The real Claude attempt stopped at workspace trust, restored focus and retired its owned processes. No bypass, live account change or new native task is authorized here. [Receipt](evidence/installed-tmux-trust-boundary-summary.json). |
-| Home/catalog and voice UI | Frontend bytes remain frozen. Visual acceptance, microphone interaction and remaining UI implementation are separate from backend tests. |
+| F77 physical behavior | Cached VIA 9/Vial 4 readout and pinned `wcass:f77` source checks pass. New typing, hotplug and write/readback checks remain unperformed. No new HID, unlock, reset, flash, bootloader, solenoid or electrical operation is authorized here. Preserve firmware Dvorak and US host input. |
+| B122 hardware and cap fit | Hardware is unavailable; all 27 physical gates remain open. |
+| Microsoft work Copilot | No approved work tenant is available. Synthetic policy/Graph checks cannot establish tenant, license or account acceptance. |
+| Windows ordinary-user/UAC/guest behavior | Headless native CI and guest doubles do not accept these interactive journeys. Restricted storage ownership separately passes all eight original checks with QUERY mask 8. |
+| Native provider/task/IDE interaction | No live login changes, model requests or new native task create/resume are authorized during this backend work. The Claude/tmux attempt stopped at trust and retired its owned processes. Installed Codex 0.167.0 remains outside the reviewed 0.166.0 gate. |
+| Home/catalog and microphone interaction | Frozen frontend bytes and backend transcription tests do not establish visual or live microphone acceptance. |
 
-Keep source and small receipts, remove successful owned staging, and publish
-regular GitHub checkpoints. Preserve the repaired native ChatGPT main window,
-hidden overlay, saved artwork and desktop guard. No Seagate work is part of this task.
-
-Historical snapshots: [8](switchyard-status-history-8.md), [7](switchyard-status-history-7.md),
-[6](switchyard-status-history-6.md), [5](switchyard-status-history-5.md),
-[4](switchyard-status-history-4.md), [3](switchyard-status-history-3.md),
-[2](switchyard-status-history-2.md), [1](switchyard-status-history-1.md).
-
-
-Windows `cadbccd` preliminary backend shard 3 is cancelled after 20 minutes
-3 seconds, with no final receipt and a failed empty artifact upload. Its elapsed
-time matches the configured twenty-minute job bound; the runner log supplies no
-more specific cause. No tests from that incomplete shard or exact cleanup are
-accepted. The separate complete release remains active. This is a CI acceptance
-gap, not a hardware/account blocker; native `9f35961` and complete local Linux
-`cadbccd` keep their separate accepted results. Inspect scheduling without
-extending any child/job bounds. [Evidence](evidence/windows-cad-cancelled-backend-summary.json).
-
-The first complete 49a5053 attempt ended with exec status 143 before a final
-receipt. Its cause is unknown and zero groups/tests from that attempt are
-accepted. The runner is absent; a scan found no processes referencing its owned
-paths. Ten known scratch directories and two empty configuration files were
-removed. The unchanged checkout was reused by the supervised retry above, then removed
-with all nine aliases after that retry failed. Original child bounds remained unchanged.
-Progress is not a final receipt. The marker changes above are later than this
-immutable full-run source. [Interruption](evidence/linux-49a5053-interrupted-summary.json).
+[Continuation notes](switchyard-continuation.md) preserve operating constraints
+and the next work. Detailed historical results remain in the
+[verification record](verification.md), [history index](switchyard-status-history-8.md)
+and [the preceding status checkpoint](https://github.com/SquirmyWormy275/strathex-switchyard/blob/9a71cf1572d49fc934fc43a5abc8b48c3a8364a9/docs/switchyard-status.md).

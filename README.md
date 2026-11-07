@@ -85,7 +85,7 @@ installed, interactive, hardware and account acceptance remain separate.
 | Return to a coding task | [Codex bindings](docs/coding-task-bindings.md), [Claude bindings](docs/claude-task-bindings.md), [reviewed text](docs/native-coding-tasks.md), [owned task loading](docs/coding-task-owners.md) |
 | Inspect a repository without starting work | [Installed `switchyard inspect` commands](docs/inspect-cli.md) |
 | Run reviewed inputs in a disposable workspace | [Task execution](docs/reviewed-task-execution.md), [bounded build workspace](docs/bounded-build-workspace.md) |
-| Understand findings and coverage | [Shield baseline](docs/shield-baseline-scanner.md), [SBOM example](docs/evidence/README.md), [CVSS context](docs/cvss-severity.md), [Rust declarations](docs/cargo-supply-chain.md), [Python wheels and internal hashes](docs/python-wheel-records.md) |
+| Understand findings and coverage | [Shield baseline](docs/shield-baseline-scanner.md), [SBOM example](docs/evidence/README.md), [CVSS context](docs/cvss-severity.md), [Rust declarations](docs/cargo-supply-chain.md), [Cargo archive identity](docs/cargo-archive-identity.md), [Python wheels and internal hashes](docs/python-wheel-records.md) |
 | Review recovery and platform boundaries | [Release recovery](docs/suite-release-recovery.md), [Windows storage](docs/windows-storage-broker.md), [complete requirement ledger](docs/switchyard-requirements.md) |
 
 Installed Linux scanner demonstrations verify actual process exits and restore
