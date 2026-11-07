@@ -290,6 +290,7 @@ export const requiredGroups = [
   { file: "tools/layout-studio/native-focus-gateway.test.mjs" },
   { file: "tools/layout-studio/windows-native-focus.test.mjs" },
   { file: "tools/layout-studio/windows-terminal-process.test.mjs", timeoutMs: process.platform === "win32" ? 120_000 : 45_000, expectedSkipped: process.platform === "win32" ? 0 : 1 },
+  { file: "tools/layout-studio/windows-editor-endpoint.test.mjs", timeoutMs: process.platform === "win32" ? 120_000 : 45_000, expectedSkipped: process.platform === "win32" ? 0 : 1 },
   { file: "tools/layout-studio/windows-terminal-peer.test.mjs", timeoutMs: process.platform === "win32" ? 120_000 : 45_000, expectedSkipped: process.platform === "win32" ? 0 : 1 },
   { file: "tools/layout-studio/editor-websocket-frames.test.mjs" },
   { file: "tools/layout-studio/windows-editor-ingress.test.mjs", timeoutMs: process.platform === "win32" ? 120_000 : 45_000, expectedSkipped: process.platform === "win32" ? 0 : 1 },

@@ -91,7 +91,7 @@ test("the Windows bundle includes broker/bootstrap sources and the linked guest 
   const manifest=await verifySuiteRelease(bundle.directory,{expectedId:bundle.id,platform:"win32"});
   const { createWindowsNativeFocus } = await import(pathToFileURL(join(bundle.directory,"tools/layout-studio/windows-native-focus.mjs")).href);
   assert.equal(typeof createWindowsNativeFocus, "function");
-  for (const name of ["src/provider-desktop.ts", "src/windows-provider-process.ts", "provider-desktop-helper/Program.cs"]) {
+  for (const name of ["src/provider-desktop.ts", "src/windows-provider-process.ts", "provider-desktop-helper/Program.cs", "provider-desktop-helper/EditorEndpoint.cs"]) {
     const path = "apps/windows-companion/" + name;
     assert.ok(manifest.files.some(file => file.path === path));
     assert.deepEqual(await readFile(join(bundle.directory,path)), await readFile(join(sourceRoot,path)));
@@ -100,6 +100,9 @@ test("the Windows bundle includes broker/bootstrap sources and the linked guest 
   await import(pathToFileURL(join(bundle.directory,"apps/windows-companion/src/provider-desktop.ts")).href);
   await import(pathToFileURL(join(bundle.directory,"apps/windows-companion/src/windows-provider-process.ts")).href);
   assert.match(await readFile(join(bundle.directory,"apps/desktop-hotkeys/Switchyard.Hotkeys.csproj"),"utf8"),/\.\.\/windows-companion\/provider-desktop-helper\/Program.cs/);
+  assert.match(await readFile(join(bundle.directory,"apps/desktop-hotkeys/Switchyard.Hotkeys.csproj"),"utf8"),/\.\.\/windows-companion\/provider-desktop-helper\/EditorEndpoint.cs/);
+  const { createWindowsEditorEndpointReader } = await import(pathToFileURL(join(bundle.directory,"tools/layout-studio/windows-editor-endpoint.mjs")).href);
+  assert.equal(typeof createWindowsEditorEndpointReader,"function");
   for(const name of ["WindowsStorageBroker.cs","WindowsStorageBrokerBootstrap.cs","WindowsStorageBrokerService.cs","WindowsStorageBrokerControl.cs","WindowsStorageBrokerPipe.cs","WindowsStorageBrokerRuntime.cs","WindowsStorageBrokerDiagnostic.cs","RuntimePackageMetadata.cs"]){
     assert.ok(manifest.files.some(file=>file.path===`apps/desktop-hotkeys/${name}`),`The shipped helper cannot be rebuilt without ${name}.`);
   }

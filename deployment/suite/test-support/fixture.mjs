@@ -10,6 +10,7 @@ const sourceFiles = ["packages/protocol/src/b122.ts", "apps/windows-companion/sr
 sourceFiles.push("apps/windows-setup/Setup.cpp","deployment/windows/Build-SwitchyardSetup.ps1");
 sourceFiles.push("apps/windows-companion/src/provider-desktop.ts", "apps/windows-companion/src/windows-provider-process.ts");
 sourceFiles.push("apps/windows-companion/provider-desktop-helper/Program.cs");
+sourceFiles.push("apps/windows-companion/provider-desktop-helper/EditorEndpoint.cs");
 sourceFiles.push("apps/windows-companion/src/repository-runtime.ts", "apps/windows-companion/src/repository-runtime-broker.ts", "apps/windows-companion/src/repository-inputs.ts", "apps/linux-companion/src/linux-repository-runtime.ts", "apps/linux-companion/src/linux-repository-inputs.ts");
 sourceFiles.push("apps/windows-companion/src/scanner-fixtures.ts", "apps/windows-companion/src/scanner-fixture-files.ts", "apps/windows-companion/src/receipt-evidence.ts", "apps/desktop-hotkeys/WindowsStoragePrerequisites.cs");
 sourceFiles.push("apps/desktop-hotkeys/WindowsStorageBrokerProtocol.cs");

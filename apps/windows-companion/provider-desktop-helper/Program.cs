@@ -16,7 +16,7 @@ using Microsoft.Win32.SafeHandles;
 
 namespace Sxsy.B122.ProviderDesktopHelper;
 
-internal static class Program
+internal static partial class Program
 {
     private const string RequestSchema = "sxsy-b122.provider-desktop-request";
     private const string ResponseSchema = "sxsy-b122.provider-desktop-response";
@@ -63,6 +63,7 @@ internal static class Program
         if (args.Length == 1 && args[0] == "--native-desktop-owner-v1") return ObserveFocusOwner();
         if (args.Length == 1 && args[0] == "--editor-terminal-process-v1") return ObserveEditorTerminalProcess();
         if (args.Length == 1 && args[0] == "--editor-terminal-peer-v1") return ObserveEditorTerminalProcess(peer: true);
+        if (args.Length == 1 && args[0] == "--editor-endpoint-v1") return ReadEditorEndpoint();
         if (args.Length == 2 && args[0] == "--managed-terminal-v1")
         {
             try

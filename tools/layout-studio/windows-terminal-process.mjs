@@ -80,14 +80,14 @@ export async function inspectWindowsTerminalSocket(probe, socket, input, { asser
   } finally { signal.removeEventListener("abort", abort); socket.removeListener("close", abort); socket.removeListener("error", abort); }
 }
 
-async function packagedHelper() {
+export async function packagedWindowsEditorHelper() {
   const root = fileURLToPath(new URL("../../", import.meta.url)), release = await verifySuiteRelease(root, { platform: "win32", checkRuntime: true });
   require(!release.development);
   const image = release.files.find(row => row.path === "runtime/hotkeys/Switchyard.Hotkeys.exe"); require(image);
   return { path: join(root, image.path), sha256: image.sha256 };
 }
 
-export function createWindowsTerminalProcessProbe({ platform = process.platform, helper = packagedHelper, command = runRuntimeCommand, guardianStopped = runtimeGuardianStopped,
+export function createWindowsTerminalProcessProbe({ platform = process.platform, helper = packagedWindowsEditorHelper, command = runRuntimeCommand, guardianStopped = runtimeGuardianStopped,
   onIntent = async () => {}, onOwner = async () => {}, onRetired = async () => {}, onNotStarted = async () => {} } = {}) {
   require([onIntent,onOwner,onRetired,onNotStarted].every(fn=>typeof fn==='function'));
   const resource = { clients: new Set(), controller: new AbortController() };

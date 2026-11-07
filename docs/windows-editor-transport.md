@@ -266,3 +266,33 @@ and keeps the bearer in a terminal-local environment value. The reviewed
 [Codex 0.166.0 CLI source](https://github.com/openai/codex/blob/rust-v0.166.0/codex-rs/cli/src/main.rs)
 defines `--remote-auth-token-env` and remote resume parsing. Its source digest is
 retained in the client evidence; the installed CLI was not executed or upgraded.
+
+## Read the Windows Suite endpoint through held native handles
+
+The native helper now provides a fixed `--editor-endpoint-v1` read operation.
+It holds each directory without delete sharing, rejects reparse points and hard
+links, and reads at most 4 KiB of strict UTF-8 from the held file. The current
+user must own the endpoint and its immediate parent; effective allow entries
+are limited to that user, SYSTEM and local administrators. The helper does not
+change ACLs, ownership or privileges. Its token access remains QUERY (`8`).
+
+The owner and DACL come from [GetSecurityInfo on the held handle](https://learn.microsoft.com/en-us/windows/win32/api/aclapi/nf-aclapi-getsecurityinfo).
+[CreateFile sharing and reparse flags](https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-createfilew)
+keep directory redirection and concurrent file replacement outside the accepted
+read. The helper rechecks native identities and the original security descriptor
+before emitting metadata. There is no general file-read or shell operation.
+
+`windows-editor-endpoint.mjs` validates the response and returns its bytes only
+after the original Job and status observers have retired. Cancellation during
+retirement still refuses those bytes. An observed spawn without its original
+guardian acknowledgement remains uncertain and blocks another read.
+
+[Source evidence](evidence/windows-editor-endpoint-source-summary.json): six
+groups, 68 passes and three Windows-only skips; typecheck passes. All 36 C#
+sources compile with the existing SDK, zero warnings/errors; the five temporary
+compiler files (621,355 bytes) were removed. The first run's inventory failures
+are retained. Actual Windows ACL/path fixtures await CI. The earlier client
+passes native CI at `485b7c6`: twenty groups, 205 tests and no skips.
+
+VS Code packaging, terminal observation and launcher composition remain
+unfinished. This boundary does not activate commands or change the installed app.
