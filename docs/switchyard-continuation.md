@@ -40,6 +40,15 @@ instructions. Do not merge or release.
 
 ## Current installed and source checkpoint
 
+Installed `e1c2f38` verifies the historical-preparation and read-only index
+modules within **76 metadata/in-memory checks and 27 exact module hashes**.
+All 54 semantic workspaces, selection, pending keyboard-only conversation and
+frozen frontend are preserved; 53 sealed files are byte-identical and one changes
+only audit metadata. Dated backup and launcher readback verify. Current plus one
+rollback remain, and the exact 532-file, 5,202,055-byte prepared bundle is removed.
+No installed scanner, native task, model/account request or hardware operation
+was performed. [Installed evidence](evidence/installed-scanner-history-review-summary.json).
+
 Historical scanner preparation now derives bounded versions of current tracked
 paths and returns exact source descriptors with explicit coverage gaps. It
 preserves separate authority and execution review. A cold-index regression also

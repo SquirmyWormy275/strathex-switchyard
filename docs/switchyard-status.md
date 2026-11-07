@@ -17,7 +17,7 @@ checkpoints are not cumulative acceptance of the latest suite.
 
 | Checkpoint | Verified result | Limit |
 | --- | --- | --- |
-| Installed Linux `ba172a1` | **76 metadata/in-memory checks; 23 exact module hashes.** All 54 semantic workspaces and frozen frontend preserved. [Receipt](evidence/installed-scanner-index-review-summary.json). | No live scanner, provider task, account/model request, native focus or hardware operation. |
+| Installed Linux `e1c2f38` | **76 metadata/in-memory checks; 27 exact module hashes.** All 54 semantic workspaces and frozen frontend preserved. [Receipt](evidence/installed-scanner-history-review-summary.json). | No live scanner, provider task, account/model request, native focus or hardware operation. |
 | Native Windows client `4f56477` | **Seven groups; 94 passing tests; no skips.** Source/merge tree, artifact digest, commands, bounds and child/tree cleanup verified. [Receipt](evidence/windows-client-4f56477-passed-summary.json). | Client contracts only; interactive focus and complete Windows release acceptance are separate. |
 | Complete Linux `94a0135` | **323 groups; 1,979 passing tests; sixteen declared skips.** Original inventory, commands, bounds and owned cleanup verified. [Receipt](evidence/linux-94a0135-complete-summary.json). | Includes native-focus policy and Cargo/npm archive work; predates Python wheel-license changes. |
 | Complete Windows `dc755901` | **417 groups; 2,478 passing tests; 207 declared skips.** All six jobs and overall workflow passed with verified packet/source/cleanup. [Receipt](evidence/windows-complete-dc755901-summary.json). | Predates newer archive, scheduling, profile/workflow and observation corrections. |
@@ -34,7 +34,7 @@ Cargo archives and npm archives. All four saved profiles and 57 workflows remain
 compatible. Selection and the pending keyboard-only conversation are preserved;
 53 sealed workspace files are byte-identical and one changes only audit metadata.
 Dated backup and launcher readback verify. Only current plus one rollback remain;
-the exact 531-file, 5,196,099-byte prepared bundle was removed.
+the exact 532-file, 5,202,055-byte prepared bundle was removed.
 
 ## Recent backend changes
 

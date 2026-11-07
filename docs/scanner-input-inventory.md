@@ -253,6 +253,15 @@ no timeout, package budget or product assertion was relaxed. Type checking
 passes and both empty owned test parents are removed.
 [Source evidence](evidence/scanner-history-review-source-summary.json).
 
-These are isolated source checks. The installed backend has not yet been updated
-to this checkpoint; native Windows history acceptance, recipe/feed assembly,
-mixed index/history execution and frozen frontend controls remain separate.
+These are isolated source checks. Native Windows history acceptance,
+recipe/feed assembly, mixed index/history execution and frozen frontend controls
+remain separate.
+
+Installed `e1c2f38` verifies the historical-preparation and read-only index
+modules within **76 metadata/in-memory checks and 27 exact module hashes**.
+All 54 semantic workspaces, selection, pending keyboard-only conversation and
+frozen frontend are preserved; 53 sealed files are byte-identical and one changes
+only audit metadata. Dated backup and launcher readback verify. Current plus one
+rollback remain, and the exact 532-file, 5,202,055-byte prepared bundle is removed.
+No installed scanner, native task, model/account request or hardware operation
+was performed. [Installed evidence](evidence/installed-scanner-history-review-summary.json).
