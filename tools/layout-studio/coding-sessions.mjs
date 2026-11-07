@@ -1,5 +1,5 @@
 /** Exact coding-task identities, separate from keyboard configuration conversations. */
-import { appendAgentObservation } from "./agent-observation.mjs";
+import { appendAgentObservation, captureAgentObservation } from "./agent-observation.mjs";
 import { createRequire } from "node:module";
 import { randomUUID } from "node:crypto";
 import { lstat, realpath } from "node:fs/promises";
@@ -142,15 +142,16 @@ export function createCodingSessions({ store, resolveCli = trustedCli, platform 
       }
     },
     async status(compartment, id) {
-      const login = await account(compartment), task = (await store.snapshot(compartment)).codingSessions?.find((t) => t.id === id);
+      const login = await account(compartment), state = await store.snapshot(compartment), task = state.codingSessions?.find((t) => t.id === id);
       if (!task?.sessionId || task.schema !== "switchyard-coding-session/v1" || task.provider !== "codex") throw new Error("Select an exact saved coding task first.");
       if (task.accountFingerprint !== login.fingerprint) throw new Error("The local Codex login changed. This task was not redirected to another account.");
       await verifyRepositoryIdentity(task);
       await store.claimSession(compartment, { provider: "codex", sessionId: task.sessionId });
       const observation = await exact(task.sessionId, task.repositoryRoot, compartment);
+      const recordObservation = captureAgentObservation(state, { provider: "codex", at: observation.observedAt });
       if ((await account(compartment)).fingerprint !== login.fingerprint) throw new Error("The local login changed during task observation.");
       await verifyRepositoryIdentity(task);
-      return store.update(compartment, "coding-session-status", (s) => { const current = s.codingSessions.find((t) => t.id === id); if (current.sessionId !== task.sessionId || current.repositoryRoot !== task.repositoryRoot || current.accountFingerprint !== task.accountFingerprint) throw new Error("The exact task binding changed during observation."); current.observation = observation; if (["creating", "creation-uncertain"].includes(current.status)) current.status = "registered"; observe(s, current, "status-observed"); return view(current); }, { provider: "codex" });
+      return store.update(compartment, "coding-session-status", (s) => { const current = s.codingSessions.find((t) => t.id === id); if (current.sessionId !== task.sessionId || current.repositoryRoot !== task.repositoryRoot || current.accountFingerprint !== task.accountFingerprint) throw new Error("The exact task binding changed during observation."); current.observation = observation; if (["creating", "creation-uncertain"].includes(current.status)) current.status = "registered"; recordObservation(s, { subjectId: current.id, phase: "status-observed", status: observation.status }); return view(current); }, { provider: "codex" });
     },
     async resume(compartment, id, { assertCurrent = async () => {}, authorizationKey } = {}) {
       const generation = generations.get(compartment) ?? 0;

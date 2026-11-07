@@ -40,6 +40,8 @@ Claude status polling captures the recording generation before requesting native
 
 Two original failing regressions are retained. Seven complete groups/113 tests and TypeScript checking pass with an explicit CLI double and real encrypted stores. This adds no background polling or native task authority. [Evidence](evidence/claude-status-consent-summary.json).
 
+Codex status now uses the same recording-consent capture as Claude. Two additional retained failures showed a delayed result entering a resumed recording and its history event receiving the storage timestamp. The fix preserves the original provider time; task-status freshness was already correct. All 35 original groups/151 tests pass, including both adapters, the shared collector and all 29 task-owner scenarios. TypeScript checking passes. [Codex evidence](evidence/codex-status-consent-summary.json).
+
 ## Custom-agent command history
 
 External status and acknowledgement reports retain their original occurrence

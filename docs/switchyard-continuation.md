@@ -40,7 +40,9 @@ instructions. Do not merge or release.
 
 ## Current Claude version work
 
-The latest source correction preserves Claude status arrival time and the recording generation captured before inventory. Two original failures are retained; seven original groups/113 tests and typecheck pass. The normal installed update is next. No recording or native task is started by this correction. [Evidence](evidence/claude-status-consent-summary.json).
+Codex status now uses the same recording-consent capture as Claude. Two additional retained failures showed a delayed result entering a resumed recording and its history event receiving the storage timestamp. The fix preserves the original provider time; task-status freshness was already correct. All 35 original groups/151 tests pass, including both adapters, the shared collector and all 29 task-owner scenarios. TypeScript checking passes. [Codex evidence](evidence/codex-status-consent-summary.json). Publish the source and perform the normal installed update; keep the original failing receipts. No native task/model operation is authorized by these checks.
+
+The latest source correction preserves Claude status arrival time and the recording generation captured before inventory. Two original failures are retained; seven original groups/113 tests and typecheck pass. Installed source `6337263` passes 102 metadata/refusal checks across 59 exact modules; the connected seven-stage synthetic demonstration passes and its temporary state is removed. No recording or native task is started by this correction. [Evidence](evidence/claude-status-consent-summary.json).
 
 The later task-adapter admission fix now uses that same exact list instead of a broad version range. Preserve the original failing 2.1.309 discovery regression and the corrected six-group/94-test receipt. Source and typecheck pass. Installed source `526c5f2` passes 102 metadata/refusal checks across 59 exact modules, including the new pure task-version refusal. Its exact prepared bundle is removed. No live task operation is authorized by this correction. [Evidence](evidence/claude-version-admission-summary.json).
 
@@ -115,9 +117,9 @@ a replacement. Eight groups/124 tests and installed metadata checks cover them.
 
 ## Installed checkpoint
 
-- Source: `526c5f26247e0cc91e2c0ff28401b30fe437267c`.
-- Release: `344fd0a03eaa1e21737c86b54db9c4142903303d1f75bfcdd72402a5830abc15`.
-- Rollback: `9e23b735e708ab5694cfcd0dc7f5ad0a920ceb3bdf356dca267f7b8db9bdce48`.
+- Source: `6337263aa789ee7bbca10819db304cbcaf27f5c3`.
+- Release: `8aa0cc4c80cfd45c1c48c0725139be7a1e1870fb2bbc749ecd849d026100d1dc`.
+- Rollback: `344fd0a03eaa1e21737c86b54db9c4142903303d1f75bfcdd72402a5830abc15`.
 - Frozen frontend: `24100ef601b810efb0cda95e4fe0842d2944560734b02c4cf482c25e19150543`.
 - 102 metadata/refusal checks, 59 exact module hashes; all 54 semantic workspaces,
   four profiles, 57 workflows, selection and one pending keyboard-only conversation
@@ -125,15 +127,15 @@ a replacement. Eight groups/124 tests and installed metadata checks cover them.
 - The earlier installed native Claude version/account check accepts 2.1.319 with both
   owned guardians independently stopped; no prompt/task/login operation occurred.
 - Dated backup and launcher readback verify. Current plus one rollback remain.
-  Installed payload: 554 files/4,749,455 bytes. The exact temporary package,
-  555 files/4,848,939 bytes, is removed.
+  Installed payload: 554 files/4,749,905 bytes. The exact temporary package,
+  555 files/4,849,389 bytes, is removed.
   Do not repeat executed installation or cleanup scripts.
 
 The selected personal workspace returns a complete empty project inventory without
 native observation or task authority. Unauthenticated and malformed requests
 refuse. Source and native contracts cover populated inventory separately.
 Host-facing task-owner, Copilot-journal and signed-intent verifiers run sequentially.
-[Installed receipt](evidence/installed-claude-version-gate-summary.json).
+[Installed receipt](evidence/installed-claude-status-consent-summary.json).
 
 ## Complete runs and native evidence
 

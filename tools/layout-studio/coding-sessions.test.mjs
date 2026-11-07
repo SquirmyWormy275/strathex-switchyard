@@ -22,6 +22,43 @@ async function fixture(fn) {
 }
 const existing = (repositoryRoot) => ({ sessionId: "synthetic-thread", repositoryRoot, label: "Local task label" });
 
+test("queued Codex status cannot inherit renewed, newly started or replaced observation consent", async () => {
+  for (const change of ["renewed", "new", "started", "paused", "excluded"]) await fixture(async ({ store, service, repositoryRoot, options }) => {
+    const task = await service.bind("personal", existing(repositoryRoot)), at = options.now();
+    const recording = { id: "observed", status: change === "started" ? "paused" : "recording", sources: ["agent-events"], exclusions: [], events: [], createdAt: at - 2, recordingSince: at - 1, recordingGeneration: "original", updatedAt: at - 1 };
+    await store.update("personal", "synthetic-observation", s => { s.observations = [recording]; });
+    const update = store.update.bind(store);
+    store.update = async (c, operation, mutate, request) => {
+      if (operation === "coding-session-status") await update(c, "synthetic-consent-change", s => {
+        if (change === "renewed") s.observations[0].recordingGeneration = "resumed-with-the-same-clock";
+        if (change === "new") s.observations = [{ ...recording, id: "new-recording" }];
+        if (change === "started") s.observations[0].status = "recording";
+        if (change === "paused") s.observations[0].status = "paused";
+        if (change === "excluded") s.observations[0].exclusions = ["codex"];
+      });
+      return update(c, operation, mutate, request);
+    };
+    try {
+      await service.status("personal", task.id);
+      assert.equal((await store.snapshot("personal")).observations[0].events.length, 0, change);
+    } finally { store.update = update; }
+  });
+});
+
+test("delayed Codex status retains its actual observation time and becomes stale while waiting for storage", () => fixture(async ({ store, service, repositoryRoot, options, stale }) => {
+  const task = await service.bind("personal", existing(repositoryRoot)), at = options.now();
+  await store.update("personal", "synthetic-observation", s => { s.observations = [{ id: "observed", status: "recording", sources: ["agent-events"], exclusions: [], events: [], createdAt: at - 2, recordingSince: at - 1, recordingGeneration: "original", updatedAt: at - 1 }]; });
+  const update = store.update.bind(store);
+  store.update = async (c, operation, mutate, request) => { if (operation === "coding-session-status") stale(); return update(c, operation, mutate, request); };
+  try {
+    const result = await service.status("personal", task.id), saved = await store.snapshot("personal");
+    assert.equal(result.observation.status, "stale"); assert.equal(result.observation.observedAt, at);
+    assert.equal(saved.codingSessions.find(t => t.id === task.id).observation.observedAt, at);
+    assert.equal(saved.observations[0].events.length, 1); assert.equal(saved.observations[0].events[0].at, at);
+    assert.equal(saved.observations[0].events[0].provenance, "native-provider-status-observation");
+  } finally { store.update = update; }
+}));
+
 test("opt-in Codex lifecycle metadata records local reservation and exact status transitions without prompt, label or repository content", () => fixture(async ({ store, service, repositoryRoot, stateRoot, idle }) => {
   await store.update("personal", "synthetic-observation", s => { s.observations = [{ id: "observed", status: "recording", sources: ["agent-events"], exclusions: [], events: [], updatedAt: Date.now() }]; });
   const request = { requestId: randomUUID(), repositoryRoot, label: "PRIVATE_LABEL_NOT_IN_OBSERVATIONS" }, task = await service.create("personal", request);
