@@ -74,6 +74,22 @@ for (const fails of [false, true]) test(`an old foreground ${fails ? "failure" :
     assert.equal(timers.size, 0); assert.equal(stops, 1);
   }, { foregroundOverride }); } finally { release.resolve(); }
 });
+test("retiring a failed sampler cannot stop the replacement source during delayed error persistence", async () => {
+  const entered = gate(), release = gate(); let activeSource = null, sources = 0, reads = 0;
+  const foregroundOverride = { implemented: true, async read(_c, authorize) { await authorize(); activeSource ??= ++sources; if (++reads === 1) throw Error("SYNTHETIC_OLD_SOURCE_FAILURE"); return frame; }, async stopCompartment() { activeSource = null; return { stopped: true }; }, async close() {} };
+  try { await suiteFixture(async ({ suite, store, sample }) => {
+    const update = store.update.bind(store);
+    store.update = async (...args) => { if (args[1] === "focus-unavailable") { entered.resolve(); await release.promise; } return update(...args); };
+    await suite.handle("/api/suite/mode", { mode: "personal-companion" }); const o = await start(suite);
+    const pending = sample(); await entered.promise;
+    await suite.handle("/api/suite/observation/state", { id: o.id, status: "paused" });
+    await suite.handle("/api/suite/observation/state", { id: o.id, status: "recording" }); await sample();
+    const replacement = activeSource; assert.equal(replacement, 2);
+    release.resolve(); await pending;
+    assert.equal(activeSource, replacement);
+    assert.equal((await store.snapshot("personal")).observations[0].sourceStates["foreground-category"].status, "sampling");
+  }, { foregroundOverride }); } finally { release.resolve(); }
+});
 test("foreground recording needs consent and an allowed companion policy; exclusions, pause and mode-off fence samples", () => suiteFixture(async ({ suite, store, timers, sample, next, readCount, stopCount, root }) => {
   await assert.rejects(start(suite), /Keyboard-only/); assert.equal(readCount(), 0);
   await suite.handle("/api/suite/mode", { mode: "personal-companion" }); await assert.rejects(start(suite, { consent: false }), /explicitly start/);

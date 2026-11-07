@@ -203,8 +203,10 @@ export function createSuite({ store = createSuiteStore(), platform = process.pla
       } catch {
         if (current()) {
           pauseMonitor(compartment);
+          // Capture/retire this instance's original source before an awaited
+          // state write lets a deliberate resume create a replacement.
+          try { await foreground.stopCompartment?.(compartment); } catch { /* Keep unavailable; no automatic restart. */ }
           try { await store.update(compartment, "focus-unavailable", (s) => { const o = session(s, id); if (!sameConsent(o)) return; o.sourceStates ??= {}; o.sourceStates["foreground-category"] = { status: "unavailable", reason: "Foreground categories are unavailable. Pause and deliberately resume to retry.", at: Date.now() }; if (o.sources.length === 1) o.status = "paused"; }, { operation: "record" }); } catch { /* A policy change or deletion wins over a late sample. */ }
-          try { await foreground.stopCompartment?.(compartment); } catch { /* The source is already marked unavailable; no automatic restart. */ }
         }
       }
       finally { pending = false; }

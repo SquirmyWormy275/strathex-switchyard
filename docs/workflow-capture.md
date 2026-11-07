@@ -38,3 +38,10 @@ pass 123 tests with no skips, using independent encrypted stores and controlled
 category replies. The existing native source's bounded retry and owned-stop
 contracts remain unchanged. This source-only proof does not read actual windows
 or accept the frozen UI. [Evidence](evidence/foreground-consent-source-summary.json).
+
+A further foreground-retirement regression exposed an old failure stopping a
+newly resumed source while error-state persistence was delayed. The original
+source is now captured and retired before that awaited write. Eight groups pass
+124 tests with no skips; the original failing receipt remains. This source-only
+follow-up postdates installed `eebfe05` and running full Linux `0c025df`.
+[Retirement evidence](evidence/foreground-retirement-source-summary.json).

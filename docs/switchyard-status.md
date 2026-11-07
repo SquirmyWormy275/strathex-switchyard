@@ -122,7 +122,7 @@ checkpoints are not cumulative acceptance of the latest suite.
 
 | Checkpoint | Verified result | Limit |
 | --- | --- | --- |
-| Installed Linux `57af859` | **88 metadata/refusal checks; 56 exact module hashes.** All 54 semantic workspaces, four profiles, 57 workflows and frozen frontend preserved. [Receipt](evidence/installed-persisted-selection-summary.json). | Persisted selection generation, consented runtime status capture, original-role/provider-effect guards, signed CLI dispatch and Codex version contract included; editor command activation remains pending; no live scanner, provider task, account/model request, native focus or hardware acceptance. |
+| Installed Linux `eebfe05` | **88 metadata/refusal checks; 56 exact module hashes.** All 54 semantic workspaces, four profiles, 57 workflows and frozen frontend preserved. [Receipt](evidence/installed-foreground-consent-summary.json). | Recording consent generations, persisted selection generation, consented runtime status capture, original-role/provider-effect guards, signed CLI dispatch and Codex version contract included; editor command activation remains pending; no live scanner, provider task, account/model request, native focus or hardware acceptance. |
 | Native Windows client `0bb7fd4` | **25 groups; 249 tests; no skips.** Original manifest, commands, bounds and cleanup verified. [Receipt](evidence/runtime-observation-native-client-summary.json). | Terminal/provider doubles remain explicit; not the complete Windows suite, runtime-observation backend groups or live authenticated Codex turns. |
 | Complete Linux `0c7d918` | **350 groups; 2,274 tests; 32 declared platform skips.** Original manifest, bounds and cleanup verified. [Receipt](evidence/linux-0c7d918-complete-summary.json). | Covers the installed `08fa7ea` runtime, including role/workspace/provider-effect boundaries; predates subsequent runtime-status capture. |
 | Complete Windows `dc755901` | **417 groups; 2,478 tests; 207 declared skips.** All six jobs and overall workflow passed. [Receipt](evidence/windows-complete-dc755901-summary.json). | Predates newer archive, scheduling, profile/workflow and observation corrections. |
@@ -139,8 +139,8 @@ semantic workspaces match; 53 sealed files are byte-identical and one changes
 only audit metadata. The first signed-route preservation check overlapped other
 metadata verifiers and failed; the unchanged check passed sequentially. Its
 failure remains retained. Dated backup and launcher readback verify. Only current
-plus one rollback remain; the exact 554-file, 4,829,848-byte prepared bundle is
-removed. The installed payload is 4,730,500 bytes across 553 files.
+plus one rollback remain; the exact 554-file, 4,830,564-byte prepared bundle is
+removed. The installed payload is 4,731,216 bytes across 553 files.
 
 Windows `e5a5781` passed all six preliminary backend shards and 27 native guardian
 checks, but complete bundle verification was cancelled at the 90-minute job
@@ -393,3 +393,10 @@ bounds and process cleanup verify. The metadata-only manifest projection's scrat
 files are removed. This lane excludes the new selection/consent backend groups
 and does not accept the complete Windows release.
 [Native client evidence](evidence/selection-native-client-summary.json).
+
+A further foreground-retirement regression exposed an old failure stopping a
+newly resumed source while error-state persistence was delayed. The original
+source is now captured and retired before that awaited write. Eight groups pass
+124 tests with no skips; the original failing receipt remains. This source-only
+follow-up postdates installed `eebfe05` and running full Linux `0c025df`.
+[Retirement evidence](evidence/foreground-retirement-source-summary.json).

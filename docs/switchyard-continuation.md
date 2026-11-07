@@ -157,12 +157,12 @@ native helper/runtime bundle was downloaded locally.
    and restricted-storage owner checks also pass. The later `e5a5781` explicit
    native-helper guardian step passes the invalid-status-request case; its final
    complete bundle acceptance remains pending.
-2. Installed Linux now runs `57af859`, release `d68481192c36`, with `f5404e9f3e35`
+2. Installed Linux now runs `eebfe05`, release `3760be8d85df`, with `d68481192c36`
    retained as rollback. All 54 semantic workspaces, selection, one pending
    keyboard-only conversation and frozen frontend verify. The 88 metadata/
    refusal checks cover 56 exact modules, four profiles and 57 workflows.
    Dated launcher backup and readback verify; the exact prepared 554-file,
-   4,829,848-byte bundle is removed. Signed requests reject absent roles, wrong
+   4,830,564-byte bundle is removed. Signed requests reject absent roles, wrong
    PID/build, stale requests and caller-selected compartments without an effect.
    No browser reload, native focus, live provider/task or hardware use occurred.
    Do not repeat this update or remove its already-removed staging again.
@@ -210,11 +210,11 @@ process-query change has been made.
 
 ## Installed application and complete-suite baseline
 
-Installed Linux is `57af859`: 88 metadata/refusal checks, 56 module hashes,
+Installed Linux is `eebfe05`: 88 metadata/refusal checks, 56 module hashes,
 all 54 semantic workspaces, four profiles, 57 workflows, selected state, pending
 keyboard-only conversation and frozen frontend preserved. The current release
 and one rollback remain; its exact prepared bundle has been removed.
-[Installed evidence](evidence/installed-persisted-selection-summary.json).
+[Installed evidence](evidence/installed-foreground-consent-summary.json).
 
 The accepted complete Linux run is `0c7d918`: 350 groups, 2,274 passes
 and 32 declared platform skips. Its exact checkout, nine dependency aliases,
@@ -265,3 +265,18 @@ bounds and process cleanup verify. The metadata-only manifest projection's scrat
 files are removed. This lane excludes the new selection/consent backend groups
 and does not accept the complete Windows release.
 [Native client evidence](evidence/selection-native-client-summary.json).
+
+The normal `eebfe05` backend update installs the recording-generation and
+foreground-consent corrections. All 88 metadata/refusal checks and 56 exact module
+hashes pass. Host-facing verifiers ran sequentially; all 54 semantic workspaces,
+four profiles, 57 workflows, selection, pending conversation, private link and
+frozen frontend verify. Current plus one rollback remain; the exact prepared
+554-file/4,830,564-byte bundle is removed. Its backup and readback are retained.
+Do not repeat those executed update/cleanup scripts.
+
+A further foreground-retirement regression exposed an old failure stopping a
+newly resumed source while error-state persistence was delayed. The original
+source is now captured and retired before that awaited write. Eight groups pass
+124 tests with no skips; the original failing receipt remains. This source-only
+follow-up postdates installed `eebfe05` and running full Linux `0c025df`.
+[Retirement evidence](evidence/foreground-retirement-source-summary.json).
