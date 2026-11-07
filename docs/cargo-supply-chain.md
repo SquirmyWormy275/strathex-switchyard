@@ -105,3 +105,22 @@ without claiming a native guest scan. [Windows receipt](evidence/windows-cargo-c
 Selected Cargo artifact-byte comparison is now implemented with exact registry,
 version and source binding. Matched bytes retain incomplete scope; mismatches
 produce failed provenance findings. [Artifact contract and evidence](cargo-artifact-integrity.md).
+
+
+The host now requires the explicit unresolved dependency, license and source
+coverage gaps for every Cargo component. Omitting one refuses report admission,
+even if the remainder of the report still says incomplete. Six focused groups
+pass 46 checks, including four actual Linux artifact journeys and four Windows
+guest doubles; the initial omission regression remains recorded.
+[Source evidence](evidence/cargo-inventory-verifier-source-summary.json).
+
+The repeatable installed metadata verifier is:
+
+```sh
+mise exec node@24.14.0 -- node scripts/verify-cargo-inventory-host.mjs --read-only-metadata
+```
+
+Its eight checks pin the installed scanner/validator and test fixed version,
+source separation, advisory, byte-comparison and forged-report cases entirely
+in memory. They start no Cargo/scanner process, resolve no dependencies, contact
+no registry and create no provider task. Installed acceptance is pending.

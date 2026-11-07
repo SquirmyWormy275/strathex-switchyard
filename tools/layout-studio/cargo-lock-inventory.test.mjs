@@ -68,3 +68,13 @@ test('Cargo version grammar rejects malformed identifiers, overflow, whitespace 
  for(const version of ['1.2.3-','1.2.3+','1.2.3-a..b','1.2.3+a..b','1.2.3-01','1.2.3-a.01','1.2.3-ä','1.2.3+a_b','1.2.3++a','v1.2.3','1.2.3\n',' 1.2.3','1.2.18446744073709551616','1.2.3+'+'a'.repeat(251)])assert.throws(()=>parseCargoVersion(version),version);
  for(const version of ['1.2.3-0','1.2.3-0a','1.2.3--','1.2.3+0001','1.2.3-a-b+0.00','1.2.3+'+'a'.repeat(250)])assert.ok(parseCargoVersion(version));
 });
+
+test('host admission retains every unresolved Cargo declaration coverage gap', async () => {
+ for(const action of ['shield_supply_chain','release_shield']) {
+  const f=cargoLockFixture({action,clean:true}),r=await f.scan(),context={engine:r.engine,requestSha256:r.requestSha256,request:f.request};
+  for(const gap of ['cargo_resolution_not_performed','license_metadata','package_source_or_integrity']) {
+   const changed=structuredClone(r);assert.ok(changed.gaps.includes(gap));changed.gaps=changed.gaps.filter(g=>g!==gap);
+   assert.throws(()=>parseShieldScannerReport(JSON.stringify(changed),context,action),undefined,gap);
+  }
+ }
+});

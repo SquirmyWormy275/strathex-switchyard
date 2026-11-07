@@ -120,6 +120,7 @@ export function parseShieldScannerReport(output,shield,action) {
       key="PyPI\0"+component.requirementsPath+"\0"+component.name;
     }else if(component.ecosystem==="Cargo"){
       validateCargoComponent(component);key=JSON.stringify(["Cargo",component.lockPath,component.name,component.version,component.sourceSha256]);
+      if (["cargo_resolution_not_performed", "license_metadata", "package_source_or_integrity"].some(gap => !report.gaps.includes(gap))) throw Error("Cargo declarations must retain unresolved dependency, license and source coverage.");
       const reference = artifactReferences.get(key);
       if (reference) {
         const a = component.artifact, file = files.get(reference.path);

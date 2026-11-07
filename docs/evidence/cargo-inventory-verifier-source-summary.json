@@ -1,0 +1,75 @@
+{
+  "schema": "switchyard-cargo-inventory-verifier-source/v1",
+  "baseCommit": "1415d48cee7ffc8f91d7e68a57d167dc380e212d",
+  "sourceFiles": {
+    "tools/layout-studio/shield-scanner-engine.mjs": "865bb004d183e5be533512540d01a5b3eeece56fd4ef62c5f26fb8936ac0454a",
+    "tools/layout-studio/repository-shield.mjs": "46077eb823ae410aa862df864483cf6844049f9cbbff73071b6ce504f04a7ae8",
+    "tools/layout-studio/test-support/shield-scanner-fixture.mjs": "e0a2d704ce0ba16531780a953906e2c0880d193f0586f291266e2434d29c6433",
+    "tools/layout-studio/cargo-lock-inventory.test.mjs": "57ac3058d30d6a34ee45471ee9cb3bc0cf8b46a29d542d3655142c2f34a438f8",
+    "tools/layout-studio/repository-shield-cargo-artifacts.test.mjs": "15f884506986dfd94508efe64153b9c329d21f05d813cf37c238cac72fc23e5a",
+    "scripts/verify-cargo-inventory-host.mjs": "dcce9802f6678e6f027ce7585581fc91f8c80535fe502931aeed0974cd32df21",
+    "scripts/verify-python-inventory-host.mjs": "5d9b4331e9d491f8d4ab1e961aa480405982959c984f16e39d3f46dca22b1c7b",
+    "scripts/verify-copilot-journal-host.test.mjs": "8209ef2e78a07ac22c863b210357d14fc6d7422dc108213a84fd3342d68d6de8"
+  },
+  "beforeCoverageRegression": {
+    "name": "isolated-test-b38a5b7a-a92f-49e9-b451-ef4f7f92fbef.json",
+    "sha256": "d4c013ec7ebee78807f9c636cf5669d2192e1395882b47fea2f220792428754d",
+    "success": false,
+    "totals": {
+      "required": 1,
+      "passed": 0,
+      "failed": 1,
+      "tests": 1,
+      "passedTests": 0,
+      "failedTests": 1,
+      "skippedTests": 0,
+      "cancelledTests": 0,
+      "todoTests": 0
+    }
+  },
+  "cargoAndVerifierGuards": {
+    "name": "isolated-test-56295328-5c72-4893-9990-ce546b3d3498.json",
+    "sha256": "3620922c2294baf9a75b469a1aaafb790f77d58b0463b7bbd1c28a05f075852b",
+    "success": true,
+    "totals": {
+      "required": 3,
+      "passed": 3,
+      "failed": 0,
+      "tests": 27,
+      "passedTests": 27,
+      "failedTests": 0,
+      "skippedTests": 0,
+      "cancelledTests": 0,
+      "todoTests": 0
+    }
+  },
+  "wheelAndPackageFollowup": {
+    "name": "isolated-test-0ced3bb3-ff52-4eb7-8c0c-8f4d5355dca8.json",
+    "sha256": "1aa0376f69c2ee2c9528bdd5aa85c34324cfa74ae19ca52b21ee94f4e4d7ad63",
+    "success": true,
+    "totals": {
+      "required": 3,
+      "passed": 3,
+      "failed": 0,
+      "tests": 19,
+      "passedTests": 19,
+      "failedTests": 0,
+      "skippedTests": 0,
+      "cancelledTests": 0,
+      "todoTests": 0
+    }
+  },
+  "distinctGroups": 6,
+  "passedTests": 46,
+  "actualLinuxScannerJourneys": 4,
+  "windowsGuestDoubleJourneys": 4,
+  "typecheckPassed": true,
+  "originalPackageBudgetPassed": true,
+  "allChildAndTreeCleanupVerified": true,
+  "exactSharedOwnedRootRemoved": true,
+  "newInstalledVerifierChecks": 8,
+  "installedAcceptancePending": true,
+  "nativeWindowsCoverageCorrectionPending": true,
+  "cargoResolutionPerformed": false,
+  "archiveInspectionImplemented": false
+}

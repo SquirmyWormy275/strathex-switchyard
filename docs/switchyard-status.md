@@ -26,6 +26,28 @@ there is no merge or public release acceptance.
 
 ## Current evidence
 
+Complete Linux 39db1fe finishes **313/314 groups**: 1,910 passing tests,
+sixteen declared skips and one failed historical scheduling-budget assertion.
+Builds and the private-permission fixture now pass. Every child/tree retires;
+the exact checkout, nine aliases, 782 generated files, short temporary parent
+and marker are removed. This remains a failed complete run.
+[Failed receipt](evidence/linux-39db1fe-scheduling-failed-summary.json).
+
+The expanded native backend inventory now uses five independent jobs. All 207
+groups occur exactly once, preserving their original objects, child bounds,
+twenty-minute job limits and 950-second estimated-workload ceiling. Historical
+placement estimates about 799 seconds per batch; no measurements were lowered.
+Three groups/35 checks and typecheck pass. Native acceptance remains pending.
+[Scheduling evidence](evidence/windows-five-shards-source-summary.json).
+
+Cargo host admission now requires its unresolved dependency, license and source
+coverage gaps. A regression proves the previous host admitted their omission;
+six focused groups/46 checks now pass, including four actual Linux artifact
+journeys, four Windows guest doubles, wheel/package regression and five verifier
+flag guards. A new repeatable installed Cargo verifier has eight in-memory checks;
+installed acceptance is pending. No Cargo resolution or archive inspection is
+added. [Source evidence](evidence/cargo-inventory-verifier-source-summary.json).
+
 Normal installed 7dbb0b8 passes **46 metadata/synthetic checks**: thirteen
 task-owner, seven Copilot-journal, fourteen agent/helper/SDK and twelve Python
 inventory/archive checks. Fourteen exact installed module hashes, thirty RECORD

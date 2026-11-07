@@ -16,7 +16,8 @@ test("native measured workloads fit evenly inside the unchanged preliminary job 
   assert.equal(costs.sourceCommit, "9f35961ca18087b2406e7e2ad716b5fe97ebc2bb");
 });
 
-test("four Windows backend shards preserve every original file and exact manifest scenario once", () => {
+test("five Windows backend shards preserve every original file and exact manifest scenario once", () => {
+  assert.deepEqual(windowsBackendShards, [1, 2, 3, 4, 5]);
   const shards = windowsBackendShards.map(shard => selectWindowsBackendShard(shard)), all = shards.flat();
   assert.equal(new Set(all).size, all.length); assert.ok(shards.every(group => group.length > 0));
   const files = new Set(discoverRequiredTestFiles().filter(file => file.startsWith("tools/layout-studio/") || file.startsWith("deployment/suite/")
@@ -25,14 +26,14 @@ test("four Windows backend shards preserve every original file and exact manifes
   assert.equal(all.length, expected.length); assert.deepEqual(new Set(all), new Set(expected));
   assert.equal(all.filter(group => group.file === "deployment/suite/installation.test.mjs").length, 16);
   assert.equal(all.filter(group => group.file === "tools/layout-studio/coding-task-owners.test.mjs").length, 26);
-  for (const shard of [0, 5, 1.5, "1", undefined, null]) assert.throws(() => selectWindowsBackendShard(shard));
+  for (const shard of [0, 6, 1.5, "1", undefined, null]) assert.throws(() => selectWindowsBackendShard(shard));
   for (const groups of [requiredGroups.filter(group => group.file !== "tools/layout-studio/state-lock.test.mjs"), [...requiredGroups, expected[0]], requiredGroups.map(group => group === expected[0] ? { ...group, pattern: ".*" } : group)]) assert.throws(() => selectWindowsBackendShard(1, groups));
 });
 
 test("Windows CI requires every isolated backend shard and uses the pinned Python executable without PATH expansion", async () => {
   const workflow = await readFile(new URL("../.github/workflows/b122-windows.yml", import.meta.url), "utf8");
   const backend = workflow.slice(workflow.indexOf("  verify-backend:"), workflow.indexOf("  verify-windows-release:"));
-  assert.match(backend, /shard: \[1, 2, 3, 4\]/); assert.match(backend, /fail-fast: false/); assert.match(backend, /timeout-minutes: 20/);
+  assert.match(backend, /shard: \[1, 2, 3, 4, 5\]/); assert.match(backend, /fail-fast: false/); assert.match(backend, /timeout-minutes: 20/);
   assert.match(backend, /windows-backend-shards\.mjs --synthetic --shard=\$\{\{ matrix\.shard \}\}/);
   assert.match(backend, /if: always\(\)/); assert.match(backend, /switchyard-backend-\$\{\{ matrix\.shard \}\}/);
   assert.match(workflow, /needs: \[build-state-helper, verify-backend\]/); assert.match(workflow, /needs\.verify-backend\.result/);
