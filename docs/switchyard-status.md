@@ -68,6 +68,8 @@ other worktrees remain.
 
 ## Current Claude Code compatibility
 
+The task adapter now shares the designer's **exact reviewed-version list**. A retained regression showed the old range incorrectly advertised task controls for unreviewed 2.1.309. The correction passes six original groups/94 tests with zero skips, rejecting unknown versions before account inspection, task reservation or launch commands. Installed adoption is pending this checkpoint. [Regression and correction](evidence/claude-version-admission-summary.json).
+
 The pilot CLI is now **2.1.319**. The designer's prior exact-version guard refused
 it before reading the account; that refusal is preserved. Source now admits this
 exact revision alongside 2.1.308/2.1.317. Six groups/93 tests pass with zero skips,

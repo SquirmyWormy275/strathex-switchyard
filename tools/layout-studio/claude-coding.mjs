@@ -1,7 +1,7 @@
 /** Actual Claude Code CLI inventory and owned background sessions; no title matching. */
 import { appendAgentObservation } from "./agent-observation.mjs";
 import { randomUUID } from "node:crypto";
-import { claudeAccount } from "./claude-account.mjs";
+import { claudeAccount, reviewedClaudeVersions } from "./claude-account.mjs";
 export { claudeAccount } from "./claude-account.mjs";
 import { lstat, realpath } from "node:fs/promises";
 import { isAbsolute, join } from "node:path";
@@ -19,7 +19,7 @@ const uuid = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/;
 const shortId = /^[a-f0-9]{8}$/;
 const bounded = (v, max) => typeof v === "string" && v.trim().length > 0 && v.length <= max && !/[\0\r\n]/.test(v);
 const adapter = { id: "switchyard.claude-code-cli", version: 1, platforms: ["linux", "win32"], testedApplicationVersion: "2.1.308", detection: "native CLI auth status and agents --json", accountScope: "fingerprint of local first-party login and provider-reported org ID; organization policy unverified" };
-function supportedVersion(value) { const version = value.trim(); if (!/^2\.1\.(?:30[8-9]|3[1-9]\d|[4-9]\d\d|\d{4,}) \(Claude Code\)$/.test(version)) throw new Error("This native CLI version has not established the required agent inventory contract."); return version; }
+function supportedVersion(value) { const version = value.trim(); if (!reviewedClaudeVersions.some(reviewed => version === `${reviewed} (Claude Code)`)) throw new Error("This native CLI version has not established the required agent inventory contract."); return version; }
 export function claudeInventory(value, root) {
   if (!Array.isArray(value) || value.length > 256) throw new Error("Claude inventory exceeds its supported contract.");
   const rows = value.filter((v) => v?.cwd === root).map((v) => {

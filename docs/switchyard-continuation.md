@@ -40,6 +40,8 @@ instructions. Do not merge or release.
 
 ## Current Claude version work
 
+The later task-adapter admission fix now uses that same exact list instead of a broad version range. Preserve the original failing 2.1.309 discovery regression and the corrected six-group/94-test receipt. Source and typecheck pass; the normal installed update and its new pure refusal check are next. No live task operation is authorized by this correction. [Evidence](evidence/claude-version-admission-summary.json).
+
 The installed native CLI has updated to 2.1.319. Its original exact designer
 version refusal is retained. The source now admits exactly 2.1.308, 2.1.317 and
 2.1.319; unknown versions and changes across approval/response still refuse.

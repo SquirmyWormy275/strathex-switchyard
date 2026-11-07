@@ -14,10 +14,10 @@ async function fixture(fn) {
   const store = createSuiteStore({ root: stateRoot, secrets: { get: async (c, p) => keys.get(`${c}:${p}`), set: async (c, p, v) => { keys.set(`${c}:${p}`, v); } } });
   await store.initialize("personal"); await store.initialize("other"); await store.initialize("company", "work");
   for (const c of ["personal", "other"]) await store.update(c, "mode-select", (s) => { s.mode = "personal-companion"; });
-  let login = { loggedIn: true, authMethod: "claude.ai", apiProvider: "firstParty", email: "synthetic@example.invalid", orgId: "synthetic-org" }, clock = Date.now(), count = 0, failInventory = false, omitIdentity = false, failStop = false, failTrust = false, beforeFocus = () => {}, focusEffects = 0;
+  let nativeVersion = "2.1.308", login = { loggedIn: true, authMethod: "claude.ai", apiProvider: "firstParty", email: "synthetic@example.invalid", orgId: "synthetic-org" }, clock = Date.now(), count = 0, failInventory = false, omitIdentity = false, failStop = false, failTrust = false, beforeFocus = () => {}, focusEffects = 0;
   const run = async (_, args, options) => {
     calls.push([...args]);
-    if (args[0] === "--version") return "2.1.308 (Claude Code)\n";
+    if (args[0] === "--version") return nativeVersion + " (Claude Code)\n";
     if (args[0] === "auth") return JSON.stringify(login);
     if (args[0] === "agents") { if (failInventory) { failInventory = false; throw new Error("Synthetic inventory interruption"); } return JSON.stringify(rows); }
     if (args[0] === "--background") { if (failTrust) throw Object.assign(new Error("Synthetic native workspace trust rejection"), { code: "CLAUDE_WORKSPACE_TRUST_REQUIRED", noEffectVerified: true }); const id = (++count).toString(16).padStart(8, "0"), row = { id, cwd: options.cwd, kind: "background", state: "blocked", startedAt: clock, pid: 12345 + count, status: "idle", sessionId: randomUUID(), name: "private provider name never imported" }; rows.push(row); return omitIdentity ? "Synthetic unexpected CLI output" : `backgrounded · ${id} · switchyard\n`; }
@@ -27,7 +27,7 @@ async function fixture(fn) {
   const windows = { focus: async ({ verifySession }) => { await beforeFocus(); await verifySession(); focusEffects++; await verifySession(); return { effect: "exact-interactive-session-focused", windowFocusVerified: true, taskResumptionVerified: false, modelPromptSubmitted: false }; } };
   const options = { store, run, windows, platform: "linux", resolveCli: async () => "/synthetic/native/claude", now: () => clock }, service = createClaudeCoding(options);
   const input = () => ({ requestId: randomUUID(), repositoryRoot, label: "Local label never sent to provider" });
-  try { await fn({ root, repositoryRoot, stateRoot, rows, store, service, options, calls, input, changeAccount: () => { login = { ...login, email: "changed@example.invalid" }; }, failInventory: () => { failInventory = true; }, omitIdentity: () => { omitIdentity = true; }, failStop: () => { failStop = true; }, rejectTrust: () => { failTrust = true; }, advance: (n) => { clock += n; }, beforeFocus: (fn) => { beforeFocus = fn; }, focusEffects: () => focusEffects }); }
+  try { await fn({ root, repositoryRoot, stateRoot, rows, store, service, options, calls, input, setVersion: value => { nativeVersion = value; }, changeAccount: () => { login = { ...login, email: "changed@example.invalid" }; }, failInventory: () => { failInventory = true; }, omitIdentity: () => { omitIdentity = true; }, failStop: () => { failStop = true; }, rejectTrust: () => { failTrust = true; }, advance: (n) => { clock += n; }, beforeFocus: (fn) => { beforeFocus = fn; }, focusEffects: () => focusEffects }); }
   finally { await service.close(); await rm(root, { recursive: true, force: true }); }
 }
 
@@ -239,4 +239,23 @@ test("revoked policy at native guardian readiness prevents the Claude target fro
   const settings = { beforeReady: async () => { await store.update("personal", "mode-select", (s) => { s.mode = "keyboard-only"; }); } }, { service, calls } = supervised(options, settings);
   try { const result = await service.discovery("personal"); assert.equal(result.available, false); assert.match(result.reason, /Keyboard-only/); assert.equal(calls.length, 1); assert.equal(nativeCalls.length, 0); }
   finally { await service.close(); }
+}));
+
+
+test("unreviewed Claude versions cannot advertise task controls or reserve and create native tasks", () => fixture(async ({ service, store, calls, input, setVersion }) => {
+  for (const version of ["2.1.309", "2.1.318", "2.1.320", "2.1.9999", "2.1.319-preview"]) {
+    setVersion(version);
+    const before = calls.length, discovery = await service.discovery("personal");
+    assert.equal(discovery.available, false);
+    assert.match(discovery.reason, /native CLI version/);
+    await assert.rejects(service.create("personal", input()), /native CLI version/);
+    await assert.rejects(service.createText("personal", input()), /native CLI version/);
+    assert.ok(calls.slice(before).every(args => args.length === 1 && args[0] === "--version"));
+    assert.equal((await store.snapshot("personal")).codingSessions?.length ?? 0, 0);
+  }
+  for (const version of ["2.1.308", "2.1.317", "2.1.319"]) {
+    setVersion(version);
+    assert.equal((await service.discovery("personal")).available, true);
+  }
+  assert.equal(calls.some(args => args[0] === "--background" || args[0] === "attach" || args.includes("-p")), false);
 }));
