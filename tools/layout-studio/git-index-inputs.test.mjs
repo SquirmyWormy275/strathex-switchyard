@@ -1,7 +1,13 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { gitIndexLimits, gitIndexPaths, selectGitIndexEntries, gitIndexBatchInput, witnessGitIndexBatch, gitIndexWitnessReport } from "./git-index-inputs.mjs";
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
+import { mkdtemp, mkdir, writeFile, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join, dirname } from "node:path";
+import { fixedGitExecutable } from "./repository-inspection.mjs";
+import { gitIndexLimits, gitIndexPaths, selectGitIndexEntries, gitIndexBatchInput, gitIndexTreeFromEntries, witnessGitIndexBatch, gitIndexWitnessReport } from "./git-index-inputs.mjs";
 const sha = bytes => createHash("sha256").update(bytes).digest("hex");
 function blob(path, text, algorithm = "sha1", mode = "100644") {
   const bytes = Buffer.from(text), objectId = createHash(algorithm).update(`blob ${bytes.length}\0`).update(bytes).digest("hex");
@@ -37,4 +43,24 @@ test("private borrowed index bytes are zeroed when a consumer fails", async () =
   const a = blob("app.mjs", "SYNTHETIC_PRIVATE_SOURCE"); let held;
   await assert.rejects(witnessGitIndexBatch(a.output, [a.entry], (_row, bytes) => { held = bytes; throw Error("synthetic consumer failure"); }), /consumer failure/);
   assert.ok(held.every(n => n === 0));
+});
+test("complete index trees match real Git SHA-1 and SHA-256 object framing and directory byte order", async t => {
+  const root = await mkdtemp(join(tmpdir(), "switchyard-index-tree-")); t.after(() => rm(root, { recursive: true, force: true }));
+  const git = await fixedGitExecutable(), execute = promisify(execFile);
+  for (const format of ["sha1", "sha256"]) {
+    const cwd = join(root, format); await mkdir(cwd);
+    const run = async (...args) => (await execute(git, args, { cwd, timeout: 10000, env: { ...process.env, GIT_CONFIG_NOSYSTEM: "1", GIT_CONFIG_GLOBAL: process.platform === "win32" ? "NUL" : "/dev/null", GIT_TERMINAL_PROMPT: "0" } })).stdout;
+    await run("init", "--object-format=" + format);
+    const paths = ["foo.bar", "foo/child", "foo0", "foo/sub/empty", "Zebra", "ábacus", "é/child", "Ω", "executable"];
+    for (const path of paths) { await mkdir(dirname(join(cwd, path)), { recursive: true }); await writeFile(join(cwd, path), path.endsWith("empty") ? "" : "exact " + path + "\n"); }
+    await run("add", "--all"); await run("update-index", "--chmod=+x", "executable");
+    const entries = selectGitIndexEntries(await run("ls-files", "--stage", "-z"), paths, format === "sha1" ? 40 : 64), expected = (await run("write-tree")).trim();
+    assert.equal(gitIndexTreeFromEntries(entries), expected); assert.equal(gitIndexTreeFromEntries([...entries].reverse()), expected);
+    assert.equal(entries.find(row => row.path === "executable").mode, "100755");
+  }
+});
+test("complete index trees refuse file-directory collisions, directory aliases and malformed identities", () => {
+  const entry = path => ({ path, mode: "100644", objectId: "a".repeat(40) });
+  for (const paths of [["a", "a/b"], ["a/b", "a"], ["A/one", "a/two"], ["a/one", "a/ONE"], ["bad\ud800"]]) assert.throws(() => gitIndexTreeFromEntries(paths.map(entry)));
+  for (const entries of [[], Array.from({ length: 65 }, (_, i) => entry("f" + i)), [{ ...entry("a"), mode: "120000" }], [{ ...entry("a"), extra: true }], [{ ...entry("a"), objectId: "0".repeat(40) }], [entry("a"), { ...entry("b"), objectId: "b".repeat(64) }]]) assert.throws(() => gitIndexTreeFromEntries(entries));
 });

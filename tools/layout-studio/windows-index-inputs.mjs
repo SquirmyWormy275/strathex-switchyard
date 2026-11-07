@@ -1,9 +1,9 @@
 /** Private bounded stdin packet; never persist or return its encoded source bytes. */
 import { createHash } from "node:crypto";
 import { validateRepositoryInputs } from "../../apps/windows-companion/src/repository-inputs.ts";
-import { gitIndexPaths, gitIndexLimits } from "./git-index-inputs.mjs";
+import { gitIndexPaths, gitIndexLimits, gitIndexWindowsRawLimit } from "./git-index-inputs.mjs";
 import { shieldActions, shieldIndexPrefix } from "./shield-scanner-engine.mjs";
-export const windowsIndexRawLimit = 320 * 1024;
+export const windowsIndexRawLimit = gitIndexWindowsRawLimit;
 export const windowsIndexRequestLimit = 512 * 1024;
 const sha = bytes => createHash("sha256").update(bytes).digest("hex");
 const exact = (value, fields) => value && typeof value === "object" && !Array.isArray(value) && Object.keys(value).sort().join() === fields.slice().sort().join();

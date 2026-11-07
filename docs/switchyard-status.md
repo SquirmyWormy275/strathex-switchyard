@@ -38,6 +38,12 @@ the exact 531-file, 5,191,760-byte prepared bundle was removed.
 
 ## Recent backend changes
 
+- **Staged-input preparation:** the authenticated review can derive all supported
+  staged descriptors and bind their exact Git tree before confirmation. Thirty-three
+  focused groups pass 129 tests with verified cleanup. Recipe/feed assembly,
+  frontend controls and native Windows acceptance remain separate.
+  [Contract](scanner-input-inventory.md#include-staged-versions-in-the-review),
+  [evidence](evidence/scanner-index-review-source-summary.json).
 - **Archive license declarations:** npm lockfile and archive obligations remain
   independent. Cargo requires matching bytes and identity; Python wheels also
   require verified RECORD hashes. Unsupported declarations and unselected OR

@@ -40,6 +40,17 @@ instructions. Do not merge or release.
 
 ## Current installed and source checkpoint
 
+Automatic staged-input preparation now derives every supported tracked index
+blob from the bound task, reconstructs its exact Git tree and rechecks the target
+before confirmation. The authenticated API preserves separate authority and
+execution reviews. Thirty-three focused groups pass 129 tests, including actual
+Linux staged-only detection and a Windows guest double; typecheck, original
+bounds and child/tree cleanup verify. Owned test staging is removed. Automatic
+recipe/feed assembly, frontend activation and native Windows acceptance remain
+separate unfinished work or unaccepted checks.
+[Contract](scanner-input-inventory.md#include-staged-versions-in-the-review),
+[source evidence](evidence/scanner-index-review-source-summary.json).
+
 Native Windows client contracts now pass all **seven groups and 94 tests** at
 `4f56477`, with no skips. Exact source/merge tree, artifact digest, original
 commands/deadlines and every child/tree cleanup verify. This closes the earlier

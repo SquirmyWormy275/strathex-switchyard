@@ -30,10 +30,41 @@ cannot authorize commits, general commands or arbitrary ignored-tree exclusions.
 
 The existing feature-branch, native-task and Personal companion requirements
 remain. At most 256 selected files and 32 named generated roots fit this path;
-no files are silently truncated. Generated contents, staged/history versions and
+no files are silently truncated. Generated contents, unselected staged/history versions and
 broader security coverage remain unverified. A complete target snapshot means
 the displayed scope is witnessed, not that the repository passed a security scan.
 Frontend controls remain pending.
+
+## Include staged versions in the review
+
+Add `"includeIndex": true` to the same request to prepare the complete supported
+index alongside the current-file scope. Omitted or `false` keeps the existing
+current-file behavior. The response uses `bounded-current-and-index/v1` and adds
+`preparation.indexInputs`, `indexTree` and `indexMetadataSha256`. Each input has the
+exact reserved path, SHA-256, byte length and Git source descriptor required by
+the [staged scanner contract](staged-shield-inputs.md). No source bytes are returned.
+`fileCount` counts current paths; `indexInputs.length` counts their staged copies.
+
+Preparation derives every tracked path from the captured repository, witnesses
+its raw staged blob, reconstructs the complete Git tree and compares it to the
+reviewed snapshot. It then captures the target again. An index temporarily
+changed during witnessing cannot match merely because it returns to its original
+state afterward. HEAD, worktree, task, account and selected-workspace drift also
+refuse confirmation. Both SHA-1 and SHA-256 repositories use Git's exact object
+framing and bytewise directory ordering; ambiguous portable names are refused.
+
+This path accepts 1–64 regular tracked files, at most 256 KiB per staged blob,
+448 KiB combined staged content, and at most 256 current-plus-staged inputs.
+Windows retains its smaller 320 KiB native transport limit. Existing UTF-8,
+metadata, output and deadline bounds remain. Oversized selections are refused
+whole; links, submodules and unknown ignored classifications remain unsupported.
+
+The returned descriptors can populate a separately reviewed Shield request and
+recipe allowlist. Preparation neither writes those files nor grants authority
+nor starts a scanner. Authority owns the original source paths; reserved aliases
+exist only inside disposable staging. Execution independently re-witnesses the
+bytes. Automatic recipe/feed assembly, broader history and frontend controls
+remain unfinished; this preparation does not establish complete security coverage.
 
 ## Preview names before choosing a scope
 
@@ -112,7 +143,8 @@ above now assembles supported bounded selections. General complete-target scan a
 operator-configured general exclusions,
 history scanning and the frontend remain unfinished implementation. A separate
 [explicit Linux staged-input scan](staged-shield-inputs.md) now preserves both
-index and worktree origin; automatic assembly remains unfinished. Windows staging now has contract checks;
+index and worktree origin; bounded staged descriptors can now be prepared above.
+Automatic complete recipe assembly remains unfinished. Windows staging now has contract checks;
 actual NTFS/guest acceptance remains separate.
 See [explicit ignored scanner inputs](ignored-scanner-inputs.md) for the distinct
 reviewed read-only scan path.
@@ -142,3 +174,24 @@ Installed `49a5053` now verifies the exact tested modules and SDK preflight
 within 34 metadata/synthetic checks, preserving all 54 workspaces and frozen
 frontend bytes. This installed verification starts no live task, scanner or
 enrolled agent. [Installed evidence](evidence/installed-scanner-sdk-summary.json).
+
+### Staged preparation verification
+
+Thirty-three groups pass 129 tests, with original commands, deadlines, skips and
+child/tree cleanup verified. Independent real Git repositories establish SHA-1
+and SHA-256 tree framing, nested directory ordering, empty and executable blobs.
+The authenticated HTTP journey returns no source text and preserves the original
+index. Changed index, HEAD, worktree, account and workspace selection refuse
+confirmation, including an index mismatch between two unchanged snapshots.
+Separate Linux execution detects a staged-only secret; the Windows guest double
+retains the same reviewed origin and incomplete result. Both preserve the
+original worktree/index/HEAD and verify owned process/staging retirement.
+
+The missing-feature red receipt and an intermediate fixture failure are retained:
+the fixture originally captured index bytes before its own reference `write-tree`
+command refreshed Git's tree cache. Capturing the baseline after that reference
+command corrected the assertion; the API still preserves exact index bytes.
+Typecheck, installation recovery and the original 5 MiB package limit pass.
+Owned temporary test staging is removed. Live installed scanning, actual Windows
+guest behavior and frontend controls are not accepted by these source tests.
+[Evidence](evidence/scanner-index-review-source-summary.json).

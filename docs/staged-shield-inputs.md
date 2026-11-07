@@ -5,6 +5,11 @@ working versions of the same files. A secret staged before the working file was
 cleaned remains detectable. Each report records which input came from the index;
 findings contain rule IDs and fingerprints, never matched values or source text.
 
+The task-bound [automatic review](scanner-input-inventory.md#include-staged-versions-in-the-review)
+can now derive the complete supported index descriptor set with `includeIndex: true`.
+It binds that set to the reviewed Git tree before issuing confirmation. Scanner
+request/recipe assembly and execution remain separately reviewed steps.
+
 The scanner request declares the original source and one reserved path inside
 the disposable input copy:
 
@@ -54,8 +59,9 @@ repository index require new authority rather than redirecting a previous grant.
 
 The index-reader subset remains bounded to 64 paths, 256 KiB per blob and 448 KiB
 combined valid UTF-8 content. Its metadata/output/deadline limits also apply.
-This is explicit input assembly, not automatic coverage of every change or
-relevant history. Unsupported data is refused, and clean results still remain
+Automatic preparation covers the supported bounded index when explicitly selected;
+it does not assemble a complete scan recipe or select relevant history.
+Unsupported data is refused, and clean results still remain
 incomplete. No passing Release Shield gate is introduced.
 
 The [Windows reviewed staged-input path](windows-index-staging.md) is now

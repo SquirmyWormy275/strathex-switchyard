@@ -6,7 +6,7 @@ import { verifyRepositoryIdentity } from "./coding-task-identity.mjs";
 import { createRepositoryInspection } from "./repository-inspection.mjs";
 import { connectedExecutionActions, linuxShieldActions } from "./repository-execution-actions.mjs";
 import { ignoredTreeRoots } from "./ignored-tree-policy.mjs";
-import { gitIndexPaths } from "./git-index-inputs.mjs";
+import { gitIndexPaths, gitIndexTreeFromEntries, gitIndexWindowsRawLimit } from "./git-index-inputs.mjs";
 import { historySelection } from "./git-history-inputs.mjs";
 const uuid = v => typeof v === "string" && /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/.test(v);
 const taskDigest = t => scopeHash([t.id, t.provider, t.sessionId, t.repositoryRoot, t.repositoryIdentity, t.accountFingerprint, t.status, t.nativeTransport, t.nativeIdentityVerified, t.launchPolicy]);
@@ -117,7 +117,7 @@ export function createTaskAuthority({ store, checkNative, isActive = async () =>
   }
   return {
     async reviewScanner(c, input) { return exclusive(c, async generation => {
-      if (!input || Object.keys(input).some(key => !["taskId", "compartment", "action", "planRevision", "lifetimeMinutes"].includes(key)) || input.compartment !== undefined && input.compartment !== c || !linuxShieldActions.includes(input.action)) throw Error("Prepare only one connected Shield action for one exact task; custom paths, exclusions and imported approvals require their separate review.");
+      if (!input || Object.keys(input).some(key => !["taskId", "compartment", "action", "planRevision", "lifetimeMinutes", "includeIndex"].includes(key)) || input.compartment !== undefined && input.compartment !== c || Object.hasOwn(input, "includeIndex") && typeof input.includeIndex !== "boolean" || !linuxShieldActions.includes(input.action)) throw Error("Prepare only one connected Shield action for one exact task; includeIndex must be a boolean, and custom paths, exclusions and imported approvals require their separate review.");
       // Validate action/revision/lifetime before any native query; real paths
       // replace this validation-only placeholder after the bounded inventory.
       const base = proposal({ ...input, paths: ["placeholder"], actions: [input.action] }, executionActions);
@@ -131,7 +131,27 @@ export function createTaskAuthority({ store, checkNative, isActive = async () =>
       const result = await capture(c, proposed, generation);
       const capturedPaths = [...result.files.tracked, ...result.files.untracked, ...result.files.ignored.filter(file => file.classification === "included")].map(file => file.path).sort();
       if (result.snapshot.head !== inventory.report.head || result.binding !== inventory.binding || result.workspace !== inventory.workspace || JSON.stringify(capturedPaths) !== JSON.stringify(proposed.paths) || result.files.tracked.some(file => file.state === "tracked_missing")) throw Error("The complete proposed scanner file set, revision or task scope changed or has missing files. Review again.");
-      return { ...await reviewCaptured(c, result, generation), preparation: { policy: "bounded-current-files/v1", inventoryDigest: inventory.report.metadataDigest, fileCount: proposed.paths.length, excludedTreeCount: proposed.classifications.excludedIgnoredTrees?.length ?? 0, scanPerformed: false, authorityGranted: false, securityCoverageComplete: false } };
+      const preparation = { policy: "bounded-current-files/v1", inventoryDigest: inventory.report.metadataDigest, fileCount: proposed.paths.length, excludedTreeCount: proposed.classifications.excludedIgnoredTrees?.length ?? 0, scanPerformed: false, authorityGranted: false, securityCoverageComplete: false };
+      if (input.includeIndex === true) {
+        const selected = gitIndexPaths(result.files.tracked.map(file => file.path));
+        if (proposed.paths.length + selected.length > 256) throw Error("The combined current and staged scanner inputs exceed the 256-file bound.");
+        if (typeof inspection.indexInputs !== "function") throw Error("The native index input verifier is unavailable.");
+        const authorize = async () => {
+          const fresh = await access(c, result.task.id, generation, result.task.provider);
+          if (taskDigest(fresh.task) !== result.binding || workspaceDigest(fresh.state) !== result.workspace) throw Error("The exact task, account or workspace changed during automatic index preparation.");
+        };
+        await checkNative(c, result.task); await authorize();
+        const witnessed = await inspection.indexInputs(c, result.task, selected, authorize);
+        await authorize(); await checkNative(c, result.task); await authorize();
+        const entries = witnessed.rows.map(({ path, mode, objectId }) => ({ path, mode, objectId }));
+        if (JSON.stringify(gitIndexPaths(entries.map(row => row.path))) !== JSON.stringify(selected) || witnessed.head !== result.snapshot.head || gitIndexTreeFromEntries(entries) !== result.snapshot.indexTree) throw Error("The witnessed index tree does not match the complete reviewed index tree. Review again.");
+        if (process.platform === "win32" && witnessed.rows.reduce((sum, row) => sum + row.size, 0) > gitIndexWindowsRawLimit) throw Error("The staged scanner inputs exceed the Windows 320 KiB transport subset.");
+        const refreshed = await capture(c, proposed, generation);
+        if (refreshed.snapshot.id !== result.snapshot.id || refreshed.binding !== result.binding || refreshed.workspace !== result.workspace) throw Error("The scanner target changed after index witnessing. Review again.");
+        Object.assign(preparation, { policy: "bounded-current-and-index/v1", indexTree: result.snapshot.indexTree, indexMetadataSha256: witnessed.indexMetadataSha256,
+          indexInputs: witnessed.rows.map(row => ({ path: ".switchyard-index/" + row.path, sha256: row.sha256, size: row.size, source: { kind: "git-index", path: row.path, objectId: row.objectId, mode: row.mode } })) });
+      }
+      return { ...await reviewCaptured(c, result, generation), preparation };
     }); },
     async historyInputs(c,input){return exclusive(c,async generation=>{
       if(!input||Object.keys(input).some(key=>!["taskId","compartment","paths","depth"].includes(key))||!uuid(input.taskId)||input.compartment!==undefined&&input.compartment!==c)throw Error("Witness only named bounded history inputs for one bound task; arbitrary commits, refs, commands and policies are refused.");
