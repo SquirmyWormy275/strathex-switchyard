@@ -54,4 +54,10 @@ groups pass 28 tests, including eight actual Linux wheel journeys and eight
 Windows guest doubles. Original commands, deadlines, skip inventory, package
 bounds and every child/tree cleanup verify; the empty test parent is removed.
 Type checking passes. [Source evidence](evidence/pypi-wheel-license-source-summary.json).
-Installed metadata acceptance remains pending.
+Installed `9ca9f84` passes 76 metadata/in-memory checks and 22 exact module
+hashes, including all 17 header cases and eight wheel-license reports. All 54
+semantic workspaces, selection, pending keyboard-only conversation and frozen
+frontend remain preserved. Dated backup and launcher readback verify; only current
+plus one rollback remain. The exact 531-file, 5,191,760-byte prepared bundle is
+removed. No live scanner, provider, account, model or hardware action occurs.
+[Installed evidence](evidence/installed-pypi-wheel-license-summary.json).

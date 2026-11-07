@@ -27,9 +27,9 @@ requests with missing, malformed or valid UUIDs, including attempts to name a
 Personal compartment. All final effect-boundary checks remain. Twenty-eight
 focused groups pass 165 tests with one declared Linux skip; typecheck, original
 bounds and child/tree cleanup verify. The later native Windows client checkpoint
-passes; interactive focus remains unaccepted. Installed `94a0135` passes 74 metadata/in-memory checks and verifies
+passes; interactive focus remains unaccepted. Installed `9ca9f84` passes 76 metadata/in-memory checks and verifies
 22 module hashes while preserving all 54 semantic workspaces and the frozen
-frontend. [Installed evidence](evidence/installed-windows-focus-policy-summary.json).
+frontend. [Installed evidence](evidence/installed-pypi-wheel-license-summary.json).
 [Native failure](evidence/windows-client-02cc6ba-failed-summary.json),
 [correction evidence](evidence/windows-focus-policy-source-summary.json).
 
@@ -53,8 +53,11 @@ export no paths. Twenty focused groups cover 167 distinct passing tests, with
 six affected groups/28 passes repeated after a reproduced reserved-budget bug
 was fixed. Eight actual Linux wheel journeys and eight Windows guest doubles
 pass again with original bounds and verified cleanup. Typecheck and package
-limits pass; staging is removed. Installed and actual Windows acceptance remain
-separate. [Contract](python-wheel-license-declarations.md),
+limits pass; staging is removed. Installed `9ca9f84` passes 76 metadata/in-memory
+checks and 22 exact module hashes, including all 17 header cases and eight
+wheel-license reports. All 54 semantic workspaces and frozen frontend are preserved.
+Actual Windows acceptance remains separate. [Installed evidence](evidence/installed-pypi-wheel-license-summary.json).
+[Contract](python-wheel-license-declarations.md),
 [source evidence](evidence/pypi-wheel-license-source-summary.json).
 
 Selected npm archives now retain their own bounded license declaration, assessed
@@ -63,9 +66,9 @@ remain independent; disallowed obligations fail and unresolved coverage remains
 explicit. Sixteen focused groups pass 146 tests, including eight actual Linux
 npm archive journeys and eight Windows guest doubles. Typecheck, original bounds,
 commands, skips and child/tree cleanup verify; owned staging is removed.
-Installed `94a0135` passes 74 metadata/in-memory checks with all 54 semantic
+Installed `9ca9f84` passes 76 metadata/in-memory checks with all 54 semantic
 workspaces and the frozen frontend preserved. Actual Windows execution remains
-separate. [Installed evidence](evidence/installed-windows-focus-policy-summary.json).
+separate. [Installed evidence](evidence/installed-pypi-wheel-license-summary.json).
 [Contract](npm-archive-license-declarations.md),
 [source evidence](evidence/npm-archive-license-source-summary.json).
 
@@ -105,7 +108,7 @@ failure occurred before any test and is retained in the record.
 | --- | --- | --- |
 | Complete Linux `97ef7d6` | **322 groups, 1,965 passing tests, sixteen declared skips**; exact original inventory, commands, bounds and cleanup. [Receipt](evidence/linux-97ef7d6-complete-summary.json). | Later VS Code focus and Cargo archive changes have separate focused evidence. |
 | Complete Windows `dc755901` | **417 groups, 2,478 passing tests and 207 declared skips**; all six jobs and the overall workflow succeed, with exact packet/source/merge inventory, bounds and cleanup. [Receipt](evidence/windows-complete-dc755901-summary.json). | Predates wheel RECORD, five-job scheduling, Cargo archive and workflow/profile/observation corrections. Interactive Windows acceptance remains separate. |
-| Installed Linux `94a0135` | 74 metadata/in-memory checks and 22 exact module hashes, including 112 Cargo reference cases, eight Cargo archive/license reports and eight npm archive policy reports. All 54 semantic workspaces, selection, pending conversation and frozen frontend are preserved. [Receipt](evidence/installed-windows-focus-policy-summary.json). | No live scanner, provider task, agent command, account action, model request or hardware operation is performed. |
+| Installed Linux `9ca9f84` | 76 metadata/in-memory checks and 22 exact module hashes, including 112 Cargo reference cases, eight Cargo archive/license reports and eight npm archive policy reports. All 54 semantic workspaces, selection, pending conversation and frozen frontend are preserved. [Receipt](evidence/installed-pypi-wheel-license-summary.json). | No live scanner, provider task, agent command, account action, model request or hardware operation is performed. |
 | Complete Linux `39db1fe` | **Failed:** 313/314 groups, 1,910 passing tests, sixteen declared skips and one failed scheduling-budget assertion. Exact owned cleanup verifies. [Receipt](evidence/linux-39db1fe-scheduling-failed-summary.json). | A nearly passing run is not complete acceptance. |
 
 Complete Linux aafb476 passes **317 groups, 1,923 tests and sixteen declared
@@ -118,7 +121,7 @@ changes and predates Cargo archive identity and the workflow-ID correction.
 [Complete receipt](evidence/linux-aafb476-complete-summary.json).
 
 The installed update verifies a dated backup and launcher readback. It retains
-current plus one rollback and removes the exact 531-file, 5,186,958-byte prepared
+current plus one rollback and removes the exact 531-file, 5,191,760-byte prepared
 bundle. Fifty-three sealed workspace files are byte-identical; one changes only
 audit metadata. It preserves the repaired native ChatGPT main window, hidden
 overlay, saved artwork and workstation guard.
