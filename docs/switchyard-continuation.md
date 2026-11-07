@@ -40,83 +40,51 @@ instructions. Do not merge or release.
 
 ## Current backend state
 
-Published launcher checkpoint `961ecb3` composes a reviewed Windows Terminal,
-signed instance requests, protected Suite state, the retained provider connection
-and a real authenticated socket. The demonstration uses explicit native,
-Terminal and provider doubles. It reaches an exact synthetic task acknowledgement,
-refuses another launch and retires the original carrier without stopping the provider.
-[Source evidence](evidence/windows-editor-launch-source-summary.json).
+Published Codex checkpoint `9c3bccf` admits exact 0.166.0 and 0.167.0 revisions,
+requires 42 explicit feature exclusions and binds text review to the observed
+native version. Twelve groups pass 152 tests with two skips. The actual 0.167
+binary passes production argument construction and hello/config validators in an
+empty owned home with network isolation. Only initialize/initialized/config-read
+are sent; all original descendants and 66 generated files are retired. Both
+probe roots and markers are removed. No new dependencies were downloaded.
+[Version contract](codex-version-contract.md).
 
-Windows CI for that checkpoint passes 24 of 25 groups, with 223 passing tests
-in groups that completed their TAP summaries. The native endpoint fixture,
-private/shared ACL and link/path checks, Windows file identity checks and seven
-launcher contract cases pass. The complete lane fails in the new concurrent
-launcher/Suite demonstration, then reaches its original group timeout.
-[Retained failure](evidence/windows-editor-launch-native-failure-summary.json).
+The Windows journal/launcher correction at `5033c18` is now natively accepted:
+workflow `42366888084`, helper `128386804466`, client `128386993646` all succeed.
+All 25 groups pass 237 tests with no skips; original manifest, deadlines,
+permissions and child cleanup verify. This includes all nine composed lifecycle
+cases and the native endpoint/file checks. Terminal/provider doubles remain
+explicit. Earlier failed attempts remain linked in the accepted receipt.
+[Native client evidence](evidence/windows-editor-journal-accepted-summary.json).
 
-A controlled source regression reproduces an ownership-journal race: protected
-bytes can advance before the original in-memory row is published. A simultaneous
-observation incorrectly treats that interval as replacement. Reads now use the
-same original transaction lease as writes. Retirement and actual replacement
-still refuse access. The fixture also attempts every original cleanup after an
-assertion fails, while preserving cleanup errors. Corrected Windows acceptance
-must pass before calling the native failure repaired. Sixteen focused groups
-pass 133 tests with five declared platform skips.
-[Regression and correction](evidence/editor-journal-publication-summary.json).
-
-The latest fully accepted native client checkpoint is `485b7c6`: twenty groups,
-205 passing tests and no skips. Newer subset passes do not replace that
-whole-lane result. [Native client evidence](evidence/windows-editor-client-native-summary.json).
-
-The published `ecbb8cb` journal correction still fails four acknowledgement
-assertions in the same Windows lifecycle group. The full lane has 229 passes,
-four failures and no skips; fixture cleanup and natural exit now complete.
-The next correction replaces the additional read-side kernel lease with an
-original-handle publication queue. Writes retain every cross-process kernel
-lease; reads retain fresh protected-row/target checks. Eight focused groups pass
-69 tests with two skips, including held publication, replacement refusal and
-failed-write outcomes. Do not declare native repair until the next lane passes.
-[Failure](evidence/editor-journal-native-failure-summary.json),
-[correction](evidence/editor-journal-read-queue-summary.json).
-
-The `0594c8d` native follow-up passes the first eight lifecycle cases and fails
-only test nine, the reviewed launcher acknowledgement deadline. The complete
-lane has 234 passes, one failure and no skips; natural cleanup completes. The
-latest correction shares overlapping original-handle checks, separated by every
-queued mutation, and never caches a settled outcome. Eight focused groups pass
-71 tests with two skips. Native acceptance remains pending.
-[Failure](evidence/editor-journal-read-queue-native-failure-summary.json),
-[correction](evidence/editor-journal-shared-observation-summary.json).
+The journal serializes reads with durable publication, preserves all mutation
+kernel leases, and shares only overlapping unfinished checks with no intervening
+queued mutation. Settled results and failures are never cached. Retirement,
+foreign replacement and unknown committed outcomes still refuse admission.
 
 ## Outstanding verification and implementation
 
-1. Complete Linux `961ecb3` is accepted: 348 groups, 2,205 passing tests and
-   32 declared skips. Its receipt is audited and exact staging removed. Do not
-   restart that completed run or use it as acceptance of later journal changes.
-2. Publish the shared-observation correction and audit its Windows client lane.
-   Prior workflow `42365874853`, job `128383860203` is audited and still fails
-   the launcher deadline. Preserve the original
-   failure if another independent defect appears; do not change deadlines or
-   assertions to obtain a pass.
-3. Continue task-specific Windows IDE/project integration and remaining backend
-   work in the requirement ledger. Editor command activation and frontend
-   exposure remain frozen; completed backend components do not imply a completed
-   user journey.
-4. Codex source admission now covers exact 0.166.0 and 0.167.0 with 42 explicit
-   exclusions and version-bound text review. Twelve groups pass 152 tests and
-   two skips. The production argument builder and validators pass the actual
-   0.167 empty-home/network-isolated initialize/config-read probe. Its original
-   descendants, 66 generated files and marker are retired. Installed Switchyard
-   still uses the earlier source; native TUI/account/task/model acceptance remains
-   separate. [Version contract](codex-version-contract.md).
-5. Maintain current software-versus-external-check distinctions. No missing
-   hardware/account check can excuse an unimplemented module.
+1. Publish the accepted native Windows receipt and current documentation, then
+   audit the CI run for Codex source `9c3bccf`. A prior native pass does not accept
+   the later version contract automatically.
+2. Prepare the normal installed backend update. The installed metadata verifier
+   still compares agents.mjs/codex-turn.mjs against an earlier design receipt;
+   update those exact references to the tested Codex contract and add pure
+   installed version/config checks before updating. Preserve dated launcher
+   backups, all 54 semantic workspaces, selection and pending conversation,
+   frozen frontend, current plus one rollback. No browser reload or live task.
+3. Continue task-specific Windows IDE/project integration and the remaining
+   backend requirements. Command activation and frontend exposure remain frozen.
+4. Native Codex TUI/account/task/model acceptance remains separate. The version
+   contract's real native proof covers initialization/config-read only.
+5. Complete Linux `961ecb3` is audited and cleaned: 348 groups, 2,205 tests and
+   32 skips. Do not restart that completed run or delete its removed staging again.
 
-The restricted-storage follow-up at `3795217` passes eight ordinary owner
-checks, eight restricted owner checks, 68 exact QUERY-only descendant
-registrations, and original fixture/service removal. The relevant retirement
-implementation is unchanged from the failed `47c80be` run. Its intermittent
-cause therefore remains unresolved.
+Restricted-storage follow-up `3795217` passes eight ordinary owner checks,
+eight restricted owner checks, 68 QUERY-only descendant registrations and
+original fixture/service removal. Retirement code was unchanged from failed
+`47c80be`; the intermittent cause remains unresolved. No speculative guardian
+process-query change has been made.
 [Passing follow-up](evidence/restricted-storage-379-followup-summary.json),
 [original failure](evidence/restricted-storage-47c80be-failure-summary.json).
 

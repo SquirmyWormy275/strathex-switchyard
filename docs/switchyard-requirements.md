@@ -1,53 +1,24 @@
 # Switchyard authoritative requirement ledger
 
 The full suite remains unfinished. Use the [current status](switchyard-status.md)
-for accepted source revisions and the table below for implementation scope.
-The Windows reviewed launcher now completes the signed client → Suite → protected
-journal → real carrier demonstration with explicit native/Terminal/provider
-doubles. Ten focused groups pass 81 tests with four platform skips; both
-TypeScript configurations and all 36 native sources compile. The native endpoint
-fixture and Windows file checks now pass; activation and live account checks
-remain separate. [Launcher evidence](evidence/windows-editor-launch-source-summary.json).
+for accepted revisions and the table below for implementation scope.
 
-The latest wholly accepted native client checkpoint is `485b7c6`: twenty groups,
-205 tests, no skips. Two later PowerShell fixture setups failed before reaching
-the endpoint reader. Their cleanup/failures are retained; a fixed native fixture
-replacement passes with the original bounds and read policy. The newer whole
-client lane fails its concurrent launcher/Suite demonstration. A controlled
-regression reproduces a journal publication race; the correction passes sixteen
-focused groups with 133 tests and five platform skips. Corrected Windows
-acceptance and the separate restricted-storage retirement cause remain open.
-[Regression and correction](evidence/editor-journal-publication-summary.json),
-[Windows result](evidence/windows-editor-launch-native-failure-summary.json).
+Native Windows client `5033c18` passes all 25 groups, 237 tests and no skips,
+including the signed launcher demonstration and original cleanup. Native
+Terminal/provider doubles remain explicit; interactive acceptance is separate.
+[Native receipt](evidence/windows-editor-journal-accepted-summary.json).
+
+Complete Linux `961ecb3` passes 348 groups, 2,205 tests and 32 declared platform
+skips. Exact temporary staging is removed. This predates journal corrections and
+Codex 0.167 work. [Complete receipt](evidence/linux-961ecb3-complete-summary.json).
+
+Codex source `9c3bccf` admits exact 0.166.0/0.167.0 with 42 feature exclusions
+and version-bound text review. Twelve groups pass 152 tests with two skips;
+actual 0.167 production initialization/config-read passes in an empty
+network-isolated home. Installed Switchyard and live account/task/model/TUI
+acceptance remain separate. [Contract](codex-version-contract.md).
 
 ## Requirement status
-
-The Codex source adapter now admits exact 0.166.0 and 0.167.0 with 42 explicit
-feature exclusions and version-bound text review. Twelve focused groups pass
-152 tests with two skips; actual 0.167 initialization/config-read passes with
-the production builder and validators in an empty network-isolated home. No live
-account/task/model or TUI acceptance is inferred, and installed Switchyard is
-unchanged. [Version contract](codex-version-contract.md).
-
-Latest Windows `0594c8d`: 24 of 25 groups accepted, 234 tests passing and one
-launcher acknowledgement failure. The other eight composed lifecycle cases now
-pass. A controlled 20-observer case reproduces repeated target checks; the
-original-handle overlap correction passes eight groups, 71 tests and two skips,
-while preserving mutation ordering and fresh checks. Native acceptance remains
-pending. [Failure](evidence/editor-journal-read-queue-native-failure-summary.json),
-[correction](evidence/editor-journal-shared-observation-summary.json).
-
-Complete Linux source `961ecb3` passes 348 groups, 2,205 tests and 32 declared
-platform skips. Original manifest, commands, bounds, child retirement and exact
-temporary-checkout cleanup verify. This predates both journal corrections.
-[Complete receipt](evidence/linux-961ecb3-complete-summary.json).
-
-Latest follow-up: `ecbb8cb` passes 24 of 25 Windows client groups, with 229
-passing tests and four acknowledgement failures; original cleanup completes
-without a group timeout. The read/publication queue correction passes eight
-focused groups, 69 tests and two declared platform skips. Native validation is
-still pending. [Retained failure](evidence/editor-journal-native-failure-summary.json),
-[source correction](evidence/editor-journal-read-queue-summary.json).
 
 | Requirement | Implementation | Validation | Actual paths | UI entry | Tests | Remaining implementation / exact blocked validation |
 | --- | --- | --- | --- | --- | --- | --- |

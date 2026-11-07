@@ -21,6 +21,13 @@ resolve that Windows failure.
 [Retained failure](evidence/editor-journal-native-failure-summary.json),
 [source correction](evidence/editor-journal-read-queue-summary.json).
 
+Native Windows client `5033c18` now passes all 25 groups, 237 tests and no skips.
+Both helper and client jobs succeed, and source/merge tree, artifact digest,
+original manifest/commands/bounds and cleanup verify. All nine composed launcher
+lifecycle cases pass. The earlier failures above are historical; the independent
+restricted-storage retirement issue remains unresolved.
+[Accepted native receipt](evidence/windows-editor-journal-accepted-summary.json).
+
 ## Earlier checkpoint records
 
 Windows editor query helpers now expose their original guardian, helper digest,

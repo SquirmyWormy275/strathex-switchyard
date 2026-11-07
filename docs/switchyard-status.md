@@ -10,70 +10,40 @@ Start with the [README](../README.md) for the product and first run, the
 on [draft PR 20](https://github.com/SquirmyWormy275/strathex-switchyard/pull/20).
 No merge or public release has been accepted.
 
-The reviewed Windows launcher now completes a working demonstration through the
-signed client, protected Suite journal and real authenticated carrier to an exact
-synthetic task acknowledgement. Ten focused groups pass 81 tests with four
-Windows-only skips; both TypeScript configurations and all 36 native C# sources
-compile. [Evidence](evidence/windows-editor-launch-source-summary.json).
-Native reader/file/Terminal/provider doubles are explicit; command/frontend
-activation and live provider acceptance remain unfinished. Two native endpoint
-fixture setups timed out before reaching the reader; the
-[second retained failure](evidence/windows-editor-runtime-native-failure-summary.json)
-now has a fixed native setup replacement that passes Windows CI, with original
-bounds and permission checks preserved. The same run passes the Windows file
-checks and seven launcher contracts, but fails the concurrent launcher/Suite
-demonstration. A controlled source regression reproduces a journal publication
-race; reads now wait for the original protected transaction. Corrected native
-acceptance remains pending. Sixteen focused groups pass 133 tests with five
-platform skips. [Regression and correction](evidence/editor-journal-publication-summary.json).
-[Retained result](evidence/windows-editor-launch-native-failure-summary.json).
+The reviewed Windows launcher completes the signed-client, protected-journal and
+real-carrier demonstration with an exact synthetic task acknowledgement. Native
+Windows client checkpoint `5033c18` passes all 25 groups: **237 tests, no skips**.
+Original deadlines, permissions and cleanup remain intact. Native endpoint,
+file, process/Job and socket checks run separately from the explicit
+Terminal/provider doubles in the composed demonstration. Command/frontend
+activation and live TUI/account/task acceptance remain unfinished.
+[Accepted native client evidence](evidence/windows-editor-journal-accepted-summary.json).
 
-## Current evidence
-
-The next native checkpoint, `0594c8d`, passes the first eight lifecycle cases;
-only the reviewed launcher acknowledgement remains failed. The complete lane
-has 234 passing tests, one failure and no skips, with natural cleanup. The latest
-source correction shares only overlapping observations of the same original
-handle. A queued mutation separates batches, and settled successes or failures
-are never cached. Eight focused groups pass 71 tests with two platform skips;
-corrected native acceptance remains pending.
-[Latest failure](evidence/editor-journal-read-queue-native-failure-summary.json),
-[source correction](evidence/editor-journal-shared-observation-summary.json).
-
-The Codex source adapter now admits exact 0.166.0 and 0.167.0 revisions with 42
-explicit feature exclusions and version-bound text review. Twelve focused groups
-pass 152 tests with two skips. Production argument construction and validators
-pass against the actual 0.167 binary in an empty network-isolated home, using
-only initialize/initialized/config-read. The original tree exits and all 66
-generated files (3,053,593 bytes) are removed. Installed Switchyard, live account/
-task/model acceptance and native TUI handoff remain separate.
+Codex source checkpoint `9c3bccf` admits exact 0.166.0 and 0.167.0 revisions with
+42 explicit feature exclusions and version-bound text review. Twelve focused
+groups pass 152 tests with two skips. The actual 0.167 binary passes production
+argument construction and hello/config validators in an empty network-isolated
+home. No account, thread or model request is sent; its original tree and 66
+generated files are removed. Installed Switchyard remains on the earlier source.
 [Version contract and evidence](codex-version-contract.md).
 
-The journal correction at `ecbb8cb` still fails the complete Windows client lane:
-24 of 25 groups pass, with 229 passing tests and four failed acknowledgement
-assertions. The failed group now exits naturally with cleanup and a complete TAP
-summary. A follow-up preserves every mutation kernel lease while serializing
-reads and durable publication through the original handle's local queue; reads
-still check fresh protected state and the original target. Eight focused groups
-pass 69 tests with two platform skips. Corrected Windows acceptance remains
-pending; the native failure is not declared repaired.
-[Failure](evidence/editor-journal-native-failure-summary.json),
-[correction](evidence/editor-journal-read-queue-summary.json).
+## Current evidence
 
 Each result belongs to its exact source revision. Test totals from different
 checkpoints are not cumulative acceptance of the latest suite.
 
 | Checkpoint | Verified result | Limit |
 | --- | --- | --- |
-| Installed Linux `edb76de` | **76 metadata/in-memory checks; 42 exact module hashes.** All 54 semantic workspaces and frozen frontend preserved. [Receipt](evidence/installed-mixed-scanner-input-summary.json). | No live scanner, provider task, account/model request, native focus or hardware operation. |
-| Native Windows client `485b7c6` | **Twenty groups; 205 passing tests; no skips.** Windows TypeScript client, signed Suite routes, lifecycle and prior native cases pass. [Receipt](evidence/windows-editor-client-native-summary.json). | Endpoint reader and provider/terminal-peer doubles are explicit in the composed client case. Predates the native endpoint reader; restricted-storage failure remains unresolved. |
-| Complete Linux `961ecb3` | **348 groups; 2,205 passing tests; 32 declared platform skips.** Original inventory, commands, bounds and owned cleanup verified. [Receipt](evidence/linux-961ecb3-complete-summary.json). | Includes the reviewed Windows launcher source; predates the two journal corrections. |
-| Complete Windows `dc755901` | **417 groups; 2,478 passing tests; 207 declared skips.** All six jobs and overall workflow passed with verified packet/source/cleanup. [Receipt](evidence/windows-complete-dc755901-summary.json). | Predates newer archive, scheduling, profile/workflow and observation corrections. |
+| Installed Linux `edb76de` | **76 metadata/in-memory checks; 42 exact module hashes.** All 54 semantic workspaces and frozen frontend preserved. [Receipt](evidence/installed-mixed-scanner-input-summary.json). | Predates current editor and Codex version work. No live scanner, provider task, account/model request, native focus or hardware operation. |
+| Native Windows client `5033c18` | **25 groups; 237 tests; no skips.** Original manifest, commands, bounds and cleanup verified. [Receipt](evidence/windows-editor-journal-accepted-summary.json). | Terminal/provider doubles remain explicit; not the complete Windows suite or later Codex-version acceptance. |
+| Complete Linux `961ecb3` | **348 groups; 2,205 tests; 32 declared platform skips.** Original manifest and cleanup verified. [Receipt](evidence/linux-961ecb3-complete-summary.json). | Predates journal corrections and Codex 0.167 admission. |
+| Complete Windows `dc755901` | **417 groups; 2,478 tests; 207 declared skips.** All six jobs and overall workflow passed. [Receipt](evidence/windows-complete-dc755901-summary.json). | Predates newer archive, scheduling, profile/workflow and observation corrections. |
 
-Complete Linux `961ecb3` has zero failures or cancellations. Its isolated checkout,
-nine dependency aliases, 802 generated files (11,900,104 bytes), empty test parent
-and active marker are removed. Other worktrees remain. The journal corrections
-have separate focused and native evidence.
+Complete Linux staging is removed: its exact checkout, nine dependency aliases,
+802 generated files (11,900,104 bytes), empty test parent and marker. Other
+worktrees remain. The journal's earlier failed Windows runs remain recorded in
+the accepted receipt; the independent restricted-storage retirement failure
+remains unresolved.
 
 The latest installation includes 17 wheel license-header cases, 112 Cargo
 manifest reference cases, and eight in-memory policy reports for each of wheels,

@@ -404,3 +404,14 @@ protected snapshot also rechecks the original policy. Eight focused groups pass
 deadlines and kernel mutation/authorization locks retained.
 [Source evidence](evidence/editor-journal-shared-observation-summary.json),
 [native failure](evidence/editor-journal-read-queue-native-failure-summary.json).
+
+## Accepted Windows client checkpoint
+
+Native source `5033c18` now passes the complete client lane: 25 groups, 237 tests
+and no skips. All nine composed lifecycle cases pass, including reviewed launch,
+acknowledgement, duplicate refusal and original retirement. Native endpoint and
+file policy checks also pass. Original deadlines, permissions, commands and
+cleanup are verified. Earlier failures remain retained, and the separate
+restricted-storage retirement issue remains unresolved. This accepts the
+synthetic/native boundaries of the lane, not a live TUI/account/task or a physical
+device. [Accepted receipt](evidence/windows-editor-journal-accepted-summary.json).
