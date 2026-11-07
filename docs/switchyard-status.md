@@ -42,6 +42,13 @@ update passes all 97 metadata/refusal checks. Native Windows acceptance remains
 pending; a complete Linux run at the installed source is now in progress.
 [Consent evidence](evidence/external-agent-consent-source-summary.json).
 
+The native guided-role lane at `f74a380` reached its 45-second whole-file child
+deadline. Its failed receipt and exact cleanup are retained. Guided-choice and
+dispatch contracts now run as two complete files, preserving all 24 test bodies,
+the shared fixture and original child limits. Six local groups/64 tests pass;
+native Windows acceptance of the split remains pending.
+[Evidence](evidence/role-contract-isolation-summary.json).
+
 Each result belongs to its exact source revision. Test totals from different
 checkpoints are not cumulative acceptance of the latest suite.
 

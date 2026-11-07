@@ -76,12 +76,16 @@ test("native filesystem, setup and restricted exchange CI lanes preserve every o
   for (const name of ["copilot-account-binding", "copilot-lifecycle", "copilot-requests"]) assert.equal(selectWindowsContractGroups(["tools/layout-studio/" + name + ".test.mjs"], requiredGroups).length, 1);
   const save = "tools/layout-studio/windows-scanner-recipe-files.test.mjs";
   assert.match(workflow, /task-owners, role-choices, agent-consent, scanner-save, mixed-scanner, history-windows-scanner/);
-  const roleFile = "tools/layout-studio/role-dispatch.test.mjs";
-  assert.ok(source.includes('"role-choices": "' + roleFile + '"'));
-  const roleGroups = selectWindowsContractGroups([roleFile], requiredGroups);
-  assert.equal(roleGroups.length, 1);
-  assert.strictEqual(roleGroups[0], requiredGroups.find(group => group.file === roleFile));
-  assert.equal(roleGroups[0].pattern, undefined);
+  const roleFiles = ["tools/layout-studio/role-dispatch.test.mjs", "tools/layout-studio/guided-role-choices.test.mjs"];
+  assert.ok(source.includes('"role-choices": ' + JSON.stringify(roleFiles).replaceAll(',', ', ')));
+  const roleGroups = selectWindowsContractGroups(roleFiles, requiredGroups);
+  assert.equal(roleGroups.length, 2);
+  for (const group of roleGroups) {
+    assert.strictEqual(group, requiredGroups.find(original => original.file === group.file));
+    assert.equal(group.pattern, undefined);
+    assert.equal(group.timeoutMs, undefined);
+    assert.equal(group.expectedSkipped ?? 0, 0);
+  }
   const agentFiles = ["tools/layout-studio/agent-revocation.test.mjs", "tools/layout-studio/agent-observation.test.mjs", "tools/layout-studio/integrations.test.mjs"];
   assert.ok(source.includes('"agent-consent": ' + JSON.stringify(agentFiles).replaceAll(',', ', ')));
   const agentGroups = selectWindowsContractGroups(agentFiles, requiredGroups);

@@ -119,6 +119,14 @@ pass; native acceptance of this new lane remains pending. Normal branch events
 schedule it; no manual workflow dispatch is needed.
 [Lane evidence](evidence/role-choices-windows-lane-summary.json).
 
+That native lane at `f74a380` subsequently hit its unchanged 45-second whole-file
+child deadline. Receipt `d489d6df-793c-4bfa-abe9-68ec083e4e72` preserves the failure
+and verified cleanup; partial TAP output is not group acceptance. Guided setup
+and dispatch now occupy two complete files with all 24 assertion bodies and the
+shared encrypted fixture preserved. Each keeps the original child deadline and
+zero skips. Six local groups/64 tests pass; native acceptance remains pending.
+[Isolation evidence](evidence/role-contract-isolation-summary.json).
+
 Native Windows client `9d230ac` passes 25 groups/250 tests with zero skips.
 The exact source/merge trees, original deadlines, artifact hashes and cleanup
 verify. Native endpoint/file/process/socket checks are distinct from explicit

@@ -10,7 +10,7 @@ const suites = {
   "suite-application": "deployment/suite/application.test.mjs",
   "suite-installation": ["deployment/suite/installation.test.mjs", "deployment/suite/shortcut-process.test.mjs"],
   "task-owners": "tools/layout-studio/coding-task-owners.test.mjs",
-  "role-choices": "tools/layout-studio/role-dispatch.test.mjs",
+  "role-choices": ["tools/layout-studio/role-dispatch.test.mjs", "tools/layout-studio/guided-role-choices.test.mjs"],
   "agent-consent": ["tools/layout-studio/agent-revocation.test.mjs", "tools/layout-studio/agent-observation.test.mjs", "tools/layout-studio/integrations.test.mjs"],
   "scanner-save": "tools/layout-studio/windows-scanner-recipe-files.test.mjs",
   "mixed-scanner": "tools/layout-studio/scanner-mixed-review.test.mjs",
