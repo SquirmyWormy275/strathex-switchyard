@@ -102,11 +102,28 @@ foreign replacement and unknown committed outcomes still refuse admission.
 
 ## Outstanding verification and implementation
 
+Complete Linux source `0c7d918` is now running in one fresh owned worktree, with
+350 original groups and existing dependencies only. Its active marker is
+`linux-full-0c7d918-run.json` in the private runtime-verification directory.
+Audit that receipt and exact ownership before removing staging; do not start a
+duplicate or reuse the already-cleaned `c359cdf` paths.
+
+Windows source `e5a5781` is audited through all six preliminary backend shards:
+232 groups, 1,356 passes and 179 declared skips. Exact source/merge trees,
+original manifests, commands, bounds and cleanup verify. The documentation/PDF
+step now passes, as do the explicit native-helper guardian step (including the
+invalid status request), fresh 49-package runtime and 30 reviewed-input checks.
+The full bundle step remains running; later receipts and canonical-source checks
+are not accepted. Only the eight small receipt ZIPs were read in memory; no
+native helper/runtime bundle was downloaded locally.
+[Windows evidence](evidence/windows-backend-e5a5781-summary.json).
+
 1. Native Windows client `c359cdf` is audited: exact merge tree, 25 groups,
    243 tests, zero skips, original deadlines and verified cleanup. It predates
    the later status-query diagnostics. At `841618d`, the 243-test client lane
-   and restricted-storage owner checks also pass; native invalid-status-request
-   coverage still belongs to the pending complete backend lane.
+   and restricted-storage owner checks also pass. The later `e5a5781` explicit
+   native-helper guardian step passes the invalid-status-request case; its final
+   complete bundle acceptance remains pending.
 2. Installed Linux now runs `738c1f7`, release `4cda61afefac`, with `edf66107db84`
    retained as rollback. All 54 semantic workspaces, selection, one pending
    keyboard-only conversation and frozen frontend verify. The 84 metadata/

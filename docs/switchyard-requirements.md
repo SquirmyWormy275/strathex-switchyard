@@ -3,10 +3,21 @@
 The full suite remains unfinished. Use the [current status](switchyard-status.md)
 for accepted revisions and the table below for implementation scope.
 
-Native Windows client `c359cdf` passes all 25 groups, 243 tests and no skips,
+Native Windows client `738c1f7` passes all 25 groups, 247 tests and no skips,
 including the signed launcher demonstration and original cleanup. Native
 Terminal/provider doubles remain explicit; interactive acceptance is separate.
-[Native receipt](evidence/windows-editor-project-context-native-summary.json).
+[Native receipt](evidence/signed-physical-intent-native-summary.json).
+
+Source `0c7d918` adds role/workspace checks at custom-agent enqueue, native focus,
+Codex task resume and configuration-conversation effects/reply writes. Eighteen
+focused groups pass 226 tests with one skip, and both TypeScript checks pass.
+Its complete Linux run is active; the installed application remains `738c1f7`.
+[Role boundaries and evidence](role-dispatch-binding.md).
+
+Windows `e5a5781` passes all six preliminary backend shards: 232 groups, 1,356
+tests and 179 declared skips. Documentation/PDF, explicit native guardian,
+fresh optional runtime and native reviewed-input steps pass. The final bundle
+check is still running. [Windows evidence](evidence/windows-backend-e5a5781-summary.json).
 
 Complete Linux `c359cdf` passes 348 groups, 2,218 tests and 32 declared platform
 skips. Exact temporary staging is removed. It includes journal, Codex 0.167 and

@@ -49,15 +49,20 @@ not covered by a complete-suite run.
 Native Windows `841618d` passes the 243-test client lane and restricted-storage
 owner checks after the bounded diagnostic change. Original restricted token
 policy, descendant QUERY access and fixture/service removal verify. No failure
-recurred, so the intermittent retirement cause remains unresolved. The native
-invalid-status-request case still needs the full backend lane.
+recurred, so the intermittent retirement cause remains unresolved. The later
+`e5a5781` release job passes its explicit native-helper guardian step, which runs
+the invalid-status-request case. Preliminary backend shards alone omit that
+native conditional; the final complete bundle check remains pending.
 [Native diagnostic evidence](evidence/runtime-status-diagnostic-native-summary.json).
 
-All six Windows backend shards at `318fafc` pass: 232 groups, 1,355 tests and
-179 declared skips. The release job then failed on a stale documentation digest;
-`db6106d` corrects it without changing the manual or demo bytes. Full Windows
-release acceptance remains pending.
-[Backend evidence](evidence/windows-backend-318fafc-summary.json).
+All six Windows backend shards at `e5a5781` pass: 232 groups, 1,356 tests and
+179 declared skips, with exact manifests, commands, bounds and cleanup audited.
+The earlier stale documentation digest is corrected: the generated documentation
+and PDF step now passes. The explicit native guardian step, fresh 49-package
+runtime/offline-model check and 30 native reviewed-input checks also pass. The
+disposable runtime is removed and the original owned volume is detached; no
+guest or user account was opened. The final complete bundle check is still
+running. [Newer Windows evidence](evidence/windows-backend-e5a5781-summary.json).
 
 Physical CLI dispatch now uses signed exact-instance requests and responses,
 without disclosing the browser token. Original instance/build/PID, active policy,

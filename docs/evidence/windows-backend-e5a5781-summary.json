@@ -1,0 +1,220 @@
+{
+  "schema": "switchyard-windows-backend-source-summary/v1",
+  "sourceCommit": "e5a57816a47fa6434811b9c1efe81fedd6d3ff77",
+  "mergeCommit": "b32c9a287d357f9a0af36b1ceb7b193e843919af",
+  "tree": "93928b68b3e59f8d723a5d24f36e8da806dd0ca7",
+  "workflowRun": 42371446132,
+  "releaseJob": 128404776061,
+  "backendShardsAccepted": true,
+  "completeWorkflowAccepted": false,
+  "totals": {
+    "groups": 232,
+    "passed": 1356,
+    "skipped": 179
+  },
+  "shards": [
+    {
+      "shard": 1,
+      "artifact": {
+        "id": 13574656864,
+        "bytes": 5670,
+        "sha256": "711797c4d294701cd5a925669c412dbf28cb103dbdfed353579ef96924ae9a6a"
+      },
+      "receipt": {
+        "id": "fff3a1c4-338f-4e46-9e5e-7863bcd71fa9",
+        "sha256": "4b483c5e8c5a64a43da7933722c9a24d1a29c12de59a749179361a8ca3594c0d"
+      },
+      "totals": {
+        "required": 38,
+        "passed": 38,
+        "failed": 0,
+        "tests": 280,
+        "passedTests": 254,
+        "failedTests": 0,
+        "skippedTests": 26,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "shard": 2,
+      "artifact": {
+        "id": 13574801272,
+        "bytes": 5532,
+        "sha256": "0609e1bd1c409f5df643618a0e42362a9a6e9f557fa21589cb1e550f3c115d18"
+      },
+      "receipt": {
+        "id": "537ca89f-3c55-4fa3-86ce-68ba89806adb",
+        "sha256": "d718f2c8b880d427961279098c309e676ef3a8bf432522fb97c882dda3b6ccc9"
+      },
+      "totals": {
+        "required": 38,
+        "passed": 38,
+        "failed": 0,
+        "tests": 260,
+        "passedTests": 224,
+        "failedTests": 0,
+        "skippedTests": 36,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "shard": 3,
+      "artifact": {
+        "id": 13574183114,
+        "bytes": 5807,
+        "sha256": "1d03efcff79e0e6fafeea5052c14c49c5093322722e73f9fefb9ccf83198a6ef"
+      },
+      "receipt": {
+        "id": "44d841eb-7588-4f88-996e-9ed8c9b3ff6e",
+        "sha256": "1798824d7b212720fef007b8ee55ab7a28880ccdb907b3db3784b9ff7b0878eb"
+      },
+      "totals": {
+        "required": 39,
+        "passed": 39,
+        "failed": 0,
+        "tests": 217,
+        "passedTests": 200,
+        "failedTests": 0,
+        "skippedTests": 17,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "shard": 4,
+      "artifact": {
+        "id": 13574396631,
+        "bytes": 5472,
+        "sha256": "76bfd0279bf0b8bffb0d979eef46de146dac96f181301d0a7dae0f8517b326e5"
+      },
+      "receipt": {
+        "id": "d029fd2d-b3e7-40e3-9341-9c64a33b1e0c",
+        "sha256": "0aff1da89fd8cd5d641435236af330dd30b657a385013e44aca852f63bc862d1"
+      },
+      "totals": {
+        "required": 38,
+        "passed": 38,
+        "failed": 0,
+        "tests": 222,
+        "passedTests": 197,
+        "failedTests": 0,
+        "skippedTests": 25,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "shard": 5,
+      "artifact": {
+        "id": 13574337845,
+        "bytes": 5506,
+        "sha256": "acb865cf293f5bfd9abd73fbc8b09ef6333fd315dd4661643457ec31953c77b1"
+      },
+      "receipt": {
+        "id": "bc484b4b-dbd9-48fb-a1dc-33f151ed413c",
+        "sha256": "78c7516412e5c663f41e8cdd39315abbb5fd55f61d1ff4c11b572c978e24b94f"
+      },
+      "totals": {
+        "required": 40,
+        "passed": 40,
+        "failed": 0,
+        "tests": 290,
+        "passedTests": 262,
+        "failedTests": 0,
+        "skippedTests": 28,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "shard": 6,
+      "artifact": {
+        "id": 13574661219,
+        "bytes": 5698,
+        "sha256": "8c0ba4ac39328027caf031cd496398cac0a39f72cd127767560f8abab5e4f3bd"
+      },
+      "receipt": {
+        "id": "2e05106e-53a3-40f0-857a-7ab2ce4f95a3",
+        "sha256": "51d8f256bfc26e3158bc831ac8440aa381046f34860b7593bcfb06ba54f8b5cb"
+      },
+      "totals": {
+        "required": 39,
+        "passed": 39,
+        "failed": 0,
+        "tests": 266,
+        "passedTests": 219,
+        "failedTests": 0,
+        "skippedTests": 47,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    }
+  ],
+  "originalManifestCommandsBoundsSkipsAndCleanupVerified": true,
+  "completedReleaseSteps": [
+    {
+      "name": "Verify generated documentation and the complete manual PDF",
+      "status": "completed",
+      "conclusion": "success",
+      "number": 8
+    },
+    {
+      "name": "Verify runtime Job Object supervision and owner-loss containment",
+      "status": "completed",
+      "conclusion": "success",
+      "number": 15
+    },
+    {
+      "name": "Verify native reviewed Windows input staging without opening a guest",
+      "status": "completed",
+      "conclusion": "success",
+      "number": 12
+    },
+    {
+      "name": "Verify a fresh optional runtime with native imports and offline CPU model",
+      "status": "completed",
+      "conclusion": "success",
+      "number": 17
+    }
+  ],
+  "nativeStatusRefusal": {
+    "explicitHelperGuardianStepPassed": true,
+    "stepNumber": 15,
+    "coverageBasis": "The unchanged exact-source workflow sets the native runtime helper, runs runtime-command and suspended-worker tests, and throws on nonzero exit. The invalid status request conditional therefore runs in this successful step. Preliminary backend shards alone do not provide this native coverage.",
+    "rawStepLogNotYetRetained": true
+  },
+  "freshOptionalRuntime": {
+    "artifact": {
+      "id": 13574732691,
+      "bytes": 760,
+      "sha256": "a8a7d2fdf73cc0bb1c82691b4eff5ee0ebbc689fc079391cdab478b7f1089c9a"
+    },
+    "receiptSha256": "31a612b2badf6821a90d30596f560d5347ae1a21ecd1cb076292a5a5a8c675a8",
+    "python": "3.12.14",
+    "packages": 49,
+    "extras": 0,
+    "sameReleaseRecheckAndOfflineModelLoad": true,
+    "temporaryRuntimeRemoved": true,
+    "noAccountMicrophoneOrKeyboard": true
+  },
+  "nativeReviewedInputs": {
+    "artifact": {
+      "id": 13574442229,
+      "bytes": 2171,
+      "sha256": "4fa1d10fa1d382573a395e1ffdf628588ab2725dc06442302e2164b23673fc7a"
+    },
+    "receiptSha256": "2a7658cc3e29da4ca02df65db72f9e29436bdda8842935f25ed6a9bf44f7872f",
+    "checks": 30,
+    "nativeCalls": 39,
+    "originalOwnedVolumeDetached": true,
+    "guestLaunched": false
+  },
+  "limitations": [
+    "The complete Windows bundle is still building/verifying; later release receipts and final generated-source checks are not accepted.",
+    "This checkpoint predates signed physical dispatch and the subsequent role/workspace boundary changes.",
+    "The intermittent restricted-owner retirement cause remains unresolved; successful diagnostics do not establish a fix.",
+    "No real account, interactive native TUI, physical keyboard, guest execution or installed update acceptance is inferred. Only bounded receipt ZIPs were downloaded; no native runtime/helper bundle was downloaded locally."
+  ]
+}
