@@ -69,10 +69,10 @@ Source/merge tree, artifact digest, original commands, bounds and cleanup verify
 
 The owner can now retain one [logical editor channel](windows-editor-transport.md)
 on its original stdio stream. It joins pending registration on shutdown and does
-not confuse channel retirement with native process exit. Windows editor-target
-preparation still deliberately refuses: durable editor journals/recovery and
-Suite/VS Code editor integration remain unfinished implementation, separate from
-live-account acceptance.
+not confuse channel retirement with native process exit. Windows target
+preparation is now implemented as described below. Durable editor journals/recovery
+and Suite/VS Code editor connection integration remain unfinished implementation,
+separate from live-account acceptance.
 [Source evidence](evidence/windows-codex-owners-source-summary.json),
 [native Job evidence](evidence/windows-owned-stdio-native-summary.json).
 
@@ -580,3 +580,42 @@ independently observing backend retirement, then successfully closing the retain
 launcher. Duplicate exact stop stays immutable and another editor UUID refuses.
 [Evidence](evidence/editor-retired-stop-summary.json). This correction is later
 than the accepted 255-group complete Linux routing run.
+
+
+## Verify the Windows editor target
+
+The same target route now supports a closed Windows stdio binding: original Job
+scope, worker PID, raw FILETIME birth and executable SHA-256. This is metadata,
+not a socket endpoint, bearer token or permission to start another process.
+Guardian identity retains its separate .NET tick convention.
+
+Before returning that binding, the original owner invokes the read-only native
+process probe with its retained executable path, file identity, size and digest.
+The probe verifies the live process, held image, current user/session and unchanged
+QUERY mask 8, and independently retires its helper. Concurrent inspections join
+the same original query. Failed inspection closes admission; whole-owner shutdown
+joins inspection and attempts both query-helper and original Job retirement even
+if one fails.
+
+The protected registry checks the acknowledged load, original task/account,
+repository identity and current policy before and after this inspection and the
+metadata read. New editor preparation requires an idle task; return observation
+can also report an active task. Changed, missing or foreign coordinates refuse.
+Logical editor registration rechecks this target before returning the client and
+at later protocol boundaries. Preparing it submits no resume, prompt or terminal
+launch.
+
+Thirty-three focused groups pass **104 tests with two declared platform skips**,
+plus typecheck. These include the real encrypted registry/kernel leases and
+explicit provider/process-query doubles, original-load refusal, changed native
+birth, concurrent/held inspection and independent retirement. The new unknown
+helper case first exposed an expected-refusal handling error in test teardown;
+its original bounded failure is retained and the corrected group passes. No
+production retirement bound or success condition was relaxed.
+
+The native fixture is extended to use actual Windows process reinspection and
+protected registry target/client composition with a synthetic app server; this
+newer acceptance is pending. The earlier retained logical channel passes at
+`fcfe38a`: fifteen native client groups, 155 tests and no skips.
+[Target source evidence](evidence/windows-editor-target-source-summary.json),
+[native channel evidence](evidence/retained-editor-client-native-summary.json).

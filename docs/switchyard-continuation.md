@@ -40,26 +40,26 @@ instructions. Do not merge or release.
 
 ## Current installed and source checkpoint
 
-A retained Windows editor channel now shares the original authenticated native
-stdio client. It returns that owner's exact initialization response, sends no
-second native handshake and keeps request IDs on the original stream. Closing
-the logical channel joins its pending requests without killing the provider or
-claiming native process exit. A single editor is retained before registration;
-account changes revoke it synchronously. **Thirty-eight focused groups pass
-163 tests with one declared platform skip**; typecheck passes. Real CodexClient
-and socket checks use explicit synthetic providers/native-peer doubles.
-[Channel contract](windows-editor-transport.md),
-[source evidence](evidence/retained-editor-client-source-summary.json).
+Windows editor target preparation now rechecks the original Job-owned process
+against its creation time and held executable identity, then repeats the saved
+load, task, account, repository and policy checks. It grants no terminal effect
+or second resume. Logical editor registration stays bound to that same target.
+**Thirty-three focused groups pass 104 tests with two declared platform skips**;
+typecheck passes. Provider/native-query doubles are explicit in local checks.
+The extended native case includes real process reinspection, protected registry
+target preparation and logical editor registration; its acceptance is pending.
+[Target contract](coding-task-owners.md),
+[source evidence](evidence/windows-editor-target-source-summary.json).
 
-The earlier Windows task adapter passes native client CI at `0078893`:
-**fourteen groups, 147 tests and no skips**, including actual Job-backed
-configuration/task RPC and saved-identity retirement with a synthetic app server.
-Exact source/merge tree, artifact, commands, bounds and cleanup verify. The newer
-logical channel still awaits native acceptance. Windows editor targets, durable
-editor journal/recovery, Suite editor routes and VS Code launching remain
-unfinished implementation.
-[Native task evidence](evidence/windows-codex-owners-native-summary.json),
-[task ownership](coding-task-owners.md).
+The earlier retained editor channel passes Windows client CI at `fcfe38a`:
+**fifteen groups, 155 tests and no skips**. An actual Job-backed synthetic
+app server returns its retained initialization response to the logical editor;
+closing that editor leaves the original task metadata connection alive.
+Source/merge tree, artifact, original commands, bounds and cleanup verify.
+Windows durable editor journal/recovery, Suite editor connections and VS Code
+launching remain unfinished implementation.
+[Native channel evidence](evidence/retained-editor-client-native-summary.json),
+[editor contract](windows-editor-transport.md).
 
 The underlying persistent process layer passes Windows client CI at `45fe70e`:
 **thirteen groups, 139 tests and no skips**, including all three actual native Job

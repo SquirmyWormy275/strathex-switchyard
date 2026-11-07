@@ -7,6 +7,7 @@ import { retireStoppedWindowsCodexOwner } from "./codex-windows-owner.mjs";
 import { retireStoppedCodexListener } from "./codex-owned-listener.mjs";
 import { verifyRepositoryIdentity } from "./coding-task-identity.mjs";
 import { suiteConfirmations } from "./confirmations.mjs";
+import { windowsCodexBinding } from "./windows-codex-binding.mjs";
 const uuid = value => typeof value === "string" && /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/.test(value);
 const digest = value => createHash("sha256").update(JSON.stringify(value)).digest("hex");
 function binding(task) {
@@ -72,7 +73,7 @@ export function createCodingTaskOwners({ store, root, runtimeRoot, resolveCli, r
   }
 
   async function editorObservation(c, { ownerRequestId, loadRequestId }, returning = false) {
-    if (platform !== "linux") throw Error("Windows task metadata ownership is available; its durable editor target integration is not yet implemented.");
+    if (!["linux", "win32"].includes(platform)) throw Error("Editor target preparation requires a supported Linux or Windows host.");
     if (![ownerRequestId, loadRequestId].every(uuid)) throw Error("Choose the original owner and acknowledged load UUIDs.");
     const resource = live.get(key(c, ownerRequestId)); if (!resource) throw Error("This host does not own the original live task connection.");
     const boundary = async () => {
@@ -85,12 +86,14 @@ export function createCodingTaskOwners({ store, root, runtimeRoot, resolveCli, r
     if (typeof resource.owner.inspectBinding !== "function") throw Error("This owner cannot recheck its original editor endpoint.");
     const endpoint = await resource.owner.inspectBinding();
     const fields = ["socketPath", "socketDevice", "socketInode", "peerPid", "peerBirth", "peerExecutableSha256"];
-    if (!endpoint || Object.keys(endpoint).sort().join() !== fields.sort().join() || typeof endpoint.socketPath !== "string" || !endpoint.socketPath.startsWith("/") || Buffer.byteLength(endpoint.socketPath) > 103 || /[\\\x00-\x20\x7f#?%]/.test(endpoint.socketPath) || ![endpoint.socketDevice, endpoint.socketInode, endpoint.peerBirth].every(v => typeof v === "string" && /^[1-9]\d{0,24}$/.test(v)) || !Number.isSafeInteger(endpoint.peerPid) || endpoint.peerPid < 1 || !/^[a-f0-9]{64}$/.test(endpoint.peerExecutableSha256 ?? "") || digest(endpoint) !== digest(resource.owner.binding)) throw Error("The original editor endpoint identity is incomplete or changed.");
+    if (platform === "win32") windowsCodexBinding(endpoint);
+    else if (!endpoint || Object.keys(endpoint).sort().join() !== fields.sort().join() || typeof endpoint.socketPath !== "string" || !endpoint.socketPath.startsWith("/") || Buffer.byteLength(endpoint.socketPath) > 103 || /[\\\x00-\x20\x7f#?%]/.test(endpoint.socketPath) || ![endpoint.socketDevice, endpoint.socketInode, endpoint.peerBirth].every(v => typeof v === "string" && /^[1-9]\d{0,24}$/.test(v)) || !Number.isSafeInteger(endpoint.peerPid) || endpoint.peerPid < 1 || !/^[a-f0-9]{64}$/.test(endpoint.peerExecutableSha256 ?? "")) throw Error("The original editor endpoint identity is incomplete or changed.");
+    if (digest(endpoint) !== digest(resource.owner.binding)) throw Error("The original editor process binding changed.");
     const observed = await resource.driver.read(initial.owner.sessionId, initial.owner.repositoryRoot, c);
     if (observed.id !== initial.owner.sessionId || observed.repositoryRoot !== initial.owner.repositoryRoot || !(returning ? ["idle", "active"] : ["idle"]).includes(observed.observation)) throw Error("The exact editor task is unavailable for this operation.");
     const final = await boundary();
     if (digest(initial) !== digest(final) || digest(await resource.owner.inspectBinding()) !== digest(endpoint)) throw Error("The original editor target changed during preparation.");
-    if (posix.normalize(endpoint.socketPath) !== endpoint.socketPath || digest(initial) !== digest(await boundary())) throw Error("The editor target or policy changed after endpoint inspection.");
+    if (platform === "linux" && posix.normalize(endpoint.socketPath) !== endpoint.socketPath || digest(initial) !== digest(await boundary())) throw Error("The editor target or policy changed after endpoint inspection.");
     const target = { schema: "switchyard-codex-editor-target/v1", ownerRequestId, loadRequestId, taskId: final.owner.taskId, sessionId: final.owner.sessionId, repositoryRoot: final.owner.repositoryRoot, repositoryIdentity: structuredClone(resource.original.repositoryIdentity), accountFingerprint: resource.original.accountFingerprint, permissions: "read-only/on-request", endpoint };
     return { target, targetDigest: digest(target), metadataObserved: true, nativeLoadAcknowledged: true, nativeTaskLoaded: false, authorityGranted: false, terminalLaunched: false, ideAttached: false, modelPromptSubmitted: false, completionVerified: false };
   }
@@ -174,7 +177,11 @@ export function createCodingTaskOwners({ store, root, runtimeRoot, resolveCli, r
       const initial = await editorObservation(c, selected, true);
       const resource = live.get(key(c, selected.ownerRequestId));
       if (!resource || typeof resource.owner.openEditorClient !== "function") throw Error("The original task owner cannot open a dedicated editor connection.");
-      return resource.owner.openEditorClient({ onClient: async client => {
+      const original = initial.target;
+      return resource.owner.openEditorClient({ ...(platform === "win32" ? {
+        target: { sessionId: original.sessionId, repositoryRoot: original.repositoryRoot, accountFingerprint: original.accountFingerprint },
+        assertCurrent: async () => { if (digest(await editorObservation(c, selected, true)) !== digest(initial)) throw Error("The original Windows editor target changed."); }
+      } : {}), onClient: async client => {
         await onClient(client);
         if (digest(await editorObservation(c, selected, true)) !== digest(initial)) throw Error("The exact editor target changed during bridge registration.");
       } });

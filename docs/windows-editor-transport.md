@@ -117,10 +117,13 @@ actual CodexClient parsing/request multiplexing with synthetic streams, a real
 authenticated WebSocket exchange using peer/provider doubles, late reply
 suppression, account drift, forbidden effects and joined owner registration.
 Typecheck passes. The actual Windows Job fixture now also exercises the channel
-and subsequent task metadata; that newer native check awaits CI. No new compiler,
+and subsequent task metadata; this passes at `fcfe38a` in fifteen native client
+groups, 155 tests and no skips. Exact source/merge tree, artifact, commands, bounds
+and cleanup verify. [Native channel evidence](evidence/retained-editor-client-native-summary.json). No new compiler,
 bundle or dependency staging was created.
 [Source evidence](evidence/retained-editor-client-source-summary.json).
 
-This channel is a backend component. Windows target preparation, durable editor
-journals and recovery, Suite routes and VS Code launching still need integration;
+This channel is a backend component. [Windows target preparation](coding-task-owners.md)
+is implemented with separate source checks. Durable editor journals and recovery,
+Suite editor connections and VS Code launching still need integration;
 no terminal command or frontend control was enabled.
