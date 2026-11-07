@@ -40,15 +40,14 @@ Successful backend shards do not establish a complete Windows pass. Earlier
 accepted Windows evidence remains source-bound; no retry, cancellation or workflow
 dispatch was performed for this observation.
 
-Complete Linux `97ef7d6` passes **322 groups, 1,965 tests and sixteen declared
+Complete Linux `94a0135` passes **323 groups, 1,979 tests and sixteen declared
 skips**, with zero failures/cancellations. Original commands, bounds, skip
 inventory and every child/tree retirement verify. The owned checkout, nine
-dependency aliases, 782 generated files (11,785,816 bytes), empty temporary parent
-and marker are removed; other worktrees remain. This includes Cargo array tables
-and the Windows ChatGPT service tested through doubles. Later VS Code focus and
-Cargo archive changes have separate focused evidence. A temporary wrapper syntax
-failure occurred before any test and is retained in the record.
-[Complete receipt](evidence/linux-97ef7d6-complete-summary.json).
+dependency aliases, 782 generated files (11,790,322 bytes), empty temporary parent
+and marker are removed; other worktrees remain. This includes the native-focus
+policy correction and npm/Cargo archive work. Later Python wheel-license changes
+have separate focused and installed evidence.
+[Complete receipt](evidence/linux-94a0135-complete-summary.json).
 
 Selected Python wheels now apply declared license policy only after matching
 outer bytes, embedded identity and verified RECORD member hashes. Missing,

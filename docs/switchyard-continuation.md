@@ -173,15 +173,14 @@ changes and predates Cargo archive identity and the workflow-ID correction.
 
 No full Linux test service or temporary marker remains from that run.
 
-Complete Linux `97ef7d6` passes **322 groups, 1,965 tests and sixteen declared
+Complete Linux `94a0135` passes **323 groups, 1,979 tests and sixteen declared
 skips**, with zero failures/cancellations. Original commands, bounds, skip
 inventory and every child/tree retirement verify. The owned checkout, nine
-dependency aliases, 782 generated files (11,785,816 bytes), empty temporary parent
-and marker are removed; other worktrees remain. This includes Cargo array tables
-and the Windows ChatGPT service tested through doubles. Later VS Code focus and
-Cargo archive changes have separate focused evidence. A temporary wrapper syntax
-failure occurred before any test and is retained in the record.
-[Complete receipt](evidence/linux-97ef7d6-complete-summary.json).
+dependency aliases, 782 generated files (11,790,322 bytes), empty temporary parent
+and marker are removed; other worktrees remain. This includes the native-focus
+policy correction and npm/Cargo archive work. Later Python wheel-license changes
+have separate focused and installed evidence.
+[Complete receipt](evidence/linux-94a0135-complete-summary.json).
 
 Workflow editing now rejects non-string role/step IDs and repeated dependency
 edges before persistence. Two regressions reproduce the previous acceptance of
@@ -238,8 +237,8 @@ native Windows profile correction acceptance remains separate.
 [Source evidence](evidence/profile-identity-source-summary.json).
 
 1. Cargo quoted/array/inline manifest coverage is published and installed; full
-   Linux `97ef7d6` is accepted and its exact staging is removed. Continue independent
-   ledger gaps. Keep later VS Code focus and Cargo inline tables separate from
+   Linux `94a0135` is accepted and its exact staging is removed. Continue independent
+   ledger gaps. Keep later Python wheel-license work separate from
    that full checkpoint, and installed in-memory proof separate
    from live model/UI acceptance. Use immutable published source and a short
    owned temporary parent for any new complete run.

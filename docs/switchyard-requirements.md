@@ -1,5 +1,14 @@
 # Switchyard authoritative requirement ledger
 
+Complete Linux `94a0135` passes **323 groups, 1,979 tests and sixteen declared
+skips**, with zero failures/cancellations. Original commands, bounds, skip
+inventory and every child/tree retirement verify. The owned checkout, nine
+dependency aliases, 782 generated files (11,790,322 bytes), empty temporary parent
+and marker are removed; other worktrees remain. This includes the native-focus
+policy correction and npm/Cargo archive work. Later Python wheel-license changes
+have separate focused and installed evidence.
+[Complete receipt](evidence/linux-94a0135-complete-summary.json).
+
 Revision 2 (October 29, 2026) replaces the original minimum-outcome handover.
 The F77 is the pilot device for the full suite. Stages are execution order, not
 stopping points. Implementation and validation are independent statuses.
