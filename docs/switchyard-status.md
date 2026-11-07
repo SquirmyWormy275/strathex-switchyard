@@ -30,6 +30,24 @@ platform skips. [Regression and correction](evidence/editor-journal-publication-
 
 ## Current evidence
 
+The next native checkpoint, `0594c8d`, passes the first eight lifecycle cases;
+only the reviewed launcher acknowledgement remains failed. The complete lane
+has 234 passing tests, one failure and no skips, with natural cleanup. The latest
+source correction shares only overlapping observations of the same original
+handle. A queued mutation separates batches, and settled successes or failures
+are never cached. Eight focused groups pass 71 tests with two platform skips;
+corrected native acceptance remains pending.
+[Latest failure](evidence/editor-journal-read-queue-native-failure-summary.json),
+[source correction](evidence/editor-journal-shared-observation-summary.json).
+
+Codex 0.167 now has isolated effective-configuration evidence: all 42 explicit
+feature exclusions read back correctly in an empty owned home with network
+isolation. Only initialize/initialized/config-read were sent; no account, thread
+or model request was made. The original process tree exited and all 66 generated
+files (3,053,441 bytes) were removed. Runtime admission remains 0.166 pending
+integration of the reviewed version contract.
+[Isolated readback](evidence/codex-0167-isolated-config-summary.json).
+
 The journal correction at `ecbb8cb` still fails the complete Windows client lane:
 24 of 25 groups pass, with 229 passing tests and four failed acknowledgement
 assertions. The failed group now exits naturally with cleanup and a complete TAP

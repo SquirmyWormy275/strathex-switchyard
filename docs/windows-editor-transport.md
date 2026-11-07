@@ -392,3 +392,15 @@ deadlines or weakening permissions. Eight focused groups pass 69 tests with two
 platform skips; corrected native acceptance remains pending.
 [Source evidence](evidence/editor-journal-read-queue-summary.json),
 [native failure](evidence/editor-journal-native-failure-summary.json).
+
+Native `0594c8d` passes eight of nine composed lifecycle cases and still fails
+the reviewed launcher acknowledgement deadline. Overlapping journal observations
+now share one unfinished original-handle check, including both target captures.
+Each queued mutation advances a fence, so a later reader cannot reuse a check
+that precedes retirement or publication. Completed results and failures are
+discarded immediately; every later observation checks fresh state. The final
+protected snapshot also rechecks the original policy. Eight focused groups pass
+71 tests with two skips. Native acceptance remains pending, with all original
+deadlines and kernel mutation/authorization locks retained.
+[Source evidence](evidence/editor-journal-shared-observation-summary.json),
+[native failure](evidence/editor-journal-read-queue-native-failure-summary.json).

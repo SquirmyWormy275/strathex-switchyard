@@ -117,18 +117,26 @@ export function createCodingEditorJournal({ store, authorizations, now=Date.now,
         // Serialize this handle's reads with publication of its writes. Each
         // write still takes the original cross-process kernel lease. A read
         // checks fresh protected bytes without opening another mutation lease.
-        let publication=Promise.resolve();
-        const serialized=fn=>{const work=publication.catch(()=>{}).then(fn);publication=work;return track(()=>work);};
+        let publication=Promise.resolve(),queuedMutation=0,reading;
+        const serialized=(fn,mutation=true)=>{if(mutation)queuedMutation++;const work=publication.catch(()=>{}).then(fn);publication=work;return track(()=>work);};
         const matches=state=>{require(leases.get(ownershipKey)===lease && hash(rowFor(state,s))===hash(lease.row));};
         const handle=Object.freeze({
           observation:()=>view(lease.row),
           // A checkpoint publishes protected bytes before replacing lease.row.
           // Observe both under its original queue so concurrent socket traffic
           // cannot mistake that in-flight publication for foreign replacement.
-          assertCurrent:()=>serialized(async()=>{
-            require(!['stopped','uncertain'].includes(lease.row.status));await current(c,s,original);
-            matches(await store.snapshot(c));
-          }),
+          assertCurrent:()=>{
+            // Overlapping callers observe this same original handle. Share only
+            // an unfinished check with no intervening queued mutation. Never
+            // cache a settled result or skip publication/retirement ahead of us.
+            if(reading?.mutation===queuedMutation)return reading.work;
+            const batch={mutation:queuedMutation,work:serialized(async()=>{
+              require(!['stopped','uncertain'].includes(lease.row.status));await current(c,s,original);
+              const state=await store.snapshot(c);matches(state);require(!closed && policy(state)===original.policyDigest);
+            },false)};
+            reading=batch;const settled=()=>{if(reading===batch)reading=undefined;};
+            void batch.work.then(settled,settled);return batch.work;
+          },
           recordQuery(event) {
             let copy;try{require(windows && exact(event,['kind','ownership']) && ['query-intent','query-ready','query-retired','query-not-started'].includes(event.kind));copy={kind:event.kind,ownership:['query-intent','query-not-started'].includes(event.kind)?windowsQueryIntent(event.ownership):windowsQueryOwnership(event.ownership)};}catch(error){return Promise.reject(error);}
             const retiring=['query-retired','query-not-started'].includes(copy.kind);

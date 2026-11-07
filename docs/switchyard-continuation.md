@@ -79,13 +79,23 @@ failed-write outcomes. Do not declare native repair until the next lane passes.
 [Failure](evidence/editor-journal-native-failure-summary.json),
 [correction](evidence/editor-journal-read-queue-summary.json).
 
+The `0594c8d` native follow-up passes the first eight lifecycle cases and fails
+only test nine, the reviewed launcher acknowledgement deadline. The complete
+lane has 234 passes, one failure and no skips; natural cleanup completes. The
+latest correction shares overlapping original-handle checks, separated by every
+queued mutation, and never caches a settled outcome. Eight focused groups pass
+71 tests with two skips. Native acceptance remains pending.
+[Failure](evidence/editor-journal-read-queue-native-failure-summary.json),
+[correction](evidence/editor-journal-shared-observation-summary.json).
+
 ## Outstanding verification and implementation
 
 1. Complete Linux `961ecb3` is accepted: 348 groups, 2,205 passing tests and
    32 declared skips. Its receipt is audited and exact staging removed. Do not
    restart that completed run or use it as acceptance of later journal changes.
-2. The journal read/publication queue correction is published as `0594c8d`.
-   Audit client workflow `42365874853`, job `128383860203`. Preserve the original
+2. Publish the shared-observation correction and audit its Windows client lane.
+   Prior workflow `42365874853`, job `128383860203` is audited and still fails
+   the launcher deadline. Preserve the original
    failure if another independent defect appears; do not change deadlines or
    assertions to obtain a pass.
 3. Continue task-specific Windows IDE/project integration and remaining backend
@@ -93,8 +103,13 @@ failed-write outcomes. Do not declare native repair until the next lane passes.
    exposure remain frozen; completed backend components do not imply a completed
    user journey.
 4. Keep native provider compatibility separate. Codex 0.167.0 is installed, but
-   admission remains 0.166.0. Static schemas and source changes do not establish
-   effective restrictions or native TUI compatibility.
+   admission remains 0.166.0. The empty-home, network-isolated config probe now
+   verifies 42 feature exclusions using only initialize/initialized/config-read.
+   All original descendants and 66 generated files are retired; its marker is
+   removed. Seven new feature flags default false; deferred_tool_world_state
+   changes from false to true. Integrate a version-specific restriction contract
+   before changing admission; native TUI/account/task acceptance remains separate.
+   [Readback evidence](evidence/codex-0167-isolated-config-summary.json).
 5. Maintain current software-versus-external-check distinctions. No missing
    hardware/account check can excuse an unimplemented module.
 

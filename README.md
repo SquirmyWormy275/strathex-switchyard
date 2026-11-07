@@ -74,7 +74,7 @@ have been removed after verification. Complete Windows checkpoint `dc755901`
 passes **417 groups / 2,478 tests**, with 207 declared skips; it predates the
 latest backend work. The Windows editor demonstration now reaches an exact
 synthetic task acknowledgement, but the latest native integration run still has
-four acknowledgement failures. A focused correction is under native validation.
+one launcher acknowledgement failure. A focused correction awaits native validation.
 Restricted storage has passing follow-ups, but an intermittent retirement failure
 remains unresolved. Source, installed, interactive, hardware and account
 acceptance remain separate.

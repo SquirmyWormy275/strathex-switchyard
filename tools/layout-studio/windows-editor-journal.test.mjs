@@ -174,3 +174,28 @@ test('a failed queued checkpoint cannot publish an uncommitted row or conceal a 
     assert.equal((await f.store.snapshot('personal')).codingEditorConnections[0].revision,committed?1:0);
   }
 });
+
+test('overlapping observations share one fresh target check but a queued retirement requires its own later observation',async t=>{
+  for(const retire of [false,true]){
+    const f=await fixture(t);await f.consume();const {handle}=await f.api.reserve('personal',f.selected,{host:f.host});
+    let entered,release,calls=0;const started=new Promise(r=>{entered=r;}),held=new Promise(r=>{release=r;});
+    f.hook=async()=>{if(++calls===1){entered();await held;}};
+    const readers=Array.from({length:20},()=>handle.assertCurrent());
+    await started;
+    const writing=retire?handle.retire(clean):undefined;
+    const afterWrite=retire?handle.assertCurrent():undefined;void afterWrite?.catch(()=>{});
+    release();await Promise.all(readers);if(writing)await writing;
+    if(retire)await assert.rejects(afterWrite);
+    assert.equal(calls,2,'One overlapping observation batch keeps both original target captures.');
+    if(!retire){await handle.assertCurrent();assert.equal(calls,4,'A settled batch never caches a later observation.');}
+  }
+});
+
+test('a failed shared observation refuses every waiter and does not cache the failure for a later fresh check',async t=>{
+  const f=await fixture(t);await f.consume();const {handle}=await f.api.reserve('personal',f.selected,{host:f.host});
+  let release,calls=0;const held=new Promise(r=>{release=r;});
+  f.hook=async()=>{calls++;await held;throw Error('synthetic target changed');};
+  const results=Promise.allSettled(Array.from({length:20},()=>handle.assertCurrent()));release();
+  for(const result of await results){assert.equal(result.status,'rejected');assert.match(result.reason.message,/synthetic target changed/);}
+  assert.equal(calls,1);f.hook=async()=>{};await handle.assertCurrent();
+});

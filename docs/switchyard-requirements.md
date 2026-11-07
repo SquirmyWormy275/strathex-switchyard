@@ -22,6 +22,14 @@ acceptance and the separate restricted-storage retirement cause remain open.
 
 ## Requirement status
 
+Latest Windows `0594c8d`: 24 of 25 groups accepted, 234 tests passing and one
+launcher acknowledgement failure. The other eight composed lifecycle cases now
+pass. A controlled 20-observer case reproduces repeated target checks; the
+original-handle overlap correction passes eight groups, 71 tests and two skips,
+while preserving mutation ordering and fresh checks. Native acceptance remains
+pending. [Failure](evidence/editor-journal-read-queue-native-failure-summary.json),
+[correction](evidence/editor-journal-shared-observation-summary.json).
+
 Complete Linux source `961ecb3` passes 348 groups, 2,205 tests and 32 declared
 platform skips. Original manifest, commands, bounds, child retirement and exact
 temporary-checkout cleanup verify. This predates both journal corrections.
