@@ -1,0 +1,35 @@
+{
+  "schema": "switchyard-signed-physical-native-summary/v1",
+  "sourceCommit": "738c1f71f681e710af7f1334109a318c54cea6fb",
+  "mergeCommit": "eda00826e14c43dadf30a65448920fa8c89ddf07",
+  "tree": "98f03e05186bef420c7e0d53d58bb63442c0ad90",
+  "workflowRun": 42372481436,
+  "helperJob": 128403277123,
+  "clientJob": 128403448327,
+  "artifact": {
+    "id": 13574028826,
+    "bytes": 3535,
+    "sha256": "487b8344c5c7d6147e37dc41e34cb3e9961b0970c05ecd067880ed70dd078208"
+  },
+  "receipt": {
+    "id": "386c8b93-e642-4840-98be-f8a773a6eafd",
+    "sha256": "3208fd4f22ed92c479d6aa20be63037acdeb31ff7749639edb13945bf26dd1fe"
+  },
+  "totals": {
+    "required": 25,
+    "passed": 25,
+    "failed": 0,
+    "tests": 247,
+    "passedTests": 247,
+    "failedTests": 0,
+    "skippedTests": 0,
+    "cancelledTests": 0,
+    "todoTests": 0
+  },
+  "originalManifestCommandsBoundsSkipsAndCleanupVerified": true,
+  "limitations": [
+    "Native client lane only; complete Windows release acceptance remains pending.",
+    "Physical keyboard, interactive provider/account/TUI and active editor command acceptance remain separate.",
+    "The later custom-agent binding correction is outside this source."
+  ]
+}

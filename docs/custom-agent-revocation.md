@@ -30,6 +30,10 @@ an agent ID or session string cannot revive an old role or let the new credentia
 acknowledge an old claim. Existing v2 SDK messages remain unchanged; older
 enrollments retain their legacy generation until deliberately revoked.
 
+[Role dispatch also checks the original binding](role-dispatch-binding.md) inside
+the enqueue transaction. Rebinding a role invalidates requests that have not yet
+queued; commands already queued remain attached to their original session.
+
 If a bundled example is owned by this Suite process, the route joins its exact
 child retirement and returns separate `ownedExample` evidence. An uncertain stop
 still blocks a replacement process. A failed stop-journal write does not hide the

@@ -64,9 +64,18 @@ without disclosing the browser token. Original instance/build/PID, active policy
 nonce and invocation identity are checked; replay, clock rollback and uncertain
 outcomes cannot silently repeat an effect. The source checks include an actual
 CLI child correlated with encrypted launch state. Installed `738c1f7` passes
-eight additional signed refusal/metadata checks without an effect. Native Windows
-and physical-key acceptance remain pending.
+eight additional signed refusal/metadata checks without an effect. The exact
+source passes all 247 native Windows client tests with no skips; complete Windows
+release and physical-key acceptance remain pending.
 [Physical dispatch contract](physical-intent-authentication.md).
+
+Custom-agent dispatch now checks its original role binding atomically with
+enqueue. Rebinding, editing or removing the role refuses a pending request;
+already queued commands remain with their original session. Seven new cases
+pass, including five reproduced regressions, and six focused groups pass 88 tests
+with one platform skip. Other provider effect boundaries and active-workspace
+lifecycle checks remain separate work. This correction is not installed yet.
+[Role dispatch evidence and limitations](role-dispatch-binding.md).
 
 ## Current evidence
 

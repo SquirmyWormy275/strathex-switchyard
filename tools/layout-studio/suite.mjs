@@ -160,7 +160,7 @@ export function createSuite({ store = createSuiteStore(), platform = process.pla
     } else if (!state.conversations.some((c) => c.id === binding.targetId && c.provider === binding.provider && c.sessionId === binding.sessionId)) throw new Error("This exact role target changed or disappeared. Rebind it deliberately.");
     return binding;
   }
-  function clientRoleDigest(state, binding) { return createHash("sha256").update(JSON.stringify([binding, state.workflow.roles.find(r => r.id === binding.roleId)])).digest("hex"); }
+  function roleBindingDigest(state, binding) { return createHash("sha256").update(JSON.stringify([binding, state.workflow.roles.find(r => r.id === binding?.roleId)])).digest("hex"); }
   const session = (s, id) => { const found = s.observations.find((o) => o.id === id); if (!found) throw new Error("That observation session is unavailable in this compartment."); return found; };
   const voiceSession = (s, id) => { const found = s.voice.find((o) => o.id === id); if (!found) throw new Error("That voice session is unavailable in this compartment."); return found; };
   function pauseMonitor(compartment) { if (monitors.has(compartment)) clearForeground(monitors.get(compartment)); monitors.delete(compartment); }
@@ -480,7 +480,7 @@ export function createSuite({ store = createSuiteStore(), platform = process.pla
           if (!["coding-task", "custom-agent", "conversation"].includes(targetKind) || (targetKind === "custom-agent") !== (provider === "custom-agent")) throw new Error("Choose the exact target kind supported by this provider.");
           const target = targetKind === "coding-task" ? s.codingSessions?.find((t) => t.id === body.targetId && t.provider === provider) : provider === "custom-agent" ? s.agents.find((a) => a.id === body.targetId) : s.conversations.find((c) => c.id === body.targetId && c.provider === provider);
           if (!target?.sessionId) throw new Error("The role needs an exact connected session, not a window title or missing tool.");
-          s.roleBindings ??= []; const binding = { roleId: role.id, provider, targetKind, targetId: body.targetId, sessionId: target.sessionId, intent: body.intent };
+          s.roleBindings ??= []; const binding = { bindingId: randomUUID(), roleId: role.id, provider, targetKind, targetId: body.targetId, sessionId: target.sessionId, intent: body.intent };
           if (provider === "custom-agent") binding.credentialEpoch = target.credentialEpoch ?? "legacy";
           s.roleBindings = [...s.roleBindings.filter((b) => b.roleId !== role.id || b.intent !== body.intent), binding]; roleTarget(s, role.id, body.intent); return binding;
         }, { provider: body.provider });
@@ -604,15 +604,19 @@ export function createSuite({ store = createSuiteStore(), platform = process.pla
     },
     async dispatchRole(compartment, roleId, intent, content, requestId) {
       const s = await store.snapshot(compartment), b = roleTarget(s, roleId, intent);
+      const digest = roleBindingDigest(s, b);
+      const assertCurrentState = state => {
+        const binding = state.roleBindings?.find(candidate => candidate.roleId === roleId && candidate.intent === intent);
+        if (roleBindingDigest(state, binding) !== digest) throw new Error("The exact role binding changed before dispatch settled. Any command already queued remains with its original session; no alternate target or automatic retry was selected.");
+      };
       await store.authorize(compartment, { provider: b.provider });
       let result;
       if (b.targetKind === "client-surface") {
         if (content !== undefined) throw new Error("A homepage launch cannot receive workflow content, prompts or handoffs.");
-        const digest = clientRoleDigest(s, b);
-        result = await clientLaunch.launch(compartment, { compartment, id: b.targetId, requestId }, { digest, assertCurrent: async () => { const current = await store.snapshot(compartment), binding = roleTarget(current, roleId, intent); if (clientRoleDigest(current, binding) !== digest) throw new Error("The exact client role binding changed before dispatch settled. No alternate target was selected."); } });
+        result = await clientLaunch.launch(compartment, { compartment, id: b.targetId, requestId }, { digest, assertCurrent: async () => { const current = await store.snapshot(compartment); assertCurrentState(current); roleTarget(current, roleId, intent); } });
       }
       else if (b.targetKind === "coding-task") result = b.provider === "claude-code" ? await (intent === "summon" ? claudeCoding.focus(compartment, b.targetId) : claudeCoding.status(compartment, b.targetId)) : await (intent === "resume" ? coding.resume(compartment, b.targetId) : coding.status(compartment, b.targetId));
-      else if (b.provider === "custom-agent") result = await custom.dispatch(compartment, { agentId: b.targetId, intent, sessionId: b.sessionId, content, credentialEpoch: b.credentialEpoch ?? "legacy" });
+      else if (b.provider === "custom-agent") result = await custom.dispatch(compartment, { agentId: b.targetId, intent, sessionId: b.sessionId, content, credentialEpoch: b.credentialEpoch ?? "legacy" }, { assertCurrentState });
       else {
         const c = s.conversations.find((c) => c.id === b.targetId && c.provider === b.provider && c.sessionId === b.sessionId);
         if (!c) throw new Error("This exact role target changed or disappeared. Rebind it deliberately.");
@@ -625,7 +629,7 @@ export function createSuite({ store = createSuiteStore(), platform = process.pla
           result = await (b.provider === "microsoft-365-copilot" ? copilot : agents).design({ compartment, provider: b.provider, message, plan: s.profile.plan, conversationId: c.id });
         }
       }
-      await store.update(compartment, "role-intent-result", (state) => { if (b.targetKind === "coding-task") state.activeCodingSessionId = b.targetId; else if (b.targetKind !== "client-surface" && b.provider !== "custom-agent") state.activeConversationId = b.targetId; state.intentResults = [...(state.intentResults ?? []).slice(-31), { at: Date.now(), roleId, intent, result }]; }, { provider: b.provider });
+      await store.update(compartment, "role-intent-result", (state) => { assertCurrentState(state); if (b.targetKind === "coding-task") state.activeCodingSessionId = b.targetId; else if (b.targetKind !== "client-surface" && b.provider !== "custom-agent") state.activeConversationId = b.targetId; state.intentResults = [...(state.intentResults ?? []).slice(-31), { at: Date.now(), roleId, intent, result }]; }, { provider: b.provider });
       return result;
     },
     async authorizeConnection(compartment, connection = { implementation: "native-chatgpt.focus/v1" }) {

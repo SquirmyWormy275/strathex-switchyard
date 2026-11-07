@@ -42,9 +42,12 @@ state and a bounded native-launch double. Its child exits, and the invocation
 receipt matches the protected launch record. All sixteen installation/recovery
 scenarios and package bounds pass. Installed `738c1f7` now passes eight additional
 metadata/refusal checks inside an 84-check update. All 54 workspaces, four profiles,
-57 workflows and the private review link are preserved. Native Windows and
-physical-key acceptance remain separate; the frontend and F77 mapping are unchanged.
+57 workflows and the private review link are preserved. The exact source now also
+passes the native Windows client lane: 25 groups, 247 tests and no skips, with
+original bounds and cleanup verified. Complete Windows release and physical-key
+acceptance remain separate; the frontend and F77 mapping are unchanged.
 [Source evidence](evidence/signed-physical-intent-source-summary.json).
+[Native Windows evidence](evidence/signed-physical-intent-native-summary.json).
 
 The repeatable installed check starts no provider, focus or keyboard operation:
 

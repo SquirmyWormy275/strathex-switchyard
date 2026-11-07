@@ -140,10 +140,12 @@ export function createCustomAgents({ store, now = () => Date.now() }) {
       const payload = { schema: agentResponseSchema, requestSequence: body.sequence, sessionId: body.sessionId, result };
       return { payload, signature: responseMac(token, path, 200, JSON.stringify(payload)) };
     },
-    async dispatch(compartment, { agentId, intent, sessionId, content, credentialEpoch }) {
+    async dispatch(compartment, { agentId, intent, sessionId, content, credentialEpoch }, { assertCurrentState = () => {} } = {}) {
       await store.authorize(compartment, { provider: "custom-agent" });
       if (!agentIntents.includes(intent) || content != null && (typeof content !== "string" || content.length > 12000)) throw new Error("Agent intent or reviewed content is invalid.");
       return store.update(compartment, "agent-intent", (s) => {
+        // The trusted role guard runs synchronously under the same state lease as enqueue.
+        assertCurrentState(s);
         const a = s.agents.find((a) => a.id === agentId);
         if (a?.enrollmentStatus === "revoked" || credentialEpoch !== undefined && credentialEpoch !== epoch(a ?? {})) throw Error("This exact agent authorization was revoked or replaced. Rebind it deliberately.");
         if (!a || !a.capabilities.includes(intent)) throw new Error("This agent does not expose the requested capability. No fallback action was selected.");

@@ -287,6 +287,7 @@ export const requiredGroups = [
   { file: "tools/layout-studio/vial-encoders.test.mjs" },
   { file: "tools/layout-studio/vial-rules.test.mjs" },
   { file: "tools/layout-studio/integrations.test.mjs" },
+  { file: "tools/layout-studio/role-dispatch.test.mjs" },
   { file: "tools/layout-studio/client-launch.test.mjs", ...(process.platform !== "win32" ? { expectedSkipped: 1 } : {}) },
   { file: "tools/layout-studio/physical-intent.test.mjs" },
   { file: "tools/layout-studio/native-focus-gateway.test.mjs" },

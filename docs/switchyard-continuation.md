@@ -40,6 +40,21 @@ instructions. Do not merge or release.
 
 ## Current backend state
 
+Custom-agent role dispatch now checks the exact binding/role under the enqueue
+state lease. Every deliberate binding receives a fresh identity. Shared result
+history also refuses stale attribution while preserving any original queued
+command. Five original regressions are retained; seven corrected cases and six
+focused groups (88 passes, one declared skip) pass with both TypeScript checks.
+This correction is source-only. Other provider native-effect checks and physical
+active-workspace lifecycle checks still need implementation.
+[Role dispatch contract](role-dispatch-binding.md).
+
+Native Windows client source `738c1f7` is audited: workflow `42372481436`, helper
+`128403277123`, client `128403448327`; exact merge tree, 25 groups, 247 passes,
+zero skips and original commands/bounds/cleanup. Complete Windows release is
+separate. Its small receipt ZIP was inspected in memory; no helper binary or
+dependency was downloaded. [Native evidence](evidence/signed-physical-intent-native-summary.json).
+
 Published Codex checkpoint `9c3bccf` admits exact 0.166.0 and 0.167.0 revisions,
 requires 42 explicit feature exclusions and binds text review to the observed
 native version. Twelve groups pass 152 tests with two skips. The actual 0.167
