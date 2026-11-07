@@ -52,6 +52,8 @@ export const windowsTaskOwnerScenarios = Object.freeze([
   "an external workspace change during native project setup refuses the late task effect",
   "a failed bridge close still attempts original native owner retirement and cannot upgrade the uncertain bridge exit",
   "project task choices preserve exact scope and refuse stale or invalid metadata without native effects",
+  "saved project inventory uses the selected protected owners without native inspection or authority",
+  "project inventory groups distinct acknowledged tasks and refuses ambiguous saved loads",
   "a dedicated editor client uses only the original acknowledged task owner and rechecks after registration",
   "authenticated editor routes consume one reviewed launch permission without launching a terminal or exposing its protected record",
   "editor target preparation binds the acknowledged load and original endpoint without another resume, launch or authority claim",

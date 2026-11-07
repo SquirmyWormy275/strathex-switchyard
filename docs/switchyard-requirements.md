@@ -15,13 +15,16 @@ selection and the pending keyboard-only conversation. The temporary package is
 removed; current plus one rollback remain.
 [Installed evidence](evidence/installed-external-agent-consent-summary.json).
 
-The latest backend feature lists saved task names for one exact project through
-signed Linux/Windows clients. Its encrypted-store-to-client demonstration passes
-34 groups/87 tests and both TypeScript checks. Listing grants no task authority;
-the selected identity still requires fresh review. Frontend picker/command
+The latest backend feature lists eligible saved projects and distinct task counts
+through signed Linux/Windows clients, followed by existing exact-project task
+choices. Protected owner/load/task records and current workspace policy determine
+eligibility. Listing performs no native observation or write and grants no task
+authority; the selected task still requires fresh review. The encrypted-store-to-
+client demonstration uses an explicit provider double. Frontend picker/command
 activation remains frozen for owner review.
-[Contract](coding-task-owners.md#find-saved-tasks-for-a-project),
-[source evidence](evidence/editor-task-choices-source-summary.json).
+[Contract](coding-task-owners.md#find-eligible-saved-projects),
+37 focused groups/117 tests, zero skips, and both TypeScript checks pass.
+[source evidence](evidence/editor-project-choices-source-summary.json).
 
 Complete Linux `2c6497f` passes 351 groups/2,312 tests with 32 declared skips.
 It covers the installed guided role choices and external-agent consent corrections.

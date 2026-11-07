@@ -27,3 +27,24 @@ export function studioEditorChoices(value: unknown, repositoryRoot: string): Stu
   });
   return Object.freeze({ ...value, choices: Object.freeze(choices) }) as unknown as StudioEditorChoices;
 }
+
+export interface StudioEditorProjects {
+  readonly schema: "switchyard-editor-project-choices/v1";
+  readonly compartment: string;
+  readonly projects: readonly Readonly<{ repositoryRoot: string; taskCount: number }>[];
+  readonly complete: true; readonly nativeObserved: false;
+  readonly authorityGranted: false; readonly freshReviewRequired: true;
+}
+export function studioEditorProjects(value: unknown, validPath: (path: unknown) => boolean): StudioEditorProjects {
+  requireValue(exact(value, ["schema", "compartment", "projects", "complete", "nativeObserved", "authorityGranted", "freshReviewRequired"]));
+  requireValue(value.schema === "switchyard-editor-project-choices/v1" && typeof value.compartment === "string" && /^[a-z][a-z0-9-]{0,63}$/.test(value.compartment));
+  requireValue(value.complete === true && value.nativeObserved === false && value.authorityGranted === false && value.freshReviewRequired === true && Array.isArray(value.projects) && value.projects.length <= 64 && Buffer.byteLength(JSON.stringify(value)) <= 24576);
+  const seen = new Set<string>(); let tasks = 0;
+  const projects = value.projects.map((row: unknown) => {
+    requireValue(exact(row, ["repositoryRoot", "taskCount"]) && typeof row.repositoryRoot === "string" && Buffer.byteLength(row.repositoryRoot) <= 4096 && validPath(row.repositoryRoot));
+    requireValue(Number.isSafeInteger(row.taskCount) && (row.taskCount as number) >= 1 && (row.taskCount as number) <= 64 && !seen.has(row.repositoryRoot));
+    seen.add(row.repositoryRoot); tasks += row.taskCount as number; requireValue(tasks <= 64);
+    return Object.freeze({ ...row }) as unknown as Readonly<{ repositoryRoot: string; taskCount: number }>;
+  });
+  return Object.freeze({ ...value, projects: Object.freeze(projects) }) as unknown as StudioEditorProjects;
+}

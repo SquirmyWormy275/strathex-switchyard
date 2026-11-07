@@ -3,7 +3,7 @@
 import { createHmac,randomBytes,timingSafeEqual } from "node:crypto";
 import { request,type ClientRequest } from "node:http";
 
-const routes={editorChoices:"/instance/v1/editor-choices",editorTarget:"/instance/v1/editor-target",editorReview:"/instance/v1/editor-review",editorIssue:"/instance/v1/editor-issue",editorConsume:"/instance/v1/editor-consume",editorReturnTarget:"/instance/v1/editor-return-target",editorConnectionOpen:"/instance/v1/editor-connection-open",editorConnectionPeer:"/instance/v1/editor-connection-pin-peer",editorConnectionObserve:"/instance/v1/editor-connection-observe",editorConnectionStop:"/instance/v1/editor-connection-stop",editorConnectionRecover:"/instance/v1/editor-connection-recover"} as const;
+const routes={editorProjects:"/instance/v1/editor-projects",editorChoices:"/instance/v1/editor-choices",editorTarget:"/instance/v1/editor-target",editorReview:"/instance/v1/editor-review",editorIssue:"/instance/v1/editor-issue",editorConsume:"/instance/v1/editor-consume",editorReturnTarget:"/instance/v1/editor-return-target",editorConnectionOpen:"/instance/v1/editor-connection-open",editorConnectionPeer:"/instance/v1/editor-connection-pin-peer",editorConnectionObserve:"/instance/v1/editor-connection-observe",editorConnectionStop:"/instance/v1/editor-connection-stop",editorConnectionRecover:"/instance/v1/editor-connection-recover"} as const;
 export type StudioInstanceOperation=keyof typeof routes;
 const hash=(v:unknown):v is string=>typeof v==="string" && /^[a-f0-9]{64}$/.test(v);
 const uuid=(v:unknown):v is string=>typeof v==="string" && /^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/.test(v);
@@ -40,7 +40,7 @@ export class StudioInstanceTransport {
     requireValue(Buffer.byteLength(body)<=(operation==="editorConnectionPeer"||operation==="editorChoices"?8192:2048));
     const proof=await this.post(new URL(route,e.url.origin),body,mac(e.token,"REQUEST",route,body));
     requireValue(proof.status===200 && hash(proof.signature) && timingSafeEqual(Buffer.from(proof.signature,"hex"),Buffer.from(mac(e.token,"RESPONSE-200",route,proof.body),"hex")));
-    const identity:unknown=JSON.parse(proof.body),field=operation==="editorChoices"?"editorChoices":operation.startsWith("editorConnection")?"editorConnection":operation==="editorTarget"||operation==="editorReturnTarget"?"targetObservation":"editorAuthorization";
+    const identity:unknown=JSON.parse(proof.body),field=operation==="editorProjects"?"editorProjects":operation==="editorChoices"?"editorChoices":operation.startsWith("editorConnection")?"editorConnection":operation==="editorTarget"||operation==="editorReturnTarget"?"targetObservation":"editorAuthorization";
     requireValue(object(identity) && Object.keys(identity).sort().join()===["schema","operation","nonce","instanceId","build","pid","origin","status",field].sort().join() && identity.schema==="switchyard-instance/v1" && identity.operation===operation && identity.nonce===nonce && identity.instanceId===e.instance.id && identity.build===e.instance.build && identity.pid===e.pid && identity.origin===e.url.origin && identity.status==="ready");
     requireValue((await this.endpoint()).bytes===e.bytes);await this.current();return identity[field];
   }

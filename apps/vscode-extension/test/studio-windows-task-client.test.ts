@@ -17,9 +17,13 @@ async function fixture(t: TestContext) {
   const selected = { compartment: "personal", ownerRequestId: randomUUID(), loadRequestId: randomUUID() };
   const target = { schema: "switchyard-codex-editor-target/v1", ownerRequestId: selected.ownerRequestId, loadRequestId: selected.loadRequestId, taskId: randomUUID(), sessionId: randomUUID(), repositoryRoot: "C:\\exact repository", repositoryIdentity: { device: "0", inode: "9007199254740993" }, accountFingerprint: "b".repeat(64), permissions: "read-only/on-request", endpoint: { schema: "switchyard-windows-codex-stdio-binding/v1", scope: {schema:"switchyard-runtime-command/v1",id:randomUUID(),guardianPid:1233,birth:"638000000000000001",containment:"windows-job"}, peerPid: 1234, peerBirth: "133000000000000001", peerExecutableSha256: "c".repeat(64) } };
   const result = () => ({ target, targetDigest: createHash("sha256").update(JSON.stringify(target)).digest("hex"), metadataObserved: true, nativeLoadAcknowledged: true, nativeTaskLoaded: false, authorityGranted: false, terminalLaunched: false, ideAttached: false, modelPromptSubmitted: false, completionVerified: false });
-  const controls: { forged: boolean; afterProbe?: () => Promise<void> | void; alter?: (value: ReturnType<typeof result>) => unknown; alterAuthorization?: (value: any) => unknown; alterConnection?: (value: any) => unknown; alterChoices?: (value: any) => unknown; hold?: boolean; routeStatus?: number; readerUnavailable?: boolean } = { forged: false };
+  const controls: { forged: boolean; afterProbe?: () => Promise<void> | void; alter?: (value: ReturnType<typeof result>) => unknown; alterAuthorization?: (value: any) => unknown; alterConnection?: (value: any) => unknown; alterChoices?: (value: any) => unknown; alterProjects?: (value: any) => unknown; hold?: boolean; routeStatus?: number; readerUnavailable?: boolean } = { forged: false };
   const calls: { path: string; bearer: boolean; payload?: unknown }[] = [];
-  const gateway = createInstanceGateway({ token, identity, onStop: () => { throw Error("Stop is outside this read-only client"); }, onEditorChoices: async (selection: { repositoryRoot: string }) => {
+  const gateway = createInstanceGateway({ token, identity, onStop: () => { throw Error("Stop is outside this read-only client"); }, onEditorProjects: async (selection: unknown) => {
+    calls.at(-1)!.payload = selection; if (controls.afterProbe) await controls.afterProbe();
+    const value = { schema: "switchyard-editor-project-choices/v1", compartment: selected.compartment, projects: [{ repositoryRoot: target.repositoryRoot, taskCount: 1 }], complete: true, nativeObserved: false, authorityGranted: false, freshReviewRequired: true };
+    return controls.alterProjects ? controls.alterProjects(value) : value;
+  }, onEditorChoices: async (selection: { repositoryRoot: string }) => {
     calls.at(-1)!.payload = selection; if (controls.afterProbe) await controls.afterProbe();
     const value = { schema: "switchyard-editor-task-choices/v1", compartment: selected.compartment, repositoryRoot: selection.repositoryRoot, choices: [{ ownerRequestId: selected.ownerRequestId, loadRequestId: selected.loadRequestId, taskId: target.taskId, label: "Review parser", loadedAt: 42 }], complete: true, nativeObserved: false, authorityGranted: false, freshReviewRequired: true };
     return controls.alterChoices ? controls.alterChoices(value) : value;
@@ -48,7 +52,7 @@ async function fixture(t: TestContext) {
   let origin: string;
   const server = createServer(async (req, res) => {
     calls.push({ path: req.url ?? "", bearer: Boolean(req.headers.authorization) });
-    assert.ok(["/instance/v1/editor-choices", "/instance/v1/editor-target", "/instance/v1/editor-review", "/instance/v1/editor-issue", "/instance/v1/editor-consume", "/instance/v1/editor-return-target", ...["open", "pin-peer", "observe", "stop", "recover"].map(action => "/instance/v1/editor-connection-"+action)].includes(req.url!)); assert.equal(req.headers.authorization, undefined); assert.equal(req.headers.origin, undefined);
+    assert.ok(["/instance/v1/editor-projects", "/instance/v1/editor-choices", "/instance/v1/editor-target", "/instance/v1/editor-review", "/instance/v1/editor-issue", "/instance/v1/editor-consume", "/instance/v1/editor-return-target", ...["open", "pin-peer", "observe", "stop", "recover"].map(action => "/instance/v1/editor-connection-"+action)].includes(req.url!)); assert.equal(req.headers.authorization, undefined); assert.equal(req.headers.origin, undefined);
     if (controls.hold) return;
     if (controls.forged) { res.end(JSON.stringify({ status: "ready" })); return; }
     await gateway(req, res, origin);
@@ -66,6 +70,10 @@ test("Windows editor client authenticates the shipped instance protocol and reta
   assert.deepEqual(result.target, f.target); assert.equal(result.authorityGranted, false); assert.equal(result.ideAttached, false); assert.equal(result.terminalLaunched, false);
   assert.deepEqual(f.calls.map(row => [row.path, row.bearer]), [["/instance/v1/editor-target", false]]); assert.deepEqual(f.calls[0].payload, f.selected);
   for (const value of [result, result.target, result.target.endpoint, result.target.repositoryIdentity]) assert.ok(Object.isFrozen(value));
+  const projects = await f.client.editorProjects();
+  assert.deepEqual(projects.projects, [{ repositoryRoot: f.target.repositoryRoot, taskCount: 1 }]);
+  assert.equal(projects.authorityGranted, false); assert.equal(projects.nativeObserved, false); assert.equal(projects.freshReviewRequired, true);
+  assert.ok(Object.isFrozen(projects) && Object.isFrozen(projects.projects) && Object.isFrozen(projects.projects[0]));
   const choices = await f.client.editorChoices(f.target.repositoryRoot);
   assert.equal(choices.repositoryRoot, f.target.repositoryRoot); assert.equal(choices.compartment, f.selected.compartment);
   assert.deepEqual(choices.choices, [{ ownerRequestId: f.selected.ownerRequestId, loadRequestId: f.selected.loadRequestId, taskId: f.target.taskId, label: "Review parser", loadedAt: 42 }]);
@@ -222,4 +230,24 @@ test("signed project choices refuse malformed inventories, substituted projects 
   f.controls.afterProbe = () => writeFile(f.endpointPath, JSON.stringify({ ...f.endpoint, pid: process.pid + 1 }));
   await assert.rejects(f.client.editorChoices(f.target.repositoryRoot));
   assert.equal(f.calls.some(row => row.bearer), false);
+});
+
+
+test("signed project inventory refuses malformed paths, counts, scope substitution and endpoint replacement", async t => {
+  const f = await fixture(t);
+  for (const alter of [
+    (v: any) => ({ ...v, complete: false }), (v: any) => ({ ...v, authorityGranted: true }),
+    (v: any) => ({ ...v, nativeObserved: true }), (v: any) => ({ ...v, freshReviewRequired: false }),
+    (v: any) => ({ ...v, credential: "never" }), (v: any) => ({ ...v, projects: [...v.projects, ...v.projects] }),
+    ...[0, -1, 65, 1.5, "1"].map(taskCount => (v: any) => ({ ...v, projects: [{ ...v.projects[0], taskCount }] })),
+    ...["relative", "C:\\repo\\..\\other", "C:\\repo\n", "C:\\" + "x".repeat(4097)].map(repositoryRoot => (v: any) => ({ ...v, projects: [{ repositoryRoot, taskCount: 1 }] })),
+    (v: any) => ({ ...v, projects: [{ ...v.projects[0], taskCount: 64 }, { repositoryRoot: "C:\\other", taskCount: 1 }] }),
+    (v: any) => ({ ...v, projects: Array.from({ length: 8 }, (_, i) => ({ repositoryRoot: "C:\\" + i + "x".repeat(3100), taskCount: 1 })) })
+  ]) { f.controls.alterProjects = alter; await assert.rejects(f.client.editorProjects()); }
+  f.controls.alterProjects = undefined;
+  const transport = new StudioInstanceTransport({ readEndpoint: () => readFile(f.endpointPath, "utf8"), assertCurrent() {} }); t.after(() => transport.close());
+  for (const selection of [{ compartment: "personal" }, { repositoryRoot: f.target.repositoryRoot }, { prompt: "never" }, [], null]) await assert.rejects(transport.exchange("editorProjects", selection));
+  f.controls.forged = true; await assert.rejects(f.client.editorProjects()); f.controls.forged = false;
+  f.controls.afterProbe = () => writeFile(f.endpointPath, JSON.stringify({ ...f.endpoint, pid: process.pid + 1 }));
+  await assert.rejects(f.client.editorProjects()); assert.equal(f.calls.some(row => row.bearer), false);
 });

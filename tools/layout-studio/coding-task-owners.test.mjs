@@ -301,6 +301,40 @@ test("project task choices preserve exact scope and refuse stale or invalid meta
     assert.equal(changed, true); assert.deepEqual(f.calls, calls);
   }
 });
+test("saved project inventory uses the selected protected owners without native inspection or authority", async t => {
+  const f = await editorFixture(t), select = body => f.suite.handle("/api/suite/coding/codex/editor-projects", body), calls = [...f.calls];
+  const before = await f.store.snapshot("personal"), result = await select({});
+  assert.deepEqual(result, { schema: "switchyard-editor-project-choices/v1", compartment: "personal", projects: [{ repositoryRoot: f.task.repositoryRoot, taskCount: 1 }], complete: true, nativeObserved: false, authorityGranted: false, freshReviewRequired: true });
+  assert.deepEqual(await f.store.snapshot("personal"), before); assert.deepEqual(f.calls, calls);
+  for (const input of [{ compartment: "personal" }, { repositoryRoot: f.task.repositoryRoot }, { prompt: "never" }]) await assert.rejects(select(input), /no selection/);
+  await f.store.update("personal", "synthetic-second-load", state => { state.codingTaskLoads.push({ ...state.codingTaskLoads[0], requestId: randomUUID() }); });
+  assert.equal((await select({})).projects[0].taskCount, 1);
+  const snapshot = f.store.snapshot.bind(f.store); let changed = false;
+  f.store.snapshot = async (...args) => { const state = await snapshot(...args); if (!changed) { changed = true; await f.store.selection("personal"); } return state; };
+  try { await assert.rejects(select({}), /workspace changed/); } finally { f.store.snapshot = snapshot; }
+  assert.equal(changed, true);
+  await f.store.update("personal", "synthetic-load-drift", state => { for (const load of state.codingTaskLoads) load.acknowledgedThreadId = randomUUID(); });
+  assert.deepEqual((await select({})).projects, []); assert.deepEqual(f.calls, calls);
+  await f.store.update("personal", "synthetic-policy-change", state => { state.mode = "keyboard-only"; });
+  await assert.rejects(select({}));
+});
+
+test("project inventory groups distinct acknowledged tasks and refuses ambiguous saved loads", async t => {
+  const f = await routedFixture(t), secondRoot = join(f.root, "second-project"); await mkdir(secondRoot);
+  const tasks = [{ ...f.task, sessionId: randomUUID() }, { ...f.task, id: randomUUID(), sessionId: randomUUID(), repositoryRoot: secondRoot, repositoryIdentity: await repositoryIdentity(secondRoot) }];
+  await f.store.update("personal", "synthetic-project-tasks", state => { state.codingSessions = tasks; });
+  for (const task of tasks) {
+    const ownerRequestId = randomUUID(); await f.api("open", { requestId: ownerRequestId, taskId: task.id });
+    const review = await f.api("review-load", { ownerRequestId });
+    await f.api("load", { ownerRequestId, requestId: randomUUID(), token: review.confirmation.token });
+  }
+  const before = await f.store.snapshot("personal"), calls = [...f.calls], select = () => f.suite.handle("/api/suite/coding/codex/editor-projects", {});
+  assert.deepEqual((await select()).projects, tasks.map(task => ({ repositoryRoot: task.repositoryRoot, taskCount: 1 })));
+  assert.deepEqual(await f.store.snapshot("personal"), before); assert.deepEqual(f.calls, calls);
+  await f.store.update("personal", "synthetic-duplicate-load", state => { state.codingTaskLoads.push({ ...state.codingTaskLoads[0] }); });
+  await assert.rejects(select(), /ambiguous/); assert.deepEqual(f.calls, calls);
+});
+
 test("a dedicated editor client uses only the original acknowledged task owner and rechecks after registration", async t => {
   const f=await fixture(t),service=f.service();f.controls.allowResume=true;f.task.sessionId=randomUUID();await f.store.update('personal','fixture-editor-id',s=>{s.codingSessions[0].sessionId=f.task.sessionId;});
   const request=f.request();await service.open('personal',request);const owner=f.owners[0];owner.binding={socketPath:'/tmp/synthetic-editor',socketDevice:'1',socketInode:'3',peerPid:1234,peerBirth:'1',peerExecutableSha256:'c'.repeat(64)};owner.inspectBinding=async()=>structuredClone(owner.binding);
@@ -376,6 +410,9 @@ test("the editor client authenticates the real Studio route and reads original p
   const client = new StudioTaskClient({ endpointPath });
   f.beforeCleanup(async () => { client.close(); await new Promise((resolve, reject) => server.close(error => error ? reject(error) : resolve())); await server.cleanup(); });
   const inventoryBefore = await f.store.snapshot("personal"), callsBefore = [...f.calls];
+  const projects = await client.editorProjects();
+  assert.deepEqual(projects.projects, [{ repositoryRoot: f.task.repositoryRoot, taskCount: 1 }]);
+  assert.equal(projects.authorityGranted, false); assert.equal(projects.nativeObserved, false);
   const choices = await client.editorChoices(f.task.repositoryRoot);
   assert.deepEqual(choices.choices, [{ ...f.input, taskId: f.task.id, label: "Codex task", loadedAt: inventoryBefore.codingTaskLoads[0].updatedAt }]);
   assert.equal(choices.nativeObserved, false); assert.equal(choices.authorityGranted, false); assert.equal(choices.freshReviewRequired, true);

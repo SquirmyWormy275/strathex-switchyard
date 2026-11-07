@@ -15,9 +15,13 @@ async function fixture(t: TestContext) {
   const selected = { compartment: "personal", ownerRequestId: randomUUID(), loadRequestId: randomUUID() };
   const target = { schema: "switchyard-codex-editor-target/v1", ownerRequestId: selected.ownerRequestId, loadRequestId: selected.loadRequestId, taskId: randomUUID(), sessionId: randomUUID(), repositoryRoot: "/exact repository", repositoryIdentity: { device: "1", inode: "2" }, accountFingerprint: "b".repeat(64), permissions: "read-only/on-request", endpoint: { socketPath: "/tmp/exact-private-socket", socketDevice: "1", socketInode: "3", peerPid: 1234, peerBirth: "456", peerExecutableSha256: "c".repeat(64) } };
   const result = () => ({ target, targetDigest: createHash("sha256").update(JSON.stringify(target)).digest("hex"), metadataObserved: true, nativeLoadAcknowledged: true, nativeTaskLoaded: false, authorityGranted: false, terminalLaunched: false, ideAttached: false, modelPromptSubmitted: false, completionVerified: false });
-  const controls: { forged: boolean; afterProbe?: () => Promise<void> | void; alter?: (value: ReturnType<typeof result>) => unknown; alterAuthorization?: (value: any) => unknown; alterConnection?: (value: any) => unknown; alterChoices?: (value: any) => unknown; hold?: boolean; routeStatus?: number } = { forged: false };
+  const controls: { forged: boolean; afterProbe?: () => Promise<void> | void; alter?: (value: ReturnType<typeof result>) => unknown; alterAuthorization?: (value: any) => unknown; alterConnection?: (value: any) => unknown; alterChoices?: (value: any) => unknown; alterProjects?: (value: any) => unknown; hold?: boolean; routeStatus?: number } = { forged: false };
   const calls: { path: string; bearer: boolean; payload?: unknown }[] = [];
-  const gateway = createInstanceGateway({ token, identity, onStop: () => { throw Error("Stop is outside this read-only client"); }, onEditorChoices: async (selection: { repositoryRoot: string }) => {
+  const gateway = createInstanceGateway({ token, identity, onStop: () => { throw Error("Stop is outside this read-only client"); }, onEditorProjects: async (selection: unknown) => {
+    calls.at(-1)!.payload = selection; if (controls.afterProbe) await controls.afterProbe();
+    const value = { schema: "switchyard-editor-project-choices/v1", compartment: selected.compartment, projects: [{ repositoryRoot: target.repositoryRoot, taskCount: 1 }], complete: true, nativeObserved: false, authorityGranted: false, freshReviewRequired: true };
+    return controls.alterProjects ? controls.alterProjects(value) : value;
+  }, onEditorChoices: async (selection: { repositoryRoot: string }) => {
     calls.at(-1)!.payload = selection; if (controls.afterProbe) await controls.afterProbe();
     const value = { schema: "switchyard-editor-task-choices/v1", compartment: selected.compartment, repositoryRoot: selection.repositoryRoot, choices: [{ ownerRequestId: selected.ownerRequestId, loadRequestId: selected.loadRequestId, taskId: target.taskId, label: "Review parser", loadedAt: 42 }], complete: true, nativeObserved: false, authorityGranted: false, freshReviewRequired: true };
     return controls.alterChoices ? controls.alterChoices(value) : value;
@@ -46,7 +50,7 @@ async function fixture(t: TestContext) {
   let origin: string;
   const server = createServer(async (req, res) => {
     calls.push({ path: req.url ?? "", bearer: Boolean(req.headers.authorization) });
-    assert.ok(["/instance/v1/editor-choices", "/instance/v1/editor-target", "/instance/v1/editor-review", "/instance/v1/editor-issue", "/instance/v1/editor-consume", "/instance/v1/editor-return-target", ...["open", "pin-peer", "observe", "stop", "recover"].map(action => "/instance/v1/editor-connection-"+action)].includes(req.url!)); assert.equal(req.headers.authorization, undefined); assert.equal(req.headers.origin, undefined);
+    assert.ok(["/instance/v1/editor-projects", "/instance/v1/editor-choices", "/instance/v1/editor-target", "/instance/v1/editor-review", "/instance/v1/editor-issue", "/instance/v1/editor-consume", "/instance/v1/editor-return-target", ...["open", "pin-peer", "observe", "stop", "recover"].map(action => "/instance/v1/editor-connection-"+action)].includes(req.url!)); assert.equal(req.headers.authorization, undefined); assert.equal(req.headers.origin, undefined);
     if (controls.hold) return;
     if (controls.forged) { res.end(JSON.stringify({ status: "ready" })); return; }
     await gateway(req, res, origin);
@@ -64,6 +68,15 @@ test("editor client authenticates the shipped instance protocol and retains exac
   assert.deepEqual(result.target, f.target); assert.equal(result.authorityGranted, false); assert.equal(result.ideAttached, false); assert.equal(result.terminalLaunched, false);
   assert.deepEqual(f.calls.map(row => [row.path, row.bearer]), [["/instance/v1/editor-target", false]]); assert.deepEqual(f.calls[0].payload, f.selected);
   for (const value of [result, result.target, result.target.endpoint, result.target.repositoryIdentity]) assert.ok(Object.isFrozen(value));
+  const projects = await f.client.editorProjects();
+  assert.deepEqual(projects.projects, [{ repositoryRoot: f.target.repositoryRoot, taskCount: 1 }]);
+  assert.equal(projects.authorityGranted, false); assert.equal(projects.nativeObserved, false); assert.equal(projects.freshReviewRequired, true);
+  assert.ok(Object.isFrozen(projects) && Object.isFrozen(projects.projects) && Object.isFrozen(projects.projects[0]));
+  for (const repositoryRoot of ["relative", "/repo/../other", "/repo\n", "C:\\foreign"]) {
+    f.controls.alterProjects = value => ({ ...value, projects: [{ repositoryRoot, taskCount: 1 }] });
+    await assert.rejects(f.client.editorProjects());
+  }
+  f.controls.alterProjects = undefined;
   const choices = await f.client.editorChoices(f.target.repositoryRoot);
   assert.equal(choices.repositoryRoot, f.target.repositoryRoot); assert.equal(choices.compartment, f.selected.compartment);
   assert.deepEqual(choices.choices, [{ ownerRequestId: f.selected.ownerRequestId, loadRequestId: f.selected.loadRequestId, taskId: f.target.taskId, label: "Review parser", loadedAt: 42 }]);

@@ -3,7 +3,7 @@ import { createHmac, randomBytes, randomUUID, timingSafeEqual } from "node:crypt
 import { request as httpRequest } from "node:http";
 import { windowsTerminalProcessQuery } from "./windows-terminal-process.mjs";
 import { physicalIntentDispatch } from "./physical-intent-contract.mjs";
-const routes = { editorChoices: "/instance/v1/editor-choices", physicalIntent: "/instance/v1/physical-intent", probe: "/instance/v1/probe", stop: "/instance/v1/stop", editorTarget: "/instance/v1/editor-target", editorReview: "/instance/v1/editor-review", editorIssue: "/instance/v1/editor-issue", editorConsume: "/instance/v1/editor-consume", editorReturnTarget: "/instance/v1/editor-return-target" };
+const routes = { editorProjects: "/instance/v1/editor-projects", editorChoices: "/instance/v1/editor-choices", physicalIntent: "/instance/v1/physical-intent", probe: "/instance/v1/probe", stop: "/instance/v1/stop", editorTarget: "/instance/v1/editor-target", editorReview: "/instance/v1/editor-review", editorIssue: "/instance/v1/editor-issue", editorConsume: "/instance/v1/editor-consume", editorReturnTarget: "/instance/v1/editor-return-target" };
 const editorActions = { editorReview: "review", editorIssue: "issue", editorConsume: "consume", editorReturnTarget: "return-target" };
 const connectionActions = { editorConnectionOpen: "open", editorConnectionPeer: "pin-peer", editorConnectionObserve: "observe", editorConnectionStop: "stop", editorConnectionRecover: "recover" };
 for (const [operation, action] of Object.entries(connectionActions)) routes[operation] = "/instance/v1/editor-connection-" + action;
@@ -17,7 +17,7 @@ export function endpointIdentity(endpoint) {
   if (endpoint.schema !== "switchyard-active-endpoint/v1" || !validIdentity(endpoint.instance) || !Number.isSafeInteger(endpoint.pid) || endpoint.pid < 1 || url.protocol !== "http:" || url.hostname !== "127.0.0.1" || url.pathname !== "/" || url.search || url.username || url.password || !token || +url.port < 1024 || +url.port > 65535) throw new Error("This endpoint has no supported authenticated application identity. Preserve the existing instance for inspection.");
   return { url, token, identity: endpoint.instance };
 }
-export function createInstanceGateway({ token, identity, onStop, onEditorChoices, onEditorTarget, onEditorAuthorization, onEditorConnection, onPhysicalIntent, now = () => Date.now() }) {
+export function createInstanceGateway({ token, identity, onStop, onEditorProjects, onEditorChoices, onEditorTarget, onEditorAuthorization, onEditorConnection, onPhysicalIntent, now = () => Date.now() }) {
   if (!validIdentity(identity) || !/^[A-Za-z0-9_-]{43}$/.test(token) || typeof onStop !== "function") throw new Error("A private application identity and owned stop handler are required.");
   let stopping = false;
   const physicalNonces = new Map();
@@ -33,9 +33,9 @@ export function createInstanceGateway({ token, identity, onStop, onEditorChoices
       if (!same(supplied, mac(token, "REQUEST", req.url, raw))) throw new Error();
       const v = JSON.parse(raw.toString("utf8"));
       const authorization = Object.hasOwn(editorActions, operation), returning = operation === "editorReturnTarget", connection = Object.hasOwn(connectionActions, operation), physical = operation === "physicalIntent";
-      const expected = ["at", "build", "instanceId", "nonce", "operation", "schema", ...(operation === "editorChoices" || operation === "editorTarget" || authorization || connection || physical ? ["selection"] : []), ...(physical ? ["pid"] : [])].sort();
+      const expected = ["at", "build", "instanceId", "nonce", "operation", "schema", ...(operation === "editorProjects" || operation === "editorChoices" || operation === "editorTarget" || authorization || connection || physical ? ["selection"] : []), ...(physical ? ["pid"] : [])].sort();
       if (JSON.stringify(Object.keys(v).sort()) !== JSON.stringify(expected) || v.schema !== schema || v.operation !== operation || v.instanceId !== identity.id || v.build !== identity.build || !/^[A-Za-z0-9_-]{43}$/.test(v.nonce) || !Number.isSafeInteger(v.at) || Math.abs(now() - v.at) > 10000) throw new Error();
-      let targetObservation, editorAuthorization, editorConnection, intentDispatch, editorChoices;
+      let targetObservation, editorAuthorization, editorConnection, intentDispatch, editorChoices, editorProjects;
       if (physical) {
         if (stopping || typeof onPhysicalIntent !== "function" || v.pid !== process.pid) throw new Error();
         const selection = physicalIntentDispatch(v.selection), at = now();
@@ -49,6 +49,12 @@ export function createInstanceGateway({ token, identity, onStop, onEditorChoices
         physicalNonces.set(v.nonce, v.at + 10000);
         try { intentDispatch = { requestId: selection.requestId, status: "accepted", result: await onPhysicalIntent(selection) }; }
         catch { intentDispatch = { requestId: selection.requestId, status: "not-confirmed" }; }
+        if (stopping) throw new Error();
+      }
+      if (operation === "editorProjects") {
+        const s = v.selection;
+        if (stopping || typeof onEditorProjects !== "function" || !s || typeof s !== "object" || Array.isArray(s) || Object.keys(s).length !== 0) throw new Error();
+        editorProjects = await onEditorProjects(Object.freeze({}));
         if (stopping) throw new Error();
       }
       if (operation === "editorChoices") {
@@ -87,7 +93,7 @@ export function createInstanceGateway({ token, identity, onStop, onEditorChoices
         editorConnection = await onEditorConnection(connectionActions[operation], Object.freeze({ ...s }));
         if (stopping) throw new Error();
       }
-      const response = JSON.stringify({ schema, operation, nonce: v.nonce, instanceId: identity.id, build: identity.build, pid: process.pid, origin, status: operation === "stop" || stopping ? "stopping" : "ready", ...(operation === "editorTarget" || returning ? { targetObservation } : {}), ...(authorization && !returning ? { editorAuthorization } : {}), ...(connection ? { editorConnection } : {}), ...(physical ? { intentDispatch } : {}), ...(operation === "editorChoices" ? { editorChoices } : {}) });
+      const response = JSON.stringify({ schema, operation, nonce: v.nonce, instanceId: identity.id, build: identity.build, pid: process.pid, origin, status: operation === "stop" || stopping ? "stopping" : "ready", ...(operation === "editorTarget" || returning ? { targetObservation } : {}), ...(authorization && !returning ? { editorAuthorization } : {}), ...(connection ? { editorConnection } : {}), ...(physical ? { intentDispatch } : {}), ...(operation === "editorChoices" ? { editorChoices } : {}), ...(operation === "editorProjects" ? { editorProjects } : {}) });
       if (Buffer.byteLength(response) > (physical ? 256 * 1024 : 32768)) throw new Error();
       res.writeHead(200, { "Content-Type": "application/json", "X-Switchyard-Instance-Response": mac(token, "RESPONSE-200", req.url, response) });
       if (operation === "stop" && !stopping) { stopping = true; res.once("finish", () => { void Promise.resolve().then(onStop).catch(() => {}); }); }

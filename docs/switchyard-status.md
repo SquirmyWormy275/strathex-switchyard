@@ -36,7 +36,7 @@ bound. [Native demo](evidence/backend-connected-demo-native-summary.json).
 | --- | --- |
 | Model F setup | 19 listed model/case/round combinations and 104 named references. Reviewed keyboard proposals retain baselines, readback/recovery and firmware capability limits. [Catalog](model-f-standard-configurations.md), [configuration](switchyard-configuration.md). |
 | Workflows and roles | Editable process definitions, readable saved connection choices and stale-choice refusal. Listing or binding a role does not grant task execution. [Role binding](role-dispatch-binding.md). |
-| Coding tools and editors | Distinct Codex/Claude task APIs, reviewed text, signed project-scoped task choices, one-use launch permits and retained ownership/recovery. [Native tasks](native-coding-tasks.md), [task ownership](coding-task-owners.md). |
+| Coding tools and editors | Distinct Codex/Claude task APIs, reviewed text, signed saved-project and task choices, one-use launch permits and retained ownership/recovery. [Native tasks](native-coding-tasks.md), [task ownership](coding-task-owners.md). |
 | Custom agents | Authenticated enrollment, Node/Python SDKs, bounded intents, replay refusal, credential replacement, revocation and uncertain-outcome review. [SDK guide](../integrations/README.md), [recovery](custom-agent-revocation.md). |
 | Microsoft 365 Copilot | Approved web/Graph routes, exact account binding, Copilot-only Work policy and durable uncertain-request recovery. Live tenant acceptance is separate. [Account contract](copilot-account-binding.md), [request recovery](copilot-request-recovery.md). |
 | Protected workspaces | Compartment-scoped encrypted state, fresh policy checks, bounded OS locks, local credentials and separate Work restrictions. [State locking](private-state-locking.md). |
@@ -106,8 +106,11 @@ the native failure's root cause is still unresolved.
 - Guided role/device wiring, portable-profile review controls, scanner setup
   controls, editor command activation and the complete connected frontend journey.
   Home/catalog and editor activation remain frozen for owner review.
-- Project selection and task-specific IDE attachment beyond the implemented
-  scoped launch/selection contracts, and broader provider containment.
+- Guided project selection and task-specific IDE attachment beyond the implemented
+  scoped launch/selection contracts, and broader provider containment. The signed
+  project inventory backend is implemented; picker activation remains frozen.
+  37 groups/117 tests and both TypeScript checks pass.
+  [Project inventory](evidence/editor-project-choices-source-summary.json).
 - Additional external observation adapters and unsupported scanner coverage:
   broader history and syntax, dependency/feature/target resolution, complete
   archive contents, license text, publisher provenance and verified local

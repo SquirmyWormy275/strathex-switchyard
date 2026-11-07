@@ -40,6 +40,15 @@ instructions. Do not merge or release.
 
 ## Current backend state
 
+The latest backend addition is read-only saved-project discovery. Both typed editor
+clients use a signed empty selection; the Suite chooses the active workspace and
+lists exact roots/distinct task counts from eligible protected owners. It shares
+task-choice eligibility and preserves fresh review. No provider inspection, task
+operation, state write or directory crawl occurs. Picker and command activation
+remain frozen. [Contract](coding-task-owners.md#find-eligible-saved-projects),
+37 focused groups/117 tests, zero skips, and both TypeScript checks pass.
+[source evidence](evidence/editor-project-choices-source-summary.json).
+
 The repeatable [connected backend demo](backend-demonstration.md) runs with
 `node scripts/demo-switchyard-backend.mjs --synthetic`. Seven stages pass using
 normal encrypted stores, authenticated API and signed SDK with a synthetic agent

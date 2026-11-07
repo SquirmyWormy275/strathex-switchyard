@@ -143,6 +143,29 @@ listener exit cannot upgrade an uncertain bridge exit. The owner stays retained
 and replacement remains blocked. Twenty registry cases and typecheck pass with
 exact cleanup. [Correction evidence](evidence/independent-task-owner-stop-summary.json).
 
+## Find eligible saved projects
+
+`editorProjects()` on the Linux and Windows typed clients sends an empty signed
+selection to `/instance/v1/editor-projects`, backed by
+`/api/suite/coding/codex/editor-projects`. The Suite chooses its selected workspace;
+a supplied compartment, project, command or prompt is refused. A same-name
+workspace reselection invalidates an in-flight result.
+
+The bounded response lists exact saved repository roots and distinct eligible
+task counts. It uses the same protected owner/load/task checks as task choices.
+Multiple load records for one task count once; duplicate protected identities
+refuse the inventory. Stale owners and changed bindings are omitted. This reads
+encrypted state only: no filesystem crawl, provider inspection, native task
+operation or state write occurs. Work policy and keyboard-only mode refuse it.
+
+The signed clients validate local paths, total counts, response bounds and endpoint
+identity, then freeze the result. Credentials, native sessions, task content,
+review tokens and launch authority are absent. Choose a project, call
+`editorChoices(repositoryRoot)`, then follow the existing exact review flow.
+An empty list means no eligible owned task is currently saved; it is not proof
+that the machine has no projects. Picker/command activation remains frozen.
+[Source evidence](evidence/editor-project-choices-source-summary.json).
+
 ## Find saved tasks for a project
 
 The editor can request candidates with `editorChoices(repositoryRoot)` on either

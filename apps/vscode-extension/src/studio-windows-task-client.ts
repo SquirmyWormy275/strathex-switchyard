@@ -1,7 +1,7 @@
 /** Windows wire contracts over the shared signed transport. A verified native
  * endpoint reader is required; there is no plain file or credential fallback. */
 import { createHash } from "node:crypto";
-import { studioEditorChoices, type StudioEditorChoices } from "./studio-editor-choices.ts";
+import { studioEditorChoices, studioEditorProjects, type StudioEditorProjects, type StudioEditorChoices } from "./studio-editor-choices.ts";
 import { StudioInstanceTransport,type StudioInstanceOperation } from "./studio-instance-transport.ts";
 import { windowsEditorEndpoint,windowsEditorLocalPath,type WindowsEditorEndpoint } from "./codex-windows-terminal.ts";
 import type { StudioEditorSelection,StudioEditorRequest,StudioEditorReview,StudioEditorAuthorization,StudioEditorObservation,StudioEditorTarget,StudioEditorConnectionObservation,StudioEditorConnectionRecord } from "./studio-task-client.ts";
@@ -88,6 +88,9 @@ function connection(value:unknown,s:StudioEditorRequest,action:Action):Result{
 export class StudioWindowsTaskClient {
   private readonly transport:StudioInstanceTransport;
   constructor(options:Readonly<{readEndpoint:()=>Promise<string>;assertCurrent:()=>void|Promise<void>}>){this.transport=new StudioInstanceTransport(options);}
+  async editorProjects(): Promise<StudioEditorProjects> {
+    return studioEditorProjects(await this.transport.exchange("editorProjects", Object.freeze({})), windowsEditorLocalPath);
+  }
   async editorChoices(repositoryRoot:string):Promise<StudioEditorChoices>{
     requireValue(windowsEditorLocalPath(repositoryRoot) && Buffer.byteLength(repositoryRoot)<=4096);
     return studioEditorChoices(await this.transport.exchange("editorChoices",Object.freeze({repositoryRoot})),repositoryRoot);

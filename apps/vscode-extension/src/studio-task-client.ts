@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { constants } from "node:fs";
 import { lstat, open, realpath } from "node:fs/promises";
-import { studioEditorChoices, type StudioEditorChoices } from "./studio-editor-choices.ts";
+import { studioEditorChoices, studioEditorProjects, type StudioEditorProjects, type StudioEditorChoices } from "./studio-editor-choices.ts";
 import { StudioInstanceTransport } from "./studio-instance-transport.ts";
 import { homedir } from "node:os";
 import { dirname, isAbsolute, join, normalize } from "node:path";
@@ -173,6 +173,9 @@ export class StudioTaskClient {
       bytes = data.subarray(0, read.bytesRead).toString("utf8");
     } finally { await file.close(); }
     await this.current(); return bytes;
+  }
+  async editorProjects(): Promise<StudioEditorProjects> {
+    return studioEditorProjects(await this.transport.exchange("editorProjects", Object.freeze({})), value => typeof value === "string" && isAbsolute(value) && normalize(value) === value && !/[\\\x00-\x1f\x7f]/.test(value));
   }
   async editorChoices(repositoryRoot: string): Promise<StudioEditorChoices> {
     requireValue(typeof repositoryRoot === "string" && isAbsolute(repositoryRoot) && normalize(repositoryRoot) === repositoryRoot && Buffer.byteLength(repositoryRoot) <= 4096 && !/[\\\x00-\x1f\x7f]/.test(repositoryRoot));
