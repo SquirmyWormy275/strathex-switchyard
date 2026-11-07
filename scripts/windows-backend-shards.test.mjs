@@ -12,8 +12,10 @@ test("native measured workloads fit evenly inside the unchanged preliminary job 
   assert.ok(Math.max(...loads) <= 950000, `The historical workload leaves too little room for setup: ${loads.join(",")}`);
   assert.ok(Math.max(...loads) - Math.min(...loads) < 60000, "One batch must not inherit several long native cases just because a new file shifts an array index.");
   assert.deepEqual(windowsBackendShards.map(shard => selectWindowsBackendShard(shard)), shards);
-  assert.equal(costs.groups.length, 198); assert.equal(known.size, 198);
-  assert.equal(costs.sourceCommit, "9f35961ca18087b2406e7e2ad716b5fe97ebc2bb");
+  assert.equal(costs.groups.length, 232); assert.equal(known.size, 232);
+  assert.equal(costs.receipts.length, 6); assert.equal(costs.priorEstimates.groups, 198);
+  for (const row of costs.groups) assert.equal(row.costMs, Math.max(row.observedCostMs, row.priorCostMs ?? 0));
+  assert.equal(costs.sourceCommit, "e5a57816a47fa6434811b9c1efe81fedd6d3ff77");
 });
 
 test("six Windows backend shards preserve every original file and exact manifest scenario once", () => {

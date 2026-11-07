@@ -113,10 +113,19 @@ unknown. No current complete Windows acceptance follows from those preliminary
 passes. Bounded complete-suite progress reporting is now wired in.
 [Interruption evidence](evidence/windows-backend-e5a5781-summary.json).
 
-Later Windows run `42379166911` at source `6727054` was last observed with
-five preliminary shards passing, shard six cancelled, and full release still
-running. Re-read its actual status before reporting a result. Never manually
-dispatch, cancel, retry or expand deadlines to turn a partial run into acceptance.
+Later Windows run `42379166911` at source `6727054` has five passing
+preliminary shards and shard six cancelled at its 20-minute budget. Logs show
+39/40 groups completed; the final Windows scanner-file group had started, with
+no final receipt. Full release was last observed still running.
+
+The scheduling fixture now uses 232 audited `e5a5781` native measurements,
+retaining a higher prior estimate for any existing group. Current batches estimate
+at most 891,633 ms; six jobs, 20-minute job limits, all original child bounds and
+the 60-second unknown-group fallback are unchanged. Three groups/35 tests pass.
+The active complete Linux run predates this test-data-only scheduling change.
+[Scheduling evidence](evidence/windows-scheduling-refresh-summary.json).
+Re-read actual remote status before reporting a result. Never manually dispatch,
+cancel, retry or expand deadlines to turn a partial run into acceptance.
 
 Earlier complete Windows `dc755901` passes 417 groups/2,478 tests with 207
 declared skips. It predates subsequent changes. The intermittent restricted-storage

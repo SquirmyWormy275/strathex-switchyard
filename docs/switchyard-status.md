@@ -251,6 +251,18 @@ corrected complete native acceptance remains pending.
 
 ## Retained failures and unresolved causes
 
+Windows run `42379166911` at source `6727054` reached its 20-minute
+preliminary-shard budget after 39 of 40 groups completed. Its final group,
+`windows-scanner-recipe-files.test.mjs`, had started but produced no final
+receipt. The old fallback estimated one minute; audited `e5a5781` measured
+that group at 209,833 ms. Scheduling now uses all 232 audited native measurements,
+retaining the higher prior estimate where applicable. The six current batches
+estimate at most 891,633 ms each; job/child deadlines, fallback, permissions and
+all tests remain unchanged. Three local groups/35 tests pass. This is a scheduling
+correction, not native acceptance of the current Windows tree.
+[Evidence](evidence/windows-scheduling-refresh-summary.json).
+
+
 The `5ec16fe` Windows workflow failed a separate restricted-storage owner check
 at final native/fixture retirement after seven passing checks. The exact assertion
 is not yet identified; original ownership and fixture data are preserved. Native
