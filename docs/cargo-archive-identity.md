@@ -29,15 +29,16 @@ broader manifest/license coverage remain unfinished.
 [Contract](cargo-archive-identity.md),
 [source evidence](evidence/cargo-inline-manifest-source-summary.json).
 
-Installed `a4e4c17` passes **71 metadata/in-memory checks** and verifies 22 exact
-module hashes, including all 112 Cargo manifest reference cases. All 54 semantic
+Installed `6fdc6bd` passes **71 metadata/in-memory checks** and verifies 22 exact
+module hashes, including all 112 Cargo manifest reference cases and eight Cargo
+archive/license policy reports. All 54 semantic
 workspaces, selection, pending keyboard-only conversation and frozen frontend
 are preserved; 53 sealed files are byte-identical and one changes only audit
 metadata. All four profiles and 57 workflows remain compatible. Dated backup
 and launcher readback verify; current plus one rollback remain. The exact
-531-file, 5,179,353-byte prepared bundle is removed. No live scanner, provider,
+531-file, 5,183,244-byte prepared bundle is removed. No live scanner, provider,
 account, model, keyboard or native Windows focus action was performed.
-[Installed evidence](evidence/installed-cargo-inline-manifest-summary.json).
+[Installed evidence](evidence/installed-cargo-license-summary.json).
 
 Previous installed `9eec9cd` passes 58 reference cases in ten Cargo metadata
 checks inside its 71-check update, preserving all 54 semantic workspaces and the

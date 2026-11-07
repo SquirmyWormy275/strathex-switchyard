@@ -46,6 +46,11 @@ The 112 independent Python TOML/USTAR/gzip cases remain passing grammar evidence
 they are separate from the added license-policy tests. Type checking and original
 package limits pass. [Source evidence](evidence/cargo-license-source-summary.json).
 
-Installed acceptance and actual Windows execution remain separate checkpoints.
+Installed `6fdc6bd` passes all eight in-memory archive/license policy reports
+within its 71-check metadata update. It verifies 22 module hashes, preserves all
+54 semantic workspaces and the frozen frontend, and removes the exact 531-file,
+5,183,244-byte prepared bundle after dated backup and launcher readback. No live
+scanner or provider is started. [Installed evidence](evidence/installed-cargo-license-summary.json).
+Actual Windows execution remains a separate checkpoint.
 Frontend controls are frozen. Broader license-text inspection, dependency
 resolution, provenance and legal approval remain outside this implemented scope.
