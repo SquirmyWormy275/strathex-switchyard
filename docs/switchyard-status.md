@@ -18,7 +18,7 @@ checkpoints are not cumulative acceptance of the latest suite.
 | Checkpoint | Verified result | Limit |
 | --- | --- | --- |
 | Installed Linux `edb76de` | **76 metadata/in-memory checks; 42 exact module hashes.** All 54 semantic workspaces and frozen frontend preserved. [Receipt](evidence/installed-mixed-scanner-input-summary.json). | No live scanner, provider task, account/model request, native focus or hardware operation. |
-| Native Windows client `dec4dd5` | **Eight groups; 100 passing tests; no skips.** Includes the actual terminal process query; source/merge tree, artifact, original commands/bounds and cleanup verify. [Receipt](evidence/windows-terminal-process-native-summary.json). | Predates the TCP peer query; task attachment, interactive focus and full Windows release remain separate. |
+| Native Windows client `89db483` | **Nine groups; 107 passing tests; no skips.** Includes actual process and TCP peer queries; source/merge tree, artifact, original commands/bounds and cleanup verify. [Receipt](evidence/windows-terminal-peer-native-summary.json). | Predates the new WebSocket carrier; task attachment, interactive focus and full Windows release remain separate. |
 | Complete Linux `edb76de` | **330 groups; 2,074 passing tests; 21 declared platform skips.** Original inventory, commands, bounds and owned cleanup verified. [Receipt](evidence/linux-edb76de-complete-summary.json). | Includes combined inputs and Windows saving source; predates terminal/peer probes. |
 | Complete Windows `dc755901` | **417 groups; 2,478 passing tests; 207 declared skips.** All six jobs and overall workflow passed with verified packet/source/cleanup. [Receipt](evidence/windows-complete-dc755901-summary.json). | Predates newer archive, scheduling, profile/workflow and observation corrections. |
 
@@ -38,13 +38,20 @@ storage reduces the package payload to 4,599,483 bytes without changing exports.
 
 ## Recent backend changes
 
+- **Windows authenticated terminal transport:** a one-use loopback carrier now
+  demonstrates bidirectional JSON exchange with a bearer capability and exact
+  peer checks before both directions. Thirteen focused groups pass 118 tests
+  with three platform skips; native Windows carrier acceptance awaits CI.
+  Durable task ownership and Suite/editor wiring remain unfinished.
+  [Contract](windows-editor-transport.md),
+  [source evidence](evidence/windows-editor-ingress-source-summary.json).
 - **Windows terminal connection identity:** a held accepted socket now supplies
   the exact loopback tuple; native TCP ownership is checked against the original
   process before and after image verification. Socket closure cancels and joins
   observation. Thirteen focused groups pass 172 tests with three platform skips;
-  34 native sources compile offline. Native peer acceptance awaits CI, while the
-  earlier process-only probe is accepted. Authenticated transport and task
-  attachment remain unfinished. [Contract](windows-terminal-process.md),
+  34 native sources compile offline. Nine native client groups now pass 107 tests at `89db483`, with no skips.
+  [Native peer evidence](evidence/windows-terminal-peer-native-summary.json).
+  Transport has separate focused evidence; task attachment remains unfinished. [Contract](windows-terminal-process.md),
   [source evidence](evidence/windows-terminal-peer-source-summary.json).
 - **Combined scanner inputs:** current, staged and bounded historical versions can
   share one reviewed scan with separate provenance and authority checks. Fifty-six

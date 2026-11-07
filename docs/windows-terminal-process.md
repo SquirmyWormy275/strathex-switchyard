@@ -62,6 +62,8 @@ compiler output is removed.
 
 The new actual Windows test binds an owned Node client, refuses the server's PID
 and a reversed tuple, then refuses the closed connection. It is registered in
-client CI and awaits native acceptance. This observation is a point-in-time
-check; the transport must retain and recheck its socket. Authenticated WebSocket
-transport, Suite routing and task-specific editor attachment remain unfinished.
+client CI and now passes at `89db483`, within nine groups and 107 tests, no skips.
+[Native peer evidence](evidence/windows-terminal-peer-native-summary.json).
+This observation is a point-in-time
+check; the transport must retain and recheck its socket. The [WebSocket carrier](windows-editor-transport.md) now has separate focused
+evidence; Suite routing and task-specific editor attachment remain unfinished.

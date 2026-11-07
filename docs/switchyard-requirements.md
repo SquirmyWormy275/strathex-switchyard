@@ -1,5 +1,18 @@
 # Switchyard authoritative requirement ledger
 
+The Windows loopback carrier now performs an actual local bidirectional JSON
+exchange with capability authentication and a separately pinned process. It
+rechecks native peer evidence before both directions and joins shutdown.
+**Thirteen focused groups pass 118 tests with three platform skips**; typecheck
+passes. Native inspection is doubled in Linux transport cases. Windows carrier
+CI acceptance and durable task/Suite/editor integration remain separate.
+[Transport contract](windows-editor-transport.md),
+[source evidence](evidence/windows-editor-ingress-source-summary.json).
+
+The underlying Windows peer query is accepted at `89db483`: **nine native client
+groups, 107 tests, no skips**, with exact source, artifacts, bounds and cleanup.
+[Native peer evidence](evidence/windows-terminal-peer-native-summary.json).
+
 Complete Linux `edb76de` passes **330 groups, 2,074 tests and 21 declared
 platform skips**, with zero failures or cancellations. Exact original inventory,
 commands, bounds, skips and child/tree retirement verify. The isolated checkout,
