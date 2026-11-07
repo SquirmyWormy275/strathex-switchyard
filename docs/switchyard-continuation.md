@@ -112,6 +112,14 @@ workspace preserved. It postdates complete Linux `0c7d918`; broader external
 streams remain unfinished. [Installed receipt](evidence/installed-runtime-observation-summary.json).
 [Runtime observation contract](codex-runtime-observation.md).
 
+Native Windows client `0bb7fd4` is audited: run `42378182713`, helper job
+`128420018866`, client job `128420211686`, 25 groups and 249 passing tests with
+zero skips. The merge/source trees match. Original source manifest, commands,
+deadlines, artifact/receipt hashes and process cleanup verify. Only the 3,534-byte
+receipt ZIP was read in memory; the native helper was not downloaded. This lane
+does not include the new runtime-observation backend groups or interactive
+provider/desktop acceptance. [Receipt](evidence/runtime-observation-native-client-summary.json).
+
 ## Outstanding verification and implementation
 
 Complete Linux `0c7d918` is audited: 350 groups, 2,274 tests and 32 declared
