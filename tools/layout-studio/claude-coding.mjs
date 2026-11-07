@@ -213,10 +213,11 @@ export function createClaudeCoding({ store, resolveCli = trustedCli, run, comman
       const confirmation = await suiteConfirmations(store, c, "claude-code", now).issue({ ...reviewed(c, task, row), reason: "Stop this exact owned Claude background session; retain its conversation. Previous effects and task completion remain unverified.", reauthenticated: false });
       return { status: "requires-confirmation", taskId: id, confirmation, scope: { provider: "claude-code", label: task.label, repositoryRoot: task.repositoryRoot, sessionId: task.sessionId, backgroundId: task.backgroundId, processId: row.pid }, taskCompletionVerified: false };
     },
-    async focus(c, id) {
+    async focus(c, id, { assertCurrent = async () => {} } = {}) {
+      await assertCurrent();
       const generation = fence(c), { task, row } = await exact(c, id, generation), executable = await access(c);
       if (row?.kind !== "interactive" || !row.pid) throw new Error("Only a live exact interactive Claude session can be focused. Background worker PIDs are not attached-terminal identities.");
-      const result = await windows.focus({ row, executable, repositoryRoot: task.repositoryRoot, verifySession: async () => { const check = await exact(c, id, generation); if (!check.row || check.row.kind !== row.kind || check.row.sessionId !== row.sessionId || check.row.pid !== row.pid || check.row.startedAt !== row.startedAt) throw new Error("Claude's exact interactive session changed during native window focus."); } });
+      const result = await windows.focus({ row, executable, repositoryRoot: task.repositoryRoot, assertCurrent, verifySession: async () => { const check = await exact(c, id, generation); if (!check.row || check.row.kind !== row.kind || check.row.sessionId !== row.sessionId || check.row.pid !== row.pid || check.row.startedAt !== row.startedAt) throw new Error("Claude's exact interactive session changed during native window focus."); await assertCurrent(); } });
       return store.update(c, "claude-window-focus", (s) => { const t = taskIn(s, id); t.lastWindowFocus = { at: now(), status: "verified", sessionId: task.sessionId, processId: row.pid, processStartedAt: row.startedAt, ...(result.terminalKind ? { terminalKind: result.terminalKind } : {}) }; t.observation = observation(row); return { id, sessionId: task.sessionId, ...result }; }, { provider: "claude-code" });
     },
     async stop(c, { id, token }) {

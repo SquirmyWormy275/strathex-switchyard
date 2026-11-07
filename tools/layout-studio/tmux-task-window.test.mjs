@@ -44,6 +44,21 @@ test("exact pane navigation selects only native IDs and verifies process/socket/
   assert.equal(current, 3); assert.equal(result.terminalKind, "foot+tmux"); assert.equal(result.paneFocusVerified, true); assert.equal(result.windowFocusVerified, true); assert.equal(result.taskResumptionVerified, false); assert.equal(result.modelPromptSubmitted, false);
   assert.equal(f.calls.filter(row => row[0] === "tmux" && row[1] === "switch-client").length, 1); assert.equal(f.calls.filter(row => row[0] === "hypr" && row[1] === "dispatch").length, 1); assert.equal(JSON.stringify(result).includes("/private"), false); assert.ok(f.calls.every(row => !row.includes("send-keys") && !row.includes("run-shell")));
 });
+
+test("tmux selection enforces its caller's current authorization after socket validation", async () => {
+  const f = fixture(), observed = await f.inspect();
+  await assert.rejects(f.tmux.select(observed.witness, { assertCurrent: async () => { throw Error("Synthetic role authorization changed"); } }), /role authorization changed/);
+  assert.equal(f.calls.some(call => call[1] === "switch-client"), false);
+});
+
+test("a changed role after exact pane selection prevents compositor focus and claims no successful result", async () => {
+  const f = fixture();
+  await assert.rejects(createTaskWindow(f.options).focus({ ...f.request, assertCurrent: async () => {
+    if (f.calls.some(call => call[1] === "switch-client")) throw Error("Synthetic role authorization changed after pane selection");
+  } }), /role authorization changed/);
+  assert.equal(f.calls.filter(call => call[1] === "switch-client").length, 1);
+  assert.equal(f.calls.some(call => call[1] === "dispatch"), false);
+});
 test("configured hooks refuse before any query with an after hook, without copying hook bodies or dispatching navigation", async () => {
   const f = fixture(); f.state.hooks = "after-list-panes[0] run-shell 'NEVER_EXECUTE'\n";
   await assert.rejects(f.inspect(), error => /Configured tmux hooks/.test(error.message) && !error.message.includes("NEVER_"));

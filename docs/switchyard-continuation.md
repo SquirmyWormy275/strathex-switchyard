@@ -50,9 +50,14 @@ both TypeScript checks. Selection attempts advance a generation, so a round trip
 failed departure or shutdown cannot revive a pending custom-agent shortcut.
 Existing native-focus/client-launch callbacks use the same guard; saved selection
 is read again before enqueue. Five original workspace regressions are retained.
-These corrections are source-only. Other provider native-effect checks still
-need implementation; the in-memory generation cannot observe external selection
-round trips entirely between reads.
+Claude's exact focus path now carries the role/workspace guard into session
+verification, the final process/window observation and tmux socket validation
+before navigation. A change after pane selection prevents compositor focus and
+does not reverse/repeat the earlier effect. Three original regressions remain;
+ten focused groups pass 141 tests with one skip and both TypeScript checks.
+These corrections are source-only. Codex/conversation resume, cancellation and
+design effect checks still need implementation; the in-memory generation cannot
+observe external selection round trips entirely between reads.
 [Role dispatch contract](role-dispatch-binding.md).
 
 Native Windows client source `738c1f7` is audited: workflow `42372481436`, helper

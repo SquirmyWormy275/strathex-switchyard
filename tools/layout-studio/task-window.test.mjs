@@ -67,3 +67,11 @@ test("focus cannot turn a wrong compositor acknowledgement into an exact task re
   await assert.rejects(createTaskWindow(next.options).focus({ ...next.request, verifySession: async () => { throw new Error("Provider session changed"); } }), /Provider session changed/);
   assert.equal(next.calls.some((c) => c[0] === "dispatch"), false);
 });
+
+test("task focus rechecks the dispatch guard after the final process and window observation", async () => {
+  const f = fixture(), hypr = f.options.hypr;
+  let observations = 0, revoked = false;
+  f.options.hypr = async (...args) => { if (args[0] === "clients" && ++observations === 2) revoked = true; return hypr(...args); };
+  await assert.rejects(createTaskWindow(f.options).focus({ ...f.request, assertCurrent: async () => { if (revoked) throw Error("Synthetic role authorization changed"); } }), /role authorization changed/);
+  assert.equal(f.calls.some(call => call[0] === "dispatch"), false);
+});

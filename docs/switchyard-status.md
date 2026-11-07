@@ -76,7 +76,10 @@ pass, including five reproduced regressions, and six focused groups pass 88 test
 with one platform skip. The follow-up workspace fence passes seven groups and
 106 tests with one skip: departure attempts, round trips and shutdown cannot
 revive a pending custom-agent shortcut, and native-focus/client-launch callbacks
-receive the same generation guard. Other provider effect boundaries remain
+receive the same generation guard. Claude's exact terminal-focus path now checks
+the role/workspace guard immediately before tmux navigation and compositor focus;
+ten focused groups pass 141 tests with one skip and both TypeScript checks.
+Codex/conversation resume, cancellation and design effect boundaries remain
 separate work. These corrections are not installed yet.
 [Role dispatch evidence and limitations](role-dispatch-binding.md).
 

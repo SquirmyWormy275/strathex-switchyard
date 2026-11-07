@@ -627,14 +627,20 @@ export function createSuite({ store = createSuiteStore(), platform = process.pla
         const binding = state.roleBindings?.find(candidate => candidate.roleId === roleId && candidate.intent === intent);
         if (roleBindingDigest(state, binding) !== digest) throw new Error("The exact role binding changed before dispatch settled. Any command already queued remains with its original session; no alternate target or automatic retry was selected.");
       };
+      const assertCurrent = async () => {
+        await assertContextCurrent();
+        const current = await store.snapshot(compartment);
+        assertCurrentState(current);
+        roleTarget(current, roleId, intent);
+      };
       await assertContextCurrent();
       await store.authorize(compartment, { provider: b.provider });
       let result;
       if (b.targetKind === "client-surface") {
         if (content !== undefined) throw new Error("A homepage launch cannot receive workflow content, prompts or handoffs.");
-        result = await clientLaunch.launch(compartment, { compartment, id: b.targetId, requestId }, { digest, assertCurrent: async () => { await assertContextCurrent(); const current = await store.snapshot(compartment); assertCurrentState(current); roleTarget(current, roleId, intent); } });
+        result = await clientLaunch.launch(compartment, { compartment, id: b.targetId, requestId }, { digest, assertCurrent });
       }
-      else if (b.targetKind === "coding-task") result = b.provider === "claude-code" ? await (intent === "summon" ? claudeCoding.focus(compartment, b.targetId) : claudeCoding.status(compartment, b.targetId)) : await (intent === "resume" ? coding.resume(compartment, b.targetId) : coding.status(compartment, b.targetId));
+      else if (b.targetKind === "coding-task") result = b.provider === "claude-code" ? await (intent === "summon" ? claudeCoding.focus(compartment, b.targetId, { assertCurrent }) : claudeCoding.status(compartment, b.targetId)) : await (intent === "resume" ? coding.resume(compartment, b.targetId) : coding.status(compartment, b.targetId));
       else if (b.provider === "custom-agent") result = await custom.dispatch(compartment, { agentId: b.targetId, intent, sessionId: b.sessionId, content, credentialEpoch: b.credentialEpoch ?? "legacy" }, { assertCurrent: assertContextCurrent, assertCurrentState });
       else {
         const c = s.conversations.find((c) => c.id === b.targetId && c.provider === b.provider && c.sessionId === b.sessionId);

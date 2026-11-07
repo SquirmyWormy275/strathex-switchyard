@@ -37,8 +37,19 @@ Suite; a separate process rewriting selection away and back entirely between
 reads is outside this generation check.
 [Workspace lifecycle evidence](evidence/physical-workspace-lifecycle-source-summary.json).
 
+Claude's exact interactive-task focus now carries the same role and workspace
+guard through session verification, final process/window observation and native
+navigation. The tmux path checks it after validating the socket and before
+switching panes. If authorization changes after pane selection, compositor focus
+is refused; the original pane action is not automatically reversed or repeated.
+Three regressions reproduced the earlier focus effects after a role/workspace
+change. Ten focused groups pass 141 tests and one declared platform skip, plus
+both TypeScript checks. Process, provider, window and tmux observations are
+explicit doubles. [Claude focus evidence](evidence/claude-focus-role-boundary-source-summary.json).
+
 These are source-level corrections; the installed application remains `738c1f7`.
-Other provider adapters still need equivalent checks immediately before their
-native effects. The shared final history check prevents stale attribution, but
-does not prevent an earlier native effect. No live account, model, installed
+Codex/conversation resume, cancellation and design submission still need
+equivalent checks at their own effect boundaries. The shared final history check
+prevents stale attribution, but does not prevent an earlier native effect.
+Windows task-window focus remains unsupported. No live account, model, installed
 agent, keyboard or frontend operation was used for this verification.

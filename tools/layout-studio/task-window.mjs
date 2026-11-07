@@ -33,21 +33,23 @@ export function createTaskWindow({ platform = process.platform, readProcess = li
   const stable = observed => JSON.stringify({ ...observed, ...(observed.tmux ? { tmux: { witness: observed.tmux.witness } } : {}) });
   const selected = observed => !observed.tmux || ["session", "window", "pane"].every(key => observed.tmux.selection[key] === observed.tmux.witness[key]);
   return {
-    async focus({ row, executable, repositoryRoot, verifySession }) {
+    async focus({ row, executable, repositoryRoot, verifySession, assertCurrent = async () => {} }) {
       const before = await inspect(row, executable, repositoryRoot);
       await verifySession();
       const justBefore = await inspect(row, executable, repositoryRoot);
       if (JSON.stringify(before) !== JSON.stringify(justBefore)) throw new Error("The exact native process/window changed before focus.");
       if (before.tmux) {
-        await tmux.select(before.tmux.witness);
+        await tmux.select(before.tmux.witness, { assertCurrent });
         await verifySession();
         const switched = await inspect(row, executable, repositoryRoot);
         if (stable(before) !== stable(switched) || !selected(switched)) throw Error("Exact tmux pane selection was not verified; terminal window focus was not dispatched.");
       }
+      await assertCurrent();
       const result = await hypr("dispatch", `hl.dsp.focus({ window = "address:${before.address}" })`);
       if (result.trim() !== "ok") throw new Error("The compositor did not acknowledge exact task-window focus.");
       const focused = JSON.parse(await hypr("activewindow", "-j")), after = await inspect(row, executable, repositoryRoot);
       await verifySession();
+      await assertCurrent();
       if (focused.address !== before.address || focused.pid !== before.terminalPid || stable(before) !== stable(after) || !selected(after)) throw new Error("Exact task-window focus was not verified after dispatch.");
       return { effect: "exact-interactive-session-focused", terminalKind: before.terminalKind, windowFocusVerified: true, ...(before.tmux ? { paneFocusVerified: true } : {}), taskResumptionVerified: false, modelPromptSubmitted: false, taskCompletionVerified: false, provenance: "Claude native inventory plus current-user process/foreground-group lineage and one exact compositor window with readback; private tmux targets also bind native socket/server/client/pane identities and selection readback; no terminal text submitted" };
     }

@@ -24,7 +24,7 @@ async function fixture(fn) {
     if (args[0] === "stop") { if (failStop) throw new Error("Synthetic uncertain stop"); const row = rows.find((r) => r.id === args[1]); assert.ok(row); row.state = "stopped"; row.startedAt -= 37; delete row.pid; delete row.status; return "stopped\n"; }
     throw new Error("Unexpected native CLI operation");
   };
-  const windows = { focus: async ({ verifySession }) => { beforeFocus(); await verifySession(); focusEffects++; await verifySession(); return { effect: "exact-interactive-session-focused", windowFocusVerified: true, taskResumptionVerified: false, modelPromptSubmitted: false }; } };
+  const windows = { focus: async ({ verifySession }) => { await beforeFocus(); await verifySession(); focusEffects++; await verifySession(); return { effect: "exact-interactive-session-focused", windowFocusVerified: true, taskResumptionVerified: false, modelPromptSubmitted: false }; } };
   const options = { store, run, windows, platform: "linux", resolveCli: async () => "/synthetic/native/claude", now: () => clock }, service = createClaudeCoding(options);
   const input = () => ({ requestId: randomUUID(), repositoryRoot, label: "Local label never sent to provider" });
   try { await fn({ root, repositoryRoot, stateRoot, rows, store, service, options, calls, input, changeAccount: () => { login = { ...login, email: "changed@example.invalid" }; }, failInventory: () => { failInventory = true; }, omitIdentity: () => { omitIdentity = true; }, failStop: () => { failStop = true; }, rejectTrust: () => { failTrust = true; }, advance: (n) => { clock += n; }, beforeFocus: (fn) => { beforeFocus = fn; }, focusEffects: () => focusEffects }); }
@@ -169,6 +169,32 @@ test("Claude interactive summon revalidates native session identity and cannot t
     assert.equal((await service.status("personal", task.id)).capabilities.focusable, false);
   } finally { await suite.close(); }
 }));
+
+for (const boundary of ["same-role-rebind", "workspace-round-trip"]) {
+  test(`Claude role focus refuses ${boundary} before the native effect`, () => fixture(async ({ service, rows, repositoryRoot, beforeFocus, focusEffects, store }) => {
+    const row = { cwd: repositoryRoot, kind: "interactive", startedAt: Date.now(), pid: 6789, status: "idle", sessionId: randomUUID() }; rows.push(row);
+    const task = await service.bind("personal", { sessionId: row.sessionId, repositoryRoot, label: "Synthetic interactive task" });
+    const suite = createSuite({ store, claudeCoding: service, agents: { discovery: async () => [], close() {} }, voice: { discovery: async () => ({ available: false }) } });
+    const binding = { roleId: "builder", intent: "summon", provider: "claude-code", targetKind: "coding-task", targetId: task.id };
+    try {
+      await suite.handle("/api/suite/bootstrap");
+      await store.saveWorkflow("personal", { name: "Synthetic focus", roles: [{ id: "builder", label: "Builder" }], steps: [] });
+      await suite.handle("/api/suite/roles/bind", binding);
+      beforeFocus(async () => {
+        if (boundary === "same-role-rebind") await suite.handle("/api/suite/roles/bind", binding);
+        else {
+          await suite.handle("/api/suite/compartment/select", { compartment: "other" });
+          await suite.handle("/api/suite/compartment/select", { compartment: "personal" });
+        }
+      });
+      await assert.rejects(suite.handle("/api/suite/intent", { implementation: "switchyard.role/v1", roleId: "builder", intent: "summon" }), /role binding changed|workspace changed/);
+      assert.equal(focusEffects(), 0);
+      const state = await store.snapshot("personal");
+      assert.equal(state.codingSessions.find(t => t.id === task.id).lastWindowFocus, undefined);
+      assert.equal(state.intentResults?.length ?? 0, 0);
+    } finally { await suite.close(); }
+  }));
+}
 
 function supervised(options, settings = {}) {
   const frames = [], calls = [];

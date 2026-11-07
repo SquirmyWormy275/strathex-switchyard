@@ -71,8 +71,9 @@ export function createTmuxTaskWindow({ readProcess = linuxProcess, stat = lstat,
       if (JSON.stringify(originalSocket) !== JSON.stringify(currentSocket) || JSON.stringify(identity(server)) !== JSON.stringify(identity(currentServer)) || JSON.stringify(context) !== JSON.stringify(await readContext(cli.pid))) throw Error("The exact tmux socket or server changed during observation.");
       return { terminal, terminalKind: terminals[terminal.executable] + "+tmux", attached: [...attached, terminal], witness: { socket, socketIdentity: originalSocket, server: identity(server), client: identity(process), clientTty: client[2], paneTty: pane[5], session: pane[1], window: pane[2], pane: pane[3], paneRoot: identity(root) }, selection: { session: client[3], window: client[4], pane: client[5] } };
     },
-    async select(observed) {
+    async select(observed, { assertCurrent = async () => {} } = {}) {
       if (!observed || !tty(observed.clientTty) || !id(observed.pane, "%") || JSON.stringify(await socketIdentity(observed.socket)) !== JSON.stringify(observed.socketIdentity)) throw Error("The exact witnessed tmux navigation target changed.");
+      await assertCurrent();
       const result = await command(observed.socket, ["switch-client", "-E", "-c", observed.clientTty, "-t", observed.pane]);
       if (result !== "") throw Error("The exact tmux pane switch did not acknowledge navigation.");
     }
