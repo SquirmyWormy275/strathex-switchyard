@@ -52,23 +52,23 @@ checkpoints are not cumulative acceptance of the latest suite.
 
 | Scope | Verified result | What it does not establish |
 | --- | --- | --- |
-| Installed Linux `6337263` | **102 metadata/refusal checks; 59 exact module hashes.** All 54 semantic workspaces, four profiles, 57 workflows, selection, pending keyboard-only conversation and frozen frontend preserved. [Evidence](evidence/installed-claude-status-consent-summary.json). | Live task/model/account operations, editor command activation, hardware or microphone acceptance. |
-| Complete Linux `cf3bb4c` | **356 groups; 2,326 passing tests; 32 declared skips.** Original manifest, commands, deadlines and cleanup audited. Covers project inventory, connected demo, guided roles, consent fences and paired-runner contracts. [Evidence](evidence/linux-cf3bb4c-complete-summary.json). | Installed `6337263` has separate metadata/refusal checks; earlier native Claude metadata acceptance is retained. Native Windows, live accounts, interactive UI and physical devices remain separate. Later fixture diagnostics have their own focused evidence. |
+| Installed Linux `9266c12` | **102 metadata/refusal checks; 59 exact module hashes.** All 54 semantic workspaces, four profiles, 57 workflows, selection, pending keyboard-only conversation and frozen frontend preserved. [Evidence](evidence/installed-codex-status-consent-summary.json). | Live task/model/account operations, editor command activation, hardware or microphone acceptance. |
+| Complete Linux `cf3bb4c` | **356 groups; 2,326 passing tests; 32 declared skips.** Original manifest, commands, deadlines and cleanup audited. Covers project inventory, connected demo, guided roles, consent fences and paired-runner contracts. [Evidence](evidence/linux-cf3bb4c-complete-summary.json). | Installed `9266c12` has separate metadata/refusal checks; earlier native Claude metadata acceptance is retained. Native Windows, live accounts, interactive UI and physical devices remain separate. Later fixture diagnostics have their own focused evidence. |
 | Complete Windows source `90fa879` | **462 groups; 2,902 passing tests; 246 declared skips.** All 21 original worker receipts and the native collector match; all 23 jobs succeed. Exact source/tree/tool identities, commands, bounds and cleanup verify. [Evidence](evidence/complete-windows-90fa879-summary.json). | Package, live-host and later Claude 2.1.319 admission. Earlier intermittent failures remain unresolved. |
 | Native Windows contracts `b38ff759` | **Role/dispatch: 24 tests across two complete files. External-agent consent: 51 tests across three files.** Exact source/merge trees, original bounds and cleanup verified. [Roles](evidence/role-choices-native-b38-summary.json), [consent](evidence/agent-consent-native-b38-summary.json). | Complete Windows suite/package acceptance or live provider behavior. |
 | Native Windows client `9d230ac` | **25 groups; 250 tests; zero skips.** Signed launcher composition plus native endpoint/process/socket contracts. [Evidence](evidence/editor-task-choices-native-client-summary.json). | Terminal/provider doubles do not establish interactive task handoff. |
 | Earlier complete Windows `dc755901` | **417 groups; 2,478 tests; 207 declared skips.** All workflow jobs passed. [Evidence](evidence/windows-complete-dc755901-summary.json). | This revision predates later backend changes. |
 
-The installed payload contains 554 files/4,749,905 bytes. Dated backup and launcher
-readback verify; current plus one rollback remain. Its exact 555-file/4,849,389-byte prepared
+The installed payload contains 554 files/4,750,121 bytes. Dated backup and launcher
+readback verify; current plus one rollback remain. Its exact 555-file/4,849,605-byte prepared
 bundle is removed. The complete Linux checkout, nine dependency aliases and
 803 generated files/11,907,805 bytes are also removed. The latest `cf3bb4c`
 checkout, nine aliases and 803 generated files/11,910,385 bytes are removed too;
 other worktrees remain.
 
-## Current Claude Code compatibility
+## Native status and version compatibility
 
-Codex status now uses the same recording-consent capture as Claude. Two additional retained failures showed a delayed result entering a resumed recording and its history event receiving the storage timestamp. The fix preserves the original provider time; task-status freshness was already correct. All 35 original groups/151 tests pass, including both adapters, the shared collector and all 29 task-owner scenarios. TypeScript checking passes. [Codex evidence](evidence/codex-status-consent-summary.json). Installed Codex adoption remains pending this source checkpoint.
+Codex status now uses the same recording-consent capture as Claude. Two additional retained failures showed a delayed result entering a resumed recording and its history event receiving the storage timestamp. The fix preserves the original provider time; task-status freshness was already correct. All 35 original groups/151 tests pass, including both adapters, the shared collector and all 29 task-owner scenarios. TypeScript checking passes. [Codex evidence](evidence/codex-status-consent-summary.json). Installed adoption now passes 102 metadata/refusal checks across 59 exact modules. [Installed evidence](evidence/installed-codex-status-consent-summary.json).
 
 Claude status now preserves its native arrival time and original recording consent across delayed ownership/account checks and storage. Two retained regressions exposed recording after same-clock pause/resume and stale status being refreshed by a write delay. Seven groups/113 tests and TypeScript checking pass; the installed update passes 102 metadata/refusal checks across 59 exact modules. The connected demo also passes all seven stages with explicit synthetic providers. [Evidence](evidence/claude-status-consent-summary.json).
 

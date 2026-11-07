@@ -38,9 +38,9 @@ instructions. Do not merge or release.
   persistent-file readback. Keep current plus one rollback. Preserve all
   workspace identities, semantic snapshots, selection and frozen frontend.
 
-## Current Claude version work
+## Current native status and version work
 
-Codex status now uses the same recording-consent capture as Claude. Two additional retained failures showed a delayed result entering a resumed recording and its history event receiving the storage timestamp. The fix preserves the original provider time; task-status freshness was already correct. All 35 original groups/151 tests pass, including both adapters, the shared collector and all 29 task-owner scenarios. TypeScript checking passes. [Codex evidence](evidence/codex-status-consent-summary.json). Publish the source and perform the normal installed update; keep the original failing receipts. No native task/model operation is authorized by these checks.
+Codex status now uses the same recording-consent capture as Claude. Two additional retained failures showed a delayed result entering a resumed recording and its history event receiving the storage timestamp. The fix preserves the original provider time; task-status freshness was already correct. All 35 original groups/151 tests pass, including both adapters, the shared collector and all 29 task-owner scenarios. TypeScript checking passes. [Codex evidence](evidence/codex-status-consent-summary.json). The normal installed update at `9266c12` passes 102 metadata/refusal checks across 59 exact modules; its exact prepared bundle is removed. Keep the original failing receipts. No native task/model operation is authorized by these checks.
 
 The latest source correction preserves Claude status arrival time and the recording generation captured before inventory. Two original failures are retained; seven original groups/113 tests and typecheck pass. Installed source `6337263` passes 102 metadata/refusal checks across 59 exact modules; the connected seven-stage synthetic demonstration passes and its temporary state is removed. No recording or native task is started by this correction. [Evidence](evidence/claude-status-consent-summary.json).
 
@@ -117,9 +117,9 @@ a replacement. Eight groups/124 tests and installed metadata checks cover them.
 
 ## Installed checkpoint
 
-- Source: `6337263aa789ee7bbca10819db304cbcaf27f5c3`.
-- Release: `8aa0cc4c80cfd45c1c48c0725139be7a1e1870fb2bbc749ecd849d026100d1dc`.
-- Rollback: `344fd0a03eaa1e21737c86b54db9c4142903303d1f75bfcdd72402a5830abc15`.
+- Source: `9266c1248af9a8f8c8bd355b5b0b150bcc957e0e`.
+- Release: `0c71eced8cddd1d184b430947fbe11f79a791c3328ea1a99cc21af714facc297`.
+- Rollback: `8aa0cc4c80cfd45c1c48c0725139be7a1e1870fb2bbc749ecd849d026100d1dc`.
 - Frozen frontend: `24100ef601b810efb0cda95e4fe0842d2944560734b02c4cf482c25e19150543`.
 - 102 metadata/refusal checks, 59 exact module hashes; all 54 semantic workspaces,
   four profiles, 57 workflows, selection and one pending keyboard-only conversation
@@ -127,17 +127,19 @@ a replacement. Eight groups/124 tests and installed metadata checks cover them.
 - The earlier installed native Claude version/account check accepts 2.1.319 with both
   owned guardians independently stopped; no prompt/task/login operation occurred.
 - Dated backup and launcher readback verify. Current plus one rollback remain.
-  Installed payload: 554 files/4,749,905 bytes. The exact temporary package,
-  555 files/4,849,389 bytes, is removed.
+  Installed payload: 554 files/4,750,121 bytes. The exact temporary package,
+  555 files/4,849,605 bytes, is removed.
   Do not repeat executed installation or cleanup scripts.
 
 The selected personal workspace returns a complete empty project inventory without
 native observation or task authority. Unauthenticated and malformed requests
 refuse. Source and native contracts cover populated inventory separately.
 Host-facing task-owner, Copilot-journal and signed-intent verifiers run sequentially.
-[Installed receipt](evidence/installed-claude-status-consent-summary.json).
+[Installed receipt](evidence/installed-codex-status-consent-summary.json).
 
 ## Complete runs and native evidence
+
+A complete Linux verification is running for source `9266c1248af9a8f8c8bd355b5b0b150bcc957e0e` in the isolated checkout recorded privately by `linux-full-9266c12-run.json`. It uses the existing 356-group manifest and dependency aliases, with no new downloads. The temporary wrapper's original syntax failure happened before any test and is preserved; the corrected wrapper passed syntax checking before restart. Do not report partial progress as acceptance or rerun the start script. Audit the final receipt and exact cleanup before removing its owned checkout.
 
 Complete Windows source `90fa879d776c0b7756f66d37180fb8c3049b3fc4` is accepted:
 462 original groups, 2,902 passes and 246 declared skips. All 23 jobs of run

@@ -73,10 +73,8 @@ execution, offline repository scans and recoverable installation. The Home and
 Model F catalog provide the starting experience; complete task/IDE attachment,
 role/device controls and full scanner coverage remain unfinished.
 
-The latest installed backend (`6337263`) passes **102 metadata/refusal checks
-across 59 exact modules** and preserves all 54 saved workspaces. It adds signed
-saved-project discovery and verified Claude Code 2.1.319 admission; role, device and editor controls still need their
-frontend integration. [Installed evidence](docs/evidence/installed-claude-status-consent-summary.json).
+The latest installed backend (`9266c12`) passes **102 metadata/refusal checks
+across 59 exact modules** and preserves all 54 saved workspaces. It includes signed saved-project discovery, verified Claude Code 2.1.319 admission and recording-consent fixes for both named task adapters. Role, device and editor controls still need their frontend integration. [Installed evidence](docs/evidence/installed-codex-status-consent-summary.json).
 
 Complete Linux `cf3bb4c` passes **356 groups / 2,326 tests**, with 32 declared
 skips. Complete Windows source `90fa879` passes **462 groups / 2,902 tests**,
