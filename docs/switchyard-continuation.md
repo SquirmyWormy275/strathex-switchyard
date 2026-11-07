@@ -288,3 +288,9 @@ removed. Current `5ee98aa4c930` plus rollback `3760be8d85df` remain. All retirem
 update/readback/cleanup scripts have executed; do not repeat them. The ongoing
 complete Linux run is an independent exact `0c025df` checkout and predates these
 observation corrections. [Current installed proof](evidence/installed-foreground-retirement-summary.json).
+
+The installed agent verifier now has 23 checks, adding two pure consent cases
+without changing runtime `849b9b9`. Combined installed coverage is 90 distinct
+checks/56 hashes; the other receipts remain tied to that exact release. The
+follow-up does not require another application update.
+[Evidence](evidence/installed-consent-followup-summary.json).

@@ -227,6 +227,18 @@ assert.equal(runtimeRows.length, 1); assert.equal(runtimeRows[0].provenance, "na
 runtimeBindingValid = false; const beforeRuntimeRefusal = structuredClone(state);
 await assert.rejects(recordCodexRuntimeStatus({ ...runtimeEvent, status: "idle" }), /original runtime binding changed/); assert.deepEqual(state, beforeRuntimeRefusal);
 checks.push("installed-runtime-observation-deduplicates-and-refuses-a-changed-original-binding");
+runtimeBindingValid = true;
+for (const generation of [undefined, "synthetic-original-interval"]) {
+    state.observations = [{ id: "synthetic-recording", status: "recording", sources: ["agent-events"], exclusions: [], createdAt: 100000, recordingSince: 100000, recordingGeneration: generation, updatedAt: 100000, events: [] }];
+    const delayedStore = { ...store, async update(...args) { state.observations[0].recordingGeneration = "synthetic-renewed-interval"; return store.update(...args); } };
+    assert.equal(await recordCodexRuntimeStatus({ ...runtimeEvent, store: delayedStore, at: 100001 }), 0);
+    assert.deepEqual(state.observations[0].events, []);
+}
+checks.push("installed-runtime-metadata-cannot-cross-legacy-or-current-consent-generation-replacement");
+assert.equal(await recordCodexRuntimeStatus(runtimeEvent), 0);
+assert.deepEqual(state.observations[0].events, []);
+assert.equal(await recordCodexRuntimeStatus({ ...runtimeEvent, at: 100001 }), 1);
+checks.push("installed-runtime-metadata-omits-ambiguous-consent-boundary-and-accepts-a-later-event");
 const evidence = { schema: "switchyard-installed-agent-security-metadata/v3", at: new Date().toISOString(), moduleDigests, verifierSourceSha256: createHash("sha256").update(await readFile(new URL(import.meta.url))).digest("hex"), sourceCommit: built.source, applicationRelease: built.id, checks, success: true, pureInMemoryOnly: true, liveUserCredentialsUsed: false, liveAgentsRevoked: 0, nativeProcessesStarted: 0, nativeShortcutRegistrations: 0, providerOrModelRequests: 0, hardwareOperations: 0 };
 const { privateDirectory } = await import("../tools/layout-studio/private-fs.mjs");
 const outputRoot = join(process.env.XDG_STATE_HOME || join(homedir(), ".local/state"), "strathex-switchyard/runtime-verification");

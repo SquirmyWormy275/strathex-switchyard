@@ -408,3 +408,10 @@ checks and 56 module hashes pass; all 54 semantic workspaces, four profiles,
 Host-facing checks ran sequentially. The dated backup/readback verify and the
 exact 554-file/4,830,690-byte prepared bundle is removed.
 [Installed retirement evidence](evidence/installed-foreground-retirement-summary.json).
+
+Two additional in-memory checks now exercise the installed runtime recorder's
+consent-generation replacement and exact-timestamp refusal directly. They replace
+the prior 21-check agent verifier with 23 checks, bringing the accepted installed
+total to 90 distinct checks at the same `849b9b9` release and 56 module hashes.
+No recording, provider or foreground operation was started.
+[Installed consent follow-up](evidence/installed-consent-followup-summary.json).
