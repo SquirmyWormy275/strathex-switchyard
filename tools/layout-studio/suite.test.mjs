@@ -23,14 +23,14 @@ async function fixture(fn) {
   try { await fn({ root, store, keys, secrets }); } finally { await rm(root, { recursive: true, force: true }); }
 }
 
-test("editor connection initialization is lazy, Linux-only and rejects unrelated fields before construction",()=>fixture(async({store})=>{
+test("editor connection initialization is lazy, platform-specific and rejects unrelated fields before construction",()=>fixture(async({store})=>{
   await store.initialize('personal');const ids={requestId:randomUUID(),editorId:randomUUID(),ownerRequestId:randomUUID(),loadRequestId:randomUUID()};
-  for(const platform of ['linux','win32']){
-    let constructed=0;const suite=createSuite({store,platform,codingEditorConnectionsFactory:()=>{constructed++;throw Error('synthetic construction refused');},agents:{discovery:async()=>[],close:async()=>{}},voice:{discovery:async()=>({available:false})}});
+  for(const platform of ['linux','win32','darwin']){
+    let constructed=0;const suite=createSuite({store,platform,codingEditorConnectionsFactory:options=>{assert.equal(options.platform,platform);constructed++;throw Error('synthetic construction refused');},agents:{discovery:async()=>[],close:async()=>{}},voice:{discovery:async()=>({available:false})}});
     try{
       await suite.handle('/api/suite/bootstrap');assert.equal(constructed,0);
       await assert.rejects(suite.handle('/api/suite/coding/codex/editor-connections/open',{...ids,command:'never'}),/unrelated fields/);assert.equal(constructed,0);
-      await assert.rejects(suite.handle('/api/suite/coding/codex/editor-connections/open',ids),platform==='linux'?/synthetic construction/:/only on Linux/);assert.equal(constructed,platform==='linux'?1:0);
+      await assert.rejects(suite.handle('/api/suite/coding/codex/editor-connections/open',ids),platform!=='darwin'?/synthetic construction/:/requires Linux or Windows/);assert.equal(constructed,platform!=='darwin'?1:0);
     }finally{await suite.close();}
   }
 }));

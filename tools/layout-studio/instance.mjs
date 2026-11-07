@@ -1,6 +1,7 @@
 /** Mutual local-instance authentication without disclosing the browser access token. */
 import { createHmac, randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
 import { request as httpRequest } from "node:http";
+import { windowsTerminalProcessQuery } from "./windows-terminal-process.mjs";
 const routes = { probe: "/instance/v1/probe", stop: "/instance/v1/stop", editorTarget: "/instance/v1/editor-target", editorReview: "/instance/v1/editor-review", editorIssue: "/instance/v1/editor-issue", editorConsume: "/instance/v1/editor-consume", editorReturnTarget: "/instance/v1/editor-return-target" };
 const editorActions = { editorReview: "review", editorIssue: "issue", editorConsume: "consume", editorReturnTarget: "return-target" };
 const connectionActions = { editorConnectionOpen: "open", editorConnectionPeer: "pin-peer", editorConnectionObserve: "observe", editorConnectionStop: "stop", editorConnectionRecover: "recover" };
@@ -50,8 +51,14 @@ export function createInstanceGateway({ token, identity, onStop, onEditorTarget,
         if (stopping || typeof onEditorConnection !== "function" || !s || typeof s !== "object" || Array.isArray(s) || Object.keys(s).sort().join() !== ["compartment", ...ids, ...(pin ? ["peer"] : [])].sort().join() || typeof s.compartment !== "string" || !/^[a-z][a-z0-9-]{0,63}$/.test(s.compartment) || !ids.every(key => typeof s[key] === "string" && /^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/.test(s[key]))) throw new Error();
         if (pin) {
           const p = s.peer;
+          if (p && typeof p === "object" && !Array.isArray(p) && Object.keys(p).sort().join() === "expectedBirth,image,processId") {
+            if (p.expectedBirth === null) throw new Error();
+            const checked = windowsTerminalProcessQuery({ schema: "switchyard-editor-terminal-process-query/v1", requestId: s.requestId, ...p });
+            s.peer = Object.freeze({ processId: checked.processId, expectedBirth: checked.expectedBirth, image: checked.image });
+          } else {
           if (!p || typeof p !== "object" || Array.isArray(p) || Object.keys(p).sort().join() !== "birth,executable,executableSha256,pid" || !Number.isSafeInteger(p.pid) || p.pid < 1 || p.pid > 2147483647 || typeof p.birth !== "string" || !/^[1-9][0-9]{0,19}$/.test(p.birth) || typeof p.executable !== "string" || !p.executable.startsWith("/") || Buffer.byteLength(p.executable) > 4096 || /[\\\x00-\x1f\x7f]/.test(p.executable) || typeof p.executableSha256 !== "string" || !/^[a-f0-9]{64}$/.test(p.executableSha256)) throw new Error();
           Object.freeze(p);
+          }
         }
         editorConnection = await onEditorConnection(connectionActions[operation], Object.freeze({ ...s }));
         if (stopping) throw new Error();

@@ -170,6 +170,7 @@ test("only explicitly slow integration or release groups extend the bounded defa
       ["tools/layout-studio/windows-scanner-recipe-files.test.mjs", process.platform === "win32" ? 300_000 : 120_000],
       ["tools/layout-studio/windows-terminal-process.test.mjs", process.platform === "win32" ? 120_000 : 45_000],
       ["tools/layout-studio/windows-editor-recovery.test.mjs", process.platform === "win32" ? 120_000 : 45_000],
+      ["tools/layout-studio/windows-coding-editor-connections.test.mjs", process.platform === "win32" ? 120_000 : 45_000],
       ["tools/layout-studio/windows-terminal-peer.test.mjs", process.platform === "win32" ? 120_000 : 45_000],
       ["tools/layout-studio/windows-editor-ingress.test.mjs", process.platform === "win32" ? 120_000 : 45_000],
       ["tools/layout-studio/windows-owned-stdio.test.mjs", process.platform === "win32" ? 120_000 : 45_000],

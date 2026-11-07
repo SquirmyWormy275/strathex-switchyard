@@ -194,7 +194,7 @@ export function createCodingEditorJournal({ store, authorizations, now=Date.now,
     async list(c) { await store.authorize(c);return ((await store.snapshot(c))[field]??[]).map(view); },
     stopped(c,input) {const s=selection(input);return track(async()=>{
       require(!closed);await store.authorize(c);const row=rowFor(await store.snapshot(c),s);
-      require(!closed && row?.schema==='switchyard-editor-connection/v1' && row.status==='stopped');
+      require(!closed && row?.schema===schema && row.status==='stopped');
       return {...view(row),duplicatePrevented:true};
     });},
     async close() {closed=true;await Promise.allSettled([...pending]);}

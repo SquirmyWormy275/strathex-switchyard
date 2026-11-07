@@ -1,6 +1,7 @@
 /** Shared product state and bounded operations behind the authenticated origin. */
 import { createScannerRecipeSave } from "./scanner-recipe-save.mjs";
 import { createCodingEditorConnections } from "./coding-editor-connections.mjs";
+import { createWindowsCodingEditorConnections } from "./windows-coding-editor-connections.mjs";
 import { createCodingEditorAuthorizations } from "./coding-editor-authorizations.mjs";
 import { randomUUID, createHash } from "node:crypto";
 import { homedir } from "node:os";
@@ -48,7 +49,7 @@ import { clientRecipe } from "../../integrations/client-recipes.mjs";
 import { linuxProcess } from "./native-process.mjs";
 
 const kinds = ["interruption", "resume", "switch", "handoff", "status", "review", "approval", "failure", "recovery", "other"];
-export function createSuite({ store = createSuiteStore(), platform = process.platform, agents, voice = localVoice(), hypr = runHypr, nativeProcess = linuxProcess, windowsNativeFocus, windowsNativeFocusFactory = createWindowsNativeFocus, devices, copilot, copilotFactory = createCopilot, coding, codingTaskOwners, codingTaskOwnersFactory = createCodingTaskOwners, codingEditorConnections, codingEditorConnectionsFactory = createCodingEditorConnections, editorRuntimeRoot = process.env.XDG_RUNTIME_DIR, codexSubmissions, claudeCoding, claudeSubmissions, keyboardIndicators = createKeyboardIndicators(), taskAuthority, taskAuthorityFactory = createTaskAuthority, repositoryRecovery, repositoryCommits, repositoryExecution, storageSetup, fixtureAdministration, scannerRecipeSave, shieldExceptions, clientLaunch, spawnExample = spawn, stopExampleChild = stopOwnedChild, foreground, scheduleForeground = setInterval, clearForeground = clearInterval } = {}) {
+export function createSuite({ store = createSuiteStore(), platform = process.platform, agents, voice = localVoice(), hypr = runHypr, nativeProcess = linuxProcess, windowsNativeFocus, windowsNativeFocusFactory = createWindowsNativeFocus, devices, copilot, copilotFactory = createCopilot, coding, codingTaskOwners, codingTaskOwnersFactory = createCodingTaskOwners, codingEditorConnections, codingEditorConnectionsFactory, editorRuntimeRoot = process.env.XDG_RUNTIME_DIR, codexSubmissions, claudeCoding, claudeSubmissions, keyboardIndicators = createKeyboardIndicators(), taskAuthority, taskAuthorityFactory = createTaskAuthority, repositoryRecovery, repositoryCommits, repositoryExecution, storageSetup, fixtureAdministration, scannerRecipeSave, shieldExceptions, clientLaunch, spawnExample = spawn, stopExampleChild = stopOwnedChild, foreground, scheduleForeground = setInterval, clearForeground = clearInterval } = {}) {
   agents ??= createAgentService({ store, runtimeRoot: join(process.env.XDG_RUNTIME_DIR || process.env.LOCALAPPDATA || join(homedir(), ".local/state"), "switchyard-design") });
   devices ??= createDeviceService({ store });
   coding ??= createCodingSessions({ store });
@@ -72,8 +73,8 @@ export function createSuite({ store = createSuiteStore(), platform = process.pla
   codingTaskOwners ??= codingTaskOwnersFactory({ store, platform, isActive: async c => { await loadSelection(); return !closed && !copilotTransitions.has(c) && c === activeCompartment && await store.selection() === c; } });
   const codingEditorAuthorizations = createCodingEditorAuthorizations({ store, owners: codingTaskOwners, isActive: async c => { await loadSelection(); return !closed && !copilotTransitions.has(c) && c === activeCompartment && await store.selection() === c; } });
   const editorConnections = () => {
-    if (platform !== "linux") throw Error("The reviewed editor connection is implemented only on Linux.");
-    return codingEditorConnections ??= codingEditorConnectionsFactory({ store, authorizations: codingEditorAuthorizations, owners: codingTaskOwners, root: editorRuntimeRoot });
+    if (!["linux", "win32"].includes(platform)) throw Error("The reviewed editor connection requires Linux or Windows.");
+    return codingEditorConnections ??= (codingEditorConnectionsFactory ?? (platform === "win32" ? createWindowsCodingEditorConnections : createCodingEditorConnections))({ store, authorizations: codingEditorAuthorizations, owners: codingTaskOwners, root: editorRuntimeRoot, platform });
   };
   const stopEditorConnections = async c => {
     const result = await codingEditorConnections?.stopCompartment(c);

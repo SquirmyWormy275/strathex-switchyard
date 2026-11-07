@@ -110,6 +110,11 @@ test("signed editor connections bind exact routes and peer fields, reject browse
       for(const change of [{selection:{...selected,prompt:'never'}},{selection:{...selected,requestId:'latest'}},{selection:{...selected,permit:randomUUID()}},{operation:'editorConsume'},{at:Date.now()-11000},{build:'b'.repeat(64)}])assert.equal((await send(change)).status,403);
       if(suffix==='pin-peer')for(const peer of [null,{...selected.peer,command:'never'},{...selected.peer,pid:0},{...selected.peer,birth:'latest'},{...selected.peer,executable:'relative'}])assert.equal((await send({selection:{...selected,peer}})).status,403);
       assert.equal((await send({},{Origin:origin})).status,403);assert.equal((await send({},{},'/instance/v1/editor-connection-foreign')).status,403);assert.equal(calls.length,count);
+      if(suffix==='pin-peer'){
+        const peer={processId:123,expectedBirth:'133000000000000001',image:{path:'C:\\Synthetic\\codex.exe',sha256:'a'.repeat(64),device:'0',inode:'9007199254740993',size:'512'}};
+        for(const changed of [{...peer,expectedBirth:null},{...peer,processId:0},{...peer,pid:123},{...peer,image:{...peer.image,path:'\\\\server\\share\\codex.exe'}},{...peer,image:{...peer.image,sha256:'A'.repeat(64)}},{...peer,image:{...peer.image,inode:9007199254740992}}])assert.equal((await send({selection:{...selection,peer:changed}})).status,403);
+        assert.equal(calls.length,count);assert.equal((await send({selection:{...selection,peer}})).status,200);assert.deepEqual(calls.at(-1).body.peer,peer);assert(Object.isFrozen(calls.at(-1).body.peer.image));
+      }
       if(suffix==='recover'){
         let release;gate=new Promise(r=>release=r);const ready=new Promise(r=>entered=r),pending=send();await ready;await requestInstance(endpoint,{operation:'stop'});release();assert.equal((await pending).status,403);assert.equal((await send()).status,403);
       }

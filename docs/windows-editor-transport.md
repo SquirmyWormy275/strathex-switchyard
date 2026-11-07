@@ -220,3 +220,25 @@ Actual Windows recovery awaits CI. Production lifecycle, Suite routing and
 VS Code activation remain separate unfinished work. The prior query ownership
 checkpoint passes 170 native client tests at `47c80be`; its separate restricted
 storage lane failed and does not establish a clean release.
+
+## Protected lifecycle and Suite routes
+
+`windows-coding-editor-connections.mjs` joins the existing review, task owner,
+journal and carrier. It captures this host's native identity before reserving
+an editor record, retains the original logical task client, and records each
+carrier query intent and retirement. The private endpoint is returned once;
+duplicate opens return only the original journal record. Logical client shutdown
+leaves the provider alive.
+
+The Suite now lazily chooses the Linux or Windows lifecycle. Its signed instance
+gateway accepts a closed Windows process/birth/image peer shape and validates it
+before forwarding. Neither these routes nor native recovery register a VS Code
+command, launch a terminal or alter the frontend.
+
+The synthetic demonstration crosses signed HTTP, protected state, an authenticated
+WebSocket and the retained provider channel, then verifies acknowledgement and
+shutdown. Workspace and keyboard-only transitions retire the editor before the
+task owner. Thirteen groups pass 145 tests with five platform skips; typecheck
+passes. The native-host lifecycle case awaits CI. The prior recovery checkpoint
+passes 181 native Windows tests at `6881d92`. VS Code's Windows endpoint reader,
+terminal process observation and launcher adaptation remain unfinished.

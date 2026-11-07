@@ -16,13 +16,14 @@ export async function openWindowsCodexEditorConnection({ requestId, target, clie
   require(client.retirementKind === undefined || logicalClient);
   createCodexEditorProtocol(target, { platform }).close();
   const selected = Object.freeze({ ...target }), controller = new AbortController();
-  let ingress, relay, closed = false, stopping, failure, startupFinished;
+  let ingress, relay, closed = false, stopping, failure, startupFinished, reportClosed;
   const started = new Promise(resolve => { startupFinished = resolve; });
+  const whenClosed = new Promise(resolve => { reportClosed = resolve; });
   const live = () => require(!closed && !signal.aborted && !client.closed && !ingress?.closed);
   const current = async () => { live(); await assertCurrent(); live(); };
   const close = () => {
     if (closed) return; closed = true; controller.abort(); signal.removeEventListener('abort', close);
-    client.off('disconnected', disconnected); relay?.close(); ingress?.close(); client.close();
+    client.off('disconnected', disconnected); relay?.close(); ingress?.close(); client.close(); reportClosed();
   };
   const disconnected = () => { failure = true; close(); };
   const observation = () => {
@@ -34,6 +35,7 @@ export async function openWindowsCodexEditorConnection({ requestId, target, clie
       terminalLaunched: false, nativeTaskLoaded: false, ideAttached: false, authorityGranted: false, completionVerified: false });
   };
   const owner = Object.freeze({
+    whenClosed,
     observation,
     get privateEndpoint() { live(); require(ingress); return ingress.privateEndpoint; },
     pinPeer(peer) {

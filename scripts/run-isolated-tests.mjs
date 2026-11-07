@@ -325,6 +325,7 @@ export const requiredGroups = [
   { file: "tools/layout-studio/codex-retained-editor-client.test.mjs" },
   { file: "tools/layout-studio/windows-editor-journal.test.mjs" },
   { file: "tools/layout-studio/windows-editor-recovery.test.mjs", timeoutMs: process.platform === "win32" ? 120_000 : 45_000, expectedSkipped: process.platform === "win32" ? 0 : 1 },
+  { file: "tools/layout-studio/windows-coding-editor-connections.test.mjs", timeoutMs: process.platform === "win32" ? 120_000 : 45_000, expectedSkipped: process.platform === "win32" ? 0 : 1 },
   { file: "tools/layout-studio/codex-editor-ingress.test.mjs", ...(process.platform !== "linux" ? { expectedSkipped: 13 } : {}) },
   { file: "tools/layout-studio/codex-editor-ingress-owner.test.mjs", ...(process.platform !== "linux" ? { expectedSkipped: 9 } : {}) },
   { file: "tools/layout-studio/codex-unix-transport.test.mjs", ...(process.platform !== "linux" ? { expectedSkipped: 6 } : {}) },

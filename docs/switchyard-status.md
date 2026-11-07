@@ -18,7 +18,7 @@ checkpoints are not cumulative acceptance of the latest suite.
 | Checkpoint | Verified result | Limit |
 | --- | --- | --- |
 | Installed Linux `edb76de` | **76 metadata/in-memory checks; 42 exact module hashes.** All 54 semantic workspaces and frozen frontend preserved. [Receipt](evidence/installed-mixed-scanner-input-summary.json). | No live scanner, provider task, account/model request, native focus or hardware operation. |
-| Native Windows client `47c80be` | **Sixteen groups; 170 passing tests; no skips.** Actual Windows carrier query ownership callbacks and native task/target/transport checks pass. [Receipt](evidence/windows-query-ownership-native-summary.json). | Predates startup intents and the new recovery verifier. Separate restricted storage failed; see below. |
+| Native Windows client `6881d92` | **Seventeen groups; 181 passing tests; no skips.** Actual owned-host and saved-query recovery plus startup intents pass. [Receipt](evidence/windows-editor-recovery-native-summary.json). | Predates the composed Windows lifecycle and signed Suite routes. Restricted-storage failure remains separate and unresolved. |
 | Complete Linux `edb76de` | **330 groups; 2,074 passing tests; 21 declared platform skips.** Original inventory, commands, bounds and owned cleanup verified. [Receipt](evidence/linux-edb76de-complete-summary.json). | Includes combined inputs and Windows saving source; predates terminal/peer probes. |
 | Complete Windows `dc755901` | **417 groups; 2,478 passing tests; 207 declared skips.** All six jobs and overall workflow passed with verified packet/source/cleanup. [Receipt](evidence/windows-complete-dc755901-summary.json). | Predates newer archive, scheduling, profile/workflow and observation corrections. |
 
@@ -38,12 +38,18 @@ storage reduces the package payload to 4,599,483 bytes without changing exports.
 
 ## Recent backend changes
 
-- **Windows editor recovery:** durable query startup intents cover the interval
-  before guardian identity is captured. Read-only recovery observes the exact
-  saved host and original query Job; unknown startup or observer cleanup remains
-  uncertain. Nine focused groups pass 87 tests with four Windows-only skips;
-  typecheck passes. The actual Windows recovery case awaits CI.
-  [Source evidence](evidence/windows-editor-recovery-source-summary.json).
+- **Windows editor lifecycle and signed routes:** consumed review, protected
+  reservation, retained logical client, authenticated socket and exact peer
+  checkpoints now compose through task acknowledgement and retirement. Thirteen
+  groups pass 145 tests with five platform skips; typecheck passes. The demo uses
+  real protected state, sockets and signed HTTP with explicit provider/native
+  doubles. Windows host composition awaits CI. VS Code Windows adaptation remains
+  unfinished. [Source evidence](evidence/windows-editor-lifecycle-source-summary.json).
+- **Windows editor recovery:** startup intents and read-only original host/query
+  recovery pass native Windows CI at `6881d92`: seventeen groups, 181 tests,
+  no skips. Unknown startup and observer cleanup remain uncertain.
+  [Native evidence](evidence/windows-editor-recovery-native-summary.json).
+
 - **Restricted storage remains unresolved:** run 42357835746 failed at
   `native-exit-owner-14-guardian` after seven owner checks. QUERY masks remain
   eight. The original protected installation was preserved; this is a software
@@ -60,8 +66,8 @@ storage reduces the package payload to 4,599,483 bytes without changing exports.
 - **Windows editor journal contract:** native client CI passes sixteen groups,
   165 tests and no skips at `75fd0b1`. Journal-native/recovery coordinates use
   explicit doubles; actual protected state and leases execute on Windows.
-  Production lifecycle/recovery, Suite editor routing and VS Code launching
-  remain unfinished. [Native evidence](evidence/windows-editor-journal-native-summary.json).
+  This historical journal checkpoint predates the lifecycle and recovery
+  integration above; VS Code Windows launching remains unfinished. [Native evidence](evidence/windows-editor-journal-native-summary.json).
 - **Windows editor target preparation:** native CI passes fifteen groups,
   159 tests and no skips at `2d1cc65`, including actual process reinspection
   and protected registry target/client registration.
@@ -75,7 +81,8 @@ storage reduces the package payload to 4,599,483 bytes without changing exports.
 - **Windows Codex task ownership:** native client CI now passes fourteen groups,
   147 tests and no skips at `0078893`, including actual Job-backed synthetic
   configuration/task RPC and saved-identity retirement. Windows durable
-  journal/recovery and Suite/VS Code editor connection integration remain unfinished.
+  journal/recovery and Suite integration now have later evidence above;
+  VS Code Windows adaptation remains unfinished.
   [Contract](coding-task-owners.md),
   [native evidence](evidence/windows-codex-owners-native-summary.json).
 - **Persistent Windows process layer:** all three actual native Job cases pass at
@@ -89,7 +96,8 @@ storage reduces the package payload to 4,599,483 bytes without changing exports.
   127 tests with three platform skips; typecheck passes. Provider/native-peer
   behavior is explicitly doubled in these real-socket tests. Windows client
   acceptance passes 127 tests at `f1167c9`, with the provider/peer doubles explicit. Durable editor
-  journal recovery, Suite editor routes and VS Code launching remain unfinished.
+  journal recovery and Suite routes have later evidence above; VS Code Windows
+  launching remains unfinished.
   [Contract](windows-editor-transport.md),
   [source evidence](evidence/windows-editor-connection-source-summary.json).
 - **Windows terminal connection identity:** a held accepted socket now supplies
