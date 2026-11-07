@@ -26,6 +26,21 @@ there is no merge or public release acceptance.
 
 ## Current evidence
 
+Installed aafb476 passes **54 metadata/synthetic checks**: thirteen task-owner,
+seven Copilot-journal, fourteen agent/helper/SDK, twelve Python and eight Cargo
+checks. Fourteen exact installed module hashes verify. The Cargo verifier exercises
+sixteen fixed in-memory reports, source separation, SemVer bounds, declared-byte
+comparisons and forged-report refusals without starting Cargo or a scanner process.
+All 54 semantic workspaces, selection, pending keyboard-only conversation and frozen
+frontend remain intact; 53 sealed files are byte-identical and one changes only
+audit metadata. Dated backup/readback and current plus one rollback verify.
+The exact 528-file, 5,224,475-byte prepared bundle is removed.
+[Installed evidence](evidence/installed-cargo-inventory-summary.json).
+
+A new immutable **317-group** complete Linux run is active on aafb476, with pinned
+Node first on PATH, a short owned temporary parent and the original test bounds.
+Progress is not accepted as a final result.
+
 Complete Linux 39db1fe finishes **313/314 groups**: 1,910 passing tests,
 sixteen declared skips and one failed historical scheduling-budget assertion.
 Builds and the private-permission fixture now pass. Every child/tree retires;
@@ -45,7 +60,7 @@ coverage gaps. A regression proves the previous host admitted their omission;
 six focused groups/46 checks now pass, including four actual Linux artifact
 journeys, four Windows guest doubles, wheel/package regression and five verifier
 flag guards. A new repeatable installed Cargo verifier has eight in-memory checks;
-installed acceptance is pending. No Cargo resolution or archive inspection is
+all eight now pass against the normal installed build. No Cargo resolution or archive inspection is
 added. [Source evidence](evidence/cargo-inventory-verifier-source-summary.json).
 
 Normal installed 7dbb0b8 passes **46 metadata/synthetic checks**: thirteen
@@ -172,7 +187,7 @@ Installed metadata checks now pass separately; native Windows marker acceptance 
 | Installation and runtime | All sixteen original Windows installation/recovery cases pass at `b600a6d`; its independent fresh runtime installs 49 packages and loads/rechecks the offline CPU model, then removes its temporary runtime. [Installation](evidence/installation-scenarios-native-summary.json), [runtime](evidence/windows-runtime-b600-native-summary.json). | Complete Windows `9f35961` now passes separately; ordinary-user/guest journeys remain open. |
 | Latest diagnostic source | Seven focused groups pass 69 tests with five Windows-only skips. Two managed builds, 2,101 portable checks, typecheck and exact owned cleanup pass. [Receipt](evidence/worker-start-observation-source-summary.json). | Actual Windows `d15285b` passes all eight acknowledgement/refusal tests without skips. [Native receipt](evidence/worker-start-refusal-native-summary.json). The full restricted-owner journey is now separately accepted above. |
 | Windows index/history/leases | Native NTFS index and history packets each pass six checks and three independent guardian exits. Both Windows scanner files pass two cases with guest execution doubled; lease groups pass 24 tests and one Linux-only skip. [Evidence](evidence/native-history-index-leases-summary.json). | Packet Git witnesses are synthetic. Actual guest, installed Windows and ordinary-user acceptance remain separate. |
-| Installed app | Linux source `7dbb0b8` passes **46 metadata/synthetic checks** and fourteen exact module hashes. All 54 semantic snapshots and frozen frontend verify. Current plus one rollback remain; the 5,224,239-byte prepared bundle is removed. [Evidence](evidence/installed-python-records-summary.json). | Pure in-memory examples start no scanner process, live task, agent or account action. Frontend/editor activation remains frozen. |
+| Installed app | Linux source `aafb476` passes **54 metadata/synthetic checks** and fourteen exact module hashes. All 54 semantic snapshots and frozen frontend verify. Current plus one rollback remain; the 5,224,475-byte prepared bundle is removed. [Evidence](evidence/installed-cargo-inventory-summary.json). | Pure in-memory examples start no scanner process, Cargo process, live task, agent or account action. Frontend/editor activation remains frozen. |
 | Windows npm archive identity | Corrected `55515d1` completes ten archive tests plus eight original byte-comparison tests, each file with two original Linux-only skips inside its original 300-second bound; guest execution is doubled. [Archive](evidence/npm-archive-native-summary.json), [bytes](evidence/npm-artifact-split-native-summary.json). | Complete Windows release remains separate. |
 | Windows shortcut retirement | `80601e9` passes all sixteen original installation/recovery scenarios and twelve writer checks, no skips and verified cleanup. The fixed stage diagnostics execute with the original bounds. [Native pass](evidence/shortcut-stage-diagnostics-native-summary.json). | `9193471` and `4b2daed` each fail the first installation scenario at the original ten-second shortcut deadline: 24/25 tests pass, all cleanup verifies. The latest pass does not reproduce or establish the cause of the intermittent timeout. [Recurring failures](evidence/windows-shortcut-recurring-timeout-summary.json), [diagnostic source](evidence/shortcut-stage-diagnostics-source-summary.json). |
 | Credential worker retirement | Six groups/69 checks pass, including ten worker tests and two controlled real children. Errors join exact-child retirement; unconfirmed exit blocks replacement. Installed pure synthetic checks also pass within the 27-check update. [Contract](credential-worker-lifecycle.md), [source](evidence/credential-process-source-summary.json), [installed](evidence/installed-agent-security-summary.json). | Live credential failure injection and native Windows acceptance remain separate. No user key is replaced. |

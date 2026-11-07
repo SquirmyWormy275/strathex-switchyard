@@ -123,4 +123,7 @@ mise exec node@24.14.0 -- node scripts/verify-cargo-inventory-host.mjs --read-on
 Its eight checks pin the installed scanner/validator and test fixed version,
 source separation, advisory, byte-comparison and forged-report cases entirely
 in memory. They start no Cargo/scanner process, resolve no dependencies, contact
-no registry and create no provider task. Installed acceptance is pending.
+no registry and create no provider task. All eight pass against installed aafb476
+inside the 54-check update. All 54 semantic workspaces and frozen frontend are
+preserved; exact prepared-package cleanup verifies.
+[Installed evidence](evidence/installed-cargo-inventory-summary.json).

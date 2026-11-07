@@ -1,5 +1,20 @@
 # What has actually been verified
 
+Installed aafb476 passes **54 metadata/synthetic checks**: thirteen task-owner,
+seven Copilot-journal, fourteen agent/helper/SDK, twelve Python and eight Cargo
+checks. Fourteen exact installed module hashes verify. The Cargo verifier exercises
+sixteen fixed in-memory reports, source separation, SemVer bounds, declared-byte
+comparisons and forged-report refusals without starting Cargo or a scanner process.
+All 54 semantic workspaces, selection, pending keyboard-only conversation and frozen
+frontend remain intact; 53 sealed files are byte-identical and one changes only
+audit metadata. Dated backup/readback and current plus one rollback verify.
+The exact 528-file, 5,224,475-byte prepared bundle is removed.
+[Installed evidence](evidence/installed-cargo-inventory-summary.json).
+
+A new immutable **317-group** complete Linux run is active on aafb476, with pinned
+Node first on PATH, a short owned temporary parent and the original test bounds.
+Progress is not accepted as a final result.
+
 Complete Linux 39db1fe finishes **313/314 groups**: 1,910 passing tests,
 sixteen declared skips and one failed historical scheduling-budget assertion.
 Builds and the private-permission fixture now pass. Every child/tree retires;
@@ -19,7 +34,7 @@ coverage gaps. A regression proves the previous host admitted their omission;
 six focused groups/46 checks now pass, including four actual Linux artifact
 journeys, four Windows guest doubles, wheel/package regression and five verifier
 flag guards. A new repeatable installed Cargo verifier has eight in-memory checks;
-installed acceptance is pending. No Cargo resolution or archive inspection is
+all eight now pass against the normal installed build. No Cargo resolution or archive inspection is
 added. [Source evidence](evidence/cargo-inventory-verifier-source-summary.json).
 
 Normal installed 7dbb0b8 passes **46 metadata/synthetic checks**: thirteen

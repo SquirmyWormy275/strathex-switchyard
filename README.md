@@ -75,7 +75,7 @@ exit and fixture/service retirement. Complete Windows source `cadbccd` passes it
 **416-group / 2,443-test packet**, with 204 declared skips and exact cleanup; its
 overall workflow still fails because a preliminary shard was cancelled.
 The latest agent and helper ownership corrections have focused checks and a
-46-check installed metadata demonstration; a
+54-check installed metadata demonstration; a
 recurring first-install shortcut timeout remains under investigation. Source,
 installed, interactive, hardware and account acceptance remain separate.
 [Current status and exact evidence](docs/switchyard-status.md).
