@@ -76,3 +76,19 @@ test("malformed and oversized frames refuse with fixed reasons; targets are copi
   }
   const input = { ...target }, w = createCodexEditorProtocol(input); input.sessionId = "other"; acknowledged(w);
 });
+
+test("Windows targets require an explicit local drive contract and preserve exact path spelling around resume", () => {
+  const repositoryRoot = 'C:\\Reviewed Projects\\repository', selected = { ...target, repositoryRoot };
+  assert.throws(() => createCodexEditorProtocol(selected));
+  assert.throws(() => createCodexEditorProtocol(target, { platform: 'win32' }));
+  for (const path of ['C:relative', '\\\\server\\share\\repo', '\\\\?\\C:\\repo', 'C:/repo', 'C:\\repo\\..\\other', 'C:\\repo\\', 'C:\\repo.', 'C:\\repo ', 'C:\\NUL.txt', 'C:\\repo:stream', 'C:\\repo\\LPT1', 'C:\\bad\ud800', '/repository']) {
+    assert.throws(() => createCodexEditorProtocol({ ...target, repositoryRoot: path }, { platform: 'win32' }));
+  }
+  for (const replyPath of [repositoryRoot, 'c:\\Reviewed Projects\\repository', 'C:\\Reviewed Projects\\other']) {
+    const w = createCodexEditorProtocol(selected, { platform: 'win32' }); before(w);
+    const request = resume(), response = resumed(); request.params.cwd = repositoryRoot; response.result.cwd = response.result.thread.cwd = replyPath;
+    assert.equal(w.client(request), true); assert.equal(w.server(response), replyPath === repositoryRoot);
+    if (replyPath === repositoryRoot) { w.client(read(3)); w.server(reply(3)); assert.equal(w.observation().protocolAcknowledged, true); }
+    else assert.equal(w.observation().protocolAcknowledged, false);
+  }
+});

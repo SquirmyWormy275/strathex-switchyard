@@ -10,8 +10,8 @@ const label = v => typeof v === 'string' && v.length > 0 && v.length <= 128 && !
 const require = v => { if (!v) throw Error('The original restricted editor connection did not verify.'); };
 const MAX = 1048576;
 
-export function createCodexEditorRelay({ target, client, assertCurrent, send, onAcknowledged, signal } = {}) {
-  const witness = createCodexEditorProtocol(target), selected = Object.freeze({ ...target });
+export function createCodexEditorRelay({ target, client, assertCurrent, send, onAcknowledged, signal, platform = 'linux' } = {}) {
+  const witness = createCodexEditorProtocol(target, { platform }), selected = Object.freeze({ ...target });
   require(client && ['request','send','on','off','close'].every(k => typeof client[k] === 'function') && !client.closed);
   require([assertCurrent,send,onAcknowledged].every(f => typeof f === 'function') && signal instanceof AbortSignal);
   const controller = new AbortController(), seen = new Set(), notifications = new Set();

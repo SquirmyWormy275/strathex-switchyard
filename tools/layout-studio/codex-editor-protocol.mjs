@@ -1,18 +1,24 @@
 /** Bounded, single-stream protocol witness. No transport, permission or IDE attachment authority. */
 import { codexAccountFingerprint } from "./agents.mjs";
 import { codexAccountBoundary } from "./codex-requests.mjs";
-import { posix } from "node:path";
+import { posix, win32 } from "node:path";
 
 const object = x => x !== null && typeof x === "object" && !Array.isArray(x);
 const uuid = x => typeof x === "string" && /^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/.test(x);
 const id = x => Number.isSafeInteger(x) || typeof x === "string" && x.length > 0 && x.length <= 128 && !/[\x00-\x1f\x7f]/.test(x);
 const key = x => typeof x + ":" + x;
 
-export function createCodexEditorProtocol(input) {
+export function createCodexEditorProtocol(input, { platform = "linux" } = {}) {
+  // The owning transport selects a path contract. Never infer a different host
+  // from an untrusted native reply or normalize it into another repository.
+  const repositoryPath = value => typeof value === "string" && value.isWellFormed() && Buffer.byteLength(value) <= 4096 && (
+    platform === "linux" ? posix.isAbsolute(value) && posix.normalize(value) === value && !/[\\\x00-\x1f\x7f]/.test(value)
+    : platform === "win32" && /^[A-Za-z]:\\/.test(value) && win32.normalize(value) === value
+      && !/[\x00-\x1f\x7f<>:"/|?*]/.test(value.slice(3))
+      && value.slice(3).split("\\").every(part => part && !/[. ]$/.test(part) && !/^(?:CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])(?:\.|$)/i.test(part)));
   if (!object(input) || Object.keys(input).sort().join() !== "accountFingerprint,repositoryRoot,sessionId" || !uuid(input.sessionId)
       || typeof input.accountFingerprint !== "string" || !/^[a-f0-9]{64}$/.test(input.accountFingerprint)
-      || typeof input.repositoryRoot !== "string" || !posix.isAbsolute(input.repositoryRoot) || posix.normalize(input.repositoryRoot) !== input.repositoryRoot
-      || Buffer.byteLength(input.repositoryRoot) > 4096 || /[\\\x00-\x1f\x7f]/.test(input.repositoryRoot)) throw Error("Choose the exact original editor protocol target.");
+      || !repositoryPath(input.repositoryRoot)) throw Error("Choose the exact original editor protocol target.");
   const target = Object.freeze({ ...input }), pending = new Map(), seen = new Set();
   let stage = "pending", reason = null, before = false, requested = false, resumed = false, after = false;
   const reject = code => { stage = "invalidated"; reason = code; pending.clear(); return false; };

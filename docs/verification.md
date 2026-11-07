@@ -1,17 +1,21 @@
 # What has actually been verified
 
-The Windows loopback carrier now performs an actual local bidirectional JSON
-exchange with capability authentication and a separately pinned process. It
-rechecks native peer evidence before both directions and joins shutdown.
-**Thirteen focused groups pass 118 tests with three platform skips**; typecheck
-passes. Native inspection is doubled in Linux transport cases. Windows carrier
-CI acceptance and durable task/Suite/editor integration remain separate.
-[Transport contract](windows-editor-transport.md),
-[source evidence](evidence/windows-editor-ingress-source-summary.json).
+The Windows carrier now composes with the restricted exact-task protocol.
+An already retained provider client checks the original Windows repository,
+task and account; the task reply waits for durable acknowledgement. Cancellation
+joins startup and pending callbacks, and unconfirmed provider/helper exit cannot
+become accepted retirement. **Fourteen focused groups pass 127 tests with three
+platform skips**; typecheck passes. Real sockets use explicit provider/native-peer
+doubles. Durable Windows task ownership, journal recovery, Suite routes and
+VS Code launching remain unfinished.
+[Transport and composition contract](windows-editor-transport.md),
+[source evidence](evidence/windows-editor-connection-source-summary.json).
 
-The underlying Windows peer query is accepted at `89db483`: **nine native client
-groups, 107 tests, no skips**, with exact source, artifacts, bounds and cleanup.
-[Native peer evidence](evidence/windows-terminal-peer-native-summary.json).
+Native Windows carrier acceptance passes at `233cd76`: **eleven client groups,
+119 tests, no skips**, including an authenticated round trip with an owned Windows
+process. Exact source/merge trees, artifact digest, original commands, bounds and
+cleanup verify. This source predates the new task-protocol composition.
+[Native carrier evidence](evidence/windows-editor-ingress-native-summary.json).
 
 Complete Linux `edb76de` passes **330 groups, 2,074 tests and 21 declared
 platform skips**, with zero failures or cancellations. Exact original inventory,

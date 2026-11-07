@@ -1,8 +1,9 @@
 # An authenticated Windows terminal connection
 
 The new internal carrier exchanges bounded JSON objects with one exact local
-terminal process. It provides the transport needed for Windows editor integration;
-Suite routing, durable task ownership and VS Code activation remain unfinished.
+terminal process. It now composes with the exact-task protocol through a retained
+provider client. Suite routing, durable task ownership and VS Code activation
+remain unfinished.
 
 `openWindowsEditorIngress()` creates an ephemeral listener on `127.0.0.1` and a
 random 256-bit capability. The private endpoint getter supplies the URL and bearer
@@ -36,11 +37,43 @@ the existing Linux editor/protocol/package regressions pass. No new compiler,
 bundle or dependency staging was created.
 [Source evidence](evidence/windows-editor-ingress-source-summary.json).
 
-The underlying Windows peer check is natively accepted at `89db483`: nine client
-groups, 107 tests, no skips. The new carrier has its own owned Node round-trip
-case registered in Windows CI; its acceptance remains pending.
-[Native peer evidence](evidence/windows-terminal-peer-native-summary.json).
+The full carrier is natively accepted at `233cd76`: eleven client groups,
+119 tests, no skips. This includes the owned Windows Node round trip, original
+process/TCP identity and independently retired helpers. Source/merge trees,
+artifact digest, original commands, bounds and cleanup verify.
+[Native carrier evidence](evidence/windows-editor-ingress-native-summary.json).
 
 Transport observations always keep protocol acknowledgement, task/account
 binding, IDE attachment and completion separate. No live provider, model,
 account, keyboard or frontend operation was used for this implementation.
+
+## Connect the exact task protocol
+
+`openWindowsCodexEditorConnection()` accepts an already retained, dedicated
+provider client and composes the carrier with the restricted editor relay. The
+caller supplies current-owner checks, durable ownership/acknowledgement callbacks
+and independent retirement of that original provider client. This composition
+does not start or adopt a provider, issue task-loading permission, or substitute
+a new process after failure.
+
+Windows targets require an explicit local drive path. UNC/device paths, alternate
+streams, reserved DOS names, traversal, trailing dots/spaces and malformed Unicode
+refuse. Native request and response paths must match the original spelling; no
+case folding or path redirection substitutes for repository identity.
+
+The same relay keeps the reviewed native version, restricted configuration and
+matching account reads around the exact resume. The terminal receives the task
+reply only after the caller retains the acknowledgement. Model turns, login,
+foreign tasks, extra configuration and expanded permissions remain refused.
+Peer loss or an account boundary withdraws acknowledgement and closes the original
+connection. Stop joins startup and pending acknowledgement before retiring both
+carrier and provider. Any unconfirmed exit or retention failure prevents an
+accepted retirement record.
+
+Fourteen focused groups pass **127 tests with three platform skips**; typecheck
+passes. Tests use real sockets with explicit provider/native-peer doubles,
+including cancellation during startup/acknowledgement and failed retirement.
+The composed connection is registered in Windows client CI. This evidence does
+not establish durable Windows task ownership, journal recovery, Suite routes,
+VS Code launching or a live installed-account task.
+[Composition evidence](evidence/windows-editor-connection-source-summary.json).

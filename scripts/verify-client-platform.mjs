@@ -1,6 +1,7 @@
 /** Bounded native client and reviewed-input checks, independent of the complete release lane. */
 import { requiredGroups, runVerification } from "./run-isolated-tests.mjs";
 const files = new Set(["tools/layout-studio/client-launch.test.mjs", "tools/layout-studio/physical-intent.test.mjs", "tools/layout-studio/native-focus-gateway.test.mjs", "tools/layout-studio/windows-terminal-process.test.mjs", "tools/layout-studio/windows-terminal-peer.test.mjs", "tools/layout-studio/editor-websocket-frames.test.mjs", "tools/layout-studio/windows-editor-ingress.test.mjs", "tools/layout-studio/integrations.test.mjs", "tools/layout-studio/suite.test.mjs", "deployment/suite/release.test.mjs", "apps/windows-companion/test/repository-runtime.test.ts"]);
+files.add("tools/layout-studio/windows-codex-editor-connection.test.mjs");
 const groups = requiredGroups.filter(g => files.has(g.file));
 if (groups.length !== files.size) throw new Error("The exact client platform verification inventory changed.");
 const { receipt, receiptPath } = await runVerification({ groups });

@@ -1,0 +1,122 @@
+{
+  "schema": "switchyard-windows-editor-connection-source-summary/v1",
+  "at": "2026-11-07T07:47:08.808Z",
+  "baseCommit": "233cd76db37446136642fe5471788fe7f1fff7fd",
+  "sourceFiles": {
+    ".github/workflows/client-platform.yml": "b435b6ebdd8a178531a8c6f692e85286129c8704a4b2100f275f50104b762abf",
+    "apps/desktop-hotkeys/Program.cs": "bb93aace81a0b40651a489f950ce89dfba0beda1d276c63f4315b41d131afcc0",
+    "apps/windows-companion/provider-desktop-helper/Program.cs": "04f0c5fd546aed1099aeca89377db623c79ac08124fb985009417100c2fec6dc",
+    "deployment/suite/application.test.mjs": "bfff39c8699b6d578edd54a80e1e26fd9d346c708b1707ac27e332e934d4b83b",
+    "deployment/suite/release.test.mjs": "bfdce3a7644ef2be90619ee410e4941e3deacff5cf387ed6c8697d8f8f5863ef",
+    "scripts/run-isolated-tests.mjs": "98faa2c49afebc7cf1c8b188fdd02ff34f595ae0e87c5c8a59010a017d65eefc",
+    "scripts/run-isolated-tests.test.mjs": "8b1779d0ca8d87e527731bf3c5b4bc263ab6328366b9327beab68d97c29817c9",
+    "scripts/verify-client-platform.mjs": "c2984488e1661a2bb029a27cc663752dd0f63210b3cd47791f1f419d44f39aa7",
+    "scripts/windows-backend-shards.test.mjs": "efaaa961fd4fd3f64dd5e7019a841b9da86b385b7ad7b9cd4593468aef04e1c3",
+    "tools/layout-studio/codex-editor-ingress.test.mjs": "7a1de575fd6b72c62e23ef72003176aea26d48d6864e8a0c0170edf2c041eed0",
+    "tools/layout-studio/codex-editor-protocol.mjs": "80017a54595c6b9c7b53717d0ed54a09d04caa13281298aba6f851feb45c779f",
+    "tools/layout-studio/codex-editor-protocol.test.mjs": "4d73f413a8f280789b66a5b560f955b6349639c1d087f81abbdddbf8edf3d182",
+    "tools/layout-studio/codex-editor-relay.mjs": "83dcecdc48950825050d532d5a722cfe70b742c80370533d89c470454f725057",
+    "tools/layout-studio/codex-editor-relay.test.mjs": "7a3ac25a8c82df7edaaabc1cfc3a36d788ca2c061fa4c3f6d7f9138c96f5bc61",
+    "tools/layout-studio/coding-editor-connections.test.mjs": "134fd8ecb7ed502d7644d09c70bd2bc4e84a70511f4f2d7ae676b60b68c4eecf",
+    "tools/layout-studio/editor-websocket-frames.mjs": "56ba5da76b9e7b3e0473e17b6408d6dd3baf5e4727e4f2aeeea58e345e1f9637",
+    "tools/layout-studio/editor-websocket-frames.test.mjs": "4a7bdcb0d0e48697c95b935cf53a0d41fa91b427f426373bcb418126236d7d74",
+    "tools/layout-studio/owned-native-command.mjs": "111ae7ad96adf1a461e3aaa8d73c0c7c698de95e9348ea6b0abc596c1d77261a",
+    "tools/layout-studio/runtime-command.test.mjs": "284608a2595cb4b823a44afce2d45a244023a1f62ad36f3f4e85e3dfadea01d1",
+    "tools/layout-studio/windows-codex-editor-connection.mjs": "0e630a0bf2e17b46c87ffefc1047d1088b81c109cbd55bb2b53137b34b809bc6",
+    "tools/layout-studio/windows-codex-editor-connection.test.mjs": "de8d47435a4a464608158a01b3e72e315adb6c3d45b9e4fda4c738b332ac14a6",
+    "tools/layout-studio/windows-editor-ingress.mjs": "7c49607d024205f3c05c725a96a4043e75e8164d696e5382f7856851dfff5571",
+    "tools/layout-studio/windows-editor-ingress.test.mjs": "dcf381d0487754f65077487b84570114d28c918218f03c361754369e7bb83681",
+    "tools/layout-studio/windows-terminal-peer.test.mjs": "e83f37af27b9a47094fdb23ff81fd9d65c0c48ad02c7fafb8fab6fa16b72b9a2",
+    "tools/layout-studio/windows-terminal-process.mjs": "fe0ed2b7e4d635130c6e734440dd23daf838aad3213837734d9d75f96ae6da7f",
+    "tools/layout-studio/windows-terminal-process.test.mjs": "6c79e27b8f9737fdd38a0923ce933ce02a58fed9fdec7f1db78c00762a71bb1b"
+  },
+  "receipts": [
+    {
+      "name": "isolated-test-4fbf24b3-d243-4185-9cd2-085f1117301f.json",
+      "sha256": "731fd9fb1cd1413115e5c9a63f12505001a8fefed5e8716f4f13decc893aa752",
+      "totals": {
+        "required": 3,
+        "passed": 3,
+        "failed": 0,
+        "tests": 26,
+        "passedTests": 26,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "name": "isolated-test-c4c20a7a-93dc-46e3-96f6-f16768034424.json",
+      "sha256": "2abc2f3dba4ad2c0e7e0741b266df8e6202ccd3409d00ab06b51f495727a0942",
+      "totals": {
+        "required": 14,
+        "passed": 14,
+        "failed": 0,
+        "tests": 130,
+        "passedTests": 127,
+        "failedTests": 0,
+        "skippedTests": 3,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    }
+  ],
+  "groups": 14,
+  "passedTests": 127,
+  "skippedTests": 3,
+  "originalCommandsBoundsSkipsAndCleanupVerified": true,
+  "typecheck": {
+    "command": "npm run typecheck",
+    "node": "24.14.0",
+    "passed": true
+  },
+  "scope": {
+    "actualLoopbackProtocolExchange": true,
+    "nativePeerExplicitlyDoubledOnLinux": true,
+    "providerExplicitlyDoubled": true,
+    "exactWindowsRepositoryContract": true,
+    "exactTaskAndAccountBracket": true,
+    "taskReplyAfterDurableAcknowledgement": true,
+    "modelLoginAndForeignTaskEffectsRefused": true,
+    "changedPeerOrAccountClosesOriginal": true,
+    "shutdownJoinsAcknowledgementAndStartup": true,
+    "unknownHelperOrProviderExitCannotAcceptRetirement": true,
+    "capabilityAbsentFromOwnershipMetadata": true,
+    "liveProviderTaskOrIdeAuthorityGranted": false
+  },
+  "bounds": {
+    "startupMs": 8000,
+    "headersBytes": 16384,
+    "messageBytes": 1048576,
+    "incomingBufferBytes": 1114112,
+    "queuedOutgoingBytes": 2097152,
+    "pendingOperations": 64,
+    "jsonDepth": 32,
+    "fragmentCount": 1024,
+    "nativeCiGroupMs": 120000
+  },
+  "nativeTransportEvidence": "windows-editor-ingress-native-summary.json",
+  "effects": {
+    "modelPrompts": 0,
+    "liveProviderTasks": 0,
+    "accountChanges": 0,
+    "hardwareOpened": false,
+    "frontendChanged": false,
+    "installedApplicationChanged": false,
+    "newDependencies": false,
+    "newNativeCompilation": false
+  },
+  "limitations": [
+    "Native carrier acceptance belongs to source 233cd76; the later composed connection has explicit native-peer and provider doubles.",
+    "Windows persistent task ownership, durable journal/recovery, Suite routes and VS Code launcher integration remain unfinished.",
+    "No live provider/account task or model request was used.",
+    "The frozen frontend and editor activation remain unchanged."
+  ],
+  "cleanup": {
+    "originalChildAndTreeRetirementVerified": true,
+    "noCompilerOrBundleStagingCreated": true,
+    "ownedSocketsAndListenersClosed": true
+  },
+  "success": true
+}
