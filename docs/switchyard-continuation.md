@@ -53,6 +53,17 @@ and task-specific IDE attachment remain unfinished.
 [Contract](windows-native-focus.md),
 [source evidence](evidence/windows-vscode-focus-source-summary.json).
 
+Selected Cargo archives now expose bounded package license declarations and
+apply the reviewed SPDX policy only after both byte integrity and manifest
+identity match. Disallowed obligations fail; permitted alternatives remain
+unselected. Missing, unsupported and file-only declarations preserve coverage
+gaps without exporting raw text or file paths. Fifteen focused groups pass 124
+tests, including eight actual Linux scans and eight Windows guest doubles.
+Typecheck, original package bounds and child/tree cleanup pass; staging is removed.
+License text inspection, dependency resolution and publisher verification remain
+unfinished. [Contract](cargo-license-declarations.md),
+[source evidence](evidence/cargo-license-source-summary.json).
+
 Cargo archive inspection now accepts bounded inline dependency tables such as
 `serde = { version = "1", features = ["derive"] }`, nested metadata and array
 tables. All 112 independent Python reference cases and ten focused groups / 96
@@ -120,7 +131,7 @@ inventory and every child/tree retirement verify. The owned checkout, nine
 dependency aliases, 782 generated files (11,785,816 bytes), empty temporary parent
 and marker are removed; other worktrees remain. This includes Cargo array tables
 and the Windows ChatGPT service tested through doubles. Later VS Code focus and
-Cargo inline tables have separate focused evidence. A temporary wrapper syntax
+Cargo archive changes have separate focused evidence. A temporary wrapper syntax
 failure occurred before any test and is retained in the record.
 [Complete receipt](evidence/linux-97ef7d6-complete-summary.json).
 

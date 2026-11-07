@@ -125,6 +125,12 @@ export function parseShieldScannerReport(output,shield,action) {
       if (reference) {
         const a = component.artifact, file = files.get(reference.path);
         if (!a || a.path !== reference.path || a.sha256 !== file?.sha256 || a.size !== file?.size) throw Error("Cargo artifact observation differs from its exact reviewed bytes.");
+        if (a.licensePolicy === "unconfigured" && !report.gaps.includes("license_policy")) throw Error("An unconfigured Cargo license policy must retain its coverage gap.");
+        if (a.licensePolicy === "permitted" && npmLicenseDeclaration(a.archive.license.expression).choice && !report.gaps.includes("license_choice_not_selected")) throw Error("A permitted Cargo alternative does not establish a selected license.");
+        if (a.licensePolicy === "disallowed") {
+          const fingerprint = sha(["license.disallowed", "Cargo", component.lockPath, files.get(component.lockPath).sha256, component.name, component.version, component.sourceSha256, a.path, a.sha256, a.archive.manifestSha256, a.archive.license.expression].join("\0"));
+          if (!report.findings.some(f => f.ruleId === "license.disallowed" && f.dimension === "licenses" && f.severity === "high" && f.path === component.lockPath && f.line === null && f.fingerprint === fingerprint) && !(report.findings.length === 512 && report.gaps.includes("finding_limit"))) throw Error("A disallowed Cargo declaration cannot lose its failed license finding.");
+        }
         if (a.archive.status !== "matched" && !report.gaps.includes("cargo_archive_identity_not_verified")) throw Error("Unverified Cargo identity must retain its coverage gap.");
         if (a.archive.status === "mismatched") {
           const fingerprint = sha(["artifact.identity-mismatch", "Cargo", component.lockPath, files.get(component.lockPath).sha256, component.name, component.version, component.sourceSha256, a.path, a.sha256, a.archive.manifestSha256].join("\0"));

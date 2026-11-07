@@ -208,11 +208,13 @@ export function validateCargoComponent(c) {
   cargoRequire(['registry','crates.io'].includes(c.sourceKind)?cargoDigest(c.declaredSha256):c.declaredSha256===null);
   if(c.sourceKind==='crates.io'){cratesIoIdentity(c.name,c.version);cargoRequire(c.sourceSha256===cargoPublicSourceSha256);}else cargoRequire(c.sourceSha256!==cargoPublicSourceSha256);
   if (Object.hasOwn(c, "artifact")) {
-    const a = c.artifact; exact(a, ["path", "sha256", "size", "algorithm", "expectedSha256", "status", "archive"]);
+    const a = c.artifact; exact(a, ["path", "sha256", "size", "algorithm", "expectedSha256", "status", "archive", "licensePolicy"]);
     scannerPath(a.path);
     cargoRequire(["registry", "crates.io"].includes(c.sourceKind) && cargoDigest(a.sha256) && Number.isSafeInteger(a.size) && a.size > 0 && a.size <= 2 * 1024 * 1024
       && a.algorithm === "sha256" && a.expectedSha256 === c.declaredSha256 && a.status === (a.sha256 === a.expectedSha256 ? "matched" : "mismatched"));
     validateCargoArchiveObservation(a.archive, c.name, c.version);
+    const assessable = a.status === "matched" && a.archive.status === "matched" && a.archive.license.status === "declared";
+    cargoRequire(assessable ? ["unconfigured", "permitted", "disallowed"].includes(a.licensePolicy) : a.licensePolicy === "unassessed");
   }
   return c;
 }
@@ -223,7 +225,7 @@ export function cargoCycloneDxComponent(c) {
       {name:'switchyard:ecosystem',value:'Cargo'},{name:'switchyard:lockfile',value:c.lockPath},{name:'switchyard:cargo-source-kind',value:c.sourceKind},
       ...(c.sourceSha256?[{name:'switchyard:declared-source-sha256',value:c.sourceSha256}]:[]),...(c.declaredSha256?[{name:'switchyard:declared-sha256',value:c.declaredSha256}]:[]),
       {name:'switchyard:declared-dependencies-sha256',value:c.dependenciesSha256},{name:'switchyard:cargo-resolution',value:'not-performed'},
-      ...(c.artifact ? [{name:'switchyard:artifact-path',value:c.artifact.path},{name:'switchyard:artifact-sha256',value:c.artifact.sha256},{name:'switchyard:artifact-integrity',value:c.artifact.status},{name:'switchyard:artifact-content',value:'not-inspected'},...archiveProperties(c.artifact.archive)] : [])
+      ...(c.artifact ? [{name:'switchyard:artifact-path',value:c.artifact.path},{name:'switchyard:artifact-sha256',value:c.artifact.sha256},{name:'switchyard:artifact-integrity',value:c.artifact.status},{name:'switchyard:artifact-content',value:'not-inspected'},{name:'switchyard:archive-license-policy',value:c.artifact.licensePolicy},...archiveProperties(c.artifact.archive),...cargoLicenseProperties(c.artifact.archive.license)] : [])
     ]};
 }
 
@@ -556,12 +558,13 @@ function cargoArchiveManifest(bytes) {
     const lines = text.replaceAll("\r\n", "\n").split("\n"), identity = {};
     cargoRequire(lines.length <= 2048 && lines.every(line => line.length <= 8192));
     const node = () => ({ kind: "table", explicit: false, children: new Map() }), root = node();
-    let table = [], current = root, pending = "", key;
+    let table = [], current = root, pending = "", key; const licenseFields = new Map();
     const store = (name, value) => {
       cargoRequire(!current.children.has(name));
       const parsed = cargoManifestValue(value); cargoRequire(!parsed.rest);
       current.children.set(name, { kind: "scalar" });
       if (table.length === 1 && table[0] === "package" && ["name", "version"].includes(name)) { cargoRequire(typeof parsed.value === "string"); identity[name] = parsed.value; }
+      if (table.length === 1 && table[0] === "package" && ["license", "license-file"].includes(name)) licenseFields.set(name, parsed.value);
     };
     for (const raw of lines) {
       const line = cargoManifestUncomment(raw); if (!line) continue;
@@ -588,18 +591,25 @@ function cargoArchiveManifest(bytes) {
       if (value.startsWith("[") && !value.endsWith("]")) pending = value; else store(key, value);
     }
     cargoRequire(!pending && root.children.get("package")?.explicit); cargoIdentity(identity.name, identity.version);
-    return { ...identity, manifestSha256: sha(bytes) };
+    const fields = root.children.get("package").children, declaration = npmLicenseDeclaration(licenseFields.get("license"));
+    const fileUnsupported = fields.has("license-file") && (typeof licenseFields.get("license-file") !== "string" || !licenseFields.get("license-file"));
+    const license = fileUnsupported ? { status: "unsupported" } : fields.has("license") ? declaration ? { status: "declared", expression: declaration.expression } : { status: "unsupported" } : { status: fields.has("license-file") ? "file-only" : "missing" };
+    return { ...identity, manifestSha256: sha(bytes), license };
   } catch { archiveRefuse("manifest"); }
 }
 export function validateCargoArchiveObservation(value, name, version) {
-  validateTarArchiveObservation(value, name, version, (n, v) => { try { cargoIdentity(n, v); return true; } catch { return false; } });
+  validateTarArchiveObservation(value, name, version, (n, v) => { try { cargoIdentity(n, v); return true; } catch { return false; } }, true);
 }
 export function validateNpmArchiveObservation(value, name, version) {
   return validateTarArchiveObservation(value, name, version, (n, v) => npmName(n) && npmVersion(v));
 }
-function validateTarArchiveObservation(value, name, version, identity) {
+function validateTarArchiveObservation(value, name, version, identity, cargo = false) {
   if (value?.status === "unsupported") { exact(value, ["status", "reason"]); if (!archiveReasons.includes(value.reason)) throw Error("Invalid archive coverage gap."); return; }
-  exact(value, ["status", "name", "version", "manifestSha256", "entries", "expandedBytes"]);
+  exact(value, ["status", "name", "version", "manifestSha256", "entries", "expandedBytes", ...(cargo ? ["license"] : [])]);
+  if (cargo) {
+    const license = value.license; exact(license, license?.status === "declared" ? ["status", "expression"] : ["status"]);
+    cargoRequire(license.status === "declared" ? npmLicenseDeclaration(license.expression)?.expression === license.expression : ["missing", "file-only", "unsupported"].includes(license.status));
+  }
   if (!identity(value.name, value.version) || !/^[a-f0-9]{64}$/.test(value.manifestSha256 ?? "")
       || !Number.isSafeInteger(value.entries) || value.entries < 1 || value.entries > 1024
       || !Number.isSafeInteger(value.expandedBytes) || value.expandedBytes < (value.entries + 3) * 512 || value.expandedBytes > archiveLimit || value.expandedBytes % 512
@@ -724,6 +734,9 @@ function archiveProperties(archive) {
       { name: "switchyard:archive-declared-name", value: archive.name },
       { name: "switchyard:archive-declared-version", value: archive.version },
       ...(archive.metadataVersion ? [{ name: "switchyard:wheel-metadata-version", value: archive.metadataVersion }, { name: "switchyard:wheel-format-version", value: archive.wheelVersion }, { name: "switchyard:wheel-record-verification", value: archive.record.status }, { name: "switchyard:wheel-record-sha256", value: archive.record.sha256 }, ...(archive.record.status === "unsupported" ? [{ name: "switchyard:wheel-record-gap", value: archive.record.reason }] : [{ name: "switchyard:wheel-record-files", value: String(archive.record.files) }])] : [])])] : [];
+}
+function cargoLicenseProperties(license) {
+  return license ? [{ name: "switchyard:archive-license-declaration", value: license.status }, ...(license.status === "declared" ? [{ name: "switchyard:archive-declared-license", value: license.expression }, ...licenseCatalogProperties(license.expression)] : [])] : [];
 }
 export const shieldArtifactReferenceKey = row => row.ecosystem === "Cargo"
   ? JSON.stringify(["Cargo", row.lockPath, row.name, row.version, row.sourceSha256])
@@ -881,7 +894,12 @@ export async function scanShieldInputs(proposed, { readInput }) {
           if (!["registry", "crates.io"].includes(component.sourceKind)) throw Error("Only Cargo registry declarations can compare a package artifact.");
           const observed = artifactDigests.get(reference.path), status = observed.sha256 === component.declaredSha256 ? "matched" : "mismatched";
           const inspected = cargoIdentities.get(reference.path), archive = inspected.status === "unsupported" ? inspected : { ...inspected, status: inspected.name === component.name && inspected.version === component.version ? "matched" : "mismatched" };
-          component.artifact = { path: observed.path, sha256: observed.sha256, size: observed.size, algorithm: "sha256", expectedSha256: component.declaredSha256, status, archive };
+          const license = archive.license?.status === "declared" ? npmLicenseDeclaration(archive.license.expression, policy.allowedLicenses) : null;
+          const licensePolicy = status === "matched" && archive.status === "matched" && license ? !policy.allowedLicenses.length ? "unconfigured" : license.allowed ? "permitted" : "disallowed" : "unassessed";
+          component.artifact = { path: observed.path, sha256: observed.sha256, size: observed.size, algorithm: "sha256", expectedSha256: component.declaredSha256, status, archive, licensePolicy };
+          if (licensePolicy === "unconfigured") gaps.add("license_policy");
+          if (licensePolicy === "permitted" && license.choice) gaps.add("license_choice_not_selected");
+          if (licensePolicy === "disallowed") add({ ruleId: "license.disallowed", dimension: "licenses", severity: "high", path: file.path, line: null, fingerprint: sha(["license.disallowed", "Cargo", file.path, file.sha256, component.name, component.version, component.sourceSha256, observed.path, observed.sha256, archive.manifestSha256, license.expression].join("\0")) });
           if (archive.status !== "matched") gaps.add("cargo_archive_identity_not_verified");
           if (archive.status === "mismatched") add({ ruleId: "artifact.identity-mismatch", dimension: "provenance", severity: "high", path: file.path, line: null, fingerprint: sha(["artifact.identity-mismatch", "Cargo", file.path, file.sha256, component.name, component.version, component.sourceSha256, observed.path, observed.sha256, archive.manifestSha256].join("\0")) });
           consumedArtifacts.add(referenceKey);

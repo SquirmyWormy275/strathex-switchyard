@@ -25,6 +25,17 @@ and task-specific IDE attachment remain unfinished.
 [Contract](windows-native-focus.md),
 [source evidence](evidence/windows-vscode-focus-source-summary.json).
 
+Selected Cargo archives now expose bounded package license declarations and
+apply the reviewed SPDX policy only after both byte integrity and manifest
+identity match. Disallowed obligations fail; permitted alternatives remain
+unselected. Missing, unsupported and file-only declarations preserve coverage
+gaps without exporting raw text or file paths. Fifteen focused groups pass 124
+tests, including eight actual Linux scans and eight Windows guest doubles.
+Typecheck, original package bounds and child/tree cleanup pass; staging is removed.
+License text inspection, dependency resolution and publisher verification remain
+unfinished. [Contract](cargo-license-declarations.md),
+[source evidence](evidence/cargo-license-source-summary.json).
+
 Cargo archive inspection now accepts bounded inline dependency tables such as
 `serde = { version = "1", features = ["derive"] }`, nested metadata and array
 tables. All 112 independent Python reference cases and ten focused groups / 96
@@ -42,13 +53,13 @@ inventory and every child/tree retirement verify. The owned checkout, nine
 dependency aliases, 782 generated files (11,785,816 bytes), empty temporary parent
 and marker are removed; other worktrees remain. This includes Cargo array tables
 and the Windows ChatGPT service tested through doubles. Later VS Code focus and
-Cargo inline tables have separate focused evidence. A temporary wrapper syntax
+Cargo archive changes have separate focused evidence. A temporary wrapper syntax
 failure occurred before any test and is retained in the record.
 [Complete receipt](evidence/linux-97ef7d6-complete-summary.json).
 
 | Checkpoint | Completed result | What it does not establish |
 | --- | --- | --- |
-| Complete Linux `97ef7d6` | **322 groups, 1,965 passing tests, sixteen declared skips**; exact original inventory, commands, bounds and cleanup. [Receipt](evidence/linux-97ef7d6-complete-summary.json). | Later VS Code focus and Cargo inline tables have separate focused evidence. |
+| Complete Linux `97ef7d6` | **322 groups, 1,965 passing tests, sixteen declared skips**; exact original inventory, commands, bounds and cleanup. [Receipt](evidence/linux-97ef7d6-complete-summary.json). | Later VS Code focus and Cargo archive changes have separate focused evidence. |
 | Complete Windows `dc755901` | **417 groups, 2,478 passing tests and 207 declared skips**; all six jobs and the overall workflow succeed, with exact packet/source/merge inventory, bounds and cleanup. [Receipt](evidence/windows-complete-dc755901-summary.json). | Predates wheel RECORD, five-job scheduling, Cargo archive and workflow/profile/observation corrections. Interactive Windows acceptance remains separate. |
 | Installed Linux `a4e4c17` | 71 metadata/in-memory checks and 22 exact module hashes, including 112 Cargo reference cases. All 54 semantic workspaces, selection, pending conversation and frozen frontend are preserved. [Receipt](evidence/installed-cargo-inline-manifest-summary.json). | No live scanner, provider task, agent command, account action, model request or hardware operation is performed. |
 | Complete Linux `39db1fe` | **Failed:** 313/314 groups, 1,910 passing tests, sixteen declared skips and one failed scheduling-budget assertion. Exact owned cleanup verifies. [Receipt](evidence/linux-39db1fe-scheduling-failed-summary.json). | A nearly passing run is not complete acceptance. |
