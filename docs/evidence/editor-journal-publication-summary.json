@@ -1,0 +1,85 @@
+{
+  "schema": "switchyard-editor-journal-publication-summary/v1",
+  "baseCommit": "961ecb36036ae40f67f0685bb6bfbd6f815d10ed",
+  "sourceFiles": {
+    "tools/layout-studio/coding-editor-journal.mjs": "039f12d220be038d4ea1a0a796ec497bb0f331b6f8713ae862fd63ac9e1217b7",
+    "tools/layout-studio/windows-editor-journal.test.mjs": "c39ee85f98383ba3cb399c67e899af769339bf314aebd028e984ab80a111c259",
+    "tools/layout-studio/windows-coding-editor-connections.test.mjs": "9887ae572225532408bb005336e56e07348cf232bba79eb2663e254f6ca075a5"
+  },
+  "receipts": [
+    {
+      "receipt": "isolated-test-64c4db8b-34f4-47be-90d3-f8811dfb76b7.json",
+      "sha256": "bfc26dcd640a7f2e6e9827599a7ed3b00214f79f16e171dcbad9d036e172ddec",
+      "success": false,
+      "totals": {
+        "required": 1,
+        "passed": 0,
+        "failed": 1,
+        "tests": 11,
+        "passedTests": 10,
+        "failedTests": 1,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "receipt": "isolated-test-f30d4260-abb1-4d5f-be86-4a9641d4ff45.json",
+      "sha256": "64588fab4ca95064d952b2763f81602f4a56ad4b090f43caa342a2698c4ed0bd",
+      "success": true,
+      "totals": {
+        "required": 8,
+        "passed": 8,
+        "failed": 0,
+        "tests": 69,
+        "passedTests": 67,
+        "failedTests": 0,
+        "skippedTests": 2,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "receipt": "isolated-test-f1ebc564-5094-4ad5-a6b4-47d72ef2608c.json",
+      "sha256": "6b54ae112c679074105ba43b7e291497aeef86374cfc92bb495c914de6bc2d94",
+      "success": true,
+      "totals": {
+        "required": 10,
+        "passed": 10,
+        "failed": 0,
+        "tests": 85,
+        "passedTests": 81,
+        "failedTests": 0,
+        "skippedTests": 4,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    }
+  ],
+  "accepted": {
+    "groups": 16,
+    "passedTests": 133,
+    "skippedTests": 5,
+    "originalCommandsBoundsSkipsAndCleanupVerified": true
+  },
+  "correction": {
+    "heldDurablePublicationRegressionReproduced": true,
+    "observationUsesOriginalCheckpointLease": true,
+    "retiredOrForeignRecordsStillRefuse": true,
+    "cleanupAttemptsAllOriginalResourcesWithoutSuppressingFailures": true
+  },
+  "nativeFailure": "windows-editor-launch-native-failure-summary.json",
+  "effects": {
+    "frontendChanged": false,
+    "installedChanged": false,
+    "liveProviderTasks": 0,
+    "modelPrompts": 0,
+    "hardwareOpened": false,
+    "newDependencies": false
+  },
+  "limitations": [
+    "Windows endpoint/file native acceptance is retained separately; corrected whole-lane launcher composition awaits CI.",
+    "The original failed regression and Windows group timeout remain recorded.",
+    "Concurrent full Linux verification is exact source 961ecb3 and predates this correction."
+  ]
+}

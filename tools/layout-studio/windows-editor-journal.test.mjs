@@ -125,3 +125,28 @@ test('a Windows startup intent remains explicit until its original scope retires
   // checkpoint itself was refused, without replaying the native operation.
   await handle.recordQuery({kind:'query-retired',ownership:second});await handle.retire(clean);assert.equal(handle.observation().stoppedVerified,true);
 });
+
+test('a concurrent observation waits for durable checkpoint publication and still refuses a retired or substituted journal',async t=>{
+  for(const phase of ['query','retirement']){
+    const f=await fixture(t);await f.consume();const {handle}=await f.api.reserve('personal',f.selected,{host:f.host});
+    const gate=()=>{let resolve;const promise=new Promise(r=>resolve=r);return{promise,resolve};};
+    const persisted=gate(),publish=gate(),readLeaseRequested=gate(),originalUpdate=f.store.update,originalLock=f.store.withResourceLock;
+    let held=false;
+    f.store.update=async(...args)=>{const result=await originalUpdate(...args);if(args[1]===(phase==='query'?'coding-editor-query-reserve':'coding-editor-connection-retire')){held=true;persisted.resolve();await publish.promise;}return result;};
+    f.store.withResourceLock=(kind,identity,fn)=>{if(held && kind==='client-launch')readLeaseRequested.resolve('waiting');return originalLock(kind,identity,fn);};
+    const writing=phase==='query'?handle.recordQuery({kind:'query-intent',ownership:queryIntentForOwner(queryOwner())}):handle.retire(clean);
+    let reading;
+    try{
+      await persisted.promise;
+      // The encrypted row has advanced while the original in-memory owner is
+      // deliberately held before publication. This is one transaction in flight.
+      assert.equal((await f.store.snapshot('personal')).codingEditorConnections[0].revision,1);
+      reading=handle.assertCurrent();void reading.catch(()=>{});
+      assert.equal(await Promise.race([readLeaseRequested.promise,reading.then(()=> 'accepted',()=> 'rejected')]),'waiting');
+    }finally{publish.resolve();await writing;}
+    if(phase==='retirement')await assert.rejects(reading);else{
+      await reading;await f.store.update('personal','fixture-external-replacement',s=>{s.codingEditorConnections[0].revision=99;});
+      await assert.rejects(handle.assertCurrent());
+    }
+  }
+});

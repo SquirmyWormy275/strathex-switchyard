@@ -360,3 +360,22 @@ pending; the PowerShell failures are retained, not reclassified as passing.
 [Windows file security creation rules](https://learn.microsoft.com/en-us/windows/win32/fileio/file-security-and-access-rights)
 underpin the fixture's explicit descriptors. This fixture role is separate from
 the read-only endpoint operation and is not exposed by the extension or Suite API.
+
+
+## Concurrent journal publication
+
+A status read can overlap the interval between durable checkpoint commit and
+publication of that row in the retained owner. The journal now takes the same
+original transaction lease for those reads. It waits for an in-flight writer,
+then rechecks policy, target and complete row identity; retirement or a foreign
+replacement still refuses access.
+
+A held-publication regression fails before the correction and passes afterward.
+Sixteen focused groups pass 133 tests with five declared platform skips.
+Windows checkpoint `961ecb3` passes native endpoint and file checks but fails
+the new concurrent launcher demonstration; corrected whole-lane acceptance is
+pending. The failed group reached its original timeout, and its original tree
+was terminated and cleaned by the test harness. Fixture teardown now attempts
+every original cleanup without suppressing failures.
+[Source evidence](evidence/editor-journal-publication-summary.json),
+[retained Windows failure](evidence/windows-editor-launch-native-failure-summary.json).

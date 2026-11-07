@@ -117,7 +117,13 @@ export function createCodingEditorJournal({ store, authorizations, now=Date.now,
         const matches=state=>{require(leases.get(ownershipKey)===lease && hash(rowFor(state,s))===hash(lease.row));};
         const handle=Object.freeze({
           observation:()=>view(lease.row),
-          assertCurrent:()=>track(async()=>{require(!['stopped','uncertain'].includes(lease.row.status));await current(c,s,original);matches(await store.snapshot(c));}),
+          // A checkpoint publishes protected bytes before replacing lease.row.
+          // Observe both under its original lease so concurrent socket traffic
+          // cannot mistake that in-flight publication for foreign replacement.
+          assertCurrent:()=>track(()=>store.withResourceLock('client-launch',ownershipKey,async owned=>{
+            require(!['stopped','uncertain'].includes(lease.row.status));await current(c,s,original);
+            owned.assert();matches(await store.snapshot(c));owned.assert();
+          })),
           recordQuery(event) {
             let copy;try{require(windows && exact(event,['kind','ownership']) && ['query-intent','query-ready','query-retired','query-not-started'].includes(event.kind));copy={kind:event.kind,ownership:['query-intent','query-not-started'].includes(event.kind)?windowsQueryIntent(event.ownership):windowsQueryOwnership(event.ownership)};}catch(error){return Promise.reject(error);}
             const retiring=['query-retired','query-not-started'].includes(copy.kind);

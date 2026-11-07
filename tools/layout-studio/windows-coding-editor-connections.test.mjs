@@ -56,7 +56,18 @@ async function fixture(t,{nativeHost=false}={}){
   f.service=extra=>{const api=createWindowsCodingEditorConnections({...options,...extra});services.push(api);return api;};f.api=f.service();
   f.open=()=>f.api.open('personal',selected);f.ready=async(endpoint,pin=p=>f.api.pinPeer('personal',selected,p))=>{const pinning=pin(peer);const [,terminalClient]=await Promise.all([pinning,terminal(t,endpoint)]);terminalClient.send({id:1,method:'initialize',params:{clientInfo:{name:'codex_tui',version:'0.166.0'}}});assert.equal((await terminalClient.receive()).id,1);terminalClient.send({method:'initialized',params:{}});return terminalClient;};
   f.resume=async terminal=>{terminal.send({id:2,method:'thread/resume',params:{threadId:target.sessionId,cwd:target.repositoryRoot,sandbox:'read-only',approvalPolicy:'on-request',excludeTurns:true}});assert.equal((await terminal.receive()).result.thread.id,target.sessionId);};
-  t.after(async()=>{for(const close of cleanup.toReversed())await close();for(const api of services){const result=await api.close();if(!f.uncertain)assert.equal(result.stopped,true);}for(const client of f.clients)await client.stop();assert.equal(provider.closed,false);await auth.close();await rm(root,{recursive:true});});return f;
+  t.after(async()=>{
+    const errors=[];let retired=true;
+    const settle=async fn=>{try{await fn();}catch(error){errors.push(error);}};
+    // A failed launcher assertion must not strand the fixture's HTTP server or
+    // carrier. Attempt every original cleanup and still fail on any refusal.
+    for(const close of cleanup.toReversed())await settle(close);
+    for(const api of services)await settle(async()=>{try{const result=await api.close();if(!f.uncertain)assert.equal(result.stopped,true);}catch(error){retired=false;throw error;}});
+    for(const client of f.clients)await settle(async()=>{try{assert.equal((await client.stop()).stopped,true);}catch(error){retired=false;throw error;}});
+    await settle(async()=>assert.equal(provider.closed,false));await settle(()=>auth.close());
+    if(retired)await settle(()=>rm(root,{recursive:true}));
+    if(errors.length)throw new AggregateError(errors,'Original Windows editor fixture cleanup did not verify.');
+  });return f;
 }
 
 test('Windows lifecycle composes consumed review, protected journal, retained client and real authenticated socket',async t=>{

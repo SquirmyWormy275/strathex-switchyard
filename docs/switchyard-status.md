@@ -19,8 +19,14 @@ Native reader/file/Terminal/provider doubles are explicit; command/frontend
 activation and live provider acceptance remain unfinished. Two native endpoint
 fixture setups timed out before reaching the reader; the
 [second retained failure](evidence/windows-editor-runtime-native-failure-summary.json)
-now has a fixed native setup replacement awaiting CI, with original bounds and
-permission checks preserved.
+now has a fixed native setup replacement that passes Windows CI, with original
+bounds and permission checks preserved. The same run passes the Windows file
+checks and seven launcher contracts, but fails the concurrent launcher/Suite
+demonstration. A controlled source regression reproduces a journal publication
+race; reads now wait for the original protected transaction. Corrected native
+acceptance remains pending. Sixteen focused groups pass 133 tests with five
+platform skips. [Regression and correction](evidence/editor-journal-publication-summary.json).
+[Retained result](evidence/windows-editor-launch-native-failure-summary.json).
 
 ## Current evidence
 
@@ -55,16 +61,16 @@ storage reduces the package payload to 4,599,483 bytes without changing exports.
   Suite/socket demonstration with an explicit native endpoint-reader double.
   Nine groups pass 86 tests with one platform skip; root and extension CommonJS
   typechecks pass. Terminal arguments use the reviewed 0.166.0 environment-token
-  flag. Native endpoint reading, process observation and launching remain
-  unfinished. [Source evidence](evidence/windows-editor-client-source-summary.json).
+  flag. Later native readers, process observation and reviewed launching are
+  implemented; their latest native integration result is described above. [Source evidence](evidence/windows-editor-client-source-summary.json).
 
 - **Windows editor lifecycle and signed routes:** consumed review, protected
   reservation, retained logical client, authenticated socket and exact peer
   checkpoints now compose through task acknowledgement and retirement. Thirteen
   groups pass 145 tests with five platform skips; typecheck passes. The demo uses
   real protected state, sockets and signed HTTP with explicit provider/native
-  doubles. Windows host composition passes at `3795217`. VS Code Windows adaptation remains
-  unfinished. [Source evidence](evidence/windows-editor-lifecycle-source-summary.json).
+  doubles. Windows host composition passes at `3795217`. The later VS Code Windows
+  launcher is implemented; production command activation remains unfinished. [Source evidence](evidence/windows-editor-lifecycle-source-summary.json).
 - **Windows editor recovery:** startup intents and read-only original host/query
   recovery pass native Windows CI at `6881d92`: seventeen groups, 181 tests,
   no skips. Unknown startup and observer cleanup remain uncertain.
@@ -74,7 +80,11 @@ storage reduces the package payload to 4,599,483 bytes without changing exports.
   `native-exit-owner-14-guardian` after seven owner checks. QUERY masks remain
   eight. The original protected installation was preserved; this is a software
   verification failure, not missing hardware/account acceptance.
-  [Failure evidence](evidence/restricted-storage-47c80be-failure-summary.json).
+  The later `3795217` run passes all eight owner checks, 68 QUERY-only
+  registrations and original cleanup with unchanged retirement code; it does
+  not establish the intermittent cause.
+  [Failure evidence](evidence/restricted-storage-47c80be-failure-summary.json),
+  [passing follow-up](evidence/restricted-storage-379-followup-summary.json).
 
 - **Windows query-helper ownership:** original guardian/helper checkpoints precede
   worker acknowledgement and remain joined through retirement. The journal
@@ -87,7 +97,7 @@ storage reduces the package payload to 4,599,483 bytes without changing exports.
   165 tests and no skips at `75fd0b1`. Journal-native/recovery coordinates use
   explicit doubles; actual protected state and leases execute on Windows.
   This historical journal checkpoint predates the lifecycle and recovery
-  integration above; VS Code Windows launching remains unfinished. [Native evidence](evidence/windows-editor-journal-native-summary.json).
+  integration above and the later implemented VS Code Windows launcher. [Native evidence](evidence/windows-editor-journal-native-summary.json).
 - **Windows editor target preparation:** native CI passes fifteen groups,
   159 tests and no skips at `2d1cc65`, including actual process reinspection
   and protected registry target/client registration.
