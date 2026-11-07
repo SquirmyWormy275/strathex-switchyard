@@ -13,10 +13,8 @@ exact executable digest. The earlier version refusal is retained. Six source
 groups/93 tests pass, including approval/version-change refusal and rejected
 late designer replies. Native model replies use explicit synthetic processes;
 a real 2.1.319 model turn remains unaccepted.
-[Version evidence](evidence/claude-319-source-summary.json). The normal installed
-update now passes 101 metadata/refusal checks and real installed-module
-version/account admission without a model prompt.
-[Installed evidence](evidence/installed-claude-319-summary.json). Windows uses the same argument-based process path;
+[Version evidence](evidence/claude-319-source-summary.json). The later task adapter also uses the same exact reviewed-version list. A retained regression exposed the old range admitting unreviewed 2.1.309; the fix passes six groups/94 tests and prevents task discovery, reservation and creation for unknown versions. [Task admission evidence](evidence/claude-version-admission-summary.json). The normal installed update passes 102 metadata/refusal checks across 59 exact modules; earlier real native version/account admission remains separate.
+[Installed evidence](evidence/installed-claude-version-gate-summary.json). Windows uses the same argument-based process path;
 native Windows CLI/account acceptance remains pending. The frozen morning
 frontend does not expose this task panel yet.
 

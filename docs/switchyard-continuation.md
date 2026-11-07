@@ -40,7 +40,7 @@ instructions. Do not merge or release.
 
 ## Current Claude version work
 
-The later task-adapter admission fix now uses that same exact list instead of a broad version range. Preserve the original failing 2.1.309 discovery regression and the corrected six-group/94-test receipt. Source and typecheck pass; the normal installed update and its new pure refusal check are next. No live task operation is authorized by this correction. [Evidence](evidence/claude-version-admission-summary.json).
+The later task-adapter admission fix now uses that same exact list instead of a broad version range. Preserve the original failing 2.1.309 discovery regression and the corrected six-group/94-test receipt. Source and typecheck pass. Installed source `526c5f2` passes 102 metadata/refusal checks across 59 exact modules, including the new pure task-version refusal. Its exact prepared bundle is removed. No live task operation is authorized by this correction. [Evidence](evidence/claude-version-admission-summary.json).
 
 The installed native CLI has updated to 2.1.319. Its original exact designer
 version refusal is retained. The source now admits exactly 2.1.308, 2.1.317 and
@@ -113,25 +113,25 @@ a replacement. Eight groups/124 tests and installed metadata checks cover them.
 
 ## Installed checkpoint
 
-- Source: `1bee5a54635c6c48233f8f97d383fc6caa3b440d`.
-- Release: `9e23b735e708ab5694cfcd0dc7f5ad0a920ceb3bdf356dca267f7b8db9bdce48`.
-- Rollback: `fcbd26b5c6703d3d5b0296211ca0b31234d862a759396a6e85ee7f53f8d4c696`.
+- Source: `526c5f26247e0cc91e2c0ff28401b30fe437267c`.
+- Release: `344fd0a03eaa1e21737c86b54db9c4142903303d1f75bfcdd72402a5830abc15`.
+- Rollback: `9e23b735e708ab5694cfcd0dc7f5ad0a920ceb3bdf356dca267f7b8db9bdce48`.
 - Frozen frontend: `24100ef601b810efb0cda95e4fe0842d2944560734b02c4cf482c25e19150543`.
-- 101 metadata/refusal checks, 59 exact module hashes; all 54 semantic workspaces,
+- 102 metadata/refusal checks, 59 exact module hashes; all 54 semantic workspaces,
   four profiles, 57 workflows, selection and one pending keyboard-only conversation
   preserved. 53 sealed files are byte-identical; one changes audit metadata only.
-- The installed native Claude version/account reader accepts 2.1.319 with both
+- The earlier installed native Claude version/account check accepts 2.1.319 with both
   owned guardians independently stopped; no prompt/task/login operation occurred.
 - Dated backup and launcher readback verify. Current plus one rollback remain.
-  Installed payload: 554 files/4,749,428 bytes. The exact temporary package,
-  555 files/4,848,912 bytes, is removed.
+  Installed payload: 554 files/4,749,455 bytes. The exact temporary package,
+  555 files/4,848,939 bytes, is removed.
   Do not repeat executed installation or cleanup scripts.
 
 The selected personal workspace returns a complete empty project inventory without
 native observation or task authority. Unauthenticated and malformed requests
 refuse. Source and native contracts cover populated inventory separately.
 Host-facing task-owner, Copilot-journal and signed-intent verifiers run sequentially.
-[Installed receipt](evidence/installed-claude-319-summary.json).
+[Installed receipt](evidence/installed-claude-version-gate-summary.json).
 
 ## Complete runs and native evidence
 
