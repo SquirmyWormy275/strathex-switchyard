@@ -242,3 +242,27 @@ task owner. Thirteen groups pass 145 tests with five platform skips; typecheck
 passes. The native-host lifecycle case awaits CI. The prior recovery checkpoint
 passes 181 native Windows tests at `6881d92`. VS Code's Windows endpoint reader,
 terminal process observation and launcher adaptation remain unfinished.
+
+## Windows extension wire client
+
+`studio-windows-task-client.ts` validates the original Windows Job binding,
+64-bit birth/file coordinates, one-use review and permission replies, closed
+peer shape, and private loopback capability. The Linux and Windows clients
+share `studio-instance-transport.ts`: signed requests and responses, fixed
+routes, original instance/endpoint readback, bounded HTTP and cancellation.
+Windows requires a native endpoint reader supplied by its composition; there
+is no plaintext file-reader fallback.
+
+The actual Windows TypeScript client now crosses the signed Suite routes and
+real carrier in the synthetic lifecycle demonstration. Native endpoint reads,
+provider replies and terminal peer queries are explicit doubles. Nine groups
+pass 86 tests with one Windows-only skip; both TypeScript configurations pass.
+The earlier lifecycle passes native Windows CI at `3795217` with 189 tests.
+Native endpoint-reader packaging, terminal process observation and launcher
+composition remain unfinished. Commands and frontend are not activated.
+
+`codex-windows-terminal.ts` supplies fixed read-only/on-request resume arguments
+and keeps the bearer in a terminal-local environment value. The reviewed
+[Codex 0.166.0 CLI source](https://github.com/openai/codex/blob/rust-v0.166.0/codex-rs/cli/src/main.rs)
+defines `--remote-auth-token-env` and remote resume parsing. Its source digest is
+retained in the client evidence; the installed CLI was not executed or upgraded.

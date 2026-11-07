@@ -1,7 +1,7 @@
-import { createHash, createHmac, randomBytes, timingSafeEqual } from "node:crypto";
+import { createHash } from "node:crypto";
 import { constants } from "node:fs";
 import { lstat, open, realpath } from "node:fs/promises";
-import { request, type ClientRequest } from "node:http";
+import { StudioInstanceTransport } from "./studio-instance-transport.ts";
 import { homedir } from "node:os";
 import { dirname, isAbsolute, join, normalize } from "node:path";
 import { codexTerminalResumeArguments } from "./codex-terminal.ts";
@@ -13,9 +13,6 @@ function object(v: unknown): v is Record<string, unknown> { return v !== null &&
 function keys(v: Record<string, unknown>, names: readonly string[]): boolean { return Object.keys(v).sort().join() === [...names].sort().join(); }
 function requireValue(v: unknown): asserts v { if (!v) throw Error("The original Switchyard editor target did not authenticate or validate."); }
 const digest = (v: unknown) => createHash("sha256").update(JSON.stringify(v)).digest("hex");
-// The instance/v1 metadata operation signs both request and response. Its
-// private API bearer never leaves the endpoint file, including during restart.
-const mac = (token: string, direction: string, route: string, body: string) => createHmac("sha256", token).update(`SWITCHYARD-INSTANCE-V1\n${direction}\nPOST\n${route}\n`).update(body).digest("hex");
 
 export interface StudioEditorSelection { readonly compartment: string; readonly ownerRequestId: string; readonly loadRequestId: string; }
 export interface StudioEditorRequest extends StudioEditorSelection { readonly requestId: string; readonly editorId: string; }
@@ -150,7 +147,7 @@ function connectionResult(value: unknown, selected: StudioEditorRequest, action:
 
 /** Signed target/review/permit transport. No command registration, task load or terminal launch. */
 export class StudioTaskClient {
-  private readonly active = new Set<ClientRequest>();
+  private readonly transport: StudioInstanceTransport;
   private closed = false;
   private readonly endpointPath: string;
   private readonly assertContext: () => void | Promise<void>;
@@ -158,9 +155,10 @@ export class StudioTaskClient {
     this.endpointPath = options.endpointPath ?? join(process.env.XDG_STATE_HOME || join(homedir(), ".local/state"), "strathex-switchyard/application/endpoint.json");
     requireValue(isAbsolute(this.endpointPath) && normalize(this.endpointPath) === this.endpointPath);
     this.assertContext = options.assertCurrent ?? (() => {});
+    this.transport = new StudioInstanceTransport({ readEndpoint: () => this.endpoint(), assertCurrent: () => this.current() });
   }
   private async current(): Promise<void> { requireValue(process.platform === "linux" && !this.closed); await this.assertContext(); requireValue(!this.closed); }
-  private async endpoint(): Promise<{ bytes: string; url: URL; token: string; instance: { id: string; build: string }; pid: number }> {
+  private async endpoint(): Promise<string> {
     await this.current();
     const parent = dirname(this.endpointPath), before = await lstat(parent), uid = process.getuid!();
     requireValue(before.isDirectory() && !before.isSymbolicLink() && before.uid === uid && !(before.mode & 0o077) && await realpath(parent) === parent);
@@ -173,59 +171,33 @@ export class StudioTaskClient {
       requireValue(after.dev === info.dev && after.ino === info.ino && after.size === info.size && after.mtimeMs === info.mtimeMs && after.ctimeMs === info.ctimeMs && directory.dev === before.dev && directory.ino === before.ino);
       bytes = data.subarray(0, read.bytesRead).toString("utf8");
     } finally { await file.close(); }
-    const e: unknown = JSON.parse(bytes); requireValue(object(e) && e.schema === "switchyard-active-endpoint/v1" && typeof e.url === "string" && object(e.instance) && uuid(e.instance.id) && hash(e.instance.build) && Number.isSafeInteger(e.pid) && (e.pid as number) > 0);
-    const url = new URL(e.url), token = /^#access=([A-Za-z0-9_-]{43})$/.exec(url.hash)?.[1];
-    requireValue(url.protocol === "http:" && url.hostname === "127.0.0.1" && url.pathname === "/" && !url.search && !url.username && !url.password && +url.port >= 1024 && +url.port <= 65535 && token);
-    await this.current(); return { bytes, url, token, instance: { id: e.instance.id, build: e.instance.build }, pid: e.pid as number };
-  }
-  private post(url: URL, body: string, headers: Record<string, string>): Promise<{ status: number; signature: string | string[] | undefined; body: string }> {
-    requireValue(!this.closed);
-    return new Promise((resolve, reject) => {
-      const req = request(url, { method: "POST", agent: false, headers: { "Content-Type": "application/json", "Content-Length": String(Buffer.byteLength(body)), ...headers } }, res => {
-        let bytes = 0; const chunks: Buffer[] = [];
-        res.on("data", (chunk: Buffer) => { bytes += chunk.length; if (bytes > 32768) res.destroy(Error("Switchyard target response exceeded its bound.")); else chunks.push(chunk); });
-        res.once("error", reject); res.once("end", () => resolve({ status: res.statusCode ?? 0, signature: res.headers["x-switchyard-instance-response"], body: Buffer.concat(chunks).toString("utf8") }));
-      });
-      this.active.add(req); const timer = setTimeout(() => req.destroy(Error("Switchyard target observation timed out.")), 5000);
-      req.once("close", () => { clearTimeout(timer); this.active.delete(req); }); req.once("error", reject); req.end(body);
-    });
-  }
-  private async exchange(operation: ConnectionOperation | "editorReturnTarget" | "editorTarget" | "editorReview" | "editorIssue" | "editorConsume", selected: StudioEditorSelection): Promise<unknown> {
-    const e = await this.endpoint(), route = { editorTarget: "/instance/v1/editor-target", editorReview: "/instance/v1/editor-review", editorIssue: "/instance/v1/editor-issue", editorConsume: "/instance/v1/editor-consume", editorReturnTarget: "/instance/v1/editor-return-target", editorConnectionOpen: "/instance/v1/editor-connection-open", editorConnectionPeer: "/instance/v1/editor-connection-pin-peer", editorConnectionObserve: "/instance/v1/editor-connection-observe", editorConnectionStop: "/instance/v1/editor-connection-stop", editorConnectionRecover: "/instance/v1/editor-connection-recover" }[operation], nonce = randomBytes(32).toString("base64url");
-    const body = JSON.stringify({ schema: "switchyard-instance/v1", operation, nonce, at: Date.now(), instanceId: e.instance.id, build: e.instance.build, selection: selected });
-    const proof = await this.post(new URL(route, e.url.origin), body, { "X-Switchyard-Instance-Request": mac(e.token, "REQUEST", route, body) });
-    requireValue(proof.status === 200 && hash(proof.signature) && timingSafeEqual(Buffer.from(proof.signature, "hex"), Buffer.from(mac(e.token, "RESPONSE-200", route, proof.body), "hex")));
-    const identity: unknown = JSON.parse(proof.body);
-    const field = operation.startsWith("editorConnection") ? "editorConnection" : operation === "editorTarget" || operation === "editorReturnTarget" ? "targetObservation" : "editorAuthorization";
-    requireValue(object(identity) && keys(identity, ["schema", "operation", "nonce", "instanceId", "build", "pid", "origin", "status", field]) && identity.schema === "switchyard-instance/v1" && identity.operation === operation && identity.nonce === nonce && identity.instanceId === e.instance.id && identity.build === e.instance.build && identity.pid === e.pid && identity.origin === e.url.origin && identity.status === "ready");
-    requireValue((await this.endpoint()).bytes === e.bytes);
-    await this.current(); return identity[field];
+    await this.current(); return bytes;
   }
   async editorTarget(input: StudioEditorSelection): Promise<StudioEditorObservation> {
     requireValue(object(input) && keys(input as unknown as Record<string, unknown>, ["compartment", "ownerRequestId", "loadRequestId"]) && /^[a-z][a-z0-9-]{0,63}$/.test(input.compartment) && uuid(input.ownerRequestId) && uuid(input.loadRequestId));
-    const selected = Object.freeze({ ...input }); return observation(await this.exchange("editorTarget", selected), selected);
+    const selected = Object.freeze({ ...input }); return observation(await this.transport.exchange("editorTarget", selected), selected);
   }
-  async returnEditorTarget(input: StudioEditorRequest): Promise<StudioEditorObservation> { const selected = editorSelection(input); return observation(await this.exchange("editorReturnTarget", selected), selected); }
-  async reviewEditor(input: StudioEditorRequest): Promise<StudioEditorReview> { const selected = editorSelection(input); return editorReview(await this.exchange("editorReview", selected), selected); }
-  async issueEditor(input: StudioEditorRequest & { readonly token: string }): Promise<StudioEditorAuthorization> { const selected = editorSelection(input, "token"); return editorAuthorization(await this.exchange("editorIssue", selected), selected, "editorIssue"); }
-  async consumeEditor(input: StudioEditorRequest & { readonly permit: string }): Promise<StudioEditorAuthorization> { const selected = editorSelection(input, "permit"); return editorAuthorization(await this.exchange("editorConsume", selected), selected, "editorConsume"); }
+  async returnEditorTarget(input: StudioEditorRequest): Promise<StudioEditorObservation> { const selected = editorSelection(input); return observation(await this.transport.exchange("editorReturnTarget", selected), selected); }
+  async reviewEditor(input: StudioEditorRequest): Promise<StudioEditorReview> { const selected = editorSelection(input); return editorReview(await this.transport.exchange("editorReview", selected), selected); }
+  async issueEditor(input: StudioEditorRequest & { readonly token: string }): Promise<StudioEditorAuthorization> { const selected = editorSelection(input, "token"); return editorAuthorization(await this.transport.exchange("editorIssue", selected), selected, "editorIssue"); }
+  async consumeEditor(input: StudioEditorRequest & { readonly permit: string }): Promise<StudioEditorAuthorization> { const selected = editorSelection(input, "permit"); return editorAuthorization(await this.transport.exchange("editorConsume", selected), selected, "editorConsume"); }
   async openEditorConnection(input: StudioEditorRequest): Promise<StudioEditorConnectionReady | StudioEditorConnectionRecord> {
-    const selected = editorSelection(input); return connectionResult(await this.exchange("editorConnectionOpen", selected), selected, "open") as StudioEditorConnectionReady | StudioEditorConnectionRecord;
+    const selected = editorSelection(input); return connectionResult(await this.transport.exchange("editorConnectionOpen", selected), selected, "open") as StudioEditorConnectionReady | StudioEditorConnectionRecord;
   }
   async pinEditorPeer(input: StudioEditorRequest & { readonly peer: StudioEditorPeer }): Promise<StudioEditorConnectionObservation> {
     requireValue(object(input) && keys(input as unknown as Record<string, unknown>, ["compartment", ...editorIds, "peer"]));
     const { peer: supplied, ...selection } = input, selected = editorSelection(selection), peer = editorPeer(supplied);
-    return connectionResult(await this.exchange("editorConnectionPeer", Object.freeze({ ...selected, peer })), selected, "pin-peer") as StudioEditorConnectionObservation;
+    return connectionResult(await this.transport.exchange("editorConnectionPeer", Object.freeze({ ...selected, peer })), selected, "pin-peer") as StudioEditorConnectionObservation;
   }
   async observeEditorConnection(input: StudioEditorRequest): Promise<StudioEditorConnectionObservation> {
-    const selected = editorSelection(input); return connectionResult(await this.exchange("editorConnectionObserve", selected), selected, "observe") as StudioEditorConnectionObservation;
+    const selected = editorSelection(input); return connectionResult(await this.transport.exchange("editorConnectionObserve", selected), selected, "observe") as StudioEditorConnectionObservation;
   }
   async stopEditorConnection(input: StudioEditorRequest): Promise<StudioEditorConnectionRecord> {
-    const selected = editorSelection(input); return connectionResult(await this.exchange("editorConnectionStop", selected), selected, "stop") as StudioEditorConnectionRecord;
+    const selected = editorSelection(input); return connectionResult(await this.transport.exchange("editorConnectionStop", selected), selected, "stop") as StudioEditorConnectionRecord;
   }
   async recoverEditorConnection(input: StudioEditorRequest): Promise<StudioEditorConnectionRecord> {
-    const selected = editorSelection(input); return connectionResult(await this.exchange("editorConnectionRecover", selected), selected, "recover") as StudioEditorConnectionRecord;
+    const selected = editorSelection(input); return connectionResult(await this.transport.exchange("editorConnectionRecover", selected), selected, "recover") as StudioEditorConnectionRecord;
   }
-  cancelPending(): void { for (const request of this.active) request.destroy(Error("Switchyard editor observation stopped.")); }
-  close(): void { this.closed = true; this.cancelPending(); }
+  cancelPending(): void { this.transport.cancelPending(); }
+  close(): void { this.closed = true; this.transport.close(); }
 }

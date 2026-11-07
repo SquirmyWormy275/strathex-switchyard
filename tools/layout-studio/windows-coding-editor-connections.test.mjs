@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createHash,randomUUID,createHmac,randomBytes } from 'node:crypto';
+import { createHash,randomUUID } from 'node:crypto';
 import { mkdtemp,rm,readFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join,resolve } from 'node:path';
@@ -16,6 +16,7 @@ import { createRetainedCodexEditorClient } from './codex-retained-editor-client.
 import { codexAccountFingerprint,codexDesignConfig } from './agents.mjs';
 import { queryIntentForOwner } from './windows-query-ownership.mjs';
 import { editorServerFrame } from './editor-websocket-frames.mjs';
+import { StudioWindowsTaskClient } from '../../apps/vscode-extension/src/studio-windows-task-client.ts';
 
 const gate=()=>{let resolve;const promise=new Promise(r=>resolve=r);return{promise,resolve};};
 const hash=v=>createHash('sha256').update(JSON.stringify(v)).digest('hex');
@@ -102,11 +103,11 @@ async function routed(f){
 test('signed Windows Suite routes complete a synthetic return and retire the carrier before task-owner shutdown',async t=>{
   const f=await fixture(t),{suite,events}=await routed(f),token='s'.repeat(43),instance={id:randomUUID(),build:'a'.repeat(64)};
   const server=createStudioServer({suite,token,instance,onApplicationStop:()=>suite.close(),bridge:{close(){}}});server.listen(0,'127.0.0.1');await once(server,'listening');f.cleanup.push(async()=>{server.closeAllConnections();await new Promise((r,j)=>server.close(e=>e?j(e):r()));});
-  const origin='http://127.0.0.1:'+server.address().port,names={open:'editorConnectionOpen','pin-peer':'editorConnectionPeer',observe:'editorConnectionObserve',stop:'editorConnectionStop',recover:'editorConnectionRecover'};
-  async function call(action,extra={}){const route='/instance/v1/editor-connection-'+action,selection={compartment:'personal',...f.selected,...extra},raw=JSON.stringify({schema:'switchyard-instance/v1',operation:names[action],nonce:randomBytes(32).toString('base64url'),at:Date.now(),instanceId:instance.id,build:instance.build,selection});
-    const sig=createHmac('sha256',token).update(`SWITCHYARD-INSTANCE-V1\nREQUEST\nPOST\n${route}\n`).update(raw).digest('hex'),response=await fetch(origin+route,{method:'POST',headers:{'Content-Type':'application/json','X-Switchyard-Instance-Request':sig},body:raw});
-    assert.equal(response.status,200);const value=await response.json();assert.deepEqual(value.editorConnection.selection,f.selected);return value.editorConnection.result;
-  }
+  const origin='http://127.0.0.1:'+server.address().port,names={open:'openEditorConnection','pin-peer':'pinEditorPeer',observe:'observeEditorConnection',stop:'stopEditorConnection',recover:'recoverEditorConnection'};
+  // The endpoint reader is explicitly doubled; wire parsing, signing and
+  // platform response contracts are the actual Windows extension client.
+  const client=new StudioWindowsTaskClient({readEndpoint:async()=>JSON.stringify({schema:'switchyard-active-endpoint/v1',url:origin+'/#access='+token,instance,pid:process.pid}),assertCurrent:async()=>{}});f.cleanup.push(async()=>client.close());
+  const call=(action,extra={})=>client[names[action]]({compartment:'personal',...f.selected,...extra});
   const opened=await call('open');assert.deepEqual(events,['constructed']);const terminal=await f.ready(opened.endpoint,p=>call('pin-peer',{peer:p}));await f.resume(terminal);await until(async()=>(await call('observe')).protocolAcknowledged);
   assert.equal((await call('open')).endpoint,undefined);assert.equal(f.registrations,1);assert.equal((await call('stop')).stoppedVerified,true);assert.equal((await call('recover')).duplicatePrevented,true);
   await suite.close();assert.equal(events.at(-1),'owner-close');assert.equal(f.provider.closed,false);

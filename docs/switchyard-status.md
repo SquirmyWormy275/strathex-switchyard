@@ -18,7 +18,7 @@ checkpoints are not cumulative acceptance of the latest suite.
 | Checkpoint | Verified result | Limit |
 | --- | --- | --- |
 | Installed Linux `edb76de` | **76 metadata/in-memory checks; 42 exact module hashes.** All 54 semantic workspaces and frozen frontend preserved. [Receipt](evidence/installed-mixed-scanner-input-summary.json). | No live scanner, provider task, account/model request, native focus or hardware operation. |
-| Native Windows client `6881d92` | **Seventeen groups; 181 passing tests; no skips.** Actual owned-host and saved-query recovery plus startup intents pass. [Receipt](evidence/windows-editor-recovery-native-summary.json). | Predates the composed Windows lifecycle and signed Suite routes. Restricted-storage failure remains separate and unresolved. |
+| Native Windows client `3795217` | **Eighteen groups; 189 passing tests; no skips.** Native host identity, lifecycle, signed Suite routes and prior recovery cases pass. [Receipt](evidence/windows-editor-lifecycle-native-summary.json). | Provider and terminal-peer doubles are explicit in lifecycle cases. Predates the Windows TypeScript client; restricted-storage failure remains unresolved. |
 | Complete Linux `edb76de` | **330 groups; 2,074 passing tests; 21 declared platform skips.** Original inventory, commands, bounds and owned cleanup verified. [Receipt](evidence/linux-edb76de-complete-summary.json). | Includes combined inputs and Windows saving source; predates terminal/peer probes. |
 | Complete Windows `dc755901` | **417 groups; 2,478 passing tests; 207 declared skips.** All six jobs and overall workflow passed with verified packet/source/cleanup. [Receipt](evidence/windows-complete-dc755901-summary.json). | Predates newer archive, scheduling, profile/workflow and observation corrections. |
 
@@ -38,12 +38,20 @@ storage reduces the package payload to 4,599,483 bytes without changing exports.
 
 ## Recent backend changes
 
+- **Windows extension client:** exact Windows task/process contracts now use the
+  shared signed instance transport. The actual TypeScript client completes the
+  Suite/socket demonstration with an explicit native endpoint-reader double.
+  Nine groups pass 86 tests with one platform skip; root and extension CommonJS
+  typechecks pass. Terminal arguments use the reviewed 0.166.0 environment-token
+  flag. Native endpoint reading, process observation and launching remain
+  unfinished. [Source evidence](evidence/windows-editor-client-source-summary.json).
+
 - **Windows editor lifecycle and signed routes:** consumed review, protected
   reservation, retained logical client, authenticated socket and exact peer
   checkpoints now compose through task acknowledgement and retirement. Thirteen
   groups pass 145 tests with five platform skips; typecheck passes. The demo uses
   real protected state, sockets and signed HTTP with explicit provider/native
-  doubles. Windows host composition awaits CI. VS Code Windows adaptation remains
+  doubles. Windows host composition passes at `3795217`. VS Code Windows adaptation remains
   unfinished. [Source evidence](evidence/windows-editor-lifecycle-source-summary.json).
 - **Windows editor recovery:** startup intents and read-only original host/query
   recovery pass native Windows CI at `6881d92`: seventeen groups, 181 tests,
