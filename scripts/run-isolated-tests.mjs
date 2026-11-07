@@ -640,7 +640,7 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
     process[help ? "stdout" : "stderr"].write("Usage: node scripts/run-isolated-tests.mjs [--help]\nRun the complete required manifest with no arguments. For selected groups, use the exported runVerification API.\n");
     process.exitCode = help ? 0 : 2;
   } else {
-    const { receipt, receiptPath } = await runVerification();
+    const { receipt, receiptPath } = await runVerification({ onProgress: event => console.log("SXSY-TEST-PROGRESS " + JSON.stringify(event)) });
     for (const child of receipt.children) {
       process.stdout.write(`${child.success ? "PASS" : "FAIL"} ${child.file}${child.pattern ? ` :: ${child.pattern}` : ""}\n`);
       if (!child.success) process.stdout.write(`FAIL_DETAIL ${JSON.stringify({ file: child.file, pattern: child.pattern, exitCode: child.exitCode, signal: child.signal, timeout: child.timeout, spawnError: child.spawnError, cleanupCompleted: child.cleanupCompleted, cleanupError: child.cleanupError, processTreeTermination: child.processTreeTermination, testCounts: child.testCounts ?? null, safeTrace: child.safeTrace, diagnostic: child.failureDiagnostic })}\n`);

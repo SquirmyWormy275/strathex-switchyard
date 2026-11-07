@@ -111,7 +111,9 @@ A later persisted selection generation also refuses physical requests after an
 independent store switches away and back, including same-name reselection. Legacy
 reads remain unchanged. Two original regressions are retained; seven groups pass
 111 tests with one skip, and both TypeScript checks pass. This correction is not
-yet installed. [Evidence and limits](evidence/persisted-selection-source-summary.json).
+installed as `57af859` with 88 metadata/refusal checks and 56 module hashes.
+[Source evidence](evidence/persisted-selection-source-summary.json),
+[installed readback](evidence/installed-persisted-selection-summary.json).
 
 ## Current evidence
 
@@ -120,7 +122,7 @@ checkpoints are not cumulative acceptance of the latest suite.
 
 | Checkpoint | Verified result | Limit |
 | --- | --- | --- |
-| Installed Linux `384cf8b` | **88 metadata/refusal checks; 56 exact module hashes.** All 54 semantic workspaces, four profiles, 57 workflows and frozen frontend preserved. [Receipt](evidence/installed-runtime-observation-summary.json). | Consented runtime status capture, original-role/provider-effect guards, signed CLI dispatch and Codex version contract included; editor command activation remains pending; no live scanner, provider task, account/model request, native focus or hardware acceptance. |
+| Installed Linux `57af859` | **88 metadata/refusal checks; 56 exact module hashes.** All 54 semantic workspaces, four profiles, 57 workflows and frozen frontend preserved. [Receipt](evidence/installed-persisted-selection-summary.json). | Persisted selection generation, consented runtime status capture, original-role/provider-effect guards, signed CLI dispatch and Codex version contract included; editor command activation remains pending; no live scanner, provider task, account/model request, native focus or hardware acceptance. |
 | Native Windows client `0bb7fd4` | **25 groups; 249 tests; no skips.** Original manifest, commands, bounds and cleanup verified. [Receipt](evidence/runtime-observation-native-client-summary.json). | Terminal/provider doubles remain explicit; not the complete Windows suite, runtime-observation backend groups or live authenticated Codex turns. |
 | Complete Linux `0c7d918` | **350 groups; 2,274 tests; 32 declared platform skips.** Original manifest, bounds and cleanup verified. [Receipt](evidence/linux-0c7d918-complete-summary.json). | Covers the installed `08fa7ea` runtime, including role/workspace/provider-effect boundaries; predates subsequent runtime-status capture. |
 | Complete Windows `dc755901` | **417 groups; 2,478 tests; 207 declared skips.** All six jobs and overall workflow passed. [Receipt](evidence/windows-complete-dc755901-summary.json). | Predates newer archive, scheduling, profile/workflow and observation corrections. |
@@ -131,15 +133,23 @@ worktrees remain. The journal's earlier failed Windows runs remain recorded in
 the accepted receipt; the independent restricted-storage retirement failure
 remains unresolved.
 
-The latest installation includes 17 wheel license-header cases, 112 Cargo
-manifest reference cases, and eight in-memory policy reports for each of wheels,
-Cargo archives and npm archives. All four saved profiles and 57 workflows remain
-compatible. Selection and the pending keyboard-only conversation are preserved;
-53 sealed workspace files are byte-identical and one changes only audit metadata.
-Dated backup and launcher readback verify. Only current plus one rollback remain;
-the exact 553-file, 4,819,454-byte prepared bundle was removed. The installed
-payload is 4,714,437 bytes across 551 files, including the lossless template
-storage and current backend modules.
+The latest installation preserves all four saved profiles, 57 workflows, selected
+state, one pending keyboard-only conversation and the frozen frontend. All 54
+semantic workspaces match; 53 sealed files are byte-identical and one changes
+only audit metadata. The first signed-route preservation check overlapped other
+metadata verifiers and failed; the unchanged check passed sequentially. Its
+failure remains retained. Dated backup and launcher readback verify. Only current
+plus one rollback remain; the exact 554-file, 4,829,848-byte prepared bundle is
+removed. The installed payload is 4,730,500 bytes across 553 files.
+
+Windows `e5a5781` passed all six preliminary backend shards and 27 native guardian
+checks, but complete bundle verification was cancelled at the 90-minute job
+boundary. No final receipt was produced; the exact active test group is unknown.
+Both complete-suite entry points now emit the already tested bounded progress
+without changing commands, limits or skips. The runner tests pass 23 checks;
+corrected complete native acceptance remains pending.
+[Retained interruption](evidence/windows-backend-e5a5781-summary.json),
+[reporting correction](evidence/full-suite-progress-source-summary.json).
 
 ## Recent backend changes
 
@@ -327,7 +337,7 @@ storage and current backend modules.
 | B122 and cap fit | Hardware is unavailable; all 27 physical gates remain open. |
 | Microsoft work Copilot | No approved work tenant is available. Synthetic checks do not establish tenant, license or account acceptance. |
 | Windows ordinary-user/UAC/guest behavior | Headless CI and guest doubles do not accept interactive journeys. Earlier restricted storage passes remain scoped to their revisions. The `edb76de` restricted owner passes all eight checks and cleanup with TOKEN_QUERY mask 8 unchanged; the earlier intermittent retirement cause remains unresolved. |
-| Native provider/task/IDE interaction | No live login changes, model requests or new native task create/resume are authorized during backend checks. The Claude/tmux attempt stopped at trust and retired its processes. Installed Codex 0.167.0 remains outside the reviewed 0.166.0 gate. |
+| Native provider/task/IDE interaction | No live login changes, model requests or new native task create/resume are authorized during backend checks. The Claude/tmux attempt stopped at trust and retired its processes. Exact Codex 0.166.0 and 0.167.0 contracts are reviewed; live authenticated task acceptance remains separate. |
 | Home/catalog and microphone interaction | Frozen frontend and backend transcription evidence do not establish visual or live microphone acceptance. |
 
 ## Retained failures and unresolved causes

@@ -2134,3 +2134,21 @@ removed. The unchanged checkout was reused by the supervised retry above, then r
 with all nine aliases after that retry failed. Original child bounds remained unchanged.
 Progress is not a final receipt. The marker changes above are later than this
 immutable full-run source. [Interruption](evidence/linux-49a5053-interrupted-summary.json).
+
+## Full-suite progress and retained Windows interruption — 2026-11-07
+
+Windows source `e5a5781` completed six preliminary backend shards (232 groups,
+1,356 passes, 179 declared skips), documentation/PDF validation, 27 native guardian
+checks, reviewed-input staging and the fresh optional runtime. The complete bundle
+step was cancelled at the 90-minute job boundary with no final receipt; canonical
+source checking was skipped. The exact active test group and cause are unknown.
+The native guardian status-refusal case is directly present in the retained log
+excerpt. [Evidence](evidence/windows-backend-e5a5781-summary.json).
+
+Both complete-suite entry points now emit the existing bounded progress callback.
+It identifies the original group at start and after cleanup, carries no child
+output and always says verification is incomplete. The original manifest, commands,
+deadlines and skip allowances are unchanged. Existing runner tests pass 23 cases,
+including reporting faults and cleanup. This makes future interruptions observable;
+it does not accept the cancelled run or establish its cause. No manual workflow
+rerun or deadline increase was used. [Source proof](evidence/full-suite-progress-source-summary.json).

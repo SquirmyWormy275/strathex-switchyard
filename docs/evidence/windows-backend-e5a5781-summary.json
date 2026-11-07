@@ -183,7 +183,10 @@
     "explicitHelperGuardianStepPassed": true,
     "stepNumber": 15,
     "coverageBasis": "The unchanged exact-source workflow sets the native runtime helper, runs runtime-command and suspended-worker tests, and throws on nonzero exit. The invalid status request conditional therefore runs in this successful step. Preliminary backend shards alone do not provide this native coverage.",
-    "rawStepLogNotYetRetained": true
+    "rawStepLogNotYetRetained": false,
+    "logExcerptRetained": true,
+    "nativeTestsPassed": 27,
+    "nativeTestsSkipped": 0
   },
   "freshOptionalRuntime": {
     "artifact": {
@@ -212,9 +215,20 @@
     "guestLaunched": false
   },
   "limitations": [
-    "The complete Windows bundle is still building/verifying; later release receipts and final generated-source checks are not accepted.",
+    "Complete bundle verification was cancelled at the 90-minute job boundary. No final verification receipt was produced and the canonical-source step was skipped. Preliminary shards and native stages do not accept the complete release.",
     "This checkpoint predates signed physical dispatch and the subsequent role/workspace boundary changes.",
     "The intermittent restricted-owner retirement cause remains unresolved; successful diagnostics do not establish a fix.",
     "No real account, interactive native TUI, physical keyboard, guest execution or installed update acceptance is inferred. Only bounded receipt ZIPs were downloaded; no native runtime/helper bundle was downloaded locally."
-  ]
+  ],
+  "releaseJobConclusion": "cancelled",
+  "releaseJobCompletedAt": "2026-11-07T14:03:20Z",
+  "finalVerificationReceiptProduced": false,
+  "releaseInterruption": {
+    "privateRecord": "windows-e5a5781-release-interruption.json",
+    "sha256": "e3b0c9fb4d561a302ca743dbbf5d6cb58460353e8b91599becd083c940cf2014",
+    "fullBundleStepStartedAt": "2026-11-07T12:38:35Z",
+    "fullBundleStepEndedAt": "2026-11-07T14:03:15Z",
+    "jobLimitMinutes": 90,
+    "exactCause": "Cancellation coincides with the 90-minute job boundary. Log states only that the operation was canceled; the exact active test group is unknown."
+  }
 }

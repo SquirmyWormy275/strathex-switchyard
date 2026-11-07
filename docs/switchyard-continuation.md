@@ -143,8 +143,11 @@ Windows source `e5a5781` is audited through all six preliminary backend shards:
 original manifests, commands, bounds and cleanup verify. The documentation/PDF
 step now passes, as do the explicit native-helper guardian step (including the
 invalid status request), fresh 49-package runtime and 30 reviewed-input checks.
-The full bundle step remains running; later receipts and canonical-source checks
-are not accepted. Only the eight small receipt ZIPs were read in memory; no
+The full bundle step was cancelled at the 90-minute job boundary; no final
+receipt was produced and canonical-source checks were skipped. The exact active
+test group remains unknown. Bounded progress is now wired into both full-suite
+entry points, retaining every original command, limit and skip. Its runner group
+passes 23 tests; full native acceptance remains pending. Only the eight small receipt ZIPs were read in memory; no
 native helper/runtime bundle was downloaded locally.
 [Windows evidence](evidence/windows-backend-e5a5781-summary.json).
 
@@ -154,12 +157,12 @@ native helper/runtime bundle was downloaded locally.
    and restricted-storage owner checks also pass. The later `e5a5781` explicit
    native-helper guardian step passes the invalid-status-request case; its final
    complete bundle acceptance remains pending.
-2. Installed Linux now runs `384cf8b`, release `f5404e9f3e35`, with `2e9fbd4ff5b8`
+2. Installed Linux now runs `57af859`, release `d68481192c36`, with `f5404e9f3e35`
    retained as rollback. All 54 semantic workspaces, selection, one pending
    keyboard-only conversation and frozen frontend verify. The 88 metadata/
    refusal checks cover 56 exact modules, four profiles and 57 workflows.
    Dated launcher backup and readback verify; the exact prepared 554-file,
-   4,829,116-byte bundle is removed. Signed requests reject absent roles, wrong
+   4,829,848-byte bundle is removed. Signed requests reject absent roles, wrong
    PID/build, stale requests and caller-selected compartments without an effect.
    No browser reload, native focus, live provider/task or hardware use occurred.
    Do not repeat this update or remove its already-removed staging again.
@@ -207,11 +210,11 @@ process-query change has been made.
 
 ## Installed application and complete-suite baseline
 
-Installed Linux is `384cf8b`: 88 metadata/refusal checks, 56 module hashes,
+Installed Linux is `57af859`: 88 metadata/refusal checks, 56 module hashes,
 all 54 semantic workspaces, four profiles, 57 workflows, selected state, pending
 keyboard-only conversation and frozen frontend preserved. The current release
 and one rollback remain; its exact prepared bundle has been removed.
-[Installed evidence](evidence/installed-runtime-observation-summary.json).
+[Installed evidence](evidence/installed-persisted-selection-summary.json).
 
 The accepted complete Linux run is `0c7d918`: 350 groups, 2,274 passes
 and 32 declared platform skips. Its exact checkout, nine dependency aliases,
@@ -235,3 +238,9 @@ the CI owner proof appends the validated stage to its first failing ordinal.
 Three focused groups/53 tests and source compilation of 36 C# files pass. The
 owned four-file, 758,554-byte compile directory is removed. This is evidence
 instrumentation, not a root-cause fix or native diagnostic acceptance.
+
+The first installed signed-route preservation assertion overlapped other metadata
+verifiers and failed. The original failed receipt is retained; the unchanged
+verifier then passes all eight checks sequentially. Run host-facing metadata
+verifiers sequentially when they share lazy initialization. The final all-workspace
+readback confirms every semantic snapshot and selection is preserved.

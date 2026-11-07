@@ -5,7 +5,7 @@ if (process.versions.node.split(".")[0] !== "24") {
 }
 
 const groups = process.platform === "linux" ? linuxGroups : requiredGroups;
-const { receipt, receiptPath } = await runVerification({ groups });
+const { receipt, receiptPath } = await runVerification({ groups, onProgress: event => console.log("SXSY-TEST-PROGRESS " + JSON.stringify(event)) });
 for (const child of receipt.children) {
   process.stdout.write(`${child.success ? "PASS" : "FAIL"} ${child.file}${child.pattern ? ` :: ${child.pattern}` : ""}${child.testCounts?.skipped ? ` (${child.testCounts.skipped} skipped)` : ""}\n`);
   if (!child.success) process.stdout.write(`FAIL_DETAIL ${JSON.stringify({ file: child.file, timeout: child.timeout, effectiveTimeoutMs: child.effectiveTimeoutMs, durationMs: child.durationMs, exitCode: child.exitCode, signal: child.signal, cleanupCompleted: child.cleanupCompleted, diagnostic: child.failureDiagnostic, testCounts: child.testCounts ?? null })}\n`);
