@@ -21,15 +21,15 @@ and task-specific IDE attachment remain unfinished.
 [Contract](windows-native-focus.md),
 [source evidence](evidence/windows-vscode-focus-source-summary.json).
 
-Installed `02cc6ba` passes **71 metadata/in-memory checks** and verifies 22 exact
-module hashes, including the Windows focus service source and all
-84 Cargo manifest reference cases. All 54 semantic workspaces, selection, pending
-keyboard-only conversation and frozen frontend are preserved; 53 sealed files are
-byte-identical and one changes only audit metadata. All four profiles and 57
-workflows remain compatible. Dated backup and launcher readback verify; current
-plus one rollback remain. The exact 531-file, 5,178,427-byte prepared bundle is
-removed. This Linux update does not establish native Windows focus acceptance.
-[Installed evidence](evidence/installed-windows-vscode-focus-summary.json).
+Installed `a4e4c17` passes **71 metadata/in-memory checks** and verifies 22 exact
+module hashes, including all 112 Cargo manifest reference cases. All 54 semantic
+workspaces, selection, pending keyboard-only conversation and frozen frontend
+are preserved; 53 sealed files are byte-identical and one changes only audit
+metadata. All four profiles and 57 workflows remain compatible. Dated backup
+and launcher readback verify; current plus one rollback remain. The exact
+531-file, 5,179,353-byte prepared bundle is removed. No live scanner, provider,
+account, model, keyboard or native Windows focus action was performed.
+[Installed evidence](evidence/installed-cargo-inline-manifest-summary.json).
 
 Cargo archive inspection now accepts bounded inline dependency tables such as
 `serde = { version = "1", features = ["derive"] }`, nested metadata and array

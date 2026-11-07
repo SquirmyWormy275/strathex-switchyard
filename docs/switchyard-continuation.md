@@ -64,15 +64,15 @@ broader manifest/license coverage remain unfinished.
 [Contract](cargo-archive-identity.md),
 [source evidence](evidence/cargo-inline-manifest-source-summary.json).
 
-Installed `02cc6ba` passes **71 metadata/in-memory checks** and verifies 22 exact
-module hashes, including the Windows focus service source and all
-84 Cargo manifest reference cases. All 54 semantic workspaces, selection, pending
-keyboard-only conversation and frozen frontend are preserved; 53 sealed files are
-byte-identical and one changes only audit metadata. All four profiles and 57
-workflows remain compatible. Dated backup and launcher readback verify; current
-plus one rollback remain. The exact 531-file, 5,178,427-byte prepared bundle is
-removed. This Linux update does not establish native Windows focus acceptance.
-[Installed evidence](evidence/installed-windows-vscode-focus-summary.json).
+Installed `a4e4c17` passes **71 metadata/in-memory checks** and verifies 22 exact
+module hashes, including all 112 Cargo manifest reference cases. All 54 semantic
+workspaces, selection, pending keyboard-only conversation and frozen frontend
+are preserved; 53 sealed files are byte-identical and one changes only audit
+metadata. All four profiles and 57 workflows remain compatible. Dated backup
+and launcher readback verify; current plus one rollback remain. The exact
+531-file, 5,179,353-byte prepared bundle is removed. No live scanner, provider,
+account, model, keyboard or native Windows focus action was performed.
+[Installed evidence](evidence/installed-cargo-inline-manifest-summary.json).
 
 Run only the current repeatable metadata verifiers, each with
 `--read-only-metadata`: `verify-task-owner-host.mjs`,
@@ -113,13 +113,6 @@ changes and predates Cargo archive identity and the workflow-ID correction.
 [Complete receipt](evidence/linux-aafb476-complete-summary.json).
 
 No full Linux test service or temporary marker remains from that run.
-
-A new complete Linux run is executing immutable published `97ef7d6`. Its
-private `linux-full-97ef7d6-active.json` marker records the owned checkout,
-dependency aliases, process unit and cleanup identities. Partial progress is not
-acceptance. Preserve the first temporary-wrapper syntax failure, which occurred
-before any test; the corrected wrapper passed syntax validation before startup.
-This run predates the later VS Code focus extension.
 
 Complete Linux `97ef7d6` passes **322 groups, 1,965 tests and sixteen declared
 skips**, with zero failures/cancellations. Original commands, bounds, skip
@@ -185,17 +178,17 @@ native Windows profile correction acceptance remains separate.
 [Installed evidence](evidence/installed-profile-identity-summary.json).
 [Source evidence](evidence/profile-identity-source-summary.json).
 
-1. Quoted/array Cargo manifest coverage is published and installed; full Linux
-   `a6a6618` is accepted and its exact staging is removed. Continue independent
-   ledger gaps. Keep the later quoted-manifest and Windows-provider corrections
-   separate from that full checkpoint, and installed in-memory proof separate
+1. Cargo quoted/array/inline manifest coverage is published and installed; full
+   Linux `97ef7d6` is accepted and its exact staging is removed. Continue independent
+   ledger gaps. Keep later VS Code focus and Cargo inline tables separate from
+   that full checkpoint, and installed in-memory proof separate
    from live model/UI acceptance. Use immutable published source and a short
    owned temporary parent for any new complete run.
 2. Inspect available native Windows receipts. The new five-shard schedule and
    later helper, SDK, Python/Cargo work require their own final results.
    Retain original failures and distinguish guest doubles from actual guests.
 3. Windows ChatGPT review, owner records, dispatch and read-only recovery are
-   installed as source at `02cc6ba`, including separately reviewed VS Code.
+   installed as source at `a4e4c17`, including separately reviewed VS Code.
    Keep native Windows owner/window acceptance separate. Continue project and
    task-specific IDE integration without weakening identity/foreground proof;
    frontend controls remain frozen. Also continue broader Shield syntax/coverage
