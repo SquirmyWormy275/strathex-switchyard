@@ -1,5 +1,18 @@
 # What has actually been verified
 
+Installed 12b3c87 passes **56 metadata/in-memory checks**: thirteen task-owner,
+seven Copilot-journal, fourteen agent/helper/SDK, twelve Python and ten Cargo.
+Fourteen exact installed module hashes verify. The Cargo verifier includes all
+26 independent archive reference cases and six new in-memory archive reports
+inside its 22 fixed scanner examples. All 54 semantic workspace snapshots,
+selection, pending keyboard-only conversation and frozen frontend are preserved;
+53 sealed files are byte-identical and one changes only audit metadata.
+Dated backup/readback and current plus one rollback verify; the exact 528-file,
+5,229,972-byte prepared bundle is removed. No Cargo process, scanner process,
+extraction, build, live agent, provider task, model request, account change,
+public query or hardware operation starts.
+[Installed evidence](evidence/installed-cargo-archive-summary.json).
+
 Selected Cargo archives now receive bounded gzip/USTAR manifest identity checks.
 A matching declared checksum cannot hide a different embedded name or literal
 version. Thirteen focused groups yield **132 distinct passes**, including six

@@ -16,7 +16,7 @@ No merge or public release has been accepted.
 | --- | --- | --- |
 | Complete Linux `68bcc76` | 310 groups, 1,875 passing tests, sixteen declared skips; exact child/tree and owned staging cleanup. [Receipt](evidence/linux-68bcc76-complete-summary.json). | Later helper, SDK, scanner-input, Python and Cargo changes are outside this checkpoint. |
 | Complete Windows `cadbccd` | 416 groups, 2,443 passing tests and 204 declared skips; packet hashes, source/merge trees, inventory, deadlines and cleanup verify. [Receipt](evidence/windows-complete-cadbccd-summary.json). | The overall workflow failed because preliminary backend shard 3 was cancelled without a final receipt. Later changes are outside this checkpoint. |
-| Installed Linux `aafb476` | 54 metadata/in-memory checks and fourteen exact installed module hashes. All 54 semantic workspace snapshots, selection, pending keyboard-only conversation and frozen frontend are preserved. [Receipt](evidence/installed-cargo-inventory-summary.json). | These checks start no scanner process, Cargo process, live task, agent, account action, model request or hardware operation. |
+| Installed Linux `12b3c87` | 56 metadata/in-memory checks and fourteen exact installed module hashes. All 54 semantic workspace snapshots, selection, pending keyboard-only conversation and frozen frontend are preserved. [Receipt](evidence/installed-cargo-archive-summary.json). | These checks start no scanner process, Cargo process, live task, agent, account action, model request or hardware operation. |
 | Complete Linux `39db1fe` | **Failed:** 313/314 groups, 1,910 passing tests, sixteen declared skips and one failed scheduling-budget assertion. Exact owned cleanup verifies. [Receipt](evidence/linux-39db1fe-scheduling-failed-summary.json). | A nearly passing run is not complete acceptance. |
 
 An immutable **317-group Linux run on aafb476 is active**. It uses the existing
@@ -25,7 +25,7 @@ Progress is not a final result. Later Cargo archive work has its own focused
 checks and is outside this immutable run.
 
 The installed update verifies a dated backup and launcher readback. It retains
-current plus one rollback and removes the exact 528-file, 5,224,475-byte prepared
+current plus one rollback and removes the exact 528-file, 5,229,972-byte prepared
 bundle. Fifty-three sealed workspace files are byte-identical; one changes only
 audit metadata. It preserves the repaired native ChatGPT main window, hidden
 overlay, saved artwork and workstation guard.
@@ -70,7 +70,9 @@ typecheck and five verifier guards pass. The first composed run failed one
 timeout-inventory assertion; registering the two new files in the original
 integration class resolves it, with no existing deadline extended. No extraction,
 Cargo invocation, build, dependency resolution or publisher verification occurs.
-Installed and native Windows archive acceptance remain pending.
+Installed metadata acceptance passes ten Cargo checks inside the 56-check update;
+native Windows and live installed scanner archive acceptance remain unperformed.
+[Installed receipt](evidence/installed-cargo-archive-summary.json).
 [Archive contract](cargo-archive-identity.md),
 [source evidence](evidence/cargo-archive-source-summary.json).
 

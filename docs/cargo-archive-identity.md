@@ -77,4 +77,9 @@ replay, unchanged Git/files and exact cleanup verify. The first composed run
 failed one test-harness inventory assertion; the corrected inventory and
 follow-up pass without extending existing deadlines.
 [Source receipts](evidence/cargo-archive-source-summary.json).
-Installed and native Windows archive acceptance remain pending.
+Normal installed 12b3c87 passes ten Cargo metadata/in-memory checks inside its
+56-check update, including all 26 reference cases and six new archive reports.
+All 54 semantic workspaces and frozen frontend are preserved; the prepared
+bundle is removed. [Installed receipt](evidence/installed-cargo-archive-summary.json).
+This starts no installed scanner process. Live installed scanner and native
+Windows archive acceptance remain unperformed.
