@@ -87,3 +87,9 @@ closed by these operations.
 [VS Code extension with retained receipt hashes](evidence/windows-vscode-focus-source-summary.json).
 The [helper protocol](../apps/windows-companion/provider-desktop-helper/README.md)
 documents the native messages and access constraints.
+
+Installed `94a0135` verifies the corrected Suite hash within 74 metadata/in-memory
+checks and 22 exact module hashes. All 54 semantic workspaces, selected workspace
+and frozen frontend remain preserved; the dated backup and launcher readback
+verify, and exact prepared staging is removed. This does not invoke native focus.
+[Installed evidence](evidence/installed-windows-focus-policy-summary.json).
