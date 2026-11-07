@@ -72,8 +72,11 @@ Complete Linux checkpoint `961ecb3` passes **348 groups / 2,205 tests**, with
 32 declared platform skips. Its temporary checkout and 11.9 MB of build output
 have been removed after verification. Complete Windows checkpoint `dc755901`
 passes **417 groups / 2,478 tests**, with 207 declared skips; it predates the
-latest backend work. Installed Linux `51a73c7` preserves all 54 workspaces and passes 76 metadata/in-memory checks; [receipt](docs/evidence/installed-codex-0167-summary.json). Native Windows client checkpoint `9c3bccf` passes
-**25 groups / 237 tests with no skips**, including the signed launcher
+latest backend work. Installed Linux `51a73c7` preserves all 54 workspaces and
+passes 76 metadata/in-memory checks;
+[receipt](docs/evidence/installed-codex-0167-summary.json).
+Native Windows client checkpoint `c359cdf` passes
+**25 groups / 243 tests with no skips**, including the signed launcher
 demonstration with an exact synthetic task acknowledgement. Interactive
 Terminal/provider acceptance remains separate.
 Restricted storage has passing follow-ups, but an intermittent retirement failure

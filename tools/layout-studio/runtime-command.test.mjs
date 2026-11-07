@@ -4,7 +4,7 @@ import { spawn } from "node:child_process";
 import { mkdtemp, readFile, rm, symlink } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { runRuntimeCommand, runtimeGuardianStopped, runtimeStartupFailureEvidence } from "./runtime-command.mjs";
+import { runRuntimeCommand, runtimeGuardianStopped, runtimeStartupFailureEvidence, runtimeStatusFailureEvidence } from "./runtime-command.mjs";
 import { runtimeEnvironment } from "./runtime-setup.mjs";
 import { runOwnedNativeCommand } from "./owned-native-command.mjs";
 import { createHash } from "node:crypto";
@@ -163,4 +163,19 @@ test("native boundary stops the direct command after guardian loss without claim
 }));
 test("runtime guardian contains excessive output before reporting a bounded failure", { skip }, async () => {
   await assert.rejects(runRuntimeCommand(process.execPath, ["-e", "process.stdout.write('x'.repeat(100000));setInterval(()=>{},1000)"], { ...options, maxOutputBytes: 64 }), (error) => { assert.match(error.message, /output bound/); assert.notEqual(error.code, "RUNTIME_STOP_UNCONFIRMED"); return true; });
+});
+
+
+test("status refusal evidence admits only fixed stages and numeric native errors without exit authority",async()=>{
+  const schema="switchyard-runtime-status-failure/v1";
+  for(const phase of ["request-fields","guardian-open","guardian-birth","guardian-exit","job-open","job-count","response-write"]){
+    const input={schema,phase,nativeCode:null},copy=runtimeStatusFailureEvidence(input);assert.deepEqual(copy,input);copy.phase="changed";assert.equal(input.phase,phase);
+  }
+  for(const nativeCode of [0,5,87,0xffffffff])assert.deepEqual(runtimeStatusFailureEvidence({schema,phase:"guardian-birth",nativeCode}),{schema,phase:"guardian-birth",nativeCode});
+  for(const input of [null,[],{schema,phase:"NEVER_RETAIN",nativeCode:null},{schema,phase:"job-open",nativeCode:"5"},{schema,phase:"job-open",nativeCode:-1},{schema,phase:"job-open",nativeCode:1.5},{schema,phase:"job-open",nativeCode:0x100000000},{schema,phase:"request-fields",nativeCode:5},{schema,phase:"job-open",nativeCode:null,path:"NEVER_RETAIN"},{schema,phase:"job-open",nativeCode:null,guardianExited:true}])assert.equal(runtimeStatusFailureEvidence(input),undefined);
+  if(process.platform==="win32"&&windowsHelper){
+    const result=await runRuntimeCommand(windowsHelper,["--runtime-command-status"],{...options,inputText:JSON.stringify({schema:"NEVER_RETAIN"})+"\n",detailed:true,maxOutputBytes:2048});
+    assert.equal(result.status,"failed");assert.equal(result.exitCode,2);assert.equal(result.treeExitVerified,true);
+    assert.deepEqual(runtimeStatusFailureEvidence(JSON.parse(result.stdout)),{schema,phase:"request-fields",nativeCode:null});assert.equal(result.stdout.includes("NEVER_RETAIN"),false);
+  }
 });

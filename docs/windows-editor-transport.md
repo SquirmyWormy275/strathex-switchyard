@@ -435,7 +435,10 @@ errors.
 Eight focused groups pass 67 tests with two platform skips; both TypeScript
 checks pass. The real carrier demonstration includes project departure and exact
 retirement, with explicit VS Code, native-file/process and provider doubles.
-Native Windows acceptance of this source remains pending. Command registration,
+Native Windows `c359cdf` passes all 25 client groups and 243 tests with no skips,
+including thirteen launcher cases. Original manifest, commands, bounds and cleanup
+verify. [Native receipt](evidence/windows-editor-project-context-native-summary.json).
+Command registration,
 guided project selection and live native task/TUI acceptance remain separate.
 
 [Project regression and retained failures](evidence/windows-editor-project-context-summary.json).

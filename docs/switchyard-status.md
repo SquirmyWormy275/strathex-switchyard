@@ -12,26 +12,29 @@ No merge or public release has been accepted.
 
 The reviewed Windows launcher completes the signed-client, protected-journal and
 real-carrier demonstration with an exact synthetic task acknowledgement. Native
-Windows client checkpoint `9c3bccf` passes all 25 groups: **237 tests, no skips**.
+Windows client checkpoint `c359cdf` passes all 25 groups: **243 tests, no skips**.
 Original deadlines, permissions and cleanup remain intact. Native endpoint,
 file, process/Job and socket checks run separately from the explicit
 Terminal/provider doubles in the composed demonstration. Command/frontend
 activation and live TUI/account/task acceptance remain unfinished.
-[Accepted native client evidence](evidence/windows-codex-0167-client-summary.json).
+[Accepted native client evidence](evidence/windows-editor-project-context-native-summary.json).
 
 Codex source checkpoint `9c3bccf` admits exact 0.166.0 and 0.167.0 revisions with
 42 explicit feature exclusions and version-bound text review. Twelve focused
 groups pass 152 tests with two skips. The actual 0.167 binary passes production
 argument construction and hello/config validators in an empty network-isolated
 home. No account, thread or model request is sent; its original tree and 66
-generated files are removed. The native Windows client lane also passes all 237 tests at this exact source. Installed Linux `51a73c7` now includes this contract and passes 76 metadata/in-memory checks while preserving all 54 workspace snapshots.
+generated files are removed. The native Windows client lane also passes all 237
+tests at this exact source. Installed Linux `51a73c7` includes this contract and
+passes 76 metadata/in-memory checks while preserving all 54 workspace snapshots.
 [Version contract and evidence](codex-version-contract.md).
 
 Windows project reviews now bind the original local workspace folder and
 invalidate on workspace changes. Leaving the project retires the original carrier
 while preserving the user's terminal. Shutdown joins the signed retirement
 response before closing transport. Eight focused groups pass 67 tests with two
-platform skips and both TypeScript checks pass; native acceptance is pending.
+platform skips and both TypeScript checks pass. Native `c359cdf` now passes all
+243 client tests, including thirteen launcher cases; deadlines and cleanup verify.
 [Project-context evidence](evidence/windows-editor-project-context-summary.json).
 
 ## Current evidence
@@ -42,7 +45,7 @@ checkpoints are not cumulative acceptance of the latest suite.
 | Checkpoint | Verified result | Limit |
 | --- | --- | --- |
 | Installed Linux `51a73c7` | **76 metadata/in-memory checks; 44 exact module hashes.** All 54 semantic workspaces, four profiles, 57 workflows and frozen frontend preserved. [Receipt](evidence/installed-codex-0167-summary.json). | Codex version and editor code included; no live scanner, provider task, account/model request, native focus or hardware acceptance. |
-| Native Windows client `9c3bccf` | **25 groups; 237 tests; no skips.** Original manifest, commands, bounds and cleanup verified. [Receipt](evidence/windows-codex-0167-client-summary.json). | Terminal/provider doubles remain explicit; not the complete Windows suite or actual authenticated Codex turns. |
+| Native Windows client `c359cdf` | **25 groups; 243 tests; no skips.** Original manifest, commands, bounds and cleanup verified. [Receipt](evidence/windows-editor-project-context-native-summary.json). | Terminal/provider doubles remain explicit; not the complete Windows suite, later storage diagnostics or authenticated Codex turns. |
 | Complete Linux `961ecb3` | **348 groups; 2,205 tests; 32 declared platform skips.** Original manifest and cleanup verified. [Receipt](evidence/linux-961ecb3-complete-summary.json). | Predates journal corrections and Codex 0.167 admission. |
 | Complete Windows `dc755901` | **417 groups; 2,478 tests; 207 declared skips.** All six jobs and overall workflow passed. [Receipt](evidence/windows-complete-dc755901-summary.json). | Predates newer archive, scheduling, profile/workflow and observation corrections. |
 
@@ -58,10 +61,18 @@ Cargo archives and npm archives. All four saved profiles and 57 workflows remain
 compatible. Selection and the pending keyboard-only conversation are preserved;
 53 sealed workspace files are byte-identical and one changes only audit metadata.
 Dated backup and launcher readback verify. Only current plus one rollback remain;
-the exact 538-file, 4,696,455-byte prepared bundle was removed. Lossless template
-storage reduces the package payload to 4,599,483 bytes without changing exports.
+the exact 552-file, 4,813,488-byte prepared bundle was removed. The installed
+payload is 4,714,437 bytes across 551 files, including the lossless template
+storage and current backend modules.
 
 ## Recent backend changes
+
+- **Storage retirement diagnostics:** failures now retain only a fixed status-query
+  stage and numeric native error. The original query logic, access rights,
+  five-second bound and unknown-retirement refusal remain. Three groups/53 tests
+  and compilation of all 36 C# sources pass; native acceptance is pending.
+  This does not establish or fix the intermittent cause.
+  [Diagnostic evidence](evidence/runtime-status-diagnostic-source-summary.json).
 
 - **Windows extension client:** exact Windows task/process contracts now use the
   shared signed instance transport. The actual TypeScript client completes the

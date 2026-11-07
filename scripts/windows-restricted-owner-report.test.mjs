@@ -476,3 +476,13 @@ test('CI console comparison retains bounded partial evidence and never substitut
    assert.equal(rejected.restrictedHostLeaseConsoles,undefined);assert.equal(JSON.stringify(rejected).includes('NEVER_RETAIN'),false);
  }
 });
+
+
+test("retirement preserves a bounded native status stage without weakening the failed exit check",async()=>{
+  const owners=[{stoppedVerified:true,ownedRuntime:{privateId:"NEVER_RETAIN"}}],original=structuredClone(owners);
+  for(const evidence of [{schema:"switchyard-runtime-status-failure/v1",phase:"guardian-birth",nativeCode:5},{schema:"switchyard-runtime-status-failure/v1",phase:"job-count",nativeCode:null},{schema:"switchyard-runtime-status-failure/v1",phase:"job-open",nativeCode:null,path:"NEVER_RETAIN"}]){
+    let phase;await assert.rejects(verifyWindowsBrokerOwnerRetirement(owners,async()=>false,v=>{phase=v;},()=>evidence),{name:"AssertionError"});
+    assert.equal(phase,evidence.path?"native-exit-owner-1-guardian":`native-exit-owner-1-guardian-status-${evidence.phase}${evidence.nativeCode===null?"":"-code"+evidence.nativeCode}`);
+    assert.match(phase,/^[A-Za-z0-9-]{1,80}$/);assert.equal(phase.includes("NEVER_RETAIN"),false);assert.deepEqual(owners,original);
+  }
+});

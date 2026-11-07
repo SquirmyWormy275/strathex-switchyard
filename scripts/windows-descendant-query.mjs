@@ -59,6 +59,6 @@ export function createWindowsDescendantQuery(context, contextPath) {
       onGuardianChild: child => { guardian("guardian")(child); options.onGuardianChild?.(child); },
       onWorkerSuspended: frame => { register("worker", frame.workerPid, frame.workerBirth, frame.executableSha256); },
     }),
-    guardianStopped: frame => runtimeGuardianStopped(frame, { windowsHelper: context.helper, onGuardianChild: guardian("status") }),
+    guardianStopped: (frame, { onStatusFailure } = {}) => runtimeGuardianStopped(frame, { windowsHelper: context.helper, onGuardianChild: guardian("status"), onStatusFailure }),
   };
 }

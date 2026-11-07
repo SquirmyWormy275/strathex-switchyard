@@ -64,8 +64,9 @@ foreign replacement and unknown committed outcomes still refuse admission.
 
 ## Outstanding verification and implementation
 
-1. Native Windows client `9c3bccf` is audited: exact merge tree, 25 groups,
-   237 tests, zero skips, original deadlines and verified cleanup.
+1. Native Windows client `c359cdf` is audited: exact merge tree, 25 groups,
+   243 tests, zero skips, original deadlines and verified cleanup. It predates
+   the later status-query diagnostics; those still need native CI acceptance.
 2. Installed Linux now runs `51a73c7`, release `edf66107db84`, with `cb2df88680ca`
    retained as rollback. All 54 semantic workspaces, selection, one pending
    keyboard-only conversation and frozen frontend verify. The 76 metadata/
@@ -74,16 +75,21 @@ foreign replacement and unknown committed outcomes still refuse admission.
    4,813,488-byte bundle is removed. No browser reload, live task or hardware use.
    Two stale hash references and five stale error assertions in host verification
    are corrected; the original failures are retained. Do not repeat this update.
-3. Audit native CI for the new Windows project-context source. It retains the
-   exact local workspace folder/generation, rejects replacement/reopen/ambiguity,
-   retires the original carrier on departure, and joins signed retirement before
-   transport closure. Eight groups/67 tests/two skips and both typechecks pass.
-   Retained regressions include five stale-context failures and the first
-   correction's original 45-second cleanup timeout. Command activation and
-   frontend exposure remain frozen. Continue independent backend requirements.
+3. Windows project-context source is accepted in the native client lane. It
+   retains the exact local workspace folder/generation, rejects replacement/
+   reopen/ambiguity, retires the original carrier on departure and joins signed
+   retirement before closing transport. Original failed regressions remain.
+   Command activation and frontend exposure remain frozen.
 4. Native Codex TUI/account/task/model acceptance remains separate. The version
    contract's real native proof covers initialization/config-read only.
-5. Complete Linux `961ecb3` is audited and cleaned: 348 groups, 2,205 tests and
+5. A new complete Linux run for `c359cdf` is active: receipt
+   `05f399ed-8f7b-4c33-8e70-e355b91ccf0e`, unit
+   `switchyard-verification-c359cdf-1794051662.service`. Read the private
+   `linux-full-c359cdf-run.json` marker for exact checkout/test-parent identities,
+   nine dependency aliases and cleanup ownership. Do not start a duplicate run.
+   Audit its original manifest and cleanup before acceptance, then remove only
+   its verified staging. Later status diagnostics are outside this source.
+6. Complete Linux `961ecb3` is audited and cleaned: 348 groups, 2,205 tests and
    32 skips. Do not restart that completed run or delete its removed staging again.
 
 Restricted-storage follow-up `3795217` passes eight ordinary owner checks,
@@ -116,3 +122,11 @@ Historical detailed continuation notes are preserved at
 [the preceding checkpoint](https://github.com/SquirmyWormy275/strathex-switchyard/blob/961ecb36036ae40f67f0685bb6bfbd6f815d10ed/docs/switchyard-continuation.md).
 Use the current status and source-specific contracts before interpreting an old
 “unfinished” note as the present implementation state.
+
+
+The status-query diagnostic change preserves every existing query/access/deadline
+and exit refusal. Only fixed phase and numeric native error leave the helper;
+the CI owner proof appends the validated stage to its first failing ordinal.
+Three focused groups/53 tests and source compilation of 36 C# files pass. The
+owned four-file, 758,554-byte compile directory is removed. This is evidence
+instrumentation, not a root-cause fix or native diagnostic acceptance.

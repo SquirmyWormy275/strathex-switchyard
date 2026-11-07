@@ -3,19 +3,24 @@
 Revision 2 supersedes any earlier first-slice ceiling. All required suite modules must be implemented; the stages are dependency order, not stopping points. The authoritative statuses are in [the requirement ledger](switchyard-requirements.md). All accepted requirements remain tracked here. See the
 [continuation record](switchyard-status.md) for current receipts and next tasks.
 
-| Milestone | Work | Dependency / status |
+| Area | Implemented behavior | Remaining work or acceptance |
 | --- | --- | --- |
-| A | Isolated integration; product split; runnable Studio; recorder and Codex work retained; live device discovery | In progress |
-| B | Shared proposal/direct model; compatibility review; private baseline; bounded host apply/readback/trial/restore; F77 identity and configuration | Current F77 readout/source match pass; physical transactions and typing acceptance remain open |
-| C | Agent-authored proposals; workflow aggregates; exact Codex task controls; Claude Code hooks and exact sessions; Microsoft 365 Copilot investigation | Existing inventory retained; new adapter controls pending |
-| D | Portable profile migration; guest/keyboard-only and Copilot-only scenarios; Windows shortcuts/device access; native Windows verification | Portable model first; Windows host unavailable |
-| E | Required controller adapters, broader observation/voice, SDK, policy/storage, Linux/Windows installation | Implement now; hardware/provider acceptance is separate |
-| Future/external | Physical B122, Windows/tenant host acceptance, independent assessment, macOS, optional external hardware | Only these checks/future targets are deferred by design |
-| Managed security | Enforced provider/account/endpoint policy; independent compartment keys; credential store; AEAD and key recovery; scoped handoffs; retention/deletion; redacted logs | Designed; no managed-client-data acceptance |
-| Distribution | Installer/update/uninstall/rollback; signed releases and key lifecycle; licensing and publication | Existing private B122 preview retained; new product packaging pending |
-| UX | One keyboard workspace; direct and conversation consistency; no mandatory model; accessible selection and responsive geometry; failures preserve work | First implementation in progress |
-| Observation | Tell me / Watch me / preset; optional recording sources; consent, pause/stop/review/delete/exclusions; reviewable transcripts and long-session recovery | Aggregate recorder retained; native audio/screen capture pending |
-| Integration breadth | Separate Codex, Claude Code/desktop, M365/GitHub Copilot, Cursor, Figma, LangChain/custom adapters; truthful capability/staleness reporting; no silent provider fallback | Closed focus action first; SDK and vendor controls pending |
+| Product and keyboard model | Home/catalog, recommended setup, editable workflow/roles, portable geometry and reviewed configuration model. All 40 pinned Model F source definitions are included. | Guided role/device wiring and visual acceptance of the frozen frontend. |
+| Device connection | Distinct Vial and original-xwhatsit transports; matched F77 readout; bounded review/apply/readback/restore paths with synthetic evidence. | Physical transaction, typing, hotplug and controller-lineage acceptance. Preserve Dvorak firmware and US host layout. |
+| Coding integrations | Account-bound Codex/Claude sessions, reviewed text, uncertainty recovery, owned loading and signed editor launcher. Codex 0.166.0/0.167.0 configuration contract is installed. | Live TUI/task handoff, controlled account-switch trials, guided project selection and command activation. [Current boundaries](windows-editor-transport.md). |
+| Work integrations | Separate Microsoft 365 Copilot and GitHub Copilot surfaces, enrolled-account policy and durable request/recovery records. Useful keyboard-only Work mode. | Approved Microsoft tenant and supported live work-surface acceptance. Personal providers never become a fallback. |
+| Observation and voice | Consented category, deliberate, agent, host-action and editor metadata; pause/stop/review/delete/exclusions; bounded local audio/transcript queue and recovery. Actual synthetic-audio checks pass with imperfect recognition. | Broader external streams, frontend controls and interactive microphone/capture acceptance. [Voice recovery](voice-recovery.md). |
+| Extensibility | Versioned authenticated SDK, JavaScript/Python bindings, examples, exact command claims, revocation and uncertain-outcome recovery. | Broader provider containment and independent live-agent trials. [SDK](../integrations/README.md). |
+| Portability | Versioned geometry/typing assumptions, mode preferences, stable intents and reviewed migration; imports clear local authority. Installed HTTP migration/export and restart are demonstrated. | Guided migration UI and second-machine/device acceptance. [Portable profiles](portable-profiles.md). |
+| Policy and storage | Provider/account boundaries, independent compartment keys, OS credential storage, authenticated encryption, scoped handoffs, retention and replay protection. | Managed-client-data approval, independent assessment and broader provider containment. A Work label is not a sandbox. |
+| Host execution and scanning | Reviewed task inputs, supervised Git/processes, Linux containment, Windows storage broker, signed findings and offline package/advisory checks. | Complete scanner coverage/provenance/context, live Windows guest acceptance and the intermittent restricted-storage retirement failure. [Current evidence](switchyard-status.md). |
+| Installation and maintenance | Small versioned Linux/Windows packages, launchers, update/rollback/recovery/uninstall and optional-runtime maintenance. Installed Linux `51a73c7` preserves all 54 workspaces. | Newer complete native Windows verification and interactive host acceptance. Public signing/key management, licensing and release approval remain open. [Installation](suite-installation.md). |
+| External/future | F77 remains the pilot; B122 is a separate specialist preset with 27 open physical gates. | Physical B122, employer approval, independent assessment, macOS and optional external hardware. These do not defer executable Linux/Windows work. |
+
+This table describes current implementation, not a completion percentage. The
+[requirement ledger](switchyard-requirements.md) preserves feature-specific paths,
+checks and remaining limitations. The [status page](switchyard-status.md) binds
+accepted results to their exact source revisions.
 
 Tests must cover model migration, unsafe imports, conflicts, stale review,
 baseline failure, partial application/readback mismatch, recovery, and actual UI

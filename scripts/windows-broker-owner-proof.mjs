@@ -8,19 +8,24 @@ import { createSuiteStore } from "../tools/layout-studio/suite-store.mjs";
 import { createWindowsStorageNative } from "../tools/layout-studio/windows-storage-native.mjs";
 import { createWindowsBrokerExchanges } from "../tools/layout-studio/windows-broker-exchanges.mjs";
 import { directoryIdentity } from "../tools/layout-studio/private-fs.mjs";
-import { runtimeGuardianStopped, runRuntimeCommand } from "../tools/layout-studio/runtime-command.mjs";
+import { runtimeGuardianStopped, runRuntimeCommand, runtimeStatusFailureEvidence } from "../tools/layout-studio/runtime-command.mjs";
 import { stateLockFailureEvidence } from "../tools/layout-studio/keyless-lease-pool.mjs";
 import { createWindowsOwnerProbeObservation } from "./windows-owner-probe-observation.mjs";
 
 /** Keep original exit assertions; report only a bounded ordinal and fixed phase. */
-export async function verifyWindowsBrokerOwnerRetirement(owners, guardianStopped, setPhase) {
+export async function verifyWindowsBrokerOwnerRetirement(owners, guardianStopped, setPhase, statusFailure = () => undefined) {
   setPhase("native-exit-owner-inventory");
   assert.ok(Array.isArray(owners) && owners.length > 0 && owners.length <= 64);
   for (const [index, owner] of owners.entries()) {
     setPhase(`native-exit-owner-${index + 1}-recorded`);
     assert.equal(owner.stoppedVerified, true);
     setPhase(`native-exit-owner-${index + 1}-guardian`);
-    assert.equal(await guardianStopped(owner.ownedRuntime), true);
+    const stopped = await guardianStopped(owner.ownedRuntime);
+    if (stopped !== true) {
+      const evidence = runtimeStatusFailureEvidence(statusFailure());
+      if (evidence) setPhase(`native-exit-owner-${index + 1}-guardian-status-${evidence.phase}${evidence.nativeCode === null ? "" : "-code" + evidence.nativeCode}`);
+    }
+    assert.equal(stopped, true);
   }
 }
 
@@ -29,7 +34,9 @@ export async function verifyWindowsBrokerOwner({ helper, installationId, service
   const root = await mkdtemp(join(process.env.RUNNER_TEMP || tmpdir(), "sxbo-")), original = await directoryIdentity(root), keys = new Map(), checks = [];
   const store = createSuiteStore({ root, secrets: { get: async (c,p) => keys.get(c+p), set: async (c,p,v) => { keys.set(c+p,v); } } });
   const observation = createWindowsOwnerProbeObservation();
-  const guardianStopped = nativeControl?.guardianStopped ?? (frame => runtimeGuardianStopped(frame, { windowsHelper: helper }));
+  let statusFailure;
+  const queryGuardian = nativeControl?.guardianStopped ?? ((frame, options) => runtimeGuardianStopped(frame, { ...options, windowsHelper: helper }));
+  const guardianStopped = frame => { statusFailure = undefined; return queryGuardian(frame, { onStatusFailure: value => { statusFailure = runtimeStatusFailureEvidence(value); } }); };
   const native = observation.native(createWindowsStorageNative({ store, helperPath: helper, setupPath: join(dirname(helper), "Switchyard.Setup.exe"), command: observation.command(nativeControl?.command ?? runRuntimeCommand), guardianStopped }));
   let consumerExited = true, phase = "private-state-initialize";
   const service = createWindowsBrokerExchanges({ store, native, consumerStopped: async () => consumerExited }), context = { operationId: randomUUID(), scopeDigest: "a".repeat(64), provider: "codex" }, inputs = { inputManifestSha256: "e".repeat(64) }, authorize = async () => {};
@@ -63,7 +70,7 @@ export async function verifyWindowsBrokerOwner({ helper, installationId, service
     assert.equal((await store.snapshot("personal")).repositoryWindowsBrokerExchanges.length, 1); checks.push("retired operation cannot create or transfer another image");
     phase = "native-exit-and-fixture-retirement";
     const owners = (await store.snapshot("personal")).windowsStorageNative;
-    await verifyWindowsBrokerOwnerRetirement(owners, guardianStopped, value => { phase = value; });
+    await verifyWindowsBrokerOwnerRetirement(owners, guardianStopped, value => { phase = value; }, () => statusFailure);
     phase = "native-exit-service-close"; await service.close();
     phase = "native-exit-directory-observe"; const current = await directoryIdentity(root);
     phase = "native-exit-directory-device"; assert.equal(current.dev, original.dev);

@@ -90,6 +90,7 @@ internal static partial class RuntimeCommandRunner
     public static int ReadStatus()
     {
         if (!OperatingSystem.IsWindows()) return 2;
+        string phase = "request-fields"; int? nativeCode = null;
         try
         {
             using var request = JsonDocument.Parse(ReadLineBounded(Console.In).GetAwaiter().GetResult() ?? throw NativeError());
@@ -97,14 +98,30 @@ internal static partial class RuntimeCommandRunner
             int guardianPid=request.RootElement.GetProperty("guardianPid").GetInt32();string birth=request.RootElement.GetProperty("birth").GetString()??"";
             if (request.RootElement.GetProperty("schema").GetString() != Schema || !Guid.TryParseExact(id, "D", out _)||guardianPid<1||!long.TryParse(birth,System.Globalization.NumberStyles.None,System.Globalization.CultureInfo.InvariantCulture,out long expectedBirth)||expectedBirth<1) throw NativeError();
             bool guardianExited;
-            try{using var process=Process.GetProcessById(guardianPid);guardianExited=process.StartTime.ToUniversalTime().Ticks!=expectedBirth||process.HasExited;}
+            try
+            {
+                phase = "guardian-open"; using var process = Process.GetProcessById(guardianPid);
+                phase = "guardian-birth"; bool sameBirth = process.StartTime.ToUniversalTime().Ticks == expectedBirth;
+                phase = "guardian-exit"; guardianExited = !sameBirth || process.HasExited;
+            }
             catch(ArgumentException){guardianExited=true;}
+            phase = "job-open";
             using SafeJobHandle job = OpenJobObjectW(4, false, JobName(id));
-            if (job.IsInvalid && Marshal.GetLastWin32Error() != 2) throw NativeError();
-            Write(new { schema = Schema, id, guardianPid,birth,guardianExited,activeProcesses = job.IsInvalid ? 0 : ActiveProcesses(job), containment = "windows-job" });
+            if (job.IsInvalid && Marshal.GetLastWin32Error() != 2) { nativeCode = Marshal.GetLastWin32Error(); throw NativeError(); }
+            phase = "job-count"; uint activeProcesses = job.IsInvalid ? 0 : ActiveProcesses(job);
+            phase = "response-write";
+            Write(new { schema = Schema, id, guardianPid,birth,guardianExited,activeProcesses, containment = "windows-job" });
             return 0;
         }
-        catch { return 2; }
+        catch (Exception error)
+        {
+            // Failure remains unknown and exit code 2. Only a fixed stage and
+            // native numeric code leave this probe; never exception text,
+            // process coordinates, paths or an inferred successful retirement.
+            if (error is System.ComponentModel.Win32Exception native) nativeCode = native.NativeErrorCode;
+            try { Write(new { schema = "switchyard-runtime-status-failure/v1", phase, nativeCode }); } catch { }
+            return 2;
+        }
     }
     private static string JobName(string id) => "Local\\Switchyard.Runtime." + id;
     private static async Task<int> RunAsync(StartupObservation startup)

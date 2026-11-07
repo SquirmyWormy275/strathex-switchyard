@@ -7,6 +7,13 @@ import { fileURLToPath } from "node:url";
 import { stopOwnedChild } from "./owned-process.mjs";
 import { desktopEnvironment, windowsHelperTemporaryEnvironment } from "./process-environment.mjs";
 const nativeHelper = fileURLToPath(new URL("../../runtime/hotkeys/Switchyard.Hotkeys.exe", import.meta.url));
+export function runtimeStatusFailureEvidence(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value) || Object.keys(value).sort().join() !== "nativeCode,phase,schema"
+      || value.schema !== "switchyard-runtime-status-failure/v1"
+      || !["request-fields", "guardian-open", "guardian-birth", "guardian-exit", "job-open", "job-count", "response-write"].includes(value.phase)
+      || !(value.nativeCode === null || ["guardian-open", "guardian-birth", "guardian-exit", "job-open", "job-count"].includes(value.phase) && Number.isInteger(value.nativeCode) && value.nativeCode >= 0 && value.nativeCode <= 0xffffffff)) return undefined;
+  return { schema: value.schema, phase: value.phase, nativeCode: value.nativeCode };
+}
 export function runtimeWorkerStartFailureEvidence(value) {
   const api = ["stdin-pipe", "stdout-pipe", "stderr-pipe", "stdin-inheritance", "stdout-inheritance", "stderr-inheritance", "attribute-size", "attribute-initialize", "handles-attribute", "job-attribute", "process-create", "worker-id", "worker-birth"];
   const managed = ["pipe-security", "pipe-security-verify", "attribute-allocation", "handle-storage", "environment-block", "worker-streams"];
@@ -41,7 +48,7 @@ export function runtimeSuspendedWorkerEvidence(value, expected) {
       || typeof value.executableSha256 !== "string" || !/^[a-f0-9]{64}$/.test(value.executableSha256)) return undefined;
   return { ...value };
 }
-export async function runtimeGuardianStopped(frame, { windowsHelper = nativeHelper, onGuardianChild = () => {} } = {}) {
+export async function runtimeGuardianStopped(frame, { windowsHelper = nativeHelper, onGuardianChild = () => {}, onStatusFailure = () => {} } = {}) {
   if (frame?.schema !== "switchyard-runtime-command/v1" || !/^[a-f0-9-]{36}$/.test(frame.id) || !Number.isSafeInteger(frame.guardianPid) || frame.guardianPid < 1 || !/^[0-9]+$/.test(frame.birth ?? "") || frame.containment !== (process.platform === "linux" ? "owned-linux-session" : "windows-job")) throw new Error("The interrupted runtime guardian scope is invalid; preserve its stage.");
   if (process.platform === "linux") {
     try {process.kill(frame.guardianPid,0);const text=await readFile(`/proc/${frame.guardianPid}/stat`,"utf8"),fields=text.slice(text.lastIndexOf(") ")+2).split(" ");if(fields[0]!=="Z")return false;}
@@ -61,7 +68,11 @@ export async function runtimeGuardianStopped(frame, { windowsHelper = nativeHelp
   try { onGuardianChild(child); child.stdin.end(JSON.stringify({ schema: frame.schema, id: frame.id, guardianPid:frame.guardianPid, birth:frame.birth }) + "\n"); }
   catch { child.stdin.end(); await stopOwnedChild(child); return false; }
   let timer; const code = await Promise.race([ended, new Promise(resolve => { timer = setTimeout(() => resolve(null), 5000); })]); clearTimeout(timer);
-  if (code !== 0 || error) { await stopOwnedChild(child); return false; }
+  if (code !== 0 || error) {
+    await stopOwnedChild(child);
+    if (code === 2 && !error) try { const evidence = runtimeStatusFailureEvidence(JSON.parse(output)); if (evidence) onStatusFailure(evidence); } catch { /* Diagnostic failure cannot turn unknown retirement into success. */ }
+    return false;
+  }
   try { const value = JSON.parse(output); return value.schema === frame.schema && value.id === frame.id && value.containment === "windows-job" && value.guardianPid===frame.guardianPid && value.birth===frame.birth && value.guardianExited===true && value.activeProcesses === 0; } catch { return false; }
 }
 export async function runRuntimeCommand(executable, args, { timeout = 120000, env, cwd = process.cwd(), maxOutputBytes = 524288, inputText, inputBytes, captureStderrBytes = 0, detailed = false, expectedExecutableSha256, linuxExecutable, signal, onGuardianChild = () => {}, onGuardianReady = async () => {}, onWorkerSuspended, windowsHelper = fileURLToPath(new URL("../../runtime/hotkeys/Switchyard.Hotkeys.exe", import.meta.url)) } = {}) {
