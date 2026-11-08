@@ -89,7 +89,14 @@
     "deployment/windows/Build-B122Release.ps1",
     ".github/workflows/b122-windows.yml"
   ],
-  "nativeWindowsFollowup": "pending",
+  "nativeWindowsFollowup": {
+    "sourceCommit": "4db5948e63df68501b56ac4d6690f3a86cf001e4",
+    "targetTestsPassed": 22,
+    "targetSkips": 0,
+    "evidence": "windows-fixture-native-4db5948-summary.json",
+    "packageAcceptance": false,
+    "laterAliasAssertionsAccepted": false
+  },
   "nativePackageAcceptance": false,
   "limitations": [
     "Local tests prove the provider module-context correction and preserve the original failing regression. Five declared platform cases still require native Windows.",

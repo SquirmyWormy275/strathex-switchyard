@@ -79,9 +79,10 @@ across 59 exact modules** and preserves all 54 saved workspaces. It includes sig
 Complete Linux `9266c12` passes **356 groups / 2,333 tests**, with 32 declared
 skips. It covers the installed source, including exact Claude version admission
 and recording-consent fixes for both task adapters. Complete Windows source
-`90fa879` passes **462 groups / 2,902 tests**, with 246 declared skips and a
-passing native collector; it predates these latest corrections.
-The Windows package run completed all 462 groups but failed two native fixture tests; package acceptance remains open. Local fixture corrections pass 29 tests with five declared platform skips. [Failure and corrections](docs/evidence/windows-package-fixture-corrections-summary.json). Earlier focus, storage and
+`4db5948` passes **462 groups / 2,910 tests**, with 246 declared skips. All 21
+original worker receipts are audited; the native collector is pending. This
+source includes the latest consent/version fixes and native fixture corrections.
+The Windows package run completed all 462 groups but failed two native fixture tests; package acceptance remains open. The corrected files now pass 22 native Windows tests with zero skips; full package follow-up remains pending. [Failure and corrections](docs/evidence/windows-package-fixture-corrections-summary.json). Earlier focus, storage and
 host-action settlement failures remain recorded; passing follow-ups do not prove
 their causes are resolved. [Current status and evidence](docs/switchyard-status.md).
 

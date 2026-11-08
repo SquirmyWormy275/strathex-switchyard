@@ -37,6 +37,8 @@ consent corrections. Its exact checkout, nine dependency aliases and 11,910,385
 bytes of generated staging are removed.
 [Latest Linux evidence](evidence/linux-9266c12-complete-summary.json).
 
+Complete Windows source `4db5948` now passes all 462 groups/2,910 tests with 246 declared skips. All 21 original worker receipts are independently audited, including the latest consent/version fixes and native fixture corrections. The native collector, full package check and later explicit alias assertions remain separate pending results. [Latest Windows source evidence](evidence/complete-windows-4db5948-summary.json).
+
 The earlier installed-source Linux `2c6497f` passes 351 groups/2,312 tests with 32 declared skips.
 It covers the installed guided role choices and external-agent consent corrections.
 The frontend picker remains frozen. Native Windows client `9d230ac` passes
@@ -46,7 +48,7 @@ now preserves every original group across bounded workers and requires a final
 receipt audit. Complete Windows source `90fa879` now passes all 462 groups,
 2,902 tests and 246 declared skips, with all 23 jobs and the native collector
 passing. The earlier `cf3bb4c` settlement failure remains unresolved despite the
-passing follow-up. The `90fa879` package run completes all 462 groups but fails two native fixture assertions. The original failures and exact cleanup are audited; local fixture corrections pass 29 tests with five declared platform skips. Native package acceptance remains pending. [Package failure](evidence/windows-package-90fa879-failure-summary.json), [fixture corrections](evidence/windows-package-fixture-corrections-summary.json).
+passing follow-up. The `90fa879` package run completes all 462 groups but fails two native fixture assertions. The original failures and exact cleanup are audited; local fixture corrections pass 29 tests with five declared platform skips. Both corrected files now pass 22 native Windows tests with zero skips at `4db5948`; the two complete worker receipts are audited. Native package acceptance and later explicit alias assertions remain pending. [Native fixture follow-up](evidence/windows-fixture-native-4db5948-summary.json), [Package failure](evidence/windows-package-90fa879-failure-summary.json), [fixture corrections](evidence/windows-package-fixture-corrections-summary.json).
 [Complete source evidence](evidence/complete-windows-90fa879-summary.json).
 These checkpoints do not establish live provider/task, interactive UI or
 physical-device acceptance.

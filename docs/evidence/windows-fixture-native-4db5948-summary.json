@@ -1,0 +1,126 @@
+{
+  "schema": "switchyard-native-windows-fixture-followup/v1",
+  "sourceCommit": "4db5948e63df68501b56ac4d6690f3a86cf001e4",
+  "mergeCommit": "29faa91ee774e760c62e658e676df3cc916d79c1",
+  "sourceTree": "3c4d0b86eaa8f6f59ec07897d4ed25888d63693e",
+  "workflowRunId": 42461208384,
+  "scope": {
+    "platform": "win32",
+    "sourceCommit": "29faa91ee774e760c62e658e676df3cc916d79c1",
+    "sourceTree": "3c4d0b86eaa8f6f59ec07897d4ed25888d63693e",
+    "nodeVersion": "24.14.0",
+    "nodeExecutable": "C:\\hostedtoolcache\\windows\\node\\24.14.0\\x64\\node.exe",
+    "nodeSha256": "63c259c81e5d472b5f11c8d506070130cb04a1ecf84b80377a34ed6ec9048088",
+    "pythonVersion": "3.13.3",
+    "pythonExecutable": "C:\\hostedtoolcache\\windows\\Python\\3.13.3\\x64\\python.exe",
+    "pythonSha256": "d87063e5597f257004c731b66c59c56c91038861c6877b1a3dca6b8c4e919125",
+    "helperSha256": "0906adafb506daece1c9a46d4c6ed9d8ba714cca4c5661112eac3ecfbbfe1637",
+    "dotnetManifestSha256": "9387431f821c8af70705752e6d8a9d16ec88e374167bd415c742db3a319c0387"
+  },
+  "originalManifestCommandsBoundsSkipsAndCleanupVerified": true,
+  "receipts": [
+    {
+      "shard": "16",
+      "artifact": {
+        "id": 13610510001,
+        "shard": "16",
+        "archiveBytes": 4504,
+        "archiveSha256": "8135828b01c42fdd554e27d206c03d72d572c8f6a090390d0afc9994b6ea8ae4",
+        "envelopeSha256": "11f0995c60875b5068b61380d906cab92db31adb3ebf14c4f4a54415ecca33d4"
+      },
+      "receiptId": "7613cbe0-1ac5-49d7-a778-e099134c762f",
+      "receiptSha256": "cfb8ced883fa2d9121ebdb199e869f07a3a5e4740fdd75469e7de898f51d9cd6",
+      "totals": {
+        "required": 25,
+        "passed": 25,
+        "failed": 0,
+        "tests": 150,
+        "passedTests": 145,
+        "failedTests": 0,
+        "skippedTests": 5,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "shard": "17",
+      "artifact": {
+        "id": 13609892427,
+        "shard": "17",
+        "archiveBytes": 4242,
+        "archiveSha256": "f10bfeb95d16f1700fc6ede4e4c642d545d9269a03eb2ea831dfe07add22839e",
+        "envelopeSha256": "2983f50fe51317765c8b646fe75a3cb9bdf1631e97e3c6eb8f327a7b9098306a"
+      },
+      "receiptId": "a6b8753e-4419-4c4a-bc36-e30554124aa4",
+      "receiptSha256": "d572cfe9bfa1d5cdc3375677db71dc7aeebae6f640fce8f28df45ed0b6375027",
+      "totals": {
+        "required": 23,
+        "passed": 23,
+        "failed": 0,
+        "tests": 193,
+        "passedTests": 183,
+        "failedTests": 0,
+        "skippedTests": 10,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    }
+  ],
+  "targets": [
+    {
+      "file": "tools/layout-studio/codex-windows-tasks.test.mjs",
+      "testCounts": {
+        "total": 14,
+        "passed": 14,
+        "failed": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "durationMs": 25745,
+      "effectiveTimeoutMs": 120000,
+      "cleanupCompleted": true,
+      "processTreeTermination": {
+        "strategy": "natural-exit",
+        "completed": true,
+        "supervisorExitCode": null,
+        "supervisorError": null
+      }
+    },
+    {
+      "file": "tools/layout-studio/windows-editor-recovery.test.mjs",
+      "testCounts": {
+        "total": 8,
+        "passed": 8,
+        "failed": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "durationMs": 2374,
+      "effectiveTimeoutMs": 120000,
+      "cleanupCompleted": true,
+      "processTreeTermination": {
+        "strategy": "natural-exit",
+        "completed": true,
+        "supervisorExitCode": null,
+        "supervisorError": null
+      }
+    }
+  ],
+  "scopeTotals": {
+    "groups": 48,
+    "passingTests": 328,
+    "declaredSkips": 15
+  },
+  "nativeTargetTests": 22,
+  "nativeTargetSkips": 0,
+  "packageAcceptance": false,
+  "completeSourceAcceptance": false,
+  "limitations": [
+    "Both target files pass on native Windows at this source, including the extensionless provider under both package module contexts. This is a scoped source follow-up; the separate full package job is pending.",
+    "This source predates the explicit directory-junction alias refusal assertions at 6089285. Those assertions remain pending native verification.",
+    "The original 90fa879 package failures and local failed regression are retained; production recovery identity checks were not weakened.",
+    "The native task uses a synthetic provider. No live model, account switching, interactive desktop, physical keyboard or guest acceptance is claimed."
+  ]
+}
