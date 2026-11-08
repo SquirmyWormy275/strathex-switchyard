@@ -95,5 +95,27 @@
     "Local tests prove the provider module-context correction and preserve the original failing regression. Five declared platform cases still require native Windows.",
     "The SUBST helper-path correction is supported by the package context and canonical-path failure guard; its causal native confirmation remains pending.",
     "No installed runtime, frontend, provider account, real task, hardware, process/token access, ACL, timeout or CI retry policy changed."
-  ]
+  ],
+  "aliasGuardFollowup": {
+    "baseCommit": "4db5948e63df68501b56ac4d6690f3a86cf001e4",
+    "file": "tools/layout-studio/windows-editor-recovery.test.mjs",
+    "sha256": "23f4d72eefa0ab3f1dfebc1d33b5a2b4aa434fcf314e84ae801f5240ad4d9f6e",
+    "receiptId": "7601f4e9-bffa-4fc7-b019-7b4dd07a9b11",
+    "receiptSha256": "31013a9a0ae002959cb6775db002a37a3a58702651ce3bb5f8b6d3badb3abd54",
+    "totals": {
+      "required": 3,
+      "passed": 3,
+      "failed": 0,
+      "tests": 34,
+      "passedTests": 29,
+      "failedTests": 0,
+      "skippedTests": 5,
+      "cancelledTests": 0,
+      "todoTests": 0
+    },
+    "originalCommandsBoundsSkipsAndCleanupVerified": true,
+    "nativeWindowsAcceptance": "pending",
+    "behavior": "The existing native case creates an owned directory junction, checks identical helper bytes and regular-file status, refuses that alias as saved identity, and accepts the untouched original canonical ownership row. It neither rewrites an original saved helper identity nor grants recovery through an alias.",
+    "limitation": "The native alias assertions are skipped on Linux and are not yet accepted by this local receipt."
+  }
 }

@@ -2,8 +2,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { randomUUID,createHash } from 'node:crypto';
 import { spawn } from 'node:child_process';
-import { lstat,readFile,realpath } from 'node:fs/promises';
-import { resolve } from 'node:path';
+import { lstat,readFile,realpath,mkdtemp,symlink,rm,rmdir } from 'node:fs/promises';
+import { basename,dirname,join,resolve } from 'node:path';
+import { tmpdir } from 'node:os';
 import { createWindowsEditorRecovery } from './windows-editor-recovery.mjs';
 import { createWindowsTerminalProcessProbe } from './windows-terminal-process.mjs';
 import { queryIntentForOwner } from './windows-query-ownership.mjs';
@@ -97,11 +98,23 @@ test('actual Windows recovery distinguishes an owned live host from its exit and
   // Capture canonical identity before ownership; package builds use a SUBST
   // drive and saved recovery evidence must never retain that alias.
   const helperPath=await realpath(resolve('runtime/hotkeys/Switchyard.Hotkeys.exe')),helper={path:helperPath,sha256:digest(await readFile(helperPath))};
+  const aliasRoot=await realpath(await mkdtemp(join(tmpdir(),'syer-'))),aliasDirectory=join(aliasRoot,'helper');
+  t.after(async()=>{await rm(aliasDirectory,{force:true});await rmdir(aliasRoot);});
+  await symlink(dirname(helperPath),aliasDirectory,'junction');
+  const aliasPath=join(aliasDirectory,basename(helperPath));
+  assert.notEqual(aliasPath,helperPath);assert.equal(await realpath(aliasPath),helperPath);
+  const aliasStat=await lstat(aliasPath);assert(aliasStat.isFile()&&!aliasStat.isSymbolicLink());
+  assert.equal(digest(await readFile(aliasPath)),helper.sha256);
   const child=spawn(executable,['-e','setInterval(()=>{},1000)'],{stdio:'ignore',windowsHide:true});let original;
   const probe=createWindowsTerminalProcessProbe({helper:async()=>helper,onOwner:async o=>{original=o;}}),recovery=createWindowsEditorRecovery({helper:async()=>helper});
   t.after(async()=>{try{await recovery.close();await probe.close();}finally{assert.equal((await stopOwnedChild(child)).stopped,true);}});
   const hostProof=await probe.inspect({processId:child.pid,expectedBirth:null,image},{assertCurrent:current,signal:new AbortController().signal});
   const r=withQuery({...row(),host:hostProof},original);
   assert.deepEqual(await recovery.verify(r,current),facts(false));assert.equal(child.exitCode,null);
-  assert.equal((await stopOwnedChild(child)).stopped,true);assert.deepEqual(await recovery.verify(r,current),facts(true,true));
+  assert.equal((await stopOwnedChild(child)).stopped,true);
+  // Identical executable bytes through a directory alias are still invalid
+  // saved identity. Keep the original canonical row intact for the valid check.
+  const aliasOwner={...original,helper:{...helper,path:aliasPath}},aliased=withQuery({...row(),host:hostProof},aliasOwner);
+  await assert.rejects(recovery.verify(aliased,current),/original Windows editor recovery evidence did not verify/);
+  assert.deepEqual(await recovery.verify(r,current),facts(true,true));
 });
