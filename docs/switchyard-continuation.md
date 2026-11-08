@@ -255,9 +255,7 @@ The original 90-minute package bound remains. The package now invokes
 most two independent children, all original groups and bounds retained. Both public
 CLI entry points validate arguments. Seven groups/74 tests and five concurrently
 executed backend groups/91 tests pass, along with TypeScript checking. Original
-failed fixture expectations are retained privately. Native package acceptance is
-pending; distributed source acceptance is explicitly not package, hardware or
-live-account acceptance. [Paired evidence](evidence/windows-paired-verification-summary.json).
+failed fixture expectations are retained privately. The `90fa879` package run completes all 462 groups in about 61 minutes but fails two native fixture assertions. Preserve [the audited original failure](evidence/windows-package-90fa879-failure-summary.json). Local fixture corrections pass three groups/29 tests with five declared platform skips; [native package confirmation remains pending](evidence/windows-package-fixture-corrections-summary.json). Do not dispatch retries, widen bounds or weaken the canonical saved-helper guard. Distributed source acceptance is not package, hardware or live-account acceptance. [Paired evidence](evidence/windows-paired-verification-summary.json).
 
 Focus retirement now reports only fixed phase/reason tags. A deterministic original
 two-second deadline test retains the pending write and blocks replacement until

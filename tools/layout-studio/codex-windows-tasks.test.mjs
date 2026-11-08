@@ -5,7 +5,7 @@ import { randomUUID, createHash } from 'node:crypto';
 import { mkdtemp, mkdir, rm, realpath, writeFile, readFile, copyFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
-import { codexAccountFingerprint, codexDesignConfig, codexRestrictedProcessArguments } from './agents.mjs';
+import { CodexClient, codexAccountFingerprint, codexDesignConfig, codexRestrictedProcessArguments } from './agents.mjs';
 import { openWindowsCodexOwner, retireStoppedWindowsCodexOwner } from './codex-windows-owner.mjs';
 import { openWindowsOwnedStdio } from './windows-owned-stdio.mjs';
 import { createCodexWindowsTasks } from './codex-windows-tasks.mjs';
@@ -14,6 +14,7 @@ import { createSuiteStore } from './suite-store.mjs';
 import { repositoryIdentity } from './coding-task-identity.mjs';
 import { createWindowsTerminalProcessProbe } from './windows-terminal-process.mjs';
 import { windowsCodexBinding } from './windows-codex-binding.mjs';
+import { stopOwnedChild } from './owned-process.mjs';
 
 const account = { type: 'chatgpt', email: 'windows-fixture@example.invalid' }, fingerprint = codexAccountFingerprint(account);
 const gate = () => { let resolve; const promise = new Promise(r => { resolve = r; }); return { promise, resolve }; };
@@ -171,6 +172,23 @@ test('a refused Windows transport checkpoint can retire the original Job from it
   await assert.rejects(service.open('personal',{requestId:randomUUID(),taskId:task.id}), /checkpoint refused/);
   const row=(await f.store.snapshot('personal')).codingTaskOwners[0];assert.equal(row.status,'stopped');assert.equal(row.stoppedVerified,true);
   assert.equal(f.transports.every(t=>t.closed),true);assert.equal(f.calls.includes('initialize'),false);
+});
+
+test('the synthetic native provider answers restricted RPC under CommonJS and module package parents', async t => {
+  const root=await realpath(await mkdtemp(join(tmpdir(),'sywm-'))),executable=await realpath(process.execPath),sessionId='11111111-1111-4111-8111-111111111111';
+  t.after(()=>rm(root,{recursive:true}));
+  for(const type of ['commonjs','module']){
+    const parent=join(root,type),cwd=join(parent,'neutral');await mkdir(cwd,{recursive:true});
+    await writeFile(join(parent,'package.json'),JSON.stringify({type}));
+    await copyFile(new URL('./test-support/codex-windows-stdio-fixture.cjs',import.meta.url),join(cwd,'app-server'));
+    await writeFile(join(cwd,'fixture.json'),JSON.stringify({sessionId,repositoryRoot:cwd,account,config:codexDesignConfig()}));
+    const client=new CodexClient(executable,cwd,[],{clientInfo:{name:'switchyard_tasks',title:'Synthetic task fixture',version:'0.1.0'}});
+    try{
+      await assert.doesNotReject(()=>client.initialize(),`restricted RPC under a ${type} package parent`);assert.equal(client.restrictionsVerified,true);assert.equal(client.accountFingerprint,fingerprint);
+      assert.equal((await client.request('thread/read',{threadId:sessionId,includeTurns:false})).thread.id,sessionId);
+      const calls=(await readFile(join(cwd,'calls'),'utf8')).trim().split('\n');assert(calls.includes('initialize'));assert(calls.includes('config/read'));assert(!calls.includes('turn/start'));assert(!calls.includes('thread/resume'));
+    }finally{client.close();assert.equal((await stopOwnedChild(client.child)).stopped,true);}
+  }
 });
 
 test('actual Windows Jobs carry restricted task RPC and recover original retirement with a synthetic provider', { skip: process.platform !== 'win32' }, async t => {

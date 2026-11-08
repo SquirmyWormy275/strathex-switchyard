@@ -81,7 +81,7 @@ skips. It covers the installed source, including exact Claude version admission
 and recording-consent fixes for both task adapters. Complete Windows source
 `90fa879` passes **462 groups / 2,902 tests**, with 246 declared skips and a
 passing native collector; it predates these latest corrections.
-Latest Windows package acceptance remains pending. Earlier focus, storage and
+The Windows package run completed all 462 groups but failed two native fixture tests; package acceptance remains open. Local fixture corrections pass 29 tests with five declared platform skips. [Failure and corrections](docs/evidence/windows-package-fixture-corrections-summary.json). Earlier focus, storage and
 host-action settlement failures remain recorded; passing follow-ups do not prove
 their causes are resolved. [Current status and evidence](docs/switchyard-status.md).
 

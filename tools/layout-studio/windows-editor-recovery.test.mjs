@@ -94,7 +94,9 @@ test('unsupported platform and stale protected record refuse without spawning an
 test('actual Windows recovery distinguishes an owned live host from its exit and observes the original completed query Job', {skip:process.platform!=='win32'},async t=>{
   const digest=v=>createHash('sha256').update(v).digest('hex'),executable=await realpath(process.execPath),stat=await lstat(executable,{bigint:true});
   const image={path:executable,sha256:digest(await readFile(executable)),device:String(stat.dev),inode:String(stat.ino),size:String(stat.size)};
-  const helperPath=resolve('runtime/hotkeys/Switchyard.Hotkeys.exe'),helper={path:helperPath,sha256:digest(await readFile(helperPath))};
+  // Capture canonical identity before ownership; package builds use a SUBST
+  // drive and saved recovery evidence must never retain that alias.
+  const helperPath=await realpath(resolve('runtime/hotkeys/Switchyard.Hotkeys.exe')),helper={path:helperPath,sha256:digest(await readFile(helperPath))};
   const child=spawn(executable,['-e','setInterval(()=>{},1000)'],{stdio:'ignore',windowsHide:true});let original;
   const probe=createWindowsTerminalProcessProbe({helper:async()=>helper,onOwner:async o=>{original=o;}}),recovery=createWindowsEditorRecovery({helper:async()=>helper});
   t.after(async()=>{try{await recovery.close();await probe.close();}finally{assert.equal((await stopOwnedChild(child)).stopped,true);}});

@@ -120,8 +120,9 @@ compiled consumers run in order, then at most two independent groups run at once
 Both public test entry points validate the option. Every original group, command,
 child bound, skip rule, cleanup check and the 90-minute package limit remain.
 Seven focused groups/74 tests pass; five actual backend groups/91 tests also pass
-under the paired schedule. Native package acceptance is pending.
-[Scheduling evidence](evidence/windows-paired-verification-summary.json).
+under the paired schedule. Source `90fa879` now completes every one of the 462 package groups in about 61 minutes, within the existing limit. Two native fixture assertions fail: Codex transport initialization and saved editor-helper identity. The original commands, bounds, skips and cleanup verify; package acceptance is withheld. [Original package failure](evidence/windows-package-90fa879-failure-summary.json).
+
+The synthetic provider now works under both CommonJS and module package parents; the old bytes reproduce the disconnect under a module parent. The recovery fixture captures the canonical helper path before ownership in the SUBST build. Three local groups pass 29 tests with five declared Windows skips. Native follow-up remains pending; production transport/recovery checks are unchanged. [Fixture corrections](evidence/windows-package-fixture-corrections-summary.json), [scheduling evidence](evidence/windows-paired-verification-summary.json).
 
 Focus retirement diagnostics now identify exit versus recording and deadline
 versus rejection, without exposing callback messages. Deterministic checks prove

@@ -1,7 +1,11 @@
 // Reviewed protocol double for actual Windows Job/stdio integration. No account
 // or network API, model request, real task storage or external command is used.
-const fs = require('node:fs');
-const readline = require('node:readline');
+// Native tests copy this file to the extensionless `app-server` entry point.
+// Package builds can place that entry under a `type: module` parent, so keep
+// the double valid in both Node module contexts without changing the RPC.
+void (async () => {
+const fs = await import('node:fs');
+const readline = await import('node:readline');
 const fixture = JSON.parse(fs.readFileSync('fixture.json','utf8'));
 const lines = readline.createInterface({ input: process.stdin });
 lines.on('line', line => {
@@ -19,3 +23,4 @@ lines.on('line', line => {
   process.stdout.write(JSON.stringify({ id: message.id, result }) + '\n');
 });
 lines.on('close', () => process.exit(0));
+})();

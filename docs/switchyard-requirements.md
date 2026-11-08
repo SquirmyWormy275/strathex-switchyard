@@ -46,7 +46,7 @@ now preserves every original group across bounded workers and requires a final
 receipt audit. Complete Windows source `90fa879` now passes all 462 groups,
 2,902 tests and 246 declared skips, with all 23 jobs and the native collector
 passing. The earlier `cf3bb4c` settlement failure remains unresolved despite the
-passing follow-up; latest native package acceptance remains pending.
+passing follow-up. The `90fa879` package run completes all 462 groups but fails two native fixture assertions. The original failures and exact cleanup are audited; local fixture corrections pass 29 tests with five declared platform skips. Native package acceptance remains pending. [Package failure](evidence/windows-package-90fa879-failure-summary.json), [fixture corrections](evidence/windows-package-fixture-corrections-summary.json).
 [Complete source evidence](evidence/complete-windows-90fa879-summary.json).
 These checkpoints do not establish live provider/task, interactive UI or
 physical-device acceptance.
