@@ -124,6 +124,28 @@ test("the native Windows lease worker refuses replaced and hard-linked lock file
     p.process.stdin.write("ACQUIRE 1 0\n"); await new Promise(resolve => setTimeout(resolve, 100));
     await endPeer(p, 2); held.assert();
   });
+  // Exercise the actual inherited stream through fragmented successful frames,
+  // then retain content-free round-trip timing for the unchanged UI deadlines.
+  const repeated = peer(); repeated.process.stdin.write(windowsLockRequest({ path: malformedPath }));
+  assert.equal((await repeated.replies.next()).value, "READY");
+  repeated.process.stdin.write("ACQUI");
+  let premature = false;
+  const firstReply = repeated.replies.next().then(value => { premature = true; return value; });
+  await new Promise(resolve => setTimeout(resolve, 20)); assert.equal(premature, false);
+  repeated.process.stdin.write("RE 1 0\n"); assert.equal((await firstReply).value, "LOCKED 1");
+  repeated.process.stdin.write("RELEA"); premature = false;
+  const released = repeated.replies.next().then(value => { premature = true; return value; });
+  await new Promise(resolve => setTimeout(resolve, 20)); assert.equal(premature, false);
+  repeated.process.stdin.write("SE 1\n"); assert.equal((await released).value, "RELEASED 1");
+  const before = performance.now();
+  for (let sequence = 2; sequence <= 25; sequence++) {
+    repeated.process.stdin.write(`ACQUIRE ${sequence} 0\n`);
+    assert.equal((await repeated.replies.next()).value, `LOCKED ${sequence}`);
+    repeated.process.stdin.write(`RELEASE ${sequence}\n`);
+    assert.equal((await repeated.replies.next()).value, `RELEASED ${sequence}`);
+  }
+  console.log("# lease-round-trips " + JSON.stringify({ cycles: 24, elapsedMs: Math.round(performance.now() - before) }));
+  await endPeer(repeated, 0);
   assert.equal(await readFile(malformedPath, "utf8"), "preserved");
 });
 

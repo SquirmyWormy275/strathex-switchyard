@@ -1,0 +1,1416 @@
+{
+  "schema": "switchyard-native-ui-timing-failures/v1",
+  "at": "2026-11-09T11:14:43.611201+00:00",
+  "workers": [
+    {
+      "sourceCommit": "72e7c22c00c7131722c0c368fe598a2785705b99",
+      "mergeCommit": "007f78e53d6b61d3c7152fc097aa4f912113085b",
+      "sourceTree": "3bf707204df13380dbbe9f175e3b553e61cd815e",
+      "runId": 42602497921,
+      "jobId": 129110743469,
+      "shard": "7",
+      "artifactId": 13668685701,
+      "archiveSha256": "772d96d59f9e1954bf9f8e40e5db48484b054d3c4b4b21c9188a0c1e992235c3",
+      "envelopeSha256": "534890ecfa8e05b6f54011681217ccfd97d671a7f0f539e44e8fc989395d8b29",
+      "receiptSha256": "4184e01d895f015ae6520bfa9395be522d2f7023383ffd8ca9e61c56dc663519",
+      "receiptRunId": "d892411e-5b55-4517-989c-a719623ddb2a",
+      "totals": {
+        "required": 21,
+        "passed": 20,
+        "failed": 1,
+        "tests": 309,
+        "passedTests": 300,
+        "failedTests": 0,
+        "skippedTests": 9,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "failure": {
+        "file": "tools/layout-studio/scanner-ui.test.mjs",
+        "pattern": null,
+        "command": [
+          "C:\\hostedtoolcache\\windows\\node\\24.14.0\\x64\\node.exe",
+          "--experimental-transform-types",
+          "--test",
+          "--test-reporter=tap",
+          "tools/layout-studio/scanner-ui.test.mjs"
+        ],
+        "startedAt": "2026-11-09T11:05:46.867Z",
+        "endedAt": "2026-11-09T11:06:32.001Z",
+        "durationMs": 45134,
+        "effectiveTimeoutMs": 45000,
+        "exitCode": 1,
+        "signal": null,
+        "timeout": true,
+        "outputDigest": "8fc5a3bbce0210a3ebc88ebe61655d44d249d7bf6fe2dcacb6dbb4d79e1ce99a",
+        "outputBytes": 9531,
+        "totalOutputBytes": 9531,
+        "outputLimitBytes": 65536,
+        "outputTruncated": false,
+        "zeroTestPlan": false,
+        "environmentPolicy": "strict-test-v3",
+        "safeTrace": [],
+        "processTreeTermination": {
+          "strategy": "taskkill-owned-tree",
+          "completed": true,
+          "supervisorExitCode": 0,
+          "supervisorError": null
+        },
+        "failureDiagnostic": "ally scanning\nok 2 - saved scanner setup crosses separate permission and execution reviews without automatically scanning\n  ---\n  duration_ms: 19966.074\n  type: 'test'\n  ...\n# \\# fixture-timings {\"stage\":\"authority-ready\",\"elapsedMs\":651,\"columns\":[\"calls\",\"pending\",\"failed\",\"totalMs\",\"maxMs\"],\"phases\":{\"setup-git\":[9,0,0,315,63],\"store-initialize\":[2,0,0,283,142],\"store-update\":[1,0,0,47,47]}}\n# \\# fixture-timings {\"stage\":\"scanner-ready\",\"elapsedMs\":3119,\"columns\":[\"calls\",\"pending\",\"failed\",\"totalMs\",\"maxMs\"],\"phases\":{\"setup-git\":[9,0,0,315,63],\"store-initialize\":[2,0,0,283,142],\"store-update\":[35,0,0,1978,63],\"store-snapshot\":[61,0,0,121,3]}}\n# \\# fixture-timings {\"stage\":\"http-response\",\"elapsedMs\":3293,\"columns\":[\"calls\",\"pending\",\"failed\",\"totalMs\",\"maxMs\"],\"phases\":{\"setup-git\":[9,0,0,315,63],\"store-initialize\":[3,0,0,336,142],\"store-update\":[36,0,0,2036,63],\"store-snapshot\":[79,0,0,157,3],\"http-request\":[1,0,0,156,156]}}\n# \\# fixture-timings {\"stage\":\"http-response\",\"elapsedMs\":3310,\"columns\":[\"calls\",\"pending\",\"failed\",\"totalMs\",\"maxMs\"],\"phases\":{\"setup-git\":[9,0,0,315,63],\"store-initialize\":[3,0,0,336,142],\"store-update\":[36,0,0,2036,63],\"store-snapshot\":[81,0,0,171,12],\"http-request\":[2,0,0,172,156]}}\n# \\# fixture-timings {\"stage\":\"http-response\",\"elapsedMs\":7929,\"columns\":[\"calls\",\"pending\",\"failed\",\"totalMs\",\"maxMs\"],\"phases\":{\"setup-git\":[9,0,0,315,63],\"store-initialize\":[3,0,0,336,142],\"store-update\":[103,0,0,9946,240],\"store-snapshot\":[321,0,0,817,13],\"http-request\":[3,0,0,4790,4618],\"store-authorize\":[6,0,0,12,2],\"guardian-ready\":[31,0,0,3384,242],\"query-git\":[31,0,2,500,22]}}\n# \\# fixture-timings {\"stage\":\"http-response\",\"elapsedMs\":12296,\"columns\":[\"calls\",\"pending\",\"failed\",\"totalMs\",\"maxMs\"],\"phases\":{\"setup-git\":[9,0,0,315,63],\"store-initialize\":[3,0,0,336,142],\"store-update\":[168,0,0,17693,240],\"store-snapshot\":[550,0,0,1449,13],\"http-request\":[4,0,0,9143,4618],\"store-authorize\":[12,0,0,25,3],\"guardian-ready\":[62,0,0,6796,248],\"query-git\":[62,0,4,1006,24]}}\n# \\# fixture-timings {\"stage\":\"http-response\",\"elapsedMs\":12306,\"columns\":[\"calls\",\"pending\",\"failed\",\"totalMs\",\"maxMs\"],\"phases\":{\"setup-git\":[9,0,0,315,63],\"store-initialize\":[3,0,0,336,142],\"store-update\":[168,0,0,17693,240],\"store-snapshot\":[552,0,0,1453,13],\"http-request\":[5,0,0,9152,4618],\"store-authorize\":[12,0,0,25,3],\"guardian-ready\":[62,0,0,6796,248],\"query-git\":[62,0,4,1006,24]}}\n# \\# fixture-timings {\"stage\":\"cleanup\",\"elapsedMs\":12470,\"columns\":[\"calls\",\"pending\",\"failed\",\"totalMs\",\"maxMs\"],\"phases\":{\"setup-git\":[9,0,0,315,63],\"store-initialize\":[3,0,0,336,142],\"store-update\":[170,0,0,17810,240],\"store-snapshot\":[564,0,0,1494,14],\"http-request\":[5,0,0,9152,4618],\"store-authorize\":[12,0,0,25,3],\"guardian-ready\":[62,0,0,6796,248],\"query-git\":[62,0,4,1006,24]}}\n# Subtest: source drift before saving refuses writes and cannot enable a permission handoff\nok 3 - source drift before saving refuses writes and cannot enable a permission handoff\n  ---\n  duration_ms: 12471.2865\n  type: 'test'\n  ...\n# \\# fixture-timings {\"stage\":\"authority-ready\",\"elapsedMs\":641,\"columns\":[\"calls\",\"pending\",\"failed\",\"totalMs\",\"maxMs\"],\"phases\":{\"setup-git\":[9,0,0,312,61],\"store-initialize\":[2,0,0,277,141],\"store-update\":[1,0,0,46,46]}}\n# \\# fixture-timings {\"stage\":\"scanner-ready\",\"elapsedMs\":3257,\"columns\":[\"calls\",\"pending\",\"failed\",\"totalMs\",\"maxMs\"],\"phases\":{\"setup-git\":[9,0,0,312,61],\"store-initialize\":[2,0,0,277,141],\"store-update\":[35,0,0,1999,66],\"store-snapshot\":[61,0,0,134,17]}}\n# \\# fixture-timings {\"stage\":\"http-response\",\"elapsedMs\":3407,\"columns\":[\"calls\",\"pending\",\"failed\",\"totalMs\",\"maxMs\"],\"phases\":{\"setup-git\":[9,0,0,312,61],\"store-initialize\":[3,0,0,316,141],\"store-update\":[36,0,0,2049,66],\"store-snapshot\":[79,0,0,170,17],\"http-request\":[1,0,0,132,132]}}\n# \\# fixture-timings {\"stage\":\"http-response\",\"elapsedMs\":3413,\"columns\":[\"calls\",\"pending\",\"failed\",\"totalMs\",\"maxMs\"],\"phases\":{\"setup-git\":[9,0,0,312,61],\"store-initialize\":[3,0,0,316,141],\"store-update\":[36,0,0,2049,66],\"store-snapshot\":[81,0,0,174,17],\"http-request\":[2,0,0,137,132]}}\n",
+        "spawnError": null,
+        "cleanupCompleted": true,
+        "cleanupError": null,
+        "success": false
+      },
+      "timings": [
+        {
+          "stage": "authority-ready",
+          "elapsedMs": 651,
+          "columns": [
+            "calls",
+            "pending",
+            "failed",
+            "totalMs",
+            "maxMs"
+          ],
+          "phases": {
+            "setup-git": [
+              9,
+              0,
+              0,
+              315,
+              63
+            ],
+            "store-initialize": [
+              2,
+              0,
+              0,
+              283,
+              142
+            ],
+            "store-update": [
+              1,
+              0,
+              0,
+              47,
+              47
+            ]
+          }
+        },
+        {
+          "stage": "scanner-ready",
+          "elapsedMs": 3119,
+          "columns": [
+            "calls",
+            "pending",
+            "failed",
+            "totalMs",
+            "maxMs"
+          ],
+          "phases": {
+            "setup-git": [
+              9,
+              0,
+              0,
+              315,
+              63
+            ],
+            "store-initialize": [
+              2,
+              0,
+              0,
+              283,
+              142
+            ],
+            "store-update": [
+              35,
+              0,
+              0,
+              1978,
+              63
+            ],
+            "store-snapshot": [
+              61,
+              0,
+              0,
+              121,
+              3
+            ]
+          }
+        },
+        {
+          "stage": "http-response",
+          "elapsedMs": 3293,
+          "columns": [
+            "calls",
+            "pending",
+            "failed",
+            "totalMs",
+            "maxMs"
+          ],
+          "phases": {
+            "setup-git": [
+              9,
+              0,
+              0,
+              315,
+              63
+            ],
+            "store-initialize": [
+              3,
+              0,
+              0,
+              336,
+              142
+            ],
+            "store-update": [
+              36,
+              0,
+              0,
+              2036,
+              63
+            ],
+            "store-snapshot": [
+              79,
+              0,
+              0,
+              157,
+              3
+            ],
+            "http-request": [
+              1,
+              0,
+              0,
+              156,
+              156
+            ]
+          }
+        },
+        {
+          "stage": "http-response",
+          "elapsedMs": 3310,
+          "columns": [
+            "calls",
+            "pending",
+            "failed",
+            "totalMs",
+            "maxMs"
+          ],
+          "phases": {
+            "setup-git": [
+              9,
+              0,
+              0,
+              315,
+              63
+            ],
+            "store-initialize": [
+              3,
+              0,
+              0,
+              336,
+              142
+            ],
+            "store-update": [
+              36,
+              0,
+              0,
+              2036,
+              63
+            ],
+            "store-snapshot": [
+              81,
+              0,
+              0,
+              171,
+              12
+            ],
+            "http-request": [
+              2,
+              0,
+              0,
+              172,
+              156
+            ]
+          }
+        },
+        {
+          "stage": "http-response",
+          "elapsedMs": 7929,
+          "columns": [
+            "calls",
+            "pending",
+            "failed",
+            "totalMs",
+            "maxMs"
+          ],
+          "phases": {
+            "setup-git": [
+              9,
+              0,
+              0,
+              315,
+              63
+            ],
+            "store-initialize": [
+              3,
+              0,
+              0,
+              336,
+              142
+            ],
+            "store-update": [
+              103,
+              0,
+              0,
+              9946,
+              240
+            ],
+            "store-snapshot": [
+              321,
+              0,
+              0,
+              817,
+              13
+            ],
+            "http-request": [
+              3,
+              0,
+              0,
+              4790,
+              4618
+            ],
+            "store-authorize": [
+              6,
+              0,
+              0,
+              12,
+              2
+            ],
+            "guardian-ready": [
+              31,
+              0,
+              0,
+              3384,
+              242
+            ],
+            "query-git": [
+              31,
+              0,
+              2,
+              500,
+              22
+            ]
+          }
+        },
+        {
+          "stage": "http-response",
+          "elapsedMs": 12296,
+          "columns": [
+            "calls",
+            "pending",
+            "failed",
+            "totalMs",
+            "maxMs"
+          ],
+          "phases": {
+            "setup-git": [
+              9,
+              0,
+              0,
+              315,
+              63
+            ],
+            "store-initialize": [
+              3,
+              0,
+              0,
+              336,
+              142
+            ],
+            "store-update": [
+              168,
+              0,
+              0,
+              17693,
+              240
+            ],
+            "store-snapshot": [
+              550,
+              0,
+              0,
+              1449,
+              13
+            ],
+            "http-request": [
+              4,
+              0,
+              0,
+              9143,
+              4618
+            ],
+            "store-authorize": [
+              12,
+              0,
+              0,
+              25,
+              3
+            ],
+            "guardian-ready": [
+              62,
+              0,
+              0,
+              6796,
+              248
+            ],
+            "query-git": [
+              62,
+              0,
+              4,
+              1006,
+              24
+            ]
+          }
+        },
+        {
+          "stage": "http-response",
+          "elapsedMs": 12306,
+          "columns": [
+            "calls",
+            "pending",
+            "failed",
+            "totalMs",
+            "maxMs"
+          ],
+          "phases": {
+            "setup-git": [
+              9,
+              0,
+              0,
+              315,
+              63
+            ],
+            "store-initialize": [
+              3,
+              0,
+              0,
+              336,
+              142
+            ],
+            "store-update": [
+              168,
+              0,
+              0,
+              17693,
+              240
+            ],
+            "store-snapshot": [
+              552,
+              0,
+              0,
+              1453,
+              13
+            ],
+            "http-request": [
+              5,
+              0,
+              0,
+              9152,
+              4618
+            ],
+            "store-authorize": [
+              12,
+              0,
+              0,
+              25,
+              3
+            ],
+            "guardian-ready": [
+              62,
+              0,
+              0,
+              6796,
+              248
+            ],
+            "query-git": [
+              62,
+              0,
+              4,
+              1006,
+              24
+            ]
+          }
+        },
+        {
+          "stage": "cleanup",
+          "elapsedMs": 12470,
+          "columns": [
+            "calls",
+            "pending",
+            "failed",
+            "totalMs",
+            "maxMs"
+          ],
+          "phases": {
+            "setup-git": [
+              9,
+              0,
+              0,
+              315,
+              63
+            ],
+            "store-initialize": [
+              3,
+              0,
+              0,
+              336,
+              142
+            ],
+            "store-update": [
+              170,
+              0,
+              0,
+              17810,
+              240
+            ],
+            "store-snapshot": [
+              564,
+              0,
+              0,
+              1494,
+              14
+            ],
+            "http-request": [
+              5,
+              0,
+              0,
+              9152,
+              4618
+            ],
+            "store-authorize": [
+              12,
+              0,
+              0,
+              25,
+              3
+            ],
+            "guardian-ready": [
+              62,
+              0,
+              0,
+              6796,
+              248
+            ],
+            "query-git": [
+              62,
+              0,
+              4,
+              1006,
+              24
+            ]
+          }
+        },
+        {
+          "stage": "authority-ready",
+          "elapsedMs": 641,
+          "columns": [
+            "calls",
+            "pending",
+            "failed",
+            "totalMs",
+            "maxMs"
+          ],
+          "phases": {
+            "setup-git": [
+              9,
+              0,
+              0,
+              312,
+              61
+            ],
+            "store-initialize": [
+              2,
+              0,
+              0,
+              277,
+              141
+            ],
+            "store-update": [
+              1,
+              0,
+              0,
+              46,
+              46
+            ]
+          }
+        },
+        {
+          "stage": "scanner-ready",
+          "elapsedMs": 3257,
+          "columns": [
+            "calls",
+            "pending",
+            "failed",
+            "totalMs",
+            "maxMs"
+          ],
+          "phases": {
+            "setup-git": [
+              9,
+              0,
+              0,
+              312,
+              61
+            ],
+            "store-initialize": [
+              2,
+              0,
+              0,
+              277,
+              141
+            ],
+            "store-update": [
+              35,
+              0,
+              0,
+              1999,
+              66
+            ],
+            "store-snapshot": [
+              61,
+              0,
+              0,
+              134,
+              17
+            ]
+          }
+        },
+        {
+          "stage": "http-response",
+          "elapsedMs": 3407,
+          "columns": [
+            "calls",
+            "pending",
+            "failed",
+            "totalMs",
+            "maxMs"
+          ],
+          "phases": {
+            "setup-git": [
+              9,
+              0,
+              0,
+              312,
+              61
+            ],
+            "store-initialize": [
+              3,
+              0,
+              0,
+              316,
+              141
+            ],
+            "store-update": [
+              36,
+              0,
+              0,
+              2049,
+              66
+            ],
+            "store-snapshot": [
+              79,
+              0,
+              0,
+              170,
+              17
+            ],
+            "http-request": [
+              1,
+              0,
+              0,
+              132,
+              132
+            ]
+          }
+        },
+        {
+          "stage": "http-response",
+          "elapsedMs": 3413,
+          "columns": [
+            "calls",
+            "pending",
+            "failed",
+            "totalMs",
+            "maxMs"
+          ],
+          "phases": {
+            "setup-git": [
+              9,
+              0,
+              0,
+              312,
+              61
+            ],
+            "store-initialize": [
+              3,
+              0,
+              0,
+              316,
+              141
+            ],
+            "store-update": [
+              36,
+              0,
+              0,
+              2049,
+              66
+            ],
+            "store-snapshot": [
+              81,
+              0,
+              0,
+              174,
+              17
+            ],
+            "http-request": [
+              2,
+              0,
+              0,
+              137,
+              132
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "sourceCommit": "7317371d799dde5da501dc5db924457b8919b2d6",
+      "mergeCommit": "305ce87f4fcfdf1c72385805aab7ba73edbab195",
+      "sourceTree": "37c577c668d1d3246ba26b1dbd9eec018ced8069",
+      "runId": 42604226144,
+      "jobId": 129116398694,
+      "shard": "11",
+      "artifactId": 13669135017,
+      "archiveSha256": "616061cc7f67f46d8bf92d05386320ccb93d8c4317a971b88e5c7673b6a4d117",
+      "envelopeSha256": "6028685af15dff7bf88087d4da4fddf515f79cc0e116b9dd5ca73ccedc577282",
+      "receiptSha256": "a01c9ae9ad25e1080f1e49a0495f836790e668a677633e530f9d1306e1b6e885",
+      "receiptRunId": "d211a015-a893-4a9e-9b56-d35514e54d64",
+      "totals": {
+        "required": 21,
+        "passed": 20,
+        "failed": 1,
+        "tests": 147,
+        "passedTests": 140,
+        "failedTests": 0,
+        "skippedTests": 7,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "failure": {
+        "file": "tools/layout-studio/execution-ui.test.mjs",
+        "pattern": null,
+        "command": [
+          "C:\\hostedtoolcache\\windows\\node\\24.14.0\\x64\\node.exe",
+          "--experimental-transform-types",
+          "--test",
+          "--test-reporter=tap",
+          "tools/layout-studio/execution-ui.test.mjs"
+        ],
+        "startedAt": "2026-11-09T11:07:26.829Z",
+        "endedAt": "2026-11-09T11:08:11.977Z",
+        "durationMs": 45148,
+        "effectiveTimeoutMs": 45000,
+        "exitCode": 1,
+        "signal": null,
+        "timeout": true,
+        "outputDigest": "21ffe5b324c0839e9375c8171dbc12f7b6835c9718a832cfa22efcb1cbcfc062",
+        "outputBytes": 8691,
+        "totalOutputBytes": 8691,
+        "outputLimitBytes": 65536,
+        "outputTruncated": false,
+        "zeroTestPlan": false,
+        "environmentPolicy": "strict-test-v3",
+        "safeTrace": [],
+        "processTreeTermination": {
+          "strategy": "taskkill-owned-tree",
+          "completed": true,
+          "supervisorExitCode": 0,
+          "supervisorError": null
+        },
+        "failureDiagnostic": "ize\":[4,0,0,4,1],\"guardian-ready\":[24,0,0,4322,563],\"query-git\":[24,0,2,342,16],\"http-request\":[3,0,0,677,226]}}\n# \\# fixture-timings {\"stage\":\"http-response\",\"elapsedMs\":7754,\"columns\":[\"calls\",\"pending\",\"failed\",\"totalMs\",\"maxMs\"],\"phases\":{\"setup-git\":[9,0,0,308,76],\"store-initialize\":[3,0,0,545,219],\"store-update\":[84,0,0,15525,556],\"store-snapshot\":[266,0,0,504,15],\"store-authorize\":[6,0,0,7,1],\"guardian-ready\":[36,0,0,6124,563],\"query-git\":[36,0,3,512,16],\"http-request\":[4,0,0,3193,2516]}}\n# \\# fixture-timings {\"stage\":\"http-response\",\"elapsedMs\":22219,\"columns\":[\"calls\",\"pending\",\"failed\",\"totalMs\",\"maxMs\"],\"phases\":{\"setup-git\":[9,0,0,308,76],\"store-initialize\":[3,0,0,545,219],\"store-update\":[258,0,0,45341,671],\"store-snapshot\":[826,0,0,1581,15],\"store-authorize\":[22,0,0,28,2],\"guardian-ready\":[108,0,0,17741,563],\"query-git\":[108,0,9,1544,23],\"http-request\":[5,0,0,17643,14450]}}\n# \\# fixture-timings {\"stage\":\"http-response\",\"elapsedMs\":22229,\"columns\":[\"calls\",\"pending\",\"failed\",\"totalMs\",\"maxMs\"],\"phases\":{\"setup-git\":[9,0,0,308,76],\"store-initialize\":[3,0,0,545,219],\"store-update\":[258,0,0,45341,671],\"store-snapshot\":[829,0,0,1589,15],\"store-authorize\":[22,0,0,28,2],\"guardian-ready\":[108,0,0,17741,563],\"query-git\":[108,0,9,1544,23],\"http-request\":[8,2,0,17652,14450]}}\n# \\# fixture-timings {\"stage\":\"cleanup\",\"elapsedMs\":23666,\"columns\":[\"calls\",\"pending\",\"failed\",\"totalMs\",\"maxMs\"],\"phases\":{\"setup-git\":[9,0,0,308,76],\"store-initialize\":[3,0,0,545,219],\"store-update\":[278,0,1,47352,671],\"store-snapshot\":[880,0,0,1678,15],\"store-authorize\":[22,0,0,28,2],\"guardian-ready\":[108,0,0,17741,563],\"query-git\":[108,0,9,1544,23],\"http-request\":[12,0,0,18813,14450]}}\n# Subtest: one confirmed run retains admission separately from observed process exit and never replays on refresh\nok 2 - one confirmed run retains admission separately from observed process exit and never replays on refresh\n  ---\n  duration_ms: 23666.5426\n  type: 'test'\n  ...\n# \\# fixture-timings {\"stage\":\"authority-ready\",\"elapsedMs\":781,\"columns\":[\"calls\",\"pending\",\"failed\",\"totalMs\",\"maxMs\"],\"phases\":{\"setup-git\":[9,0,0,409,124],\"store-initialize\":[2,0,0,242,125],\"store-update\":[1,0,0,124,124]}}\n# \\# fixture-timings {\"stage\":\"execution-ready\",\"elapsedMs\":4435,\"columns\":[\"calls\",\"pending\",\"failed\",\"totalMs\",\"maxMs\"],\"phases\":{\"setup-git\":[9,0,0,409,124],\"store-initialize\":[2,0,0,242,125],\"store-update\":[54,0,0,8041,372],\"store-snapshot\":[156,0,0,266,8],\"store-authorize\":[4,0,0,4,1],\"guardian-ready\":[24,0,0,3038,251],\"query-git\":[24,0,2,332,21]}}\n# \\# fixture-timings {\"stage\":\"http-response\",\"elapsedMs\":4571,\"columns\":[\"calls\",\"pending\",\"failed\",\"totalMs\",\"maxMs\"],\"phases\":{\"setup-git\":[9,0,0,409,124],\"store-initialize\":[3,0,0,287,125],\"store-update\":[55,0,0,8096,372],\"store-snapshot\":[172,2,0,285,8],\"store-authorize\":[4,0,0,4,1],\"guardian-ready\":[24,0,0,3038,251],\"query-git\":[24,0,2,332,21],\"http-request\":[3,2,0,124,124]}}\n# \\# fixture-timings {\"stage\":\"http-response\",\"elapsedMs\":4572,\"columns\":[\"calls\",\"pending\",\"failed\",\"totalMs\",\"maxMs\"],\"phases\":{\"setup-git\":[9,0,0,409,124],\"store-initialize\":[3,0,0,287,125],\"store-update\":[55,0,0,8096,372],\"store-snapshot\":[172,0,0,293,8],\"store-authorize\":[4,0,0,4,1],\"guardian-ready\":[24,0,0,3038,251],\"query-git\":[24,0,2,332,21],\"http-request\":[3,1,0,248,124]}}\n# \\# fixture-timings {\"stage\":\"http-response\",\"elapsedMs\":4572,\"columns\":[\"calls\",\"pending\",\"failed\",\"totalMs\",\"maxMs\"],\"phases\":{\"setup-git\":[9,0,0,409,124],\"store-initialize\":[3,0,0,287,125],\"store-update\":[55,0,0,8096,372],\"store-snapshot\":[172,0,0,293,8],\"store-authorize\":[4,0,0,4,1],\"guardian-ready\":[24,0,0,3038,251],\"query-git\":[24,0,2,332,21],\"http-request\":[3,0,0,372,124]}}\n# \\# fixture-timings {\"stage\":\"http-response\",\"elapsedMs\":6868,\"columns\":[\"calls\",\"pending\",\"failed\",\"totalMs\",\"maxMs\"],\"phases\":{\"setup-git\":[9,0,0,409,124],\"store-initialize\":[3,0,0,287,125],\"store-update\":[84,0,0,12662,372],\"store-snapshot\":[266,0,0,441,8],\"store-authorize\":[6,0,0,7,1],\"guardian-ready\":[36,0,0,4846,340],\"query-git\":[36,0,3,501,21],\"http-request\":[4,0,0,2649,2277]}}\n",
+        "spawnError": null,
+        "cleanupCompleted": true,
+        "cleanupError": null,
+        "success": false
+      },
+      "timings": [
+        {
+          "stage": "http-response",
+          "elapsedMs": 7754,
+          "columns": [
+            "calls",
+            "pending",
+            "failed",
+            "totalMs",
+            "maxMs"
+          ],
+          "phases": {
+            "setup-git": [
+              9,
+              0,
+              0,
+              308,
+              76
+            ],
+            "store-initialize": [
+              3,
+              0,
+              0,
+              545,
+              219
+            ],
+            "store-update": [
+              84,
+              0,
+              0,
+              15525,
+              556
+            ],
+            "store-snapshot": [
+              266,
+              0,
+              0,
+              504,
+              15
+            ],
+            "store-authorize": [
+              6,
+              0,
+              0,
+              7,
+              1
+            ],
+            "guardian-ready": [
+              36,
+              0,
+              0,
+              6124,
+              563
+            ],
+            "query-git": [
+              36,
+              0,
+              3,
+              512,
+              16
+            ],
+            "http-request": [
+              4,
+              0,
+              0,
+              3193,
+              2516
+            ]
+          }
+        },
+        {
+          "stage": "http-response",
+          "elapsedMs": 22219,
+          "columns": [
+            "calls",
+            "pending",
+            "failed",
+            "totalMs",
+            "maxMs"
+          ],
+          "phases": {
+            "setup-git": [
+              9,
+              0,
+              0,
+              308,
+              76
+            ],
+            "store-initialize": [
+              3,
+              0,
+              0,
+              545,
+              219
+            ],
+            "store-update": [
+              258,
+              0,
+              0,
+              45341,
+              671
+            ],
+            "store-snapshot": [
+              826,
+              0,
+              0,
+              1581,
+              15
+            ],
+            "store-authorize": [
+              22,
+              0,
+              0,
+              28,
+              2
+            ],
+            "guardian-ready": [
+              108,
+              0,
+              0,
+              17741,
+              563
+            ],
+            "query-git": [
+              108,
+              0,
+              9,
+              1544,
+              23
+            ],
+            "http-request": [
+              5,
+              0,
+              0,
+              17643,
+              14450
+            ]
+          }
+        },
+        {
+          "stage": "http-response",
+          "elapsedMs": 22229,
+          "columns": [
+            "calls",
+            "pending",
+            "failed",
+            "totalMs",
+            "maxMs"
+          ],
+          "phases": {
+            "setup-git": [
+              9,
+              0,
+              0,
+              308,
+              76
+            ],
+            "store-initialize": [
+              3,
+              0,
+              0,
+              545,
+              219
+            ],
+            "store-update": [
+              258,
+              0,
+              0,
+              45341,
+              671
+            ],
+            "store-snapshot": [
+              829,
+              0,
+              0,
+              1589,
+              15
+            ],
+            "store-authorize": [
+              22,
+              0,
+              0,
+              28,
+              2
+            ],
+            "guardian-ready": [
+              108,
+              0,
+              0,
+              17741,
+              563
+            ],
+            "query-git": [
+              108,
+              0,
+              9,
+              1544,
+              23
+            ],
+            "http-request": [
+              8,
+              2,
+              0,
+              17652,
+              14450
+            ]
+          }
+        },
+        {
+          "stage": "cleanup",
+          "elapsedMs": 23666,
+          "columns": [
+            "calls",
+            "pending",
+            "failed",
+            "totalMs",
+            "maxMs"
+          ],
+          "phases": {
+            "setup-git": [
+              9,
+              0,
+              0,
+              308,
+              76
+            ],
+            "store-initialize": [
+              3,
+              0,
+              0,
+              545,
+              219
+            ],
+            "store-update": [
+              278,
+              0,
+              1,
+              47352,
+              671
+            ],
+            "store-snapshot": [
+              880,
+              0,
+              0,
+              1678,
+              15
+            ],
+            "store-authorize": [
+              22,
+              0,
+              0,
+              28,
+              2
+            ],
+            "guardian-ready": [
+              108,
+              0,
+              0,
+              17741,
+              563
+            ],
+            "query-git": [
+              108,
+              0,
+              9,
+              1544,
+              23
+            ],
+            "http-request": [
+              12,
+              0,
+              0,
+              18813,
+              14450
+            ]
+          }
+        },
+        {
+          "stage": "authority-ready",
+          "elapsedMs": 781,
+          "columns": [
+            "calls",
+            "pending",
+            "failed",
+            "totalMs",
+            "maxMs"
+          ],
+          "phases": {
+            "setup-git": [
+              9,
+              0,
+              0,
+              409,
+              124
+            ],
+            "store-initialize": [
+              2,
+              0,
+              0,
+              242,
+              125
+            ],
+            "store-update": [
+              1,
+              0,
+              0,
+              124,
+              124
+            ]
+          }
+        },
+        {
+          "stage": "execution-ready",
+          "elapsedMs": 4435,
+          "columns": [
+            "calls",
+            "pending",
+            "failed",
+            "totalMs",
+            "maxMs"
+          ],
+          "phases": {
+            "setup-git": [
+              9,
+              0,
+              0,
+              409,
+              124
+            ],
+            "store-initialize": [
+              2,
+              0,
+              0,
+              242,
+              125
+            ],
+            "store-update": [
+              54,
+              0,
+              0,
+              8041,
+              372
+            ],
+            "store-snapshot": [
+              156,
+              0,
+              0,
+              266,
+              8
+            ],
+            "store-authorize": [
+              4,
+              0,
+              0,
+              4,
+              1
+            ],
+            "guardian-ready": [
+              24,
+              0,
+              0,
+              3038,
+              251
+            ],
+            "query-git": [
+              24,
+              0,
+              2,
+              332,
+              21
+            ]
+          }
+        },
+        {
+          "stage": "http-response",
+          "elapsedMs": 4571,
+          "columns": [
+            "calls",
+            "pending",
+            "failed",
+            "totalMs",
+            "maxMs"
+          ],
+          "phases": {
+            "setup-git": [
+              9,
+              0,
+              0,
+              409,
+              124
+            ],
+            "store-initialize": [
+              3,
+              0,
+              0,
+              287,
+              125
+            ],
+            "store-update": [
+              55,
+              0,
+              0,
+              8096,
+              372
+            ],
+            "store-snapshot": [
+              172,
+              2,
+              0,
+              285,
+              8
+            ],
+            "store-authorize": [
+              4,
+              0,
+              0,
+              4,
+              1
+            ],
+            "guardian-ready": [
+              24,
+              0,
+              0,
+              3038,
+              251
+            ],
+            "query-git": [
+              24,
+              0,
+              2,
+              332,
+              21
+            ],
+            "http-request": [
+              3,
+              2,
+              0,
+              124,
+              124
+            ]
+          }
+        },
+        {
+          "stage": "http-response",
+          "elapsedMs": 4572,
+          "columns": [
+            "calls",
+            "pending",
+            "failed",
+            "totalMs",
+            "maxMs"
+          ],
+          "phases": {
+            "setup-git": [
+              9,
+              0,
+              0,
+              409,
+              124
+            ],
+            "store-initialize": [
+              3,
+              0,
+              0,
+              287,
+              125
+            ],
+            "store-update": [
+              55,
+              0,
+              0,
+              8096,
+              372
+            ],
+            "store-snapshot": [
+              172,
+              0,
+              0,
+              293,
+              8
+            ],
+            "store-authorize": [
+              4,
+              0,
+              0,
+              4,
+              1
+            ],
+            "guardian-ready": [
+              24,
+              0,
+              0,
+              3038,
+              251
+            ],
+            "query-git": [
+              24,
+              0,
+              2,
+              332,
+              21
+            ],
+            "http-request": [
+              3,
+              1,
+              0,
+              248,
+              124
+            ]
+          }
+        },
+        {
+          "stage": "http-response",
+          "elapsedMs": 4572,
+          "columns": [
+            "calls",
+            "pending",
+            "failed",
+            "totalMs",
+            "maxMs"
+          ],
+          "phases": {
+            "setup-git": [
+              9,
+              0,
+              0,
+              409,
+              124
+            ],
+            "store-initialize": [
+              3,
+              0,
+              0,
+              287,
+              125
+            ],
+            "store-update": [
+              55,
+              0,
+              0,
+              8096,
+              372
+            ],
+            "store-snapshot": [
+              172,
+              0,
+              0,
+              293,
+              8
+            ],
+            "store-authorize": [
+              4,
+              0,
+              0,
+              4,
+              1
+            ],
+            "guardian-ready": [
+              24,
+              0,
+              0,
+              3038,
+              251
+            ],
+            "query-git": [
+              24,
+              0,
+              2,
+              332,
+              21
+            ],
+            "http-request": [
+              3,
+              0,
+              0,
+              372,
+              124
+            ]
+          }
+        },
+        {
+          "stage": "http-response",
+          "elapsedMs": 6868,
+          "columns": [
+            "calls",
+            "pending",
+            "failed",
+            "totalMs",
+            "maxMs"
+          ],
+          "phases": {
+            "setup-git": [
+              9,
+              0,
+              0,
+              409,
+              124
+            ],
+            "store-initialize": [
+              3,
+              0,
+              0,
+              287,
+              125
+            ],
+            "store-update": [
+              84,
+              0,
+              0,
+              12662,
+              372
+            ],
+            "store-snapshot": [
+              266,
+              0,
+              0,
+              441,
+              8
+            ],
+            "store-authorize": [
+              6,
+              0,
+              0,
+              7,
+              1
+            ],
+            "guardian-ready": [
+              36,
+              0,
+              0,
+              4846,
+              340
+            ],
+            "query-git": [
+              36,
+              0,
+              3,
+              501,
+              21
+            ],
+            "http-request": [
+              4,
+              0,
+              0,
+              2649,
+              2277
+            ]
+          }
+        }
+      ]
+    }
+  ],
+  "timingColumns": [
+    "calls",
+    "pending",
+    "failed",
+    "totalMs",
+    "maxMs"
+  ],
+  "interpretation": "Cumulative/inclusive/concurrent times overlap. Do not sum phase totals. State-update calls and guardian-ready waits dominate the observed journeys; Git commands themselves finish quickly. Source inspection identifies a 25 ms input-polling sleep on each lease command, but native acceptance of its removal remains separate.",
+  "audit": {
+    "originalManifestCommandsBoundsSkips": true,
+    "sourceTreesMatch": true,
+    "originalSerialOrder": true,
+    "outputBounds": true,
+    "ownedTreeCleanup": true,
+    "failedReceiptsPreserved": true,
+    "manualWorkflowAction": false,
+    "completeWindowsAcceptance": false
+  }
+}

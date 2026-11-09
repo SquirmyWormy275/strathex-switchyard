@@ -111,6 +111,25 @@ remain separate.
 
 ## Current Windows follow-up
 
+Original diagnostic worker 7 (job **129110743469**, source `72e7c22`, run
+**42602497921**) and worker 11 (job **129116398694**, source `7317371`, run
+**42604226144**) both fail their unchanged 45-second UI file limits. Their
+source trees, archive/receipt hashes, exact commands, bounds, skips and owned-tree
+cleanup are audited. Phase records show heavy state-update/guardian waiting and
+short Git execution, with overlapping totals that must not be summed.
+[Native evidence](evidence/native-ui-timing-failure-summary.json).
+
+The latest source removes the Windows lease reader's 25 ms input polling sleep;
+the single reader now blocks on input/EOF. Peek checks during contention and
+before transitions, exact file identity, kernel ownership and durable writes
+remain. Native EOF cases are retained and extended with successful fragmented
+frames plus 24 sequenced round trips. Nine original groups pass 82/one existing
+skip; two offline managed builds and 2,117 portable checks pass. Typecheck and
+cleanup verify; all 206 owned build files (3,688,439 bytes) are removed. **Do not
+replay build cleanup. Native performance/pipe acceptance remains pending** on
+the next normal push. [Source evidence](evidence/lease-blocking-source-summary.json).
+This Windows helper-only change needs no Linux app reinstall.
+
 Normal-push diagnostic source `72e7c22` scheduled complete-source run
 **42602497921**, client **42602497768**, Linux release **42602497789** and Windows
 release **42602497863**. Re-read status; these IDs are not passing evidence.

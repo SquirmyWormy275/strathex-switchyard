@@ -63,11 +63,15 @@ than the completed full Linux run.
 | `48bf450`, audited Windows client | 31 groups, 356 passes, zero skips. Its full run fails two UI deadlines and a repeated-focus case. [Receipt and failures](evidence/native-48bf450-results-summary.json) |
 | `7529718`, earlier complete Windows package | 462 groups, 2,910 passes, 246 declared skips; all eight jobs pass. This does not accept later source. [Receipt](evidence/windows-package-7529718-summary.json) |
 
-At `42655aa`, normal-push Windows complete-source run `42599935522` still fails
-workers 7 and 11; worker 15 passes. These are job-status observations, not a new
-audited receipt total. The earlier repeated-focus failure remains unresolved.
-The new diagnostics measure Git, state and HTTP phases in the original UI cases;
-deadlines, assertions, skip allowances and commands are unchanged.
+The original Windows UI failures now have audited timing receipts: worker 7 at
+`72e7c22` and worker 11 at `7317371` still exceed 45 seconds. Measurements point
+to state-update/guardian waits, with short Git command durations. A source
+correction removes the lease worker's 25 ms input polling delay, preserving all
+file identities, ownership, durable writes and deadlines. Nine local groups pass
+82 tests/one existing skip; two offline builds and 2,117 portable checks pass.
+Native acceptance remains pending. The earlier repeated-focus failure remains
+unresolved. [Measurements](evidence/native-ui-timing-failure-summary.json),
+[correction](evidence/lease-blocking-source-summary.json).
 
 The synthetic running preview is separately proven at `dfa40fb`: nine checks
 cover served assets, a named role, signed acknowledgement and stale-workspace
@@ -75,7 +79,7 @@ refusal. [Demonstration receipt](evidence/batched-inspection-running-demo-summar
 
 ## Remaining implementation and defects
 
-- Diagnose and correct the Windows scanner/execution UI file timeouts. Preserve
+- Verify the Windows lease-input correction against the scanner/execution UI file timeouts. Preserve
   earlier intermittent native focus, host-action settlement and shortcut failures.
 - Finish the Linux Claude Desktop binding and launch/focus path for a verified
   supported installation. Windows controls do not establish Linux support.

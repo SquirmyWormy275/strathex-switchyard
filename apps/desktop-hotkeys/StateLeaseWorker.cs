@@ -54,23 +54,18 @@ internal static class StateLeaseWorker
         return (next, parts[2] == "1");
     }
 
-    // One reader owns this stream. Peek before reading prevents a partial frame
-    // from blocking supervision; the writer's EOF is also checked during lock
-    // contention. No PID lookup, process access or background reader is needed.
-    internal sealed class LeasePipeReader(Func<int> readByte, Func<uint?> available, Action idle) : TextReader
+    // One reader blocks on the inherited pipe, waking on bytes or writer EOF.
+    // Polling here adds a full timer tick to both ACQUIRE and RELEASE for every
+    // state write. Peek remains the owner check while contending for a lock;
+    // no PID lookup, process access or background reader is needed.
+    internal sealed class LeasePipeReader(Func<int> readByte, Func<uint?> available) : TextReader
     {
         internal void AssertConnected() { if (available() == null) throw Invalid(); }
         public override int Read()
         {
-            while (true)
-            {
-                uint? count = available();
-                if (count == null) return -1;
-                if (count == 0) { idle(); continue; }
-                int value = readByte();
-                if (value is < 0 or > 255) throw Invalid();
-                return value;
-            }
+            int value = readByte();
+            if (value is < -1 or > 255) throw Invalid();
+            return value;
         }
     }
 
@@ -92,7 +87,7 @@ internal static class StateLeaseWorker
                 if (error is 109 or 233) return null; // Broken or disconnected pipe.
                 throw new Win32Exception(error);
             }
-            using var input = new LeasePipeReader(inheritedInput.ReadByte, Available, () => Thread.Sleep(25));
+            using var input = new LeasePipeReader(inheritedInput.ReadByte, Available);
             var request = ParseRequest(ReadLine(input, 22000, tabs: true) ?? throw Invalid());
             trace.WriteLine("lease-input-read");
             if (!string.Equals(System.IO.Path.GetFullPath(request.Path), request.Path, StringComparison.OrdinalIgnoreCase)) throw Invalid();

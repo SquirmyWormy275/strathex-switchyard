@@ -32,22 +32,28 @@ internal static class StateLeaseProtocolProof
         Require(StateLeaseWorker.ReadLine(new StringReader("READY\n"), 5) == "READY");
         Require(StateLeaseWorker.ReadLine(new StringReader(""), 5) == null);
         foreach (string line in new[] { "READY", "READY\r\n", "READY!\n", "\u0080\n", "A\tB\n" }) Refuses(() => StateLeaseWorker.ReadLine(new StringReader(line), 5));
-        var bytes = new Queue<int>(); int waits = 0;
-        using var fragmented = new StateLeaseWorker.LeasePipeReader(() => bytes.Dequeue(), () => bytes.Count > 0 ? (uint)bytes.Count : waits < 2 ? 0u : null, () => { foreach (char c in ++waits == 1 ? "REA" : "DY\n") bytes.Enqueue(c); });
-        Require(StateLeaseWorker.ReadLine(fragmented, 5) == "READY"); Require(waits == 2);
+        var bytes = new Queue<int>(); int reads = 0, arrivals = 0, queries = 0;
+        using var fragmented = new StateLeaseWorker.LeasePipeReader(() => {
+            reads++;
+            if (bytes.Count == 0 && arrivals < 2) foreach (char c in ++arrivals == 1 ? "REA" : "DY\n") bytes.Enqueue(c);
+            return bytes.Count > 0 ? bytes.Dequeue() : -1;
+        }, () => { queries++; return arrivals < 2 ? 0u : null; });
+        fragmented.AssertConnected(); Require(queries == 1);
+        Require(StateLeaseWorker.ReadLine(fragmented, 5) == "READY"); Require(arrivals == 2 && reads == 6);
+        Require(queries == 1); // Reads wait for input itself, never a polling timer.
+        Require(fragmented.Read() == -1);
         Refuses(fragmented.AssertConnected);
-        int idle = 0;
-        using var quiet = new StateLeaseWorker.LeasePipeReader(() => throw new InvalidOperationException("No unavailable byte may be read."), () => idle == 0 ? 0u : null, () => idle++);
-        quiet.AssertConnected(); Require(quiet.Read() == -1 && idle == 1);
+        using var quiet = new StateLeaseWorker.LeasePipeReader(() => -1, () => 0u);
+        quiet.AssertConnected(); Require(quiet.Read() == -1);
         bytes.Enqueue('R');
-        using var partial = new StateLeaseWorker.LeasePipeReader(() => bytes.Dequeue(), () => bytes.Count > 0 ? (uint)bytes.Count : null, () => throw new InvalidOperationException("No wait after EOF."));
+        using var partial = new StateLeaseWorker.LeasePipeReader(() => bytes.Count > 0 ? bytes.Dequeue() : -1, () => null);
         Refuses(() => StateLeaseWorker.ReadLine(partial, 5));
-        foreach (int badByte in new[] { -1, 256 })
+        foreach (int badByte in new[] { -2, 256 })
         {
-            using var corrupt = new StateLeaseWorker.LeasePipeReader(() => badByte, () => 1u, () => {});
+            using var corrupt = new StateLeaseWorker.LeasePipeReader(() => badByte, () => 1u);
             Refuses(() => corrupt.Read());
         }
-        using var failed = new StateLeaseWorker.LeasePipeReader(() => 0, () => throw new InvalidOperationException("Synthetic pipe query failure."), () => {});
+        using var failed = new StateLeaseWorker.LeasePipeReader(() => throw new InvalidOperationException("Synthetic pipe read failure."), () => throw new InvalidOperationException("Synthetic pipe query failure."));
         Refuses(failed.AssertConnected); Refuses(() => failed.Read());
         return checks;
     }
