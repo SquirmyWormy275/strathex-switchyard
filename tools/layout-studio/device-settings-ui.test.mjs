@@ -106,3 +106,15 @@ test("alternate repeat is gated to Vial 6 and uses named modifiers and options",
     await review(c); await apply(c); assert.deepEqual(c.device.alternateRepeatKeys[0], [4, 5, 2, 10]); await restore(c); assert.deepEqual(c.device.alternateRepeatKeys[0], [0, 0, 0, 0]); assert.deepEqual(c.device.raw[0], [[4, 5]]);
   }, d => { d.enableRules(); d.protocol(6); });
 });
+
+
+test("cancelled and replaced-workspace device reviews remove synthetic macro content without applying it", () => fixture(async c => {
+  const before = Buffer.from(c.device.macro); c.group("macros");
+  field(c.form(), "Replace this slot with the steps below (empty clears it)").checked = true;
+  press(descendants(c.form()).find(row => row.textContent === "Add a macro step")); value(field(c.form(), "Text"), "PRIVATE SYNTHETIC MACRO");
+  await review(c); assert.match(c.$("device-review-summary").textContent, /PRIVATE SYNTHETIC MACRO/);
+  c.click("cancel-device-change"); await until(() => c.$("device-review-summary").textContent === "");
+  await review(c); c.document.dispatchEvent(new Event("switchyard-workspace-changing"));
+  assert.equal(c.$("device-review-summary").textContent, ""); assert.equal(c.$("apply-device-change").disabled, true);
+  assert.deepEqual(c.device.macro, before); assert.equal(c.device.writes.length, 0);
+}));

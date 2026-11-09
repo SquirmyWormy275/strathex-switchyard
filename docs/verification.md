@@ -12,12 +12,13 @@ for work that remains.
 | --- | --- | --- |
 | Complete Linux source | `72e7c22` | 376 groups, 2,574 passes, 32 declared skips. Original commands, bounds, serial order and owned-tree cleanup audited. [Receipt](evidence/linux-72e7c22-complete-summary.json). |
 | Later legacy history account checks | `7317371` | Three regressions reproduced the omission; 13 integration groups pass 139 tests/one existing skip. Separate package and type checks pass. [Evidence](evidence/codex-legacy-read-account-summary.json). |
-| Installed Linux application | `a7958c4` | 42 served/installation/API/state and 123 metadata checks, 65 exact module hashes; all 54 semantic workspaces and three conversations preserved. [Receipt](evidence/installed-history-discovery-summary.json). |
+| Installed Linux application | `2fb81bc` | 44 served/installation/API/state/presentation and 123 metadata checks, 65 exact module hashes. 54 workspace definitions and three conversations preserved; Personal has only the expected shutdown revocation increment. [Receipt](evidence/installed-scanner-readable-summary.json). |
 | Installed pilot editor extension | `42655aa` | 53 exact payload hashes and eight module checks. Actual graphical activation remains unaccepted. [Receipt](evidence/installed-editor-terminal-summary.json). |
 | Real Codex 0.167 terminal | `42655aa` | Synthetic saved history rendered through the production relay, including paginated older history. No model prompt or live task. [Contract](codex-terminal-compatibility.md). |
 | Audited Windows client | `3222727` | 31 groups, 362 passes, zero skips. Includes retained legacy-history account regressions; predates the lease-input correction. [Evidence](evidence/native-client-3222727-summary.json). |
 | Windows UI failure measurements | `72e7c22` / `7317371` | Original scanner/execution files exceed 45 seconds. State and guardian waits dominate the observed phases; timings overlap. [Failed receipts](evidence/native-ui-timing-failure-summary.json). |
 | Windows lease input correction | `f4dcc79` | Two offline builds, 2,117 portable checks and nine local groups/82 passes/one existing skip. Native complete-source follow-up passes below. [Source evidence](evidence/lease-blocking-source-summary.json). |
+| Complete Windows source | `a7958c4` | 482 groups, 3,158 passes, 246 declared skips; all 23 worker receipts agree with the native collector. Original limits, skips and cleanup audited. [Receipt](evidence/complete-windows-a7958c4-summary.json). |
 | Earlier complete Windows package | `7529718` | 462 groups, 2,910 passes, 246 declared skips; eight jobs pass. This does not accept later source. [Receipt](evidence/windows-package-7529718-summary.json). |
 
 The lease correction now has complete native source acceptance at `f4dcc79`:
@@ -26,7 +27,10 @@ collector pass; original receipts, commands, bounds and cleanup are audited.
 [Complete Windows receipt](evidence/complete-windows-f4dcc79-summary.json).
 The later historical-name discovery passes ten integration groups/80 tests/one
 existing skip and eighteen package/installation groups/26 tests, with typecheck.
-Normal installation now passes the checks above; Windows follow-up remains pending.
+The native follow-up is included in the complete a7958c4 source result above.
+The newer readable-review frontend has 58 integration passes, 26 package checks
+and eight verifier guards; normal installed checks are recorded above. A full
+Linux run at a7958c4 remains active and does not yet establish acceptance.
 [Discovery evidence](evidence/history-path-discovery-source-summary.json).
 
 Counts from overlapping runs must not be added. The complete Linux result predates
@@ -131,3 +135,10 @@ links, remains in [the verification record at f4dcc79](https://github.com/Squirm
 The files under [evidence](evidence/) are retained. Historical “next” or “frontend
 frozen” statements describe their original checkpoint and are not current
 instructions.
+
+Complete Linux `a7958c4` passes 376 original groups, 2,578 tests and 32 declared
+skips, with exact source, original bounds and cleanup audited. Its temporary
+checkout and 806 generated files are removed. [Receipt](evidence/linux-a7958c4-complete-summary.json).
+
+Review-context clearing passes 12 original UI groups, 103 checks and no skips
+after eight reproduced regressions. [Source receipt](evidence/review-context-source-summary.json).

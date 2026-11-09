@@ -12,7 +12,7 @@ export function mountExecution({ notify }) {
   const run = () => runs.find(r => r.requestId === $("execution-history").value);
   const available = row => row?.status === "issued" && Date.parse(row.grant.expiresAt) > Date.now();
   const allowed = row => (row?.proposal.actions ?? []).filter(a => actions[a] && row.connectedExecutionActions.includes(a));
-  function invalidate() { generation++; reviewed = null; $("execution-review-dialog").close(); controls(); }
+  function invalidate() { generation++; reviewed = null; $("execution-review-dialog").close(); $("execution-review-summary").textContent = ""; controls(); }
   function controls() {
     const current = grant();
     for (const id of ["execution-grant", "execution-action", "execution-manifest", "execution-manifest-file", "execution-history", "refresh-executions"]) $(id).disabled = busy || !permitted();
@@ -97,8 +97,8 @@ export function mountExecution({ notify }) {
     $("execution-review-summary").textContent = `Project: ${selected.repositoryRoot}\nAction: ${actions[value.review.originalAction] ?? value.review.originalAction}\nRequest: ${value.review.requestId}\nOperation: ${value.review.originalOperationId}\nExpires: ${value.review.expiresAt}\n\n${value.confirmation.record.reason}\n\nBudget:\n${json(value.budget)}`;
     $("confirm-execution").textContent = "Stop this exact execution"; $("execution-review-dialog").showModal();
   }));
-  $("cancel-execution").addEventListener("click", () => { reviewed = null; $("execution-review-dialog").close(); controls(); });
-  $("execution-review-dialog").addEventListener("close", () => { reviewed = null; controls(); });
+  $("cancel-execution").addEventListener("click", () => { reviewed = null; $("execution-review-dialog").close(); $("execution-review-summary").textContent = ""; controls(); });
+  $("execution-review-dialog").addEventListener("close", () => { reviewed = null; $("execution-review-summary").textContent = ""; controls(); });
   $("confirm-execution").addEventListener("click", () => work(async context => {
     if (!reviewed) return; const request = reviewed; reviewed = null; $("execution-review-dialog").close();
     $("execution-status").textContent = request.kind === "stop" ? "Requesting the separately reviewed stop. Waiting for its retained result…" : "Submitting the reviewed execution once. Waiting for its retained admission result…";

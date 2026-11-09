@@ -106,7 +106,7 @@ test("Linux Claude catalog does not offer the Windows navigation implementation"
 test("saved Linux app choices are passive and a cancelled review never inspects a window", () => fixture(async c => {
   assert.equal(c.f.probes, 0); assert.equal(c.f.effects, 0); assert.equal(c.$("native-app-setup").hidden, true);
   await openReview(c, "review-native-app-focus"); assert.match(c.$("native-app-review-summary").textContent, /No app is started/);
-  c.click("cancel-native-app-review"); c.click("refresh-native-apps"); await settled(c); assert.equal(c.f.probes, 0);
+  c.click("cancel-native-app-review"); await until(() => c.$("native-app-review-summary").textContent === ""); c.click("refresh-native-apps"); await settled(c); assert.equal(c.f.probes, 0);
   await assert.rejects(c.suite.handle("/api/suite/native-focus/catalog", { compartment: "personal", executablePath: "foreign" }), /Read only/);
 }));
 
@@ -125,7 +125,7 @@ test("changed UI selection invalidates review and stale Personal focus cannot re
   await openReview(c, "review-native-app-focus"); await c.suite.handle("/api/suite/compartment/select", { compartment: "work" });
   c.click("confirm-native-app-review"); await until(() => c.f.notices.length > 0); await settled(c); assert.equal(c.f.effects, 0);
   c.document.dispatchEvent(new CustomEvent("switchyard-compartment-state", { detail: await c.store.snapshot("work") }));
-  await until(() => /requires a Personal/.test(c.$("native-app-detail").textContent)); assert.equal(c.$("review-native-app-focus").disabled, true);
+  await until(() => /requires a Personal/.test(c.$("native-app-detail").textContent)); assert.equal(c.$("native-app-review-summary").textContent, ""); assert.equal(c.$("review-native-app-focus").disabled, true);
 }));
 
 test("missing windows and lost focus replies remain explicit; metadata refresh never repeats focus", () => fixture(async c => {

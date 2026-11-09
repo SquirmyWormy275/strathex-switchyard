@@ -1,14 +1,5 @@
 # Switchyard: implementation and acceptance
 
-The next frontend checkpoint makes scanner setup reviews readable and clears
-hidden project/scope metadata when a review is cancelled or its workspace changes.
-Five original integration groups pass 58 tests after two red regressions;
-immutable packaging and normal installation are next. [Evidence](evidence/scanner-review-readable-source-summary.json).
-A complete Linux run of installed a7958c4 is active. Its 23 native Windows workers
-pass 482 groups/3,158 tests with 246 declared skips; the final native collector
-is still queued. These results predate the readable-review change.
-
-
 Switchyard gives Model F keyboards consistent controls for returning to tasks,
 reviewing work and moving between tools. The application is installed and running
 on the Omarchy pilot. **The full Rev2 assignment remains unfinished.** The F77 is
@@ -36,24 +27,32 @@ The [requirement ledger](switchyard-requirements.md) tracks the wider scope;
 
 ## Installed checkpoint
 
-The app uses source **a7958c4**; the pilot VS Code extension remains at **42655aa**.
+The app uses source **2fb81bc**; the pilot VS Code extension remains at **42655aa**.
 The app release is
-`3714ac7e4798230b85eee7dbe94ea67e28665303d0b0ce392faf236f8f6bf970`;
-the frontend is `00140e1b02bc`. Current plus one app rollback remain.
+`f609168aee5ff3796d9d3ad44e80d27db8c21041d8dacc921f243e35891bfe72`;
+the frontend is `42bb51b8db85`. Current plus one app rollback remain.
 
-- All 36 served assets and six installation/API/state readbacks pass.
+- All 36 served assets and eight installation/API/state/presentation readbacks pass.
 - Nine installed verifiers pass 123 checks across 65 exact module hashes.
-- All 54 semantic workspaces, 57 workflow definitions, Personal selection and
-  three conversations are preserved, including the pending keyboard-only record.
+- All 54 workspace definitions, 57 workflows, Personal selection and three
+  conversations are preserved, including the pending keyboard-only record.
+  53 semantic snapshots match exactly; Personal differs only by its expected
+  shutdown task-permission revocation counter, 78 → 79.
 - The extension's 53 payload files and eight installed module checks pass.
   Actual graphical editor activation remains unaccepted.
 - Dated launcher/editor backups verify. The latest prepared app package of
-  5,186,299 bytes is removed; previous prepared editor staging was already removed.
+  5,188,326 bytes is removed; previous prepared editor staging was already removed.
 
-[App receipt](evidence/installed-history-discovery-summary.json),
+[App receipt](evidence/installed-scanner-readable-summary.json),
 [editor receipt](evidence/installed-editor-terminal-summary.json).
 
 ## Verification belongs to a source
+
+The installed readable scanner review passes 58 integration checks after two
+regressions reproduced stale hidden metadata. Cancellation and workspace changes
+now clear both the readable summary and technical details. All 18 original
+package groups pass 26 tests; eight verifier guards pass.
+[Source evidence](evidence/scanner-review-readable-source-summary.json).
 
 A later source correction brackets acknowledged legacy history reads with fresh
 account checks. Three regressions reproduce the original gap; 13 integration
@@ -64,6 +63,7 @@ than the completed full Linux run.
 
 | Source and scope | Result |
 | --- | --- |
+| `a7958c4`, complete Windows source | 482 groups, 3,158 passes, 246 declared skips. All 23 workers and native collector agree; original commands, limits, source/merge tree and cleanup audited. [Receipt](evidence/complete-windows-a7958c4-summary.json) |
 | `72e7c22`, complete Linux | 376 groups, 2,574 passes, 32 declared skips. Exact manifest/commands/bounds and cleanup audited; temporary checkout, nine aliases and 806 generated files removed. [Receipt](evidence/linux-72e7c22-complete-summary.json) |
 | `6f9bacc`, controller correction | All 126 controller cases pass, zero skips. Exact remote-resume argument assertion corrected; production behavior and relay permissions unchanged. [Evidence](evidence/codex-controller-argument-expectation-summary.json) |
 | `72e7c22`, UI phase diagnostics | Six original groups pass 51 tests, zero skips. Original bounds and cleanup verify; no Windows performance correction claimed. [Evidence](evidence/ui-phase-timing-source-summary.json) |
@@ -79,7 +79,8 @@ correction removes the lease worker's 25 ms input polling delay, preserving all
 file identities, ownership, durable writes and deadlines. Nine local groups pass
 82 tests/one existing skip; two offline builds and 2,117 portable checks pass.
 Both original UI files and the full Windows source cohort now pass with unchanged
-limits. Execution UI still has only 359 ms of margin. The earlier repeated-focus
+limits. Execution UI had only 359 ms of margin at f4dcc79; a7958c4 passes
+in 42,128 ms and scanner UI in 40,875 ms against unchanged 45-second bounds. The earlier repeated-focus
 failure remains unresolved. [Measurements](evidence/native-ui-timing-failure-summary.json),
 [correction](evidence/lease-blocking-source-summary.json).
 
@@ -88,14 +89,27 @@ skips**. All 23 workers and the native collector pass; original receipts, comman
 bounds, serial order, source trees and cleanup are audited.
 [Complete native evidence](evidence/complete-windows-f4dcc79-summary.json).
 
+Complete Linux **a7958c4** passes 376 original groups: 2,578 tests and 32
+declared skips. Original commands, bounds, serial order and child cleanup verify;
+the temporary checkout, nine aliases and 806 generated files are removed. It
+includes the account-read and historical-name corrections and predates the later
+frontend changes. [Receipt](evidence/linux-a7958c4-complete-summary.json).
+
 The synthetic running preview is separately proven at `dfa40fb`: nine checks
 cover served assets, a named role, signed acknowledgement and stale-workspace
 refusal. [Demonstration receipt](evidence/batched-inspection-running-demo-summary.json).
 
+The next frontend checkpoint clears cancelled and invalidated review context
+across app launch, execution, device, profile, shortcut and role controls. Eight
+regressions reproduce the original stale content; 12 original groups pass 103
+checks with no skips. The first handoff fixture failure is retained separately.
+This source still needs its immutable frontend pin and normal installed update.
+[Evidence](evidence/review-context-source-summary.json).
+
 ## Remaining implementation and defects
 
 - Bounded historical-name discovery is implemented and normally installed. Its
-  native Windows follow-up remains pending. Ten integration groups pass 80 tests/
+  native Windows follow-up passes in the complete a7958c4 cohort. Ten integration groups pass 80 tests/
   one existing skip; package/installation groups pass 26 tests, and typechecking
   passes. Automatic authority/recipe assembly for removed paths remains unfinished.
   [Source evidence](evidence/history-path-discovery-source-summary.json).

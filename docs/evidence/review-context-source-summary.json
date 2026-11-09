@@ -1,0 +1,444 @@
+{
+  "schema": "switchyard-review-context-clearing/v1",
+  "at": "2026-11-09T12:30:08.501Z",
+  "baseCommit": "2fb81bc345b6fab85838672b1c054a74c5fa0233",
+  "sourceFiles": {
+    "tools/layout-studio/client-ui.mjs": "7852a2fb748412afa3b847665c8e70c957cd7be87fe5408cb5362064c66ba782",
+    "tools/layout-studio/execution-ui.mjs": "493de6690c767fdf62ecb4576dae8af975db13f2d7d693c9d10c54e283ab1cbc",
+    "tools/layout-studio/device-ui.mjs": "66ab0d1cf4af321a530508de022858734ec6afbb29f0f676552ac7e19ef29f10",
+    "tools/layout-studio/portable-ui.mjs": "9a6b6d699ae38fd1f9613a987edb15b1c611b6c43bab6f79d9f34fd12ed7cb2e",
+    "tools/layout-studio/connection.mjs": "4c8261e89e76da6c7b611c3ffe01303ec33b14e3cec110c210980cfae9f6f7bf",
+    "tools/layout-studio/role-ui.mjs": "1b956e5660461cf9246d4e5fe9f7e27db11fabc3eada733c1a44e253aeda0de3",
+    "tools/layout-studio/client-ui.test.mjs": "bf15468ec3282ecc9eeac5c1fcd07da213e3aaa982a5e7e79c1c0c022657ee79",
+    "tools/layout-studio/execution-ui.test.mjs": "261fe33074c66ba85664cd9e0d62dc89df1160716a430b64d58d2902833af6a2",
+    "tools/layout-studio/device-settings-ui.test.mjs": "268b9422e1a48b8f0f67dff74d0fc954e147b76a34a3faf7ee9e13d6d713af4e",
+    "tools/layout-studio/portable-ui.test.mjs": "fc767a3ab83ffdb479c8f28e319a99a7c65c42bc0013bc3a267283d9a4137143",
+    "tools/layout-studio/connection-ui.test.mjs": "5982974b1d6d014e30bb815352c666dbe164c71564ffa0e94a33ca061aea9870",
+    "tools/layout-studio/role-ui.test.mjs": "effe66c755d380bf793e05693603043d0b075ecf16a75b5421ec6896a381a8a0",
+    "tools/layout-studio/agent-maintenance-ui.test.mjs": "3a8e4d6e536896de63998d3f3a0d0fe8f58eec884a58e37dd826491d160fd155",
+    "tools/layout-studio/native-focus-ui.test.mjs": "e93c6a0030a6ba2852034e6c60c67eb3378e1d29b52973d644dc5f316bf05481"
+  },
+  "runs": [
+    {
+      "receiptId": "11106b80-fb60-4fe9-87bd-192d405d1c36",
+      "receiptSha256": "c10dc654d0002f94aa01e4273443d508b1bf257ccb667094eba257b977125c90",
+      "green": true,
+      "totals": {
+        "required": 9,
+        "passed": 9,
+        "failed": 0,
+        "tests": 76,
+        "passedTests": 76,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "children": [
+        {
+          "file": "tools/layout-studio/client-ui.test.mjs",
+          "pattern": null,
+          "durationMs": 827,
+          "effectiveTimeoutMs": 45000,
+          "tests": {
+            "total": 5,
+            "passed": 5,
+            "failed": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          }
+        },
+        {
+          "file": "tools/layout-studio/native-focus-ui.test.mjs",
+          "pattern": null,
+          "durationMs": 2379,
+          "effectiveTimeoutMs": 45000,
+          "tests": {
+            "total": 18,
+            "passed": 18,
+            "failed": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          }
+        },
+        {
+          "file": "tools/layout-studio/execution-ui.test.mjs",
+          "pattern": null,
+          "durationMs": 13022,
+          "effectiveTimeoutMs": 45000,
+          "tests": {
+            "total": 7,
+            "passed": 7,
+            "failed": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          }
+        },
+        {
+          "file": "tools/layout-studio/authority-ui.test.mjs",
+          "pattern": null,
+          "durationMs": 3414,
+          "effectiveTimeoutMs": 45000,
+          "tests": {
+            "total": 9,
+            "passed": 9,
+            "failed": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          }
+        },
+        {
+          "file": "tools/layout-studio/scanner-ui.test.mjs",
+          "pattern": null,
+          "durationMs": 10983,
+          "effectiveTimeoutMs": 45000,
+          "tests": {
+            "total": 7,
+            "passed": 7,
+            "failed": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          }
+        },
+        {
+          "file": "tools/layout-studio/feed-ui.test.mjs",
+          "pattern": null,
+          "durationMs": 1760,
+          "effectiveTimeoutMs": 45000,
+          "tests": {
+            "total": 9,
+            "passed": 9,
+            "failed": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          }
+        },
+        {
+          "file": "tools/layout-studio/device-ui.test.mjs",
+          "pattern": null,
+          "durationMs": 472,
+          "effectiveTimeoutMs": 45000,
+          "tests": {
+            "total": 2,
+            "passed": 2,
+            "failed": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          }
+        },
+        {
+          "file": "tools/layout-studio/device-settings-ui.test.mjs",
+          "pattern": null,
+          "durationMs": 1580,
+          "effectiveTimeoutMs": 45000,
+          "tests": {
+            "total": 12,
+            "passed": 12,
+            "failed": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          }
+        },
+        {
+          "file": "tools/layout-studio/portable-ui.test.mjs",
+          "pattern": null,
+          "durationMs": 827,
+          "effectiveTimeoutMs": 45000,
+          "tests": {
+            "total": 7,
+            "passed": 7,
+            "failed": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          }
+        }
+      ],
+      "duplicateReceiptRemoved": true
+    },
+    {
+      "receiptId": "7ebf00c3-eded-4831-8a93-81c1201d0779",
+      "receiptSha256": "3fa21e291f13d518a41a06ba0cf57a31ed0e3752a2edf3a44a889c5f6cf6ba3a",
+      "green": true,
+      "totals": {
+        "required": 3,
+        "passed": 3,
+        "failed": 0,
+        "tests": 27,
+        "passedTests": 27,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "children": [
+        {
+          "file": "tools/layout-studio/role-ui.test.mjs",
+          "pattern": null,
+          "durationMs": 1295,
+          "effectiveTimeoutMs": 45000,
+          "tests": {
+            "total": 15,
+            "passed": 15,
+            "failed": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          }
+        },
+        {
+          "file": "tools/layout-studio/agent-maintenance-ui.test.mjs",
+          "pattern": null,
+          "durationMs": 1103,
+          "effectiveTimeoutMs": 45000,
+          "tests": {
+            "total": 8,
+            "passed": 8,
+            "failed": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          }
+        },
+        {
+          "file": "tools/layout-studio/connection-ui.test.mjs",
+          "pattern": null,
+          "durationMs": 525,
+          "effectiveTimeoutMs": 45000,
+          "tests": {
+            "total": 4,
+            "passed": 4,
+            "failed": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          }
+        }
+      ],
+      "duplicateReceiptRemoved": true
+    },
+    {
+      "receiptId": "a7d66bdf-04f3-459c-902c-dbe599c8ffd0",
+      "receiptSha256": "6ddc5029b89f2077f3282013464259261d422d96924f716632cb3b165dcf0d7e",
+      "green": false,
+      "totals": {
+        "required": 5,
+        "passed": 0,
+        "failed": 5,
+        "tests": 5,
+        "passedTests": 0,
+        "failedTests": 5,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "children": [
+        {
+          "file": "tools/layout-studio/execution-ui.test.mjs",
+          "pattern": "saved permission selection and local file hashing lead to an exact cancellable review without execution",
+          "durationMs": 3067,
+          "effectiveTimeoutMs": 45000,
+          "tests": {
+            "total": 1,
+            "passed": 0,
+            "failed": 1,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          }
+        },
+        {
+          "file": "tools/layout-studio/client-ui.test.mjs",
+          "pattern": "a concrete launch review can be cancelled and only one confirmed fixed request reaches the synthetic portal",
+          "durationMs": 2411,
+          "effectiveTimeoutMs": 45000,
+          "tests": {
+            "total": 1,
+            "passed": 0,
+            "failed": 1,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          }
+        },
+        {
+          "file": "tools/layout-studio/native-focus-ui.test.mjs",
+          "pattern": "saved Linux app choices are passive and a cancelled review never inspects a window",
+          "durationMs": 2394,
+          "effectiveTimeoutMs": 45000,
+          "tests": {
+            "total": 1,
+            "passed": 0,
+            "failed": 1,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          }
+        },
+        {
+          "file": "tools/layout-studio/device-settings-ui.test.mjs",
+          "pattern": "cancelled and replaced-workspace device reviews remove synthetic macro content without applying it",
+          "durationMs": 2428,
+          "effectiveTimeoutMs": 45000,
+          "tests": {
+            "total": 1,
+            "passed": 0,
+            "failed": 1,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          }
+        },
+        {
+          "file": "tools/layout-studio/portable-ui.test.mjs",
+          "pattern": "portable review cancellation and workspace changes clear imported and exported context",
+          "durationMs": 2392,
+          "effectiveTimeoutMs": 45000,
+          "tests": {
+            "total": 1,
+            "passed": 0,
+            "failed": 1,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          }
+        }
+      ],
+      "duplicateReceiptRemoved": true
+    },
+    {
+      "receiptId": "dde30a7a-dfa8-40c7-93eb-8d7719ef59a7",
+      "receiptSha256": "4cd6926253192fe2e525a30037bce1b2f152d1c09f2378955d8086c5914eff6b",
+      "green": false,
+      "totals": {
+        "required": 2,
+        "passed": 0,
+        "failed": 2,
+        "tests": 2,
+        "passedTests": 0,
+        "failedTests": 2,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "children": [
+        {
+          "file": "tools/layout-studio/connection-ui.test.mjs",
+          "pattern": "cancelled and replaced-workspace shortcut reviews discard their target and change list",
+          "durationMs": 2410,
+          "effectiveTimeoutMs": 45000,
+          "tests": {
+            "total": 1,
+            "passed": 0,
+            "failed": 1,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          }
+        },
+        {
+          "file": "tools/layout-studio/role-ui.test.mjs",
+          "pattern": "cancelled and replaced-workspace role reviews discard handoff previews without sending them",
+          "durationMs": 2389,
+          "effectiveTimeoutMs": 45000,
+          "tests": {
+            "total": 1,
+            "passed": 0,
+            "failed": 1,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          }
+        }
+      ],
+      "duplicateReceiptRemoved": true
+    },
+    {
+      "receiptId": "abc42a7f-d20d-4784-aa93-b65a129a61ec",
+      "receiptSha256": "e8ab3d34431f97a8dcdd0010324784b9dfa53e4427d2cae50b8671f1e140b239",
+      "green": false,
+      "totals": {
+        "required": 2,
+        "passed": 0,
+        "failed": 2,
+        "tests": 2,
+        "passedTests": 0,
+        "failedTests": 2,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "children": [
+        {
+          "file": "tools/layout-studio/role-ui.test.mjs",
+          "pattern": "cancelled and replaced-workspace role reviews discard handoff previews without sending them",
+          "durationMs": 2398,
+          "effectiveTimeoutMs": 45000,
+          "tests": {
+            "total": 1,
+            "passed": 0,
+            "failed": 1,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          }
+        },
+        {
+          "file": "tools/layout-studio/agent-maintenance-ui.test.mjs",
+          "pattern": "revocation reviews exact bindings and claims, preserves another agent and consumes its confirmation once",
+          "durationMs": 2437,
+          "effectiveTimeoutMs": 45000,
+          "tests": {
+            "total": 1,
+            "passed": 0,
+            "failed": 1,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          }
+        }
+      ],
+      "duplicateReceiptRemoved": true
+    }
+  ],
+  "accepted": {
+    "groups": 12,
+    "passedTests": 103,
+    "skippedTests": 0,
+    "failedTests": 0
+  },
+  "regressions": {
+    "distinctReproduced": 8,
+    "fixtureFailure": "The first handoff regression omitted synthetic handoff capability and failed before opening its review. That original failure is retained; after adding the fixture capability, the unchanged production code fails at the intended stale-preview assertion."
+  },
+  "typecheck": {
+    "command": "node node_modules/typescript/bin/tsc --noEmit -p tsconfig.json",
+    "exitCode": 0
+  },
+  "audit": {
+    "originalGreenManifestCommandsBoundsSkips": true,
+    "redSelectedCasesWithOriginalBounds": true,
+    "serialOrder": true,
+    "outputBounds": true,
+    "originalChildTreeCleanup": true,
+    "privateReceiptCopiesVerified": true
+  },
+  "scope": [
+    "Cancelled, closed and invalidated client, native-app, execution, device, portable-profile, shortcut, role and agent-maintenance reviews discard displayed context.",
+    "Workspace changes discard old review summaries and imported/exported metadata. Handoff/macro previews are synthetic; tests assert no unconfirmed command, device write or profile change.",
+    "Original permission and apply semantics, reviewed content, errors and all previous test assertions remain."
+  ],
+  "limitations": [
+    "Explicit browser/provider/device doubles are used. No graphical browser, hardware or live account acceptance is claimed.",
+    "Complete Linux a7958c4 acceptance predates these frontend changes.",
+    "Immutable frontend pin and normal installed update are pending."
+  ]
+}

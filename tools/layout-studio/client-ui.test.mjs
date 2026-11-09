@@ -31,7 +31,7 @@ test("distinct client metadata and exported recipes do not open applications or 
 
 test("a concrete launch review can be cancelled and only one confirmed fixed request reaches the synthetic portal", () => fixture(async c => {
   await review(c); assert.match(c.$("client-review-summary").textContent, /https:\/\/github.com\/copilot/); assert.match(c.$("client-review-summary").textContent, /does not verify or change that account/); assert.equal(c.effects(), 0);
-  c.click("cancel-client-launch"); assert.equal(c.effects(), 0); await review(c); c.click("confirm-client-launch"); c.$("confirm-client-launch").dispatchEvent(new Event("click"));
+  c.click("cancel-client-launch"); await until(() => c.$("client-review-summary").textContent === ""); assert.equal(c.effects(), 0); await review(c); c.click("confirm-client-launch"); c.$("confirm-client-launch").dispatchEvent(new Event("click"));
   await until(() => c.$("client-launch-history").children.length === 1 && !c.$("review-client-launch").disabled); assert.equal(c.effects(), 1); assert.match(c.$("client-status").textContent, /opening and exact-task attachment are not verified/);
   const record = (await c.store.snapshot("personal")).clientLaunches[0]; assert.equal(record.status, "settled"); assert.equal(record.stoppedVerified, true); assert.equal(record.cleanupPending, false); assert.equal(record.result.providerAccountVerified, false); assert.equal(record.result.modelPromptSubmitted, false);
   const request = c.calls.find(row => row.path.endsWith("/integrations/launch")); assert.deepEqual(Object.keys(request.body).sort(), ["compartment", "id", "requestId"]);
@@ -40,7 +40,7 @@ test("a concrete launch review can be cancelled and only one confirmed fixed req
 test("changed selection and workspace invalidate a launch review and Work exposes only Microsoft 365", () => fixture(async c => {
   await review(c); c.change("client-picker", "figma-web"); assert.equal(c.$("client-review-dialog").open, false); assert.equal(c.$("confirm-client-launch").disabled, true);
   await review(c); c.document.dispatchEvent(new Event("switchyard-workspace-changing")); await c.store.initialize("work", "work"); c.document.dispatchEvent(new CustomEvent("switchyard-compartment-state", { detail: await c.store.snapshot("work") })); await until(() => c.$("client-picker").options.length === 5);
-  assert.equal(c.$("client-picker").value, "microsoft-365-copilot-web"); assert.equal(c.$("review-client-launch").disabled, true); assert.equal(c.$("download-client-recipe").disabled, true); assert.equal(c.$("client-review-dialog").open, false);
+  assert.equal(c.$("client-review-summary").textContent, ""); assert.equal(c.$("client-picker").value, "microsoft-365-copilot-web"); assert.equal(c.$("review-client-launch").disabled, true); assert.equal(c.$("download-client-recipe").disabled, true); assert.equal(c.$("client-review-dialog").open, false);
   c.change("client-picker", "github-copilot-web"); assert.equal(c.$("review-client-launch").disabled, true); assert.equal(c.effects(), 0);
 }));
 
@@ -55,6 +55,6 @@ test("a late native result cannot populate another workspace's status or history
     await review(c); c.click("confirm-client-launch"); await until(() => entered);
     try { c.document.dispatchEvent(new Event("switchyard-workspace-changing")); await c.store.initialize("work", "work"); c.document.dispatchEvent(new CustomEvent("switchyard-compartment-state", { detail: await c.store.snapshot("work") })); await until(() => c.$("client-picker").options.length === 5); }
     finally { release(); }
-    await until(() => !c.$("refresh-clients").disabled); assert.equal(c.$("client-launch-history").children.length, 0); assert.doesNotMatch(c.$("client-status").textContent, /accepted the launch/); assert.equal(c.$("client-picker").value, "microsoft-365-copilot-web");
+    await until(() => !c.$("refresh-clients").disabled); assert.equal(c.$("client-launch-history").children.length, 0); assert.doesNotMatch(c.$("client-status").textContent, /accepted the launch/); assert.equal(c.$("client-review-summary").textContent, ""); assert.equal(c.$("client-picker").value, "microsoft-365-copilot-web");
   }, async () => { entered = true; await waiting; });
 });

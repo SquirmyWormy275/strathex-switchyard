@@ -6,6 +6,26 @@ import { join } from "node:path";
 import { createClientLaunch } from "./client-launch.mjs";
 const uiFixture = fn => browserSurfaceFixture(async context => { const { mountRoles } = await import("./role-ui.mjs"); await fn({ ...context, mount: extra => mountRoles({ notify() {}, refresh: context.refresh, ...extra }) }); });
 
+test("cancelled and replaced-workspace role reviews discard handoff previews without sending them", () => uiFixture(async c => {
+  await c.store.update("personal", "synthetic-handoff-capability", state => { for (const agent of state.agents) agent.capabilities.push("handoff"); });
+  const handoff = c.document.createElement("option"); handoff.value = "handoff"; handoff.textContent = "Leave a handoff"; c.$("role-intent").append(handoff);
+  c.mount(); await c.refresh();
+  c.change("role-intent", "handoff"); await until(() => c.$("role-target").children.length === 3);
+  c.change("role-target", "0"); c.$("role-handoff").value = "PRIVATE SYNTHETIC HANDOFF";
+  for (const action of ["cancel", "workspace"]) {
+    c.click("bind-agent-role");
+    assert.equal(c.$("role-connection-dialog").open, true);
+    assert.equal(c.$("role-connection-content").textContent, "PRIVATE SYNTHETIC HANDOFF");
+    if (action === "cancel") c.click("cancel-role-connection");
+    else c.document.dispatchEvent(new Event("switchyard-workspace-changing"));
+    await until(() => ["role-connection-title", "role-connection-summary", "role-connection-effect", "role-connection-content"].every(id => c.$(id).textContent === ""));
+    assert.equal(c.$("role-connection-dialog").open, false); assert.equal(c.$("role-connection-content").hidden, true);
+    assert.equal(c.$("confirm-role-connection").disabled, true);
+  }
+  assert.equal(c.calls.some(row => /\/roles\/(bind-choice|dispatch|dispatch-choice)$/.test(row.path)), false);
+  assert.equal((await c.store.snapshot("personal")).agents.every(agent => agent.commands.length === 0), true);
+}));
+
 test("Home's connected-control step selects its saved role and intent without dispatching", () => uiFixture(async c => {
   const previousWindow = Object.getOwnPropertyDescriptor(globalThis, "window"), previousFetch = globalThis.fetch;
   Object.defineProperty(globalThis, "window", { configurable: true, value: new EventTarget() });

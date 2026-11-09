@@ -39,37 +39,91 @@ No merge, public release or visibility change is authorized.
   page loading. Do not use shell/CDP/Playwright outside CUA to bypass this or change
   Brave protections. The user's unrelated NIGHTWIRE tab stays untouched.
 
-## Active follow-up — readable reviews and full platform checks
+## Current checkpoint — readable scanner review installed
 
-Published **9cc29a5b523358026c95a966dec7cf02b9feea1f** contains the installed
-history-discovery verifier/evidence. The next frontend change replaces the initial
-scanner-review JSON dump with readable paths and scope, keeping full technical
-evidence expandable. Two red regressions confirm stale hidden metadata after
-cancel/workspace change; all five original integration groups now pass **58**
-tests with zero skips. Typecheck and unique page IDs pass. Source evidence is in
-[readable scanner review](evidence/scanner-review-readable-source-summary.json).
-The source change still needs immutable frontend pinning, package checks, normal
-installation and served-state verification. No visual acceptance is claimed.
+Published source **df1edce9785ac8a54a25c13908c645aa53f8fd3e** replaces the initial
+scanner-review JSON dump with readable paths/scope and expandable exact metadata.
+Two red regressions confirm stale hidden metadata after cancellation and workspace
+change; five original integration groups now pass **58 tests**, zero skips.
+Immutable frontend pin **2fb81bc345b6fab85838672b1c054a74c5fa0233** is published
+and normally installed as release
+**f609168aee5ff3796d9d3ad44e80d27db8c21041d8dacc921f243e35891bfe72**,
+frontend **42bb51b8db8592fb10939b078ca39a2122624e87e9fd3ea3b5766fe8c827e09b**.
+Rollback is **3714ac7e4798230b85eee7dbe94ea67e28665303d0b0ce392faf236f8f6bf970**.
 
-A new complete Linux run for installed **a7958c4** is active, preserving all
-original 376 groups and limits. Private setup receipt **linux-a7958c4-setup.json**
-records its exact owned checkout, nine existing dependency aliases, supervisor
-and original worktrees. Run ID **853cc5ea-8dfa-43bd-89d8-84a8a8215e62**. Do not
-repeat setup or delete its running checkout. Its receipt/audit and owned cleanup
-remain to complete. The prior 72e7c22 cleanup below is historical and finished.
+All **44 served/installation/API/state/presentation checks** and **123 metadata
+checks / 65 exact module hashes** pass. All 54 workspace definitions, 57 workflows,
+modes, selection, three conversations and the pending keyboard-only record remain.
+53 semantic snapshots match exactly. Personal differs only by its expected
+original-owner shutdown permission-revocation counter **78 → 79**, independently
+verified against the exact pre-update hash and one original shutdown audit event.
+Do not restore that counter. The first strict readback correctly refused this
+difference; the final receipt records it explicitly, not as full semantic equality.
+One concise console line retained an incorrect equality boolean; both private and
+public full receipts correctly record the exception.
 
-All 23 workers for native Windows **a7958c4**, run **42612174584**, have passed.
-Original worker receipts are privately retained and independently audited:
-**482 groups / 3,158 passes / 246 declared skips**, original manifest, commands,
-bounds, skip inventory, serial worker order and cleanup. Native collector
-**129150916723** is still queued at this checkpoint. Private receipt prefixes:
-**native-a7958c4-**. No ZIP or helper binary was retained; do not repeat downloads.
+The old Home hash caused one task-owner metadata verifier failure. Both Home
+verifiers now pin the tested readable-review page; all original assertions remain.
+An in-memory formatter fixture initially lacked browser globals; explicit no-I/O
+globals corrected it without changing the installed module. All original failures
+remain recorded. Eighteen package/installation groups pass 26 tests; eight verifier
+guards pass. Their original receipts are privately copied and duplicate checkout
+receipts removed. Source and installed receipts:
+[readable review](evidence/scanner-review-readable-source-summary.json),
+[installed result](evidence/installed-scanner-readable-summary.json).
 
-## Current published and installed sources
+The normal dated backup is **2026-11-09T12-15-08.289Z-05d655c8-7e63-4e38-a9ae-0e6d5cb77df3**.
+All **576 prepared files / 5,188,326 bytes** are removed after exact ownership/hash
+and independent installed-payload verification. Current plus one rollback remain.
+Private receipts use **scanner-readable-**. **Do not replay install or cleanup.**
+The new frontend rotates local access; the normal launcher obtains the fresh link.
+
+## Complete Linux verification — audited and removed
+
+Source **a7958c4** passes all 376 original groups: **2,578 tests / 32 declared
+skips**. Run **853cc5ea-8dfa-43bd-89d8-84a8a8215e62** and supervisor
+**switchyard-verification-a7958c4-1794225922** exited successfully. Original
+manifest, commands, bounds, skips, serial order and every child cleanup verify.
+Private receipts use **linux-a7958c4-**. The owned checkout, runner, temporary
+parent, nine aliases and **806 generated files / 12,507,506 bytes** are removed;
+all three original worktrees remain. Do not replay setup, audit or cleanup.
+[Complete Linux evidence](evidence/linux-a7958c4-complete-summary.json).
+
+## Next frontend checkpoint — source verified
+
+Cancelled and invalidated app, native-app, execution, device, portable profile,
+shortcut, role and agent-maintenance reviews now clear their displayed context.
+Eight distinct regressions reproduce the previous stale content. Twelve original
+groups pass **103 checks**, zero skips; typechecking passes. The first synthetic
+handoff fixture omitted capability and failed before review; that original failure
+is retained separately from the corrected regression. Private receipts use
+**review-context-**; all duplicate checkout receipts are removed.
+[Source evidence](evidence/review-context-source-summary.json).
+
+Pin this tested source in the immutable 36-asset frontend, run original package
+checks, then normally update the installed app with a dated backup and exact
+state readback. The currently installed 2fb81bc update above is already complete.
+
+## Latest complete Windows acceptance
+
+All 25 jobs at **a7958c4**, run **42612174584**, pass, including collector
+**129150916723**. Its artifact **13672751496** matches the independent audit of
+all 23 original receipts: **482 groups / 3,158 passes / 246 declared skips**.
+Source/merge tree, original manifest, commands, bounds, skips, serial worker order,
+output and child/tree cleanup verify. Scanner UI passes in **40,875 ms** and
+execution UI in **42,128 ms**, both against unchanged 45,000 ms limits.
+Native collector receipt SHA-256:
+**c8bfed60c6a9911445e12e54d14ca3fc14577bc09cbcac51508b948173307c40**.
+Private receipt prefix: **native-a7958c4-**. No ZIP or helper binary was retained;
+**do not repeat downloads/audits**. This accepts historical-name discovery source,
+not the later readable-review frontend or a Windows package.
+[Complete native evidence](evidence/complete-windows-a7958c4-summary.json).
+
+## Preceding installed history-discovery checkpoint
 
 Published **c44b6805f16a3ab63b0d9212cd1e199c728b7739** adds historical-name
 discovery and the full Windows receipt; **a7958c4b7cd22efdaa532d91ad4a3dc28150093b**
-pins its immutable frontend. That source is normally installed:
+pins its immutable frontend. That source was normally installed before 2fb81bc:
 release **3714ac7e4798230b85eee7dbe94ea67e28665303d0b0ce392faf236f8f6bf970**,
 rollback **2ee8827dd022ba676bff48f3b0639ef5d0d0f47c683cef12d806a7db6defc2ea**,
 frontend **00140e1b02bcacc4077219d67b2a796fa798e7ccdc04b95e6d16b9e6f6f4219a**.
@@ -250,11 +304,13 @@ focus is not task attachment.
 
 ## Continue independent work
 
-1. Complete Linux cleanup and the f4dcc79 Windows source audit are finished.
+1. Complete a7958c4 Linux/Windows source audits and Linux cleanup are finished.
+   Finish the new review-context frontend pin, package checks and normal update.
 2. Historical-name discovery is installed and staging cleanup is complete.
-   Continue its normal-push Windows follow-up and actual UI acceptance when the
-   supported browser-control connection works. No reinstallation is needed for
-   the subsequent verifier/evidence-only checkpoint.
+   Its complete native Windows acceptance is recorded above. Continue the new
+   frontend's normal-push follow-up and actual UI acceptance when the supported
+   browser-control connection works. No reinstallation is needed for subsequent
+   verifier/evidence-only edits.
 3. Continue Linux Claude Desktop and exact interactive attachment limitations
    with supported native contracts; keep missing platform evidence explicit.
 4. Carry the remaining observation/scanner/managed-policy/later-platform scope

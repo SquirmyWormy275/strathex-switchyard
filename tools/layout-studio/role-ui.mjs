@@ -20,8 +20,13 @@ export function mountRoles({ notify, refresh, request = api }) {
     $("role-target-detail").textContent = selected() ? `${providerNames[selected().provider] ?? selected().provider} · ${targetNames[selected().targetKind] ?? "saved connection"}${matchingBinding() ? " · connected to this control" : " · not connected to this control"}` : "";
     $("role-handoff-wrap").hidden = $("role-intent").value !== "handoff";
   }
+  function clearReview() {
+    pending = null;
+    for (const id of ["role-connection-title", "role-connection-summary", "role-connection-effect", "role-connection-content"]) $(id).textContent = "";
+    $("role-connection-content").hidden = true;
+  }
   function invalidate() {
-    generation++; choices = []; pending = null;
+    generation++; choices = []; clearReview();
     $("role-connection-dialog").close();
     $("role-target").replaceChildren(option("", "Choose a saved connection"));
     controls();
@@ -61,7 +66,7 @@ export function mountRoles({ notify, refresh, request = api }) {
   }
   $("role-picker").addEventListener("change", choicesForRole);
   $("role-intent").addEventListener("change", choicesForRole);
-  $("role-target").addEventListener("change", () => { pending = null; controls(); });
+  $("role-target").addEventListener("change", () => { clearReview(); $("role-connection-dialog").close(); controls(); });
   document.addEventListener("switchyard-open-role-control", async event => {
     const target = event.detail;
     if (busy || !state || state.mode === "keyboard-only" || !target || Object.keys(target).sort().join() !== "compartment,intent,roleId" || target.compartment !== state.id
@@ -76,8 +81,8 @@ export function mountRoles({ notify, refresh, request = api }) {
   });
   $("bind-agent-role").addEventListener("click", () => openReview(false));
   $("try-agent-role").addEventListener("click", () => openReview(true));
-  $("cancel-role-connection").addEventListener("click", () => $("role-connection-dialog").close());
-  $("role-connection-dialog").addEventListener("close", () => { pending = null; controls(); });
+  $("cancel-role-connection").addEventListener("click", () => { clearReview(); $("role-connection-dialog").close(); controls(); });
+  $("role-connection-dialog").addEventListener("close", () => { if (!$("role-connection-dialog").open) { clearReview(); controls(); } });
   $("confirm-role-connection").addEventListener("click", async () => {
     const review = pending; if (busy || !review || review.generation !== generation) return;
     pending = null; busy = true; controls();
@@ -174,8 +179,8 @@ export function mountAgentMaintenance({ notify, refresh, request = api }) {
     if (busy || state?.policy !== "personal" || !example()) return;
     show("stop", { example: example() }, `Stop the bundled ${example()} example in workspace ${state.id}\n\nOnly the exact child still owned by this Switchyard host can be stopped. A missing owner is reported as not observed; no PID search or unrelated process termination occurs.\n\nThis does not revoke its enrollment or prove any external task completed. Unconfirmed retirement prevents another example from starting.`);
   });
-  $("cancel-agent-maintenance").addEventListener("click", () => { review = null; $("agent-maintenance-dialog").close(); controls(); });
-  $("agent-maintenance-dialog").addEventListener("close", () => { if (!$("agent-maintenance-dialog").open) { review = null; controls(); } });
+  $("cancel-agent-maintenance").addEventListener("click", () => { review = null; $("agent-maintenance-summary").textContent = ""; $("agent-maintenance-dialog").close(); controls(); });
+  $("agent-maintenance-dialog").addEventListener("close", () => { if (!$("agent-maintenance-dialog").open) { review = null; $("agent-maintenance-summary").textContent = ""; controls(); } });
   $("confirm-agent-maintenance").addEventListener("click", () => run(async ({ compartment, valid }) => {
     if (!review) return; const { kind, ...input } = review; review = null; $("agent-maintenance-dialog").close();
     try {

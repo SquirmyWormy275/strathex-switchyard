@@ -5,7 +5,7 @@ export function mountClients({ notify, download }) {
   const $ = id => document.getElementById(id);
   let state = null, entries = [], launches = [], generation = 0, busy = false, reviewed = null;
   const selected = () => entries.find(entry => entry.id === $("client-picker").value);
-  function invalidate() { generation++; reviewed = null; $("client-review-dialog").close(); controls(); }
+  function invalidate() { generation++; reviewed = null; $("client-review-dialog").close(); $("client-review-summary").textContent = ""; controls(); }
   function controls() {
     const entry = selected(), permitted = !!entry?.policyPermitsProvider;
     $("client-picker").disabled = busy || !entries.length;
@@ -65,8 +65,8 @@ export function mountClients({ notify, download }) {
     $("client-review-summary").textContent = `Request ${entry.name}: ${entry.surface}\n\nDestination: ${value.recipe.target.url}\nWorkspace: ${compartment}\n\nThe operating system will receive this fixed web destination. Your browser may use its existing signed-in account; Switchyard does not verify or change that account. No repository, file, conversation or agent task is selected, and no prompt is submitted.\n\n${entry.requirements.join(". ")}.\n\n${entry.limits.join(". ")}.`;
     $("client-review-dialog").showModal();
   }));
-  $("cancel-client-launch").addEventListener("click", () => { reviewed = null; $("client-review-dialog").close(); controls(); });
-  $("client-review-dialog").addEventListener("close", () => { reviewed = null; controls(); });
+  $("cancel-client-launch").addEventListener("click", () => { reviewed = null; $("client-review-dialog").close(); $("client-review-summary").textContent = ""; controls(); });
+  $("client-review-dialog").addEventListener("close", () => { reviewed = null; $("client-review-summary").textContent = ""; controls(); });
   $("confirm-client-launch").addEventListener("click", () => run(async ({ compartment, current }) => {
     if (!reviewed) return; const request = reviewed; reviewed = null; $("client-review-dialog").close();
     try {
@@ -87,7 +87,7 @@ export function mountNativeFocus({ notify }) {
   let state = null, catalog = null, generation = 0, busy = false, reviewed = null;
   const selected = () => catalog?.entries.find(row => row.implementation === $("native-app-picker").value);
   const current = (version, c) => generation === version && state?.id === c;
-  function invalidate() { generation++; reviewed = null; $("native-app-review-dialog").close(); controls(); }
+  function invalidate() { generation++; reviewed = null; $("native-app-review-dialog").close(); $("native-app-review-summary").textContent = ""; controls(); }
   function controls() {
     const allowed = !!catalog?.supported && !!catalog?.permitted, windows = catalog?.platform === "win32";
     $("native-app-picker").disabled = busy || !catalog;
@@ -164,8 +164,8 @@ export function mountNativeFocus({ notify }) {
     if (busy || catalog?.platform !== "win32") return;
     show("recover", {}, `Check retained helper retirement in workspace ${state.id}\n\nObserve the exact original Switchyard helpers. This does not retry focus, close the external app, or turn an uncertain earlier effect into a verified success.`);
   });
-  $("cancel-native-app-review").addEventListener("click", () => { reviewed = null; $("native-app-review-dialog").close(); controls(); });
-  $("native-app-review-dialog").addEventListener("close", () => { if (!$("native-app-review-dialog").open) { reviewed = null; controls(); } });
+  $("cancel-native-app-review").addEventListener("click", () => { reviewed = null; $("native-app-review-dialog").close(); $("native-app-review-summary").textContent = ""; controls(); });
+  $("native-app-review-dialog").addEventListener("close", () => { if (!$("native-app-review-dialog").open) { reviewed = null; $("native-app-review-summary").textContent = ""; controls(); } });
   $("confirm-native-app-review").addEventListener("click", () => run(async ({ c, valid }) => {
     if (!reviewed) return; const review = reviewed; reviewed = null; $("native-app-review-dialog").close();
     try {

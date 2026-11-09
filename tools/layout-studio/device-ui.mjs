@@ -8,7 +8,7 @@ const option = (value, label) => { const o = document.createElement("option"); o
 export function mountDevices({ onSnapshot, notify }) {
   let snapshot, review, receipt, busy = false, savedSnapshots = [], compartment = "personal", generation = 0, settings, keyEditor, diagnostic;
   const savedSnapshot = () => savedSnapshots.find(s => s.identity.deviceId === $("saved-device-picker").value);
-  function invalidateReview() { generation++; review = null; $("device-review-dialog").close(); controls(); }
+  function invalidateReview() { generation++; review = null; $("device-review-dialog").close(); $("device-review-summary").textContent = ""; controls(); }
   function clearReview() { snapshot = null; keyEditor = null; settings?.update(null); diagnostic?.update(null); $("device-key-editor").replaceChildren(); invalidateReview(); }
   function setSnapshot(value) { snapshot = value; settings.update(value); diagnostic.update(value); $("device-layer").replaceChildren(...Array.from({ length: value.layers }, (_, i) => option(i, i === 0 ? "Layer 0 · ordinary typing" : `Layer ${i}`))); keys(); }
   function editKey() { invalidateReview(); const position = $("device-key").value; if (!snapshot || !position) { keyEditor = null; $("device-key-editor").replaceChildren(); return; } const [r, c] = position.split(":").map(Number); keyEditor = deviceKeyEditor(snapshot, snapshot.keymap_raw[Number($("device-layer").value)][r][c], invalidateReview, { transparent: true }); $("device-key-editor").replaceChildren(keyEditor.element); }
@@ -106,8 +106,8 @@ export function mountDevices({ onSnapshot, notify }) {
     const [row, col] = $("device-key").value.split(":").map(Number), layer = Number($("device-layer").value);
     void reviewConfiguration({ changes: [{ layer, row, col, before: snapshot.keymap_raw[layer][row][col], after: keyEditor.value() }] });
   } catch (error) { message(error.message); notify(error.message); } });
-  $("device-review-dialog").addEventListener("close", () => { if (review) invalidateReview(); });
-  $("cancel-device-change").addEventListener("click", () => { review = null; $("device-review-dialog").close(); controls(); });
+  $("device-review-dialog").addEventListener("close", () => { $("device-review-summary").textContent = ""; if (review) invalidateReview(); });
+  $("cancel-device-change").addEventListener("click", () => { review = null; $("device-review-dialog").close(); $("device-review-summary").textContent = ""; controls(); });
   $("apply-device-change").addEventListener("click", () => run(async ({ scope, current }) => {
     if (!review) return;
     const reviewId = review.reviewId; review = null;

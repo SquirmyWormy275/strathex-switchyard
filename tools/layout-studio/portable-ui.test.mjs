@@ -73,3 +73,19 @@ test("print export verifies the backend content digest and honors Work export po
   assert.equal($("export-json").disabled, true); assert.equal($("export-profile-settings").disabled, true); assert.equal($("export-legends").disabled, true);
   assert.equal(calls.filter(call => call.path.endsWith("/legends/export")).length, 1);
 }));
+
+
+test("portable review cancellation and workspace changes clear imported and exported context", () => portableFixture(async ({ ui, $, click, document, store, downloads }) => {
+  const before = await store.snapshot("personal"), candidate = createPortablePackage(profile("incoming", "PRIVATE SYNTHETIC LAYOUT"));
+  await ui.reviewImport(candidate); assert.ok($("portable-import-summary").textContent.length); assert.ok($("portable-import-changes").children.length);
+  click("cancel-profile-import"); await until(() => $("portable-import-summary").textContent === "");
+  assert.equal($("portable-import-effects").textContent, ""); assert.equal($("portable-import-changes").children.length, 0);
+  click("export-json"); await until(() => $("portable-export-dialog").open && !$("download-portable-profile").disabled);
+  assert.ok($("portable-export-name").textContent.length); assert.ok($("portable-meanings").children.length);
+  click("cancel-profile-export"); await until(() => $("portable-export-name").textContent === "");
+  assert.equal($("portable-meanings").children.length, 0); assert.equal($("portable-export-status").textContent, "");
+  await ui.reviewImport(candidate); document.dispatchEvent(new Event("switchyard-workspace-changing"));
+  assert.equal($("portable-import-summary").textContent, ""); assert.equal($("portable-import-effects").textContent, ""); assert.equal($("portable-import-changes").children.length, 0);
+  assert.equal($("confirm-profile-import").disabled, true); assert.equal($("download-portable-profile").disabled, true);
+  assert.equal(downloads.length, 0); assert.deepEqual(await store.snapshot("personal"), before);
+}));

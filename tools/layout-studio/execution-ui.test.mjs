@@ -32,7 +32,7 @@ test("saved permission selection and local file hashing lead to an exact cancell
   await chooseFile(c); await review(c);
   const summary = c.$("execution-review-summary").textContent; assert.ok(summary.includes(c.root)); assert.match(summary, /program.mjs/); assert.match(summary, /denied/); assert.match(summary, /5000/); assert.match(summary, /64|67108864/);
   const request = c.calls.find(row => row.path.endsWith("execution/review")); assert.deepEqual(Object.keys(request.body).sort(), ["action", "authorityId", "compartment", "manifestPath", "manifestSha256", "requestId"]); assert.equal(request.body.manifestSha256, c.proposed.manifestSha256);
-  c.click("cancel-execution"); assert.equal(c.effects(), 0); assert.equal(c.$("confirm-execution").disabled, true);
+  c.click("cancel-execution"); await until(() => c.$("execution-review-summary").textContent === ""); assert.equal(c.effects(), 0); assert.equal(c.$("confirm-execution").disabled, true);
   assert.equal((await c.execution.list("personal"))[0].status, "reviewed");
 }));
 
@@ -60,7 +60,7 @@ test("changed inputs refuse execution and an unavailable result is retained with
 test("selection and workspace changes invalidate review and clear local permission data", async t => fixture(t, async c => {
   await chooseFile(c); await review(c); c.change("execution-action", "run_target"); assert.equal(c.$("execution-review-dialog").open, false); assert.equal(c.$("confirm-execution").disabled, true);
   await review(c); c.document.dispatchEvent(new Event("switchyard-workspace-changing")); c.document.dispatchEvent(new CustomEvent("switchyard-compartment-state", { detail: await c.store.snapshot("work") }));
-  assert.equal(c.$("execution-review-dialog").open, false); assert.equal(c.$("refresh-executions").disabled, true); assert.equal(c.$("execution-history").options.length, 0); assert.equal(c.$("execution-grant").options.length, 0); assert.equal(c.effects(), 0);
+  assert.equal(c.$("execution-review-summary").textContent, ""); assert.equal(c.$("execution-review-dialog").open, false); assert.equal(c.$("refresh-executions").disabled, true); assert.equal(c.$("execution-history").options.length, 0); assert.equal(c.$("execution-grant").options.length, 0); assert.equal(c.effects(), 0);
 }));
 
 

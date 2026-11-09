@@ -37,6 +37,7 @@ test("revocation reviews exact bindings and claims, preserves another agent and 
   const beta = (await c.store.snapshot("personal")).agents.find(a => a.id === "beta");
   await openReview(c, "review-agent-revoke"); assert.match(c.$("agent-maintenance-summary").textContent, /Saved role bindings removed: 1/); assert.match(c.$("agent-maintenance-summary").textContent, /Queued commands cancelled locally: 1/); assert.match(c.$("agent-maintenance-summary").textContent, /Claimed commands retained as uncertain: 1/);
   c.click("cancel-agent-maintenance"); assert.equal((await c.store.snapshot("personal")).agents[0].enrollmentStatus, "active");
+  await until(() => c.$("agent-maintenance-summary").textContent === "");
   await openReview(c, "review-agent-revoke"); c.click("confirm-agent-maintenance"); await until(() => c.$("managed-agent-status").textContent.includes("access revoked")); await settled(c);
   const state = await c.store.snapshot("personal"), alpha = state.agents.find(a => a.id === "alpha");
   assert.equal(alpha.enrollmentStatus, "revoked"); assert.deepEqual(alpha.commands.map(row => row.status), ["uncertain-session-ended", "cancelled-before-claim"]); assert.deepEqual(state.agents.find(a => a.id === "beta"), beta); assert.equal(state.roleBindings.length, 0);

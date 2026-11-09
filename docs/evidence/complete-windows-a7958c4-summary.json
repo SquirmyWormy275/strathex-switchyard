@@ -1,0 +1,919 @@
+{
+  "schema": "switchyard-complete-windows-a7958c4/v1",
+  "at": "2026-11-09T12:19:23.268809+00:00",
+  "sourceCommit": "a7958c4b7cd22efdaa532d91ad4a3dc28150093b",
+  "mergeCommit": "7b018a10794344c630f4fe97b19d6c838548f871",
+  "sourceTree": "c5667192c79fbfa824c61639ed7012d13e390adc",
+  "workflowRunId": 42612174584,
+  "nativeCollectorJobId": 129150916723,
+  "nativeCollectorArtifactId": 13672751496,
+  "nativeCollectorArchiveSha256": "9a27f4bba6069b7f0622ffbf8042801c1c4ae872e7b7efd4d1574c2786fc6677",
+  "nativeCollectorReceiptSha256": "c8bfed60c6a9911445e12e54d14ca3fc14577bc09cbcac51508b948173307c40",
+  "result": {
+    "schema": "switchyard-complete-windows-verification/v1",
+    "scope": {
+      "platform": "win32",
+      "sourceCommit": "7b018a10794344c630f4fe97b19d6c838548f871",
+      "sourceTree": "c5667192c79fbfa824c61639ed7012d13e390adc",
+      "nodeVersion": "24.14.0",
+      "nodeExecutable": "C:\\hostedtoolcache\\windows\\node\\24.14.0\\x64\\node.exe",
+      "nodeSha256": "63c259c81e5d472b5f11c8d506070130cb04a1ecf84b80377a34ed6ec9048088",
+      "pythonVersion": "3.13.3",
+      "pythonExecutable": "C:\\hostedtoolcache\\windows\\Python\\3.13.3\\x64\\python.exe",
+      "pythonSha256": "d87063e5597f257004c731b66c59c56c91038861c6877b1a3dca6b8c4e919125",
+      "helperSha256": "bcb1f6dbf8ce03f4068494b6599903a12b401c4f3584e96cf7b5e758ecaf02a7",
+      "dotnetManifestSha256": "9387431f821c8af70705752e6d8a9d16ec88e374167bd415c742db3a319c0387"
+    },
+    "complete": true,
+    "distributed": true,
+    "manifestSha256": "7b4067fbe6c6a978e91f8d413040c3bb79a8aaaee7791fa540284ce34b5f78c2",
+    "totals": {
+      "required": 482,
+      "passed": 482,
+      "failed": 0,
+      "tests": 3404,
+      "passedTests": 3158,
+      "failedTests": 0,
+      "skippedTests": 246,
+      "cancelledTests": 0,
+      "todoTests": 0
+    },
+    "cohorts": [
+      {
+        "shard": "1",
+        "receiptId": "31017fbf-dc18-431f-b4ba-800026aa7c8d",
+        "receiptSha256": "2612162fb81cde2ab7014ccd5cbfb4847718d44e38ebae63cfafea851e732632",
+        "totals": {
+          "required": 20,
+          "passed": 20,
+          "failed": 0,
+          "tests": 124,
+          "passedTests": 114,
+          "failedTests": 0,
+          "skippedTests": 10,
+          "cancelledTests": 0,
+          "todoTests": 0
+        }
+      },
+      {
+        "shard": "2",
+        "receiptId": "371766a4-3cf0-44ac-9331-4438c0b3b437",
+        "receiptSha256": "9de51330e93619b2f394c862bedbecdd60b8e182deeb935f263dd6fc09d2b4fa",
+        "totals": {
+          "required": 19,
+          "passed": 19,
+          "failed": 0,
+          "tests": 109,
+          "passedTests": 108,
+          "failedTests": 0,
+          "skippedTests": 1,
+          "cancelledTests": 0,
+          "todoTests": 0
+        }
+      },
+      {
+        "shard": "3",
+        "receiptId": "77e4c0bd-f82a-41c9-b43c-f6744e679625",
+        "receiptSha256": "c7ab6e7c8ee1ec71cfa4c1c33328dde70907547c7265af24954af2d1cc2ffd3e",
+        "totals": {
+          "required": 21,
+          "passed": 21,
+          "failed": 0,
+          "tests": 157,
+          "passedTests": 133,
+          "failedTests": 0,
+          "skippedTests": 24,
+          "cancelledTests": 0,
+          "todoTests": 0
+        }
+      },
+      {
+        "shard": "4",
+        "receiptId": "cb1365d2-ca20-4c47-b4d4-a206ed3cf98c",
+        "receiptSha256": "11da36ebb9f4dad99319d4d73dc77588461d0f8381ecff5495f202493077da92",
+        "totals": {
+          "required": 21,
+          "passed": 21,
+          "failed": 0,
+          "tests": 175,
+          "passedTests": 154,
+          "failedTests": 0,
+          "skippedTests": 21,
+          "cancelledTests": 0,
+          "todoTests": 0
+        }
+      },
+      {
+        "shard": "5",
+        "receiptId": "1dbb3b8e-7821-4689-a73e-89482630e906",
+        "receiptSha256": "b75134fb8f5ac73f3c806df53af5161001da1a95654da249245b7fe62436d41f",
+        "totals": {
+          "required": 20,
+          "passed": 20,
+          "failed": 0,
+          "tests": 177,
+          "passedTests": 160,
+          "failedTests": 0,
+          "skippedTests": 17,
+          "cancelledTests": 0,
+          "todoTests": 0
+        }
+      },
+      {
+        "shard": "6",
+        "receiptId": "b2823b98-dbdb-4ec3-aeaa-f835c7f40bf8",
+        "receiptSha256": "a145136712652bc5d44c755810b7fc5e7bbc6bac529608d5eb85fcf62f24b4f4",
+        "totals": {
+          "required": 20,
+          "passed": 20,
+          "failed": 0,
+          "tests": 141,
+          "passedTests": 137,
+          "failedTests": 0,
+          "skippedTests": 4,
+          "cancelledTests": 0,
+          "todoTests": 0
+        }
+      },
+      {
+        "shard": "7",
+        "receiptId": "8dd84578-0cff-4552-8496-94de195e279b",
+        "receiptSha256": "fae93f2aeb67ec0244da71f7121b594ae0d3e9a46ef9114335de2ade6c537cd0",
+        "totals": {
+          "required": 21,
+          "passed": 21,
+          "failed": 0,
+          "tests": 316,
+          "passedTests": 307,
+          "failedTests": 0,
+          "skippedTests": 9,
+          "cancelledTests": 0,
+          "todoTests": 0
+        }
+      },
+      {
+        "shard": "8",
+        "receiptId": "4aca7f04-d9df-4a30-8b8a-a920c0ef912e",
+        "receiptSha256": "3ed7d4d01938114b3970e2cb6a8f9044a0fe53f687fc3709a0835662e6fdc029",
+        "totals": {
+          "required": 22,
+          "passed": 22,
+          "failed": 0,
+          "tests": 162,
+          "passedTests": 135,
+          "failedTests": 0,
+          "skippedTests": 27,
+          "cancelledTests": 0,
+          "todoTests": 0
+        }
+      },
+      {
+        "shard": "9",
+        "receiptId": "8775702b-9c6a-4c7e-9dac-9e00545d7c38",
+        "receiptSha256": "3db454d54e4010662ad148eb3aa729b89388640e3c93727a00581415c7b7e13a",
+        "totals": {
+          "required": 20,
+          "passed": 20,
+          "failed": 0,
+          "tests": 134,
+          "passedTests": 116,
+          "failedTests": 0,
+          "skippedTests": 18,
+          "cancelledTests": 0,
+          "todoTests": 0
+        }
+      },
+      {
+        "shard": "10",
+        "receiptId": "95206bd8-d044-43ba-8beb-654da07780fa",
+        "receiptSha256": "6fa7c16ae4a64a29f7d205a3d402cdc028ba128d9eace1335372077b0c7e3070",
+        "totals": {
+          "required": 23,
+          "passed": 23,
+          "failed": 0,
+          "tests": 133,
+          "passedTests": 118,
+          "failedTests": 0,
+          "skippedTests": 15,
+          "cancelledTests": 0,
+          "todoTests": 0
+        }
+      },
+      {
+        "shard": "11",
+        "receiptId": "b0f3f21c-3f0f-41b9-8a54-34fbfa61d3d9",
+        "receiptSha256": "d2e46c5e9150cec6297983438ee4d8d3127cc9e7ce61ef84d61c0da41d47687e",
+        "totals": {
+          "required": 21,
+          "passed": 21,
+          "failed": 0,
+          "tests": 154,
+          "passedTests": 147,
+          "failedTests": 0,
+          "skippedTests": 7,
+          "cancelledTests": 0,
+          "todoTests": 0
+        }
+      },
+      {
+        "shard": "12",
+        "receiptId": "f75ade9e-988b-4089-ac1a-0e535e3c3691",
+        "receiptSha256": "a0ce392b8cc532a5901cfd8fa7d6c4153a040d5540bdfa7ab4479383edbc5ee5",
+        "totals": {
+          "required": 21,
+          "passed": 21,
+          "failed": 0,
+          "tests": 121,
+          "passedTests": 116,
+          "failedTests": 0,
+          "skippedTests": 5,
+          "cancelledTests": 0,
+          "todoTests": 0
+        }
+      },
+      {
+        "shard": "13",
+        "receiptId": "1537e8ed-0ed1-494c-8532-573a61208840",
+        "receiptSha256": "a57da1225513b0fa7a7f5fd1373fb145dae5c0df975195b0e932ba338904d5c8",
+        "totals": {
+          "required": 20,
+          "passed": 20,
+          "failed": 0,
+          "tests": 187,
+          "passedTests": 183,
+          "failedTests": 0,
+          "skippedTests": 4,
+          "cancelledTests": 0,
+          "todoTests": 0
+        }
+      },
+      {
+        "shard": "14",
+        "receiptId": "5549cb31-d8fc-4b15-b2dd-f0cd1963befa",
+        "receiptSha256": "61faa3ce30a35f83a9e8fe8290db90ee5c6bfd83921b080f435703292a694d4f",
+        "totals": {
+          "required": 23,
+          "passed": 23,
+          "failed": 0,
+          "tests": 132,
+          "passedTests": 126,
+          "failedTests": 0,
+          "skippedTests": 6,
+          "cancelledTests": 0,
+          "todoTests": 0
+        }
+      },
+      {
+        "shard": "15",
+        "receiptId": "51358550-254b-4816-b5d0-f2ef1c2a7575",
+        "receiptSha256": "b11281e31f98dddde97a8864eaa323bb9a69b8c909697436ec1da49fcf3b2e9d",
+        "totals": {
+          "required": 21,
+          "passed": 21,
+          "failed": 0,
+          "tests": 192,
+          "passedTests": 160,
+          "failedTests": 0,
+          "skippedTests": 32,
+          "cancelledTests": 0,
+          "todoTests": 0
+        }
+      },
+      {
+        "shard": "16",
+        "receiptId": "ff1d153c-90eb-428c-a28e-94214c3449a2",
+        "receiptSha256": "bf4d86157199124273841f44ef0b6c7a34a51516923f214cd794b412bb0238ca",
+        "totals": {
+          "required": 21,
+          "passed": 21,
+          "failed": 0,
+          "tests": 177,
+          "passedTests": 164,
+          "failedTests": 0,
+          "skippedTests": 13,
+          "cancelledTests": 0,
+          "todoTests": 0
+        }
+      },
+      {
+        "shard": "17",
+        "receiptId": "ca1178ee-96a7-4126-bf4d-0d601483f062",
+        "receiptSha256": "82e203ac3ead885d548daf6de35009fe63a76554184e395c6e9d409b5c568a86",
+        "totals": {
+          "required": 22,
+          "passed": 22,
+          "failed": 0,
+          "tests": 107,
+          "passedTests": 104,
+          "failedTests": 0,
+          "skippedTests": 3,
+          "cancelledTests": 0,
+          "todoTests": 0
+        }
+      },
+      {
+        "shard": "18",
+        "receiptId": "07517559-1229-4f4a-be8a-3ca35a7119de",
+        "receiptSha256": "841b4873bb9aa81775673d5d298df553b05ae9155ec85d33c97d39936f2ebf42",
+        "totals": {
+          "required": 23,
+          "passed": 23,
+          "failed": 0,
+          "tests": 136,
+          "passedTests": 122,
+          "failedTests": 0,
+          "skippedTests": 14,
+          "cancelledTests": 0,
+          "todoTests": 0
+        }
+      },
+      {
+        "shard": "19",
+        "receiptId": "95d756dc-07c6-489c-ba76-9fa4c30c42bd",
+        "receiptSha256": "ceacb5b91aba6d106826a21d4a5b522ca44795fb95968ac8675ca7019fbd3ef8",
+        "totals": {
+          "required": 22,
+          "passed": 22,
+          "failed": 0,
+          "tests": 123,
+          "passedTests": 120,
+          "failedTests": 0,
+          "skippedTests": 3,
+          "cancelledTests": 0,
+          "todoTests": 0
+        }
+      },
+      {
+        "shard": "20",
+        "receiptId": "acf53dff-8247-4547-8c5d-a49850ae2986",
+        "receiptSha256": "cedb7ee38dc57fa565affcc8ac75af67037a2ccdc0d8475428bd2ae7526c8d1d",
+        "totals": {
+          "required": 22,
+          "passed": 22,
+          "failed": 0,
+          "tests": 151,
+          "passedTests": 148,
+          "failedTests": 0,
+          "skippedTests": 3,
+          "cancelledTests": 0,
+          "todoTests": 0
+        }
+      },
+      {
+        "shard": "21",
+        "receiptId": "9319c0b7-10f6-466d-aaf3-583f7f1e487a",
+        "receiptSha256": "06fa6440c05282a44f1c961efb41d61cec4e104d94e1125f17e2a61dc0c0127b",
+        "totals": {
+          "required": 24,
+          "passed": 24,
+          "failed": 0,
+          "tests": 151,
+          "passedTests": 146,
+          "failedTests": 0,
+          "skippedTests": 5,
+          "cancelledTests": 0,
+          "todoTests": 0
+        }
+      },
+      {
+        "shard": "22",
+        "receiptId": "aaff946d-63a9-487e-a146-f771538fd2ac",
+        "receiptSha256": "db8e43c8db992a5b091091452cfa9fe272b677a81f5dd10523cee24bd5bd0b30",
+        "totals": {
+          "required": 22,
+          "passed": 22,
+          "failed": 0,
+          "tests": 133,
+          "passedTests": 128,
+          "failedTests": 0,
+          "skippedTests": 5,
+          "cancelledTests": 0,
+          "todoTests": 0
+        }
+      },
+      {
+        "shard": "assembly",
+        "receiptId": "13e88aa8-2f8a-4c25-b605-7cab4df25368",
+        "receiptSha256": "b1b01ce9aad0a1ee5a414e335eaf4a41f35ee8d76e4c9a212d7b6d6b5420703f",
+        "totals": {
+          "required": 13,
+          "passed": 13,
+          "failed": 0,
+          "tests": 12,
+          "passedTests": 12,
+          "failedTests": 0,
+          "skippedTests": 0,
+          "cancelledTests": 0,
+          "todoTests": 0
+        }
+      }
+    ],
+    "originalCommandsBoundsSkipsAndCleanupVerified": true,
+    "packageAcceptance": false
+  },
+  "artifacts": [
+    {
+      "shard": "10",
+      "artifactId": 13672620165,
+      "archiveSha256": "4aed47c7c876a1f1494c507bf8dbb5dea94067d3588581ec13aef14366bcac5e",
+      "envelopeSha256": "662f555e881c95843d8d90440d66f277c02c7fecb8f8bf84dac5f191a005b95d",
+      "receiptSha256": "6fa7c16ae4a64a29f7d205a3d402cdc028ba128d9eace1335372077b0c7e3070",
+      "envelopeBytes": 39981,
+      "success": true,
+      "totals": {
+        "required": 23,
+        "passed": 23,
+        "failed": 0,
+        "tests": 133,
+        "passedTests": 118,
+        "failedTests": 0,
+        "skippedTests": 15,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "shard": "2",
+      "artifactId": 13672395580,
+      "archiveSha256": "d7418ba9dd8968bd14ba8686b6bbc785e46660e7d7ad9a69375c122fa39fdc17",
+      "envelopeSha256": "119a35ea9fc6018fbf64cf68335ed972df17a43d59423a6c54068ed5d1efb968",
+      "receiptSha256": "9de51330e93619b2f394c862bedbecdd60b8e182deeb935f263dd6fc09d2b4fa",
+      "envelopeBytes": 33312,
+      "success": true,
+      "totals": {
+        "required": 19,
+        "passed": 19,
+        "failed": 0,
+        "tests": 109,
+        "passedTests": 108,
+        "failedTests": 0,
+        "skippedTests": 1,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "shard": "6",
+      "artifactId": 13672385424,
+      "archiveSha256": "49afd9a6d093353f029442e5b5c0ce314237bd24c7c8a9362051dea5b17829b7",
+      "envelopeSha256": "00d5212a4e1587bc3239a0a9c2cfdb9fc161d1a35b31581aa17dca60c41399ca",
+      "receiptSha256": "a145136712652bc5d44c755810b7fc5e7bbc6bac529608d5eb85fcf62f24b4f4",
+      "envelopeBytes": 34537,
+      "success": true,
+      "totals": {
+        "required": 20,
+        "passed": 20,
+        "failed": 0,
+        "tests": 141,
+        "passedTests": 137,
+        "failedTests": 0,
+        "skippedTests": 4,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "shard": "8",
+      "artifactId": 13672225656,
+      "archiveSha256": "1c9837bb94d9da04d9aa42a5ff2f4a74dd6c6c309dca95e1a17ab623a0e422f9",
+      "envelopeSha256": "0abbf8c608d4549074d2ac7ad5baeccb105428d0cc9973018f4cdc8a586eec98",
+      "receiptSha256": "3ed7d4d01938114b3970e2cb6a8f9044a0fe53f687fc3709a0835662e6fdc029",
+      "envelopeBytes": 38114,
+      "success": true,
+      "totals": {
+        "required": 22,
+        "passed": 22,
+        "failed": 0,
+        "tests": 162,
+        "passedTests": 135,
+        "failedTests": 0,
+        "skippedTests": 27,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "shard": "1",
+      "artifactId": 13672156225,
+      "archiveSha256": "7b375d3e1908215b90fafe97de0631b11cd1bc73778b2a2b2bbcc95b7ead2994",
+      "envelopeSha256": "71ff88dc3a3435c1ad155070c652c4442aaf7170e1712bb5d4e9edf0bc856242",
+      "receiptSha256": "2612162fb81cde2ab7014ccd5cbfb4847718d44e38ebae63cfafea851e732632",
+      "envelopeBytes": 35162,
+      "success": true,
+      "totals": {
+        "required": 20,
+        "passed": 20,
+        "failed": 0,
+        "tests": 124,
+        "passedTests": 114,
+        "failedTests": 0,
+        "skippedTests": 10,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "shard": "7",
+      "artifactId": 13672151310,
+      "archiveSha256": "7e6de96c8fd08e63df48ab0a9280489b38a8c2d6c17f68527f76215c9753c7aa",
+      "envelopeSha256": "7ed37c9fb8550f86c1b4de042e8395665a964dc11e4a929baa75d0957a422d5a",
+      "receiptSha256": "fae93f2aeb67ec0244da71f7121b594ae0d3e9a46ef9114335de2ade6c537cd0",
+      "envelopeBytes": 36343,
+      "success": true,
+      "totals": {
+        "required": 21,
+        "passed": 21,
+        "failed": 0,
+        "tests": 316,
+        "passedTests": 307,
+        "failedTests": 0,
+        "skippedTests": 9,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "shard": "16",
+      "artifactId": 13672055669,
+      "archiveSha256": "18ffb9362780c21245cff89c5882653763578d41410c5495bea0ccf136dea5f4",
+      "envelopeSha256": "6e1093276061169a0d0dd85bbc0c7521b428a07bfe38616d60ce3290163c4ee3",
+      "receiptSha256": "bf4d86157199124273841f44ef0b6c7a34a51516923f214cd794b412bb0238ca",
+      "envelopeBytes": 36915,
+      "success": true,
+      "totals": {
+        "required": 21,
+        "passed": 21,
+        "failed": 0,
+        "tests": 177,
+        "passedTests": 164,
+        "failedTests": 0,
+        "skippedTests": 13,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "shard": "11",
+      "artifactId": 13672016172,
+      "archiveSha256": "e982a3e74160e0b8844630f62a418f4a026e8b7d1f19087b3d8e41b989315692",
+      "envelopeSha256": "43e54cf9f1e18bef210168f9aef924e0c587b544a160a3dec6676f186b44e22c",
+      "receiptSha256": "d2e46c5e9150cec6297983438ee4d8d3127cc9e7ce61ef84d61c0da41d47687e",
+      "envelopeBytes": 36412,
+      "success": true,
+      "totals": {
+        "required": 21,
+        "passed": 21,
+        "failed": 0,
+        "tests": 154,
+        "passedTests": 147,
+        "failedTests": 0,
+        "skippedTests": 7,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "shard": "17",
+      "artifactId": 13671981234,
+      "archiveSha256": "2fe98bcad3a0e90d43c3bf0e157373838cc7da113ef2017d215ee816393bab2c",
+      "envelopeSha256": "fdd85dd984ea03d278152ca7a3df52726ebbbd91192c416a8c7287fca6d18e09",
+      "receiptSha256": "82e203ac3ead885d548daf6de35009fe63a76554184e395c6e9d409b5c568a86",
+      "envelopeBytes": 38585,
+      "success": true,
+      "totals": {
+        "required": 22,
+        "passed": 22,
+        "failed": 0,
+        "tests": 107,
+        "passedTests": 104,
+        "failedTests": 0,
+        "skippedTests": 3,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "shard": "21",
+      "artifactId": 13671926623,
+      "archiveSha256": "5fc362f2c88a850b98b7d5c9e00516a388d9b000def903a0790b336a07914977",
+      "envelopeSha256": "467ecfbd6c0fb1a52fe495e228e1e98ae93aede0f25ab17e18bf16310897fa9c",
+      "receiptSha256": "06fa6440c05282a44f1c961efb41d61cec4e104d94e1125f17e2a61dc0c0127b",
+      "envelopeBytes": 41428,
+      "success": true,
+      "totals": {
+        "required": 24,
+        "passed": 24,
+        "failed": 0,
+        "tests": 151,
+        "passedTests": 146,
+        "failedTests": 0,
+        "skippedTests": 5,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "shard": "3",
+      "artifactId": 13671872523,
+      "archiveSha256": "a4d747882a0deddf56eea78333f1dbda893b8dfa5a0d1eae756af17f32994e21",
+      "envelopeSha256": "7c5c1e27c76cf9c98bb6bd28a6c2dec1536191d027752492e69d4de8629579c9",
+      "receiptSha256": "c7ab6e7c8ee1ec71cfa4c1c33328dde70907547c7265af24954af2d1cc2ffd3e",
+      "envelopeBytes": 36568,
+      "success": true,
+      "totals": {
+        "required": 21,
+        "passed": 21,
+        "failed": 0,
+        "tests": 157,
+        "passedTests": 133,
+        "failedTests": 0,
+        "skippedTests": 24,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "shard": "5",
+      "artifactId": 13671686603,
+      "archiveSha256": "5ffd5926d30dfa979943c60e3fc53826e8a6c096827521802f67a06d6974699b",
+      "envelopeSha256": "9f5cefd3cf62e4baf627d76157b77706f04fc67ee36b9d56c29f512dd3af4863",
+      "receiptSha256": "b75134fb8f5ac73f3c806df53af5161001da1a95654da249245b7fe62436d41f",
+      "envelopeBytes": 35326,
+      "success": true,
+      "totals": {
+        "required": 20,
+        "passed": 20,
+        "failed": 0,
+        "tests": 177,
+        "passedTests": 160,
+        "failedTests": 0,
+        "skippedTests": 17,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "shard": "9",
+      "artifactId": 13671606472,
+      "archiveSha256": "e96107c198c1a4628b580c73203ae9c7ba5679bd3d0c479f0ba342df9c8dc240",
+      "envelopeSha256": "1ffe6c8873e38034df960cd2603acce89bf01c487a62332fdbcf5807b357ffe5",
+      "receiptSha256": "3db454d54e4010662ad148eb3aa729b89388640e3c93727a00581415c7b7e13a",
+      "envelopeBytes": 35238,
+      "success": true,
+      "totals": {
+        "required": 20,
+        "passed": 20,
+        "failed": 0,
+        "tests": 134,
+        "passedTests": 116,
+        "failedTests": 0,
+        "skippedTests": 18,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "shard": "4",
+      "artifactId": 13671586932,
+      "archiveSha256": "e910dc42a39a1204ae63789987f35ea79068807130117be37564a1a579b53e38",
+      "envelopeSha256": "187e4f5c1ed9a6bec585cecc97ff4034b2f0bb71da3e8723595e13f1ae5237df",
+      "receiptSha256": "11da36ebb9f4dad99319d4d73dc77588461d0f8381ecff5495f202493077da92",
+      "envelopeBytes": 37239,
+      "success": true,
+      "totals": {
+        "required": 21,
+        "passed": 21,
+        "failed": 0,
+        "tests": 175,
+        "passedTests": 154,
+        "failedTests": 0,
+        "skippedTests": 21,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "shard": "15",
+      "artifactId": 13671582143,
+      "archiveSha256": "b3c2e35f0422e67af9733cb5ffdfbba3ebf743a02c433dacb74c9105c86a14af",
+      "envelopeSha256": "bcf0b9dc4a5f08dd1febca28e08a842eefbfe31eed21e3a09668ea290decdf59",
+      "receiptSha256": "b11281e31f98dddde97a8864eaa323bb9a69b8c909697436ec1da49fcf3b2e9d",
+      "envelopeBytes": 36501,
+      "success": true,
+      "totals": {
+        "required": 21,
+        "passed": 21,
+        "failed": 0,
+        "tests": 192,
+        "passedTests": 160,
+        "failedTests": 0,
+        "skippedTests": 32,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "shard": "14",
+      "artifactId": 13671542363,
+      "archiveSha256": "3ad89182566335332dd1d990197ebfb6c4c12413e523b9acaa8c6b799ae8a101",
+      "envelopeSha256": "7855fa60c608063e6430b61274344e6e74013029c3c4b6175867d195e4940caa",
+      "receiptSha256": "61faa3ce30a35f83a9e8fe8290db90ee5c6bfd83921b080f435703292a694d4f",
+      "envelopeBytes": 40500,
+      "success": true,
+      "totals": {
+        "required": 23,
+        "passed": 23,
+        "failed": 0,
+        "tests": 132,
+        "passedTests": 126,
+        "failedTests": 0,
+        "skippedTests": 6,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "shard": "19",
+      "artifactId": 13671396939,
+      "archiveSha256": "fe1cbc4c541d062758c435a8795309f26632c8c1a586941ff82df18d58f1ded2",
+      "envelopeSha256": "386f3c4a3cb0def3bb5976b5eda1d38e2d10d98bae25f9ed4585b5816c9beb99",
+      "receiptSha256": "ceacb5b91aba6d106826a21d4a5b522ca44795fb95968ac8675ca7019fbd3ef8",
+      "envelopeBytes": 38674,
+      "success": true,
+      "totals": {
+        "required": 22,
+        "passed": 22,
+        "failed": 0,
+        "tests": 123,
+        "passedTests": 120,
+        "failedTests": 0,
+        "skippedTests": 3,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "shard": "18",
+      "artifactId": 13671247046,
+      "archiveSha256": "651e8d075846aa29aa3252e4f5e3be07947bb896d1e692830f097fe1155c72c9",
+      "envelopeSha256": "e7f9f6ccb19a515d1153dd90b06ef6873e514299cf8a283a0b3ef948e4382072",
+      "receiptSha256": "841b4873bb9aa81775673d5d298df553b05ae9155ec85d33c97d39936f2ebf42",
+      "envelopeBytes": 39407,
+      "success": true,
+      "totals": {
+        "required": 23,
+        "passed": 23,
+        "failed": 0,
+        "tests": 136,
+        "passedTests": 122,
+        "failedTests": 0,
+        "skippedTests": 14,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "shard": "12",
+      "artifactId": 13671227446,
+      "archiveSha256": "5f2ff7cdd262839e36d19bdfd0a3d30d06c67de4f94ab0afb93028fb367f3e54",
+      "envelopeSha256": "bb4f5cc14cf49cd45624ed087300cacd811878171331a935d37b05cff53e9119",
+      "receiptSha256": "a0ce392b8cc532a5901cfd8fa7d6c4153a040d5540bdfa7ab4479383edbc5ee5",
+      "envelopeBytes": 35722,
+      "success": true,
+      "totals": {
+        "required": 21,
+        "passed": 21,
+        "failed": 0,
+        "tests": 121,
+        "passedTests": 116,
+        "failedTests": 0,
+        "skippedTests": 5,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "shard": "22",
+      "artifactId": 13671208142,
+      "archiveSha256": "e46247c8f7b62490d9c38e06c605d0d5d74c7f2319da20588aeffc45ee209e9f",
+      "envelopeSha256": "475aaf5e1270b3815418827159e96fa5051e26a6a73becba41993e77103ccfb8",
+      "receiptSha256": "db8e43c8db992a5b091091452cfa9fe272b677a81f5dd10523cee24bd5bd0b30",
+      "envelopeBytes": 38442,
+      "success": true,
+      "totals": {
+        "required": 22,
+        "passed": 22,
+        "failed": 0,
+        "tests": 133,
+        "passedTests": 128,
+        "failedTests": 0,
+        "skippedTests": 5,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "shard": "13",
+      "artifactId": 13671207512,
+      "archiveSha256": "b284e8a4538b834e3191be82c46692b5b03c05417cb9e632f746b56e072e17ad",
+      "envelopeSha256": "ceafe7678800075c6cda0c3999691019c1a737e1f11adb205eebfcae972bee28",
+      "receiptSha256": "a57da1225513b0fa7a7f5fd1373fb145dae5c0df975195b0e932ba338904d5c8",
+      "envelopeBytes": 34799,
+      "success": true,
+      "totals": {
+        "required": 20,
+        "passed": 20,
+        "failed": 0,
+        "tests": 187,
+        "passedTests": 183,
+        "failedTests": 0,
+        "skippedTests": 4,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "shard": "assembly",
+      "artifactId": 13671169246,
+      "archiveSha256": "513d1964fd0b4d08bd3a774071d5f9db79aeced8fe9ef6a7b8aeea05bfc24308",
+      "envelopeSha256": "855545d80a51c8eb2dee932ffecb59760e5a971f907aa0c3ff5e9c367a982b52",
+      "receiptSha256": "b1b01ce9aad0a1ee5a414e335eaf4a41f35ee8d76e4c9a212d7b6d6b5420703f",
+      "envelopeBytes": 24612,
+      "success": true,
+      "totals": {
+        "required": 13,
+        "passed": 13,
+        "failed": 0,
+        "tests": 12,
+        "passedTests": 12,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "shard": "20",
+      "artifactId": 13670958503,
+      "archiveSha256": "1d31c5e6e2ce65e8d5e9f413607c8a65e27eb01083690ff3ce40638d3f081962",
+      "envelopeSha256": "e2a59b8b5ed9cec7384f74282e3be79a3521c9e13952a28aec7378b222c95167",
+      "receiptSha256": "cedb7ee38dc57fa565affcc8ac75af67037a2ccdc0d8475428bd2ae7526c8d1d",
+      "envelopeBytes": 37976,
+      "success": true,
+      "totals": {
+        "required": 22,
+        "passed": 22,
+        "failed": 0,
+        "tests": 151,
+        "passedTests": 148,
+        "failedTests": 0,
+        "skippedTests": 3,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    }
+  ],
+  "uiTimings": [
+    {
+      "file": "tools/layout-studio/scanner-ui.test.mjs",
+      "durationMs": 40875,
+      "effectiveTimeoutMs": 45000,
+      "testCounts": {
+        "total": 7,
+        "passed": 7,
+        "failed": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      }
+    },
+    {
+      "file": "tools/layout-studio/execution-ui.test.mjs",
+      "durationMs": 42128,
+      "effectiveTimeoutMs": 45000,
+      "testCounts": {
+        "total": 7,
+        "passed": 7,
+        "failed": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      }
+    }
+  ],
+  "audit": {
+    "all23OriginalWorkerReceipts": true,
+    "sourceMergeTreeAndParentVerified": true,
+    "originalManifestCommandsBoundsSkips": true,
+    "serialOrderWithinEveryWorker": true,
+    "outputBoundsAndChildTreeCleanup": true,
+    "nativeCollectorMatchesIndependentReceiptAudit": true,
+    "all25JobsPassed": true,
+    "archiveFilesRetainedLocally": 0
+  },
+  "limits": [
+    "Complete Windows source acceptance at a7958c4 includes bounded historical-name discovery, but predates the readable-review frontend and is not Windows package acceptance.",
+    "Provider/window/guest doubles remain scoped; no physical device, graphical desktop, live account or actual guest acceptance is inferred.",
+    "Earlier intermittent native failures remain retained; later passes do not prove their cause."
+  ]
+}

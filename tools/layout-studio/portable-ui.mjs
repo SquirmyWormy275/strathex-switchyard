@@ -25,9 +25,15 @@ export function mountPortable({ getProfile, persist, refresh, loadProfile, downl
     $("confirm-profile-import").disabled = busy || !pendingImport;
     $("download-portable-profile").disabled = busy || !pendingExport;
   }
+  function clearImport() {
+    $("portable-import-summary").textContent = ""; $("portable-import-effects").textContent = ""; $("portable-import-changes").replaceChildren();
+  }
+  function clearExport() {
+    meaningRows = []; $("portable-export-name").textContent = ""; $("portable-export-status").textContent = ""; $("portable-meanings").replaceChildren(); $("portable-mode").value = "";
+  }
   function invalidate() {
     generation++; pendingImport = null; pendingExport = null;
-    $("portable-import-dialog").close(); $("portable-export-dialog").close(); printLabels(); controls();
+    $("portable-import-dialog").close(); $("portable-export-dialog").close(); clearImport(); clearExport(); printLabels(); controls();
   }
   async function run(fn) {
     if (busy) return;
@@ -84,7 +90,7 @@ export function mountPortable({ getProfile, persist, refresh, loadProfile, downl
     notify($("portability-status").textContent);
   }));
   $("cancel-profile-import").addEventListener("click", () => $("portable-import-dialog").close());
-  $("portable-import-dialog").addEventListener("close", () => { pendingImport = null; controls(); });
+  $("portable-import-dialog").addEventListener("close", () => { pendingImport = null; clearImport(); controls(); });
 
   $("export-profile-settings").addEventListener("click", () => $("export-json").click());
   $("import-profile-settings").addEventListener("click", () => $("profile-dialog").showModal());
@@ -132,7 +138,7 @@ export function mountPortable({ getProfile, persist, refresh, loadProfile, downl
     $("portable-export-dialog").close(); notify("Portable profile download requested. It excludes local accounts and connections.");
   }));
   $("cancel-profile-export").addEventListener("click", () => $("portable-export-dialog").close());
-  $("portable-export-dialog").addEventListener("close", () => { pendingExport = null; controls(); });
+  $("portable-export-dialog").addEventListener("close", () => { pendingExport = null; clearExport(); controls(); });
 
   $("export-legends").addEventListener("click", () => run(async () => {
     const context = await prepare(), format = $("legend-format").value;

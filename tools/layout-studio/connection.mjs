@@ -47,8 +47,13 @@ export function connectWorkspace({ getPlan, notify, request = api }) {
     $("connection-implementation").replaceChildren(...rows.map(([id, name]) => { const o = document.createElement("option"); o.value = id; o.textContent = name; return o; }));
     $("connection-implementation").value = rows.some(([id]) => id === previous) ? previous : "switchyard.role/v1";
   }
+  function clearReview() {
+    reviewed = null;
+    $("host-review-title").textContent = "";
+    $("host-review-changes").replaceChildren();
+  }
   function invalidate() {
-    generation++; reviewed = null;
+    generation++; clearReview();
     $("host-review-dialog").close();
     const selected = $("connection-action").value;
     $("connection-action").replaceChildren();
@@ -106,7 +111,7 @@ export function connectWorkspace({ getPlan, notify, request = api }) {
     implementations();
     controls();
   }
-  document.addEventListener("switchyard-workspace-changing", () => { generation++; workspace = null; roleTargets = []; reviewed = null; $("host-review-dialog").close(); controls(); });
+  document.addEventListener("switchyard-workspace-changing", () => { generation++; workspace = null; roleTargets = []; clearReview(); $("host-review-dialog").close(); controls(); });
   document.addEventListener("switchyard-compartment-state", event => {
     generation++; workspace = event.detail;
     const previous = roleTarget();
@@ -117,12 +122,12 @@ export function connectWorkspace({ getPlan, notify, request = api }) {
     roleTargets.forEach((target, i) => { const o = document.createElement("option"); o.value = String(i); o.textContent = `${workspace.workflow.roles.find(r => r.id === target.roleId)?.label ?? "Saved role"} · ${({ status: "Check progress", resume: "Return to task", review: "Review work", handoff: "Leave a handoff", summon: "Open app", cancel: "Cancel turn" })[target.intent]}`; $("connection-role-target").append(o); });
     const index = roleTargets.findIndex(t => t.roleId === previous?.roleId && t.intent === previous?.intent);
     if (index >= 0) $("connection-role-target").value = String(index);
-    reviewed = null; $("host-review-dialog").close(); controls();
+    clearReview(); $("host-review-dialog").close(); controls();
   });
-  for (const id of ["connection-implementation", "connection-role-target"]) $(id).addEventListener("change", () => { generation++; reviewed = null; controls(); });
+  for (const id of ["connection-implementation", "connection-role-target"]) $(id).addEventListener("change", () => { generation++; clearReview(); $("host-review-dialog").close(); controls(); });
   $("refresh-discovery").addEventListener("click", refresh);
   document.addEventListener("switchyard-local-connected", refresh);
-  $("connection-action").addEventListener("change", () => { generation++; reviewed = null; controls(); });
+  $("connection-action").addEventListener("change", () => { generation++; clearReview(); $("host-review-dialog").close(); controls(); });
   $("review-connection").addEventListener("click", () => run(async () => {
     const version = generation, label = roleConnection() ? $("connection-role-target").selectedOptions[0]?.textContent : null;
     const result = await request("/api/review", { plan: getPlan(), actionId: $("connection-action").value, implementation: $("connection-implementation").value, ...(roleConnection() ? { target: roleTarget() } : {}) });
@@ -133,7 +138,8 @@ export function connectWorkspace({ getPlan, notify, request = api }) {
     $("connection-message").textContent = "";
     $("host-review-dialog").showModal();
   }));
-  $("cancel-connection").addEventListener("click", () => { reviewed = null; $("host-review-dialog").close(); controls(); });
+  $("cancel-connection").addEventListener("click", () => { clearReview(); $("host-review-dialog").close(); controls(); });
+  $("host-review-dialog").addEventListener("close", () => { if (!$("host-review-dialog").open) { clearReview(); controls(); } });
   $("apply-connection").addEventListener("click", () => run(async () => {
     const reviewId = reviewed?.reviewId;
     reviewed = null;
