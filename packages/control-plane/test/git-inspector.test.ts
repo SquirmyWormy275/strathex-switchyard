@@ -37,6 +37,54 @@ class FakeDigests implements FileDigestReader {
 
 const result = (stdout: string): GitCommandResult => ({ exitCode: 0, stdout, stderr: "" });
 
+test("independent metadata overlaps in bounded groups after root discovery and before the final index witness", async () => {
+  let release!: () => void;
+  const gate = new Promise<void>(resolve => { release = resolve; });
+  const calls: string[] = []; let active = 0, peak = 0, finished = 0, indexReads = 0;
+  const runner: GitCommandRunner = { async run(args, cwd) {
+    const key = args.join(" "); calls.push(key);
+    if (key === "rev-parse --show-toplevel") { assert.equal(calls.length, 1); return result("C:/work/example\n"); }
+    assert.equal(cwd, "C:/work/example");
+    if (key === "ls-files --stage -z" && ++indexReads === 2) {
+      assert.equal(finished, 10); assert.equal(active, 0); return result("");
+    }
+    active++; peak = Math.max(peak, active);
+    try { await gate; return result(key === "rev-parse HEAD" ? "a".repeat(40) : ""); }
+    finally { active--; finished++; }
+  } };
+  const pending = new GitCliInspector({ runner, digestReader: new FakeDigests() }).inspect();
+  try {
+    await new Promise<void>(resolve => setImmediate(resolve));
+    assert.equal(active, 4); assert.equal(calls.length, 5);
+  } finally { release(); await pending; }
+  assert.equal(peak, 4); assert.equal(finished, 10); assert.equal(indexReads, 2);
+  assert.equal(calls.includes("submodule status --recursive"), false);
+});
+
+test("a metadata failure joins every started sibling before rejecting and does not start another group", async () => {
+  let release!: () => void;
+  const gate = new Promise<void>(resolve => { release = resolve; });
+  const first = new Error("first metadata failure"), second = new Error("second metadata failure"), calls: string[] = [];
+  let settled = false, active = 0;
+  const runner: GitCommandRunner = { async run(args) {
+    const key = args.join(" "); calls.push(key);
+    if (key === "rev-parse --show-toplevel") return result("C:/work/example\n");
+    if (key === "remote get-url origin") throw first;
+    if (key === "branch --show-current") throw second;
+    active++;
+    try { await gate; return result(""); } finally { active--; }
+  } };
+  const pending = new GitCliInspector({ runner, digestReader: new FakeDigests() }).inspect().then(
+    () => { settled = true; throw Error("A failed query produced a snapshot"); },
+    error => { settled = true; return error; }
+  );
+  try {
+    await new Promise<void>(resolve => setImmediate(resolve));
+    assert.equal(settled, false); assert.equal(active, 2); assert.equal(calls.length, 5);
+  } finally { release(); assert.equal(await pending, first); }
+  assert.equal(active, 0); assert.equal(calls.length, 5);
+});
+
 test("default Git command runner accepts only fixed absolute Git identities", () => {
   assert.throws(() => new NodeGitCommandRunner(["git"]), /fixed absolute/i);
   assert.throws(() => new NodeGitCommandRunner(["C:\\tools\\not-git.cmd"]), /fixed absolute/i);

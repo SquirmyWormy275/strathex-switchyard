@@ -68,6 +68,17 @@ evidence. Do not rerun executed start/audit/cleanup scripts.
 
 ## Current Windows verification
 
+Repository inspection now runs the same independent metadata queries in groups
+of four after root verification, joining every started sibling before failure or
+cleanup. The final index witness, query allowlist, owner quota and original
+deadlines remain unchanged. Seven integration groups pass 58 tests; four further
+consumer groups pass 24. A native Linux demonstration verifies twelve actual Git
+guardians, four concurrent queries, independent exit and unchanged repository
+bytes, with all owned staging removed. Typechecking passes. The two original
+scheduling failures remain retained. Windows deadline acceptance and normal
+installation of this source remain pending.
+[Source and demonstration](evidence/batched-inspection-source-summary.json).
+
 The permission review now shows literal Windows project paths and readable task,
 action, file and exclusion summaries. Full scope/fingerprints remain available in
 a collapsed details section and clear on workspace changes. Nine focused cases

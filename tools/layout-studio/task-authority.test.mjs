@@ -135,3 +135,35 @@ test("Git root spelling is canonicalized through native realpath and another rea
   redirect = true; assert.equal((await reader.capture("personal", f.task, classifications)).snapshot.completeness, "incomplete");
   await reader.close();
 });
+
+test("suspension retires every concurrent metadata guardian before removing its scratch", async t => {
+  const f = await fixture(t), active = new Set(), acknowledged = [];
+  let release;
+  const allReady = new Promise(resolve => { release = resolve; });
+  const command = async (exe, args, options) => {
+    if (args.at(-1) === "--show-toplevel") return f.command(exe, args, options);
+    const scope = { schema: "switchyard-runtime-command/v1", id: randomUUID(), guardianPid: 12345, birth: "1", containment: process.platform === "linux" ? "owned-linux-session" : "windows-job" };
+    active.add(scope.id);
+    try {
+      await options.onGuardianReady(scope);
+      acknowledged.push(scope.id); if (acknowledged.length === 4) release();
+      await new Promise(resolve => { if (options.signal.aborted) resolve(); else options.signal.addEventListener("abort", resolve, { once: true }); });
+      throw Object.assign(new Error("Synthetic cancelled metadata query"), { code: "CANCELLED" });
+    } finally { active.delete(scope.id); }
+  };
+  const probe = createRepositoryInspection({ store: f.store, command, guardianStopped: async scope => !active.has(scope.id), runtimeRoot: join(f.stage, "parallel-probes") });
+  f.onCleanup(() => probe.close());
+  const pending = probe.capture("personal", f.task, { includedUntracked: [], excludedUntracked: [], excludedIgnored: [] }).then(
+    () => { throw new Error("A suspended metadata group returned a snapshot"); }, error => error
+  );
+  await allReady;
+  const before = (await f.store.snapshot("personal")).repositoryProbes;
+  assert.equal(active.size, 4); assert.equal(before.filter(p => !p.stoppedVerified).length, 4);
+  assert.equal((await probe.stopCompartment("personal")).stopped, true);
+  assert.match((await pending).message, /stopped/i);
+  assert.equal(active.size, 0); assert.equal(acknowledged.length, 4);
+  const after = (await f.store.snapshot("personal")).repositoryProbes;
+  assert.equal(after.length, 5); assert(after.every(p => p.stoppedVerified && p.scratchCleanupPending === false));
+  for (const record of before) await assert.rejects(access(record.scratch), { code: "ENOENT" });
+  assert.deepEqual(await f.service.list("personal"), []);
+});

@@ -9,7 +9,7 @@ entry point, evidence and remaining work. A hardware/account check does not excu
 unfinished independent software. Read [current status](switchyard-status.md) for
 accepted checkpoints and [verification](verification.md) for reproducible checks.
 
-Installed Linux source `99784a7` includes the 36-asset guided frontend, permissions,
+Installed Linux source `85f1ec4` includes the 36-asset guided frontend, permissions,
 scanner setup, signed-feed maintenance, reviewed execution, saved design
 conversations, coding-task text/background controls and approved-work account/
 recovery, exact native-app navigation, agent maintenance, saved voice notes,
@@ -17,7 +17,7 @@ transcript import, Claude hook setup and direct client-to-native setup navigatio
 hashes, thirty-three API/inventory checks and 107 metadata/refusal checks across 62 exact modules
 pass, preserving all 54 semantic workspaces and 57 workflow definitions.
 Current plus one rollback remain and the prepared package is removed.
-[Installed evidence](evidence/installed-atomic-startup-summary.json).
+[Installed evidence](evidence/installed-permission-summary.json).
 Reviewed role dispatch carries the active and persisted workspace identity;
 the current synthetic running demonstration verifies acknowledgement and stale
 selection refusal. [Demonstration](evidence/claude-launch-running-demo-summary.json).
@@ -58,7 +58,7 @@ Windows client source a351626 passes 31 groups/353 tests with zero skips under
 the original limits. Its exact receipt and source tree are audited.
 [Client evidence](evidence/client-native-a351626-summary.json). The newer atomic
 startup/shutdown correction passes ten local groups/147 tests with one original
-platform skip; normal installation passes 69 served/API and 107 metadata checks; native follow-up remains pending.
+platform skip; its native Windows client follow-up passes 31 groups/356 tests with zero skips. Normal installation passes 69 served/API and 107 metadata checks.
 [Startup evidence](evidence/atomic-startup-source-summary.json).
 
 Full Windows package source 7529718 passes all eight jobs, including 462 test
@@ -86,6 +86,17 @@ physical-device acceptance.
 [Windows release interruption](evidence/windows-6727054-full-interruption-summary.json).
 
 ## Requirement status
+
+Repository inspection now runs the same independent metadata queries in groups
+of four after root verification, joining every started sibling before failure or
+cleanup. The final index witness, query allowlist, owner quota and original
+deadlines remain unchanged. Seven integration groups pass 58 tests; four further
+consumer groups pass 24. A native Linux demonstration verifies twelve actual Git
+guardians, four concurrent queries, independent exit and unchanged repository
+bytes, with all owned staging removed. Typechecking passes. The two original
+scheduling failures remain retained. Windows deadline acceptance and normal
+installation of this source remain pending.
+[Source and demonstration](evidence/batched-inspection-source-summary.json).
 
 The new [Claude hook bridge](claude-hook-observation.md) implements a separate
 recording source, exact native-session/destination settings preview and local

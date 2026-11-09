@@ -228,34 +228,36 @@ export class GitCliInspector implements GitInspector {
     const repositoryRoot = rootResult.exitCode === 0 ? cleanOutput(rootResult.stdout) : undefined;
     if (!repositoryRoot) return { ...(targetHint ? { repositoryRoot: targetHint } : {}), issues: [shortFailure("root discovery", rootResult)] };
 
-    const remote = await this.optional(["remote", "get-url", "origin"], repositoryRoot, "canonical remote", issues);
-    const branchResult = await this.runner.run(["branch", "--show-current"], repositoryRoot);
-    const branch = branchResult.exitCode === 0 ? cleanOutput(branchResult.stdout) : undefined;
-    if (branchResult.exitCode !== 0) issues.push(shortFailure("branch", branchResult));
-    const detached = branchResult.exitCode === 0 && !branch;
-    const remoteDefault = await this.optional(["symbolic-ref", "--quiet", "--short", "refs/remotes/origin/HEAD"], repositoryRoot, "default branch", issues, false);
+    // These fixed metadata reads are independent once the root is verified.
+    // Join each bounded group, including failed siblings, before another group
+    // starts or the caller can retire its owned guardians and scratch directory.
+    const [remoteResult, branchResult, remoteDefaultResult, upstreamResult, headResult, indexListing, trackedResult, deletedResult, untrackedResult, ignoredResult] = await this.metadata(repositoryRoot);
+    const remote = this.optional(remoteResult!, "canonical remote", issues);
+    const branch = branchResult!.exitCode === 0 ? cleanOutput(branchResult!.stdout) : undefined;
+    if (branchResult!.exitCode !== 0) issues.push(shortFailure("branch", branchResult!));
+    const detached = branchResult!.exitCode === 0 && !branch;
+    const remoteDefault = this.optional(remoteDefaultResult!, "default branch", issues, false);
     const defaultBranch = remoteDefault?.startsWith("origin/") ? remoteDefault.slice("origin/".length) : undefined;
     if (remoteDefault && !defaultBranch) issues.push("Git default branch reference is not bound to origin.");
-    const upstream = await this.optional(["rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{upstream}"], repositoryRoot, "upstream", issues, false);
-    const head = await this.optional(["rev-parse", "HEAD"], repositoryRoot, "HEAD", issues);
-    const indexListing = await this.runner.run(["ls-files", "--stage", "-z"], repositoryRoot);
+    const upstream = this.optional(upstreamResult!, "upstream", issues, false);
+    const head = this.optional(headResult!, "HEAD", issues);
     let indexTree: string | undefined;
-    if (indexListing.exitCode !== 0) issues.push(shortFailure("index tree", indexListing));
-    else { try { indexTree = gitIndexTreeFromListing(indexListing.stdout, head ?? ""); } catch { issues.push("Git index tree metadata is unavailable, unmerged or outside supported bounds."); } }
-    const tracked = await this.paths(["ls-files", "-z"], repositoryRoot, "tracked file list", issues);
-    const deleted = await this.paths(["ls-files", "--deleted", "-z"], repositoryRoot, "tracked deletion list", issues);
+    if (indexListing!.exitCode !== 0) issues.push(shortFailure("index tree", indexListing!));
+    else { try { indexTree = gitIndexTreeFromListing(indexListing!.stdout, head ?? ""); } catch { issues.push("Git index tree metadata is unavailable, unmerged or outside supported bounds."); } }
+    const tracked = this.paths(trackedResult!, "tracked file list", issues);
+    const deleted = this.paths(deletedResult!, "tracked deletion list", issues);
     const trackedSet = new Set(tracked);
     for (const path of deleted) if (!trackedSet.has(path)) issues.push(`Git reported tracked deletion ${path} outside the tracked file list.`);
     const deletedSet = new Set(deleted.filter((path) => trackedSet.has(path)));
-    const untracked = await this.paths(["ls-files", "--others", "--exclude-standard", "-z"], repositoryRoot, "untracked file list", issues);
-    const ignored = await this.paths(["ls-files", "--others", "--ignored", "--exclude-standard", "-z"], repositoryRoot, "ignored file list", issues);
+    const untracked = this.paths(untrackedResult!, "untracked file list", issues);
+    const ignored = this.paths(ignoredResult!, "ignored file list", issues);
     let submodules: Record<string, string> = {};
-    if (indexTree && !indexListing.stdout.split("\0").some(row => row.startsWith("160000 "))) {
+    if (indexTree && !indexListing!.stdout.split("\0").some(row => row.startsWith("160000 "))) {
       // A validated index with no gitlinks has no submodules to recurse into.
       // Re-read the exact listing so a concurrent index edit cannot turn this
       // optimization into an unverified assertion that submodules are absent.
       const finalIndex = await this.runner.run(["ls-files", "--stage", "-z"], repositoryRoot);
-      if (finalIndex.exitCode !== 0 || finalIndex.stdout !== indexListing.stdout) issues.push("Git index tree changed or became unavailable while checking submodule absence.");
+      if (finalIndex.exitCode !== 0 || finalIndex.stdout !== indexListing!.stdout) issues.push("Git index tree changed or became unavailable while checking submodule absence.");
     } else {
       const submoduleResult = await this.runner.run(["submodule", "status", "--recursive"], repositoryRoot);
       submodules = submoduleResult.exitCode === 0 ? parseSubmodules(submoduleResult.stdout) : (issues.push(shortFailure("submodule status", submoduleResult)), {});
@@ -278,8 +280,28 @@ export class GitCliInspector implements GitInspector {
     };
   }
 
-  private async optional(args: readonly string[], cwd: string, label: string, issues: string[], required = true): Promise<string | undefined> {
-    const result = await this.runner.run(args, cwd);
+  private async metadata(cwd: string): Promise<readonly GitCommandResult[]> {
+    const queries = [
+      ["remote", "get-url", "origin"], ["branch", "--show-current"],
+      ["symbolic-ref", "--quiet", "--short", "refs/remotes/origin/HEAD"],
+      ["rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{upstream}"],
+      ["rev-parse", "HEAD"], ["ls-files", "--stage", "-z"],
+      ["ls-files", "-z"], ["ls-files", "--deleted", "-z"],
+      ["ls-files", "--others", "--exclude-standard", "-z"],
+      ["ls-files", "--others", "--ignored", "--exclude-standard", "-z"]
+    ] as const;
+    const results: GitCommandResult[] = [];
+    for (let offset = 0; offset < queries.length; offset += 4) {
+      const settled = await Promise.allSettled(queries.slice(offset, offset + 4).map(args => Promise.resolve().then(() => this.runner.run(args, cwd))));
+      for (const item of settled) {
+        if (item.status === "rejected") throw item.reason;
+        results.push(item.value);
+      }
+    }
+    return results;
+  }
+
+  private optional(result: GitCommandResult, label: string, issues: string[], required = true): string | undefined {
     if (result.exitCode !== 0) {
       if (required) issues.push(shortFailure(label, result));
       return undefined;
@@ -289,8 +311,7 @@ export class GitCliInspector implements GitInspector {
     return value;
   }
 
-  private async paths(args: readonly string[], cwd: string, label: string, issues: string[]): Promise<readonly string[]> {
-    const result = await this.runner.run(args, cwd);
+  private paths(result: GitCommandResult, label: string, issues: string[]): readonly string[] {
     if (result.exitCode !== 0) {
       issues.push(shortFailure(label, result));
       return [];
