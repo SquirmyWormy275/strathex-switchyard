@@ -315,6 +315,27 @@ for (const change of [
 ]) { const changed = structuredClone(roleState); change(changed); assert.notEqual(roleChoiceDigest(changed, selectedRoleChoice, selectionDigest), originalChoice); }
 assert.notEqual(roleChoiceDigest(roleState, selectedRoleChoice, "b".repeat(64)), originalChoice);
 checks.push("installed-role-choice-digest-fences-role-account-enrollment-prior-binding-and-workspace-selection-changes");
+{
+    const { claudeHookMetadata, claudeHookRecipe, recordClaudeHook } = await load("tools/layout-studio/claude-hook-observation.mjs");
+    const hookInput = JSON.stringify({ session_id: "synthetic-hook-session", hook_event_name: "Stop", last_assistant_message: "NEVER_RETAIN", transcript_path: "/NEVER_OPEN", background_tasks: [{ command: "NEVER_EXECUTE" }] });
+    assert.deepEqual(claudeHookMetadata(hookInput, "synthetic-hook-session"), { event: "Stop", status: "provider-turn-finished" });
+    assert.equal(claudeHookMetadata(hookInput, "different-session"), null);
+    assert.equal(claudeHookMetadata(JSON.stringify({ ...JSON.parse(hookInput), agent_id: "nested" }), "synthetic-hook-session"), null);
+    checks.push("installed-Claude-hook-parser-discards-content-and-refuses-other-or-nested-session-reports");
+    const observationId = "ac730133-f745-42b2-9ab0-949c33e3ecf6";
+    let value = { id: "synthetic", policy: "personal", mode: "personal-companion", observations: [{ id: observationId, status: "recording", sources: ["agent-events"], exclusions: [], events: [], createdAt: 1, recordingSince: 1, recordingGeneration: "first" }] }, writes = 0, replace = false;
+    const hookStore = { selection: async () => "synthetic", snapshot: async () => structuredClone(value), update: async (_id, _op, fn) => { if (replace) value.observations[0].recordingGeneration = "replacement"; const draft = structuredClone(value), result = await fn(draft); value = draft; writes++; return result; } };
+    const record = at => recordClaudeHook({ store: hookStore, compartment: "synthetic", observationId, expectedSessionId: "synthetic-hook-session", raw: hookInput, at, now: () => 30 });
+    assert.equal((await record(20)).recorded, 0); assert.equal(writes, 0);
+    value.observations[0].sources = ["claude-hook-events"]; assert.equal((await record(21)).recorded, 1);
+    const event = value.observations[0].events[0]; assert.equal(event.provenance, "unverified-local-claude-hook"); assert.equal(event.taskCompletionVerified, false); assert.equal(event.nativeIdentityVerified, false); assert(!JSON.stringify(event).includes("NEVER"));
+    replace = true; assert.equal((await record(22)).recorded, 0); assert.equal(value.observations[0].events.length, 1);
+    checks.push("installed-Claude-hook-requires-separate-consent-and-refuses-replacement-generation-without-completion-claims");
+    const recipe = claudeHookRecipe(value, { observationId, expectedSessionId: "synthetic-hook-session" });
+    assert.equal(recipe.configured, false); assert.equal(recipe.providerCommandSent, false);
+    for (const [entry] of Object.values(recipe.settings.hooks)) { assert.equal(entry.hooks[0].command, process.execPath); assert.equal(entry.hooks[0].args[0], join(root, "integrations/claude-hook.mjs")); assert.equal(entry.hooks[0].onFailure, "continue"); }
+    checks.push("installed-Claude-hook-recipe-pins-its-installed-command-without-writing-native-settings");
+}
 const evidence = { schema: "switchyard-installed-agent-security-metadata/v3", at: new Date().toISOString(), moduleDigests, verifierSourceSha256: createHash("sha256").update(await readFile(new URL(import.meta.url))).digest("hex"), sourceCommit: built.source, applicationRelease: built.id, checks, success: true, pureInMemoryOnly: true, liveUserCredentialsUsed: false, liveAgentsRevoked: 0, nativeProcessesStarted: 0, nativeShortcutRegistrations: 0, providerOrModelRequests: 0, hardwareOperations: 0 };
 const { privateDirectory } = await import("../tools/layout-studio/private-fs.mjs");
 const outputRoot = join(process.env.XDG_STATE_HOME || join(homedir(), ".local/state"), "strathex-switchyard/runtime-verification");

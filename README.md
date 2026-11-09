@@ -33,6 +33,8 @@ Copilot-only policy. Imported layouts never enable providers or recording.
   proposal, review an exact local connection, and restore a change.
 - [Optional local runtime](docs/optional-runtime.md): install or verify the shared
   CPU voice, configuration HID and LangChain environment from pinned hashes.
+- [Voice notes and transcript import](docs/voice-note-controls.md): review words before using them in a design draft.
+- [Claude hook observations](docs/claude-hook-observation.md): opt in to fixed status metadata from one exact session.
 - [Portable profiles](docs/portable-profiles.md): review typing/geometry assumptions,
   stable intents and migration before connecting a second computer.
 - [Assignment references and legends](docs/assignment-legends.md): export saved
@@ -83,18 +85,19 @@ execution, offline repository scans and recoverable installation. The Home and
 Model F catalog provide the starting experience; complete task/IDE attachment,
 broader observation sources and full scanner coverage remain unfinished.
 
-The installed application at `f28f01c` includes guided setup, portable profiles,
-observation-assisted design, advertised keyboard controls and distinct client
-recipes, plus task permissions, scanner setup, signed feeds and reviewed execution.
-Saved design conversations, coding-task text/background controls and approved-work
-account/recovery and exact native-app navigation controls are connected. Its 35 served asset hashes, eight API checks and 100 metadata/refusal
-checks pass; all 54 semantic workspaces and 57 workflows are preserved.
-Browser visual/interactive acceptance remains blocked and is not inferred from
-HTTP tests. [Installed evidence](docs/evidence/installed-native-app-controls-summary.json).
+The installed application at `23293d1` includes guided setup, portable profiles,
+observation-assisted design, keyboard/client controls, task permissions, scanners,
+signed feeds and reviewed execution. Saved conversations, coding-task and account
+controls, native-app navigation, agent maintenance, voice notes, transcript import
+and separately opted-in Claude hook setup are connected. All 36 served hashes,
+22 API checks and 103 installed metadata checks pass; all 54 semantic workspaces
+and 57 workflows are preserved. Browser visual acceptance remains blocked.
+[Installed evidence](docs/evidence/installed-claude-hook-controls-summary.json).
 
-Complete Linux `9266c12` passes **356 groups / 2,333 tests**, with 32 declared
-skips. It covers that earlier source, including exact Claude version admission
-and recording-consent fixes for both task adapters. Complete Windows source
+Complete Linux `4e3feb4` passes **375 groups / 2,483 tests**, with 32 declared
+skips. It covers the guided frontend through voice-note controls; transcript import
+and Claude hooks have later focused evidence. [Complete Linux receipt](docs/evidence/linux-4e3feb4-complete-summary.json).
+Complete Windows source
 `4db5948` passes **462 groups / 2,910 tests**, with 246 declared skips. All 21
 original worker receipts are audited and the native collector passes. This
 source includes the latest consent/version fixes and native fixture corrections.

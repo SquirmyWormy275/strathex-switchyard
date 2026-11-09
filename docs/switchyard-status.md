@@ -19,7 +19,8 @@ settings preview. Ten hook cases and two UI cases pass within eight original
 groups/111 checks, including actual independent Node processes and encrypted
 storage. Fourteen running-preview checks pass. The original expired synthetic
 fixture is retained and corrected without changing retention or bounds. No native
-Claude hook/settings or visual acceptance is claimed.
+Claude hook/settings or visual acceptance is claimed. The normal installation
+passes 58 served/API and 103 installed metadata checks across 60 exact modules.
 [Setup and boundaries](claude-hook-observation.md),
 [source evidence](evidence/claude-hook-source-summary.json).
 
@@ -173,17 +174,18 @@ tree and local reproduction are retained. No current full-platform pass is claim
 The normal installed application includes guided setup, portability, observation,
 keyboard/client controls, permissions/scanners/feeds/execution, saved design
 conversations, coding-task text/background controls and approved-work account/
-recovery, exact native-app navigation and connected-agent maintenance, saved voice notes and plain-text transcript import at source `9057de5`,
-release `ff9e2aa6`. All 36 served asset hashes and nineteen API/inventory checks pass; eight
-installed verifiers pass 100 checks across 58 exact modules. All 54 semantic
+recovery, exact native-app navigation, connected-agent maintenance, saved voice notes,
+transcript import and Claude hook setup at source `23293d1`,
+release `f9e73add`. All 36 served asset hashes and twenty-two API/inventory checks pass; eight
+installed verifiers pass 103 checks across 60 exact modules. All 54 semantic
 workspaces, 57 workflow definitions, modes, selection and conversation records
 remain intact. Fifty-three sealed files are byte-identical; one changes audit only.
 
-Dated launcher backups verify and the previous `dba8ce5b` release is the single
-rollback. The 572-file payload is 5,034,214 bytes; its exact prepared copy
-(573 files/5,137,723 bytes) is removed after identity/hash verification. No live
+Dated launcher backups verify and the previous `ff9e2aa6` release is the single
+rollback. The 574-file payload is 5,046,103 bytes; its exact prepared copy
+(575 files/5,149,887 bytes) is removed after identity/hash verification. No live
 account/task/model or hardware operation occurred. Visual acceptance remains
-blocked before browser inspection. [Exact installed evidence](evidence/installed-transcript-import-controls-summary.json).
+blocked before browser inspection. [Exact installed evidence](evidence/installed-claude-hook-controls-summary.json).
 Earlier [agent maintenance](evidence/installed-agent-maintenance-controls-summary.json),
 [native-app controls](evidence/installed-native-app-controls-summary.json),
 [account/background controls](evidence/installed-lifecycle-controls-summary.json),
@@ -233,6 +235,7 @@ checkpoints are not cumulative acceptance of the latest suite.
 | --- | --- | --- |
 | Installed Linux `9266c12` | **102 metadata/refusal checks; 59 exact module hashes.** All 54 semantic workspaces, four profiles, 57 workflows, selection, pending keyboard-only conversation and frozen frontend preserved. [Evidence](evidence/installed-codex-status-consent-summary.json). | Live task/model/account operations, editor command activation, hardware or microphone acceptance. |
 | Complete Linux `9266c12` | **356 groups; 2,333 passing tests; 32 declared skips.** Same source as the installed backend. Original manifest, commands, deadlines and cleanup audited; includes exact-version and both status-consent corrections. [Evidence](evidence/linux-9266c12-complete-summary.json). | Native Windows, live accounts/models, interactive UI and physical devices remain separate. Installed metadata/refusal acceptance is recorded independently. |
+| Complete Linux `4e3feb4` | **375 groups; 2,483 passing tests; 32 declared skips.** Original manifest, commands, bounds, serial build order and cleanup audited. [Evidence](evidence/linux-4e3feb4-complete-summary.json). | Includes guided controls through voice notes. Later transcript import/hooks, Windows, live providers, visual UI and hardware remain separate. |
 | Complete Windows package `7529718` | **462 groups; 2,910 passing tests; 246 declared skips.** Exact manifest, commands, bounds, two-child scheduling and cleanup independently audited. Full native helper publishing, portable smoke and artifact validation pass; all eight release jobs succeed. [Evidence](evidence/windows-package-7529718-summary.json). | Later frontend/editor revisions, live providers, interactive Windows/IDE, devices and microphone acceptance remain separate. The binary payload was not downloaded locally. |
 | Complete Windows source `4db5948` | **462 groups; 2,910 passing tests; 246 declared skips.** All 21 original worker receipts pass an independent source/tree/tool/manifest/command/bound/cleanup audit. Native collector passes; all 23 jobs succeed. [Evidence](evidence/complete-windows-4db5948-summary.json). | The later standalone-helper compiler failure is corrected and full package construction passes at `7529718`. The alias assertions pass in the separate package test receipt; live providers, UI and hardware remain separate. |
 | Complete Windows source `90fa879` | **462 groups; 2,902 passing tests; 246 declared skips.** All 21 original worker receipts and the native collector match; all 23 jobs succeed. Exact source/tree/tool identities, commands, bounds and cleanup verify. [Evidence](evidence/complete-windows-90fa879-summary.json). | Package, live-host and later Claude 2.1.319 admission. Earlier intermittent failures remain unresolved. |
@@ -245,7 +248,7 @@ readback verify; current plus one rollback remain. Its exact 555-file/4,849,605-
 bundle is removed. The complete Linux checkout, nine dependency aliases and
 803 generated files/11,907,805 bytes are also removed. The latest `cf3bb4c`
 checkout, nine aliases and 803 generated files/11,910,385 bytes are removed too;
-other worktrees remain. The latest `9266c12` checkout, nine aliases and 803 generated files/11,910,385 bytes are also removed after verified unit exit and exact ownership checks.
+other worktrees remain. The earlier `9266c12` checkout, nine aliases and 803 generated files/11,910,385 bytes are also removed after verified unit exit and exact ownership checks.
 
 ## Native status and version compatibility
 

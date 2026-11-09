@@ -9,14 +9,15 @@ entry point, evidence and remaining work. A hardware/account check does not excu
 unfinished independent software. Read [current status](switchyard-status.md) for
 accepted checkpoints and [verification](verification.md) for reproducible checks.
 
-Installed Linux source `9057de5` includes the 36-asset guided frontend, permissions,
+Installed Linux source `23293d1` includes the 36-asset guided frontend, permissions,
 scanner setup, signed-feed maintenance, reviewed execution, saved design
 conversations, coding-task text/background controls and approved-work account/
-recovery, exact native-app navigation connected-agent maintenance, saved voice notes and plain-text transcript import. All served asset
-hashes, nineteen API/inventory checks and 100 metadata/refusal checks across 58 exact modules
+recovery, exact native-app navigation, agent maintenance, saved voice notes,
+transcript import and Claude hook setup. All served asset
+hashes, twenty-two API/inventory checks and 103 metadata/refusal checks across 60 exact modules
 pass, preserving all 54 semantic workspaces and 57 workflow definitions.
 Current plus one rollback remain and the prepared package is removed.
-[Installed evidence](evidence/installed-transcript-import-controls-summary.json).
+[Installed evidence](evidence/installed-claude-hook-controls-summary.json).
 
 The installed source also includes [saved design-conversation controls](saved-conversation-controls.md):
 exact history selection, reviewed legacy account binding, explicit native status
@@ -45,11 +46,11 @@ its 15-test consumer group passes at `90fa879` without changing the original bou
 [Scoped follow-up](evidence/host-action-settlement-native-followup-summary.json).
 [Native inventory evidence](evidence/editor-project-choices-native-summary.json).
 
-Complete Linux `9266c12` passes 356 groups/2,333 tests with 32 declared skips,
-covering the installed source, exact Claude version admission and both task-status
-consent corrections. Its exact checkout, nine dependency aliases and 11,910,385
-bytes of generated staging are removed.
-[Latest Linux evidence](evidence/linux-9266c12-complete-summary.json).
+Complete Linux `4e3feb4` passes 375 groups/2,483 tests with 32 declared skips,
+covering the guided frontend through voice-note controls. Its owned checkout,
+nine aliases and 11,926,549 bytes of generated staging are removed. Transcript
+import and Claude hooks have separate later focused evidence.
+[Latest Linux evidence](evidence/linux-4e3feb4-complete-summary.json).
 
 Complete Windows source `4db5948` now passes all 462 groups/2,910 tests with 246 declared skips. All 21 original worker receipts are independently audited, including the latest consent/version fixes and native fixture corrections. The native collector passes. The later `db24634` package test stage independently passes every group, including explicit alias refusal; release creation then hits a standalone provider-helper compiler error. Its platform guard and early CI preflight are implemented and locally verified. Native Windows publish and self-test pass at `7529718`; full release follow-up remains pending. [Native build correction](evidence/provider-helper-platform-native-summary.json). [Build correction](evidence/provider-helper-platform-source-summary.json). [Latest Windows source evidence](evidence/complete-windows-4db5948-summary.json).
 
@@ -75,8 +76,9 @@ physical-device acceptance.
 The new [Claude hook bridge](claude-hook-observation.md) implements a separate
 recording source, exact native-session/destination settings preview and local
 command. Eight groups pass 111 tests with ten hook and two UI cases. Its native
-identity is explicitly unverified; it grants no task or tool authority. Native
-hook invocation and installed adoption remain separate.
+identity is explicitly unverified; it grants no task or tool authority. Installed
+source `23293d1` passes 58 served/API and 103 metadata checks. Native hook
+invocation remains separate.
 [Evidence](evidence/claude-hook-source-summary.json).
 
 | Requirement | Implementation | Validation | Actual paths | UI entry | Tests | Remaining implementation / exact blocked validation |

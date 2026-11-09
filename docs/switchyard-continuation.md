@@ -22,26 +22,26 @@ Start with [current status](switchyard-status.md), the [requirement ledger](swit
 
 | Identity | Verified checkpoint |
 | --- | --- |
-| Source | `9057de51915a4019e1ff869575096f712e5579c7` |
-| Release | `ff9e2aa65185f7dd9c2839619bb05ab16d230660abc1e44bf467723c0f73e7a4` |
-| Rollback | `dba8ce5b76b2610e9dbf77482d9f773fd59e0fc2ff84640c65442213d8b8f423` |
-| Frontend | `6fb653ccfacf5bb1c29ac8feaa9bcc0f50643383d4dea5a873311dc3baa4bffb` |
+| Source | `23293d1a48efeb1324603b4d1bc4369a6172ad33` |
+| Release | `f9e73add415652feec892613ccca36b604a9d4ba2f33b10f86c11020f51e7479` |
+| Rollback | `ff9e2aa65185f7dd9c2839619bb05ab16d230660abc1e44bf467723c0f73e7a4` |
+| Frontend | `184196a44a75798ae0bad063845336eed8f6c47c73d7a452ad2256e70e482893` |
 
 The approved frontend is installed at the normal local address. All 36 served assets
-and nineteen API/inventory metadata/refusal checks pass. Eight installed verifiers pass 100 checks
-with 58 exact module hashes; the workflow verifier checks all 57 definitions.
+and twenty-two API/inventory metadata/refusal checks pass. Eight installed verifiers pass 103 checks
+with 60 exact module hashes; the workflow verifier checks all 57 definitions.
 All 54 semantic workspaces, Personal selection and the pending keyboard-only
 conversation remain intact. 53 sealed files are byte-identical; the remaining
 workspace changes audit metadata only. No physical keyboard, native provider,
 account, model or microphone operation occurred.
 
 The normal update retained and verified dated launcher backups and current plus
-one rollback. The payload contains 572 files/5,034,214 bytes. Its exact prepared
-573-file/5,137,723-byte bundle is removed after identity/hash verification. The
+one rollback. The payload contains 574 files/5,046,103 bytes. Its exact prepared
+575-file/5,149,887-byte bundle is removed after identity/hash verification. The
 private access token intentionally changed with the frontend digest; use the normal
 launcher/new endpoint rather than restoring the old token. Host-facing owner,
 Copilot and signed-intent checks ran sequentially. Do not repeat executed update
-or cleanup scripts. [Installed evidence](evidence/installed-transcript-import-controls-summary.json).
+or cleanup scripts. [Installed evidence](evidence/installed-claude-hook-controls-summary.json).
 
 All original workspace modes and all three conversation records are preserved.
 Selected Personal was already in companion mode; the pending conversation lives
@@ -54,9 +54,19 @@ Their exact pins now reference the tested frontend revision, with historical
 evidence and behavioral assertions unchanged. Browser visual acceptance is still
 blocked before inspection; this installation is not visual approval.
 
-Complete Linux at the earlier `9266c12` source is accepted: **356 groups, 2,333 passing tests, 32 declared skips**. Original receipt `e19a2513-00d0-4f53-b1b1-726f467955f4` preserves manifest, commands, bounds and cleanup. The unit exited zero; its checkout, nine dependency aliases, 803 generated files/11,910,385 bytes, test parent and active marker are removed. Other worktrees remain untouched. A later complete Linux run is active at exact source `4e3feb4`: 375 required groups, original serial schedule and bounds. The protected `linux-full-active.json` marker records its owned checkout, aliases, unit and receipts. It excludes the subsequent transcript-import source. Do not start a duplicate run or remove its staging before final receipt/exit auditing.
+Complete Linux `4e3feb4` is accepted: **375 groups, 2,483 passing tests,
+32 declared skips**. Receipt `c82e308c-14f5-4d4f-90fe-118845d37885`
+preserves every original command, bound, skip and child cleanup. The original
+serial schedule and four builds before compiled consumers verify. Its unit exits
+zero. The owned checkout, nine dependency aliases, 805 generated files/11,926,549
+bytes, empty test parent and active marker are removed. Other worktrees remain
+untouched. No complete Linux run is active. Transcript import and Claude hooks
+are later sources with separate focused evidence.
+[Complete Linux evidence](evidence/linux-4e3feb4-complete-summary.json).
 
-The temporary wrapper's original syntax failure preceded every test and remains retained. The corrected reusable private template uses whole-token placeholder replacement and syntax-checks the wrapper before launch. Do not rerun executed start/audit/cleanup scripts. [Complete Linux evidence](evidence/linux-9266c12-complete-summary.json).
+The earlier `9266c12` wrapper syntax failure and corrected run remain historical
+evidence. Do not rerun executed start/audit/cleanup scripts.
+[Prior complete Linux evidence](evidence/linux-9266c12-complete-summary.json).
 
 ## Current Windows verification
 
@@ -95,7 +105,7 @@ Only bounded digest-verified JSON receipts remain locally outside the checkout. 
 
 ## Recent backend behavior
 
-- Claude hook observations now have a separate source, exact destination/session recipe preview and local stdin command. Eight groups/111 tests and fourteen running-preview checks pass, with independent Node processes and encrypted storage. The original expired synthetic-fixture failure is retained. No actual Claude settings, hook invocation, account or task was touched. Install this later source through the normal reviewed update; native and browser acceptance remain separate. [Contract](claude-hook-observation.md), [source evidence](evidence/claude-hook-source-summary.json).
+- Claude hook observations now have a separate source, exact destination/session recipe preview and local stdin command. Eight groups/111 tests and fourteen running-preview checks pass, with independent Node processes and encrypted storage. The original expired synthetic-fixture failure is retained. No actual Claude settings, hook invocation, account or task was touched. Normal installed adoption now passes 58 served/API and 103 installed checks with all 54 semantic workspaces preserved; native hook invocation and browser acceptance remain separate. [Contract](claude-hook-observation.md), [source evidence](evidence/claude-hook-source-summary.json).
 
 - Signed saved-project discovery and exact-project task choices are implemented in both typed editor clients. Current protected owner/load/task records and workspace policy determine eligibility. Listing does not inspect a native provider, write state or grant execution. Fresh exact review remains mandatory. Picker/command activation may now be implemented. [Contract](coding-task-owners.md#find-eligible-saved-projects).
 - Named role choices provide readable local connection labels and digest-checked binding. Listing/binding is separate from dispatch authority. [Contract](role-dispatch-binding.md#choose-a-saved-connection-by-name).

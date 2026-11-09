@@ -47,7 +47,7 @@ workflows++;
 }checks.push("all-saved-workflows-validate-with-byte-identical-sealed-files");
 
 const designPath = "tools/layout-studio/design-observations.mjs", designDigest = sha(await readFile(join(root, designPath)));
-const designSource = JSON.parse(await readFile(new URL("../docs/evidence/codex-runtime-observation-source-summary.json", import.meta.url), "utf8"));
+const designSource = JSON.parse(await readFile(new URL("../docs/evidence/claude-hook-source-summary.json", import.meta.url), "utf8"));
 assert.equal(designDigest, designSource.sourceFiles[designPath]);
 const { reviewDesignObservations, reviewedDesignObservations } = await import(pathToFileURL(join(root, designPath)).href);
 checks.push("exact-tested-installed-observation-design-module");

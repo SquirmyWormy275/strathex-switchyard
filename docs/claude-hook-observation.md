@@ -63,3 +63,11 @@ Claude settings, account, session or prompt has been changed for this work.
 Eight original groups pass 111 tests with no skips; fourteen running-preview checks
 pass. The original expired synthetic-fixture failure is retained.
 [Exact source evidence](evidence/claude-hook-source-summary.json).
+
+Normal installed source `23293d1` passes 58 served-asset/API checks and 103
+metadata checks across 60 exact modules. All 54 semantic workspaces and 57
+workflow definitions are preserved, with dated launcher backups and one rollback.
+The exact prepared package is removed. Three new pure installed checks verify
+the hook parser, consent boundary and installed recipe path without invoking
+Claude or changing native settings.
+[Installed evidence](evidence/installed-claude-hook-controls-summary.json).
