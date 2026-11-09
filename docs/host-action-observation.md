@@ -2,8 +2,9 @@
 
 Switchyard can retain a private workflow history of the runs, gates and scans it
 mediates. Start an observation with the separate `host-action-events` source.
-Existing `agent-events` consent does not enable this source. This backend API is
-available while frontend changes remain frozen; the UI does not yet offer it.
+Existing `agent-events` consent does not enable this source. In Activity, choose
+**Switchyard shortcut results** when starting the recording. The API below uses
+the same explicit consent; see [guided observation](guided-setup.md#learn-from-a-demonstration).
 
 ```json
 {

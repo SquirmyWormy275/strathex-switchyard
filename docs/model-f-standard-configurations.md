@@ -113,7 +113,8 @@ historical. Additional source builds and split halves remain distinct. A matchin
 F77 firmware definition suggests both Classic and Compact; it does not identify
 the physical case or attest the controller hardware. Original xwhatsit requires
 its separate protocol/lineage path and is not guessed from the Vial catalog.
-Frontend reconciliation controls and actual F77 acceptance remain pending.
+Saved-readout source inspection and adoption are connected through
+[guided setup](guided-setup.md). Actual F77 acceptance remains separate.
 
 ## Start from your captured typing layer
 
@@ -141,8 +142,8 @@ no desktop connection. Connect local tools separately. All of these routes use
 the normal authenticated exact-origin session and selected compartment.
 
 This is implemented for single interfaces and declared split pairs, with fault
-and authenticated HTTP tests. The frontend controls and physical pairing/typing
-acceptance remain pending. Logical right-half matrix rows use the same portable
+and authenticated HTTP tests. Guided source/adoption controls are connected;
+physical pairing/typing and browser visual acceptance remain pending. Logical right-half matrix rows use the same portable
 offset as the source catalog; this is not a combined physical controller matrix.
 
 The manufacturer's [new-design request page](https://modelfkeyboards.com/product/ultra-compact-new-model-f-designs-split-ortho-planck-preonic-6x12-f20-kinesis-advantage-unsaver-etc/)

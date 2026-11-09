@@ -4,8 +4,10 @@ A disposable execution workspace must contain only the files the operator
 reviewed. Copying a whole project can carry an ignored `.env`, database or
 credential file into the run. Switchyard's Linux runtime now refuses that
 fallback. The [reviewed task execution API](reviewed-task-execution.md) connects
-this prerequisite to separately approved Linux Run effects. Other execution
-actions and the frontend connection remain unfinished.
+this prerequisite to separately approved execution. The connected
+[reviewed execution controls](reviewed-execution-controls.md) select saved
+permissions and exact recipes, with separate run and stop reviews. Supported
+Run/Pipeline/Shield capabilities and native-platform limits remain explicit.
 
 The existing v1 host-pinned process recipe accepts an `inputFiles` extension:
 

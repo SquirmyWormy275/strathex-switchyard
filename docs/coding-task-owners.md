@@ -7,7 +7,9 @@ not create a thread, submit a prompt, attach an IDE, or grant task authority.
 Opening and reading observe metadata only. Loading an existing idle task requires
 a separate exact review and one-use confirmation.
 Studio now exposes separate owned-connection routes. Existing task creation and
-reviewed-text APIs retain their stdio behavior; frontend and IDE handoff are unfinished.
+reviewed-text APIs retain their stdio behavior. [Editor task commands](editor-task-controls.md)
+now connect the saved-project/task picker to reviewed launch and owned-terminal
+return. Actual graphical activation and live task/account acceptance remain separate.
 
 A request first reserves its UUID under a per-task kernel lease. The listener
 then records its private directory before startup, guardian before provider start,
@@ -194,8 +196,9 @@ review, issue and consume with the original identity. The clients validate and
 freeze the complete bounded response and recheck the signed endpoint.
 
 The encrypted-store-to-client demonstration uses an explicit synthetic provider.
-Frontend picker/command activation and live account/TUI acceptance remain
-unfinished. [Source evidence](evidence/editor-task-choices-source-summary.json).
+The original inventory evidence predates the connected
+[editor commands](editor-task-controls.md). Live account/task and graphical IDE
+acceptance remain separate. [Inventory source evidence](evidence/editor-task-choices-source-summary.json).
 
 ## Prepare an exact editor target
 
@@ -619,7 +622,9 @@ retirement while leaving the original provider alive. Typecheck, extension build
 twelve CommonJS method checks and exact test/build cleanup pass.
 [Source-specific evidence](evidence/editor-terminal-connection-summary.json).
 
-Production command activation and frozen frontend exposure remain unfinished.
+Production command activation is now connected through the
+[editor task controls](editor-task-controls.md); see [current status](switchyard-status.md)
+for installed and native terminal evidence. Actual graphical activation remains open.
 Native Codex TUI behavior and installed 0.167.0 compatibility are unaccepted; no
 real provider account, native task, model or keyboard action ran.
 

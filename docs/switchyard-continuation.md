@@ -130,6 +130,20 @@ replay build cleanup. Native performance/pipe acceptance remains pending** on
 the next normal push. [Source evidence](evidence/lease-blocking-source-summary.json).
 This Windows helper-only change needs no Linux app reinstall.
 
+The correction is published at **f4dcc7930294512f4f725c6163cbbf8cdf65ca32**.
+Normal-push full-source run **42607816380** has helper success; worker 7
+**129128646045** and worker 11 **129128645733** were queued at 11:23 UTC.
+Client run **42607816341** is separate. Re-read their actual results before
+claiming native acceptance. Pending jobs can be superseded by another normal
+branch push even with `cancel-in-progress: false`; batch follow-up checkpoints.
+
+Native client source **3222727** is now audited: run **42604386508**, job
+**129118530980**, all **31 groups / 362 tests / zero skips**. Original source/merge
+tree, artifact hash, commands, bounds, serial order and child/tree cleanup verify.
+The retained legacy-history account cases pass with synthetic provider identities.
+This predates the lease-input correction and is not complete Windows acceptance.
+[Client evidence](evidence/native-client-3222727-summary.json).
+
 Normal-push diagnostic source `72e7c22` scheduled complete-source run
 **42602497921**, client **42602497768**, Linux release **42602497789** and Windows
 release **42602497863**. Re-read status; these IDs are not passing evidence.

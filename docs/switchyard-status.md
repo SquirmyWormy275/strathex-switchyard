@@ -60,7 +60,7 @@ than the completed full Linux run.
 | `72e7c22`, UI phase diagnostics | Six original groups pass 51 tests, zero skips. Original bounds and cleanup verify; no Windows performance correction claimed. [Evidence](evidence/ui-phase-timing-source-summary.json) |
 | `42655aa`, native terminal demonstration | Actual Codex 0.167 renders two synthetic history pages through original cursors, with one narrowed resume and no model prompt. [Contract and evidence](codex-terminal-compatibility.md) |
 | `96ac214`, earlier complete Linux | 376 groups, 2,549 passes, 32 declared skips. Owned checkout and generated files removed. [Receipt](evidence/linux-96ac214-complete-summary.json) |
-| `48bf450`, audited Windows client | 31 groups, 356 passes, zero skips. Its full run fails two UI deadlines and a repeated-focus case. [Receipt and failures](evidence/native-48bf450-results-summary.json) |
+| `3222727`, audited Windows client | 31 groups, 362 passes, zero skips, including retained legacy-history account regressions. Predates the lease-input correction; full-suite acceptance remains separate. [Receipt](evidence/native-client-3222727-summary.json) |
 | `7529718`, earlier complete Windows package | 462 groups, 2,910 passes, 246 declared skips; all eight jobs pass. This does not accept later source. [Receipt](evidence/windows-package-7529718-summary.json) |
 
 The original Windows UI failures now have audited timing receipts: worker 7 at

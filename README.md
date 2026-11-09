@@ -75,7 +75,7 @@ accept later changes.
 | Native Codex terminal, synthetic provider | Real 0.167 CLI renders legacy and paginated saved transcripts through the production relay; one narrowed resume, zero model prompts. [Receipt](docs/evidence/codex-native-paginated-history-summary.json) |
 | Native Linux repository inspection | Twelve real Git guardians, at most four concurrent reads, independent exit and unchanged repository bytes. [Receipt](docs/evidence/batched-inspection-source-summary.json) |
 | Complete Linux suite, `72e7c22` | 376 groups, 2,574 passing tests, 32 declared skips; later account-read correction has separate scoped evidence. [Receipt](docs/evidence/linux-72e7c22-complete-summary.json) |
-| Windows client lane, `48bf450` | 31 groups, 356 passing tests, zero skips; the full Windows suite still fails. [Receipt](docs/evidence/native-48bf450-results-summary.json) |
+| Windows client lane, `3222727` | 31 groups, 362 passing tests, zero skips; later lease correction and full-suite acceptance remain separate. [Receipt](docs/evidence/native-client-3222727-summary.json) |
 | Earlier Windows package, `7529718` | 462 groups, 2,910 passing tests, 246 declared skips; bundle construction and smoke checks pass. [Receipt](docs/evidence/windows-package-7529718-summary.json) |
 
 **Unfinished software:** Linux Claude Desktop focus/launch and the broader

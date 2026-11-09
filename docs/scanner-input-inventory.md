@@ -33,7 +33,8 @@ remain. At most 256 selected files and 32 named generated roots fit this path;
 no files are silently truncated. Generated contents, unselected staged/history versions and
 broader security coverage remain unverified. A complete target snapshot means
 the displayed scope is witnessed, not that the repository passed a security scan.
-Frontend controls remain pending.
+The [scanner setup controls](scanner-setup-controls.md) expose preparation,
+reviewed saving and separate permission/execution handoffs.
 
 ## Include staged versions in the review
 
@@ -63,8 +64,8 @@ The returned descriptors can populate a separately reviewed Shield request and
 recipe allowlist. Preparation neither writes those files nor grants authority
 nor starts a scanner. Authority owns the original source paths; reserved aliases
 exist only inside disposable staging. Execution independently re-witnesses the
-bytes. Broader history and frontend controls
-remain unfinished; this preparation does not establish complete security coverage.
+bytes. The frontend exposes staged and bounded-history selection;
+this preparation does not establish complete security coverage.
 
 ## Include bounded history in the review
 
@@ -90,8 +91,9 @@ Current paths, staged and historical descriptors must fit the 256-file execution
 excess inputs are refused whole. A final target capture refuses intervening HEAD,
 index, worktree, task, account or selected-workspace changes before confirmation.
 
-This prepares metadata for a separately reviewed request and recipe. It neither
-assembles those control files nor starts a scanner. The history gaps still include
+This endpoint prepares metadata for a separately reviewed request and recipe.
+The connected [scanner setup flow](scanner-setup-controls.md) assembles and saves
+control files through separate routes. Metadata preparation starts no scanner. The history gaps still include
 other refs, non-first-parent branches, commit messages, renames and versions beyond
 the chosen depth or shallow boundary. Authority and security coverage remain
 ungranted/unverified until their separate steps; no complete passing gate is added.
@@ -271,4 +273,5 @@ was performed. [Installed evidence](evidence/installed-scanner-history-review-su
 Use the [scanner-draft route](scanner-recipe-drafts.md) to assemble the exact
 engine, feeds, request and recipe without writes or authority. Separately
 [reviewed saving](scanner-recipe-saving.md) materializes those controls.
-Frontend activation remains unfinished.
+The [scanner setup controls](scanner-setup-controls.md) connect drafting, saving,
+permission and execution as separate reviewed steps.

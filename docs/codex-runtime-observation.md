@@ -10,8 +10,9 @@ The existing observation session must explicitly include `agent-events`, remain
 recording in a personal companion workspace, and permit the `codex` category.
 Starting a turn does not enable recording. Pausing, deleting, excluding the source
 or changing the original binding prevents later metadata from being retained.
-The narrow authenticated `/api/suite/observation/start` route supplies this
-consent; guided frontend exposure remains unfinished.
+Choose **Activity → Connected agent status events** when starting a recording.
+The authenticated `/api/suite/observation/start` route supplies the same consent.
+See [guided observation controls](guided-setup.md#learn-from-a-demonstration).
 
 Only `thread/status/changed` notifications on the exact owned connection and
 thread are considered. The native account and turn generation remain pinned;

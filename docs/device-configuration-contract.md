@@ -3,8 +3,10 @@
 The authenticated local suite accepts reviewed key, onboard macro and physical
 layout-option and advertised standard QMK setting changes through the same
 baseline/apply/readback/restore path.
-These backend capabilities are implemented; the frozen morning frontend still
-exposes only ordinary key edits. Expanded editing controls are unfinished UI work.
+Customize connects ordinary key edits and advertised firmware forms to these
+reviewed transactions. Saved readouts can be inspected without contacting a
+keyboard. Software interaction checks use synthetic transport; visual and physical
+acceptance remain separate. [Frontend evidence](evidence/device-frontend-source-summary.json).
 
 ## What is supported
 
@@ -26,7 +28,7 @@ Physical layout choices use the definition's reverse-packed option bits and
 preserve unknown higher bits. Choosing a layout does not rearrange physical keys.
 Recovery checks its owned option bits and preserves unrelated changes outside
 that mask. Advertised tap-dance, combo and encoder transactions are implemented below;
-their expanded frontend editing controls remain unfinished.
+their advertised entries are exposed by the same firmware forms.
 
 Vial 4+ standard QMK settings are queried in bounded advancing pages. Only the
 advertised IDs with a known codec can be read or edited: standard IDs 1–27 cover
@@ -115,7 +117,8 @@ Stop does not silently relock firmware. The separate
 workspace's diagnostic, verifies the previously read exact identity, sends only
 Vial's volatile lock command and verifies locked readback. Insecure firmware
 that ignores relock is reported as unverified. No keymap, flash or electrical
-setting is written. The frontend controls remain unfinished while frozen.
+setting is written. The frontend exposes separately reviewed manual sampling,
+explicit stop and relock controls; their physical acceptance remains open.
 
 The codec follows the pinned firmware's
 [matrix query](https://github.com/vial-kb/vial-qmk/blob/dd43959ae5c08d8a28d38a1acf7b04e86b14a344/quantum/via.c#L228)
@@ -236,7 +239,8 @@ Nine additional fault-transport tests cover exact packing and protocol bounds,
 combined TD/key changes, opaque slots, combo clearing, typing fallback, locked or
 failed backups, partial writes, unplug/reconnect, bad readback and preflight of
 unrelated edits. Physical typing, tap timing, chords and unlock acceptance remain
-pending on real hardware. The frozen frontend does not expose these controls yet.
+pending on real hardware. The frontend exposes the advertised slots and their
+concrete before/after values for review.
 
 The wire contract follows the pinned GUI's
 [dynamic advertisement](https://github.com/vial-kb/vial-gui/blob/aef8222a2d0429a183b2ed692d5f9efcfd383f08/src/main/python/protocol/dynamic.py),
@@ -279,9 +283,8 @@ restore before their tap tables.
 Nine additional fault tests exercise label decoding, advertised-index gaps,
 big-endian packets, unsupported reads, permission/baseline failures, interrupted
 writes, unplug/reconnect, unrelated changes and combined TD restoration. The
-shared synthetic transport stays outside production bundles. Actual knob behavior
-and the corresponding frontend controls remain unaccepted/unimplemented,
-respectively.
+shared synthetic transport stays outside production bundles. Encoder direction
+forms are connected; actual knob behavior and browser visual acceptance remain open.
 
 Source checks use the pinned GUI's
 [KLE label normalization](https://github.com/vial-kb/vial-gui/blob/aef8222a2d0429a183b2ed692d5f9efcfd383f08/src/main/python/kle_serial.py),
@@ -368,8 +371,8 @@ fault transports; no physical typing, repeat or modifier behavior is accepted.
 `POST /api/suite/host/keyboard-indicators` performs an explicit one-shot read. It
 changes no keys, indicators, modes or firmware and does not retain a recording.
 Authentication and the exact local origin are still required. This read is usable
-in keyboard-only mode, independently of any assistant account. Frontend exposure
-is pending the frozen review.
+in keyboard-only mode, independently of any assistant account. The device
+controls expose this explicit read without associating it with a physical keyboard.
 
 Linux reads only the kernel's `inputN::numlock`, `capslock` and `scrolllock` LED
 class brightness values. Reports preserve each input instance separately: two

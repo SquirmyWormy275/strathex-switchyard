@@ -3,7 +3,8 @@
 An explicitly started Personal recording can now include the protected editor
 connection's lifecycle. Select `editor-events` through the existing observation
 API with `consent: true`; earlier agent or host-action consent does not enable it.
-The frontend remains frozen and does not yet expose this source.
+The connected Activity controls expose this as **Switchyard editor results**;
+see [guided observation](guided-setup.md#learn-from-a-demonstration).
 
 Four fixed events describe reservation, protocol acknowledgement, verified
 resource retirement and unconfirmed retirement. They share a compartment-scoped
@@ -25,8 +26,9 @@ reservation, acknowledgement and exact cleanup. Other checks cover failed commit
 pause, source consent, exclusions, bounds and private field omission. Typecheck,
 child/tree cleanup and removal of the empty owned test parent pass.
 
-This is backend software evidence. Installed acceptance, frontend controls and
-native TUI/Windows acceptance remain separate. Two earlier runs retained three
+This paragraph records the original backend evidence. Current installed and
+native terminal results are tracked separately in [current status](switchyard-status.md);
+visual UI and live-provider acceptance remain separate. Two earlier runs retained three
 fixture failures each: their manually seeded recordings omitted the retention
 timestamp. Correcting the fixtures required no retention-policy change.
 [Evidence](evidence/editor-workflow-observation-summary.json).
