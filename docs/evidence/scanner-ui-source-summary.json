@@ -93,5 +93,14 @@
     "Signed scanner/advisory feed trust installation remains a separate operator configuration; the picker cannot import trust or download a feed.",
     "Browser visual/responsive acceptance remains blocked before inspection.",
     "No installed update, native account/task operation, Windows guest execution, physical device or model request is accepted by this checkpoint."
-  ]
+  ],
+  "reviewBundle": {
+    "sourceCommit": "74bd215c106d6812163c047a3f88347442747f36",
+    "digest": "27f10868d1a282d6536dc8d3d90b69fc365c2905e906ac9373a37a741b4969b7",
+    "assets": 31,
+    "allBytesVerified": true,
+    "priorPointerDatedBackupVerified": true,
+    "installed": false,
+    "visuallyAccepted": false
+  }
 }

@@ -322,7 +322,8 @@ are explicit doubles; included original backend groups exercise existing Linux
 contracts. Nine running-preview checks pass and restore keyboard-only mode.
 [Controls](scanner-setup-controls.md), [evidence](evidence/scanner-ui-source-summary.json).
 
-The immutable scanner frontend source and digest are pinned in the next checkpoint.
+Source 74bd215c106d6812163c047a3f88347442747f36 has an immutable 31-asset frontend
+27f10868d1a282d6536dc8d3d90b69fc365c2905e906ac9373a37a741b4969b7. All bytes and the prior dated pointer backup verify. It is not installed or visually accepted.
 The installed release remains `47143a9f` with its separately accepted 28 assets.
 Browser tooling still fails before inspection; no visual acceptance is inferred.
 Continue remaining required observation sources, feed trust setup, native exact-task
