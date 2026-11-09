@@ -19,6 +19,18 @@ const nativeResume = () => ({ id: 'native-resume', method: 'thread/resume', para
   ...Object.fromEntries(['history','path','model','modelProvider','runtimeWorkspaceRoots','approvalPolicy','approvalsReviewer','sandbox','permissions','config','baseInstructions','developerInstructions','personality','initialTurnsPage'].map(k => [k, null]))
 } });
 const gate = () => { let resolve; const promise = new Promise(r => resolve = r); return { promise, resolve }; };
+const turnPage = () => ({ data: [{ id: 'saved-turn', items: [], itemsView: 'notLoaded', status: 'completed', error: null }], nextCursor: null, backwardsCursor: 'saved-turn-cursor' });
+const itemPage = () => ({ data: [{ turnId: 'saved-turn', item: { id: 'saved-item', type: 'agentMessage', text: 'Saved reply', phase: 'final_answer' }, startedAtMs: null, completedAtMs: null }], nextCursor: 'next-items', backwardsCursor: 'saved-item-cursor' });
+const pageRequest = (items = false, cursor = null) => ({ id: items ? 'item-page' : 'turn-page', method: items ? 'thread/items/list' : 'thread/turns/list', params: { threadId: target.sessionId, cursor, limit: items ? 100 : 5, sortDirection: 'desc', ...(items ? { turnId: null } : { itemsView: 'notLoaded' }) } });
+async function paginatedFixture(t, reply) {
+  const f = fixture(t, { reply: async (m,r) => {
+    if (m.method === 'initialize') r.userAgent = 'codex-tui/0.167.0 (synthetic)';
+    if (m.method === 'thread/resume') r.thread.historyMode = 'paginated';
+    if (['thread/turns/list','thread/items/list'].includes(m.method)) { delete r.thread; Object.assign(r, m.method === 'thread/turns/list' ? turnPage() : itemPage()); }
+    await reply?.(m,r);
+  } });
+  await f.relay.receive(nativeInitialize); await f.relay.receive({ method: 'initialized' }); await f.relay.receive(nativeResume()); return f;
+}
 function fixture(t, options = {}) {
   const calls = [], delivered = [], acknowledgements = [], abort = new AbortController();
   const client = new EventEmitter(); client.closed = false;
@@ -187,6 +199,65 @@ test('native bootstrap metadata refuses expanded queries, malformed replies and 
     await assert.rejects(f.relay.receive(input)); assert.equal(f.delivered.some(m => m.id === input.id), false);
     assert.equal(f.relay.observation().protocolAcknowledged, false);
   }
+});
+test('native paginated history reads only the resumed task with account checks around each bounded page', async t => {
+  const f = fixture(t, { reply: async (m,r) => {
+    if (m.method === 'initialize') r.userAgent = 'codex-tui/0.167.0 (synthetic)';
+    if (m.method === 'thread/resume') r.thread.historyMode = 'paginated';
+    if (m.method === 'thread/turns/list') { delete r.thread; Object.assign(r, turnPage()); }
+  } });
+  await f.relay.receive(nativeInitialize); await f.relay.receive({ method: 'initialized' }); await f.relay.receive(nativeResume());
+  const params = { threadId: target.sessionId, cursor: null, limit: 5, sortDirection: 'desc', itemsView: 'notLoaded' };
+  await f.relay.receive({ id: 'turn-page', method: 'thread/turns/list', params });
+  assert.deepEqual(f.delivered.at(-1).result, turnPage());
+  assert.deepEqual(f.calls.slice(-3).map(m => m.method), ['account/read','thread/turns/list','account/read']);
+  assert.deepEqual(f.calls.at(-2).params, params);
+  assert.equal(f.relay.observation().protocolAcknowledged, true); assert.equal(f.acknowledgements.length, 1);
+});
+test('native history follows only cursors returned by that task and page family', async t => {
+  const f = await paginatedFixture(t);
+  await f.relay.receive(pageRequest()); await f.relay.receive(pageRequest(true));
+  assert.deepEqual(f.delivered.at(-1).result, itemPage());
+  await f.relay.receive({ ...pageRequest(true, 'next-items'), id: 'older-items' });
+  assert.equal(f.calls.at(-2).params.cursor, 'next-items');
+  await f.relay.receive({ ...pageRequest(false, 'saved-turn-cursor'), id: 'older-turn', params: { ...pageRequest(false, 'saved-turn-cursor').params, limit: 1 } });
+  assert.equal(f.calls.at(-2).params.limit, 1);
+  assert.equal(f.relay.observation().protocolAcknowledged, true);
+  for (const input of [pageRequest(false, 'next-items'), pageRequest(true, 'saved-turn-cursor'), pageRequest(true, 'invented')]) {
+    const x = await paginatedFixture(t); await x.relay.receive(pageRequest()); await x.relay.receive(pageRequest(true));
+    const before = x.calls.length; await assert.rejects(x.relay.receive({ ...input, id: 'foreign-cursor' })); assert.equal(x.calls.length, before);
+  }
+});
+test('native history refuses expanded parameters, legacy history and pages requested before resume', async t => {
+  for (const items of [false,true]) for (const changed of [{ threadId: 'other' }, { cursor: {} }, { limit: 1000 }, { limit: 0 }, { limit: 1.5 }, { sortDirection: 'asc' }, { extra: false }, ...(items ? [{ turnId: 'foreign-turn' }] : [{ itemsView: 'full' }])]) {
+    const f = await paginatedFixture(t), input = pageRequest(items); Object.assign(input.params, changed);
+    const before = f.calls.length; await assert.rejects(f.relay.receive(input)); assert.equal(f.calls.length, before);
+  }
+  const legacy = await paginatedFixture(t, (m,r) => { if (m.method === 'thread/resume') delete r.thread.historyMode; });
+  await assert.rejects(legacy.relay.receive(pageRequest())); assert.equal(legacy.calls.some(m => m.method === 'thread/turns/list'), false);
+  const early = fixture(t, { reply: (m,r) => { if (m.method === 'initialize') r.userAgent = 'codex-tui/0.167.0 (synthetic)'; } });
+  await early.relay.receive(nativeInitialize); await early.relay.receive({ method: 'initialized' });
+  await assert.rejects(early.relay.receive(pageRequest())); assert.equal(early.calls.some(m => m.method === 'thread/turns/list'), false);
+});
+test('malformed, oversized or account-changed native history is withheld before delivery', async t => {
+  const corruptions = [r => r.data = {}, r => r.nextCursor = 'bad\n', r => r.backwardsCursor = 'x'.repeat(2049), r => r.data.push(structuredClone(r.data[0])), r => r.data[0].threadId = 'foreign'];
+  for (const items of [false,true]) for (const corrupt of [...corruptions, items ? r => r.data[0].item.threadId = 'foreign' : r => r.data[0].itemsView = 'full', r => { r.data = Array.from({ length: items ? 101 : 6 }, (_,i) => items ? { ...itemPage().data[0], item: { ...itemPage().data[0].item, id: 'item-'+i } } : { ...turnPage().data[0], id: 'turn-'+i }); }, ...(items ? [r => r.data[0].item.text = 'x'.repeat(1048576)] : [])]) {
+    const input = pageRequest(items), f = await paginatedFixture(t, (m,r) => { if (m.method === input.method) corrupt(r); });
+    await assert.rejects(f.relay.receive(input)); assert.equal(f.delivered.some(m => m.id === input.id), false);
+  }
+  let read = false;
+  const f = await paginatedFixture(t, (m,r) => { if (m.method === 'thread/items/list') read = true; if (read && m.method === 'account/read') r.account.email = 'changed@example.invalid'; });
+  await assert.rejects(f.relay.receive(pageRequest(true))); assert.equal(f.delivered.some(m => m.id === 'item-page'), false);
+});
+test('closing during a saved history read joins it and suppresses both its reply and queued pages', async t => {
+  const entered = gate(), release = gate();
+  const f = await paginatedFixture(t, async m => { if (m.method === 'thread/items/list') { entered.resolve(); await release.promise; } });
+  const pending = f.relay.receive(pageRequest(true)), rejected = assert.rejects(pending); await entered.promise;
+  const queued = assert.rejects(f.relay.receive(pageRequest())); let stopped = false;
+  const stop = f.relay.stop().then(() => { stopped = true; }); await new Promise(r => setImmediate(r)); assert.equal(stopped, false);
+  release.resolve(); await Promise.all([rejected,queued,stop]);
+  assert.equal(f.delivered.some(m => ['item-page','turn-page'].includes(m.id)), false);
+  assert.equal(f.calls.some(m => m.method === 'thread/turns/list'), false); assert.equal(stopped, true);
 });
 test('unreviewed versions and experimental initialization are refused before any task request', async t => {
   const f = fixture(t, { reply: async (m,r) => { if (m.method === 'initialize') r.userAgent = 'codex_tui/0.168.0 (unverified)'; } });

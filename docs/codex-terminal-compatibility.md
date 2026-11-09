@@ -3,8 +3,9 @@
 The real Codex 0.167 terminal can now open and display a synthetic saved task
 through Switchyard's production handshake and relay. The demonstration includes
 a stored assistant reply, one reviewed read-only resume and a stable connection.
-**Live-provider and actual VS Code GUI acceptance remain separate.** Paginated
-history is still unfinished implementation.
+The paginated path also renders two saved pages, loading the older turn through
+its original continuation cursor. **Live-provider and actual VS Code GUI
+acceptance remain separate.**
 
 The installed Switchyard application remains `ec28d09`, and the installed
 extension remains source `99784a7`; this source change has not been installed.
@@ -31,7 +32,26 @@ explicit unsupported errors locally. They never enumerate other tasks, install
 tools or reach the provider. Unknown operations and task/config/account effects
 still close the attachment.
 
-## Demonstration and checks
+## Paginated saved history
+
+The reviewed 0.167 terminal reads turn summaries and message items separately.
+Both requests require the acknowledged selected task and paginated history mode.
+Every page checks the original account before and after reading. Page sizes are
+bounded at 100 entries; only descending reads and cursors returned by that task
+and the same page family are accepted. Responses are bounded to one MiB.
+Retained Windows channels use the same validation without another handshake.
+
+The actual terminal renders both the newest saved message and an older message
+through two item pages and two turn pages. Thirteen integration groups pass
+136 tests with one original skip; final history and packaging groups pass 39
+with no skips. Counts overlap. Four diagnostic roots, twenty files and 93,752
+bytes are removed after original guardian exit and exact file verification.
+[Paginated source and native demonstration](evidence/codex-native-paginated-history-summary.json).
+
+Per-turn edits, anchor cursors, ascending reads and experimental history methods
+remain refused. History reads grant no prompt or tool authority.
+
+## Earlier legacy demonstration and checks
 
 The native CLI, production WebSocket handshake and production relay ran in an
 empty owned home with a separate network namespace and a synthetic provider.
@@ -48,10 +68,13 @@ passes. Original deadlines, commands, cleanup and declared skips are unchanged.
 
 The native terminal displays two skills-unavailable messages because those
 optional queries are refused; Switchyard does not fabricate an empty-success
-response. The demonstration covers legacy history. Paginated history, other TUI
-versions and live account/IDE acceptance need their own work and evidence.
+response. The earlier demonstration covers legacy history; the paginated
+demonstration is recorded separately above. Other TUI versions and live
+account/IDE acceptance need their own evidence.
 
 [Earlier startup-prefix evidence](evidence/codex-native-startup-summary.json)
 retains the original failures. The contract review uses the
 [official App Server documentation](https://learn.chatgpt.com/docs/app-server)
 and [version-pinned native connection source](https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/app-server-client/src/remote.rs).
+
+The paging contract also follows the [version-pinned native history loader](https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/tui/src/app_server_session/history.rs).

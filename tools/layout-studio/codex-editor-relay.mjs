@@ -2,6 +2,7 @@
 import { assertCodexDesignConfig, codexAccountFingerprint, reviewedCodexVersion } from './agents.mjs';
 import { createCodexEditorProtocol } from './codex-editor-protocol.mjs';
 import { codexAccountBoundary } from './codex-requests.mjs';
+import { createCodexEditorHistory } from './codex-editor-history.mjs';
 
 const object = v => v !== null && typeof v === 'object' && !Array.isArray(v);
 const exact = (v, names) => object(v) && Object.keys(v).every(k => names.includes(k));
@@ -16,6 +17,7 @@ const unavailableNativeReads = new Set(['hooks/list','account/bedrock/checkGovCl
 
 export function createCodexEditorRelay({ target, client, assertCurrent, send, onAcknowledged, signal, platform = 'linux' } = {}) {
   const witness = createCodexEditorProtocol(target, { platform }), selected = Object.freeze({ ...target });
+  const history = createCodexEditorHistory(selected.sessionId); let paginated = false;
   require(client && ['request','send','on','off','close'].every(k => typeof client[k] === 'function') && !client.closed);
   require([assertCurrent,send,onAcknowledged].every(f => typeof f === 'function') && signal instanceof AbortSignal);
   const controller = new AbortController(), seen = new Set(), notifications = new Set();
@@ -99,6 +101,7 @@ export function createCodexEditorRelay({ target, client, assertCurrent, send, on
       await account('switchyard-before-resume');
       require(witness.client({ ...m, params, id: 'switchyard-resume' }));
       const result = await request('thread/resume', params); require(witness.server({ id: 'switchyard-resume', result }));
+      paginated = result.thread.historyMode === 'paginated';
       await account('switchyard-after-resume'); require(witness.observation().protocolAcknowledged);
       await current(); await onAcknowledged(witness.observation(), controller.signal); await current();
       await deliver({ id: m.id, result }); phase = 'acknowledged'; acknowledged = true; return;
@@ -125,6 +128,13 @@ export function createCodexEditorRelay({ target, client, assertCurrent, send, on
         : result.requirements === null || object(result.requirements));
       await account('switchyard-after-bootstrap-' + ++accountSequence);
       await deliver({ id: m.id, result }); acknowledged = attempted && witness.observation().protocolAcknowledged; return;
+    }
+    if (['thread/turns/list','thread/items/list'].includes(m.method)) {
+      require(nativeTui && acknowledged && paginated); history.request(m.method, m.params);
+      await account('switchyard-before-history-' + ++accountSequence);
+      const result = await request(m.method, m.params); history.response(m.method, m.params, result);
+      await account('switchyard-after-history-' + ++accountSequence);
+      await deliver({ id: m.id, result }); acknowledged = witness.observation().protocolAcknowledged; return;
     }
     if (m.method === 'thread/read') {
       const startupRead = nativeTui && phase === 'ready' && !attempted;

@@ -105,6 +105,40 @@ test('retained bootstrap refuses expanded parameters and unreviewed native metad
     await assert.rejects(c.request(method,params)); assert.equal(f.calls.length,before); assert.equal(f.native.closed,false);
   }
 });
+test('native paginated history crosses the retained Windows channel without another native handshake or resume', async t => {
+  const page = { data: [{ turnId: 'saved-turn', item: { id: 'saved-item', type: 'agentMessage', text: 'Original saved reply' } }], nextCursor: 'older-items', backwardsCursor: null };
+  const f = await fixture(t, { reply: (m,r) => {
+    if (m.method === 'initialize') r.userAgent = r.userAgent.replace('/0.166.0', '/0.167.0');
+    if (m.method === 'thread/resume') r.thread.historyMode = 'paginated';
+    if (m.method === 'thread/items/list') { delete r.thread; Object.assign(r, page); }
+  } }), c = f.create(), delivered = [];
+  const relay = createCodexEditorRelay({ client: c, target, platform: 'win32', signal: new AbortController().signal, assertCurrent: async () => {}, send: async m => delivered.push(m), onAcknowledged: async () => {} });
+  t.after(() => relay.stop());
+  await relay.receive({ id: 'init', method: 'initialize', params: { clientInfo: { name: 'codex-tui', title: null, version: '0.167.0' }, capabilities: { requiredHumanApproval: true, experimentalApi: true, requestAttestation: false, optOutNotificationMethods: null } } });
+  await relay.receive({ method: 'initialized' }); await relay.receive({ id: 'resume', method: 'thread/resume', params: resume });
+  const params = { threadId: target.sessionId, turnId: null, cursor: null, limit: 100, sortDirection: 'desc' };
+  await relay.receive({ id: 'items', method: 'thread/items/list', params });
+  assert.deepEqual(delivered.at(-1).result, page);
+  await relay.receive({ id: 'older', method: 'thread/items/list', params: { ...params, cursor: 'older-items' } });
+  assert.equal(f.calls.filter(m => m.method === 'initialize').length, 1); assert.equal(f.calls.filter(m => m.method === 'thread/resume').length, 1);
+  assert.deepEqual(f.calls.slice(-3).map(m => m.method), ['account/read','thread/items/list','account/read']);
+  assert.equal(relay.observation().protocolAcknowledged, true);
+  await relay.stop(); assert.equal(f.native.closed, false); assert.equal(f.killed(), false);
+});
+test('the retained history boundary rejects foreign cursors, malformed replies and unsupported versions without retiring its owner', async t => {
+  const params = { threadId: target.sessionId, turnId: null, cursor: null, limit: 100, sortDirection: 'desc' };
+  for (const mode of ['early','legacy','version','cursor','limit','thread','reply']) {
+    const f = await fixture(t, { reply: (m,r) => {
+      if (m.method === 'initialize' && mode !== 'version') r.userAgent = r.userAgent.replace('/0.166.0', '/0.167.0');
+      if (m.method === 'thread/resume' && mode !== 'legacy') r.thread.historyMode = 'paginated';
+      if (m.method === 'thread/items/list') { delete r.thread; Object.assign(r, { data: [{ turnId: 'saved', item: { id: 'item', type: 'agentMessage', threadId: 'foreign' } }], nextCursor: null, backwardsCursor: null }); }
+    } }), { c } = await f.ready();
+    if (mode !== 'early') await c.request('thread/resume', resume);
+    const input = { ...params, ...(mode === 'cursor' ? { cursor: 'unseen' } : mode === 'limit' ? { limit: 101 } : mode === 'thread' ? { threadId: 'other' } : {}) }, before = f.calls.length;
+    await assert.rejects(c.request('thread/items/list', input)); assert.equal(f.calls.length, before + (mode === 'reply' ? 1 : 0));
+    assert.equal(c.closed, true); assert.equal(f.native.closed, false); assert.equal(f.killed(), false);
+  }
+});
 
 test('retained channel rejects other tasks, effects, initialization replay and a second resume before native dispatch', async t => {
   for(const [method,params] of [['turn/start',{}],['account/logout',{}],['thread/read',{threadId:'other'}],['thread/resume',{...resume,sandbox:'workspace-write'}],['initialize',init]]) {

@@ -68,6 +68,20 @@ evidence. Do not rerun executed start/audit/cleanup scripts.
 
 ## Current Windows verification
 
+Native Codex paginated history is now connected for the reviewed 0.167 terminal.
+An isolated actual TUI renders two saved item pages and loads the older turn
+through its original cursor. Thirteen integration groups pass 136 tests with one
+existing skip; final history/package groups pass 39 with zero skips. Four owned
+probe roots/93,752 bytes are removed. Source remains uninstalled.
+[Evidence](evidence/codex-native-paginated-history-summary.json).
+
+At source 48bf450, the Windows client lane passes all 31 groups/356 tests with
+zero skips. The full Windows run still fails scanner/execution UI file deadlines
+and the second repeated-focus cycle. Source/merge trees, original manifests,
+commands, limits, serial order and cleanup are audited. Repository-query batching
+has not established Windows deadline acceptance. No manual CI operation occurred.
+[Original Windows results](evidence/native-48bf450-results-summary.json).
+
 The source now supports the real Codex 0.167 legacy-history terminal startup:
 exact Unix /rpc handshake, restricted capability translation, project/model/policy
 metadata and one narrowed read-only/on-request resume. The production argument
@@ -77,7 +91,7 @@ focused run passes 27. Typechecking passes. An isolated real TUI renders the
 synthetic saved task and transcript through the production handshake and relay,
 with no reconnect or model prompt. Optional catalog queries receive local errors;
 they never reach the provider. All twelve diagnostic roots and 254,286 bytes are
-removed. Paginated history remains implementation work; live-provider and actual
+removed. The later paginated demonstration is recorded above; live-provider and actual
 IDE acceptance remain separate. These source changes are not installed.
 [Current native contract](codex-terminal-compatibility.md),
 [audited evidence](evidence/codex-native-bootstrap-summary.json).

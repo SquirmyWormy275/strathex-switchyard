@@ -4,6 +4,7 @@ import { EventEmitter } from 'node:events';
 import { assertCodexDesignConfig, codexAccountFingerprint, reviewedCodexVersion } from './agents.mjs';
 import { createCodexEditorProtocol } from './codex-editor-protocol.mjs';
 import { codexAccountBoundary } from './codex-requests.mjs';
+import { createCodexEditorHistory } from './codex-editor-history.mjs';
 
 const exact = (v, keys) => v && typeof v === 'object' && !Array.isArray(v) && Object.keys(v).every(k => keys.includes(k));
 const require = value => { if (!value) throw Error('The original retained editor channel did not verify.'); };
@@ -16,6 +17,7 @@ export function createRetainedCodexEditorClient({ client, target, assertCurrent,
     && ['request','on','off','close'].every(k => typeof client[k] === 'function') && typeof assertCurrent === 'function'
     && exact(initialization, ['clientName','result']) && typeof initialization.clientName === 'string');
   const nativeVersion = reviewedCodexVersion(initialization.result, initialization.clientName);
+  const history = createCodexEditorHistory(selected.sessionId); let paginated = false;
   const original = JSON.stringify(initialization), epoch = client.accountEpoch, channel = new EventEmitter(), pending = new Set();
   let closed = false, phase = 'initialize', resumed = false, bytes = 0, stopping;
   const live = () => require(!closed && !client.closed && client.restrictionsVerified && client.accountEpoch === epoch
@@ -74,6 +76,7 @@ export function createRetainedCodexEditorClient({ client, target, assertCurrent,
         || exact(params, ['includeLayers','cwd']) && params.includeLayers === true && params.cwd === selected.repositoryRoot);
       else if (method === 'model/list') require(nativeVersion === '0.167.0' && exact(params, ['cursor','limit','includeHidden']) && params.cursor === null && params.limit === null && params.includeHidden === true);
       else if (method === 'configRequirements/read') require(nativeVersion === '0.167.0' && params === null);
+      else if (['thread/turns/list','thread/items/list'].includes(method)) { require(nativeVersion === '0.167.0' && resumed && paginated); history.request(method, params); }
       else if (method === 'thread/read') require(exact(params, ['threadId','includeTurns']) && params.threadId === selected.sessionId && [undefined,true,false].includes(params.includeTurns));
       else if (method === 'thread/resume') {
         require(!resumed && exact(params, ['threadId','cwd','sandbox','approvalPolicy','excludeTurns']) && params.threadId === selected.sessionId
@@ -86,8 +89,10 @@ export function createRetainedCodexEditorClient({ client, target, assertCurrent,
         catch (error) { client.close(Object.assign(error, { code: 'ACCOUNT_UNCONFIRMED' })); throw error; }
       }
       if (method === 'config/read') assertCodexDesignConfig(result?.config);
-      if (method.startsWith('thread/')) require(result?.thread?.id === selected.sessionId && result.thread.cwd === selected.repositoryRoot);
+      if (['thread/turns/list','thread/items/list'].includes(method)) history.response(method, params, result);
+      else if (method.startsWith('thread/')) require(result?.thread?.id === selected.sessionId && result.thread.cwd === selected.repositoryRoot);
       if (method === 'thread/resume') require(result.cwd === selected.repositoryRoot && result.sandbox?.type === 'readOnly' && result.approvalPolicy === 'on-request' && result.modelProvider === 'openai');
+      if (method === 'thread/resume') paginated = result.thread.historyMode === 'paginated';
       return result;
     }).catch(error => { close(error); throw error; }).finally(() => { pending.delete(work); bytes -= size; });
     pending.add(work); return work;
