@@ -39,9 +39,16 @@ session; it is not silently substituted.
 
 ## Verification and availability
 
-This is source implementation on the development branch; the user's installed
-extension has not been replaced. Build/install the extension through the existing
-repository packaging workflow before using these commands.
+The pilot's existing extension is now updated from source `99784a7` through the
+local VSIX packaging workflow. All 53 payload files and the three command
+declarations verify. The original extension and registry have dated, verified
+backups; the owned build/package staging is removed. An already-open editor may
+need its normal reload before the new commands appear.
+[Installed evidence](evidence/installed-editor-commands-summary.json).
+
+Command registration, injected-argument refusal and returning without an owned
+terminal also pass against the installed CommonJS module using an explicit editor
+surface double. This is not an interactive editor or native attachment claim.
 
 Seven command interaction cases use a VS Code/session fixture: no-I/O startup,
 read-only browsing, exact review, cancel at every picker, stale/substituted choice

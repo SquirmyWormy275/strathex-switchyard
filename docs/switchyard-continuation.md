@@ -22,9 +22,9 @@ Start with [current status](switchyard-status.md), the [requirement ledger](swit
 
 | Identity | Verified checkpoint |
 | --- | --- |
-| Source | `a3516267fe78d046b3b371098b550746639f4200` |
-| Release | `195f24092320c0b4588396bb421af22d8cb9d5e51d636a58f28ca7cdbbddd2f6` |
-| Rollback | `f14f814bfc666c98b698d4ad083c94e4060dbfec89ac5cf92df268d079e3827e` |
+| Source | `99784a78c62a0f625eb77122abf17ea34352ce4f` |
+| Release | `8d08efa74a9cd297ec674956aef6e3f1418f1c0b67ef9a841d9317719954bbb4` |
+| Rollback | `195f24092320c0b4588396bb421af22d8cb9d5e51d636a58f28ca7cdbbddd2f6` |
 | Frontend | `3cf2b5af65489f932603711ca6b4ea836b7b8b2b1c08dac14dd3dfbd89545e2b` |
 
 The approved frontend is installed at the normal local address. All 36 served assets
@@ -35,15 +35,13 @@ conversation remain intact. 53 sealed files are byte-identical; the remaining
 workspace changes audit metadata only. No physical keyboard, native provider,
 account, model or microphone operation occurred.
 
-The normal update retained and verified dated launcher backups and current plus
-one rollback. The payload contains 574 files/5,065,200 bytes. Its exact prepared
-575-file/5,168,984-byte bundle is removed after identity/hash verification. The
-private access URL was updated for the intentional new frontend digest. The
-original task-owner verifier failure retained an outdated Home hash; its exact
-pin and the Copilot pin now use the tested connected-launch evidence. All behavior
-assertions remain intact. Host-facing owner,
-Copilot and signed-intent checks ran sequentially. Do not repeat executed update
-or cleanup scripts. [Installed evidence](evidence/installed-claude-launch-controls-summary.json).
+The normal update retains dated launcher backups and current plus one rollback.
+The payload contains 574 files/5,066,818 bytes. Its exact prepared
+575-file/5,170,602-byte bundle is removed after identity/hash verification.
+The frontend digest and private access URL remain unchanged. All eight verifiers
+pass with no failed verifier in this update. Host-facing owner, Copilot and
+signed-intent checks run sequentially. Do not repeat executed update or cleanup
+scripts. [Installed evidence](evidence/installed-atomic-startup-summary.json).
 
 All original workspace modes and all three conversation records are preserved.
 Selected Personal was already in companion mode; the pending conversation lives
@@ -56,16 +54,13 @@ Their exact pins now reference the tested frontend revision, with historical
 evidence and behavioral assertions unchanged. Browser visual acceptance is still
 blocked before inspection; this installation is not visual approval.
 
-Complete Linux `49602de` is accepted: **376 groups, 2,508 passing tests,
-32 declared skips**. Receipt `d5d20824-74b2-48a4-a7b6-bf01fd64e1e7`
-preserves every original command, bound, skip and child cleanup. The original
-serial schedule and four builds before compiled consumers verify. Its unit exits
-zero. The owned checkout, nine dependency aliases, 805 generated files/11,926,549
-bytes, empty test parent and active marker are removed. Other worktrees remain
-untouched. A newer complete Linux run is active as recorded below. This source includes transcript import,
-Claude hooks and native-client changes. The later catalog navigation and reviewed
-role corrections retain separate focused evidence.
-[Complete Linux evidence](evidence/linux-49602de-complete-summary.json).
+Complete Linux 96ac214 is accepted: **376 groups, 2,549 passing tests,
+32 declared skips**. Receipt cfd737eb-5968-4777-ae1e-51a1f2c0f573 preserves every
+original command, bound, skip and child cleanup, serial schedule and four builds
+before compiled consumers. The unit exits zero. Its owned checkout, nine dependency
+aliases, 805 generated files/11,931,780 bytes, empty test parent and active marker
+are removed. No full Linux run is active. This source predates the startup fix.
+[Complete Linux evidence](evidence/linux-96ac214-complete-summary.json).
 
 The earlier `9266c12` wrapper syntax failure and corrected run remain historical
 evidence. Do not rerun executed start/audit/cleanup scripts.
@@ -78,18 +73,24 @@ one original kernel lease and one encrypted commit; a later failure leaves the
 original bytes intact. Shutdown joins startup/selection promises and refuses later
 recovery or discovery. The original regression is retained. Ten final groups pass
 147 tests with one original Windows-only skip; typechecking passes. This source
-still needs normal installation and native Windows follow-up.
+is installed and verified above; native Windows follow-up remains pending.
 [Evidence](evidence/atomic-startup-source-summary.json).
 
-Full Linux source `96ac2148bf0e023878abb1ae5daf493f5677a832` is running in the owned
-checkout `/home/kingoftheeast/.sxf-9gfmg93x/s`, unit
-`switchyard-verification-96ac214-1794211773.service`, receipt ID
-`cfd737eb-5968-4777-ae1e-51a1f2c0f573`. The private runtime-verification directory
-contains `linux-full-active.json` and the `linux-full-96ac214-{progress,result}.json`
-records. Do not start a duplicate, cancel it or replay its start script. On exit,
-audit the original 376-group manifest, commands, bounds, declared skips and cleanup,
-then remove only its identity-verified generated files, nine aliases, owned
-checkout, empty test parent and active marker. It predates the startup correction.
+The pilot VS Code extension is updated from source 99784a7 through the existing
+local VSIX workflow. All 53 payload files, three new command declarations and
+installed-module synthetic registration/refusal checks verify. The previous
+32-file/956,123-byte extension and registry are preserved in the dated private
+editor-installation backup. All 54 prepared files/1,393,488 bytes are removed.
+No native task/account/model action occurred. An existing editor window may need
+normal reload; interactive activation and exact native task attachment are
+unaccepted. Code normalized equivalent URI fields and filled the prior gallery
+UUID in other extension registry rows; every other field verifies unchanged.
+The original exact-JSON readback refusal is retained in the evidence.
+[Installed editor evidence](evidence/installed-editor-commands-summary.json).
+
+Native client follow-up for the startup correction: run 42586125624, helper job
+129056434432 passed; client job 129057118505 is running at its native test step.
+No final receipt has been accepted. No manual CI operation is authorized.
 
 Native Windows client `a351626` passes 31 groups/353 tests with zero skips in run
 42583312203, job 129048176520. Merge/source tree, original bounds, serial schedule

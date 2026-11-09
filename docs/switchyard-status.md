@@ -12,11 +12,12 @@ validation. Work is published on
 [draft PR 20](https://github.com/SquirmyWormy275/strathex-switchyard/pull/20);
 no merge or public release has been accepted.
 
-Complete Linux source `49602de` passes **376 groups, 2,508 tests and 32 declared
+Complete Linux source `96ac214` passes **376 groups, 2,549 tests and 32 declared
 skips**. Original commands, bounds, skips, serial build order and child cleanup
 verify. Its owned checkout, nine aliases and 805 generated files are removed.
-A complete run at `96ac214` is now in progress; it is not accepted yet.
-[Complete source evidence](evidence/linux-49602de-complete-summary.json).
+No full Linux run is active. The later startup correction has separate focused
+evidence and normal installed verification.
+[Complete source evidence](evidence/linux-96ac214-complete-summary.json).
 
 ## Guided frontend checkpoint
 
@@ -24,10 +25,10 @@ Workspace startup now commits its recovery stages in one protected transaction,
 reducing repeated native lock startup. Shutdown joins pending startup and selection
 work before returning. A regression reproduced the original premature shutdown;
 ten final groups pass 147 tests with one declared Windows-only skip, and typechecking
-passes. This source is not yet installed or accepted on Windows.
+passes. This source is installed as `99784a7`; its Windows follow-up is running.
 [Source and regression evidence](evidence/atomic-startup-source-summary.json).
 
-Installed source `a351626` now passes the native Windows client lane: **31 groups,
+Prior installed source `a351626` passes the native Windows client lane: **31 groups,
 353 tests, zero skips**. Its exact source/merge tree, original commands, deadlines,
 serial ordering and cleanup are audited. The earlier `21e8394` timeout and UI
 cleanup failure remain retained. Role dispatch passes at 44.445 seconds under its
@@ -41,7 +42,23 @@ Windows client run 42579643586 at source 531587b failed before tests because the
 
 Claude Desktop’s owned Windows launch transport now passes eight groups/93 tests and both offline helper builds. Its final review/API/frontend connection now has the separate source evidence above; no actual app or account was used. Exact owner persistence, normal-launch limits and process-birth readback are tested. The 2.8 MB build staging is removed. [Transport evidence](evidence/owned-claude-launch-port-summary.json).
 
-Latest normal installed source `a351626` includes the connected native launch controls, bounded repository inspection, Home navigation and saved-role refresh. All 36 assets, 33 API checks and 107 installed metadata checks pass; all 54 semantic workspaces and 57 workflows remain intact. Current plus one rollback remain, and the verified 5,168,984-byte prepared bundle is removed. The current synthetic preview passes ten checks. Browser visual acceptance remains blocked before inspection. [Installed evidence](evidence/installed-claude-launch-controls-summary.json), [running demonstration](evidence/claude-launch-running-demo-summary.json).
+Latest normal installed source 99784a7 includes atomic recovery and joined
+shutdown, connected native launch controls, Home navigation and saved-role refresh.
+All 36 assets, 33 API checks and 107 installed metadata checks pass; all 54
+semantic workspaces, three conversations, modes, selection and 57 workflows remain
+intact. Current plus one rollback remain; the 5,170,602-byte prepared package is
+removed. [Installed evidence](evidence/installed-atomic-startup-summary.json).
+
+The pilot VS Code extension is updated from the same source. Its 53 payload files,
+three saved-task commands and installed-module registration/refusal checks pass.
+Original extension/registry backups verify; 1,393,488 bytes of owned staging are
+removed. Interactive editor activation and native task attachment remain separate.
+[Editor evidence](evidence/installed-editor-commands-summary.json).
+
+The running synthetic preview remains at source a351626 and passes ten checks.
+Brave reappeared in the browser inventory, but both supported navigation paths
+still fail before loading the page. Visual acceptance remains blocked.
+[Running demonstration](evidence/claude-launch-running-demo-summary.json).
 
 The Windows client follow-up at installed source `0aeb317` passes all 31 groups and 340 tests with zero skips. Its exact merge/source tree, manifest, commands, original bounds, serial ordering and cleanup are audited. This accepts the Home and refusal-refresh corrections within the client lane; actual window/browser/hardware checks remain separate. [Native follow-up](evidence/client-native-0aeb317-summary.json).
 
