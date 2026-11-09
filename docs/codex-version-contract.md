@@ -55,9 +55,11 @@ native evidence is retained; this change has no new native 0.166 run.
 
 The subsequent [native terminal compatibility check](codex-terminal-compatibility.md)
 exercises the real 0.167 TUI with the production handshake/relay and a synthetic
-provider. Its startup prefix now passes; project-specific configuration and the
-remaining TUI bootstrap/resume exchange are still implementation gaps. Seven
-integration groups pass 64 tests with no skips.
+provider. Startup, a narrowed read-only resume and rendering of a synthetic saved
+legacy transcript now pass. Thirteen integration groups pass 128 tests with one
+existing platform skip; the final focused run passes 27. Paginated history,
+authenticated provider acceptance and actual VS Code GUI acceptance remain
+separate. [Bootstrap evidence](evidence/codex-native-bootstrap-summary.json).
 
 The review uses the [official App Server contract](https://learn.chatgpt.com/docs/app-server),
 [0.166 feature parser](https://github.com/openai/codex/blob/rust-v0.166.0/codex-rs/features/src/lib.rs),

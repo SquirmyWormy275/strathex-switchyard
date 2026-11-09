@@ -58,6 +58,54 @@ test('closing a retained channel joins its pending RPC and suppresses the late r
   assert.equal(stopped,true);assert.equal(f.killed(),false);assert.equal(f.native.listenerCount('notification'),0);
 });
 
+test('retained configuration reads preserve the selected project and refuse ineffective restrictions', async t => {
+  const f = await fixture(t), {c} = await f.ready(), params = { includeLayers: true, cwd: target.repositoryRoot };
+  await c.request('config/read', params); assert.deepEqual(f.calls.at(-1).params, params);
+  for (const changed of [{ includeLayers: true, cwd: 'C:\\Other' }, { includeLayers: true }, { ...params, extra: false }]) {
+    const x = await fixture(t), {c} = await x.ready(), before = x.calls.length;
+    await assert.rejects(c.request('config/read', changed)); assert.equal(x.calls.length, before); assert.equal(x.native.closed, false);
+  }
+  const bad = await fixture(t, { reply: async (m,r) => { if (m.method === 'config/read' && m.params.cwd) r.config.features.hooks = true; } }), channel = await bad.ready();
+  await assert.rejects(channel.c.request('config/read', params)); assert.equal(channel.c.closed, true); assert.equal(bad.native.closed, false);
+});
+
+test('native bootstrap reuses one retained hello and forwards only reviewed metadata and narrowed resume', async t => {
+  const f = await fixture(t, { reply: async (m,r) => {
+    if (m.method === 'initialize') r.userAgent = r.userAgent.replace('/0.166.0', '/0.167.0');
+    if (m.method === 'model/list') Object.assign(r, { data: [{ id: 'synthetic', model: 'synthetic' }], nextCursor: null });
+    if (m.method === 'configRequirements/read') r.requirements = null;
+  } }), c = f.create(), delivered = [], acknowledged = [];
+  const relay = createCodexEditorRelay({client:c,target,platform:'win32',signal:new AbortController().signal,assertCurrent:async()=>{},send:async m=>delivered.push(m),onAcknowledged:async o=>acknowledged.push(o)});
+  t.after(() => relay.stop());
+  await relay.receive({ id: 'init', method: 'initialize', params: { clientInfo: { name: 'codex-tui', title: null, version: '0.167.0' }, capabilities: { requiredHumanApproval: true, experimentalApi: true, requestAttestation: false, optOutNotificationMethods: null } } });
+  await relay.receive({ method: 'initialized' });
+  await relay.receive({ id: 'config', method: 'config/read', params: { includeLayers: true, cwd: target.repositoryRoot } });
+  await relay.receive({ id: 'models', method: 'model/list', params: { cursor: null, limit: null, includeHidden: true } });
+  await relay.receive({ id: 'requirements', method: 'configRequirements/read' });
+  assert.equal(f.calls.at(-2).params, null); assert.equal(f.calls.at(-2).method, 'configRequirements/read');
+  const nulls = Object.fromEntries(['history','path','model','modelProvider','runtimeWorkspaceRoots','approvalPolicy','approvalsReviewer','sandbox','permissions','config','baseInstructions','developerInstructions','personality','initialTurnsPage'].map(k => [k,null]));
+  await relay.receive({ id: 'resume', method: 'thread/resume', params: { ...nulls, threadId: target.sessionId, cwd: target.repositoryRoot, excludeTurns: true } });
+  assert.deepEqual(f.calls.find(m => m.method === 'thread/resume').params, resume);
+  assert.equal(acknowledged.length, 1); assert.equal(relay.observation().protocolAcknowledged, true);
+  const count = f.calls.length;
+  await relay.receive({ id: 'skills', method: 'skills/list', params: { cwds: [target.repositoryRoot], forceReload: true } });
+  assert.equal(delivered.at(-1).error.code, -32601); assert.equal(f.calls.length, count);
+  assert.equal(relay.observation().protocolAcknowledged, true);
+  assert.equal(f.calls.filter(m => m.method === 'initialize').length, 1); assert.equal(f.calls.filter(m => m.method === 'initialized').length, 1);
+});
+
+test('retained bootstrap refuses expanded parameters and unreviewed native metadata versions before dispatch', async t => {
+  for (const [method,params,version] of [
+    ['model/list', { cursor: null, limit: null, includeHidden: true }, '0.166.0'],
+    ['model/list', { cursor: 'another-page', limit: null, includeHidden: true }, '0.167.0'],
+    ['model/list', { cursor: null, limit: 1000, includeHidden: true }, '0.167.0'],
+    ['configRequirements/read', {}, '0.167.0']
+  ]) {
+    const f = await fixture(t, { reply: async (m,r) => { if (m.method === 'initialize') r.userAgent = r.userAgent.replace('/0.166.0', '/'+version); } }), {c} = await f.ready(), before = f.calls.length;
+    await assert.rejects(c.request(method,params)); assert.equal(f.calls.length,before); assert.equal(f.native.closed,false);
+  }
+});
+
 test('retained channel rejects other tasks, effects, initialization replay and a second resume before native dispatch', async t => {
   for(const [method,params] of [['turn/start',{}],['account/logout',{}],['thread/read',{threadId:'other'}],['thread/resume',{...resume,sandbox:'workspace-write'}],['initialize',init]]) {
     const f=await fixture(t),{c}=await f.ready(),count=f.calls.length;await assert.rejects(c.request(method,params));assert.equal(f.calls.length,count);assert.equal(f.native.closed,false);

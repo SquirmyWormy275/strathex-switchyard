@@ -9,6 +9,10 @@ const id = v => Number.isSafeInteger(v) || typeof v === 'string' && v.length > 0
 const label = v => typeof v === 'string' && v.length > 0 && v.length <= 128 && !/[\x00-\x1f\x7f]/.test(v);
 const require = v => { if (!v) throw Error('The original restricted editor connection did not verify.'); };
 const MAX = 1048576;
+const nativeResumeNulls = ['history','path','model','modelProvider','runtimeWorkspaceRoots','approvalPolicy','approvalsReviewer','sandbox','permissions','config','baseInstructions','developerInstructions','personality','initialTurnsPage'];
+// Observed optional catalog/feature requests from the reviewed native TUI.
+// They receive an explicit unsupported response locally; none reach the owner.
+const unavailableNativeReads = new Set(['hooks/list','account/bedrock/checkGovCloudRequirements','collaborationMode/list','thread/list','thread/loaded/list','thread/goal/get','skills/list','account/rateLimits/read','plugin/installed','app/installed','app/list']);
 
 export function createCodexEditorRelay({ target, client, assertCurrent, send, onAcknowledged, signal, platform = 'linux' } = {}) {
   const witness = createCodexEditorProtocol(target, { platform }), selected = Object.freeze({ ...target });
@@ -79,13 +83,22 @@ export function createCodexEditorRelay({ target, client, assertCurrent, send, on
       phase = 'ready'; return;
     }
     require(m.id !== undefined && ['ready','acknowledged'].includes(phase));
+    if (nativeTui && unavailableNativeReads.has(m.method)) {
+      require(m.params === undefined || object(m.params));
+      await deliver({ id: m.id, error: { code: -32601, message: 'This optional feature is unavailable in the reviewed editor attachment.' } }); return;
+    }
     if (m.method === 'thread/resume') {
-      require(!attempted && exact(m.params, ['threadId','cwd','sandbox','approvalPolicy','excludeTurns']) && m.params.threadId === selected.sessionId && m.params.cwd === selected.repositoryRoot
-        && m.params.sandbox === 'read-only' && m.params.approvalPolicy === 'on-request' && (m.params.excludeTurns === undefined || typeof m.params.excludeTurns === 'boolean'));
+      // Remote 0.167 resumes cannot carry CLI permission overrides. Its exact
+      // null-only settings envelope is narrowed to the already reviewed scope.
+      const nativeResume = nativeTui && exact(m.params, ['threadId','cwd','excludeTurns',...nativeResumeNulls])
+        && m.params.threadId === selected.sessionId && m.params.cwd === selected.repositoryRoot && m.params.excludeTurns === true && nativeResumeNulls.every(k => m.params[k] === null);
+      const params = nativeResume ? { threadId: selected.sessionId, cwd: selected.repositoryRoot, sandbox: 'read-only', approvalPolicy: 'on-request', excludeTurns: true } : m.params;
+      require(!attempted && exact(params, ['threadId','cwd','sandbox','approvalPolicy','excludeTurns']) && params.threadId === selected.sessionId && params.cwd === selected.repositoryRoot
+        && params.sandbox === 'read-only' && params.approvalPolicy === 'on-request' && (params.excludeTurns === undefined || typeof params.excludeTurns === 'boolean'));
       attempted = true; phase = 'resuming'; acknowledged = false;
       await account('switchyard-before-resume');
-      require(witness.client({ ...m, id: 'switchyard-resume' }));
-      const result = await request('thread/resume', m.params); require(witness.server({ id: 'switchyard-resume', result }));
+      require(witness.client({ ...m, params, id: 'switchyard-resume' }));
+      const result = await request('thread/resume', params); require(witness.server({ id: 'switchyard-resume', result }));
       await account('switchyard-after-resume'); require(witness.observation().protocolAcknowledged);
       await current(); await onAcknowledged(witness.observation(), controller.signal); await current();
       await deliver({ id: m.id, result }); phase = 'acknowledged'; acknowledged = true; return;
@@ -95,8 +108,23 @@ export function createCodexEditorRelay({ target, client, assertCurrent, send, on
       const result = await account('switchyard-account-' + ++accountSequence); await deliver({ id: m.id, result }); acknowledged = attempted && witness.observation().protocolAcknowledged; return;
     }
     if (m.method === 'config/read') {
-      require(exact(m.params, ['includeLayers']) && m.params.includeLayers === false);
-      const result = await request(m.method, m.params); assertCodexDesignConfig(result?.config); await deliver({ id: m.id, result }); return;
+      const projectRead = nativeTui && exact(m.params, ['includeLayers','cwd']) && m.params.includeLayers === true && m.params.cwd === selected.repositoryRoot;
+      require(projectRead || exact(m.params, ['includeLayers']) && m.params.includeLayers === false);
+      if (projectRead) await account('switchyard-before-config-' + ++accountSequence);
+      const result = await request(m.method, m.params); assertCodexDesignConfig(result?.config);
+      if (projectRead) await account('switchyard-after-config-' + ++accountSequence);
+      await deliver({ id: m.id, result }); acknowledged = attempted && witness.observation().protocolAcknowledged; return;
+    }
+    if (nativeTui && ['model/list','configRequirements/read'].includes(m.method)) {
+      const models = m.method === 'model/list';
+      require(models ? exact(m.params, ['cursor','limit','includeHidden']) && m.params.cursor === null && m.params.limit === null && m.params.includeHidden === true : m.params === undefined || m.params === null);
+      await account('switchyard-before-bootstrap-' + ++accountSequence);
+      const result = await request(m.method, models ? m.params : null);
+      require(object(result) && Buffer.byteLength(JSON.stringify(result)) <= MAX);
+      require(models ? Array.isArray(result.data) && result.data.length <= 256 && result.data.every(model => object(model) && label(model.id) && label(model.model)) && (result.nextCursor === null || label(result.nextCursor))
+        : result.requirements === null || object(result.requirements));
+      await account('switchyard-after-bootstrap-' + ++accountSequence);
+      await deliver({ id: m.id, result }); acknowledged = attempted && witness.observation().protocolAcknowledged; return;
     }
     if (m.method === 'thread/read') {
       const startupRead = nativeTui && phase === 'ready' && !attempted;

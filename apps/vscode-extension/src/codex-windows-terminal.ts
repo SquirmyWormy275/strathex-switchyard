@@ -23,13 +23,14 @@ export function windowsEditorEndpoint(value: unknown): Readonly<WindowsEditorEnd
   } finally { token.fill(0); }
 }
 
-/** Reviewed Codex 0.166.0 remote syntax. The bearer is a terminal-local env value,
- * never a command argument, URL credential, shell expression or prompt. */
+/** The bearer is a terminal-local env value, never a command argument, URL
+ * credential, shell expression or prompt. The reviewed relay enforces resume
+ * permissions; native remote resume rejects CLI permission overrides. */
 export function codexWindowsTerminalResume(threadId: string, repositoryRoot: string, input: WindowsEditorEndpoint): Readonly<{ shellArgs: readonly string[]; env: Readonly<Record<string, string>> }> {
   requireValue(typeof threadId === "string" && /^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i.test(threadId) && threadId !== "00000000-0000-0000-0000-000000000000" && windowsEditorLocalPath(repositoryRoot));
   const endpoint = windowsEditorEndpoint(input);
   return Object.freeze({
-    shellArgs: Object.freeze(["resume", "--remote", endpoint.url, "--remote-auth-token-env", windowsEditorTokenVariable, "--sandbox", "read-only", "--ask-for-approval", "on-request", "--cd", repositoryRoot, threadId]),
+    shellArgs: Object.freeze(["resume", "--remote", endpoint.url, "--remote-auth-token-env", windowsEditorTokenVariable, "--cd", repositoryRoot, threadId]),
     env: Object.freeze({ [windowsEditorTokenVariable]: endpoint.authToken })
   });
 }

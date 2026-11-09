@@ -70,7 +70,7 @@ test("reviewed signed permission reaches one exact Terminal object without claim
   const f=await fixture(t),review=await f.launcher.review(f.selected);
   assert.equal(f.calls.length,0);assert.equal((await f.store.snapshot("personal")).codingEditorAuthorizations,undefined);
   const result=await f.launcher.launch(review);assert.deepEqual(f.routes.slice(0,3),["review","issue","consume"]);assert.ok(f.routes.slice(3).every(r=>r==="return-target"));assert.equal(f.calls.length,1);
-  assert.deepEqual(f.calls[0],{name:"Switchyard · Codex task",cwd:f.repositoryRoot,shellPath:f.executable,shellArgs:["resume","--remote","unix://"+f.ingressPath,"--sandbox","read-only","--ask-for-approval","on-request","--cd",f.repositoryRoot,f.target.sessionId]});
+  assert.deepEqual(f.calls[0],{name:"Switchyard · Codex task",cwd:f.repositoryRoot,shellPath:f.executable,shellArgs:["resume","--remote","unix://"+f.ingressPath,"--cd",f.repositoryRoot,f.target.sessionId]});
   assert.equal(result.focusVerified,true);assert.equal(result.terminalObjectReturned,true);assert.equal(result.ideAttached,false);assert.equal(result.nativeTaskLoaded,false);assert.equal(result.modelPromptSubmitted,false);assert.equal(f.window.activeTerminal,f.terminals[0]);
   assert.equal((await f.store.snapshot("personal")).codingEditorAuthorizations[0].status,"consumed");await assert.rejects(f.launcher.launch(review));await assert.rejects(f.launcher.launch(structuredClone(review)));assert.equal(f.calls.length,1);
 });

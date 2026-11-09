@@ -39,7 +39,7 @@ through signed Linux/Windows clients, followed by existing exact-project task
 choices. Protected owner/load/task records and current workspace policy determine
 eligibility. Listing performs no native observation or write and grants no task
 authority; the selected task still requires fresh review. The encrypted-store-to-
-client demonstration uses an explicit provider double. The owner has lifted the frontend freeze. Named role/device setup is now connected; editor picker/command activation now uses the existing reviewed Linux/Windows launch path. Interactive IDE and native task attachment remain unaccepted.
+client demonstration uses an explicit provider double. The owner has lifted the frontend freeze. Named role/device setup is now connected; editor picker/command activation now uses the existing reviewed Linux/Windows launch path. Interactive IDE and native task attachment remain unaccepted. The real Codex 0.167 terminal now renders a synthetic saved legacy transcript through the production relay; paginated history remains implementation work, and live-provider/actual IDE acceptance remains separate. [Native terminal evidence](codex-terminal-compatibility.md).
 [Contract](coding-task-owners.md#find-eligible-saved-projects),
 37 focused groups/117 tests, zero skips, and both TypeScript checks pass.
 [source evidence](evidence/editor-project-choices-source-summary.json).

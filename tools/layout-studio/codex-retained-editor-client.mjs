@@ -70,7 +70,10 @@ export function createRetainedCodexEditorClient({ client, target, assertCurrent,
       }
       require(phase === 'ready');
       if (method === 'account/read') require(exact(params, ['refreshToken']) && params.refreshToken === false);
-      else if (method === 'config/read') require(exact(params, ['includeLayers']) && params.includeLayers === false);
+      else if (method === 'config/read') require(exact(params, ['includeLayers']) && params.includeLayers === false
+        || exact(params, ['includeLayers','cwd']) && params.includeLayers === true && params.cwd === selected.repositoryRoot);
+      else if (method === 'model/list') require(nativeVersion === '0.167.0' && exact(params, ['cursor','limit','includeHidden']) && params.cursor === null && params.limit === null && params.includeHidden === true);
+      else if (method === 'configRequirements/read') require(nativeVersion === '0.167.0' && params === null);
       else if (method === 'thread/read') require(exact(params, ['threadId','includeTurns']) && params.threadId === selected.sessionId && [undefined,true,false].includes(params.includeTurns));
       else if (method === 'thread/resume') {
         require(!resumed && exact(params, ['threadId','cwd','sandbox','approvalPolicy','excludeTurns']) && params.threadId === selected.sessionId

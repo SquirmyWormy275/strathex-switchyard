@@ -3,9 +3,9 @@ import test from "node:test";
 import { codexTerminalConnectionArguments, codexTerminalResumeArguments } from "../src/codex-terminal.ts";
 const id = "019a36f0-1345-7345-b123-123456789abc";
 
-test("exact Codex resume pins the explicit local socket, repository and read-only approval policy without a prompt", () => {
+test("exact Codex resume pins the local socket and repository while the reviewed server owns permissions", () => {
   const args = codexTerminalResumeArguments(id, "/repo with spaces", "/private/control.sock");
-  assert.deepEqual(args, ["resume", "--remote", "unix:///private/control.sock", "--sandbox", "read-only", "--ask-for-approval", "on-request", "--cd", "/repo with spaces", id]);
+  assert.deepEqual(args, ["resume", "--remote", "unix:///private/control.sock", "--cd", "/repo with spaces", id]);
   assert.equal(Object.isFrozen(args), true); assert.equal(Object.isFrozen(codexTerminalConnectionArguments("/repo", "/private/control.sock")), true);
 });
 

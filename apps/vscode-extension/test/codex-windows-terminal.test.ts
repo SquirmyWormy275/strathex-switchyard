@@ -6,7 +6,7 @@ const endpoint = () => ({ url: "ws://127.0.0.1:43179/", authToken: token });
 
 test("Windows resume uses the exact loopback endpoint and task with a terminal-local bearer and no command interpolation", () => {
   const root = "C:\\Reviewed Projects\\repository", input = endpoint(), result = codexWindowsTerminalResume(id, root, input);
-  assert.deepEqual(result.shellArgs, ["resume", "--remote", input.url, "--remote-auth-token-env", windowsEditorTokenVariable, "--sandbox", "read-only", "--ask-for-approval", "on-request", "--cd", root, id]);
+  assert.deepEqual(result.shellArgs, ["resume", "--remote", input.url, "--remote-auth-token-env", windowsEditorTokenVariable, "--cd", root, id]);
   assert.deepEqual(result.env, { [windowsEditorTokenVariable]: token });assert.equal(JSON.stringify(result.shellArgs).includes(token), false);
   input.authToken = "changed";assert.equal(result.env[windowsEditorTokenVariable], token);
   assert(Object.isFrozen(result) && Object.isFrozen(result.env) && Object.isFrozen(result.shellArgs));

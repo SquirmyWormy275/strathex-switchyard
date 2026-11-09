@@ -1,51 +1,57 @@
 # Native Codex terminal compatibility
 
-The installed Codex 0.167 terminal now passes Switchyard's initial connection
-and selected-thread metadata checks in an isolated demonstration. **Full native
-terminal attachment is still unfinished.** The current installed Switchyard
-application remains `ec28d09`; this source change has not been installed.
+The real Codex 0.167 terminal can now open and display a synthetic saved task
+through Switchyard's production handshake and relay. The demonstration includes
+a stored assistant reply, one reviewed read-only resume and a stable connection.
+**Live-provider and actual VS Code GUI acceptance remain separate.** Paginated
+history is still unfinished implementation.
 
-The demonstration uses the real CLI, production WebSocket handshake and
-production relay, with an explicitly synthetic provider. An empty owned home,
-hidden host configuration and separate network namespace keep real accounts,
-tasks and model requests outside the check.
+The installed Switchyard application remains `ec28d09`, and the installed
+extension remains source `99784a7`; this source change has not been installed.
 
-## What changed
+## Connection and permission contract
 
-The native Unix-socket client requests `/rpc`; the carrier previously accepted
-only `/`. Both exact paths now use the same kernel peer verification and bounded
-frame parser. Alternate paths, query strings and encoded variants still refuse.
+The Unix carrier accepts the exact `/` and `/rpc` paths under the same kernel
+peer verification and bounded frame parser. Query strings, encoded variants and
+other paths refuse. Only the captured `codex-tui` 0.167.0 initialization shape is
+translated into the restricted upstream handshake; experimental provider methods,
+notification opt-outs and attestation are not enabled.
 
-Codex also sends a nullable title and a capability advertisement that differed
-from the synthetic clients. The relay recognizes only the captured `codex-tui`
-0.167.0 shape and translates it into the existing restricted provider handshake.
-It does **not** forward experimental capability admission, notification opt-outs
-or attestation requests.
+Native remote resume rejects CLI sandbox and approval overrides. Terminal launch
+therefore supplies only the exact endpoint, directory and session UUID. The relay
+translates the native null-settings envelope into the already reviewed
+`read-only/on-request` request. It verifies the returned permissions and brackets
+resume with original-account reads. Client overrides, foreign tasks and replay
+still refuse.
 
-Before resuming, the native terminal reads its account and selected thread.
-Empty account-read parameters become `refreshToken: false`. Startup thread reads
-are metadata-only, restricted to the reviewed UUID and directory, and bracketed
-by original-account checks. These reads do not acknowledge or resume a task.
+Project configuration is read only for the selected directory and must retain
+the effective tool restrictions. The initial model catalog and policy requirements
+also use original-account checks. Eleven optional catalog/feature requests receive
+explicit unsupported errors locally. They never enumerate other tasks, install
+tools or reach the provider. Unknown operations and task/config/account effects
+still close the attachment.
 
-## Evidence and remaining work
+## Demonstration and checks
 
-Seven integration groups pass **64 tests, zero skips**. Original commands,
-deadlines, serial scheduling and child cleanup are verified. The original four
-regression failures are retained. The existing thirteen non-Linux carrier skips
-are unchanged; the new path cases extend existing tests.
+The native CLI, production WebSocket handshake and production relay ran in an
+empty owned home with a separate network namespace and a synthetic provider.
+The terminal rendered the saved task title and the stored marker
+`SWITCHYARD_SYNTHETIC_TRANSCRIPT_OK`, remained connected, and submitted no model
+prompt. The provider received exactly one narrowed resume. All processes exited,
+and twelve diagnostic directories, 42 files and 254,286 bytes were removed.
 
-The real terminal passes initialization, account read and two exact thread reads.
-It then reaches a project-specific `config/read` request that the relay still
-refuses. Later capture probes also observed `hooks/list` and a Bedrock requirement
-check. Supporting the remaining startup exchange and native resume parameters
-is **implementation work**, not an account or hardware blocker. Every new request
-needs an explicit scope; there is no general forwarding branch.
+Thirteen integration groups pass **128 tests with one existing platform skip**.
+The final focused run passes **27 tests**, including changed-account, malformed
+metadata, non-null override and retained Windows-channel cases. Typechecking
+passes. Original deadlines, commands, cleanup and declared skips are unchanged.
+[Audited source and demonstration](evidence/codex-native-bootstrap-summary.json).
 
-Visible loading of a real saved task, live provider acceptance and VS Code GUI
-verification remain separate checks. No native attachment or completion claim
-is inferred from a JSON-RPC reply. The diagnostic processes exited, and their
-twelve owned directories, forty files and 230,303 bytes were removed.
+The native terminal displays two skills-unavailable messages because those
+optional queries are refused; Switchyard does not fabricate an empty-success
+response. The demonstration covers legacy history. Paginated history, other TUI
+versions and live account/IDE acceptance need their own work and evidence.
 
-[Audited source and native evidence](evidence/codex-native-startup-summary.json).
-The contract review used the [official App Server documentation](https://learn.chatgpt.com/docs/app-server)
+[Earlier startup-prefix evidence](evidence/codex-native-startup-summary.json)
+retains the original failures. The contract review uses the
+[official App Server documentation](https://learn.chatgpt.com/docs/app-server)
 and [version-pinned native connection source](https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/app-server-client/src/remote.rs).

@@ -14,6 +14,10 @@ const nativeInitialize = { id: 'initialize', method: 'initialize', params: {
 } };
 const resumed = () => ({ thread: { id: target.sessionId, cwd: target.repositoryRoot, status: { type: 'idle' } }, cwd: target.repositoryRoot, sandbox: { type: 'readOnly' }, approvalPolicy: 'on-request', modelProvider: 'openai' });
 const resume = (id = 2) => ({ id, method: 'thread/resume', params: { threadId: target.sessionId, cwd: target.repositoryRoot, sandbox: 'read-only', approvalPolicy: 'on-request', excludeTurns: true } });
+const nativeResume = () => ({ id: 'native-resume', method: 'thread/resume', params: {
+  threadId: target.sessionId, cwd: target.repositoryRoot, excludeTurns: true,
+  ...Object.fromEntries(['history','path','model','modelProvider','runtimeWorkspaceRoots','approvalPolicy','approvalsReviewer','sandbox','permissions','config','baseInstructions','developerInstructions','personality','initialTurnsPage'].map(k => [k, null]))
+} });
 const gate = () => { let resolve; const promise = new Promise(r => resolve = r); return { promise, resolve }; };
 function fixture(t, options = {}) {
   const calls = [], delivered = [], acknowledgements = [], abort = new AbortController();
@@ -84,6 +88,31 @@ test('native pre-resume metadata is withheld if its original account changes dur
   await assert.rejects(f.relay.receive({ id: 2, method: 'thread/read', params: { threadId: target.sessionId } }));
   assert.equal(f.delivered.some(m => m.id === 2), false); assert.equal(f.relay.observation().protocolAcknowledged, false);
 });
+test('native project configuration reads preserve exact cwd, effective restrictions and original account', async t => {
+  const ready = async hooks => {
+    const f = fixture(t, { reply: async (m,r) => { if (m.method === 'initialize') r.userAgent = 'codex-tui/0.167.0 (synthetic)'; await hooks?.(m,r); } });
+    await f.relay.receive(nativeInitialize); await f.relay.receive({ method: 'initialized' }); return f;
+  };
+  const request = { id: 'project-trust', method: 'config/read', params: { includeLayers: true, cwd: target.repositoryRoot } };
+  const f = await ready((m,r) => { if (m.method === 'config/read') r.layers = [{ source: 'synthetic exact project' }]; });
+  await f.relay.receive(request);
+  assert.deepEqual(f.calls.slice(-3).map(m => m.method), ['account/read','config/read','account/read']);
+  assert.deepEqual(f.calls.at(-2).params, request.params);
+  assert.deepEqual(f.delivered.at(-1).result.layers, [{ source: 'synthetic exact project' }]);
+  assert.equal(f.acknowledgements.length, 0);
+  for (const params of [{ includeLayers: true, cwd: '/other' }, { includeLayers: true }, { includeLayers: true, cwd: target.repositoryRoot, extra: false }]) {
+    const x = await ready(), before = x.calls.length;
+    await assert.rejects(x.relay.receive({ ...request, params })); assert.equal(x.calls.length, before);
+  }
+  for (const failure of ['config','account']) {
+    let projectRead = false;
+    const x = await ready((m,r) => {
+      if (m.method === 'config/read' && m.params.cwd) { projectRead = true; if (failure === 'config') r.config.features.hooks = true; }
+      if (m.method === 'account/read' && projectRead && failure === 'account') r.account.email = 'other@example.invalid';
+    });
+    await assert.rejects(x.relay.receive(request)); assert.equal(x.delivered.some(m => m.id === request.id), false);
+  }
+});
 
 test('unreviewed requests, effects, foreign task IDs and expanded permissions never reach the provider', async t => {
   for (const method of ['turn/start','turn/steer','thread/start','thread/fork','account/logout','account/login/start','config/value/write','unknown/method']) {
@@ -91,6 +120,72 @@ test('unreviewed requests, effects, foreign task IDs and expanded permissions ne
   }
   for (const change of [{ threadId: '22222222-2222-4222-8222-222222222222' }, { cwd: '/other' }, { sandbox: 'workspace-write' }, { approvalPolicy: 'never' }, { config: {} }, { model: 'other' }]) {
     const f = fixture(t); await f.ready(); const m = resume(); Object.assign(m.params, change); await assert.rejects(f.relay.receive(m)); assert.equal(f.calls.some(c => c.method === 'thread/resume'), false);
+  }
+});
+
+test('native resume derives permissions from the reviewed target and rejects every client override', async t => {
+  const ready = async () => {
+    const f = fixture(t, { reply: async (m,r) => { if (m.method === 'initialize') r.userAgent = 'codex-tui/0.167.0 (synthetic)'; } });
+    await f.relay.receive(nativeInitialize); await f.relay.receive({ method: 'initialized' }); return f;
+  };
+  const f = await ready(); await f.relay.receive(nativeResume());
+  assert.deepEqual(f.calls.find(m => m.method === 'thread/resume').params, resume().params);
+  assert.equal(f.acknowledgements.length, 1); assert.equal(f.relay.observation().protocolAcknowledged, true);
+  await assert.rejects(f.relay.receive({ ...nativeResume(), id: 'replayed' }));
+  assert.equal(f.calls.filter(m => m.method === 'thread/resume').length, 1);
+  for (const [key,value] of Object.entries({ threadId: 'other', cwd: '/other', history: [], path: '/rollout', model: 'other', modelProvider: 'other', runtimeWorkspaceRoots: [], approvalPolicy: 'never', approvalsReviewer: 'guardian_subagent', sandbox: 'workspace-write', permissions: {}, config: {}, baseInstructions: 'changed', developerInstructions: 'changed', personality: 'friendly', initialTurnsPage: {}, excludeTurns: false, extra: null })) {
+    const x = await ready(), m = nativeResume(); m.params[key] = value;
+    await assert.rejects(x.relay.receive(m)); assert.equal(x.calls.some(m => m.method === 'thread/resume'), false);
+  }
+});
+
+test('native bootstrap reads return original account-bound metadata and never forward optional capabilities', async t => {
+  const f = fixture(t, { reply: async (m,r) => {
+    if (m.method === 'initialize') r.userAgent = 'codex-tui/0.167.0 (synthetic)';
+    if (m.method === 'model/list') Object.assign(r, { data: [{ id: 'synthetic', model: 'synthetic' }], nextCursor: null });
+    if (m.method === 'configRequirements/read') r.requirements = { allowedSandboxModes: ['read-only'] };
+  } });
+  await f.relay.receive(nativeInitialize); await f.relay.receive({ method: 'initialized' });
+  await f.relay.receive({ id: 'models', method: 'model/list', params: { cursor: null, limit: null, includeHidden: true } });
+  assert.deepEqual(f.calls.slice(-3).map(m => m.method), ['account/read','model/list','account/read']);
+  await f.relay.receive({ id: 'requirements', method: 'configRequirements/read' });
+  assert.deepEqual(f.calls.at(-2), { method: 'configRequirements/read', params: null });
+  assert.deepEqual(f.delivered.at(-1).result.requirements, { allowedSandboxModes: ['read-only'] });
+  const before = f.calls.length;
+  for (const [i,method] of ['hooks/list','account/bedrock/checkGovCloudRequirements','collaborationMode/list','thread/list','thread/loaded/list','thread/goal/get','skills/list','account/rateLimits/read','plugin/installed','app/installed','app/list'].entries()) {
+    await f.relay.receive({ id: 'optional-'+i, method, params: {} });
+    assert.equal(f.delivered.at(-1).error.code, -32601); assert.equal(f.calls.length, before); assert.equal(f.relay.observation().connectionClosed, false);
+  }
+  assert.equal(f.acknowledgements.length, 0);
+  await assert.rejects(f.relay.receive({ id: 'effects', method: 'turn/start', params: {} }));
+  assert.equal(f.calls.length, before);
+});
+
+test('native bootstrap metadata refuses expanded queries, malformed replies and changed accounts before delivery', async t => {
+  const ready = async hook => {
+    const f = fixture(t, { reply: async (m,r) => {
+      if (m.method === 'initialize') r.userAgent = 'codex-tui/0.167.0 (synthetic)';
+      if (m.method === 'model/list') Object.assign(r, { data: [{ id: 'synthetic', model: 'synthetic' }], nextCursor: null });
+      if (m.method === 'configRequirements/read') r.requirements = null;
+      await hook?.(m,r);
+    } });
+    await f.relay.receive(nativeInitialize); await f.relay.receive({ method: 'initialized' }); return f;
+  };
+  const models = { id: 'models', method: 'model/list', params: { cursor: null, limit: null, includeHidden: true } };
+  for (const input of [{ ...models, params: { ...models.params, cursor: 'other-page' } }, { ...models, params: { ...models.params, limit: 1000 } }, { id: 'requirements', method: 'configRequirements/read', params: {} }]) {
+    const f = await ready(), count = f.calls.length; await assert.rejects(f.relay.receive(input)); assert.equal(f.calls.length, count);
+  }
+  for (const failure of ['model-shape','requirements-shape','account']) {
+    let read = false;
+    const f = await ready((m,r) => {
+      if (['model/list','configRequirements/read'].includes(m.method)) read = true;
+      if (m.method === 'model/list' && failure === 'model-shape') r.data = [{ id: 'bad', model: null }];
+      if (m.method === 'configRequirements/read' && failure === 'requirements-shape') r.requirements = [];
+      if (m.method === 'account/read' && read && failure === 'account') r.account.email = 'other@example.invalid';
+    });
+    const input = failure === 'requirements-shape' ? { id: 'requirements', method: 'configRequirements/read' } : models;
+    await assert.rejects(f.relay.receive(input)); assert.equal(f.delivered.some(m => m.id === input.id), false);
+    assert.equal(f.relay.observation().protocolAcknowledged, false);
   }
 });
 test('unreviewed versions and experimental initialization are refused before any task request', async t => {
