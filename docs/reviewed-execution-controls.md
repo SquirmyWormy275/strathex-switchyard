@@ -24,9 +24,9 @@ open review. Lost replies retain an explicit unknown outcome; refreshing history
 never retries execution. There is no background status polling. A manual status
 request may reconcile retained ownership and independently verified cleanup.
 
-New task permission issuance and scanner-recipe creation are still separate
-frontend work. Existing saved permissions are usable here; source-only and
-installed API contracts remain in [task authority](task-authority.md),
+[Task permission issuance and revocation](task-permission-controls.md) now have
+separate frontend controls. Scanner-recipe creation remains frontend work.
+Source-only and installed API contracts remain in [task authority](task-authority.md),
 [execution](reviewed-task-execution.md) and [scanner saving](scanner-recipe-saving.md).
 Browser visual acceptance remains blocked by the browser-control failure.
 

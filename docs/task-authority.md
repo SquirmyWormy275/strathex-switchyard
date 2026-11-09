@@ -16,6 +16,10 @@ reconciles exact owned metadata without replay. Connected execution grants cover
 Run on Linux/Windows and local-gate/clean-reproduction recipes on Linux, each
 with its separate [execution review](reviewed-task-execution.md).
 
+The Studio now exposes [task permission controls](task-permission-controls.md)
+with named saved tasks, exact scope review, separate issuance, revalidation and
+revocation. Opening the task picker performs no native provider query.
+
 ## Review an exact scope
 
 All routes are authenticated POST requests below `/api/suite/coding/authority/`.

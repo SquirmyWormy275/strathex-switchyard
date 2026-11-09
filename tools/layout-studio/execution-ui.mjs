@@ -111,6 +111,10 @@ export function mountExecution({ notify }) {
       if (context.current()) try { await inventory(context, request.requestId); } catch (error) { if (context.current()) { $("execution-status").textContent += ` Saved history could not be refreshed: ${error.message}.`; notify("Refresh saved execution history when the local connection is available."); } }
     }
   }));
+  document.addEventListener("switchyard-execution-grants-changed", event => {
+    if (!permitted() || event.detail.compartment !== state.id) return;
+    invalidate(); void work(async context => { await inventory(context); if (context.current() && grants.some(row => row.id === event.detail.authorityId)) { $("execution-grant").value = event.detail.authorityId; renderGrant(); } });
+  });
   document.addEventListener("switchyard-workspace-changing", () => { state = null; invalidate(); clear(); $("execution-status").textContent = "Select a workspace to inspect its saved runs."; });
   document.addEventListener("switchyard-compartment-state", event => { state = event.detail; invalidate(); clear(); $("execution-status").textContent = permitted() ? "Load saved task permissions and execution history when you need them." : "Execution requires a Personal workspace in companion mode."; });
   clear(); controls();

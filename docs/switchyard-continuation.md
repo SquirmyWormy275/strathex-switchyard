@@ -280,3 +280,24 @@ adds lost-successful-reply coverage. Totals overlap. Eight running-preview check
 pass. Original two DOM-settle failures are retained; tests now join the actual
 HTTP response before the unchanged two-second UI assertion. The HTTP/group/native
 bounds and backend checks are unchanged. [Evidence](evidence/execution-ui-source-summary.json).
+
+## Task permission frontend checkpoint
+
+Named saved coding tasks now lead to explicit file/action/lifetime review and
+separate grant issuance. Revalidation and separate revocation are connected;
+revocation remains usable in keyboard-only mode. Opening the picker makes no
+native query. Native task and read-only Git inspection start only on explicit
+review/revalidation. New grants become execution choices without reviewing or
+running a recipe. Workspace/form changes and late replies cannot carry approval
+across scopes; lost replies never trigger automatic issuance.
+
+Eight original groups pass 66 tests with no skips; the final eight-case UI run
+adds combined permission-to-execution selection with overlap. Eight running
+preview checks pass. Original commands/bounds/cleanup verify. Tests use actual
+Git/encrypted state/HTTP with an explicit native task double. No user workspace,
+live provider or hardware is used. [Controls](task-permission-controls.md),
+[evidence](evidence/authority-ui-source-summary.json).
+
+Continue with scanner recipe creation/saving and its separate permission/execution
+handoffs, remaining required observation sources and native attachment limitations.
+Installed/interactive browser/IDE/hardware/account checks remain separate.

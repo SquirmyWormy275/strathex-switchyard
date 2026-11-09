@@ -56,8 +56,8 @@ Activity now has a collapsed reviewed-execution workbench for existing task
 permissions: recipe-file hashing, concrete recipe/isolation/budget review,
 separate execution and stop approvals, retained status and bounded output.
 A source-only demonstration runs an actual disposable Linux program through the
-authenticated API without an existing account. Permission issuance and scanner
-recipe creation still need frontend controls. [Execution controls](reviewed-execution-controls.md).
+authenticated API without an existing account. Named saved-task permission issuance, revalidation and revocation now have
+separate frontend controls; scanner recipe creation remains unfinished. [Execution controls](reviewed-execution-controls.md).
 
 ## Installed frontend verification
 
