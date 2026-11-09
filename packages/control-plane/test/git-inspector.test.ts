@@ -89,6 +89,7 @@ test("read-only index trees match real Git while preserving cold index caches an
     // Mode-only metadata covers links without creating a live filesystem link.
     run("update-index", "--add", "--cacheinfo", "120000," + run("rev-parse", "HEAD:base").trim() + ",link");
     run("update-index", "--add", "--cacheinfo", "160000," + run("rev-parse", "HEAD").trim() + ",module");
+    await writeFile(join(root, ".gitmodules"), '[submodule "module"]\n\tpath = module\n\turl = https://example.invalid/synthetic.git\n');
     async function objects() {
       const rows: string[] = [];
       const walk = async (directory: string, prefix = ""): Promise<void> => { for (const item of await readdir(directory, { withFileTypes: true })) { const name = prefix + item.name; if (item.isDirectory()) await walk(join(directory, item.name), name + "/"); else { assert.equal(item.isFile(), true); rows.push(name + ":" + createHash("sha256").update(await readFile(join(directory, item.name))).digest("hex")); } } };
@@ -97,11 +98,55 @@ test("read-only index trees match real Git while preserving cold index caches an
     for (const empty of [false, true]) {
       if (empty) run("read-tree", "--empty");
       const before = await readFile(join(root, ".git/index")), beforeObjects = await objects();
-      const inspected = await new GitCliInspector({ runner: new NodeGitCommandRunner([git]), digestReader: new FakeDigests() }).inspect(root);
+      const native = new NodeGitCommandRunner([git]), calls: string[] = [];
+      const inspected = await new GitCliInspector({ runner: { async run(args, cwd) { calls.push(args.join(" ")); return native.run(args, cwd); } }, digestReader: new FakeDigests() }).inspect(root);
+      assert.equal(calls.includes("submodule status --recursive"), !empty);
+      if (empty) assert.deepEqual(inspected.submodules, {});
+      else assert.match(inspected.submodules?.module ?? "", /^[a-f0-9]{40}(?:[a-f0-9]{24})?$/);
       assert.ok(inspected.indexTree); assert.deepEqual(await readFile(join(root, ".git/index")), before); assert.deepEqual(await objects(), beforeObjects);
       assert.equal(inspected.indexTree, run("write-tree").trim());
       assert.equal(inspected.indexTree, gitIndexTreeFromListing(run("ls-files", "--stage", "-z"), run("rev-parse", "HEAD").trim()));
     }
+  }
+});
+
+test("an unchanged validated index without gitlinks avoids recursive submodule startup", async () => {
+  const listing = "100644 " + "b".repeat(40) + " 0\tsrc/a.ts\0";
+  const runner = new ScriptedRunner({
+    "rev-parse --show-toplevel": result("C:/work/example\n"),
+    "rev-parse HEAD": result("a".repeat(40) + "\n"),
+    "ls-files --stage -z": result(listing)
+  });
+  const inspected = await new GitCliInspector({ runner, digestReader: new FakeDigests() }).inspect();
+  assert.deepEqual(inspected.submodules, {});
+  assert.equal(runner.calls.includes("submodule status --recursive"), false);
+  assert.equal(runner.calls.filter(call => call === "ls-files --stage -z").length, 2);
+  assert.equal(inspected.issues?.some(issue => /submodule|index tree changed/.test(issue)), false);
+});
+
+test("changed or unavailable final index cannot certify the absence of submodules", async () => {
+  const listing = "100644 " + "b".repeat(40) + " 0\tsrc/a.ts\0";
+  for (const final of [result(listing + "160000 " + "c".repeat(40) + " 0\tmodule\0"), { exitCode: 1, stdout: "", stderr: "unavailable" }]) {
+    let reads = 0;
+    const runner = new ScriptedRunner({ "rev-parse --show-toplevel": result("C:/work/example\n"), "rev-parse HEAD": result("a".repeat(40) + "\n") });
+    const run = runner.run.bind(runner);
+    runner.run = async args => args.join(" ") === "ls-files --stage -z" ? (++reads === 1 ? result(listing) : final) : run(args);
+    const inspected = await new GitCliInspector({ runner, digestReader: new FakeDigests() }).inspect();
+    assert.equal(reads, 2);
+    assert.match(inspected.issues?.join(" ") ?? "", /index tree changed or became unavailable/i);
+  }
+});
+
+test("gitlinks and invalid index metadata retain the recursive submodule query", async () => {
+  for (const listing of ["160000 " + "c".repeat(40) + " 0\tmodule\0", "truncated", "100644 " + "b".repeat(40) + " 1\tunmerged\0"]) {
+    const runner = new ScriptedRunner({
+      "rev-parse --show-toplevel": result("C:/work/example\n"), "rev-parse HEAD": result("a".repeat(40) + "\n"),
+      "ls-files --stage -z": result(listing), "submodule status --recursive": result("-" + "c".repeat(40) + " module\n")
+    });
+    const inspected = await new GitCliInspector({ runner, digestReader: new FakeDigests() }).inspect();
+    assert.equal(runner.calls.filter(call => call === "submodule status --recursive").length, 1);
+    assert.equal(Object.keys(inspected.submodules ?? {}).length, 1);
+    if (!listing.startsWith("160000")) assert.match(inspected.issues?.join(" ") ?? "", /index tree metadata is unavailable/i);
   }
 });
 

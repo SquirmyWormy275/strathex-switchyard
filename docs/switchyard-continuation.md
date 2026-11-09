@@ -71,6 +71,10 @@ evidence. Do not rerun executed start/audit/cleanup scripts.
 
 ## Current Windows verification
 
+The Windows client follow-up at installed source `0aeb317` passes all 31 groups and 340 tests with zero skips. Its exact merge/source tree, manifest, commands, original bounds, serial ordering and cleanup are audited. This accepts the Home and refusal-refresh corrections within the client lane; actual window/browser/hardware checks remain separate. [Native follow-up](evidence/client-native-0aeb317-summary.json).
+
+Repository inspection now avoids recursive submodule startup only when a validated index has no gitlinks and an exact second read matches. Changed/unavailable reads remain incomplete; gitlinks and invalid metadata keep the original recursive query. Eight integration groups pass 80 tests, three focused groups pass 31, and the final native-Git test file passes 17, with overlap. Typechecking passes. Execution UI tests now join the original HTTP reply before the unchanged rendering assertion. Full Windows timeout acceptance and normal installed adoption of this backend optimization remain pending. [Source evidence](evidence/repository-inspection-startup-summary.json).
+
 Full Windows run `42573946626` at `58ecd54` failed. Workers 7 and 11 each finish 20 of 21 groups; scanner and execution UI hit their original 45-second file limits. Execution UI also reports premature two-second rendering assertions. Their partial TAP output has no final count and is not a pass. Exact manifests, commands, bounds, toolchain identity and owned cleanup are audited; performance investigation remains open. [Original failures](evidence/full-native-58ecd54-ui-failures-summary.json).
 
 Preserve the later client failure at `51ce508`: run `42575533662`, job
@@ -81,7 +85,7 @@ UI test and zero skips; all original commands/bounds/cleanup verify. The fixture
 restored its global document before post-refusal refresh completed. It now joins
 visible readiness, with no deadline change. Two separate stale-label regressions
 also drove the production refresh correction; seven groups pass 88 locally.
-Native follow-up remains pending. [Failure](evidence/client-native-51ce508-failure-summary.json),
+Native follow-up passes at `0aeb317` above. [Failure](evidence/client-native-51ce508-failure-summary.json),
 [correction](evidence/role-refusal-refresh-source-summary.json).
 
 The client lane at `58ecd54` passes **31 groups, 327 tests, zero skips**. Run

@@ -249,8 +249,17 @@ export class GitCliInspector implements GitInspector {
     const deletedSet = new Set(deleted.filter((path) => trackedSet.has(path)));
     const untracked = await this.paths(["ls-files", "--others", "--exclude-standard", "-z"], repositoryRoot, "untracked file list", issues);
     const ignored = await this.paths(["ls-files", "--others", "--ignored", "--exclude-standard", "-z"], repositoryRoot, "ignored file list", issues);
-    const submoduleResult = await this.runner.run(["submodule", "status", "--recursive"], repositoryRoot);
-    const submodules = submoduleResult.exitCode === 0 ? parseSubmodules(submoduleResult.stdout) : (issues.push(shortFailure("submodule status", submoduleResult)), {});
+    let submodules: Record<string, string> = {};
+    if (indexTree && !indexListing.stdout.split("\0").some(row => row.startsWith("160000 "))) {
+      // A validated index with no gitlinks has no submodules to recurse into.
+      // Re-read the exact listing so a concurrent index edit cannot turn this
+      // optimization into an unverified assertion that submodules are absent.
+      const finalIndex = await this.runner.run(["ls-files", "--stage", "-z"], repositoryRoot);
+      if (finalIndex.exitCode !== 0 || finalIndex.stdout !== indexListing.stdout) issues.push("Git index tree changed or became unavailable while checking submodule absence.");
+    } else {
+      const submoduleResult = await this.runner.run(["submodule", "status", "--recursive"], repositoryRoot);
+      submodules = submoduleResult.exitCode === 0 ? parseSubmodules(submoduleResult.stdout) : (issues.push(shortFailure("submodule status", submoduleResult)), {});
+    }
 
     return {
       repositoryRoot,

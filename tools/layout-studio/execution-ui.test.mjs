@@ -23,7 +23,7 @@ async function chooseFile(c, bytes) {
   c.$("execution-manifest-file").files = [{ name: "run.json", size: data.length, arrayBuffer: async () => Uint8Array.from(data).buffer }];
   c.$("execution-manifest-file").dispatchEvent(new Event("change")); await until(() => !c.$("review-execution").disabled);
 }
-async function review(c) { c.click("review-execution"); await until(() => c.$("execution-review-dialog").open && !c.$("confirm-execution").disabled); }
+async function review(c) { c.click("review-execution"); await c.responses.findLast(r => r.path.endsWith("execution/review")).response; await until(() => c.$("execution-review-dialog").open && !c.$("confirm-execution").disabled); }
 async function confirm(c) { c.click("confirm-execution"); c.$("confirm-execution").dispatchEvent(new Event("click")); await c.responses.findLast(r => r.path.endsWith("/apply")).response; await until(() => !c.$("refresh-executions").disabled); }
 
 test("saved permission selection and local file hashing lead to an exact cancellable review without execution", async t => fixture(t, async c => {

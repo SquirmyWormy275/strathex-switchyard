@@ -22,13 +22,17 @@ no full Linux run remains active. Later source changes have focused evidence.
 
 Latest normal installed source `0aeb317` includes the Home navigation and saved-role refresh corrections. All 36 assets, 29 API checks and 107 installed metadata checks pass; all 54 semantic workspaces and 57 workflows remain intact. Current plus one rollback remain, and the verified prepared bundle is removed. The current synthetic preview passes nine checks. Browser visual acceptance remains blocked before inspection. [Installed evidence](evidence/installed-role-refusal-refresh-summary.json), [running demonstration](evidence/role-refusal-refresh-running-demo-summary.json).
 
+The Windows client follow-up at installed source `0aeb317` passes all 31 groups and 340 tests with zero skips. Its exact merge/source tree, manifest, commands, original bounds, serial ordering and cleanup are audited. This accepts the Home and refusal-refresh corrections within the client lane; actual window/browser/hardware checks remain separate. [Native follow-up](evidence/client-native-0aeb317-summary.json).
+
+Repository inspection now avoids recursive submodule startup only when a validated index has no gitlinks and an exact second read matches. Changed/unavailable reads remain incomplete; gitlinks and invalid metadata keep the original recursive query. Eight integration groups pass 80 tests, three focused groups pass 31, and the final native-Git test file passes 17, with overlap. Typechecking passes. Execution UI tests now join the original HTTP reply before the unchanged rendering assertion. Full Windows timeout acceptance and normal installed adoption of this backend optimization remain pending. [Source evidence](evidence/repository-inspection-startup-summary.json).
+
 Full Windows run `42573946626` at `58ecd54` failed. Workers 7 and 11 each finish 20 of 21 groups; scanner and execution UI hit their original 45-second file limits. Execution UI also reports premature two-second rendering assertions. Their partial TAP output has no final count and is not a pass. Exact manifests, commands, bounds, toolchain identity and owned cleanup are audited; performance investigation remains open. [Original failures](evidence/full-native-58ecd54-ui-failures-summary.json).
 
 Post-refusal role refresh now reads current saved labels and disables stale
 choices if that read fails. Two UI regressions reproduced stale labels; seven
 groups pass 88 tests. Windows client source `51ce508` remains failed with 334
 passes and one asynchronous fixture-teardown error. The corrected test joins
-visible readiness under the unchanged deadline; native follow-up is pending.
+visible readiness under the unchanged deadline; native follow-up passes at `0aeb317`.
 [Source correction](evidence/role-refusal-refresh-source-summary.json),
 [original Windows failure](evidence/client-native-51ce508-failure-summary.json).
 
