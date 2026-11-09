@@ -35,12 +35,12 @@ runpy.run_path(sys.argv[0],run_name='__main__')`;
  child.stdin.write(JSON.stringify({schema:'switchyard-editor-ingress/v1',parentPid:process.pid,socketPath:path,directoryDevice:String(d.dev),directoryInode:String(d.ino),...change})+'\n');
  t.after(async()=>{for(const s of sockets)s.destroy();child.stdin.end();if(!exit)await stopOwnedChild(child);await closed;assert.equal(stderr,'');await assert.rejects(lstat(path),{code:'ENOENT'});await rmdir(root);});
  const send=value=>child.stdin.write(JSON.stringify(value)+'\n');
- async function connect(peerChange={},headersChange='',partial=false){
+ async function connect(peerChange={},headersChange='',partial=false,requestPath='/'){
   await until(()=>messages.find(x=>x.kind==='ready')||exit);assert.equal(exit,undefined);
   const named=await lstat(path,{bigint:true}),ready=messages[0];assert.equal(ready.socketDevice,String(named.dev));assert.equal(ready.socketInode,String(named.ino));assert.equal(Number(named.mode)&0o077,0);
   const socket=createConnection(path);sockets.push(socket);socket.on('error',()=>{});let wire=Buffer.alloc(0),handshake;
   socket.on('data',chunk=>wire=Buffer.concat([wire,chunk]));await new Promise((resolve,reject)=>{socket.once('connect',resolve);socket.once('error',reject);});
-  const key=randomBytes(16).toString('base64');socket.write(partial?'GET / HTTP/1.1\r\n':`GET / HTTP/1.1\r\nHost: localhost\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Version: 13\r\nSec-WebSocket-Key: ${key}\r\n${headersChange}\r\n`);
+  const key=randomBytes(16).toString('base64');socket.write(partial?'GET / HTTP/1.1\r\n':`GET ${requestPath} HTTP/1.1\r\nHost: localhost\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Version: 13\r\nSec-WebSocket-Key: ${key}\r\n${headersChange}\r\n`);
   send({...await identity(),...peerChange});
   async function upgrade(){await until(()=>wire.includes('\r\n\r\n')||exit);assert.equal(exit,undefined);const end=wire.indexOf('\r\n\r\n');handshake=wire.subarray(0,end).toString();wire=wire.subarray(end+4);assert.ok(handshake.startsWith('HTTP/1.1 101'));assert.ok(handshake.includes(createHash('sha1').update(key+'258EAFA5-E914-47DA-95CA-C5AB0DC85B11').digest('base64')));await until(()=>messages.some(x=>x.kind==='peer-verified'));}
   async function nextFrame(){return until(()=>{if(wire.length<2)return false;assert.equal(wire[1]&128,0);let n=wire[1]&127,offset=2;if(n===126){if(wire.length<4)return false;n=wire.readUInt16BE(2);offset=4;}if(n===127){if(wire.length<10)return false;n=Number(wire.readBigUInt64BE(2));offset=10;}if(wire.length<offset+n)return false;const f={opcode:wire[0]&15,data:wire.subarray(offset,offset+n)};wire=wire.subarray(offset+n);return f;});}
@@ -50,10 +50,12 @@ runpy.run_path(sys.argv[0],run_name='__main__')`;
 }
 
 test('exact kernel peer exchanges Unicode JSON over one bounded masked WebSocket and closes its owned socket',native,async t=>{
- const f=await fixture(t),c=await f.connect();await c.upgrade();c.socket.write(frame({id:1,method:'fixture/read',params:{text:'私用'}}));await until(()=>f.messages.some(x=>x.kind==='message'));assert.deepEqual(f.messages.at(-1),{kind:'message',message:{id:1,method:'fixture/read',params:{text:'私用'}}});
+ for(const requestPath of ['/','/rpc']){
+ const f=await fixture(t),c=await f.connect({},'',false,requestPath);await c.upgrade();c.socket.write(frame({id:1,method:'fixture/read',params:{text:'私用'}}));await until(()=>f.messages.some(x=>x.kind==='message'));assert.deepEqual(f.messages.at(-1),{kind:'message',message:{id:1,method:'fixture/read',params:{text:'私用'}}});
  f.send({kind:'send',message:{id:1,result:{text:'exact'}}});const reply=await c.nextFrame();assert.equal(reply.opcode,1);assert.deepEqual(JSON.parse(reply.data),{id:1,result:{text:'exact'}});
  c.socket.write(frame(Buffer.from([3,232]),{opcode:8}));assert.equal((await c.nextFrame()).opcode,8);assert.deepEqual(await f.closed,{code:0,signal:null});
  assert.equal(f.messages.some(x=>'ideAttached'in x||'protocolAcknowledged'in x),false);
+ }
 });
 
 test('wrong terminal PID, birth or executable digest receives no upgrade and cannot submit JSON',native,async t=>{
@@ -72,6 +74,11 @@ test('unsupported, unmasked, oversized and malformed JSON frames fail before for
 });
 
 test('handshake extensions, browser origins and duplicate headers fail before peer readiness',native,async t=>{
+ for(const path of ['/rpc/','/rpc?token=x','/%72pc','/other']){
+  const f=await fixture(t),c=await f.connect({},'',false,path);
+  assert.equal((await f.closed).code,2);assert.equal(c.wire().length,0);
+  assert.deepEqual(f.messages.map(x=>x.kind),['ready']);
+ }
  for(const headers of ['Origin: https://untrusted.invalid\r\n','Sec-WebSocket-Extensions: permessage-deflate\r\n','Sec-WebSocket-Version: 13\r\n']){const f=await fixture(t),c=await f.connect({},headers);assert.equal((await f.closed).code,2);assert.equal(c.wire().length,0);assert.deepEqual(f.messages.map(x=>x.kind),['ready']);}
 });
 

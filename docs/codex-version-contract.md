@@ -53,6 +53,12 @@ That proof covers effective configuration, not live account/task/model behavior
 or native TUI handoff. Those remain separate acceptance work. Earlier 0.166
 native evidence is retained; this change has no new native 0.166 run.
 
+The subsequent [native terminal compatibility check](codex-terminal-compatibility.md)
+exercises the real 0.167 TUI with the production handshake/relay and a synthetic
+provider. Its startup prefix now passes; project-specific configuration and the
+remaining TUI bootstrap/resume exchange are still implementation gaps. Seven
+integration groups pass 64 tests with no skips.
+
 The review uses the [official App Server contract](https://learn.chatgpt.com/docs/app-server),
 [0.166 feature parser](https://github.com/openai/codex/blob/rust-v0.166.0/codex-rs/features/src/lib.rs),
 [0.167 features](https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/features/src/lib.rs)

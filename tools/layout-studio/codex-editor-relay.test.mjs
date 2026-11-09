@@ -7,6 +7,11 @@ import { createCodexEditorRelay } from './codex-editor-relay.mjs';
 const account = { type: 'chatgpt', email: 'editor@example.invalid' };
 const target = { sessionId: '11111111-1111-4111-8111-111111111111', repositoryRoot: '/original/repository', accountFingerprint: codexAccountFingerprint(account) };
 const initialize = { id: 1, method: 'initialize', params: { clientInfo: { name: 'codex_tui', version: '0.166.0' } } };
+// Captured from the installed 0.167 binary in an empty network-isolated home.
+const nativeInitialize = { id: 'initialize', method: 'initialize', params: {
+  clientInfo: { name: 'codex-tui', title: null, version: '0.167.0' },
+  capabilities: { requiredHumanApproval: true, experimentalApi: true, requestAttestation: false, optOutNotificationMethods: null }
+} };
 const resumed = () => ({ thread: { id: target.sessionId, cwd: target.repositoryRoot, status: { type: 'idle' } }, cwd: target.repositoryRoot, sandbox: { type: 'readOnly' }, approvalPolicy: 'on-request', modelProvider: 'openai' });
 const resume = (id = 2) => ({ id, method: 'thread/resume', params: { threadId: target.sessionId, cwd: target.repositoryRoot, sandbox: 'read-only', approvalPolicy: 'on-request', excludeTurns: true } });
 const gate = () => { let resolve; const promise = new Promise(r => resolve = r); return { promise, resolve }; };
@@ -38,6 +43,48 @@ test('one connection brackets the exact resume with account reads and withholds 
   release.resolve(); await work; assert.equal(f.delivered.at(-1).result.thread.id, target.sessionId); assert.equal(f.relay.observation().protocolAcknowledged, true);
   assert.equal(f.relay.observation().ideAttached, false); assert.equal(f.relay.observation().authorityGranted, false);
 });
+test('native 0.167 startup normalizes capabilities and empty account reads without expanding provider authority', async t => {
+  const f = fixture(t, { reply: async (m,r) => { if (m.method === 'initialize') r.userAgent = 'codex-tui/0.167.0 (synthetic)'; } });
+  await f.relay.receive(nativeInitialize); await f.relay.receive({ method: 'initialized' });
+  assert.deepEqual(f.calls[0], { method: 'initialize', params: { clientInfo: { name: 'codex-tui', version: '0.167.0' }, capabilities: { experimentalApi: false } } });
+  await f.relay.receive({ id: 1, method: 'account/read', params: {} });
+  await f.relay.receive({ id: 2, method: 'thread/read', params: { threadId: target.sessionId } });
+  assert.deepEqual(f.calls.filter(m => m.method === 'account/read').map(m => m.params), Array(4).fill({ refreshToken: false }));
+  assert.deepEqual(f.calls.filter(m => m.method === 'thread/read'), [{ method: 'thread/read', params: { threadId: target.sessionId, includeTurns: false } }]);
+  assert.equal(f.delivered.at(-1).result.thread.id, target.sessionId);
+  assert.equal(f.acknowledgements.length, 0); assert.equal(f.relay.observation().protocolAcknowledged, false);
+  assert.equal(f.calls.some(m => m.method === 'thread/resume'), false);
+});
+test('native startup shape, version and pre-resume reads stay closed to expanded or foreign requests', async t => {
+  const changed = [m => m.params.clientInfo.version = '0.168.0', m => m.params.clientInfo.name = 'other',
+    m => m.params.capabilities.requiredHumanApproval = false, m => m.params.capabilities.requestAttestation = true,
+    m => m.params.capabilities.optOutNotificationMethods = ['account/updated'], m => m.params.capabilities.extra = false];
+  for (const mutate of changed) {
+    const f = fixture(t), m = structuredClone(nativeInitialize); mutate(m);
+    await assert.rejects(f.relay.receive(m)); assert.deepEqual(f.calls, []);
+  }
+  for (const params of [{ threadId: target.sessionId, includeTurns: true }, { threadId: 'foreign' }]) {
+    const f = fixture(t, { reply: async (m,r) => { if (m.method === 'initialize') r.userAgent = 'codex-tui/0.167.0 (synthetic)'; } });
+    await f.relay.receive(nativeInitialize); await f.relay.receive({ method: 'initialized' });
+    await assert.rejects(f.relay.receive({ id: 2, method: 'thread/read', params }));
+    assert.equal(f.calls.some(m => m.method === 'thread/read'), false);
+  }
+  const generic = fixture(t); await generic.ready();
+  await assert.rejects(generic.relay.receive({ id: 2, method: 'thread/read', params: { threadId: target.sessionId } }));
+  assert.equal(generic.calls.some(m => m.method === 'thread/read'), false);
+});
+test('native pre-resume metadata is withheld if its original account changes during the read', async t => {
+  let changed = false;
+  const f = fixture(t, { reply: async (m,r) => {
+    if (m.method === 'initialize') r.userAgent = 'codex-tui/0.167.0 (synthetic)';
+    if (m.method === 'thread/read') changed = true;
+    if (m.method === 'account/read' && changed) r.account.email = 'other@example.invalid';
+  } });
+  await f.relay.receive(nativeInitialize); await f.relay.receive({ method: 'initialized' });
+  await assert.rejects(f.relay.receive({ id: 2, method: 'thread/read', params: { threadId: target.sessionId } }));
+  assert.equal(f.delivered.some(m => m.id === 2), false); assert.equal(f.relay.observation().protocolAcknowledged, false);
+});
+
 test('unreviewed requests, effects, foreign task IDs and expanded permissions never reach the provider', async t => {
   for (const method of ['turn/start','turn/steer','thread/start','thread/fork','account/logout','account/login/start','config/value/write','unknown/method']) {
     const f = fixture(t); await f.ready(); const prior = f.calls.length; await assert.rejects(f.relay.receive({ id: 2, method, params: {} })); assert.equal(f.calls.length, prior); assert.equal(f.client.closed, true);

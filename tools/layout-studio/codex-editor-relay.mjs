@@ -15,7 +15,7 @@ export function createCodexEditorRelay({ target, client, assertCurrent, send, on
   require(client && ['request','send','on','off','close'].every(k => typeof client[k] === 'function') && !client.closed);
   require([assertCurrent,send,onAcknowledged].every(f => typeof f === 'function') && signal instanceof AbortSignal);
   const controller = new AbortController(), seen = new Set(), notifications = new Set();
-  let phase = 'initialize', closed = false, failure = false, acknowledged = false, attempted = false, accountSequence = 0, count = 0, bytes = 0, tail = Promise.resolve(), stopping;
+  let phase = 'initialize', closed = false, failure = false, acknowledged = false, attempted = false, nativeTui = false, accountSequence = 0, count = 0, bytes = 0, tail = Promise.resolve(), stopping;
   const live = () => { require(!closed && !signal.aborted && !client.closed); };
   const current = async () => { live(); await assertCurrent(); live(); };
   const observation = () => Object.freeze({ schema: 'switchyard-editor-relay/v1', phase, protocolAcknowledged: !closed && !client.closed && acknowledged && witness.observation().protocolAcknowledged,
@@ -52,14 +52,22 @@ export function createCodexEditorRelay({ target, client, assertCurrent, send, on
     if (phase === 'initialize') {
       require(m.method === 'initialize' && m.id !== undefined && exact(m.params, ['clientInfo','capabilities']));
       const info = m.params.clientInfo, caps = m.params.capabilities;
-      require(exact(info, ['name','title','version']) && typeof info.name === 'string' && /^[A-Za-z0-9_-]{1,64}$/.test(info.name) && label(info.version) && (info.title === undefined || label(info.title)));
-      require(caps === undefined || exact(caps, ['experimentalApi']) && (caps.experimentalApi === undefined || caps.experimentalApi === false));
-      const result = await request('initialize', m.params);
+      // The reviewed native TUI advertises its own broad protocol support.
+      // Translate that exact dialect into our existing restricted upstream
+      // handshake. Advertising support never authorizes experimental methods,
+      // notification opt-outs, attestation or any additional task effects.
+      nativeTui = exact(info, ['name','title','version']) && info.name === 'codex-tui' && info.title === null && info.version === '0.167.0'
+        && exact(caps, ['requiredHumanApproval','experimentalApi','requestAttestation','optOutNotificationMethods'])
+        && caps.requiredHumanApproval === true && caps.experimentalApi === true && caps.requestAttestation === false && caps.optOutNotificationMethods === null;
+      require(nativeTui || exact(info, ['name','title','version']) && typeof info.name === 'string' && /^[A-Za-z0-9_-]{1,64}$/.test(info.name) && label(info.version) && (info.title === undefined || label(info.title)));
+      require(nativeTui || caps === undefined || exact(caps, ['experimentalApi']) && (caps.experimentalApi === undefined || caps.experimentalApi === false));
+      const result = await request('initialize', nativeTui ? { clientInfo: { name: info.name, version: info.version }, capabilities: { experimentalApi: false } } : m.params);
       // A logical stdio channel returns its retained owner's exact native hello;
       // it never sends a second initialize or substitutes the terminal's name.
       const retained = client.initializationOrigin === 'retained-owner';
       require(!retained || client.retirementKind === 'logical-channel' && typeof client.initializationClientName === 'string');
       client.nativeVersion = reviewedCodexVersion(result, retained ? client.initializationClientName : info.name);
+      require(!nativeTui || client.nativeVersion === info.version);
       phase = 'initialized'; await deliver({ id: m.id, result }); return;
     }
     if (phase === 'initialized') {
@@ -83,7 +91,7 @@ export function createCodexEditorRelay({ target, client, assertCurrent, send, on
       await deliver({ id: m.id, result }); phase = 'acknowledged'; acknowledged = true; return;
     }
     if (m.method === 'account/read') {
-      require(exact(m.params, ['refreshToken']) && m.params.refreshToken === false);
+      require(exact(m.params, ['refreshToken']) && (m.params.refreshToken === false || nativeTui && m.params.refreshToken === undefined));
       const result = await account('switchyard-account-' + ++accountSequence); await deliver({ id: m.id, result }); acknowledged = attempted && witness.observation().protocolAcknowledged; return;
     }
     if (m.method === 'config/read') {
@@ -91,8 +99,13 @@ export function createCodexEditorRelay({ target, client, assertCurrent, send, on
       const result = await request(m.method, m.params); assertCodexDesignConfig(result?.config); await deliver({ id: m.id, result }); return;
     }
     if (m.method === 'thread/read') {
-      require(acknowledged && exact(m.params, ['threadId','includeTurns']) && m.params.threadId === selected.sessionId && (m.params.includeTurns === undefined || typeof m.params.includeTurns === 'boolean'));
-      const result = await request(m.method, m.params); require(result?.thread?.id === selected.sessionId && result.thread.cwd === selected.repositoryRoot && ['idle','active'].includes(result.thread.status?.type));
+      const startupRead = nativeTui && phase === 'ready' && !attempted;
+      require((acknowledged || startupRead) && exact(m.params, ['threadId','includeTurns']) && m.params.threadId === selected.sessionId && (m.params.includeTurns === undefined || typeof m.params.includeTurns === 'boolean')
+        && (!startupRead || m.params.includeTurns !== true));
+      if (startupRead) await account('switchyard-before-read-' + ++accountSequence);
+      const result = await request(m.method, startupRead ? { threadId: selected.sessionId, includeTurns: false } : m.params);
+      require(result?.thread?.id === selected.sessionId && result.thread.cwd === selected.repositoryRoot && ['idle','active'].includes(result.thread.status?.type));
+      if (startupRead) await account('switchyard-after-read-' + ++accountSequence);
       await deliver({ id: m.id, result }); return;
     }
     // No default forwarding. Turn, login, config-write, other-task and unknown

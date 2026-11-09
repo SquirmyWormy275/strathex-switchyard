@@ -68,6 +68,18 @@ evidence. Do not rerun executed start/audit/cleanup scripts.
 
 ## Current Windows verification
 
+The source now handles the real Codex 0.167 Unix `/rpc` handshake, translates its
+exact capability advertisement into restricted provider initialization, and
+allows account-bracketed metadata reads for the selected thread before resume.
+Seven integration groups pass 64 tests with zero skips; original deadlines and
+thirteen non-Linux carrier skips are unchanged. An actual isolated TUI passes
+those stages against the production handshake/relay and a synthetic provider.
+The next project-specific configuration request still refuses. Remaining TUI
+bootstrap/resume support is unfinished implementation, not unavailable-account
+acceptance. All twelve diagnostic roots and 230,303 bytes are removed. This
+change is not installed. [Next protocol work](codex-terminal-compatibility.md),
+[audited evidence](evidence/codex-native-startup-summary.json).
+
 Repository inspection now runs the same independent metadata queries in groups
 of four after root verification, joining every started sibling before failure or
 cleanup. The final index witness, query allowlist, owner quota and original

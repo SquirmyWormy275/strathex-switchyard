@@ -104,7 +104,9 @@ def handshake(connection, stopped):
         incoming.extend(chunk)
     raw, rest = bytes(incoming).split(b"\r\n\r\n", 1)
     lines = raw.decode("ascii", "strict").split("\r\n")
-    require(lines[0] == "GET / HTTP/1.1")
+    # Codex 0.167 uses /rpc on Unix sockets. Both exact paths retain the same
+    # kernel peer, size, header and frame checks; no arbitrary routing exists.
+    require(lines[0] in ("GET / HTTP/1.1", "GET /rpc HTTP/1.1"))
     headers = {}
     for line in lines[1:]:
         name, value = line.split(":", 1)
