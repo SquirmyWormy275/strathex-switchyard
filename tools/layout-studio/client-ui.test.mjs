@@ -25,6 +25,7 @@ test("distinct client metadata and exported recipes do not open applications or 
   assert.match(c.$("client-facts").children.map(e => e.textContent).join(" "), /Separate from Microsoft 365 Copilot/);
   c.change("client-picker", "microsoft-365-copilot-web"); assert.equal(c.$("review-client-launch").disabled, true); assert.equal(c.$("download-client-recipe").disabled, true);
   c.change("client-picker", "claude-desktop"); assert.equal(c.$("review-client-launch").disabled, true); assert.match(c.$("client-facts").children.map(e => e.textContent).join(" "), /Separate from Claude Code/);
+  assert.match(c.$("client-facts").children.map(e => e.textContent).join(" "), /Linux desktop host:/);
   c.click("download-client-recipe"); await until(() => c.downloads.length === 1); const [name, content, mime] = c.downloads[0], recipe = JSON.parse(content);
   assert.equal(name, "switchyard-claude-desktop.json"); assert.equal(mime, "application/json"); assert.equal(recipe.importedAuthority, false); assert.equal(recipe.approval, "required-from-current-local-environment"); assert.equal(c.effects(), 0); assert.deepEqual(await c.store.snapshot("personal"), c.before);
 }));

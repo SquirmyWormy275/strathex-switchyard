@@ -63,6 +63,28 @@ Private receipts use **review-context-**. **Do not replay install or cleanup.**
 The new frontend rotates local access; the normal launcher obtains the fresh link.
 [Installed result](evidence/installed-review-context-summary.json).
 
+## Next backend checkpoint
+
+Local host-support assessment now feeds the existing Claude Desktop client facts.
+Six original groups pass **70 checks / one existing skip**; the final metadata
+follow-up passes 19 overlapping checks. One bounded metadata read reports this
+Omarchy host as unsupported by the vendor's desktop beta. No app, provider or
+account is inspected. Linux executable binding and launch/focus remain unfinished.
+Source evidence: **linux-desktop-host-support-summary.json**. Normal installed
+adoption is pending; its frontend assets are unchanged.
+
+Windows `2fb81bc` run **42615316762**, assembly job **129154818239**, failed the
+PowerShell 5.1 trusted-bootstrap fixture with a counter-file sharing violation.
+Original artifact **13674025946** is privately retained as
+**native-2fb81bc-assembly-original.json**; its 13 groups and cleanup are audited.
+Twenty-two other workers report success, but no complete acceptance is claimed.
+The counter-readiness loop now tolerates only Win32 sharing/lock errors 32/33
+within its original 15-second wait. All exact count/process/staging assertions
+remain; production bootstrap is unchanged. Two local harness groups pass 32
+checks. No local PowerShell exists; native correction acceptance is pending via
+normal branch pushes. Do not retry, cancel or expand deadlines.
+[Failure evidence](evidence/windows-bootstrap-contention-summary.json).
+
 ## Complete Linux verification — audited and removed
 
 Source **a7958c4** passes all 376 original groups: **2,578 tests / 32 declared

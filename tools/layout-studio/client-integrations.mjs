@@ -1,6 +1,7 @@
 /** Offline-compatible discovery; no CLI, browser or account probing. */
 import { clientCatalog, clientRecipe, validateClientRecipe } from "../../integrations/client-recipes.mjs";
-export function createClientIntegrations({ store, platform = process.platform, hostLaunchPlatforms = [] } = {}) {
+import { assessClaudeDesktopLinuxHost, readLinuxDesktopHost } from "./linux-desktop-support.mjs";
+export function createClientIntegrations({ store, platform = process.platform, hostLaunchPlatforms = [], linuxDesktopHost = readLinuxDesktopHost } = {}) {
   return {
     async focusCatalog(c) {
       const s = await store.snapshot(c);
@@ -17,8 +18,15 @@ export function createClientIntegrations({ store, platform = process.platform, h
     },
     async catalog(c) {
       const s = await store.snapshot(c);
+      let nativeHostSupport = null;
+      if (platform === "linux") {
+        let metadata; try { metadata = await linuxDesktopHost(); } catch { metadata = {}; }
+        nativeHostSupport = assessClaudeDesktopLinuxHost(metadata);
+      }
       const entries = clientCatalog({ policy: s.policy, mode: s.mode, platform, hostLaunchPlatforms }).map(entry => ({
         ...entry,
+        nativeHostSupport: entry.id === "claude-desktop" ? nativeHostSupport : null,
+        requirements: entry.id === "claude-desktop" && nativeHostSupport ? [...entry.requirements, nativeHostSupport.summary] : entry.requirements,
         // Implementation and saved setup are distinct from observing an actual
         // process/window. This does not change the exported launch recipe.
         nativeNavigation: entry.id === "claude-desktop" && platform === "win32" ? {

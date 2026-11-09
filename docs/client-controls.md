@@ -5,6 +5,17 @@ Copilot, Claude desktop, Cursor Cloud Agents and Figma. Each choice shows its
 exact destination, prerequisites, current workspace availability and source
 reference. Browsing the catalog contacts no provider and starts no application.
 
+On Linux, the Claude Desktop facts now distinguish this computer's vendor platform
+baseline from the portable recipe. One bounded local `os-release` read and the
+processor architecture identify supported versions, unsupported hosts, untested
+Debian derivatives or unavailable metadata. Omarchy is reported as unsupported by
+the vendor's desktop beta. This grants no permission and selects no alternate app.
+The verified executable binding and Linux launch/focus path remain unfinished.
+[Vendor requirements](https://code.claude.com/docs/en/desktop-linux),
+[source and host evidence](evidence/linux-desktop-host-support-summary.json).
+Six original integration groups pass 70 checks and one existing skip; the final
+metadata group passes 19 overlapping checks. Installed adoption remains pending.
+
 On Windows, select **Claude desktop → Set up Claude Desktop** to move directly
 to its exact native-app setup. An already saved identity changes the link to
 **Go to Claude Desktop controls**. Navigation reads saved metadata only; it does

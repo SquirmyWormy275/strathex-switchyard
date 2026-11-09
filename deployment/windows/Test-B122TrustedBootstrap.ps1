@@ -249,7 +249,16 @@ switch($mode){
     Assert-True ($null-ne$crashMarkerValue) 'The bootstrap interruption fixture never reached its exact running marker.'
     Assert-True ([int]$crashMarkerValue.bootstrapPid-eq[int]$crashProcess.Id-and[int]$crashMarkerValue.supervisorPid-gt0-and[int]$crashMarkerValue.childPid-gt0) 'The bootstrap interruption marker was not bound to the exact process tree.'
     $supervisorTicks=Get-ProcessStartTicks ([int]$crashMarkerValue.supervisorPid);$childTicks=Get-ProcessStartTicks ([int]$crashMarkerValue.childPid)
-    $childReadyDeadline=[DateTime]::UtcNow.AddSeconds(15);do{$count=[int][IO.File]::ReadAllText((Join-Path $stateRoot 'bootstrap-invocations.txt'));if($count-eq(3+$ReceiptModes.Count)){break};[Threading.Thread]::Sleep(25)}while([DateTime]::UtcNow-lt$childReadyDeadline)
+    # The running installer publishes this counter with WriteAllText. During
+    # that write, Windows can refuse this polling read with a sharing/lock
+    # violation. Keep waiting within the original deadline; all other errors
+    # still fail, and only the exact expected count establishes readiness.
+    $childReadyDeadline=[DateTime]::UtcNow.AddSeconds(15);$count=$null
+    do{
+      try{$count=[int][IO.File]::ReadAllText((Join-Path $stateRoot 'bootstrap-invocations.txt'))}
+      catch [IO.IOException]{if(($_.Exception.GetBaseException().HResult -band 0xFFFF) -notin @(32,33)){throw};$count=$null}
+      if($count-eq(3+$ReceiptModes.Count)){break};[Threading.Thread]::Sleep(25)
+    }while([DateTime]::UtcNow-lt$childReadyDeadline)
     Assert-True ($count-eq(3+$ReceiptModes.Count)) 'The interruption fixture installer did not reach its bounded hang seam.'
     $crashProcess.Kill();Assert-True $crashProcess.WaitForExit(10000) 'The exact bootstrap host did not terminate within its bound.'
     $treeDeadline=[DateTime]::UtcNow.AddSeconds(15);do{$supervisorAlive=Test-OriginalProcessAlive ([int]$crashMarkerValue.supervisorPid) $supervisorTicks;$childAlive=Test-OriginalProcessAlive ([int]$crashMarkerValue.childPid) $childTicks;if(-not$supervisorAlive-and-not$childAlive){break};[Threading.Thread]::Sleep(25)}while([DateTime]::UtcNow-lt$treeDeadline)

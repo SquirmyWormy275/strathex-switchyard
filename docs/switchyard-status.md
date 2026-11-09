@@ -107,6 +107,21 @@ The immutable frontend pin and normal installation are complete; all 36 served
 assets match and the prepared package is removed.
 [Evidence](evidence/review-context-source-summary.json).
 
+The next backend checkpoint reports Linux Claude Desktop host support in the
+existing client facts. Omarchy is unsupported by the vendor beta; malformed or
+unavailable metadata stays unverified. Six integration groups pass 70 checks/one
+existing skip. Native executable binding and launch/focus remain unfinished.
+[Source evidence](evidence/linux-desktop-host-support-summary.json).
+
+A later Windows source cohort at **2fb81bc** failed its PowerShell 5.1 bootstrap
+fixture on a sharing violation while reading the invocation counter. Its 13-group
+assembly receipt, source tree, original commands/bounds and cleanup are audited;
+12 groups passed. The existing counter-readiness wait now tolerates only sharing/
+lock violations within its original 15 seconds. Exact count/exit assertions and
+production bootstrap behavior are unchanged. Two local harness groups pass 32
+checks; actual native acceptance is pending.
+[Original failure and correction](evidence/windows-bootstrap-contention-summary.json).
+
 ## Remaining implementation and defects
 
 - Bounded historical-name discovery is implemented and normally installed. Its

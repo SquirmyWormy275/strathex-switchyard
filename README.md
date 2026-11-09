@@ -84,6 +84,8 @@ observation and scanner capabilities tracked in the ledger. The Windows UI files
 now pass their original limits, though execution retains a narrow timing margin.
 Earlier repeated-focus and other intermittent native failures remain recorded.
 [Retained Windows failures](docs/evidence/native-48bf450-results-summary.json).
+A later PowerShell bootstrap fixture hit counter-file contention; its bounded
+wait correction awaits native acceptance. [Current failure](docs/evidence/windows-bootstrap-contention-summary.json).
 
 **Separate acceptance checks:** browser task/visual review, physical F77/B122
 changes, approved Microsoft tenant access, live native accounts/tasks, interactive

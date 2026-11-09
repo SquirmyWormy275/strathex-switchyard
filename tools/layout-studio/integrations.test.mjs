@@ -10,6 +10,7 @@ import { stopOwnedChild } from "./owned-process.mjs";
 import { createCustomAgents } from "./custom-agents.mjs";
 import { createCopilot } from "./copilot.mjs";
 import { createClientIntegrations } from "./client-integrations.mjs";
+import { assessClaudeDesktopLinuxHost } from "./linux-desktop-support.mjs";
 import { clientRecipe, validateClientRecipe } from "../../integrations/client-recipes.mjs";
 import { createStudioServer } from "./serve.mjs";
 import { switchyardAgent } from "../../integrations/agent-sdk.mjs";
@@ -52,6 +53,43 @@ test("client discovery keeps offline configuration useful and Work recipes canno
   const desktop = personal.entries.find(e => e.provider === "claude-desktop"); assert.equal(desktop.recipe.target.kind, "native-application"); assert.equal(desktop.capabilities.exactResume, false);
   desktop.recipe.target.applicationId = "foreign"; assert.equal((await service.recipe("personal", { id: "claude-desktop" })).recipe.target.applicationId, "claude-desktop");
   assert.equal(store.history.length, 0); assert.equal(store.secrets.size, 0);
+});
+
+test("Linux Claude Desktop discovery reports this host separately from portable recipes and native permission", async () => {
+  const store = memoryStore(); let reads = 0;
+  const service = createClientIntegrations({ store, platform: "linux", linuxDesktopHost: async () => {
+    reads++; return { osRelease: 'ID=omarchy\nID_LIKE=arch\nVERSION_ID="4.5.0"\n', architecture: "x64" };
+  } });
+  const before = structuredClone(store.states), catalog = await service.catalog("personal"), desktop = catalog.entries.find(e => e.id === "claude-desktop");
+  assert.equal(reads, 1);
+  assert.equal(desktop.nativeHostSupport.status, "unsupported-distribution"); assert.equal(desktop.nativeHostSupport.supported, false);
+  assert.match(desktop.requirements.join(" "), /Linux desktop host:.*omarchy.*unsupported/i);
+  assert.equal(desktop.capabilities.hostLaunchConnected, false); assert.equal(desktop.nativeNavigation, null);
+  assert.equal(desktop.recipePlatformSupported, true, "the portable Linux recipe is distinct from this host");
+  assert.deepEqual((await service.recipe("personal", { id: "claude-desktop" })).recipe, clientRecipe("claude-desktop"));
+  assert.equal(reads, 1, "exporting a portable recipe must not probe the host");
+  assert.deepEqual(store.states, before); assert.equal(store.history.length, 0); assert.equal(store.secrets.size, 0);
+  const windows = createClientIntegrations({ store, platform: "win32", linuxDesktopHost: async () => { throw Error("Windows must not read Linux metadata"); } });
+  assert.equal((await windows.catalog("personal")).entries.find(e => e.id === "claude-desktop").nativeHostSupport, null);
+});
+
+test("desktop support metadata distinguishes version boundaries, derivatives, architecture and malformed input", async () => {
+  const assess = (text, architecture = "x64") => assessClaudeDesktopLinuxHost({ osRelease: text, architecture });
+  for (const [id, version, status] of [["ubuntu", "22.03", "unsupported-version"], ["ubuntu", "22.04", "vendor-baseline-matched"], ["ubuntu", "24.04", "vendor-baseline-matched"], ["debian", "11", "unsupported-version"], ["debian", "12", "vendor-baseline-matched"], ["debian", "13.1", "vendor-baseline-matched"], ["ubuntu", "22", "unverified-host"]]) {
+    const result = assess(`ID=${id}\nVERSION_ID="${version}"\n`);
+    assert.equal(result.status, status); assert.equal(result.supported, status === "vendor-baseline-matched");
+    for (const field of ["applicationObserved", "executableVerified", "accountVerified", "authorityGranted"]) assert.equal(result[field], false);
+  }
+  assert.equal(assess("ID=debian\nVERSION_ID=12\n", "arm64").supported, true);
+  assert.equal(assess("ID=debian\nVERSION_ID=12\n", "ia32").status, "unsupported-architecture");
+  assert.equal(assess('ID=linuxmint\nID_LIKE="ubuntu debian"\nVERSION_ID=22\n').status, "untested-distribution");
+  assert.equal(assess("ID=fedora\nVERSION_ID=42\n").status, "unsupported-distribution");
+  for (const text of ["", "ID=ubuntu\nVERSION_ID=22.04\nID=debian\n", 'ID="$(touch forbidden)"\nVERSION_ID=24.04\n', "ID=ubuntu\nVERSION_ID=rolling\n", "ID=ubuntu\r\nVERSION_ID=24.04\n", "ID=ubuntu\nVERSION_ID=24.04\0", "ID=ubuntu\nVERSION_ID=24.04\n" + "#".repeat(16384)]) assert.equal(assess(text).status, "unverified-host");
+  for (const input of [null, [], 1, "linux"]) assert.equal(assessClaudeDesktopLinuxHost(input).status, "unverified-host");
+  const store = memoryStore(), service = createClientIntegrations({ store, platform: "linux", linuxDesktopHost: async () => { throw Error("Synthetic unavailable metadata"); } });
+  const catalog = await service.catalog("personal"), desktop = catalog.entries.find(e => e.id === "claude-desktop");
+  assert.equal(catalog.entries.length, 5); assert.equal(desktop.nativeHostSupport.status, "unverified-host");
+  assert.equal(desktop.capabilities.hostLaunchConnected, false); assert.equal(store.history.length, 0);
 });
 
 test("custom SDK events require exact scoped MAC, freshness and monotonic sequence; commands have one claim", async () => {
