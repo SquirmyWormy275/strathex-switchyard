@@ -86,5 +86,14 @@
     "Scanner-recipe creation is still independent frontend implementation work.",
     "Browser visual/responsive inspection remains blocked by the browser tool failure.",
     "No live native account/task inspection, installed update, hardware or model request is accepted by this checkpoint."
-  ]
+  ],
+  "reviewBundle": {
+    "sourceCommit": "09de950f97383773d14dbcac4bc82b70628fe0d0",
+    "digest": "e599e9010326e4bcd02d2c577fc16aac62492ac78e3e3630328ce5a586f2f24a",
+    "assets": 30,
+    "allBytesVerified": true,
+    "priorPointerDatedBackupVerified": true,
+    "installed": false,
+    "visuallyAccepted": false
+  }
 }

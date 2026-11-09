@@ -283,6 +283,9 @@ bounds and backend checks are unchanged. [Evidence](evidence/execution-ui-source
 
 ## Task permission frontend checkpoint
 
+Source 09de950f97383773d14dbcac4bc82b70628fe0d0 has an immutable 30-asset frontend
+e599e9010326e4bcd02d2c577fc16aac62492ac78e3e3630328ce5a586f2f24a. All bytes and the prior dated pointer backup verify. It is not installed or visually accepted.
+
 Named saved coding tasks now lead to explicit file/action/lifetime review and
 separate grant issuance. Revalidation and separate revocation are connected;
 revocation remains usable in keyboard-only mode. Opening the picker makes no
