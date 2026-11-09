@@ -37,6 +37,17 @@ The temporary wrapper's original syntax failure preceded every test and remains 
 
 ## Current Windows verification
 
+**Full package verification now passes at `7529718`.** Run `42539354588`, job
+`128917796171`, merge `1f2bf2d153eebedeaf488a911f1fe1812dac4d42`,
+source/merge tree `ec96edb826e7ba408d9b3c1c2155cb2b3d51b1d3`: all eight jobs
+succeed. The retained receipt has 462 groups, 2,910 passes and 246 declared skips.
+Every original command, bound, skip, cleanup and build dependency order is audited;
+at most two children overlap. Native helper publishing, portable smoke and artifact
+validation reach the original verified-bundle marker. No binary/runtime archive
+was downloaded locally. Later frontend/editor revisions and live-host acceptance
+remain separate. [Exact evidence](evidence/windows-package-7529718-summary.json).
+
+
 Source `4db5948e63df68501b56ac4d6690f3a86cf001e4` passes all **462 groups, 2,910 tests and 246 declared skips**. All 21 original worker receipts are independently audited against the source/merge tree, toolchain, manifest, commands, bounds and cleanup. Run `42461208384` uses merge `29faa91ee774e760c62e658e676df3cc916d79c1`, tree `3c4d0b86eaa8f6f59ec07897d4ed25888d63693e`. Its native collector is accepted: exact scope, manifest, all cohort identities/digests and totals match the independent audit; all 23 workflow jobs pass. [Complete source evidence](evidence/complete-windows-4db5948-summary.json).
 
 The earlier full package run `42397684952` at `90fa879` completed all 462 groups in about 61 minutes, within its existing 90-minute limit. **Two native fixture assertions failed.** The receipt has 2,900 passes, two failures and 246 declared skips, with exact cleanup. Preserve the [audited original failure](evidence/windows-package-90fa879-failure-summary.json).
@@ -53,7 +64,7 @@ The latest source `db24634` also has a passing native collector and all 462 pack
 Next remote checks:
 
 1. The early native preflight is now accepted at `7529718`: client run `42539354532`, helper job `128910595134`, merge `1f2bf2d153eebedeaf488a911f1fe1812dac4d42`, source/merge tree `ec96edb826e7ba408d9b3c1c2155cb2b3d51b1d3`. The standalone helper publishes and passes its own-process self-test under the unchanged 15-minute bound, pinned offline toolchain and QUERY 8. [Native evidence](evidence/provider-helper-platform-native-summary.json). No binary was downloaded locally. The adjacent voice target compiles offline; 33 staging files/377,415 bytes are removed. Do not rerun executed reproduction/build/cleanup scripts.
-2. Follow ordinary source run `42539354478` and full package run `42539354588` at `7529718`, or their exact newer-source replacements. Require the complete release job to pass its remaining native publishing/packaging stages. Source and package test-stage acceptance do not establish a finished release.
+2. Package run `42539354588` at `7529718` is now fully accepted within its documented software boundary above. Follow exact newer-source CI for subsequent frontend/editor changes; do not transfer this acceptance to newer code.
 3. Preserve the two `db24634` preliminary HTTP 504 failures before tests (jobs `128691327134` and `128691327237`); no receipts exist. The next normal source push can schedule a fresh run. Do not dispatch/cancel/retry CI manually.
 
 The frontend clarification is resolved: the owner approved completing it. Continue backend/package verification alongside the guided frontend implementation.
