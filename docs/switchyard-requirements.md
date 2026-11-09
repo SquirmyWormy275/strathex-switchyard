@@ -20,7 +20,7 @@ Current plus one rollback remain and the prepared package is removed.
 The installed source also includes [saved design-conversation controls](saved-conversation-controls.md):
 exact history selection, reviewed legacy account binding, explicit native status
 and lost-reply handling. Dedicated coding-task creation and reviewed-text frontend
-flows are now connected; background-task controls and exact attachment remain implementation work. Visual, hardware and live account acceptance
+flows and background-task controls are now connected; exact interactive attachment remains implementation work. Visual, hardware and live account acceptance
 remain separate.
 
 The approved-work account UI now uses explicit sign-in/check/stop controls and

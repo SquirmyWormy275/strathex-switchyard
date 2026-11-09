@@ -258,7 +258,7 @@ Publish tested source and evidence regularly. Retain original failures and front
 
 The installed checkpoint includes guided controls, scanner setup, feed trust,
 saved design conversations and dedicated coding-task text controls.
-Continue remaining background-task controls and native attachment limitations. Approved-work account/recovery controls are now implemented in the source checkpoint below. Native exact-task
+Background-task and approved-work account/recovery controls are now implemented in the source checkpoints below. Continue normal installed adoption and native attachment limitations. Native exact-task
 attachment, interactive IDE, browser visual review and hardware/account acceptance
 remain separately tracked; the full Rev2 assignment is unfinished.
 
@@ -461,3 +461,24 @@ and retained native host-action failures remain open.
 
 Copilot source 5670ba8c2aa6c413ad6d13feb1466669c77f9d83 has an immutable 35-asset frontend
 92f8dbcd0be9efdbaa2d3922d27c8a09c184db16fc745f64f32ac928a0807ebe. All source/bundle bytes and the dated prior pointer backup verify. It is not yet normally installed or visually accepted.
+
+## Background-task controls
+
+Claude background-task controls now connect reviewed empty launch, native
+identity reconciliation, separately reviewed exact stop and an existing-window
+focus review. Stopped owned background tasks can enter the existing text-review
+path; empty unavailable transcripts refuse without creating a replacement.
+External bindings stay observation-only for stop/text. Focus does not attach,
+resume or restart a task.
+
+Eight new UI cases bring the task interaction file to nineteen cases. Eight
+original groups pass 113 tests with no skips, unchanged bounds and verified
+cleanup. Twelve running-preview checks pass. Native command/account/window
+transports are explicit doubles; no live task, model or desktop action occurred.
+[Task walkthrough](coding-task-controls.md),
+[exact evidence](evidence/background-ui-source-summary.json).
+
+Normal installation of the account and background controls is next. Native exact
+interactive attachment remains implementation work. Browser visual review, live
+provider/task/tenant behavior, current complete Linux/Windows and retained native
+host-action failures remain separate acceptance work.

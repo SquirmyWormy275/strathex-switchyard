@@ -59,8 +59,45 @@ tests, including production Codex/Claude adapter suites; six final groups pass
 65 with overlap and zero skips. Eleven running-preview checks verify served
 controls, synthetic history and refusals. [Exact source and receipts](evidence/task-ui-source-summary.json).
 
-These controls do not launch or stop Claude background sessions or attach an
-interactive terminal. Those remain distinct implementation/acceptance work.
+Claude background launch/stop and existing-window focus are now connected below.
+Attaching an interactive terminal remains distinct implementation/acceptance work.
 Live account/model/task operations, visual browser review and full latest-source
 Linux/Windows acceptance are unverified. [Backend contracts](native-coding-tasks.md),
 [editor controls](editor-task-controls.md), [current status](switchyard-status.md).
+
+## Claude background lifecycle and existing windows
+
+Dedicated text tasks remain the default. The advanced **Start an empty Claude
+background task** option reviews the exact project, local label, stable request
+UUID and tools-disabled launch before starting a worker without a model prompt.
+The native job supplies its own short ID and full session UUID. A missing or lost
+acknowledgement preserves uncertainty; refresh never launches a replacement.
+When a short ID is known, **Check exact native status** can reconcile that same
+job's full UUID. Without either identity, there is no guessed status or stop target.
+
+**Review background stop** performs the backend's current account, directory and
+native identity checks, then shows the exact session/job/process and expiry.
+Confirm separately to consume the one-use approval and request that exact stop.
+The resulting saved observation distinguishes provider-reported stop from task
+completion. A changed process or account refuses. A lost successful reply reads
+back the original observation without repeating the stop. Already-stopped jobs
+require no further effect. External bindings cannot acquire this stop authority.
+
+A stopped owned background task can enter the existing exact text-review flow.
+The backend rechecks its stopped native identity before review and submission.
+An empty task stopped before its first turn may have no resumable transcript;
+unavailable native history must refuse without creating another conversation.
+The UI does not imply that an empty background worker is needed for ordinary text.
+
+For a saved interactive Claude session, **Review focus of existing window** shows
+its exact project/session before calling the existing verified focus adapter.
+Missing, changed or ambiguous native windows refuse. This only focuses an existing
+supported window; it does not attach, resume, restart, type text or accept completion.
+Keyboard-only mode and Work disable these native operations.
+
+Eight additional lifecycle interaction cases bring this file to nineteen cases.
+Eight original groups pass 113 tests with no skips, including the production
+Claude task/text/window adapters. Twelve running-preview checks pass. HTTP,
+encrypted state, directory identities and reviews are real; UI native account,
+command and window transports are explicit doubles. No live task or window was
+operated. [Lifecycle evidence](evidence/background-ui-source-summary.json).

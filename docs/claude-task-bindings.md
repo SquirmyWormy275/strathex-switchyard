@@ -15,8 +15,7 @@ late designer replies. Native model replies use explicit synthetic processes;
 a real 2.1.319 model turn remains unaccepted.
 [Version evidence](evidence/claude-319-source-summary.json). The later task adapter also uses the same exact reviewed-version list. A retained regression exposed the old range admitting unreviewed 2.1.309; the fix passes six groups/94 tests and prevents task discovery, reservation and creation for unknown versions. [Task admission evidence](evidence/claude-version-admission-summary.json). The normal installed update passes 102 metadata/refusal checks across 59 exact modules; earlier real native version/account admission remains separate.
 [Installed evidence](evidence/installed-claude-version-gate-summary.json). Windows uses the same argument-based process path;
-native Windows CLI/account acceptance remains pending. The frozen morning
-frontend does not expose this task panel yet.
+native Windows CLI/account acceptance remains pending. The [task panel](coding-task-controls.md) now connects dedicated text tasks, reviewed background launch/stop and existing-window focus. Interactive attachment remains separate.
 
 ## Available behavior
 

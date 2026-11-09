@@ -96,6 +96,25 @@ license and live consent checks remain separate. Continue background-task
 launch/stop controls and exact attachment limitations; current full-platform CI
 and retained native host-action failures remain open.
 
+Claude background-task controls now connect reviewed empty launch, native
+identity reconciliation, separately reviewed exact stop and an existing-window
+focus review. Stopped owned background tasks can enter the existing text-review
+path; empty unavailable transcripts refuse without creating a replacement.
+External bindings stay observation-only for stop/text. Focus does not attach,
+resume or restart a task.
+
+Eight new UI cases bring the task interaction file to nineteen cases. Eight
+original groups pass 113 tests with no skips, unchanged bounds and verified
+cleanup. Twelve running-preview checks pass. Native command/account/window
+transports are explicit doubles; no live task, model or desktop action occurred.
+[Task walkthrough](coding-task-controls.md),
+[exact evidence](evidence/background-ui-source-summary.json).
+
+Normal installation of the account and background controls is next. Native exact
+interactive attachment remains implementation work. Browser visual review, live
+provider/task/tenant behavior, current complete Linux/Windows and retained native
+host-action failures remain separate acceptance work.
+
 ## Current broader CI failures
 
 The `ce89c78` Linux job and one Windows source worker fail the historical workload
