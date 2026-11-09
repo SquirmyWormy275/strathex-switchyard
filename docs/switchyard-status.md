@@ -14,6 +14,13 @@ no merge or public release has been accepted.
 
 ## Guided frontend checkpoint
 
+Existing transcripts can now be imported as explicitly unverified text in Personal
+keyboard-only mode, without microphone/runtime/provider effects. Exact request
+identity prevents a lost reply from creating a duplicate or replacing later
+corrections. Work import and unrelated authority fields refuse. Six added UI cases
+bring the selected nine-group run to 120 passes. Installed adoption of this later
+source remains separate. [Import evidence](evidence/transcript-import-source-summary.json).
+
 Voice notes now expose exact saved-note history, separate correction/draft actions
 and reviewed deletion. Workspace and mode changes release capture, and late
 permission responses cannot start a microphone in a new workspace. Bounded

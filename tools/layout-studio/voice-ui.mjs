@@ -4,7 +4,7 @@ import { api } from "./connection.mjs";
 export function mountVoice({ notify, refresh, request = api, media = globalThis.navigator?.mediaDevices, Recorder = globalThis.MediaRecorder, page = globalThis.window } = {}) {
   const $ = id => document.getElementById(id), drafts = new Map();
   let state = null, epoch = 0, busy = false, available = false, selected = "", review = null, deliveryWarning = "";
-  let capture = null, pending = Promise.resolve(), active = Promise.resolve(), queued = 0;
+  let capture = null, pending = Promise.resolve(), active = Promise.resolve(), queued = 0, importRequest = null;
   const session = () => state?.voice.find(v => v.id === selected);
   const permitted = () => state?.policyRules.recording && state.mode === "personal-companion";
   const scope = () => { const compartment = state?.id, generation = epoch; return { compartment, current: () => state?.id === compartment && epoch === generation }; };
@@ -24,11 +24,13 @@ export function mountVoice({ notify, refresh, request = api, media = globalThis.
     $("retry-voice").disabled = busy || recording || queued > 0 || !permitted() || !available || !pendingAudio;
     $("delete-voice").disabled = busy || recording || queued > 0 || !v || v.status === "recording";
     $("confirm-voice-delete").disabled = busy || !review;
+    $("import-voice-transcript").disabled = busy || capture || queued > 0 || state?.policy !== "personal" || !$("voice-import-text").value.trim();
+    $("voice-import-text").disabled = busy || state?.policy !== "personal";
   }
   function render({ keepMessage = false } = {}) {
     const v = session();
     $("voice-transcript").value = drafts.has(selected) ? drafts.get(selected) : text(v);
-    if (!keepMessage) message(deliveryWarning || (capture ? "Microphone recording locally. Pause or stop at any time." : v ? `${v.status} · ${v.chunks.filter(c => c.status === "transcribed").length} transcribed segments · ${v.chunks.filter(c => c.pendingAudio || c.status === "pending").length} saved segments awaiting deliberate retry. This page's microphone is off.` : "Microphone is off. Choose a saved note or start a new local recording."));
+    if (!keepMessage) message(deliveryWarning || (capture ? "Microphone recording locally. Pause or stop at any time." : v ? `${v.source?.kind === "imported-transcript" ? "Imported text · original recording and recognition unverified · " : ""}${v.status} · ${v.chunks.filter(c => c.status === "transcribed").length} transcribed segments · ${v.chunks.filter(c => c.pendingAudio || c.status === "pending").length} saved segments awaiting deliberate retry. This page's microphone is off.` : "Microphone is off. Choose a saved note, import a transcript or start a new local recording."));
     controls();
   }
   function run(fn) {
@@ -93,6 +95,20 @@ export function mountVoice({ notify, refresh, request = api, media = globalThis.
   }
   $("voice-session").addEventListener("change", () => { if (busy || capture || queued) { $("voice-session").value = selected; return; } epoch++; selected = $("voice-session").value; deliveryWarning = ""; review = null; $("voice-delete-dialog").close(); render(); });
   $("voice-transcript").addEventListener("input", () => { if (selected) drafts.set(selected, $("voice-transcript").value); controls(); });
+  $("voice-import-text").addEventListener("input", controls);
+  $("import-voice-transcript").addEventListener("click", () => run(async context => {
+    if (state?.policy !== "personal" || capture || queued) throw Error("Import a transcript in a Personal workspace after pausing capture.");
+    const transcript = $("voice-import-text").value;
+    if (!transcript.trim() || transcript.length > 160000 || transcript.includes("\0")) throw Error("Paste a nonempty plain-text transcript of at most 160,000 characters.");
+    if (!importRequest || importRequest.transcript !== transcript) importRequest = { requestId: crypto.randomUUID(), transcript };
+    const input = importRequest;
+    try {
+      const value = await request("/api/suite/voice/import", { compartment: context.compartment, ...input });
+      if (!context.current()) return;
+      if (value.saved !== true || value.id !== `import-${input.requestId}` || value.recordingStarted !== false || value.source !== "user-provided-text") throw Error("The exact imported transcript acknowledgement did not verify.");
+      selected = value.id; $("voice-import-text").value = ""; importRequest = null; await refresh(); message("Transcript saved as imported text. Review its words before using it in a design draft; no microphone, recognizer or assistant was started.");
+    } catch (error) { if (context.current()) await refresh(); throw Error(`${error.message} Inspect saved notes before trying again. The same unchanged import retains its identity; no automatic retry occurred.`); }
+  }));
   $("start-voice").addEventListener("click", () => run(async context => {
     if (!permitted() || !available || capture) throw Error("Choose Personal companion mode and an available local transcription runtime first.");
     if (!media?.getUserMedia || !Recorder) throw Error("This browser cannot record a microphone. Saved notes remain available.");
@@ -136,7 +152,7 @@ export function mountVoice({ notify, refresh, request = api, media = globalThis.
     try { await request("/api/suite/voice/delete", { compartment: saved.compartment, id: saved.id }); drafts.delete(saved.id); }
     finally { if (context.current()) await refresh(); }
   }));
-  function clear() { epoch++; state = null; selected = ""; deliveryWarning = ""; drafts.clear(); review = null; $("voice-delete-dialog").close(); $("voice-delete-summary").textContent = ""; $("voice-session").replaceChildren(); render(); }
+  function clear() { epoch++; state = null; selected = ""; deliveryWarning = ""; importRequest = null; $("voice-import-text").value = ""; drafts.clear(); review = null; $("voice-delete-dialog").close(); $("voice-delete-summary").textContent = ""; $("voice-session").replaceChildren(); render(); }
   document.addEventListener("switchyard-workspace-changing", () => { const old = capture; clear(); void release().then(() => old && pauseSaved(old.compartment, old.id)).catch(() => {}); });
   document.addEventListener("switchyard-compartment-state", event => {
     if (state?.id && state.id !== event.detail.id) clear();

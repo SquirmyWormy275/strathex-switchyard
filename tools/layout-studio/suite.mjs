@@ -658,6 +658,21 @@ export function createSuite({ store = createSuiteStore(), platform = process.pla
       if (path === "/api/suite/observation/mark") return store.update(compartment, "observation-mark", (s) => { const o = session(s, body.id); if (o.status !== "recording" || !o.sources.includes("deliberate") || !kinds.includes(body.kind)) throw new Error("Start deliberate observation and choose a supported event kind."); if (o.events.length >= 2000) throw new Error("Session event limit reached. Stop and review this session."); o.events.push({ kind: body.kind, provenance: "user-marked", at: Date.now() }); o.updatedAt = Date.now(); return observationSummary(o); }, { operation: "record" });
       if (path === "/api/suite/observation/state") { let shouldMonitor = false, recordingGeneration; const result = await store.update(compartment, "observation-state", (s) => { const o = session(s, body.id); if (!["paused", "recording", "stopped"].includes(body.status) || (o.status === "stopped" && body.status !== "stopped")) throw new Error("That session transition is unavailable."); const at = Date.now(); if (body.status === "recording" && o.status !== "recording") { o.recordingSince = Math.max(at, o.createdAt ?? 0, o.recordingSince ?? 0); o.recordingGeneration = randomUUID(); } o.status = body.status; o.updatedAt = at; shouldMonitor = o.status === "recording" && o.sources.includes("foreground-category"); recordingGeneration = o.recordingGeneration; return observationSummary(o); }, body.status === "recording" ? { operation: "record" } : {}); pauseMonitor(compartment); if (shouldMonitor) monitor(compartment, body.id, recordingGeneration); else await foreground.stopCompartment?.(compartment); return result; }
       if (path === "/api/suite/observation/delete") return store.update(compartment, "observation-delete", (s) => { const o = session(s, body.id); if (o.status === "recording") throw new Error("Stop the session before deleting its data."); s.observations = s.observations.filter((o) => o.id !== body.id); return { deleted: true }; });
+      if (path === "/api/suite/voice/import") {
+        if (Object.keys(body).some(key => !["compartment", "workspaceBaseUrl", "requestId", "transcript"].includes(key)) || typeof body.requestId !== "string" || !/^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/.test(body.requestId) || typeof body.transcript !== "string" || !body.transcript.trim() || body.transcript.length > 160000 || body.transcript.includes("\0")) throw Error("Import one bounded plain-text transcript with its original request identity; source paths, providers and recording instructions are not accepted.");
+        const id = `import-${body.requestId}`, digest = createHash("sha256").update(JSON.stringify(body.transcript)).digest("hex");
+        return store.update(compartment, "voice-transcript-import", s => {
+          if (s.policy !== "personal") throw Error("Transcript import is prohibited by this workspace's recording policy.");
+          const existing = s.voice.find(v => v.id === id);
+          if (existing) {
+            if (existing.source?.kind !== "imported-transcript" || existing.source.contentDigest !== digest) throw Error("This import identity belongs to different text. The original note is preserved.");
+            return { id, saved: true, duplicate: true, source: "user-provided-text", recordingStarted: false };
+          }
+          if (s.voice.length >= 100) throw Error("This workspace already retains 100 voice notes. Review its existing notes before importing another.");
+          s.voice.push({ id, status: "stopped", destination: "local-transcript-import", source: { kind: "imported-transcript", provenance: "User-provided text; original recording and recognition unverified", contentDigest: digest }, chunks: [], transcript: body.transcript, reviewedTranscript: "", reviewStatus: "needs-review", updatedAt: Date.now() });
+          return { id, saved: true, duplicate: false, source: "user-provided-text", recordingStarted: false };
+        });
+      }
       if (path === "/api/suite/voice/start") {
         await store.authorize(compartment, { operation: "record", provider: "local-transcription" });
         if (body.consent !== true) throw new Error("Review the local audio destination before starting voice.");

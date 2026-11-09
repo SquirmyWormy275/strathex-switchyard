@@ -6,6 +6,19 @@ Recording requires a Personal workspace in companion mode and an available local
 transcription runtime. Browsing existing notes opens no microphone and starts no
 recognizer.
 
+If you already have a transcript, expand **Add an existing transcript**, paste its
+text and choose **Save imported transcript**. This works in a Personal keyboard-only
+workspace without a microphone, recognition runtime or assistant account. Work's
+recording policy refuses imports. The note identifies its source as user-provided
+text; it does not certify the original recording or recognition. Review and save
+its words separately before placing them in a design draft.
+
+A lost import reply retains the pasted text and its request identity. Inspect the
+saved notes first; deliberately retrying unchanged text returns the original note
+without overwriting later corrections. Changed text cannot reuse that identity.
+Import refuses when 100 notes are retained, preserving their pending audio. The
+existing workspace retention period and explicit deletion still apply.
+
 **Pause voice** releases the microphone and finishes delivery of its current
 segment. **Resume voice** requests microphone access for that same note. **Stop**
 ends capture for that note; saved pending audio can still be retried deliberately.
@@ -50,3 +63,9 @@ workspaces, modes, conversations and selection are preserved. Dated launcher
 backups and one rollback verify; the exact prepared package is removed. No live
 microphone or recognizer was opened.
 [Installed evidence](evidence/installed-voice-note-controls-summary.json).
+
+The subsequent transcript-import source adds six interaction cases, bringing the
+voice file to twenty. Nine original groups pass 120 checks with no skips and exact
+cleanup. These checks use synthetic pasted text and real encrypted HTTP storage;
+none starts a provider, microphone or recognizer.
+[Import source evidence](evidence/transcript-import-source-summary.json).

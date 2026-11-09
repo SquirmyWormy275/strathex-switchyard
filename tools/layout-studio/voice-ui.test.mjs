@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { randomUUID } from "node:crypto";
 import { browserSurfaceFixture, until } from "./test-support/browser-ui.mjs";
 
 const deferred = () => { let resolve; const promise = new Promise(r => { resolve = r; }); return { promise, resolve }; };
@@ -115,6 +116,51 @@ test("a lost delete reply reads back absence without replaying deletion or clear
   globalThis.fetch = async (path, input) => { const response = await fetch(path, input); if (path === "/api/suite/voice/delete") { await response.text(); throw Error("Synthetic lost delete reply"); } return response; };
   try { c.click("confirm-voice-delete"); await until(() => c.notices.some(v => v.includes("lost delete"))); await settle(c); } finally { globalThis.fetch = fetch; }
   assert.equal(c.$("voice-session").value, "newer"); assert.equal(c.$("voice-transcript").value, "Newer note"); assert.equal(c.calls.filter(row => row.path === "/api/suite/voice/delete").length, 1);
+}));
+
+function pasted(c, text) { c.$("voice-import-text").value = text; c.$("voice-import-text").dispatchEvent(new Event("input")); }
+
+test("a pasted transcript works in keyboard-only mode without a runtime and needs separate correction review before use", () => fixture(async c => {
+  await c.suite.handle("/api/suite/mode", { mode: "keyboard-only" }); c.ui.setAvailability({ available: false, reason: "Synthetic missing runtime" }); await c.refresh();
+  const original = "Existing transcript: preserve Dvorak. <img src=x onerror=alert(1)>"; pasted(c, original); c.click("import-voice-transcript"); await until(() => c.$("voice-status").textContent.includes("Transcript saved as imported text") && !c.$("review-transcript").disabled);
+  const note = (await c.store.snapshot("personal")).voice[0]; assert.equal(note.status, "stopped"); assert.equal(note.transcript, original); assert.equal(note.source.kind, "imported-transcript"); assert.equal(note.reviewStatus, "needs-review"); assert.deepEqual(note.chunks, []); assert.equal(c.$("use-voice-draft").disabled, true); assert.equal(c.$("pause-voice").disabled, true); assert.deepEqual(c.native, []);
+  c.click("review-transcript"); await until(() => !c.$("use-voice-draft").disabled); c.click("use-voice-draft"); assert.equal(c.$("design-message").value, original); assert.equal(c.calls.some(row => row.path === "/api/suite/design"), false);
+}));
+
+test("a lost import reply preserves text and its request identity; deliberate retry returns the original note", () => fixture(async c => {
+  pasted(c, "Synthetic pre-existing transcript"); const fetch = globalThis.fetch;
+  globalThis.fetch = async (path, input) => { const response = await fetch(path, input); if (path === "/api/suite/voice/import") { await response.text(); throw Error("Synthetic lost import reply"); } return response; };
+  try { c.click("import-voice-transcript"); await until(() => c.notices.some(v => v.includes("lost import"))); await settle(c); } finally { globalThis.fetch = fetch; }
+  assert.equal(c.$("voice-import-text").value, "Synthetic pre-existing transcript"); const first = c.calls.find(row => row.path === "/api/suite/voice/import").body;
+  assert.equal((await c.store.snapshot("personal")).voice.length, 1); c.click("import-voice-transcript"); await until(() => c.$("voice-status").textContent.includes("Transcript saved as imported text") && !c.$("voice-session").disabled);
+  const imports = c.calls.filter(row => row.path === "/api/suite/voice/import"); assert.equal(imports.length, 2); assert.equal(imports[1].body.requestId, first.requestId); assert.equal((await c.store.snapshot("personal")).voice.length, 1); assert.equal(c.$("voice-import-text").value, ""); assert.deepEqual(c.native, []);
+}));
+
+test("an import identity refuses changed content and retains later user corrections on an exact repeat", () => fixture(async c => {
+  const requestId = randomUUID(), input = { compartment: "personal", requestId, transcript: "Original imported words" };
+  const first = await c.suite.handle("/api/suite/voice/import", input); await c.suite.handle("/api/suite/voice/review", { compartment: "personal", id: first.id, transcript: "Corrected words" });
+  await assert.rejects(c.suite.handle("/api/suite/voice/import", { ...input, transcript: "Different words" }), /different text/);
+  const again = await c.suite.handle("/api/suite/voice/import", input); assert.equal(again.id, first.id); assert.equal(again.duplicate, true); const notes = (await c.store.snapshot("personal")).voice; assert.equal(notes.length, 1); assert.equal(notes[0].reviewedTranscript, "Corrected words"); assert.deepEqual(c.native, []);
+}));
+
+test("import rejects Work, malformed identities, empty or excessive text, source paths and claimed provider authority", () => fixture(async c => {
+  const requestId = randomUUID(), original = await c.store.snapshot("personal");
+  for (const input of [{ requestId: "wrong", transcript: "text" }, { requestId, transcript: " " }, { requestId, transcript: "x".repeat(160001) }, { requestId, transcript: "a\0b" }, { requestId, transcript: "text", sourcePath: "/private/file" }, { requestId, transcript: "text", provider: "codex" }, { requestId, transcript: "text", consent: true }]) await assert.rejects(c.suite.handle("/api/suite/voice/import", { compartment: "personal", ...input }), /bounded plain-text/);
+  await assert.rejects(c.suite.handle("/api/suite/voice/import", { compartment: "work", requestId, transcript: "Personal source" }), /prohibited/);
+  assert.deepEqual(await c.store.snapshot("personal"), original); assert.equal((await c.store.snapshot("work")).voice.length, 0); assert.deepEqual(c.native, []);
+}));
+
+test("a late import reply cannot select a Personal note or retain its pasted text in Work", () => fixture(async c => {
+  const fetch = globalThis.fetch, gate = deferred(); let entered = false;
+  globalThis.fetch = async (path, input) => { const response = await fetch(path, input); if (path === "/api/suite/voice/import") { entered = true; await gate.promise; } return response; };
+  try { pasted(c, "Private imported Personal transcript"); c.click("import-voice-transcript"); await until(() => entered); await c.ui.beforeWorkspaceChange(); await c.select("work"); gate.resolve(); await c.ui.dispose();
+    assert.equal(c.$("voice-import-text").value, ""); assert.equal(c.$("voice-transcript").value, ""); assert.equal(c.$("voice-session").options.length, 0); assert.equal((await c.store.snapshot("personal")).voice.length, 1); assert.equal((await c.store.snapshot("work")).voice.length, 0); assert.deepEqual(c.native, []); }
+  finally { gate.resolve(); globalThis.fetch = fetch; }
+}));
+
+test("import capacity refusal preserves all retained notes and their pending audio", () => fixture(async c => {
+  await c.store.update("personal", "synthetic-full-voice-history", s => { s.voice = Array.from({ length: 100 }, (_, i) => ({ id: `retained-${i}`, status: "paused", chunks: [{ id: "pending", status: "pending", audio: btoa("Synthetic retained audio") }], transcript: `Retained note ${i}`, updatedAt: Date.now() })); });
+  const before = await c.store.snapshot("personal"); await assert.rejects(c.suite.handle("/api/suite/voice/import", { compartment: "personal", requestId: randomUUID(), transcript: "New note" }), /100 voice notes/); assert.deepEqual(await c.store.snapshot("personal"), before); assert.deepEqual(c.native, []);
 }));
 
 test("the complete page releases its microphone before changing mode and clears voice history when selecting Work", () => browserSurfaceFixture(async c => {

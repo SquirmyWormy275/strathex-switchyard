@@ -115,6 +115,13 @@ Passing follow-ups do not establish the cause of earlier intermittent failures. 
 
 ## Voice-note frontend checkpoint
 
+Existing transcripts can now be imported as explicitly unverified text in Personal
+keyboard-only mode, without microphone/runtime/provider effects. Exact request
+identity prevents a lost reply from creating a duplicate or replacing later
+corrections. Work import and unrelated authority fields refuse. Six added UI cases
+bring the selected nine-group run to 120 passes. Installed adoption of this later
+source remains separate. [Import evidence](evidence/transcript-import-source-summary.json).
+
 Saved-note history, separate correction and design-draft actions, reviewed deletion
 and bounded capture are connected. Mode/workspace transitions release the exact
 microphone and late permission/start replies cannot cross that boundary. Fourteen
