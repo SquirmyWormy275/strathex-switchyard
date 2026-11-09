@@ -157,18 +157,19 @@ tree and local reproduction are retained. No current full-platform pass is claim
 The normal installed application includes guided setup, portability, observation,
 keyboard/client controls, permissions/scanners/feeds/execution, saved design
 conversations, coding-task text/background controls and approved-work account/
-recovery, exact native-app navigation and connected-agent maintenance at source `b12319e`,
-release `447f05ef`. All 35 served asset hashes and twelve API checks pass; eight
+recovery, exact native-app navigation and connected-agent maintenance and saved voice notes at source `4e3feb4`,
+release `dba8ce5b`. All 36 served asset hashes and sixteen API/inventory checks pass; eight
 installed verifiers pass 100 checks across 58 exact modules. All 54 semantic
 workspaces, 57 workflow definitions, modes, selection and conversation records
 remain intact. Fifty-three sealed files are byte-identical; one changes audit only.
 
-Dated launcher backups verify and the previous `176cd53e` release is the single
-rollback. The 570-file payload is 5,005,481 bytes; its exact prepared copy
-(571 files/5,108,635 bytes) is removed after identity/hash verification. No live
+Dated launcher backups verify and the previous `447f05ef` release is the single
+rollback. The 572-file payload is 5,027,703 bytes; its exact prepared copy
+(573 files/5,131,212 bytes) is removed after identity/hash verification. No live
 account/task/model or hardware operation occurred. Visual acceptance remains
-blocked before browser inspection. [Exact installed evidence](evidence/installed-agent-maintenance-controls-summary.json).
-Earlier [native-app controls](evidence/installed-native-app-controls-summary.json),
+blocked before browser inspection. [Exact installed evidence](evidence/installed-voice-note-controls-summary.json).
+Earlier [agent maintenance](evidence/installed-agent-maintenance-controls-summary.json),
+[native-app controls](evidence/installed-native-app-controls-summary.json),
 [account/background controls](evidence/installed-lifecycle-controls-summary.json),
 [34-asset](evidence/installed-task-controls-summary.json),
 [32-asset](evidence/installed-scanner-controls-summary.json) and

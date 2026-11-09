@@ -43,3 +43,10 @@ fourteen cases after improving note labels. The running preview also checks save
 synthetic notes without opening a microphone or executing a transcription runtime.
 Browser rendering, recognition quality and live microphone/device acceptance
 remain separate. [Exact source evidence](evidence/voice-ui-source-summary.json).
+
+Normal installed `4e3feb4` passes all 36 served-asset hashes and sixteen API/
+inventory checks, plus 100 checks from eight installed verifiers. All 54 semantic
+workspaces, modes, conversations and selection are preserved. Dated launcher
+backups and one rollback verify; the exact prepared package is removed. No live
+microphone or recognizer was opened.
+[Installed evidence](evidence/installed-voice-note-controls-summary.json).

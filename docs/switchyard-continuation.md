@@ -22,13 +22,13 @@ Start with [current status](switchyard-status.md), the [requirement ledger](swit
 
 | Identity | Verified checkpoint |
 | --- | --- |
-| Source | `b12319e861031c87c1a31b249bb3d9e8f295ef71` |
-| Release | `447f05ef97fad12a72686f226d65a2e07dbc5ae5d44c68b2d17760dd42d1e0c0` |
-| Rollback | `176cd53e10ea34c9a026a6689f2796081003033774ffb4cb05e703d6cb69700a` |
-| Frontend | `ee5975ed37a47c3ce2ce5564c933896e7d0c867f1e55f3cb24bde3f3cd14dd0c` |
+| Source | `4e3feb45dc899393db7403d108c18c1b57d7e48d` |
+| Release | `dba8ce5b76b2610e9dbf77482d9f773fd59e0fc2ff84640c65442213d8b8f423` |
+| Rollback | `447f05ef97fad12a72686f226d65a2e07dbc5ae5d44c68b2d17760dd42d1e0c0` |
+| Frontend | `1f1f3d1f7e9d3613f49d6da592f6daeaeb64ace41e1e6301db817c09c86503d1` |
 
-The approved frontend is installed at the normal local address. All 35 served assets
-and twelve API metadata/refusal checks pass. Eight installed verifiers pass 100 checks
+The approved frontend is installed at the normal local address. All 36 served assets
+and sixteen API/inventory metadata/refusal checks pass. Eight installed verifiers pass 100 checks
 with 58 exact module hashes; the workflow verifier checks all 57 definitions.
 All 54 semantic workspaces, Personal selection and the pending keyboard-only
 conversation remain intact. 53 sealed files are byte-identical; the remaining
@@ -36,12 +36,12 @@ workspace changes audit metadata only. No physical keyboard, native provider,
 account, model or microphone operation occurred.
 
 The normal update retained and verified dated launcher backups and current plus
-one rollback. The payload contains 570 files/5,005,481 bytes. Its exact prepared
-571-file/5,108,635-byte bundle is removed after identity/hash verification. The
+one rollback. The payload contains 572 files/5,027,703 bytes. Its exact prepared
+573-file/5,131,212-byte bundle is removed after identity/hash verification. The
 private access token intentionally changed with the frontend digest; use the normal
 launcher/new endpoint rather than restoring the old token. Host-facing owner,
 Copilot and signed-intent checks ran sequentially. Do not repeat executed update
-or cleanup scripts. [Installed evidence](evidence/installed-agent-maintenance-controls-summary.json).
+or cleanup scripts. [Installed evidence](evidence/installed-voice-note-controls-summary.json).
 
 All original workspace modes and all three conversation records are preserved.
 Selected Personal was already in companion mode; the pending conversation lives
@@ -119,8 +119,9 @@ Saved-note history, separate correction and design-draft actions, reviewed delet
 and bounded capture are connected. Mode/workspace transitions release the exact
 microphone and late permission/start replies cannot cross that boundary. Fourteen
 interaction cases include the complete page. HTTP/storage/queue are real; browser
-media and recognition are explicit doubles. Normal installed adoption, browser
-rendering and live microphone acceptance remain separate.
+media and recognition are explicit doubles. Normal installed adoption passes
+52 asset/API checks and 100 metadata checks with all workspace state preserved.
+Browser rendering and live microphone acceptance remain separate.
 [Controls](voice-note-controls.md), [source evidence](evidence/voice-ui-source-summary.json).
 
 ## Connected-agent frontend checkpoint
