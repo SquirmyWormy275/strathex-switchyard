@@ -21,6 +21,12 @@ evidence and normal installed verification.
 
 ## Guided frontend checkpoint
 
+The scanner/execution UI tests now report bounded phase timings for Git setup,
+queries, protected-state operations and HTTP. Six original groups pass 51 tests
+with zero skips and unchanged limits. Windows deadline diagnosis remains open;
+these measurements are not a performance correction.
+[Timing evidence](evidence/ui-phase-timing-source-summary.json).
+
 The latest Linux release check exposed one stale controller expectation: native
 remote resume no longer accepts CLI permission overrides. Its exact argument
 assertion now matches the production builder; all 126 controller cases pass with

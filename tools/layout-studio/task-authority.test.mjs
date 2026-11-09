@@ -7,6 +7,28 @@ import { createRepositoryInspection, fixedGitExecutable } from "./repository-ins
 import { authorityFixture as fixture } from "./test-support/task-authority-fixture.mjs";
 import { createTaskAuthority } from "./task-authority.mjs";
 import { createSuite } from "./suite.mjs";
+import { fixtureTiming } from "./test-support/fixture-timing.mjs";
+
+test("fixture timing preserves async values, failures and receiver while emitting only bounded metadata", async () => {
+  let time = 0; const lines = [], failure = Error("PRIVATE_EXCEPTION"), payload = { privateText: "PRIVATE_SOURCE" };
+  const timing = fixtureTiming({ enabled: true, clock: () => time, emit: line => lines.push(line) });
+  const store = { marker: payload, async snapshot(arg) { assert.equal(this, store); assert.equal(arg, "PRIVATE_PATH"); time += 7; return this.marker; } };
+  assert.equal(await timing.wrapStore(store).snapshot("PRIVATE_PATH"), payload);
+  await assert.rejects(timing.measure("query-git", () => { time += 3; throw failure; }), error => error === failure);
+  let release; const pending = timing.measure("http-request", () => new Promise(resolve => { release = resolve; }));
+  timing.report("http-response");
+  const first = JSON.parse(lines[0].slice("# fixture-timings ".length));
+  assert.deepEqual(first.phases["store-snapshot"], [1, 0, 0, 7, 7]);
+  assert.deepEqual(first.phases["query-git"], [1, 0, 1, 3, 3]);
+  assert.deepEqual(first.phases["http-request"], [1, 1, 0, 0, 0]);
+  time += 4; release(payload); assert.equal(await pending, payload);
+  for (let i = 0; i < 100; i++) timing.report("http-response");
+  timing.report("cleanup"); assert.equal(lines.length, 9); assert.ok(Buffer.byteLength(lines.join("\n")) < 4096);
+  assert.equal(lines.join("\n").includes("PRIVATE"), false);
+  assert.deepEqual(JSON.parse(lines.at(-1).slice("# fixture-timings ".length)).phases["http-request"], [1, 0, 0, 4, 4]);
+  const quiet = fixtureTiming({ emit() { throw Error("Disabled timing emitted"); } });
+  assert.equal(quiet.wrapStore(store), store); assert.equal(await quiet.measure("query-git", () => payload), payload); quiet.report("cleanup");
+});
 
 test("normal Windows suite authority routes distinguish exact reviewed grants from connected Run and pipeline capabilities", async t => {
   const f = await fixture(t); let nativeChecks = 0;

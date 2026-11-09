@@ -6,8 +6,8 @@ import { createRepositoryExecution } from "../repository-execution.mjs";
 import { createRepositoryExecutionSupervisors } from "../repository-execution-supervisor.mjs";
 import { createRepositoryExecutionStaging } from "../repository-execution-staging.mjs";
 const sha=bytes=>createHash("sha256").update(bytes).digest("hex");
-export async function executionFixture(t,{native=false,hold=false}={}) {
-  const f=await authorityFixture(t,{executionActions:["run_target"]});
+export async function executionFixture(t,{native=false,hold=false,profile=false}={}) {
+  const f=await authorityFixture(t,{executionActions:["run_target"],profile});
   const program="process.stdout.write('exact reviewed run output')",programPath=join(f.root,"program.mjs");await writeFile(programPath,program);
   const recipe={schema:"sxsy-b122.repository-runtime",version:1,repositoryRoot:f.root,allowedHttpsUrls:[],recipes:{run_target:{kind:"process",executable:process.execPath,args:["program.mjs"],cwd:".",environment:{},lifecycle:"managed",isolation:"disposable",timeoutMs:5000,maxOutputBytes:4096,inputFiles:[{path:"program.mjs",sha256:sha(program),size:Buffer.byteLength(program),classification:"non-production"}]}}};
   const bytes=JSON.stringify(recipe);await writeFile(join(f.root,"run.json"),bytes);
@@ -21,5 +21,6 @@ export async function executionFixture(t,{native=false,hold=false}={}) {
   const execution=createRepositoryExecution({store:f.store,authority:f.service,stateDirectory:join(f.stage,"execution"),platform:native?process.platform:"linux",now:Date.now,...(native?{}:{supervisors,staging,namespaceFactory:port=>port})});
   f.onCleanup(()=>execution.close());
   const proposed={requestId:randomUUID(),authorityId:grant.id,manifestPath:"run.json",manifestSha256:sha(bytes),action:"run_target"};
+  f.timings.report("execution-ready");
   return {...f,execution,grant,grantInput,recipe,proposed,effects:()=>effects};
 }

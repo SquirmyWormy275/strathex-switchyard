@@ -10,8 +10,8 @@ import { createScannerAuthority, signScannerFixture } from "../../../scripts/b12
 import { connectedExecutionActions } from "../repository-execution-actions.mjs";
 
 export const draftInput = f => ({ taskId: f.task.id, action: "shield_codebase_audit", planRevision: "draft-1", scannerFixtureId: "synthetic-scanner", advisoryFixtureId: "synthetic-advisory" });
-export async function scannerDraftFixture(t, overrides = {}) {
-  const f = await authorityFixture(t, { executionActions: connectedExecutionActions("linux") });
+export async function scannerDraftFixture(t, overrides = {}, { profile = false } = {}) {
+  const f = await authorityFixture(t, { executionActions: connectedExecutionActions("linux"), profile });
   const feeds = createScannerFixtures({ store: f.store, stateDirectory: join(f.stage, "feeds"), now: f.now }); f.onCleanup(() => feeds.close());
   const perform = async (action, body) => { const r = await feeds.review("personal", { requestId: randomUUID(), action, ...body }); const result = await feeds.apply("personal", { requestId: r.review.requestId, token: r.confirmation.token }); assert.equal(result.status, "completed"); };
   const signing = await createScannerAuthority({ outputDirectory: join(f.stage, "signing"), authorityId: "draft-test", allowedKinds: ["scanner", "advisory"], expiresAt: new Date(f.now() + 86400000).toISOString() });
@@ -25,5 +25,6 @@ export async function scannerDraftFixture(t, overrides = {}) {
   }
   const service = createTaskAuthority({ store: f.store, inspection: f.inspection, now: f.now, executionActions: connectedExecutionActions("linux"), checkNative: async () => {}, readScannerSources: (c, i) => feeds.readSources(c, i), resolveScannerFixtures: (c, i) => feeds.resolve(c, i), ...overrides });
   f.onCleanup(() => service.close());
+  f.timings.report("scanner-ready");
   return { ...f, feeds, perform, service };
 }

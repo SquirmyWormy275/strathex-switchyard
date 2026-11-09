@@ -7,7 +7,7 @@ import { withBrowserSurface, until } from "./test-support/browser-ui.mjs";
 import { createSuite } from "./suite.mjs";
 
 async function fixture(t, fn, options = {}) {
-  const f = await executionFixture(t, options), notices = [];
+  const f = await executionFixture(t, { ...options, profile: true }), notices = [];
   // The outer fixture owns retirement of the real authority/execution services.
   const suite = createSuite({ store: f.store, agents: { discovery: async () => [], close: async () => {} }, voice: { discovery: async () => ({ available: false }) }, taskAuthority: { ...f.service, close: async () => {} }, repositoryExecution: { ...f.execution, close: async () => {} } });
   f.onCleanup(() => suite.close());

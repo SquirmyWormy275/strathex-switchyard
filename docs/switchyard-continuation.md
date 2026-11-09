@@ -65,9 +65,15 @@ production arguments and relay permissions do not change. Preserve original
 CI/local failure evidence. This is not complete Linux acceptance.
 [Controller evidence](evidence/codex-controller-argument-expectation-summary.json).
 
-Next: publish the installed checkpoint and corrected controller expectation;
-investigate Windows scanner/execution UI file deadlines using measured phase
-timings. Do not infer performance acceptance from the Linux pass or relax bounds.
+The installed checkpoint and corrected controller expectation are published at
+`6f9bacc`. Current Windows `42655aa` still fails workers 7 and 11; worker 15 passes,
+without resolving the earlier repeated-focus failure. The two original UI
+journeys now emit bounded phase timings for Git, protected state and HTTP, with
+no paths/content/identities. Six original groups pass 51 tests, zero skips, under
+unchanged bounds. Inspect the next normal-push Windows failures for these phase
+measurements. Inclusive/concurrent totals overlap; do not add them or infer root
+cause from Linux timing. No production behavior or assertion is relaxed.
+[Timing evidence](evidence/ui-phase-timing-source-summary.json).
 
 Native Codex paginated history is now connected for the reviewed 0.167 terminal.
 An isolated actual TUI renders two saved item pages and loads the older turn

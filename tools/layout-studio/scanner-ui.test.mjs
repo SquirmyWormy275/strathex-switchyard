@@ -11,7 +11,7 @@ import { createRepositoryExecution } from "./repository-execution.mjs";
 
 const sha = data => createHash("sha256").update(data).digest("hex");
 async function fixture(t, fn, { failWrite = false } = {}) {
-  const f = await scannerDraftFixture(t), notices = []; let writes = 0, lastDraft;
+  const f = await scannerDraftFixture(t, {}, { profile: true }), notices = []; let writes = 0, lastDraft;
   // Explicit portable filesystem boundary double. Production Linux/NTFS
   // identity/anchoring is covered by the original scanner-save test groups.
   const filesystem = {

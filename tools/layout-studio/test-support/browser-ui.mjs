@@ -41,7 +41,8 @@ export async function withBrowserSurface(context, fn) {
     globalThis.document = ui.document; globalThis.location = { hash: "" }; globalThis.localStorage = { getItem: () => token };
     globalThis.fetch = (path, options) => {
       calls.push({ path, body: options.body ? JSON.parse(options.body) : null });
-      const response = previous.fetch(origin + path, { ...options, headers: { ...options.headers, Origin: origin } });
+      const request = () => previous.fetch(origin + path, { ...options, headers: { ...options.headers, Origin: origin } });
+      const response = context.timings ? context.timings.measure("http-request", request).finally(() => context.timings.report("http-response")) : request();
       responses.push({ path, response }); return response;
     };
     const refresh = async () => ui.document.dispatchEvent(new CustomEvent("switchyard-compartment-state", { detail: await context.store.snapshot("personal") }));
