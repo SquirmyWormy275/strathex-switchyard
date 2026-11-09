@@ -22,13 +22,13 @@ Start with [current status](switchyard-status.md), the [requirement ledger](swit
 
 | Identity | Verified checkpoint |
 | --- | --- |
-| Source | `4e3feb45dc899393db7403d108c18c1b57d7e48d` |
-| Release | `dba8ce5b76b2610e9dbf77482d9f773fd59e0fc2ff84640c65442213d8b8f423` |
-| Rollback | `447f05ef97fad12a72686f226d65a2e07dbc5ae5d44c68b2d17760dd42d1e0c0` |
-| Frontend | `1f1f3d1f7e9d3613f49d6da592f6daeaeb64ace41e1e6301db817c09c86503d1` |
+| Source | `9057de51915a4019e1ff869575096f712e5579c7` |
+| Release | `ff9e2aa65185f7dd9c2839619bb05ab16d230660abc1e44bf467723c0f73e7a4` |
+| Rollback | `dba8ce5b76b2610e9dbf77482d9f773fd59e0fc2ff84640c65442213d8b8f423` |
+| Frontend | `6fb653ccfacf5bb1c29ac8feaa9bcc0f50643383d4dea5a873311dc3baa4bffb` |
 
 The approved frontend is installed at the normal local address. All 36 served assets
-and sixteen API/inventory metadata/refusal checks pass. Eight installed verifiers pass 100 checks
+and nineteen API/inventory metadata/refusal checks pass. Eight installed verifiers pass 100 checks
 with 58 exact module hashes; the workflow verifier checks all 57 definitions.
 All 54 semantic workspaces, Personal selection and the pending keyboard-only
 conversation remain intact. 53 sealed files are byte-identical; the remaining
@@ -36,12 +36,12 @@ workspace changes audit metadata only. No physical keyboard, native provider,
 account, model or microphone operation occurred.
 
 The normal update retained and verified dated launcher backups and current plus
-one rollback. The payload contains 572 files/5,027,703 bytes. Its exact prepared
-573-file/5,131,212-byte bundle is removed after identity/hash verification. The
+one rollback. The payload contains 572 files/5,034,214 bytes. Its exact prepared
+573-file/5,137,723-byte bundle is removed after identity/hash verification. The
 private access token intentionally changed with the frontend digest; use the normal
 launcher/new endpoint rather than restoring the old token. Host-facing owner,
 Copilot and signed-intent checks ran sequentially. Do not repeat executed update
-or cleanup scripts. [Installed evidence](evidence/installed-voice-note-controls-summary.json).
+or cleanup scripts. [Installed evidence](evidence/installed-transcript-import-controls-summary.json).
 
 All original workspace modes and all three conversation records are preserved.
 Selected Personal was already in companion mode; the pending conversation lives
@@ -54,7 +54,7 @@ Their exact pins now reference the tested frontend revision, with historical
 evidence and behavioral assertions unchanged. Browser visual acceptance is still
 blocked before inspection; this installation is not visual approval.
 
-Complete Linux at the earlier `9266c12` source is accepted: **356 groups, 2,333 passing tests, 32 declared skips**. Original receipt `e19a2513-00d0-4f53-b1b1-726f467955f4` preserves manifest, commands, bounds and cleanup. The unit exited zero; its checkout, nine dependency aliases, 803 generated files/11,910,385 bytes, test parent and active marker are removed. Other worktrees remain untouched. No complete Linux run is active.
+Complete Linux at the earlier `9266c12` source is accepted: **356 groups, 2,333 passing tests, 32 declared skips**. Original receipt `e19a2513-00d0-4f53-b1b1-726f467955f4` preserves manifest, commands, bounds and cleanup. The unit exited zero; its checkout, nine dependency aliases, 803 generated files/11,910,385 bytes, test parent and active marker are removed. Other worktrees remain untouched. A later complete Linux run is active at exact source `4e3feb4`: 375 required groups, original serial schedule and bounds. The protected `linux-full-active.json` marker records its owned checkout, aliases, unit and receipts. It excludes the subsequent transcript-import source. Do not start a duplicate run or remove its staging before final receipt/exit auditing.
 
 The temporary wrapper's original syntax failure preceded every test and remains retained. The corrected reusable private template uses whole-token placeholder replacement and syntax-checks the wrapper before launch. Do not rerun executed start/audit/cleanup scripts. [Complete Linux evidence](evidence/linux-9266c12-complete-summary.json).
 

@@ -164,17 +164,17 @@ tree and local reproduction are retained. No current full-platform pass is claim
 The normal installed application includes guided setup, portability, observation,
 keyboard/client controls, permissions/scanners/feeds/execution, saved design
 conversations, coding-task text/background controls and approved-work account/
-recovery, exact native-app navigation and connected-agent maintenance and saved voice notes at source `4e3feb4`,
-release `dba8ce5b`. All 36 served asset hashes and sixteen API/inventory checks pass; eight
+recovery, exact native-app navigation and connected-agent maintenance, saved voice notes and plain-text transcript import at source `9057de5`,
+release `ff9e2aa6`. All 36 served asset hashes and nineteen API/inventory checks pass; eight
 installed verifiers pass 100 checks across 58 exact modules. All 54 semantic
 workspaces, 57 workflow definitions, modes, selection and conversation records
 remain intact. Fifty-three sealed files are byte-identical; one changes audit only.
 
-Dated launcher backups verify and the previous `447f05ef` release is the single
-rollback. The 572-file payload is 5,027,703 bytes; its exact prepared copy
-(573 files/5,131,212 bytes) is removed after identity/hash verification. No live
+Dated launcher backups verify and the previous `dba8ce5b` release is the single
+rollback. The 572-file payload is 5,034,214 bytes; its exact prepared copy
+(573 files/5,137,723 bytes) is removed after identity/hash verification. No live
 account/task/model or hardware operation occurred. Visual acceptance remains
-blocked before browser inspection. [Exact installed evidence](evidence/installed-voice-note-controls-summary.json).
+blocked before browser inspection. [Exact installed evidence](evidence/installed-transcript-import-controls-summary.json).
 Earlier [agent maintenance](evidence/installed-agent-maintenance-controls-summary.json),
 [native-app controls](evidence/installed-native-app-controls-summary.json),
 [account/background controls](evidence/installed-lifecycle-controls-summary.json),

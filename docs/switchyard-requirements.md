@@ -9,14 +9,14 @@ entry point, evidence and remaining work. A hardware/account check does not excu
 unfinished independent software. Read [current status](switchyard-status.md) for
 accepted checkpoints and [verification](verification.md) for reproducible checks.
 
-Installed Linux source `4e3feb4` includes the 36-asset guided frontend, permissions,
+Installed Linux source `9057de5` includes the 36-asset guided frontend, permissions,
 scanner setup, signed-feed maintenance, reviewed execution, saved design
 conversations, coding-task text/background controls and approved-work account/
-recovery, exact native-app navigation connected-agent maintenance and saved voice-note controls. All served asset
-hashes, sixteen API/inventory checks and 100 metadata/refusal checks across 58 exact modules
+recovery, exact native-app navigation connected-agent maintenance, saved voice notes and plain-text transcript import. All served asset
+hashes, nineteen API/inventory checks and 100 metadata/refusal checks across 58 exact modules
 pass, preserving all 54 semantic workspaces and 57 workflow definitions.
 Current plus one rollback remain and the prepared package is removed.
-[Installed evidence](evidence/installed-voice-note-controls-summary.json).
+[Installed evidence](evidence/installed-transcript-import-controls-summary.json).
 
 The installed source also includes [saved design-conversation controls](saved-conversation-controls.md):
 exact history selection, reviewed legacy account binding, explicit native status

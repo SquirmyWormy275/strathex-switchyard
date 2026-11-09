@@ -57,12 +57,12 @@ synthetic notes without opening a microphone or executing a transcription runtim
 Browser rendering, recognition quality and live microphone/device acceptance
 remain separate. [Exact source evidence](evidence/voice-ui-source-summary.json).
 
-Normal installed `4e3feb4` passes all 36 served-asset hashes and sixteen API/
+Normal installed `9057de5` passes all 36 served-asset hashes and nineteen API/
 inventory checks, plus 100 checks from eight installed verifiers. All 54 semantic
 workspaces, modes, conversations and selection are preserved. Dated launcher
 backups and one rollback verify; the exact prepared package is removed. No live
 microphone or recognizer was opened.
-[Installed evidence](evidence/installed-voice-note-controls-summary.json).
+[Installed evidence](evidence/installed-transcript-import-controls-summary.json).
 
 The subsequent transcript-import source adds six interaction cases, bringing the
 voice file to twenty. Nine original groups pass 120 checks with no skips and exact
