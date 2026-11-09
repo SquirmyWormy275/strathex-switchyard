@@ -106,10 +106,13 @@ async function atomicFile(path, text, mode = 0o600) {
   } finally { await rm(temporary, { force: true }); }
 }
 
-export async function discoverHost(hypr = runHypr, sysRoot = "/sys/bus/usb/devices") {
+export async function discoverHost(hypr = runHypr, sysRoot = "/sys/bus/usb/devices", platform = process.platform) {
   const checkedAt = new Date().toISOString();
-  const result = { platform: process.platform, checkedAt, keyboard: { status: "unavailable", message: "USB discovery is unavailable on this platform." }, chatgpt: { status: "unavailable" }, shortcuts: false, hostLayouts: [] };
-  if (process.platform !== "linux") return result;
+  const result = { platform, checkedAt, keyboard: { status: "unavailable", message: "USB discovery is unavailable on this platform." }, chatgpt: { status: "unavailable" }, shortcuts: false, hostLayouts: [] };
+  if (platform === "win32") return { ...result, shortcuts: true, shortcutRegistrationVerified: false,
+    keyboard: { status: "not-observed", message: "Windows shortcut controls are available. Keyboard identity and host layout have not been observed; registration requires the US host layout and an available chord." },
+    chatgpt: { status: "not-observed", message: "Review the exact installed native app in Your tools. Opening setup does not inspect or focus a window." } };
+  if (platform !== "linux") return result;
   try {
     let found = false;
     for (const entry of await readdir(sysRoot)) {

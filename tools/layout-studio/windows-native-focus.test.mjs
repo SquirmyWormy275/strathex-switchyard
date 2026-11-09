@@ -279,9 +279,13 @@ test("owner exit readback is closed, birth-bound and restricted to query-only ob
 test("authenticated Suite routes review and configure exact Windows focus, dispatch selected scope and hide owner records", async t => {
   const f = await fixture(t);
   f.suite = createSuite({ store: f.store, platform: "win32", windowsNativeFocusFactory: options => createWindowsNativeFocus({ ...f.options, ...options }), agents: { discovery: async () => [], close() {} }, voice: { discovery: async () => ({ available: false }) } });
-  f.server = createStudioServer({ token: "synthetic-native-focus-token", suite: f.suite, bridge: {} });
+  f.server = createStudioServer({ token: "synthetic-native-focus-token", suite: f.suite, platform: "win32", bridge: {} });
   f.server.listen(0, "127.0.0.1"); await once(f.server, "listening");
   const origin = `http://127.0.0.1:${f.server.address().port}`;
+  const discovery = await fetch(origin + "/api/discovery", { headers: { Authorization: "Bearer synthetic-native-focus-token" } });
+  assert.equal(discovery.status, 200); const observed = await discovery.json();
+  assert.equal(observed.platform, "win32"); assert.equal(observed.shortcuts, true); assert.equal(observed.shortcutRegistrationVerified, false);
+  assert.deepEqual(observed.hostLayouts, []); assert.equal(observed.chatgpt.status, "not-observed"); assert.equal(f.sessions.length, 0);
   const api = async (route, body, headers = {}) => {
     const response = await fetch(origin + "/api/suite/" + route, { method: "POST", headers: { Origin: origin, "Content-Type": "application/json", Authorization: "Bearer synthetic-native-focus-token", ...headers }, body: JSON.stringify(body) });
     return { status: response.status, body: await response.json() };

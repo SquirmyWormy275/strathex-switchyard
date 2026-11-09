@@ -28,7 +28,7 @@ try {
     ["signed-physical-intent-source-summary.json", ["tools/layout-studio/physical-intent.mjs"]],
     ["claude-desktop-focus-source-summary.json", ["tools/layout-studio/physical-intent-contract.mjs"]],
     ["editor-project-choices-source-summary.json", ["tools/layout-studio/instance.mjs"]],
-    ["voice-ui-source-summary.json", ["tools/layout-studio/serve.mjs"]]
+    ["windows-shortcut-discovery-source-summary.json", ["tools/layout-studio/serve.mjs"]]
   ]) {
     const source = JSON.parse(await readFile(new URL("../docs/evidence/" + summary, import.meta.url), "utf8"));
     const sourceFiles = source.sourceFiles ?? Object.fromEntries(source.files.map(file => [file.path, file.sha256]));

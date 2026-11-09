@@ -23,6 +23,10 @@ Interactive Windows image/window acceptance, Linux Claude focus and application
 launch remain separate. [Controls and evidence](windows-native-focus.md).
 Normal installed adoption of this source is pending.
 
+Windows discovery now exposes the implemented shortcut bridge, fixing a disabled
+frontend path. Five groups/78 checks pass without claiming keyboard layout,
+native window or actual shortcut registration. [Evidence](evidence/windows-shortcut-discovery-source-summary.json).
+
 Latest audited Linux release run `42568708712` at `947d982` failed before tests:
 the unchanged pinned Bubblewrap download returned HTTP 504. No test was skipped
 by changing the plan, and no manual retry was requested. The completed local

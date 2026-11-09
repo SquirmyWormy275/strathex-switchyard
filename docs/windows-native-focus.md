@@ -55,6 +55,14 @@ installed Windows image acceptance is still required.
 
 ## One focus attempt and its recovery
 
+Windows discovery now exposes the implemented shortcut controls. Previously it
+returned `shortcuts: false` on every non-Linux host, disabling the frontend even
+when the Windows backend was present. Availability does not claim registration:
+host layout remains unknown, app windows remain unobserved, and the native helper
+still verifies the US host layout and chord at registration. Five groups/78 tests
+pass through the real authenticated discovery route and pure metadata checks.
+[Discovery evidence](evidence/windows-shortcut-discovery-source-summary.json).
+
 Claude Desktop has its own encrypted configuration and compiled desktop product
 identity. It cannot reuse a ChatGPT request or select Claude Code. The existing
 native helper still requires exact executable bytes, Authenticode identity,

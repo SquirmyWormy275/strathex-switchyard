@@ -109,6 +109,14 @@ test("Claude Desktop shortcut compilation is navigation only with its own closed
   assert.throws(() => compileConnection(plan(), "summon", "native-claude-code.focus/v1"), /unavailable/);
 });
 
+test("Windows discovery advertises the implemented bridge without observing native apps, hardware or host layout", async () => {
+  let probes = 0;
+  const result = await discoverHost(async () => { probes++; throw Error("No native discovery permitted"); }, "/nonexistent-synthetic-sysfs", "win32");
+  assert.equal(result.platform, "win32"); assert.equal(result.shortcuts, true); assert.equal(result.shortcutRegistrationVerified, false);
+  assert.deepEqual(result.hostLayouts, []); assert.equal(result.keyboard.status, "not-observed"); assert.equal(result.chatgpt.status, "not-observed"); assert.equal(probes, 0);
+  assert.equal((await discoverHost(undefined, undefined, "unsupported")).shortcuts, false);
+});
+
 test("another application sharing VS Code's class cannot steal the exact native editor target", async () => {
   const f = chatgptFocusFixture(); f.process.executable = "/usr/share/code/code"; f.window.initialClass = "com.microsoft.VSCode";
   f.windows.push({ ...f.window, pid: 124, address: "0x456" });
