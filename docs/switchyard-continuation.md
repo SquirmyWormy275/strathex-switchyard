@@ -71,6 +71,14 @@ evidence. Do not rerun executed start/audit/cleanup scripts.
 
 ## Current Windows verification
 
+The client lane at `58ecd54` passes **31 groups, 327 tests, zero skips**. Run
+`42573946400`, job `129019951751`, merge `2089ac1b7f93995f87f67eab99379c5b7c5d330e`
+has the exact source tree `983062fbf08cea4847c377c2806015b6265b260d`.
+Receipt `af03d0f3-3187-4483-ad4b-fb634698ba1a` independently verifies every original
+command, bound, skip, serial ordering and child cleanup. The 4,164-byte ZIP was
+hashed in memory; only JSON remains. Newer exact-choice confirmation source is
+not accepted by this earlier run. [Evidence](evidence/client-native-58ecd54-summary.json).
+
 **Full package verification now passes at `7529718`.** Run `42539354588`, job
 `128917796171`, merge `1f2bf2d153eebedeaf488a911f1fe1812dac4d42`,
 source/merge tree `ec96edb826e7ba408d9b3c1c2155cb2b3d51b1d3`: all eight jobs

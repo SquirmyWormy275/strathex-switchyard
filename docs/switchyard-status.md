@@ -20,6 +20,13 @@ no full Linux run remains active. Later source changes have focused evidence.
 
 ## Guided frontend checkpoint
 
+Native Windows client source `58ecd54` passes all **31 groups and 327 tests with
+zero skips**. Its receipt matches the exact source/merge tree, original commands,
+bounds and owned-process cleanup. It includes client navigation and workspace
+fences; the newer exact-choice confirmation correction below remains separate.
+Only its bounded JSON receipt is retained locally.
+[Native client evidence](evidence/client-native-58ecd54-summary.json).
+
 An open role-control confirmation now stays with the exact target displayed in
 its review. Independent rebinding, role edits and saved selection changes refuse
 instead of selecting the replacement. Four original regressions are retained;

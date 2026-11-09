@@ -170,5 +170,44 @@
     "No actual native account/task/model, HID, microphone or IDE operation occurred.",
     "Latest full Linux/Windows acceptance belongs to separately recorded earlier sources.",
     "Native Windows Claude Desktop image/window acceptance remains pending; Linux Claude focus, launching and exact interactive task attachment remain unfinished implementation."
-  ]
+  ],
+  "installationRegression": {
+    "receiptId": "2826652a-5c1a-4d10-90d8-31b8584fcc93",
+    "sha256": "c7674244fd671419b0efa9ef73be054cf64b3866b645e8db6f0a3814a1749d02",
+    "success": true,
+    "totals": {
+      "required": 18,
+      "passed": 18,
+      "failed": 0,
+      "tests": 29,
+      "passedTests": 29,
+      "failedTests": 0,
+      "skippedTests": 0,
+      "cancelledTests": 0,
+      "todoTests": 0
+    },
+    "files": [
+      "scripts/verify-copilot-journal-host.test.mjs",
+      "deployment/suite/release.test.mjs",
+      "deployment/suite/installation.test.mjs",
+      "deployment/suite/installation.test.mjs",
+      "deployment/suite/installation.test.mjs",
+      "deployment/suite/installation.test.mjs",
+      "deployment/suite/installation.test.mjs",
+      "deployment/suite/installation.test.mjs",
+      "deployment/suite/installation.test.mjs",
+      "deployment/suite/installation.test.mjs",
+      "deployment/suite/installation.test.mjs",
+      "deployment/suite/installation.test.mjs",
+      "deployment/suite/installation.test.mjs",
+      "deployment/suite/installation.test.mjs",
+      "deployment/suite/installation.test.mjs",
+      "deployment/suite/installation.test.mjs",
+      "deployment/suite/installation.test.mjs",
+      "deployment/suite/installation.test.mjs"
+    ],
+    "originalBoundsPreserved": true,
+    "ownedCleanupComplete": true,
+    "auditCorrection": "The first audit expected an unanchored test-name pattern. The original runner uses exact escaped anchors; the audit now derives that unchanged command. No tests were rerun or bounds altered."
+  }
 }
