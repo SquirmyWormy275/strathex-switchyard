@@ -26,8 +26,10 @@ action, file and exclusion summaries. Full scope/fingerprints remain available i
 a collapsed details section and clear on workspace changes. Nine focused cases
 and six integration groups/63 tests pass, with overlap and zero skips. The native
 literal-path failure and intermediate fixture/edit failures are retained.
-This frontend source still needs its immutable package, installation and native
-Windows follow-up. [Source evidence](evidence/permission-review-source-summary.json).
+Its immutable 36-asset package is installed and verified at source 85f1ec4.
+Native Windows follow-up and visual acceptance remain separate.
+[Source evidence](evidence/permission-review-source-summary.json),
+[installed evidence](evidence/installed-permission-summary.json).
 
 Installed startup source 99784a7 passes the native Windows client lane: 31 groups,
 356 tests, zero skips. Role dispatch finishes at 38.705 seconds within its
@@ -47,7 +49,7 @@ Workspace startup now commits its recovery stages in one protected transaction,
 reducing repeated native lock startup. Shutdown joins pending startup and selection
 work before returning. A regression reproduced the original premature shutdown;
 ten final groups pass 147 tests with one declared Windows-only skip, and typechecking
-passes. This source is installed as `99784a7`; its native Windows client follow-up passes; full-suite follow-up remains pending.
+passes. This correction is included in installed source `85f1ec4`; its native Windows client follow-up passes; full-suite follow-up remains pending.
 [Source and regression evidence](evidence/atomic-startup-source-summary.json).
 
 Prior installed source `a351626` passes the native Windows client lane: **31 groups,
@@ -64,14 +66,14 @@ Windows client run 42579643586 at source 531587b failed before tests because the
 
 Claude Desktop’s owned Windows launch transport now passes eight groups/93 tests and both offline helper builds. Its final review/API/frontend connection now has the separate source evidence above; no actual app or account was used. Exact owner persistence, normal-launch limits and process-birth readback are tested. The 2.8 MB build staging is removed. [Transport evidence](evidence/owned-claude-launch-port-summary.json).
 
-Latest normal installed source 99784a7 includes atomic recovery and joined
-shutdown, connected native launch controls, Home navigation and saved-role refresh.
+Latest normal installed source 85f1ec4 includes readable permission summaries,
+atomic recovery, joined shutdown, native launch controls and Home navigation.
 All 36 assets, 33 API checks and 107 installed metadata checks pass; all 54
 semantic workspaces, three conversations, modes, selection and 57 workflows remain
-intact. Current plus one rollback remain; the 5,170,602-byte prepared package is
-removed. [Installed evidence](evidence/installed-atomic-startup-summary.json).
+intact. Current plus one rollback remain; the 5,172,332-byte prepared package is
+removed. [Installed evidence](evidence/installed-permission-summary.json).
 
-The pilot VS Code extension is updated from the same source. Its 53 payload files,
+The pilot VS Code extension is updated from source 99784a7. Its 53 payload files,
 three saved-task commands and installed-module registration/refusal checks pass.
 Original extension/registry backups verify; 1,393,488 bytes of owned staging are
 removed. Interactive editor activation and native task attachment remain separate.

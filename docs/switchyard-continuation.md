@@ -22,10 +22,10 @@ Start with [current status](switchyard-status.md), the [requirement ledger](swit
 
 | Identity | Verified checkpoint |
 | --- | --- |
-| Source | `99784a78c62a0f625eb77122abf17ea34352ce4f` |
-| Release | `8d08efa74a9cd297ec674956aef6e3f1418f1c0b67ef9a841d9317719954bbb4` |
-| Rollback | `195f24092320c0b4588396bb421af22d8cb9d5e51d636a58f28ca7cdbbddd2f6` |
-| Frontend | `3cf2b5af65489f932603711ca6b4ea836b7b8b2b1c08dac14dd3dfbd89545e2b` |
+| Source | `85f1ec4adc7d48f61fed7b92db39c65e46c5df2f` |
+| Release | `5e6ef12d38e6d8890c3ebc0e29fd422828c1099a6f950165863ed08457f56661` |
+| Rollback | `8d08efa74a9cd297ec674956aef6e3f1418f1c0b67ef9a841d9317719954bbb4` |
+| Frontend | `3265d16737fae14d99c7c5a0792af4c5e7cd743320f0abc84263bf22490770ed` |
 
 The approved frontend is installed at the normal local address. All 36 served assets
 and thirty-three API/inventory metadata/refusal checks pass. Eight installed verifiers pass 107 checks
@@ -36,12 +36,12 @@ workspace changes audit metadata only. No physical keyboard, native provider,
 account, model or microphone operation occurred.
 
 The normal update retains dated launcher backups and current plus one rollback.
-The payload contains 574 files/5,066,818 bytes. Its exact prepared
-575-file/5,170,602-byte bundle is removed after identity/hash verification.
-The frontend digest and private access URL remain unchanged. All eight verifiers
+The payload contains 574 files/5,068,548 bytes. Its exact prepared
+575-file/5,172,332-byte bundle is removed after identity/hash verification.
+The new immutable frontend and rotated private access URL both verify. All eight verifiers
 pass with no failed verifier in this update. Host-facing owner, Copilot and
 signed-intent checks run sequentially. Do not repeat executed update or cleanup
-scripts. [Installed evidence](evidence/installed-atomic-startup-summary.json).
+scripts. [Installed evidence](evidence/installed-permission-summary.json).
 
 All original workspace modes and all three conversation records are preserved.
 Selected Personal was already in companion mode; the pending conversation lives
@@ -73,8 +73,10 @@ action, file and exclusion summaries. Full scope/fingerprints remain available i
 a collapsed details section and clear on workspace changes. Nine focused cases
 and six integration groups/63 tests pass, with overlap and zero skips. The native
 literal-path failure and intermediate fixture/edit failures are retained.
-This frontend source still needs its immutable package, installation and native
-Windows follow-up. [Source evidence](evidence/permission-review-source-summary.json).
+Its immutable 36-asset package is installed and verified at source 85f1ec4.
+Native Windows follow-up and visual acceptance remain separate.
+[Source evidence](evidence/permission-review-source-summary.json),
+[installed evidence](evidence/installed-permission-summary.json).
 
 Installed startup source 99784a7 passes the native Windows client lane: 31 groups,
 356 tests, zero skips. Role dispatch finishes at 38.705 seconds within its
