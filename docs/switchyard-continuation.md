@@ -201,6 +201,9 @@ remaining observation/host-execution flows and native task attachment limitation
 
 ## Client frontend checkpoint
 
+Source d32c60dec9157cab64a40f436ddb5e19bdcdc57d has an immutable 28-asset review bundle
+8114b09fc9d33c6e79b65a58ba58b719629b29bf6e8cd3290b91c09d90ebe35f. All asset hashes and the prior dated pointer backup verify. This bundle is not installed or visually accepted.
+
 Your tools now exposes five distinct documented client surfaces, authority-free
 recipe download, separate exact-destination launch review and retained outcomes.
 UI selection/workspace changes discard review; late results cannot populate a

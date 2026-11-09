@@ -148,7 +148,15 @@
     "deadlinesChanged": false,
     "realLaunches": 0
   },
-  "reviewBundle": null,
+  "reviewBundle": {
+    "sourceCommit": "d32c60dec9157cab64a40f436ddb5e19bdcdc57d",
+    "digest": "8114b09fc9d33c6e79b65a58ba58b719629b29bf6e8cd3290b91c09d90ebe35f",
+    "assets": 28,
+    "allBytesVerified": true,
+    "priorPointerDatedBackupVerified": true,
+    "installed": false,
+    "visuallyAccepted": false
+  },
   "limits": [
     "Browser visual/responsive acceptance remains blocked before navigation by the existing browser-tool error.",
     "Claude desktop native launch remains unfinished; its card exposes this limitation and offers no browser fallback.",
