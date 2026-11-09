@@ -11,6 +11,8 @@ class Element extends EventTarget {
   get options() { return this.children; }
   get selectedOptions() { return this.children.filter(child => child.value === this.value); }
   showModal() { this.open = true; }
+  focus() { this.focused = true; }
+  scrollIntoView(options) { this.scrollOptions = options; }
   close() { if (this.open) { this.open = false; queueMicrotask(() => this.dispatchEvent(new Event("close"))); } }
 }
 function surface() {

@@ -11,6 +11,9 @@ export function mountClients({ notify, download }) {
     $("client-picker").disabled = busy || !entries.length;
     $("refresh-clients").disabled = busy || !state;
     $("review-client-launch").disabled = busy || !permitted || !entry.companionModeSelected || !entry.recipePlatformSupported || !entry.capabilities.hostLaunchConnected;
+    $("open-client-native-setup").hidden = !entry?.nativeNavigation;
+    $("open-client-native-setup").disabled = busy || !permitted || !entry?.nativeNavigation?.permitted;
+    $("open-client-native-setup").textContent = entry?.nativeNavigation?.configured ? "Go to Claude Desktop controls" : "Set up Claude Desktop";
     $("download-client-recipe").disabled = busy || !permitted || !state?.policyRules.export;
     $("confirm-client-launch").disabled = busy || !reviewed;
   }
@@ -18,8 +21,9 @@ export function mountClients({ notify, download }) {
     const entry = selected(); $("client-facts").replaceChildren();
     $("client-source").hidden = !entry;
     if (!entry) { $("client-launch-history").replaceChildren(); $("client-status").textContent = "Choose a documented client in this workspace."; controls(); return; }
-    const availability = !entry.policyPermitsProvider ? "Unavailable under this workspace policy" : !entry.recipePlatformSupported ? "This platform is not supported by the recipe" : !entry.capabilities.hostLaunchConnected ? "Native launch integration is unfinished" : !entry.companionModeSelected ? "Choose companion mode to enable an explicit launch" : "Ready for an explicitly reviewed launch request";
+    const availability = !entry.policyPermitsProvider ? "Unavailable under this workspace policy" : !entry.recipePlatformSupported ? "This platform is not supported by the recipe" : entry.nativeNavigation ? !entry.nativeNavigation.permitted ? "Choose Personal companion mode to set up window controls" : entry.nativeNavigation.configured ? "Saved for window controls. Open Claude Desktop, then use its controls below." : "Set up the installed app to return to its open window" : !entry.capabilities.hostLaunchConnected ? "Native launch integration is unfinished" : !entry.companionModeSelected ? "Choose companion mode to enable an explicit launch" : "Ready for an explicitly reviewed launch request";
     const facts = [["Surface", entry.surface], ["Destination", entry.recipe.target.url ?? entry.recipe.target.applicationId], ["Availability", availability], ["Before use", entry.requirements.join(". ")], ["Scope", entry.limits.join(". ")], ["Account and task", "Not verified or selected by opening this surface"]];
+    if (entry.nativeNavigation) facts.splice(3, 0, ["Window controls", "The exact open window is verified when you request focus. No window has been inspected by this catalog."], ["Opening the app", "Automatic native launch is unfinished. Open Claude Desktop yourself first."]);
     $("client-facts").append(...facts.flatMap(([name, value]) => { const dt = document.createElement("dt"), dd = document.createElement("dd"); dt.textContent = name; dd.textContent = value; return [dt, dd]; }));
     $("client-source").href = entry.source.url; $("client-source").textContent = `Vendor documentation · source checked ${entry.source.verifiedAt}`;
     $("client-launch-history").replaceChildren(...launches.filter(row => row.recipeId === entry.id).slice(-5).reverse().map(row => { const item = document.createElement("li"); item.textContent = `${row.result?.status ?? row.status} · native helper exit ${row.nativeOwnerStoppedVerified === true ? "verified" : "unconfirmed"}${row.cleanupPending ? " · cleanup pending" : ""}. ${row.result?.summary ?? "No application, account or task acceptance is inferred."}`; return item; }));
@@ -40,6 +44,12 @@ export function mountClients({ notify, download }) {
   async function run(fn) { if (busy) return; busy = true; controls(); const version = generation, compartment = state?.id; try { await fn({ compartment, current: () => generation === version && state?.id === compartment }); } catch (error) { if (generation === version) { $("client-status").textContent = error.message; notify(error.message); } } finally { busy = false; controls(); } }
   $("client-picker").addEventListener("change", () => { invalidate(); render(); });
   $("refresh-clients").addEventListener("click", () => { void load(); });
+  $("open-client-native-setup").addEventListener("click", () => {
+    const entry = selected();
+    if (busy || !state || !entry?.policyPermitsProvider || !entry.nativeNavigation?.permitted) return;
+    invalidate();
+    document.dispatchEvent(new CustomEvent("switchyard-native-app-setup", { detail: { compartment: state.id, implementation: entry.nativeNavigation.implementation } }));
+  });
   $("download-client-recipe").addEventListener("click", () => run(async ({ compartment, current }) => {
     const entry = selected(); if (!entry?.policyPermitsProvider || !state?.policyRules.export) return;
     const value = await api("/api/suite/integrations/recipe", { compartment, id: entry.id }); if (!current()) return;
@@ -98,13 +108,18 @@ export function mountNativeFocus({ notify }) {
     }));
     controls();
   }
-  async function load({ preserveStatus = false } = {}) {
+  async function load({ preserveStatus = false, implementation = null } = {}) {
     if (!state) return;
     const choice = $("native-app-picker").value, c = state.id; catalog = null; invalidate(); render(); const version = generation;
     try {
       const value = await api("/api/suite/native-focus/catalog", { compartment: c }); if (!current(version, c)) return;
       catalog = value; $("native-app-picker").replaceChildren(...value.entries.map(row => option(row.implementation, row.name)));
       if (value.entries.some(row => row.implementation === choice)) $("native-app-picker").value = choice;
+      if (implementation && value.permitted && value.supported && value.entries.some(row => row.implementation === implementation)) {
+        $("native-app-picker").value = implementation;
+        $("native-app-picker").focus();
+        $("native-app-picker").scrollIntoView({ block: "center" });
+      }
       if (!preserveStatus) $("native-app-status").textContent = "Saved setup loaded. No app was opened, inspected or focused.";
       render();
     } catch (error) { if (current(version, c)) { $("native-app-status").textContent = error.message; notify(error.message); } }
@@ -121,6 +136,11 @@ export function mountNativeFocus({ notify }) {
     $("native-app-review-dialog").showModal(); controls();
   }
   $("refresh-native-apps").addEventListener("click", () => { void load(); });
+  document.addEventListener("switchyard-native-app-setup", event => {
+    if (busy || !state || state.id !== event.detail?.compartment || state.policy !== "personal" || state.mode !== "personal-companion" || event.detail?.implementation !== "native-claude-desktop.focus/v1") return;
+    $("native-app-path").value = "";
+    void load({ implementation: event.detail.implementation });
+  });
   $("native-app-picker").addEventListener("change", () => { $("native-app-path").value = ""; invalidate(); render(); });
   $("native-app-path").addEventListener("input", () => { invalidate(); controls(); });
   $("review-native-app-setup").addEventListener("click", () => run(async ({ c, valid }) => {

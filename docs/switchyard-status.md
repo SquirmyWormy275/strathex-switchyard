@@ -14,6 +14,18 @@ no merge or public release has been accepted.
 
 ## Guided frontend checkpoint
 
+The Windows Claude Desktop catalog now leads directly to its native setup or
+saved window controls. It distinguishes configured identity from an observed
+window and keeps launch availability separate. Five groups/59 tests pass through
+the authenticated API, with native/browser fixtures and zero skips. This later
+source is not yet installed or visually accepted.
+[Evidence](evidence/client-native-navigation-source-summary.json).
+
+Native helper publish and own-process self-test pass at `ece17a0` within the
+original 15-minute bound and QUERY 8. The exact source/merge tree verifies; no
+native archive was downloaded locally. Window/shortcut acceptance remains separate.
+[Native evidence](evidence/native-helper-ece17a0-summary.json).
+
 Windows Claude Desktop now connects exact executable review, saved identity,
 window focus and navigation shortcuts. Twelve groups pass 177 checks; a final
 four-group UI run passes 39 with overlap. The helper builds offline with warnings

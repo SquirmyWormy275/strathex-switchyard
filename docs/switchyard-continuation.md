@@ -60,8 +60,15 @@ preserves every original command, bound, skip and child cleanup. The original
 serial schedule and four builds before compiled consumers verify. Its unit exits
 zero. The owned checkout, nine dependency aliases, 805 generated files/11,926,549
 bytes, empty test parent and active marker are removed. Other worktrees remain
-untouched. No complete Linux run is active. Transcript import and Claude hooks
-are later sources with separate focused evidence.
+untouched. This is earlier-source evidence. A new complete Linux run is active
+at installed source `49602de9f5482ec72542bb63313bb244674cef79`: unit
+`switchyard-verification-49602de-1794204385.service`, receipt/run UUID
+`d5d20824-74b2-48a4-a7b6-bf01fd64e1e7`, 376 original required groups.
+Its exact checkout, temporary parent and nine dependency aliases are retained in
+`~/.local/state/strathex-switchyard/runtime-verification/linux-full-active.json`.
+Let it finish; audit original commands/bounds/skips/cleanup before retiring only
+those owned paths. Do not restart it. Transcript import, hooks and native-client
+changes are included; the newer catalog navigation has separate focused evidence.
 [Complete Linux evidence](evidence/linux-4e3feb4-complete-summary.json).
 
 The earlier `9266c12` wrapper syntax failure and corrected run remain historical
@@ -104,6 +111,9 @@ The frontend clarification is resolved: the owner approved completing it. Contin
 Only bounded digest-verified JSON receipts remain locally outside the checkout. ZIPs were read in memory; no native runtime archive or disposable checkout is retained. Package verification keeps ordered builds/compiled consumers followed by at most two independent children. [Scheduling contract](evidence/windows-paired-verification-summary.json).
 
 ## Recent backend behavior
+
+- The Claude Desktop catalog now leads directly to exact Windows native setup with passive metadata readback and workspace-change fencing. Five groups/59 tests pass with no skips. This source still needs normal installed adoption and browser acceptance. [Evidence](evidence/client-native-navigation-source-summary.json).
+- Windows helper build and own-process self-test pass at `ece17a0`, run `42570708844`, job `129008065497`, exact merge tree `623501971159b3d2fcd1fc0ef28dc0566412594c`. Original toolchain/bound/QUERY 8 remain. Actual desktop and current full CI outcomes remain separate. [Evidence](evidence/native-helper-ece17a0-summary.json).
 
 - Windows Claude Desktop is connected through native executable review, saved identity, focus, physical dispatch and shortcut controls. Source verification passes 177 checks plus 39 final UI checks with overlap; offline helper build/self-test passes. Actual Windows image/window acceptance, Linux Claude focus and launch remain separate. Normal installed adoption passes 61 served/API and 106 installed checks, with all 54 workspaces preserved. [Source evidence](evidence/claude-desktop-focus-source-summary.json).
 - Linux release run `42568708712`, job `129000860981`, at `947d982` failed before tests when the pinned Bubblewrap download returned HTTP 504. Preserve the failure; no manual retry/cancel/dispatch or bound change. [Receipt](evidence/linux-947-download-failure-summary.json).

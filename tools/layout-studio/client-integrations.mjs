@@ -14,7 +14,19 @@ export function createClientIntegrations({ store, platform = process.platform, h
         history: ((s.nativeFocusOperations ?? []).slice(-64)).map(row => ({ requestId: row.id, implementation: row.implementation ?? "native-chatgpt.focus/v1", kind: row.kind, status: row.status, effectAuthorized: row.effectAuthorized, helpersRetired: (row.helpers ?? []).every(h => h.stopped === true), summary: row.result?.summary ?? null })),
         provenance: "Saved local configuration and receipts only; no process, window or account was inspected." };
     },
-    async catalog(c) { const s = await store.snapshot(c); return { schema: "switchyard-client-catalog/v1", compartment: c, entries: clientCatalog({ policy: s.policy, mode: s.mode, platform, hostLaunchPlatforms }), provenance: "Documented distinct client surfaces; host launch implementation is distinct from installed/account/session acceptance" }; },
+    async catalog(c) {
+      const s = await store.snapshot(c);
+      const entries = clientCatalog({ policy: s.policy, mode: s.mode, platform, hostLaunchPlatforms }).map(entry => ({
+        ...entry,
+        // Implementation and saved setup are distinct from observing an actual
+        // process/window. This does not change the exported launch recipe.
+        nativeNavigation: entry.id === "claude-desktop" && platform === "win32" ? {
+          implementation: "native-claude-desktop.focus/v1", configured: !!s.nativeWindowsClaude?.identity,
+          permitted: s.policy === "personal" && s.mode === "personal-companion", windowObserved: false
+        } : null
+      }));
+      return { schema: "switchyard-client-catalog/v1", compartment: c, entries, provenance: "Documented distinct client surfaces and saved local setup; no process, window or account was inspected" };
+    },
     async recipe(c, input) {
       if (Object.keys(input).some(k => !["compartment", "id"].includes(k))) throw new Error("Select only one exact documented recipe ID; imported commands, URLs and approval fields are not accepted.");
       const s = await store.snapshot(c), recipe = validateClientRecipe(clientRecipe(input.id));

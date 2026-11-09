@@ -53,6 +53,55 @@ async function setup(c) {
   await until(() => c.$("native-app-status").textContent.includes("Exact application saved")); await settled(c);
 }
 
+async function clientCatalog(c) {
+  const { mountClients } = await import("./client-ui.mjs");
+  mountClients({ notify: message => c.f.notices.push(message), download: () => { throw Error("No export expected during navigation"); } });
+  await c.refresh(); await until(() => c.$("client-picker").options.length === 5); await settled(c);
+  c.change("client-picker", "claude-desktop");
+}
+
+test("the Windows Claude catalog leads to its exact setup without probing or granting launch authority", () => fixture(async c => {
+  await clientCatalog(c); const before = await c.store.snapshot("personal");
+  assert.equal(c.$("open-client-native-setup").hidden, false); assert.equal(c.$("open-client-native-setup").disabled, false);
+  assert.match(c.$("client-facts").children.map(row => row.textContent).join(" "), /Set up the installed app/);
+  assert.equal(c.$("review-client-launch").disabled, true);
+  c.$("native-app-path").value = "discarded unreviewed input";
+  c.click("open-client-native-setup");
+  await until(() => c.$("native-app-picker").value === "native-claude-desktop.focus/v1"); await settled(c);
+  assert.equal(c.$("native-app-path").value, ""); assert.equal(c.$("native-app-picker").focused, true);
+  assert.equal(c.$("native-app-review-dialog").open, false); assert.equal(c.$("review-native-app-focus").disabled, true);
+  assert.equal(c.f.probes, 0); assert.equal(c.f.effects, 0); assert.deepEqual(await c.store.snapshot("personal"), before);
+  await setup(c); await c.refresh(); await until(() => c.$("client-picker").options.length === 5); await settled(c);
+  assert.match(c.$("client-facts").children.map(row => row.textContent).join(" "), /Saved for window controls/);
+  assert.equal(c.$("open-client-native-setup").textContent, "Go to Claude Desktop controls");
+  assert.equal(c.$("review-client-launch").disabled, true); assert.equal(c.f.effects, 0); assert.equal(c.f.probes, 0);
+  assert(c.calls.every(row => !/native-focus\/(focus|recover)$|integrations\/launch$/.test(row.path)));
+}, "win32"));
+
+test("a delayed catalog handoff cannot select or focus an app in a replacement workspace", () => fixture(async c => {
+  await clientCatalog(c);
+  const fetch = globalThis.fetch; let release, entered = false; const waiting = new Promise(resolve => { release = resolve; });
+  globalThis.fetch = async (path, options) => { const response = await fetch(path, options); if (path.endsWith("native-focus/catalog") && JSON.parse(options.body).compartment === "personal") { entered = true; await waiting; } return response; };
+  try {
+    c.click("open-client-native-setup"); await until(() => entered);
+    c.document.dispatchEvent(new Event("switchyard-workspace-changing"));
+    c.document.dispatchEvent(new CustomEvent("switchyard-compartment-state", { detail: await c.store.snapshot("work") }));
+    await until(() => c.$("client-picker").value === "microsoft-365-copilot-web"); await settled(c);
+    release(); await Promise.all(c.responses.map(row => row.response)); await new Promise(resolve => setImmediate(resolve));
+    assert.notEqual(c.$("native-app-picker").value, "native-claude-desktop.focus/v1"); assert.notEqual(c.$("native-app-picker").focused, true);
+    c.change("client-picker", "claude-desktop"); assert.equal(c.$("open-client-native-setup").disabled, true);
+    c.document.dispatchEvent(new CustomEvent("switchyard-native-app-setup", { detail: { compartment: "personal", implementation: "native-claude-desktop.focus/v1" } }));
+    assert.equal(c.$("native-app-review-dialog").open, false); assert.equal(c.f.probes, 0); assert.equal(c.f.effects, 0);
+  } finally { release(); globalThis.fetch = fetch; }
+}, "win32"));
+
+test("Linux Claude catalog does not offer the Windows navigation implementation", () => fixture(async c => {
+  await clientCatalog(c); assert.equal(c.$("open-client-native-setup").hidden, true); assert.equal(c.$("open-client-native-setup").disabled, true);
+  c.document.dispatchEvent(new CustomEvent("switchyard-native-app-setup", { detail: { compartment: "personal", implementation: "native-claude-desktop.focus/v1" } }));
+  await settled(c); assert.notEqual(c.$("native-app-picker").value, "native-claude-desktop.focus/v1");
+  assert.equal(c.f.probes, 0); assert.equal(c.f.effects, 0);
+}));
+
 test("saved Linux app choices are passive and a cancelled review never inspects a window", () => fixture(async c => {
   assert.equal(c.f.probes, 0); assert.equal(c.f.effects, 0); assert.equal(c.$("native-app-setup").hidden, true);
   await openReview(c, "review-native-app-focus"); assert.match(c.$("native-app-review-summary").textContent, /No app is started/);

@@ -5,6 +5,16 @@ Copilot, Claude desktop, Cursor Cloud Agents and Figma. Each choice shows its
 exact destination, prerequisites, current workspace availability and source
 reference. Browsing the catalog contacts no provider and starts no application.
 
+On Windows, select **Claude desktop → Set up Claude Desktop** to move directly
+to its exact native-app setup. An already saved identity changes the link to
+**Go to Claude Desktop controls**. Navigation reads saved metadata only; it does
+not inspect or focus a window. Open Claude Desktop first, then separately review
+returning to that window. Automatic native launch remains unfinished. Work policy
+and keyboard-only mode cannot enable these controls, and Linux offers no substitute.
+Five original groups pass 59 interaction/integration checks with no skips,
+including delayed-response refusal after a workspace change.
+[Source evidence](evidence/client-native-navigation-source-summary.json).
+
 Choose **Review app launch** to inspect the fixed destination and workspace.
 **Request this app launch** is a separate action. Its receipt distinguishes an
 OS-accepted request from a verified application window, account or exact task.
