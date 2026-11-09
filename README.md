@@ -86,17 +86,17 @@ execution, offline repository scans and recoverable installation. The Home and
 Model F catalog provide the starting experience; complete task/IDE attachment,
 broader observation sources and full scanner coverage remain unfinished.
 
-The installed application at `0aeb317` includes guided setup, portable profiles,
+The installed application at `531587b` includes guided setup, portable profiles,
 observation-assisted design, keyboard/client controls, task permissions, scanners,
 signed feeds and reviewed execution. Saved conversations, coding-task and account
 controls, native-app navigation, agent maintenance, voice notes, transcript import
 and separately opted-in Claude hook setup are connected. All 36 served hashes,
 29 API checks and 107 installed metadata checks pass; all 54 semantic workspaces
 and 57 workflows are preserved. Browser visual acceptance remains blocked.
-[Installed evidence](docs/evidence/installed-role-refusal-refresh-summary.json).
+[Installed evidence](docs/evidence/installed-repository-inspection-startup-summary.json).
 The running synthetic demonstration verifies named-role dispatch, independent SDK
 acknowledgement and workspace-change refusal through the current served frontend;
-the seven-stage connected backend journey also passes.
+the seven-stage connected backend journey also passes. A separate reviewed-execution demonstration at `531587b` runs one actual isolated Linux program and verifies exit, duplicate refusal and cleanup. [Execution evidence](docs/evidence/repository-inspection-connected-demo-summary.json).
 [Demonstration evidence](docs/evidence/role-refusal-refresh-running-demo-summary.json).
 
 Complete Linux `49602de` passes **376 groups / 2,508 tests**, with 32 declared

@@ -22,9 +22,9 @@ Start with [current status](switchyard-status.md), the [requirement ledger](swit
 
 | Identity | Verified checkpoint |
 | --- | --- |
-| Source | `0aeb31704579eaba2fb03f870380af65cefbe01d` |
-| Release | `6e750877ab5fbe8d6565de2ff15d1d10eedbae35a737fdee46a4a148afa04b54` |
-| Rollback | `33a5554a7694b009d9f116dcb981270bf64e7fad850970cf6d0658f033a4b4aa` |
+| Source | `531587b75ba7aac212072f6b2601fb3a3c5de105` |
+| Release | `f14f814bfc666c98b698d4ad083c94e4060dbfec89ac5cf92df268d079e3827e` |
+| Rollback | `6e750877ab5fbe8d6565de2ff15d1d10eedbae35a737fdee46a4a148afa04b54` |
 | Frontend | `c77f3fe8d57d71176023bd8dbad71c3c3f1c2a7f6d8747951137ce3f3c5b0aef` |
 
 The approved frontend is installed at the normal local address. All 36 served assets
@@ -36,12 +36,13 @@ workspace changes audit metadata only. No physical keyboard, native provider,
 account, model or microphone operation occurred.
 
 The normal update retained and verified dated launcher backups and current plus
-one rollback. The payload contains 574 files/5,055,264 bytes. Its exact prepared
-575-file/5,159,048-byte bundle is removed after identity/hash verification. The
-private access token intentionally changed with the frontend digest; use the normal
-launcher/new endpoint rather than restoring the old token. Host-facing owner,
+one rollback. The payload contains 574 files/5,055,935 bytes. Its exact prepared
+575-file/5,159,719-byte bundle is removed after identity/hash verification. The
+private access URL is preserved with the unchanged frontend digest. An inherited
+readback assertion expected a new frontend; that failed check is retained and now
+requires identical frontend bytes and the preserved URL. Host-facing owner,
 Copilot and signed-intent checks ran sequentially. Do not repeat executed update
-or cleanup scripts. [Installed evidence](evidence/installed-role-refusal-refresh-summary.json).
+or cleanup scripts. [Installed evidence](evidence/installed-repository-inspection-startup-summary.json).
 
 All original workspace modes and all three conversation records are preserved.
 Selected Personal was already in companion mode; the pending conversation lives
@@ -73,7 +74,7 @@ evidence. Do not rerun executed start/audit/cleanup scripts.
 
 The Windows client follow-up at installed source `0aeb317` passes all 31 groups and 340 tests with zero skips. Its exact merge/source tree, manifest, commands, original bounds, serial ordering and cleanup are audited. This accepts the Home and refusal-refresh corrections within the client lane; actual window/browser/hardware checks remain separate. [Native follow-up](evidence/client-native-0aeb317-summary.json).
 
-Repository inspection now avoids recursive submodule startup only when a validated index has no gitlinks and an exact second read matches. Changed/unavailable reads remain incomplete; gitlinks and invalid metadata keep the original recursive query. Eight integration groups pass 80 tests, three focused groups pass 31, and the final native-Git test file passes 17, with overlap. Typechecking passes. Execution UI tests now join the original HTTP reply before the unchanged rendering assertion. Full Windows timeout acceptance and normal installed adoption of this backend optimization remain pending. [Source evidence](evidence/repository-inspection-startup-summary.json).
+Repository inspection now avoids recursive submodule startup only when a validated index has no gitlinks and an exact second read matches. Changed/unavailable reads remain incomplete; gitlinks and invalid metadata keep the original recursive query. Eight integration groups pass 80 tests, three focused groups pass 31, and the final native-Git test file passes 17, with overlap. Typechecking passes. Execution UI tests now join the original HTTP reply before the unchanged rendering assertion. Normal installed source `531587b` passes 65 served/API and 107 metadata checks with all 54 semantic workspaces preserved; full Windows timeout acceptance remains pending. [Source evidence](evidence/repository-inspection-startup-summary.json). The seven-stage backend CLI passes at the same source, and the separate execution demonstration passes six checks with an actual owned Linux program, independent exit, no duplicate run, unchanged repository and complete staging cleanup. [Connected demonstration](evidence/repository-inspection-connected-demo-summary.json).
 
 Full Windows run `42573946626` at `58ecd54` failed. Workers 7 and 11 each finish 20 of 21 groups; scanner and execution UI hit their original 45-second file limits. Execution UI also reports premature two-second rendering assertions. Their partial TAP output has no final count and is not a pass. Exact manifests, commands, bounds, toolchain identity and owned cleanup are audited; performance investigation remains open. [Original failures](evidence/full-native-58ecd54-ui-failures-summary.json).
 
