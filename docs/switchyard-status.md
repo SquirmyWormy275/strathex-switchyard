@@ -20,6 +20,10 @@ no full Linux run remains active. Later source changes have focused evidence.
 
 ## Guided frontend checkpoint
 
+Latest normal installed source `0aeb317` includes the Home navigation and saved-role refresh corrections. All 36 assets, 29 API checks and 107 installed metadata checks pass; all 54 semantic workspaces and 57 workflows remain intact. Current plus one rollback remain, and the verified prepared bundle is removed. The current synthetic preview passes nine checks. Browser visual acceptance remains blocked before inspection. [Installed evidence](evidence/installed-role-refusal-refresh-summary.json), [running demonstration](evidence/role-refusal-refresh-running-demo-summary.json).
+
+Full Windows run `42573946626` at `58ecd54` failed. Workers 7 and 11 each finish 20 of 21 groups; scanner and execution UI hit their original 45-second file limits. Execution UI also reports premature two-second rendering assertions. Their partial TAP output has no final count and is not a pass. Exact manifests, commands, bounds, toolchain identity and owned cleanup are audited; performance investigation remains open. [Original failures](evidence/full-native-58ecd54-ui-failures-summary.json).
+
 Post-refusal role refresh now reads current saved labels and disables stale
 choices if that read fails. Two UI regressions reproduced stale labels; seven
 groups pass 88 tests. Windows client source `51ce508` remains failed with 334
@@ -50,7 +54,7 @@ instead of selecting the replacement. Four original regressions are retained;
 sixteen groups pass 245 tests with one declared skip, including changes under the
 enqueue lease and after enqueue. Installed source `51ce508` passes 65 served/API
 and 107 metadata checks; all 54 workspaces and 57 workflows remain intact.
-The current synthetic preview passes nine checks and the seven-stage backend demo
+That checkpoint’s synthetic preview passed nine checks and the seven-stage backend demo
 passes. Native Windows and browser visual follow-up remain separate.
 [Installed evidence](evidence/installed-reviewed-role-choice-summary.json),
 [running demonstration](evidence/reviewed-role-choice-running-demo-summary.json).
