@@ -39,46 +39,40 @@ No merge, public release or visibility change is authorized.
   page loading. Do not use shell/CDP/Playwright outside CUA to bypass this or change
   Brave protections. The user's unrelated NIGHTWIRE tab stays untouched.
 
-## Current installed checkpoint
+## Current installed checkpoint — completed, do not replay
 
-Published backend **167df7b125af93e46c0631b2a1b08d1ec9bec951** is normally installed.
-Release: **635d0718fd18734f65e2dd2f3ab537571d55d538d35815601884a14bddd2783d**.
-Rollback: **ef51ea8dbe2e8784ff5a5202cbecea3164b8e957e3a585e1046acc769a541702**.
-Frontend remains **4fe51fece3b7c3034a8d0a2130030096b081a5149270648f52373a638ae413ba**,
-36 assets pinned to source **a97ebe8504cfea30ff1d729470994c4633ca5169**. Private
-local access is unchanged across this backend update; never publish its bearer.
+Published source **fd13fd038c9f85112e2cf80fe2360fae517d8e27** is normally installed.
+Release: **ea4ae48345d8fc658658d1074bfc553d6042bad3c0a4a384ba6d58e2c3679f85**.
+Rollback: **635d0718fd18734f65e2dd2f3ab537571d55d538d35815601884a14bddd2783d**.
+Frontend: **0d52f396a8e8e07a4e03b29a13a099aab4936190b6779ee81fccbc379011ec0e**,
+36 assets pinned to **b0f67bc22e379aee65d479ef8e5cc6650ce9b1a6**. Three changed
+assets are `index.html`, `scanner-ui.mjs`, `authority-ui.mjs`. The new immutable
+frontend has its own private authenticated access; never print its bearer.
 
-The backend reports vendor Linux desktop support from one bounded metadata read.
-The authenticated catalog identifies Omarchy as unsupported by the vendor's
-Claude Desktop beta. It grants no app/account/task authority. The Linux executable
-binding and launch/focus path remain unfinished software.
+All **48 served/installation/API/state/presentation checks** and **129 metadata
+checks / 67 exact module hashes** pass. Nine verifiers succeed. All 54 workspace
+definitions, 57 workflows, modes, Personal selection, three conversations and the
+pending keyboard-only record remain. 53 semantic snapshots and sealed files match
+exactly. Personal differs only by the exact original-owner shutdown permission
+revocation counter **81 → 82**, timestamp **1794230312512**. Do not restore it or
+claim full semantic equality.
 
-All **45 served/installation/API/state/presentation checks** and **126 metadata
-checks / 66 exact module hashes** pass. All 54 workspace definitions, 57 workflows,
-modes, selection, three conversations and the pending keyboard-only record remain.
-53 semantic snapshots match exactly. Personal differs only by its verified
-original-owner shutdown permission-revocation counter **80 → 81**. Do not restore
-that counter or report full semantic equality. Nine installed verifiers pass.
+Backup: **2026-11-09T13-18-32.484Z-dc929254-bb4d-4048-8b53-5a11a13c816e**.
+All **578 prepared files / 5,203,957 bytes** are removed after exact identities,
+paths, hashes and independent installed-payload checks. Current plus one rollback
+remain. Private receipts use **removed-history-installed-**. **No install or
+cleanup replay.** [Installed evidence](evidence/installed-removed-history-summary.json).
 
-Dated backup: **2026-11-09T12-49-17.934Z-830d59af-07f6-411a-8be2-1d7cdcff0ef1**.
-All **577 prepared files / 5,195,702 bytes** are removed after exact ownership/hash
-and independent installed-payload verification. Current plus one rollback remain.
-Private receipts use **desktop-host-**. **Do not replay install or cleanup.**
-[Installed result](evidence/installed-desktop-host-summary.json).
+The Copilot metadata verifier first stopped at its stale Home hash after six
+checks. Original receipt **installed-copilot-journal-metadata-1794230330926.json**
+is retained. It changed no user state. Its pin now references the tested frontend;
+all seven checks pass. This verifier-only correction does not require reinstalling.
+Eighteen original package groups pass 26 tests and eight verifier guards pass.
+Original receipt copies are private; checkout duplicates are removed.
 
-Source verification: six original integration groups pass **70 checks / one
-existing skip**, final metadata group passes 19 overlapping checks, and typecheck
-passes. Eighteen original package groups pass 26 tests; eight verifier guards
-pass. Two regressions reproduce the missing host assessment and connected UI text.
-Original receipts are copied privately; duplicate checkout receipts are removed.
-[Source](evidence/linux-desktop-host-support-summary.json).
-
-The frontend clears cancelled/invalidated app, task, device, profile, shortcut,
-role and maintenance reviews. Eight distinct regressions reproduce prior stale
-context; twelve original UI groups pass 103 checks with zero skips.
-[Source](evidence/review-context-source-summary.json). The readable scanner
-summary retains expandable exact files/hashes and closed technical metadata.
-[Source](evidence/scanner-review-readable-source-summary.json).
+Linux desktop vendor support reporting remains installed. Omarchy is unsupported
+by the official Claude Desktop beta; no executable/window authority is inferred.
+The real Linux binding and launch/focus adapter remain unfinished software.
 
 ## Complete platform acceptance and current native failure
 
@@ -111,9 +105,12 @@ Win32 sharing/lock errors 32/33 within its original 15-second wait. Exact count,
 process, staging and terminal assertions remain; production bootstrap is unchanged.
 The diagnostic has no source line; the only intentional concurrent counter read
 is that wait. This addresses the unguarded wait, not every possible external lock.
-Two local harness groups pass 32 checks. No local PowerShell exists. Native
-correction acceptance awaits normal branch-push follow-up; do not manually retry,
-cancel or expand deadlines. [Failure/correction](evidence/windows-bootstrap-contention-summary.json).
+Two local harness groups pass 32 checks. No local PowerShell exists. Both native variants now pass in the audited 13-group assembly at **167df7b**,
+job **129170298273**, artifact **13676378868**; PowerShell 5.1 took 74,669 ms and
+pwsh 39,741 ms under their original 300,000 ms limits. Private original:
+**native-167df7b-assembly-original.json**. The separate worker 9 failure still
+prevents complete cohort acceptance. [Native evidence](evidence/windows-bootstrap-native-followup-summary.json).
+Do not manually retry, cancel or expand deadlines. [Failure/correction](evidence/windows-bootstrap-contention-summary.json).
 Preserve earlier intermittent focus, shortcut and host-action failures in status.
 
 Native **167df7b** worker 9, job **129170296960**, failed the Linux host-label
@@ -178,7 +175,7 @@ Prior chronological checkpoints and original failures remain in
 [the previous continuation](https://github.com/SquirmyWormy275/strathex-switchyard/blob/167df7b125af93e46c0631b2a1b08d1ec9bec951/docs/switchyard-continuation.md)
 and linked evidence. Treat historical “next” paragraphs as history.
 
-## New source checkpoint awaiting installed adoption
+## Deleted-history source and working demonstration
 
 Deleted-history permission and portable recipe assembly now pass 25 distinct
 source groups / 195 tests with zero skips. The read-only scope pins exact paths,
@@ -195,9 +192,9 @@ confirmation mismatch, and the test fixture that compared index bytes across its
 own intentional commit. The corrected case checks exact bytes before that commit
 and exact post-commit bytes after drift refusals. Do not replay receipt cleanup.
 
-Frontend changes are `index.html`, `scanner-ui.mjs`, `authority-ui.mjs`. Publish
-source, pin all 36 assets to that immutable commit, verify packaging, then perform
-the ordinary backed-up update. Installed source remains **167df7b** until that
-readback completes. Updated installed verifiers pin the new history modules and
-Home bytes; they must run only after adopting this source. The agent metadata
-verifier adds three pure checks and one exact module hash. No live task is needed.
+The immutable pin and normal installation are completed above. Source evidence
+retains the pre-install checkpoint as history. The installed verifiers add three
+pure historical-scope checks and one module hash; no live task is created. The
+empty verifier filename selection **85117181-4e95-40ab-9264-65cc2ad8d338** ran no
+tests and is explicitly retained as non-validation. The actual eight-case guard
+group passed afterward, including after the final Copilot hash-pin correction.
