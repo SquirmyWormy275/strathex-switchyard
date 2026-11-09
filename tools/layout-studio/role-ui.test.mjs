@@ -6,6 +6,25 @@ import { join } from "node:path";
 import { createClientLaunch } from "./client-launch.mjs";
 const uiFixture = fn => browserSurfaceFixture(async context => { const { mountRoles } = await import("./role-ui.mjs"); await fn({ ...context, mount: extra => mountRoles({ notify() {}, refresh: context.refresh, ...extra }) }); });
 
+for (const change of ["another target", "same target", "role label", "same workspace selection"]) {
+  test(`confirming an open control review refuses ${change} changed in another window`, () => uiFixture(async c => {
+    c.mount(); await c.refresh(); await until(() => !c.$("try-agent-role").disabled);
+    c.click("try-agent-role"); assert.match(c.$("role-connection-summary").textContent, /→ alpha/);
+    if (change === "another target") await c.bind("beta");
+    else if (change === "same target") await c.bind("alpha");
+    else if (change === "role label") await c.store.update("personal", "synthetic-review-change", state => { state.workflow.roles[0].label = "Replacement role"; });
+    else await c.peer.selection("personal");
+    c.click("confirm-role-connection");
+    await until(() => c.responses.some(row => /\/roles\/dispatch(?:-choice)?$/.test(row.path)));
+    await c.responses.find(row => /\/roles\/dispatch(?:-choice)?$/.test(row.path)).response;
+    await until(() => !c.$("role-connection-dialog").open);
+    const state = await c.store.snapshot("personal");
+    assert.equal(state.agents.every(agent => agent.commands.length === 0), true, "confirmation must not queue a command for a changed reviewed choice");
+    assert.equal(state.intentResults?.length ?? 0, 0);
+    assert.match(c.$("role-result").textContent, /reviewed role connection changed/);
+  }));
+}
+
 test("a saved homepage role can be reviewed and tried without sending empty workflow content", async () => {
   let launch, effects = 0;
   const clientLaunch = { launch: (...args) => launch.launch(...args), list: (...args) => launch.list(...args), stopCompartment: (...args) => launch ? launch.stopCompartment(...args) : { stopped: true }, close: () => launch?.close() };
@@ -25,7 +44,8 @@ test("a saved homepage role can be reviewed and tried without sending empty work
     c.click("try-agent-role"); c.click("confirm-role-connection");
     await until(() => !c.$("role-connection-dialog").open && c.$("role-result").textContent.includes("launch-requested"));
     assert.equal(effects, 1);
-    const request = c.calls.find(row => row.path.endsWith("/roles/dispatch")); assert.equal(Object.hasOwn(request.body, "content"), false);
+    const request = c.calls.find(row => row.path.endsWith("/roles/dispatch-choice")); assert.equal(Object.hasOwn(request.body, "content"), false);
+    assert.equal(request.body.targetId, "github-copilot-web"); assert.match(request.body.choiceDigest, /^[a-f0-9]{64}$/);
     const state = await c.store.snapshot("personal"); assert.equal(state.clientLaunches.length, 1); assert.equal(state.clientLaunches[0].stoppedVerified, true);
     assert.equal(state.clientLaunches[0].cleanupPending, false); assert.equal(state.intentResults.at(-1).result.providerAccountVerified, false);
   }, { platform: "linux", clientLaunch });

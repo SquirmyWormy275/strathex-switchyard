@@ -1,5 +1,25 @@
 # Keep a command with its original role binding
 
+An open **Try this connected control** review now retains the exact choice shown
+in its dialog. If another window changes the binding, role, connection identity
+or saved workspace selection before confirmation, the request refuses. Rebinding
+to the same tool also invalidates the old review. Refresh and review again.
+
+The frontend sends its original workspace, provider, target and choice digest to
+`/api/suite/roles/dispatch-choice`. The Suite checks that the choice is currently
+bound, then retains that check through provider boundaries, the custom-agent
+enqueue transaction and result attribution. A listed but unbound candidate cannot
+dispatch. The digest detects changes; it is not an approval token or a command
+deduplication key. Ordinary immediate `/roles/dispatch` and physical shortcuts
+still resolve their current binding at invocation.
+
+Four UI regressions reproduced commands being queued after the reviewed choice
+changed. All sixteen surrounding groups now pass **245 tests with one declared
+Windows skip**, including unchanged-heartbeat success, malformed-choice refusal,
+metadata changes while waiting to enqueue and post-enqueue preservation. Native
+Windows, normal installed adoption and browser visual acceptance remain separate.
+[Exact review evidence](evidence/reviewed-role-choice-source-summary.json).
+
 **Try connected control** now sends workflow content only for an explicit
 handoff. Previously the frontend included an empty message for every action,
 causing an otherwise valid app-homepage launch to refuse. The complete frontend

@@ -7,6 +7,52 @@ import { fixture } from "./test-support/role-dispatch.mjs";
 import { once } from "node:events";
 import { createStudioServer } from "./serve.mjs";
 
+async function reviewedControl(suite, targetId = "alpha") {
+  const inventory = await suite.handle("/api/suite/roles/choices", { roleId: "operator", intent: "status" });
+  const { label, ...choice } = inventory.choices.find(row => row.targetId === targetId);
+  return { compartment: "personal", roleId: "operator", intent: "status", ...choice };
+}
+
+test("reviewed dispatch requires the exact currently bound choice, without converting an unbound candidate into authority", () => fixture(async ({ suite, store, bind, send }) => {
+  const input = await reviewedControl(suite, "beta");
+  await assert.rejects(suite.handle("/api/suite/roles/dispatch-choice", input), /reviewed role connection changed/);
+  await bind("beta");
+  await assert.rejects(suite.handle("/api/suite/roles/dispatch-choice", input), /reviewed role connection changed/);
+  assert.equal((await store.snapshot("personal")).agents.every(agent => agent.commands.length === 0), true);
+  const fresh = await reviewedControl(suite, "beta");
+  await send("beta", agentRoutes.event, { event: { status: "ready" } });
+  const result = await suite.handle("/api/suite/roles/dispatch-choice", fresh);
+  assert.equal(result.status, "queued");
+  assert.equal((await send("beta", agentRoutes.poll)).command.id, result.commandId);
+  assert.equal((await send("alpha", agentRoutes.poll)).command, null);
+}));
+
+test("reviewed dispatch refuses missing review identity, substituted choices and extra authority fields", () => fixture(async ({ suite, store }) => {
+  const input = await reviewedControl(suite);
+  for (const key of ["compartment", "choiceDigest", "provider", "targetKind", "targetId"]) {
+    const changed = { ...input }; delete changed[key];
+    await assert.rejects(suite.handle("/api/suite/roles/dispatch-choice", changed));
+  }
+  for (const patch of [{ choiceDigest: "bad" }, { choiceDigest: "0".repeat(64) }, { targetId: "beta" }, { sessionId: "exact-alpha" }, { approved: true }, { url: "https://foreign.invalid" }]) await assert.rejects(suite.handle("/api/suite/roles/dispatch-choice", { ...input, ...patch }));
+  assert.equal((await store.snapshot("personal")).agents.every(agent => agent.commands.length === 0), true);
+}));
+
+for (const afterEnqueue of [false, true]) test(`reviewed choice metadata is checked ${afterEnqueue ? "after enqueue without losing the original command" : "under the enqueue lease"}`, () => fixture(async ({ suite, store, pause, send }) => {
+  const input = await reviewedControl(suite), held = pause(afterEnqueue ? "role-intent-result" : "agent-intent");
+  const result = suite.handle("/api/suite/roles/dispatch-choice", input).then(value => ({ value }), error => ({ error }));
+  try {
+    await held.entered;
+    const original = structuredClone((await store.snapshot("personal")).agents.find(agent => agent.id === "alpha").commands);
+    await store.update("personal", "synthetic-label-change", state => { state.agents.find(agent => agent.id === "alpha").name = "Replacement meaning"; });
+    held.release();
+    assert.match((await result).error?.message ?? "stale result accepted", /reviewed role connection changed/);
+    const state = await store.snapshot("personal"); assert.deepEqual(state.agents.find(agent => agent.id === "alpha").commands, original);
+    assert.equal(state.agents.find(agent => agent.id === "beta").commands.length, 0); assert.equal(state.intentResults?.length ?? 0, 0);
+    assert.equal(original.length, afterEnqueue ? 1 : 0);
+    if (afterEnqueue) { assert.equal((await send("alpha", agentRoutes.poll)).command.id, original[0].id); assert.equal((await send("alpha", agentRoutes.poll)).command, null); }
+  } finally { held.release(); await result; }
+}));
+
 test("guided role choices bind a saved named connection through authenticated HTTP without exposing sessions or dispatching a command", () => fixture(async ({ suite, store, root }) => {
   const token = "r".repeat(43), server = createStudioServer({ suite, token, bridge: { close() {} } });
   server.listen(0, "127.0.0.1"); await once(server, "listening");

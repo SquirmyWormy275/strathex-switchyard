@@ -106,6 +106,8 @@ Only bounded digest-verified JSON receipts remain locally outside the checkout. 
 
 ## Recent backend behavior
 
+- Open frontend role confirmations now use a dedicated exact-choice dispatch route. Independent rebinding, role/target metadata changes and same-name workspace selection invalidate the original displayed choice. Four failing UI regressions are retained; sixteen groups pass 245 tests/one declared skip, including leased enqueue and post-enqueue preservation. Normal installation and native Windows follow-up remain pending. [Evidence](evidence/reviewed-role-choice-source-summary.json).
+
 - Reviewed frontend role dispatch now carries active/persisted workspace selection through effect boundaries and result attribution. Homepage role requests omit content except for explicit handoffs. Nine red cases are retained; final sixteen groups pass 237 tests/one declared skip. Normal installed adoption passes 62 served/API and 107 metadata checks; native Windows follow-up remains pending. [Evidence](evidence/reviewed-role-dispatch-source-summary.json).
 - Earlier Linux source `574958f` run `42570104922`, job `129005270185`, failed on the unchanged pinned Bubblewrap download with HTTP 504/curl 22 before tests. The original log/hash is retained; no manual retry or bound change. [Receipt](evidence/linux-574-download-failure-summary.json).
 

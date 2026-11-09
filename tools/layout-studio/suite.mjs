@@ -271,13 +271,20 @@ export function createSuite({ store = createSuiteStore(), platform = process.pla
           return { schema: "switchyard-role-choice-binding/v1", bindingId: saved.bindingId, roleId: saved.roleId, intent: saved.intent, provider: saved.provider, targetKind: saved.targetKind, targetId: saved.targetId, bound: true, nativeObserved: false, authorityGranted: false };
         }, { provider: body.provider });
       }
-      if (path === "/api/suite/roles/dispatch") {
-        if (Object.keys(body).some(k => !["compartment", "roleId", "intent", "content", "requestId", "workspaceBaseUrl"].includes(k))) throw new Error("Role dispatch accepts only a bound role, intent, request identity and supported content.");
+      if (path === "/api/suite/roles/dispatch" || path === "/api/suite/roles/dispatch-choice") {
+        const reviewed = path.endsWith("/dispatch-choice");
+        if (Object.keys(body).some(k => !["compartment", "roleId", "intent", "content", "requestId", "workspaceBaseUrl", ...(reviewed ? ["provider", "targetKind", "targetId", "choiceDigest"] : [])].includes(k))) throw new Error("Role dispatch accepts only a bound role, intent, request identity and supported content.");
+        if (reviewed && (!Object.hasOwn(body, "compartment") || typeof body.choiceDigest !== "string" || !/^[a-f0-9]{64}$/.test(body.choiceDigest))) throw Error("Review an exact saved role connection in its original workspace before dispatch.");
         await loadSelection();
         const selected = activeCompartment, context = await selectedIntentContext(selected);
         if (compartment !== selected) throw new Error("The selected workspace changed after this role review. Review the control in its original workspace again.");
         await context.assertCurrent();
-        return this.dispatchRole(selected, body.roleId, body.intent, body.content, body.requestId, context);
+        const assertReviewedState = state => {
+          context.assertCurrentState();
+          const binding = state.roleBindings?.find(row => row.roleId === body.roleId && row.intent === body.intent);
+          if (!binding || binding.provider !== body.provider || binding.targetKind !== body.targetKind || binding.targetId !== body.targetId || roleChoiceDigest(state, body, context.selectionDigest) !== body.choiceDigest) throw Error("The reviewed role connection changed. Refresh and review the original control again; no alternate target or automatic retry was selected.");
+        };
+        return this.dispatchRole(selected, body.roleId, body.intent, body.content, body.requestId, reviewed ? { ...context, assertCurrentState: assertReviewedState } : context);
       }
       if(path==="/api/suite/compartment/status"){
         if(Object.keys(body).some(key=>key!=="workspaceBaseUrl"))throw Error("Read only the selected workspace; selection arguments are refused.");
@@ -703,7 +710,7 @@ export function createSuite({ store = createSuiteStore(), platform = process.pla
       const s = await store.snapshot(compartment), b = roleTarget(s, roleId, intent);
       const digest = roleBindingDigest(s, b);
       const assertCurrentState = state => {
-        assertContextState();
+        assertContextState(state);
         const binding = state.roleBindings?.find(candidate => candidate.roleId === roleId && candidate.intent === intent);
         if (roleBindingDigest(state, binding) !== digest) throw new Error("The exact role binding changed before dispatch settled. Any command already queued remains with its original session; no alternate target or automatic retry was selected.");
       };
@@ -713,8 +720,10 @@ export function createSuite({ store = createSuiteStore(), platform = process.pla
         assertCurrentState(current);
         roleTarget(current, roleId, intent);
       };
+      assertCurrentState(s);
       await assertContextCurrent();
       await store.authorize(compartment, { provider: b.provider });
+      await assertCurrent();
       let result;
       if (b.targetKind === "client-surface") {
         if (content !== undefined) throw new Error("A homepage launch cannot receive workflow content, prompts or handoffs.");

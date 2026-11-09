@@ -20,6 +20,14 @@ no full Linux run remains active. Later source changes have focused evidence.
 
 ## Guided frontend checkpoint
 
+An open role-control confirmation now stays with the exact target displayed in
+its review. Independent rebinding, role edits and saved selection changes refuse
+instead of selecting the replacement. Four original regressions are retained;
+sixteen groups pass 245 tests with one declared skip, including changes under the
+enqueue lease and after enqueue. Installation and native Windows follow-up for
+this latest correction remain pending.
+[Source evidence](evidence/reviewed-role-choice-source-summary.json).
+
 Reviewed role actions now carry the same active-workspace generation checks as
 physical shortcuts. The frontend also stops sending empty workflow content to
 homepage launch controls. Nine original failures are retained; sixteen groups

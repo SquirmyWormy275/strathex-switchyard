@@ -1,0 +1,126 @@
+{
+  "schema": "switchyard-reviewed-role-choice-source-evidence/v1",
+  "scope": "Confirmation remains bound to the exact role connection displayed in its review, across independent changes and effect boundaries.",
+  "runs": [
+    {
+      "receiptId": "b2014675-1b73-453f-8b81-c9ba3170e0da",
+      "sha256": "d67f46cf4a53de094e58fde9fa5067d2f31b0a3ca9f33074e8de26788844b815",
+      "success": false,
+      "totals": {
+        "required": 1,
+        "passed": 0,
+        "failed": 1,
+        "tests": 9,
+        "passedTests": 5,
+        "failedTests": 4,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "files": [
+        "tools/layout-studio/role-ui.test.mjs"
+      ],
+      "originalBoundsAndSkipsPreserved": true,
+      "ownedCleanupComplete": true,
+      "failures": [
+        {
+          "file": "tools/layout-studio/role-ui.test.mjs",
+          "counts": {
+            "total": 9,
+            "passed": 5,
+            "failed": 4,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          },
+          "diagnosticSha256": "140378aeb77f5c3649befe222bf2194452248ec011278bec6a7e0c6829fbb790"
+        }
+      ]
+    },
+    {
+      "receiptId": "67d31fb0-f62e-4fe8-9bba-044185d77d59",
+      "sha256": "704260ae7bc010bb423440b5c7ebdf594a6af4290daa53c62976f5aea9abe1e6",
+      "success": true,
+      "totals": {
+        "required": 1,
+        "passed": 1,
+        "failed": 0,
+        "tests": 9,
+        "passedTests": 9,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "files": [
+        "tools/layout-studio/role-ui.test.mjs"
+      ],
+      "originalBoundsAndSkipsPreserved": true,
+      "ownedCleanupComplete": true,
+      "failures": []
+    },
+    {
+      "receiptId": "f695e656-65d2-49c3-80d8-49770abbc377",
+      "sha256": "949c27e8cc578abd10a25b86f2095fee1c09a9e943ff7a7397f5c9d1314bd23c",
+      "success": true,
+      "totals": {
+        "required": 16,
+        "passed": 16,
+        "failed": 0,
+        "tests": 246,
+        "passedTests": 245,
+        "failedTests": 0,
+        "skippedTests": 1,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "files": [
+        "scripts/windows-backend-shards.test.mjs",
+        "scripts/run-isolated-tests.test.mjs",
+        "tools/layout-studio/copilot-requests.test.mjs",
+        "deployment/suite/release.test.mjs",
+        "tools/layout-studio/suite.test.mjs",
+        "tools/layout-studio/role-dispatch.test.mjs",
+        "tools/layout-studio/guided-role-choices.test.mjs",
+        "tools/layout-studio/role-ui.test.mjs",
+        "tools/layout-studio/client-ui.test.mjs",
+        "tools/layout-studio/voice-ui.test.mjs",
+        "tools/layout-studio/conversation-role-boundaries.test.mjs",
+        "tools/layout-studio/client-launch.test.mjs",
+        "tools/layout-studio/physical-intent.test.mjs",
+        "tools/layout-studio/native-focus-gateway.test.mjs",
+        "tools/layout-studio/coding-sessions.test.mjs",
+        "tools/layout-studio/claude-coding.test.mjs"
+      ],
+      "originalBoundsAndSkipsPreserved": true,
+      "ownedCleanupComplete": true,
+      "failures": []
+    }
+  ],
+  "sourceFiles": {
+    "tools/layout-studio/suite.mjs": "cf3d06da35be65eb484a6519e226c63129de00398b37e2db8457816c5eba92d1",
+    "tools/layout-studio/role-ui.mjs": "21764999108c9638861998886fc25d0eb88053a99f32d898972345a579b25c4d",
+    "tools/layout-studio/role-ui.test.mjs": "cd3705ce909a28d6431a54f48d5170b407e67c6acb70a111ac66d148a042846b",
+    "tools/layout-studio/guided-role-choices.test.mjs": "deaaa6ff2501b324dae2208fcbbff7e0d80b01d3ebd6199da39f35baaad46c02",
+    "scripts/demo-switchyard-ui.mjs": "a099b7f81b4a08d7fc4ad2f10eb056e860c45151d5286cb74c32c168acb49a99"
+  },
+  "originalFailures": [
+    "Another window rebound the role to a different target while the confirmation stayed open.",
+    "Rebinding to the same target changed its saved identity without invalidating the old confirmation.",
+    "Editing the role label while its dialog stayed open silently changed the reviewed meaning.",
+    "An independent same-name workspace selection silently replaced the reviewed generation."
+  ],
+  "behavior": [
+    "The frontend uses the closed roles/dispatch-choice route, carrying its original choice digest and exact workspace/provider/target.",
+    "Initial dispatch, pre-provider checks, custom-agent enqueue under its state lease and result attribution validate the original choice.",
+    "Unbound, missing, substituted and malformed selections refuse before effects; a heartbeat with unchanged metadata remains usable.",
+    "Already queued commands remain with their original session; changed metadata refuses attribution without cancelling or repeating them.",
+    "The existing immediate roles/dispatch and physical intent routes retain current-binding behavior; they do not stand in for a reviewed browser confirmation."
+  ],
+  "boundaries": [
+    "Real authenticated HTTP and encrypted temporary storage with a small DOM interaction fixture; no visual browser claim.",
+    "Native portal and custom agents are fixtures. No actual account, model, installed agent, native app or keyboard operation.",
+    "Original commands, bounds, declared skips and child cleanup remain; focused totals overlap.",
+    "Native Windows and installed acceptance are separate."
+  ]
+}
