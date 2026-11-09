@@ -1,5 +1,10 @@
 # Connect an application to Switchyard
 
+To record bounded status from one existing Claude Code session, use the separate
+[Claude hook setup](../docs/claude-hook-observation.md). Its UI prepares exact
+settings for review and its local command writes only into an explicitly opted-in
+observation. It does not enroll a general command adapter or grant task authority.
+
 An enrolled application can report its own session status and handle six bounded
 intents: `summon`, `resume`, `review`, `handoff`, `status` and `cancel`. It implements
 only the intents it declares. Switchyard never loads application plugin code or
@@ -105,8 +110,8 @@ The short client-platform workflow checks native Windows metadata without
 launching a URI; all 41 checks passed at ea96ffe after correcting native UTF-8 startup. Interactive
 Windows URI/account/window acceptance remains pending.
 
-Exact native Claude desktop binding and frontend controls remain unfinished
-implementation. The catalog reports those missing capabilities. Do
+Exact native Claude desktop binding remains unfinished implementation. The five
+client recipes now have frontend controls. Do
 not bind a launch-only recipe to resume, submit, cancel or mediated repository
 actions. Native client/tenant/account acceptance remains separate from the
 implemented request transport.
@@ -136,8 +141,8 @@ accepting a result. An uncertain request is retained, not replayed.
 
 The connection review reports `capability: "launch-only"`. It establishes no
 window focus, account, conversation, task resumption, status or mediated authority.
-Opening a client leaves the active conversation unchanged. Frontend role controls
-remain pending while the current review is frozen. For an explicit installed
+Opening a client leaves the active conversation unchanged. Named frontend role
+controls now connect separate binding and dispatch reviews. For an explicit installed
 Linux proof with one real homepage request and zero prompts, run
 `node scripts/verify-client-launch-host.mjs --synthetic --role`; it uses the idle
 validation workspace, saves a private definition backup, restores definitions and

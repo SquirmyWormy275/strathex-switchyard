@@ -14,12 +14,21 @@ no merge or public release has been accepted.
 
 ## Guided frontend checkpoint
 
+Claude Code now has a separately opted-in hook observation path and an exact-session
+settings preview. Ten hook cases and two UI cases pass within eight original
+groups/111 checks, including actual independent Node processes and encrypted
+storage. Fourteen running-preview checks pass. The original expired synthetic
+fixture is retained and corrected without changing retention or bounds. No native
+Claude hook/settings or visual acceptance is claimed.
+[Setup and boundaries](claude-hook-observation.md),
+[source evidence](evidence/claude-hook-source-summary.json).
+
 Existing transcripts can now be imported as explicitly unverified text in Personal
 keyboard-only mode, without microphone/runtime/provider effects. Exact request
 identity prevents a lost reply from creating a duplicate or replacing later
 corrections. Work import and unrelated authority fields refuse. Six added UI cases
-bring the selected nine-group run to 120 passes. Installed adoption of this later
-source remains separate. [Import evidence](evidence/transcript-import-source-summary.json).
+bring the selected nine-group run to 120 passes. Normal installed source `9057de5` now passes 55 served/API checks and 100
+installed metadata checks with all 54 semantic workspaces preserved. [Import evidence](evidence/transcript-import-source-summary.json).
 
 Voice notes now expose exact saved-note history, separate correction/draft actions
 and reviewed deletion. Workspace and mode changes release capture, and late

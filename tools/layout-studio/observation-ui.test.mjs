@@ -31,6 +31,33 @@ test("observation controls record only chosen sources, mark, pause, resume and s
   const after = (await c.store.snapshot("personal")).observations; assert.equal(after.length, 1); assert.equal(after[0].id, session.id); assert.equal(after[0].events[0].kind, "handoff"); assert.equal(c.$("pause-observation").disabled, true);
 }));
 
+test("Claude hook setup requires separate consent and previews the exact destination without installing settings", () => browserSurfaceFixture(async c => {
+  await mount(c); c.$("observe-deliberate").checked = false; c.$("observe-claude-hook-events").checked = true;
+  assert.equal(c.$("prepare-claude-hook").disabled, true);
+  c.click("start-observation"); await until(() => !c.$("prepare-claude-hook").disabled);
+  const observation = (await c.store.snapshot("personal")).observations[0]; assert.deepEqual(observation.sources, ["claude-hook-events"]);
+  c.$("claude-hook-session").value = "synthetic-native-session"; c.click("prepare-claude-hook");
+  await until(() => c.$("claude-hook-settings").textContent.includes("SessionStart") && !c.$("prepare-claude-hook").disabled);
+  const settings = JSON.parse(c.$("claude-hook-settings").textContent), args = settings.hooks.Stop[0].hooks[0].args;
+  assert.deepEqual(args.slice(1), ["--workspace", "personal", "--observation", observation.id, "--session", "synthetic-native-session"]);
+  assert.match(c.$("claude-hook-detail").textContent, /writes no settings/);
+  assert.equal((await c.store.snapshot("personal")).observations[0].events.length, 0);
+  c.$("claude-hook-session").value = "other"; c.$("claude-hook-session").dispatchEvent(new Event("input")); assert.equal(c.$("claude-hook-settings").textContent, "");
+  await assert.rejects(c.suite.handle("/api/suite/observation/claude-hook/recipe", { observationId: observation.id, expectedSessionId: "synthetic", command: "foreign" }), /only an exact/);
+}));
+
+test("a late hook settings reply cannot expose the old Personal session in Work", () => browserSurfaceFixture(async c => {
+  const { api } = await import("./connection.mjs"); let entered = false, release;
+  const gate = new Promise(resolve => { release = resolve; });
+  await mount(c, async (path, body) => { const value = await api(path, body); if (path.endsWith("claude-hook/recipe")) { entered = true; await gate; } return value; });
+  c.$("observe-deliberate").checked = false; c.$("observe-claude-hook-events").checked = true; c.click("start-observation"); await until(() => !c.$("prepare-claude-hook").disabled);
+  c.$("claude-hook-session").value = "private-native-session"; c.click("prepare-claude-hook"); await until(() => entered);
+  try { await c.store.initialize("work", "work"); c.document.dispatchEvent(new CustomEvent("switchyard-compartment-state", { detail: await c.store.snapshot("work") })); }
+  finally { release(); }
+  await until(() => c.$("observation-consent-detail").textContent.includes("unavailable")); await new Promise(resolve => setImmediate(resolve));
+  assert.equal(c.$("claude-hook-settings").textContent, ""); assert.equal(c.$("claude-hook-session").value, ""); assert.equal(c.$("prepare-claude-hook").disabled, true);
+}));
+
 test("selected activity needs destination review and confirmation before its single-use request envelope", () => browserSurfaceFixture(async c => {
   const id = await stopped(c); const { ui } = await mount(c); select(c);
   assert.throws(() => ui.takeReview("codex"), /Review the selected activity/);

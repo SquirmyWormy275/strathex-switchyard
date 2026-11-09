@@ -4,10 +4,11 @@ import { scopeHash } from "./confirmations.mjs";
 
 const kinds = ["interruption", "resume", "switch", "handoff", "status", "review", "approval", "failure", "recovery", "other"];
 const categories = ["terminal", "vscode", "chatgpt", "claude", "codex", "browser", "other"];
-const sources = ["deliberate", "foreground-category", "agent-events", "host-action-events", "editor-events"];
+const sources = ["deliberate", "foreground-category", "agent-events", "host-action-events", "editor-events", "claude-hook-events"];
 const provenance = new Map([
   ["user-marked", "deliberate"], ["authenticated-agent-self-report", "agent-events"],
   ["native-provider-status-observation", "agent-events"], ["native-provider-runtime-notification", "agent-events"], ["switchyard-local-lifecycle", "agent-events"],
+  ["unverified-local-claude-hook", "claude-hook-events"],
   ["switchyard-local-host-action", "host-action-events"], ["switchyard-editor-journal", "editor-events"]
 ]);
 const refuse = () => { throw new Error("Choose stopped or paused observations from this personal workspace and review their exact summary for this designer. No observation context was sent."); };

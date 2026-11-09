@@ -289,6 +289,7 @@ export const requiredGroups = [
   { file: "tools/layout-studio/vial-encoders.test.mjs" },
   { file: "tools/layout-studio/vial-rules.test.mjs" },
   { file: "tools/layout-studio/integrations.test.mjs" },
+  { file: "tools/layout-studio/claude-hook-observation.test.mjs" },
   { file: "tools/layout-studio/role-dispatch.test.mjs" },
   { file: "tools/layout-studio/guided-role-choices.test.mjs" },
   { file: "tools/layout-studio/role-ui.test.mjs" },

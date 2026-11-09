@@ -1,5 +1,5 @@
 import { api } from "./connection.mjs";
-const sourceNames = { deliberate: "Your event marks", "foreground-category": "App categories", "agent-events": "Agent status events", "host-action-events": "Switchyard shortcut events", "editor-events": "Switchyard editor events" };
+const sourceNames = { deliberate: "Your event marks", "foreground-category": "App categories", "agent-events": "Agent status events", "host-action-events": "Switchyard shortcut events", "editor-events": "Switchyard editor events", "claude-hook-events": "Selected Claude Code hooks" };
 const categoryNames = { terminal: "Terminal", vscode: "Code editor", chatgpt: "ChatGPT", claude: "Claude", codex: "Codex", browser: "Browser", other: "Other apps" };
 const providerName = value => value === "codex" ? "Codex" : value === "claude-code" ? "Claude Code" : "the selected assistant";
 const option = (value, text) => { const o = document.createElement("option"); o.value = value; o.textContent = text; return o; };
@@ -27,6 +27,7 @@ export function mountObservation({ refresh, notify, request = api }) {
     $("review-design-observations").disabled = busy || !canDesign() || !selectedIds().length || selectedIds().length > 8;
     $("confirm-design-observations").disabled = busy || !pending;
     $("confirm-delete-observation").disabled = busy || !deleting;
+    $("prepare-claude-hook").disabled = busy || !recordingAllowed || !active?.sources.includes("claude-hook-events") || active.exclusions.includes("claude") || !["recording", "paused"].includes(active.status);
     for (const row of choices) row.input.disabled = busy || !canDesign() || !["paused", "stopped", "interrupted"].includes(row.status);
     $("observation-consent-detail").textContent = recordingAllowed ? `Only checked sources are recorded in ${state.id}. Data stays encrypted here for up to ${state.policyRules.retentionDays} days or until you delete it. Starting does not send it to an assistant.` : "Observation is unavailable in this mode or workspace policy. Your saved sessions remain reviewable.";
   }
@@ -65,7 +66,17 @@ export function mountObservation({ refresh, notify, request = api }) {
   }
   const mutate = (route, body) => run(async () => { const id = state?.id; if (!id) throw Error("Connect a local workspace first."); await request("/api/suite/observation/" + route, { compartment: id, ...body }); if (state?.id === id) await refresh(); });
   $("start-observation").addEventListener("click", () => mutate("start", { sources: Object.keys(sourceNames).filter(source => $("observe-" + source).checked), exclusions: Object.keys(categoryNames).filter(category => $("exclude-" + category).checked), consent: true }));
-  $("observation-session").addEventListener("change", sessionDetails);
+  const clearHook = () => { $("claude-hook-settings").textContent = ""; $("claude-hook-detail").textContent = "Nothing has been installed or connected."; };
+  $("observation-session").addEventListener("change", () => { generation++; clearHook(); sessionDetails(); });
+  $("claude-hook-session").addEventListener("input", () => { generation++; clearHook(); });
+  $("prepare-claude-hook").addEventListener("click", () => run(async () => {
+    const version = generation, compartment = state.id, observationId = session().id, expectedSessionId = $("claude-hook-session").value.trim();
+    clearHook();
+    const result = await request("/api/suite/observation/claude-hook/recipe", { compartment, observationId, expectedSessionId });
+    if (generation !== version || state?.id !== compartment || session()?.id !== observationId || $("claude-hook-session").value.trim() !== expectedSessionId) return;
+    $("claude-hook-settings").textContent = JSON.stringify(result.settings, null, 2);
+    $("claude-hook-detail").textContent = result.boundary;
+  }));
   $("mark-observation").addEventListener("click", () => mutate("mark", { id: session()?.id, kind: $("observation-kind").value }));
   $("pause-observation").addEventListener("click", () => mutate("state", { id: session()?.id, status: session()?.status === "paused" ? "recording" : "paused" }));
   $("stop-observation").addEventListener("click", () => mutate("state", { id: session()?.id, status: "stopped" }));
@@ -109,8 +120,8 @@ export function mountObservation({ refresh, notify, request = api }) {
   $("observation-review-dialog").addEventListener("close", () => { pending = null; controls(); });
   $("clear-design-observations").addEventListener("click", () => { choices.forEach(row => { row.input.checked = false; }); generation++; forget(); controls(); });
   $("conversation-provider").addEventListener("change", () => { generation++; forget("Assistant changed. Review selected activity for the new destination, or clear the selection."); controls(); });
-  document.addEventListener("switchyard-workspace-changing", () => { generation++; state = null; choices = []; deleting = null; forget(); $("delete-observation-dialog").close(); render(); });
-  document.addEventListener("switchyard-compartment-state", event => { generation++; if (state?.id !== event.detail.id) { choices = []; forget(); } state = event.detail; pending = null; $("observation-review-dialog").close(); render(); });
+  document.addEventListener("switchyard-workspace-changing", () => { generation++; state = null; choices = []; deleting = null; clearHook(); $("claude-hook-session").value = ""; forget(); $("delete-observation-dialog").close(); render(); });
+  document.addEventListener("switchyard-compartment-state", event => { generation++; clearHook(); if (state?.id !== event.detail.id) { choices = []; $("claude-hook-session").value = ""; forget(); } state = event.detail; pending = null; $("observation-review-dialog").close(); render(); });
   controls();
   return { takeReview(destination) {
     if (!selectedIds().length) return undefined;

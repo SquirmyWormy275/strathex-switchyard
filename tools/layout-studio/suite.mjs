@@ -14,6 +14,7 @@ import { createAgentService } from "./agents.mjs";
 import { localVoice } from "./voice.mjs";
 import { parseWorkflow, observationSummary } from "./workflow.mjs";
 import { reviewDesignObservations } from "./design-observations.mjs";
+import { claudeHookRecipe } from "./claude-hook-observation.mjs";
 import { surfaceForClass } from "../../scripts/workflow-monitor.mjs";
 import { runHypr, nativeFocusImplementations } from "./host.mjs";
 import { createDeviceService } from "./devices.mjs";
@@ -648,12 +649,18 @@ export function createSuite({ store = createSuiteStore(), platform = process.pla
       if (path === "/api/suite/conversation/delete") return store.update(compartment, "conversation-delete", (s) => { s.conversations = s.conversations.filter((c) => c.id !== body.id); return { deleted: true }; });
       if (path === "/api/suite/observation/start") {
         const sources = body.sources;
-        if (body.consent !== true || !Array.isArray(sources) || !sources.length || sources.some((s) => !["deliberate", "foreground-category", "agent-events", "host-action-events", "editor-events"].includes(s)) || !Array.isArray(body.exclusions) || body.exclusions.some((s) => !["terminal", "vscode", "chatgpt", "claude", "codex", "browser", "other"].includes(s))) throw new Error("Choose observation sources and exclusions and explicitly start a session.");
+        if (body.consent !== true || !Array.isArray(sources) || !sources.length || sources.some((s) => !["deliberate", "foreground-category", "agent-events", "host-action-events", "editor-events", "claude-hook-events"].includes(s)) || !Array.isArray(body.exclusions) || body.exclusions.some((s) => !["terminal", "vscode", "chatgpt", "claude", "codex", "browser", "other"].includes(s))) throw new Error("Choose observation sources and exclusions and explicitly start a session.");
         if (!foreground.implemented && sources.includes("foreground-category")) throw new Error("Foreground category sampling requires the supported native platform adapter. Deliberate and agent-event observation remain available.");
         const at = Date.now(), o = { id: randomUUID(), status: "recording", sources, exclusions: body.exclusions, events: [], focusCategories: {}, createdAt: at, recordingSince: at, recordingGeneration: randomUUID(), updatedAt: at };
         await store.update(compartment, "observation-start", (s) => { if (s.observations.some((o) => ["recording", "paused"].includes(o.status))) throw new Error("Stop or resume the existing session first."); s.observations.push(o); }, { operation: "record" });
         if (sources.includes("foreground-category")) monitor(compartment, o.id, o.recordingGeneration);
         return o;
+      }
+      if (path === "/api/suite/observation/claude-hook/recipe") {
+        if (Object.keys(body).some(key => !["compartment", "workspaceBaseUrl", "observationId", "expectedSessionId"].includes(key))) throw Error("Hook setup accepts only an exact session and observation destination.");
+        await loadSelection();
+        if (compartment !== activeCompartment || await store.selection() !== compartment) throw Error("Choose the active workspace before preparing hook settings.");
+        return claudeHookRecipe(await store.snapshot(compartment, { provider: "claude-code", operation: "record" }), body);
       }
       if (path === "/api/suite/observation/mark") return store.update(compartment, "observation-mark", (s) => { const o = session(s, body.id); if (o.status !== "recording" || !o.sources.includes("deliberate") || !kinds.includes(body.kind)) throw new Error("Start deliberate observation and choose a supported event kind."); if (o.events.length >= 2000) throw new Error("Session event limit reached. Stop and review this session."); o.events.push({ kind: body.kind, provenance: "user-marked", at: Date.now() }); o.updatedAt = Date.now(); return observationSummary(o); }, { operation: "record" });
       if (path === "/api/suite/observation/state") { let shouldMonitor = false, recordingGeneration; const result = await store.update(compartment, "observation-state", (s) => { const o = session(s, body.id); if (!["paused", "recording", "stopped"].includes(body.status) || (o.status === "stopped" && body.status !== "stopped")) throw new Error("That session transition is unavailable."); const at = Date.now(); if (body.status === "recording" && o.status !== "recording") { o.recordingSince = Math.max(at, o.createdAt ?? 0, o.recordingSince ?? 0); o.recordingGeneration = randomUUID(); } o.status = body.status; o.updatedAt = at; shouldMonitor = o.status === "recording" && o.sources.includes("foreground-category"); recordingGeneration = o.recordingGeneration; return observationSummary(o); }, body.status === "recording" ? { operation: "record" } : {}); pauseMonitor(compartment); if (shouldMonitor) monitor(compartment, body.id, recordingGeneration); else await foreground.stopCompartment?.(compartment); return result; }
