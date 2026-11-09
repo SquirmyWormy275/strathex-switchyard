@@ -52,8 +52,8 @@ The latest source `db24634` also has a passing native collector and all 462 pack
 
 Next remote checks:
 
-1. Inspect the ordinary CI run from the compiler correction. The shared helper workflow now first publishes the standalone provider helper with the existing pinned offline toolchain and requires its native self-test. Its 15-minute bound is unchanged. Look for the bounded `SXSY-PROVIDER-HELPER-PREFLIGHT` receipt.
-2. Require the complete release job to pass its remaining native publishing/packaging stages. Source and package test-stage acceptance do not establish a finished release.
+1. The early native preflight is now accepted at `7529718`: client run `42539354532`, helper job `128910595134`, merge `1f2bf2d153eebedeaf488a911f1fe1812dac4d42`, source/merge tree `ec96edb826e7ba408d9b3c1c2155cb2b3d51b1d3`. The standalone helper publishes and passes its own-process self-test under the unchanged 15-minute bound, pinned offline toolchain and QUERY 8. [Native evidence](evidence/provider-helper-platform-native-summary.json). No binary was downloaded locally. The adjacent voice target compiles offline; 33 staging files/377,415 bytes are removed. Do not rerun executed reproduction/build/cleanup scripts.
+2. Follow ordinary source run `42539354478` and full package run `42539354588` at `7529718`, or their exact newer-source replacements. Require the complete release job to pass its remaining native publishing/packaging stages. Source and package test-stage acceptance do not establish a finished release.
 3. Preserve the two `db24634` preliminary HTTP 504 failures before tests (jobs `128691327134` and `128691327237`); no receipts exist. The next normal source push can schedule a fresh run. Do not dispatch/cancel/retry CI manually.
 
 The frontend-freeze clarification is pending with the owner. Until answered, continue independent backend/package work without changing Home/catalog/editor activation.

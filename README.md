@@ -82,7 +82,7 @@ and recording-consent fixes for both task adapters. Complete Windows source
 `4db5948` passes **462 groups / 2,910 tests**, with 246 declared skips. All 21
 original worker receipts are audited and the native collector passes. This
 source includes the latest consent/version fixes and native fixture corrections.
-The latest Windows package test stage also passes all 462 groups, including the corrected fixtures and helper-alias refusal. A later standalone helper compiler error still blocks release acceptance; its platform guard is corrected and locally verified. [Package evidence](docs/evidence/windows-package-db24634-tests-summary.json), [build correction](docs/evidence/provider-helper-platform-source-summary.json). Earlier focus, storage and
+The latest Windows package test stage also passes all 462 groups, including the corrected fixtures and helper-alias refusal. The later standalone helper compiler error is corrected; native Windows publish and self-test now pass. Full release follow-up remains pending. [Package evidence](docs/evidence/windows-package-db24634-tests-summary.json), [build correction](docs/evidence/provider-helper-platform-source-summary.json). Earlier focus, storage and
 host-action settlement failures remain recorded; passing follow-ups do not prove
 their causes are resolved. [Current status and evidence](docs/switchyard-status.md).
 

@@ -91,7 +91,11 @@
     "nativeSelfTestRequired": true,
     "noWindowFocus": true,
     "tokenAccessMask": 8,
-    "acceptance": "pending"
+    "acceptance": {
+      "sourceCommit": "75297186d08d15b9c5c740bd26bf8bd76f3a4fe1",
+      "evidence": "provider-helper-platform-native-summary.json",
+      "nativePublishAndSelfTestVerified": true
+    }
   },
   "nativePackageAcceptance": false,
   "temporaryBuildRemoved": true,
