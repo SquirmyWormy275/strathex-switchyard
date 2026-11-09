@@ -22,12 +22,12 @@ Start with [current status](switchyard-status.md), the [requirement ledger](swit
 
 | Identity | Verified checkpoint |
 | --- | --- |
-| Source | `9784aa9134fc1eca8c22852dfb7583afe01f5b1d` |
-| Release | `47143a9fa5de873a1d6f10bc738ef5c703be64af15727eb8e31ffddfa629ffc7` |
-| Rollback | `0c71eced8cddd1d184b430947fbe11f79a791c3328ea1a99cc21af714facc297` |
-| Frontend | `8114b09fc9d33c6e79b65a58ba58b719629b29bf6e8cd3290b91c09d90ebe35f` |
+| Source | `1b00198c71ef41d85995d3d974e104fa7859c613` |
+| Release | `db142f7c6fa6d2717856d709d739135bfd6cf04ddeb2dca2e8c4f500196ff916` |
+| Rollback | `47143a9fa5de873a1d6f10bc738ef5c703be64af15727eb8e31ffddfa629ffc7` |
+| Frontend | `82309a37b568526dcf3f64d1ab0e4d9b6d2ffaa61eaf63e4da101911b4cadd67` |
 
-The approved frontend is installed at the normal local address. All 28 served assets
+The approved frontend is installed at the normal local address. All 32 served assets
 and four API metadata/refusal checks pass. Eight installed verifiers pass 100 checks
 with 58 exact module hashes; the workflow verifier checks all 57 definitions.
 All 54 semantic workspaces, Personal selection and the pending keyboard-only
@@ -36,12 +36,18 @@ workspace changes audit metadata only. No physical keyboard, native provider,
 account, model or microphone operation occurred.
 
 The normal update retained and verified dated launcher backups and current plus
-one rollback. The payload contains 563 files/4,876,464 bytes. Its exact prepared
-564-file/4,978,029-byte bundle is removed after identity/hash verification. The
+one rollback. The payload contains 567 files/4,936,344 bytes. Its exact prepared
+568-file/5,038,815-byte bundle is removed after identity/hash verification. The
 private access token intentionally changed with the frontend digest; use the normal
 launcher/new endpoint rather than restoring the old token. Host-facing owner,
 Copilot and signed-intent checks ran sequentially. Do not repeat executed update
-or cleanup scripts. [Installed evidence](evidence/installed-frontend-controls-summary.json).
+or cleanup scripts. [Installed evidence](evidence/installed-scanner-controls-summary.json).
+
+All original workspace modes and all three conversation records are preserved.
+Selected Personal was already in companion mode; the pending conversation lives
+in a different keyboard-only workspace. The initial read-only preflight's incorrect
+mode assumption remains recorded and was corrected before mutation. The prior
+28-asset installation remains [historical evidence](evidence/installed-frontend-controls-summary.json).
 
 The original stale packaging-source and frozen-Home verifier failures are retained.
 Their exact pins now reference the tested frontend revision, with historical

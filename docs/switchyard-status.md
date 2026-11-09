@@ -79,15 +79,21 @@ tree and local reproduction are retained. No current full-platform pass is claim
 
 ## Installed frontend verification
 
-The normal installed application now contains the guided setup, portability,
-observation, keyboard and distinct-client controls at source `9784aa9`, release
-`47143a9f`. All 28 frontend asset hashes and four API checks pass; eight metadata
+The normal installed application now contains guided setup, portability,
+observation, keyboard and distinct-client controls, plus task permissions,
+scanner setup, signed feeds and reviewed execution at source `1b00198`, release
+`db142f7c`. All 32 frontend asset hashes and four API checks pass; eight metadata
 verifiers pass 100 checks. All 54 semantic workspaces, 57 workflow definitions,
 selection and the pending keyboard-only conversation are preserved. Dated launcher
 backups and one rollback verify; the temporary prepared package is removed.
 The original stale verifier failures remain recorded. No live hardware or native
 account/task operation was used, and browser visual acceptance remains blocked.
-[Exact installed evidence](evidence/installed-frontend-controls-summary.json).
+[Exact installed evidence](evidence/installed-scanner-controls-summary.json).
+The 567-file payload retains the prior `47143a9f` release as its single rollback.
+Its exact prepared copy (568 files/5,038,815 bytes) is removed after identity and
+hash verification. All original workspace modes and conversation records remain
+intact; selected Personal was already in companion mode before this update.
+The earlier 28-asset installation remains [historical evidence](evidence/installed-frontend-controls-summary.json).
 
 ## A working backend journey
 
