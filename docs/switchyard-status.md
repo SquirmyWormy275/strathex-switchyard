@@ -24,8 +24,12 @@ An open role-control confirmation now stays with the exact target displayed in
 its review. Independent rebinding, role edits and saved selection changes refuse
 instead of selecting the replacement. Four original regressions are retained;
 sixteen groups pass 245 tests with one declared skip, including changes under the
-enqueue lease and after enqueue. Installation and native Windows follow-up for
-this latest correction remain pending.
+enqueue lease and after enqueue. Installed source `51ce508` passes 65 served/API
+and 107 metadata checks; all 54 workspaces and 57 workflows remain intact.
+The current synthetic preview passes nine checks and the seven-stage backend demo
+passes. Native Windows and browser visual follow-up remain separate.
+[Installed evidence](evidence/installed-reviewed-role-choice-summary.json),
+[running demonstration](evidence/reviewed-role-choice-running-demo-summary.json).
 [Source evidence](evidence/reviewed-role-choice-source-summary.json).
 
 Reviewed role actions now carry the same active-workspace generation checks as

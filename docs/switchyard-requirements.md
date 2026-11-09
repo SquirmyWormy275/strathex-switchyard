@@ -9,18 +9,18 @@ entry point, evidence and remaining work. A hardware/account check does not excu
 unfinished independent software. Read [current status](switchyard-status.md) for
 accepted checkpoints and [verification](verification.md) for reproducible checks.
 
-Installed Linux source `58ecd54` includes the 36-asset guided frontend, permissions,
+Installed Linux source `51ce508` includes the 36-asset guided frontend, permissions,
 scanner setup, signed-feed maintenance, reviewed execution, saved design
 conversations, coding-task text/background controls and approved-work account/
 recovery, exact native-app navigation, agent maintenance, saved voice notes,
 transcript import, Claude hook setup and direct client-to-native setup navigation. All served asset
-hashes, twenty-six API/inventory checks and 107 metadata/refusal checks across 62 exact modules
+hashes, twenty-nine API/inventory checks and 107 metadata/refusal checks across 62 exact modules
 pass, preserving all 54 semantic workspaces and 57 workflow definitions.
 Current plus one rollback remain and the prepared package is removed.
-[Installed evidence](evidence/installed-reviewed-role-summary.json).
+[Installed evidence](evidence/installed-reviewed-role-choice-summary.json).
 Reviewed role dispatch carries the active and persisted workspace identity;
 the current synthetic running demonstration verifies acknowledgement and stale
-selection refusal. [Demonstration](evidence/reviewed-role-running-demo-summary.json).
+selection refusal. [Demonstration](evidence/reviewed-role-choice-running-demo-summary.json).
 
 The installed source also includes [saved design-conversation controls](saved-conversation-controls.md):
 exact history selection, reviewed legacy account binding, explicit native status

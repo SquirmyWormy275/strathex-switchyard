@@ -1,0 +1,33 @@
+{
+  "schema": "switchyard-reviewed-role-choice-running-demo/v1",
+  "sourceCommit": "51ce508041ca17ea724a5fb97744d59245aa72c7",
+  "frontend": "3c6309fafd643af537adb82178f90746d6fe1992a7bed1919bada689db37b69d",
+  "origin": "http://127.0.0.1:37943",
+  "checks": [
+    "all 36 served frontend assets match the installed review",
+    "unauthenticated saved-state access refused",
+    "named synthetic role saves once and stale choice refuses",
+    "pre-binding reviewed choice refuses without queuing a replacement target",
+    "reviewed frontend route queues exact status and independently running signed SDK acknowledges it",
+    "stale reviewed role refuses after selecting Work",
+    "returning to Personal cannot revive the old confirmation",
+    "one original command and four planned controls remain after returning",
+    "preview refuses actual launch and native focus"
+  ],
+  "success": true,
+  "synthetic": true,
+  "modelPrompts": 0,
+  "hardwareOperations": 0,
+  "nativeAppEffects": 0,
+  "accountOperations": 0,
+  "browserVisualAcceptance": false,
+  "backendJourney": {
+    "command": "node scripts/demo-switchyard-backend.mjs --synthetic",
+    "exitCode": 0,
+    "stages": 7,
+    "passed": 7,
+    "serversClosed": true,
+    "temporaryEncryptedStateRemoved": true
+  },
+  "previewRetainedForReview": true
+}

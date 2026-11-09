@@ -16,8 +16,13 @@ still resolve their current binding at invocation.
 Four UI regressions reproduced commands being queued after the reviewed choice
 changed. All sixteen surrounding groups now pass **245 tests with one declared
 Windows skip**, including unchanged-heartbeat success, malformed-choice refusal,
-metadata changes while waiting to enqueue and post-enqueue preservation. Native
-Windows, normal installed adoption and browser visual acceptance remain separate.
+metadata changes while waiting to enqueue and post-enqueue preservation. Normal
+installed source `51ce508` passes 65 served/API and 107 metadata checks, preserving
+all 54 semantic workspaces. Nine running synthetic-preview checks include stale
+confirmation refusal and one independently acknowledged SDK command. Native
+Windows and browser visual acceptance remain separate.
+[Installed evidence](evidence/installed-reviewed-role-choice-summary.json),
+[running demonstration](evidence/reviewed-role-choice-running-demo-summary.json).
 [Exact review evidence](evidence/reviewed-role-choice-source-summary.json).
 
 **Try connected control** now sends workflow content only for an explicit
