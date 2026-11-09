@@ -24,8 +24,8 @@ as unknown in the UI, followed by metadata-only history; the UI never automatica
 issues another grant. A late reply cannot populate another workspace.
 
 These controls use the existing [task-authority contract](task-authority.md) and
-[reviewed execution workbench](reviewed-execution-controls.md). Scanner-recipe
-creation is the next independent frontend step. Live native account use and browser
+[reviewed execution workbench](reviewed-execution-controls.md). The [scanner setup controls](scanner-setup-controls.md) can fill a saved setup's
+file scope here for a fresh review. Live native account use and browser
 visual acceptance remain separate from the HTTP interaction tests.
 
 Eight original groups pass 66 tests without skips. The final eight-case UI run

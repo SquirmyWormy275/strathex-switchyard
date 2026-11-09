@@ -115,6 +115,18 @@ export function mountExecution({ notify }) {
     if (!permitted() || event.detail.compartment !== state.id) return;
     invalidate(); void work(async context => { await inventory(context); if (context.current() && grants.some(row => row.id === event.detail.authorityId)) { $("execution-grant").value = event.detail.authorityId; renderGrant(); } });
   });
+  document.addEventListener("switchyard-execution-recipe", event => {
+    const input = event.detail;
+    if (!permitted() || input.compartment !== state.id || !/^[a-f0-9]{64}$/.test(input.manifestSha256)) return;
+    invalidate(); void work(async context => {
+      await inventory(context); if (!context.current()) return;
+      const matches = grants.filter(row => available(row) && row.taskId === input.taskId && row.proposal.paths.includes(input.manifestPath) && allowed(row).includes(input.action));
+      if (matches.length !== 1) throw Error(matches.length ? "Several permissions cover this scanner recipe. Select the intended permission and its exact recipe file before review." : "Save a fresh task permission for this scanner setup before selecting its execution recipe.");
+      $("execution-grant").value = matches[0].id; renderGrant(); $("execution-action").value = input.action; $("execution-manifest").value = input.manifestPath; manifest = input.manifestSha256;
+      $("execution-file-status").textContent = `Saved scanner recipe · SHA-256 ${manifest}. The backend rechecks the actual repository bytes during review.`;
+      $("execution-controls").open = true; $("execution-status").textContent = "Saved scanner recipe selected. Review its exact inputs, feeds and isolation before confirming a scan. Nothing has executed."; controls();
+    });
+  });
   document.addEventListener("switchyard-workspace-changing", () => { state = null; invalidate(); clear(); $("execution-status").textContent = "Select a workspace to inspect its saved runs."; });
   document.addEventListener("switchyard-compartment-state", event => { state = event.detail; invalidate(); clear(); $("execution-status").textContent = permitted() ? "Load saved task permissions and execution history when you need them." : "Execution requires a Personal workspace in companion mode."; });
   clear(); controls();

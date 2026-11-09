@@ -25,7 +25,8 @@ never retries execution. There is no background status polling. A manual status
 request may reconcile retained ownership and independently verified cleanup.
 
 [Task permission issuance and revocation](task-permission-controls.md) now have
-separate frontend controls. Scanner-recipe creation remains frontend work.
+separate frontend controls. [Scanner setup](scanner-setup-controls.md) prepares
+reviewable new control files and selects their saved recipe after permission.
 Source-only and installed API contracts remain in [task authority](task-authority.md),
 [execution](reviewed-task-execution.md) and [scanner saving](scanner-recipe-saving.md).
 Browser visual acceptance remains blocked by the browser-control failure.

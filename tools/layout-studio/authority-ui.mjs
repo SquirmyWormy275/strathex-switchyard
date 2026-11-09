@@ -82,6 +82,13 @@ export function mountAuthority({ notify }) {
     } catch (error) { if (context.current()) { $("authority-status").textContent = `No confirmed permission result was received: ${error.message}. No automatic retry was made; refresh saved permissions before deciding whether to issue another.`; notify("Inspect saved permission history; no automatic retry was made."); } }
     finally { if (context.current()) try { await inventory(context, id); } catch (error) { if (context.current()) $("authority-status").textContent += ` Saved history unavailable: ${error.message}.`; } }
   }));
+  document.addEventListener("switchyard-authority-proposal", event => {
+    const { compartment, proposal } = event.detail;
+    if (busy || !permitted() || compartment !== state.id || !tasks.some(t => t.id === proposal?.taskId) || proposal?.actions?.length !== 1 || !actions[proposal.actions[0]] || !Array.isArray(proposal.paths) || !proposal.paths.every(path => typeof path === "string")) return;
+    invalidate(); $("authority-task").value = proposal.taskId; $("authority-plan").value = proposal.planRevision; $("authority-action").value = proposal.actions[0]; $("authority-lifetime").value = String(proposal.lifetimeMinutes ?? 15); $("authority-paths").value = proposal.paths.join("\n");
+    for (const [id, key] of [["authority-included-untracked", "includedUntracked"], ["authority-excluded-untracked", "excludedUntracked"], ["authority-included-ignored", "includedIgnored"], ["authority-excluded-ignored", "excludedIgnored"], ["authority-excluded-trees", "excludedIgnoredTrees"]]) $(id).value = (proposal.classifications?.[key] ?? []).join("\n");
+    $("authority-controls").open = true; $("authority-status").textContent = "Saved scanner scope loaded for your review. Inspect the task and confirm a fresh permission; no approval or execution was imported."; controls();
+  });
   document.addEventListener("switchyard-workspace-changing", () => { state = null; invalidate(); clear(); $("authority-status").textContent = "Choose a workspace to review its saved task permissions."; });
   document.addEventListener("switchyard-compartment-state", event => {
     state = event.detail; invalidate(); clear();

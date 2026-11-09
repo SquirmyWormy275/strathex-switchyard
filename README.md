@@ -42,15 +42,16 @@ Copilot-only policy. Imported layouts never enable providers or recording.
 - [Codex task bindings](docs/coding-task-bindings.md) and [Claude Code task
   bindings](docs/claude-task-bindings.md): exact native identities, actual host
   evidence and the controls still being implemented.
-- [Editor task controls](docs/editor-task-controls.md): browse saved projects,\n  review an exact terminal connection and return to its owned terminal.\n- [Reviewed native coding text](docs/native-coding-tasks.md): follow an exact task,
+- [Editor task controls](docs/editor-task-controls.md): browse saved projects,
+  review an exact terminal connection and return to its owned terminal.
+- [Reviewed native coding text](docs/native-coding-tasks.md): follow an exact task,
   approve bounded text and recover an uncertain turn without automatic retry.
 - [Microsoft work conversations](docs/copilot-request-recovery.md): keep the exact
   enrolled account and recover a lost reply without silently sending it again.
 - [Mediated repository effects](docs/mediated-repository-effects.md): follow a
   binary file through review, encrypted preservation, the durable policy broker
   and supervised native Git; run its disposable native demonstration.
-- [Reviewed task execution](docs/reviewed-task-execution.md): run exact task-owned
-  inputs through separate approval, Linux containment and durable native evidence.
+- [Task permission controls](docs/task-permission-controls.md) → [scanner setup](docs/scanner-setup-controls.md) → [reviewed execution](docs/reviewed-execution-controls.md): choose a saved task, review its scope, and keep permission, file saving and execution separate.
 - [Current implementation and evidence](docs/switchyard-status.md): what runs,
   what has been checked, and what still needs implementation.
 - [Detailed verification record](docs/verification.md): accepted checkpoints,
@@ -73,18 +74,27 @@ This is a **partial development suite**, built and exercised on Omarchy Linux.
 The backend connects protected compartments, exact task identities, reviewed
 execution, offline repository scans and recoverable installation. The Home and
 Model F catalog provide the starting experience; complete task/IDE attachment,
-broader device controls and full scanner coverage remain unfinished.
+broader observation sources and full scanner coverage remain unfinished.
 
-The latest installed backend (`9266c12`) passes **102 metadata/refusal checks
-across 59 exact modules** and preserves all 54 saved workspaces. It includes signed saved-project discovery, verified Claude Code 2.1.319 admission and recording-consent fixes for both named task adapters. The newer source connects guided role/device setup, portable import/export, printable legends, observation-assisted design and editor commands. Its installed update and visual/interactive acceptance remain pending. [Installed evidence](docs/evidence/installed-codex-status-consent-summary.json).
+The installed application at `9784aa9` includes guided setup, portable profiles,
+observation-assisted design, advertised keyboard controls and distinct client
+recipes. Its 28 served asset hashes, four API checks and 100 metadata/refusal
+checks pass; all 54 semantic workspaces and 57 workflows are preserved.
+The newer source connects reviewed scanner setup, task permissions and execution.
+Browser visual/interactive acceptance remains blocked and is not inferred from
+HTTP tests. [Installed evidence](docs/evidence/installed-frontend-controls-summary.json).
 
 Complete Linux `9266c12` passes **356 groups / 2,333 tests**, with 32 declared
-skips. It covers the installed source, including exact Claude version admission
+skips. It covers that earlier source, including exact Claude version admission
 and recording-consent fixes for both task adapters. Complete Windows source
 `4db5948` passes **462 groups / 2,910 tests**, with 246 declared skips. All 21
 original worker receipts are audited and the native collector passes. This
 source includes the latest consent/version fixes and native fixture corrections.
-The latest Windows package test stage also passes all 462 groups, including the corrected fixtures and helper-alias refusal. The later standalone helper compiler error is corrected; native Windows publish and self-test now pass. Full release follow-up remains pending. [Package evidence](docs/evidence/windows-package-db24634-tests-summary.json), [build correction](docs/evidence/provider-helper-platform-source-summary.json). Earlier focus, storage and
+Full Windows package verification at `7529718` passes all 462 original groups
+(2,910 tests and 246 declared skips), native helper publishing, portable smoke and
+the original verified-bundle check; all eight jobs succeed. That exact acceptance
+predates the later frontend revisions. [Package evidence](docs/evidence/windows-package-7529718-summary.json).
+Earlier focus, storage and
 host-action settlement failures remain recorded; passing follow-ups do not prove
 their causes are resolved. [Current status and evidence](docs/switchyard-status.md).
 
@@ -92,8 +102,8 @@ their causes are resolved. [Current status and evidence](docs/switchyard-status.
 | --- | --- |
 | Return to a coding task | [Codex bindings](docs/coding-task-bindings.md), [Claude bindings](docs/claude-task-bindings.md), [reviewed text](docs/native-coding-tasks.md), [owned task loading](docs/coding-task-owners.md) |
 | Inspect a repository without starting work | [Installed `switchyard inspect` commands](docs/inspect-cli.md) |
-| Run reviewed inputs in a disposable workspace | [Task execution](docs/reviewed-task-execution.md), [bounded build workspace](docs/bounded-build-workspace.md) |
-| Understand findings and coverage | [Shield baseline](docs/shield-baseline-scanner.md), [SBOM example](docs/evidence/README.md), [CVSS context](docs/cvss-severity.md), [Rust declarations](docs/cargo-supply-chain.md), [Cargo archive identity](docs/cargo-archive-identity.md), [Python wheels and internal hashes](docs/python-wheel-records.md) |
+| Run reviewed inputs in a disposable workspace | [Permission controls](docs/task-permission-controls.md), [execution workbench](docs/reviewed-execution-controls.md), [bounded build workspace](docs/bounded-build-workspace.md) |
+| Understand findings and coverage | [Scanner setup](docs/scanner-setup-controls.md), [Shield baseline](docs/shield-baseline-scanner.md), [SBOM example](docs/evidence/README.md), [CVSS context](docs/cvss-severity.md), [Rust declarations](docs/cargo-supply-chain.md), [Cargo archive identity](docs/cargo-archive-identity.md), [Python wheels and internal hashes](docs/python-wheel-records.md) |
 | Review recovery and platform boundaries | [Release recovery](docs/suite-release-recovery.md), [Windows storage](docs/windows-storage-broker.md), [complete requirement ledger](docs/switchyard-requirements.md) |
 
 Installed Linux scanner demonstrations verify actual process exits and restore

@@ -55,10 +55,10 @@ defect and initial TypeScript annotation failure remain recorded; both are fixed
 [Source evidence](evidence/scanner-recipe-draft-source-summary.json).
 
 [Reviewed Linux/Windows saving and interruption recovery](scanner-recipe-saving.md) are
-now implemented as separate authenticated routes. Frozen frontend controls
-remain unfinished. This draft API does not establish a normal
-UI setup journey, a real Windows guest scan, broad security coverage or a complete
-passing Shield gate.
+implemented as separate authenticated routes and connected through the
+[scanner setup controls](scanner-setup-controls.md). Source interaction coverage
+does not establish visual acceptance, a real Windows guest scan, broad security
+coverage or a complete passing Shield gate.
 
 Installed `6ab9b1e` verifies scan-draft assembly within **76 metadata/in-memory
 checks and 30 exact module hashes**. All 54 semantic workspaces, selection,

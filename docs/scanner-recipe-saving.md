@@ -3,7 +3,9 @@
 The backend saves the exact generated scanner setup after a separate, one-use
 review. Saving does not grant task authority or execute the scanner. Linux has
 actual save-and-scan evidence. The Windows implementation is connected and
-software-tested; actual NTFS acceptance is pending. Frontend controls remain frozen.
+software-tested, with native NTFS evidence recorded below. The Studio now connects
+[scanner setup controls](scanner-setup-controls.md); browser visual acceptance
+and actual guest/account acceptance remain separate.
 
 Start with the task and installed feed selection described in
 [scanner drafts](scanner-recipe-drafts.md). Send that selection to authenticated
@@ -101,7 +103,7 @@ formats remain byte-for-byte equivalent; exported-package rebuilding also retain
 the template through the full 640-file recovery drill. Earlier failed assertions,
 package size and exported-package regression receipts remain recorded.
 
-This does not establish a completed frontend setup journey, full Windows acceptance,
+That backend checkpoint does not establish visual frontend or full Windows acceptance,
 live provider/account commissioning, hardware acceptance or complete security
 coverage. Earlier complete-suite receipts remain tied to their original revisions.
 

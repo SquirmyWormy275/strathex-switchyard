@@ -57,7 +57,9 @@ permissions: recipe-file hashing, concrete recipe/isolation/budget review,
 separate execution and stop approvals, retained status and bounded output.
 A source-only demonstration runs an actual disposable Linux program through the
 authenticated API without an existing account. Named saved-task permission issuance, revalidation and revocation now have
-separate frontend controls; scanner recipe creation remains unfinished. [Execution controls](reviewed-execution-controls.md).
+separate frontend controls. Scanner setup now reviews generated control files,
+saves them separately and hands their scope/recipe to those controls without
+implicit authority or execution. [Execution controls](reviewed-execution-controls.md).
 
 ## Installed frontend verification
 

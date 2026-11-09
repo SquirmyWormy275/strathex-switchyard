@@ -251,7 +251,7 @@ Publish tested source and evidence regularly. Retain original failures and front
 ## Next implementation work
 
 The installed checkpoint includes all guided frontend work above. Continue remaining
-required observation sources and reviewed execution/scanner controls. Native exact-task
+required observation sources, feed trust setup and native attachment limitations. Native exact-task
 attachment, interactive IDE, browser visual review and hardware/account acceptance
 remain separately tracked; the full Rev2 assignment is unfinished.
 
@@ -304,3 +304,26 @@ live provider or hardware is used. [Controls](task-permission-controls.md),
 Continue with scanner recipe creation/saving and its separate permission/execution
 handoffs, remaining required observation sources and native attachment limitations.
 Installed/interactive browser/IDE/hardware/account checks remain separate.
+
+## Scanner setup frontend checkpoint
+
+The new scanner workbench selects named saved tasks and already installed signed
+feeds. It reviews the exact new directory, every generated control file/hash,
+input provenance, coverage gaps and proposed later permission. Saving never
+grants authority or starts a scan. Explicit buttons fill the separate task
+permission and execution forms; fresh reviews remain mandatory.
+
+Seven interaction cases cover the complete save → permission → execution-review
+sequence, repository drift, interrupted writes, lost successful replies, workspace
+changes and separately witnessed staged/history inputs. Eight original groups
+pass 93 tests; the final three UI groups pass 22 with overlap, zero skips and
+verified original bounds/cleanup. The UI filesystem and native-task boundaries
+are explicit doubles; included original backend groups exercise existing Linux
+contracts. Nine running-preview checks pass and restore keyboard-only mode.
+[Controls](scanner-setup-controls.md), [evidence](evidence/scanner-ui-source-summary.json).
+
+The immutable scanner frontend source and digest are pinned in the next checkpoint.
+The installed release remains `47143a9f` with its separately accepted 28 assets.
+Browser tooling still fails before inspection; no visual acceptance is inferred.
+Continue remaining required observation sources, feed trust setup, native exact-task
+attachment limitations and normal installed/frontend verification.
