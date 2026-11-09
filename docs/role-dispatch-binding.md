@@ -1,5 +1,26 @@
 # Keep a command with its original role binding
 
+**Try connected control** now sends workflow content only for an explicit
+handoff. Previously the frontend included an empty message for every action,
+causing an otherwise valid app-homepage launch to refuse. The complete frontend
+journey now saves a homepage connection, cancels one action review, and sends
+one confirmed request through the real launch service with a synthetic portal.
+
+Reviewed frontend dispatch also uses the active and persisted workspace generation
+already used by physical shortcuts. A workspace change, round trip, independent
+same-name selection or shutdown before enqueue refuses the original request.
+An already queued command remains with its original authenticated session; a late
+result cannot be attributed to the new workspace. An explicitly unselected
+workspace refuses before initialization or provider work.
+
+Nine regression cases reproduce the original failures. The final sixteen groups
+pass **237 tests and one declared Windows skip**, preserving original commands,
+bounds and child cleanup. HTTP, encrypted storage and selection witnesses are
+real; external agents and the native portal are fixtures. The three role files
+are included in the original bounded Windows client lane. Visual and native
+Windows follow-up remain separate.
+[Evidence](evidence/reviewed-role-dispatch-source-summary.json).
+
 Reassigning a workflow role invalidates a custom-agent request that has not yet
 entered the queue. The enqueue transaction checks the exact binding and role
 definition under the same state lease as the command write. Changing the target,

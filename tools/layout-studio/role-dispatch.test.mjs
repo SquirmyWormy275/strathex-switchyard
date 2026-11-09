@@ -64,10 +64,10 @@ test("unrebound legacy role bindings remain usable until deliberately replaced",
   assert.equal((await dispatch()).value.status, "queued");
 }));
 
-for (const change of ["another workspace", "away and back", "saved selection", "saved selection round trip", "saved same selection", "shutdown"]) {
-  test(`a physical role intent refuses ${change} before enqueue`, () => fixture(async ({ suite, store, peer, dispatch, pause }) => {
+for (const physical of [true, false]) for (const change of ["another workspace", "away and back", "saved selection", "saved selection round trip", "saved same selection", "shutdown"]) {
+  test(`a ${physical ? "physical" : "reviewed frontend"} role intent refuses ${change} before enqueue`, () => fixture(async ({ suite, store, peer, dispatch, pause }) => {
     await suite.handle("/api/suite/compartment/create", { compartment: "second" });
-    const held = pause("agent-intent"), result = dispatch(true);
+    const held = pause("agent-intent"), result = dispatch(physical);
     await held.entered;
     if (change === "shutdown") await suite.close();
     else if (change === "saved selection") await store.selection("second");
@@ -86,9 +86,9 @@ for (const change of ["another workspace", "away and back", "saved selection", "
   }));
 }
 
-test("a workspace change after physical enqueue preserves the original command and refuses stale attribution", () => fixture(async ({ suite, store, dispatch, pause, send }) => {
+for (const physical of [true, false]) test(`a workspace change after ${physical ? "physical" : "reviewed frontend"} enqueue preserves the original command and refuses stale attribution`, () => fixture(async ({ suite, store, dispatch, pause, send }) => {
   await suite.handle("/api/suite/compartment/create", { compartment: "second" });
-  const held = pause("role-intent-result"), result = dispatch(true);
+  const held = pause("role-intent-result"), result = dispatch(physical);
   await held.entered;
   const original = (await store.snapshot("personal")).agents.find(agent => agent.id === "alpha").commands[0];
   await suite.handle("/api/suite/compartment/select", { compartment: "second" });
@@ -99,6 +99,13 @@ test("a workspace change after physical enqueue preserves the original command a
   assert.equal(state.intentResults?.length ?? 0, 0);
   assert.equal((await send("alpha", agentRoutes.poll)).command.id, original.id);
   assert.equal((await send("alpha", agentRoutes.poll)).command, null);
+}));
+
+test("a reviewed frontend request cannot dispatch a no-longer-selected workspace", () => fixture(async ({ suite, store }) => {
+  await suite.handle("/api/suite/compartment/create", { compartment: "second" });
+  await suite.handle("/api/suite/compartment/select", { compartment: "second" });
+  await assert.rejects(suite.handle("/api/suite/roles/dispatch", { compartment: "personal", roleId: "operator", intent: "status" }), /selected workspace changed/);
+  assert.equal((await store.snapshot("personal")).agents.every(agent => agent.commands.length === 0), true);
 }));
 
 test("a fresh physical role intent works after deliberately returning to its workspace", () => fixture(async ({ suite, dispatch }) => {

@@ -1,7 +1,35 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { browserSurfaceFixture, until } from "./test-support/browser-ui.mjs";
+import { randomUUID } from "node:crypto";
+import { join } from "node:path";
+import { createClientLaunch } from "./client-launch.mjs";
 const uiFixture = fn => browserSurfaceFixture(async context => { const { mountRoles } = await import("./role-ui.mjs"); await fn({ ...context, mount: extra => mountRoles({ notify() {}, refresh: context.refresh, ...extra }) }); });
+
+test("a saved homepage role can be reviewed and tried without sending empty workflow content", async () => {
+  let launch, effects = 0;
+  const clientLaunch = { launch: (...args) => launch.launch(...args), list: (...args) => launch.list(...args), stopCompartment: (...args) => launch ? launch.stopCompartment(...args) : { stopped: true }, close: () => launch?.close() };
+  await browserSurfaceFixture(async c => {
+    launch = createClientLaunch({ store: c.store, stateDirectory: join(c.root, "role-launch"), platform: "linux", guardianStopped: async () => true, command: async (_exe, _args, options) => {
+      const input = JSON.parse(options.inputText); assert.equal(input.id, "github-copilot-web");
+      await options.onGuardianReady({ schema: "switchyard-runtime-command/v1", id: randomUUID(), guardianPid: 12345, birth: "1", containment: "owned-linux-session" });
+      effects++;
+      return { status: "completed", exitCode: 0, inputDelivered: true, treeExitVerified: true, stdout: JSON.stringify({ schema: "switchyard-client-portal-result/v1", id: input.id, status: "accepted", response: 0, applicationOpenedVerified: false, accountVerified: false, sessionIdentified: false }) };
+    } });
+    const item = c.document.createElement("option"); item.value = "summon"; item.textContent = "Open app or conversation"; c.$("role-intent").replaceChildren(item);
+    const { mountRoles } = await import("./role-ui.mjs"); mountRoles({ notify() {}, refresh: c.refresh }); await c.refresh();
+    await until(() => c.$("role-target").children.length === 4); c.change("role-target", "0");
+    c.click("bind-agent-role"); c.click("confirm-role-connection");
+    await until(() => !c.$("role-connection-dialog").open && !c.$("try-agent-role").disabled); assert.equal(effects, 0);
+    c.click("try-agent-role"); c.click("cancel-role-connection"); await new Promise(resolve => setImmediate(resolve)); assert.equal(effects, 0);
+    c.click("try-agent-role"); c.click("confirm-role-connection");
+    await until(() => !c.$("role-connection-dialog").open && c.$("role-result").textContent.includes("launch-requested"));
+    assert.equal(effects, 1);
+    const request = c.calls.find(row => row.path.endsWith("/roles/dispatch")); assert.equal(Object.hasOwn(request.body, "content"), false);
+    const state = await c.store.snapshot("personal"); assert.equal(state.clientLaunches.length, 1); assert.equal(state.clientLaunches[0].stoppedVerified, true);
+    assert.equal(state.clientLaunches[0].cleanupPending, false); assert.equal(state.intentResults.at(-1).result.providerAccountVerified, false);
+  }, { platform: "linux", clientLaunch });
+});
 
 test("named picker uses the real HTTP contract, requires review, and saves without dispatch", () => uiFixture(async ({ mount, refresh, $, change, click, calls, store }) => {
   mount(); await refresh(); await until(() => $("role-target").children.length === 3);

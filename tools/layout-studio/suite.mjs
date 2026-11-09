@@ -271,6 +271,14 @@ export function createSuite({ store = createSuiteStore(), platform = process.pla
           return { schema: "switchyard-role-choice-binding/v1", bindingId: saved.bindingId, roleId: saved.roleId, intent: saved.intent, provider: saved.provider, targetKind: saved.targetKind, targetId: saved.targetId, bound: true, nativeObserved: false, authorityGranted: false };
         }, { provider: body.provider });
       }
+      if (path === "/api/suite/roles/dispatch") {
+        if (Object.keys(body).some(k => !["compartment", "roleId", "intent", "content", "requestId", "workspaceBaseUrl"].includes(k))) throw new Error("Role dispatch accepts only a bound role, intent, request identity and supported content.");
+        await loadSelection();
+        const selected = activeCompartment, context = await selectedIntentContext(selected);
+        if (compartment !== selected) throw new Error("The selected workspace changed after this role review. Review the control in its original workspace again.");
+        await context.assertCurrent();
+        return this.dispatchRole(selected, body.roleId, body.intent, body.content, body.requestId, context);
+      }
       if(path==="/api/suite/compartment/status"){
         if(Object.keys(body).some(key=>key!=="workspaceBaseUrl"))throw Error("Read only the selected workspace; selection arguments are refused.");
         await loadSelection();if(await store.selection()!==activeCompartment)throw Error("The saved workspace changed outside this active instance; select it through the application before inspecting.");
@@ -543,10 +551,6 @@ export function createSuite({ store = createSuiteStore(), platform = process.pla
       if (path === "/api/suite/roles/bind") {
         if (!agentIntents.includes(body.intent)) throw new Error("Choose a stable supported intent.");
         return store.update(compartment, "role-bind", state => saveRoleBinding(state, body), { provider: body.provider });
-      }
-      if (path === "/api/suite/roles/dispatch") {
-        if (Object.keys(body).some(k => !["compartment", "roleId", "intent", "content", "requestId", "workspaceBaseUrl"].includes(k))) throw new Error("Role dispatch accepts only a bound role, intent, request identity and supported content.");
-        return this.dispatchRole(compartment, body.roleId, body.intent, body.content, body.requestId);
       }
       if (path === "/api/suite/native-focus/recover") {
         if (Object.keys(body).some(key => !["compartment", "workspaceBaseUrl"].includes(key))) throw Error("Native focus recovery observes only original helper retirement.");

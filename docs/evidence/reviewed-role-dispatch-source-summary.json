@@ -1,0 +1,167 @@
+{
+  "schema": "switchyard-reviewed-role-dispatch-source-evidence/v1",
+  "scope": "Reviewed frontend role actions use active workspace generations; homepage controls omit workflow content",
+  "runs": [
+    {
+      "receiptId": "c7a04f9d-1556-4723-925c-e41ea4c5300b",
+      "sha256": "cf1e701c09b804349c1efd8eeae6145f19ca6aabfcc565c9107b61974c6565a8",
+      "success": false,
+      "totals": {
+        "required": 2,
+        "passed": 0,
+        "failed": 2,
+        "tests": 32,
+        "passedTests": 23,
+        "failedTests": 9,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "files": [
+        "tools/layout-studio/role-dispatch.test.mjs",
+        "tools/layout-studio/role-ui.test.mjs"
+      ],
+      "originalBoundsAndSkipsPreserved": true,
+      "ownedCleanupComplete": true,
+      "failures": [
+        {
+          "file": "tools/layout-studio/role-dispatch.test.mjs",
+          "counts": {
+            "total": 27,
+            "passed": 19,
+            "failed": 8,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          },
+          "diagnosticSha256": "25760db362b9ee12a5108ec5e632ec55a16f05a3208365594f0ca930df0c2b3c"
+        },
+        {
+          "file": "tools/layout-studio/role-ui.test.mjs",
+          "counts": {
+            "total": 5,
+            "passed": 4,
+            "failed": 1,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          },
+          "diagnosticSha256": "ba5f4d4a016849eeca3547a211ae99703cfefe846bf556916586cdcddc2ed46b"
+        }
+      ]
+    },
+    {
+      "receiptId": "342f5bda-91b7-4313-8ab5-5af52693965e",
+      "sha256": "dde757315f2ed27052a1482548a01c0f0ddb9f2709ac2267073a2c7c0d901691",
+      "success": true,
+      "totals": {
+        "required": 2,
+        "passed": 2,
+        "failed": 0,
+        "tests": 32,
+        "passedTests": 32,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "files": [
+        "tools/layout-studio/role-dispatch.test.mjs",
+        "tools/layout-studio/role-ui.test.mjs"
+      ],
+      "originalBoundsAndSkipsPreserved": true,
+      "ownedCleanupComplete": true,
+      "failures": []
+    },
+    {
+      "receiptId": "5743d03e-0d5e-4291-b6cd-75c7610dacab",
+      "sha256": "c9303d1ccdcde93dc6b0d0b81cd3cf80ae2ed86d76fc01df7549f9840d75682b",
+      "success": true,
+      "totals": {
+        "required": 13,
+        "passed": 13,
+        "failed": 0,
+        "tests": 203,
+        "passedTests": 202,
+        "failedTests": 0,
+        "skippedTests": 1,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "files": [
+        "tools/layout-studio/copilot-requests.test.mjs",
+        "tools/layout-studio/suite.test.mjs",
+        "tools/layout-studio/role-dispatch.test.mjs",
+        "tools/layout-studio/guided-role-choices.test.mjs",
+        "tools/layout-studio/role-ui.test.mjs",
+        "tools/layout-studio/client-ui.test.mjs",
+        "tools/layout-studio/voice-ui.test.mjs",
+        "tools/layout-studio/conversation-role-boundaries.test.mjs",
+        "tools/layout-studio/client-launch.test.mjs",
+        "tools/layout-studio/physical-intent.test.mjs",
+        "tools/layout-studio/native-focus-gateway.test.mjs",
+        "tools/layout-studio/coding-sessions.test.mjs",
+        "tools/layout-studio/claude-coding.test.mjs"
+      ],
+      "originalBoundsAndSkipsPreserved": true,
+      "ownedCleanupComplete": true,
+      "failures": []
+    },
+    {
+      "receiptId": "c261d014-613c-4e1e-9d91-7195a0ab739d",
+      "sha256": "6581c49b84d1209dd4eadbfca61e74db309dd8440d41561cdcbbca54999fa400",
+      "success": true,
+      "totals": {
+        "required": 16,
+        "passed": 16,
+        "failed": 0,
+        "tests": 238,
+        "passedTests": 237,
+        "failedTests": 0,
+        "skippedTests": 1,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "files": [
+        "scripts/windows-backend-shards.test.mjs",
+        "scripts/run-isolated-tests.test.mjs",
+        "tools/layout-studio/copilot-requests.test.mjs",
+        "deployment/suite/release.test.mjs",
+        "tools/layout-studio/suite.test.mjs",
+        "tools/layout-studio/role-dispatch.test.mjs",
+        "tools/layout-studio/guided-role-choices.test.mjs",
+        "tools/layout-studio/role-ui.test.mjs",
+        "tools/layout-studio/client-ui.test.mjs",
+        "tools/layout-studio/voice-ui.test.mjs",
+        "tools/layout-studio/conversation-role-boundaries.test.mjs",
+        "tools/layout-studio/client-launch.test.mjs",
+        "tools/layout-studio/physical-intent.test.mjs",
+        "tools/layout-studio/native-focus-gateway.test.mjs",
+        "tools/layout-studio/coding-sessions.test.mjs",
+        "tools/layout-studio/claude-coding.test.mjs"
+      ],
+      "originalBoundsAndSkipsPreserved": true,
+      "ownedCleanupComplete": true,
+      "failures": []
+    }
+  ],
+  "sourceFiles": {
+    "tools/layout-studio/suite.mjs": "4ccabf89138195b9f7ddbb70e6cdf5e8451bd066e92084604f1809109b9a2212",
+    "tools/layout-studio/role-ui.mjs": "52c9f51458086544cd029a09dd3e18cd897dc3a76e0ec1397cb39f55ed34fe95",
+    "tools/layout-studio/role-ui.test.mjs": "aead9f7a76abdbb38194713b13dbd31481f6a853e0f24ebe337cba91093cff2d",
+    "tools/layout-studio/role-dispatch.test.mjs": "342d9b0b70b5503168a16fcb10991f45f5a606fe3c9468107a300f3f6ffa5af5",
+    "scripts/verify-client-platform.mjs": "e5c0eb1f9e86ed4bc47aab7a10bd29102c051ee08eb649196b076db16c868596"
+  },
+  "originalFailures": {
+    "frontend": "Empty content on every role request prevented the real homepage launch service from accepting the selected launch-only action.",
+    "backend": "Reviewed role dispatch lacked the active/persisted workspace-generation context used by physical shortcuts. Six before-enqueue changes, one post-enqueue change and an explicitly unselected workspace reproduced the gap."
+  },
+  "boundaries": [
+    "Actual authenticated local HTTP, encrypted temporary storage, saved selection generations and portal-command persistence; native portal and agent messages are controlled fixtures.",
+    "No native provider, account, real webpage launch, installed agent, keyboard or microphone operation occurs.",
+    "A command already queued remains with its original session and is not attributed to a replacement workspace. No automatic replay or cancellation is added.",
+    "The final sixteen-group result includes earlier focused cases; their totals are not added together.",
+    "Browser visual acceptance and native Windows follow-up remain separate.",
+    "The Windows client lane now includes the three existing role test files under its original 15-minute job bound."
+  ]
+}

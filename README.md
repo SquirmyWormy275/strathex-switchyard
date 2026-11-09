@@ -95,9 +95,10 @@ and separately opted-in Claude hook setup are connected. All 36 served hashes,
 and 57 workflows are preserved. Browser visual acceptance remains blocked.
 [Installed evidence](docs/evidence/installed-client-navigation-summary.json).
 
-Complete Linux `4e3feb4` passes **375 groups / 2,483 tests**, with 32 declared
-skips. It covers the guided frontend through voice-note controls; transcript import
-and Claude hooks have later focused evidence. [Complete Linux receipt](docs/evidence/linux-4e3feb4-complete-summary.json).
+Complete Linux `49602de` passes **376 groups / 2,508 tests**, with 32 declared
+skips. It covers transcript import, Claude hooks and native-client controls;
+later catalog navigation and role corrections retain focused evidence.
+[Complete Linux receipt](docs/evidence/linux-49602de-complete-summary.json).
 Complete Windows source
 `4db5948` passes **462 groups / 2,910 tests**, with 246 declared skips. All 21
 original worker receipts are audited and the native collector passes. This

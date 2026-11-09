@@ -54,22 +54,16 @@ Their exact pins now reference the tested frontend revision, with historical
 evidence and behavioral assertions unchanged. Browser visual acceptance is still
 blocked before inspection; this installation is not visual approval.
 
-Complete Linux `4e3feb4` is accepted: **375 groups, 2,483 passing tests,
-32 declared skips**. Receipt `c82e308c-14f5-4d4f-90fe-118845d37885`
+Complete Linux `49602de` is accepted: **376 groups, 2,508 passing tests,
+32 declared skips**. Receipt `d5d20824-74b2-48a4-a7b6-bf01fd64e1e7`
 preserves every original command, bound, skip and child cleanup. The original
 serial schedule and four builds before compiled consumers verify. Its unit exits
 zero. The owned checkout, nine dependency aliases, 805 generated files/11,926,549
 bytes, empty test parent and active marker are removed. Other worktrees remain
-untouched. This is earlier-source evidence. A new complete Linux run is active
-at installed source `49602de9f5482ec72542bb63313bb244674cef79`: unit
-`switchyard-verification-49602de-1794204385.service`, receipt/run UUID
-`d5d20824-74b2-48a4-a7b6-bf01fd64e1e7`, 376 original required groups.
-Its exact checkout, temporary parent and nine dependency aliases are retained in
-`~/.local/state/strathex-switchyard/runtime-verification/linux-full-active.json`.
-Let it finish; audit original commands/bounds/skips/cleanup before retiring only
-those owned paths. Do not restart it. Transcript import, hooks and native-client
-changes are included; the newer catalog navigation has separate focused evidence.
-[Complete Linux evidence](evidence/linux-4e3feb4-complete-summary.json).
+untouched. No complete Linux run is active. This source includes transcript import,
+Claude hooks and native-client changes. The later catalog navigation and reviewed
+role corrections retain separate focused evidence.
+[Complete Linux evidence](evidence/linux-49602de-complete-summary.json).
 
 The earlier `9266c12` wrapper syntax failure and corrected run remain historical
 evidence. Do not rerun executed start/audit/cleanup scripts.
@@ -111,6 +105,9 @@ The frontend clarification is resolved: the owner approved completing it. Contin
 Only bounded digest-verified JSON receipts remain locally outside the checkout. ZIPs were read in memory; no native runtime archive or disposable checkout is retained. Package verification keeps ordered builds/compiled consumers followed by at most two independent children. [Scheduling contract](evidence/windows-paired-verification-summary.json).
 
 ## Recent backend behavior
+
+- Reviewed frontend role dispatch now carries active/persisted workspace selection through effect boundaries and result attribution. Homepage role requests omit content except for explicit handoffs. Nine red cases are retained; final sixteen groups pass 237 tests/one declared skip. Normal installed adoption and native Windows follow-up remain pending. [Evidence](evidence/reviewed-role-dispatch-source-summary.json).
+- Earlier Linux source `574958f` run `42570104922`, job `129005270185`, failed on the unchanged pinned Bubblewrap download with HTTP 504/curl 22 before tests. The original log/hash is retained; no manual retry or bound change. [Receipt](evidence/linux-574-download-failure-summary.json).
 
 - The Claude Desktop catalog now leads directly to exact Windows native setup with passive metadata readback and workspace-change fencing. Five groups/59 tests pass with no skips. Normal installed adoption passes 62 served/API and 107 metadata checks with all 54 workspaces preserved. Browser acceptance remains blocked. [Evidence](evidence/client-native-navigation-source-summary.json).
 - Windows helper build and own-process self-test pass at `ece17a0`, run `42570708844`, job `129008065497`, exact merge tree `623501971159b3d2fcd1fc0ef28dc0566412594c`. Original toolchain/bound/QUERY 8 remain. Its adjacent client job `129008372534` passes 28 groups/287 tests/zero skips with exact audited receipts. Actual desktop and current full CI outcomes remain separate. [Evidence](evidence/native-helper-ece17a0-summary.json).

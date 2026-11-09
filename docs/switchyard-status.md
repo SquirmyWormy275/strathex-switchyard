@@ -12,7 +12,21 @@ validation. Work is published on
 [draft PR 20](https://github.com/SquirmyWormy275/strathex-switchyard/pull/20);
 no merge or public release has been accepted.
 
+Complete Linux source `49602de` passes **376 groups, 2,508 tests and 32 declared
+skips**. Original commands, bounds, skips, serial build order and child cleanup
+verify. Its owned checkout, nine aliases and 805 generated files are removed;
+no full Linux run remains active. Later source changes have focused evidence.
+[Complete source evidence](evidence/linux-49602de-complete-summary.json).
+
 ## Guided frontend checkpoint
+
+Reviewed role actions now carry the same active-workspace generation checks as
+physical shortcuts. The frontend also stops sending empty workflow content to
+homepage launch controls. Nine original failures are retained; sixteen groups
+pass 237 tests with one declared skip after correction. The authenticated UI
+demonstration reaches the real launch service with a synthetic portal. This
+latest correction awaits normal installed adoption and native Windows follow-up.
+[Evidence](evidence/reviewed-role-dispatch-source-summary.json).
 
 The Windows Claude Desktop catalog now leads directly to its native setup or
 saved window controls. It distinguishes configured identity from an observed

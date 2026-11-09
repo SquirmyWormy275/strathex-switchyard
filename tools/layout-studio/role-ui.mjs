@@ -71,7 +71,7 @@ export function mountRoles({ notify, refresh, request = api }) {
     pending = null; busy = true; controls();
     try {
       const result = review.dispatch
-        ? await request("/api/suite/roles/dispatch", { compartment: review.compartment, roleId: review.roleId, intent: review.intent, content: review.content, requestId: review.requestId })
+        ? await request("/api/suite/roles/dispatch", { compartment: review.compartment, roleId: review.roleId, intent: review.intent, ...(review.intent === "handoff" ? { content: review.content } : {}), requestId: review.requestId })
         : await request("/api/suite/roles/bind-choice", { roleId: review.roleId, intent: review.intent, ...review.selection }, { selectedWorkspace: true });
       if (review.generation !== generation) return;
       $("role-result").textContent = review.dispatch ? `${result.reply ?? result.status ?? "Control completed"}${result.provenance ? `. ${result.provenance}` : ""}` : "Connection saved. You can now review and try this control.";
