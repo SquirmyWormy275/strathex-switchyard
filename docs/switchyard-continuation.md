@@ -397,3 +397,6 @@ model, status and binding operations remain refused there. Its predecessor's
 exact process and owned state were retired. Continue native coding-task creation,
 reviewed-text/recovery controls and exact attachment limitations; the full Rev2
 suite remains unfinished. Do not confuse UI source with the installed checkpoint.
+
+Conversation source 9bb9fffc35fe083912f9fdd09f5a995b52c45848 has an immutable 33-asset frontend
+9e54d5d38129a4c75b47a3f0b1b0a6e03487004059d7170bd971a1b67677b8fd. All bytes and the dated prior-pointer backup verify. This newer source is not yet the installed release or visually accepted.
