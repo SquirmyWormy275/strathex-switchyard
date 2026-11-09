@@ -150,5 +150,12 @@
     "Event/selection contracts are not visual browser acceptance.",
     "No actual provider, microphone, hardware, installed update or account operation was performed.",
     "Screen/audio/input-sequence observation and production editor commands remain separate implementation work."
-  ]
+  ],
+  "sourceCommit": "5ef1713b7d9864ec6f73cda36f050d92d02ad3d4",
+  "preparedFrontend": {
+    "digest": "a7cf99137ad0dc0be8f5a6b7b9e529bd6f0068dd7166b8e9b294f1040b884f10",
+    "files": 22,
+    "installed": false,
+    "visualBrowserAccepted": false
+  }
 }

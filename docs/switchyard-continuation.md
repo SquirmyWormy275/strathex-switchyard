@@ -116,6 +116,9 @@ remains unavailable; no installed update or visual acceptance is claimed.
 
 ## Observation frontend checkpoint
 
+Source 5ef1713b7d9864ec6f73cda36f050d92d02ad3d4 has an immutable 22-asset review bundle
+a7cf99137ad0dc0be8f5a6b7b9e529bd6f0068dd7166b8e9b294f1040b884f10. All bytes verify; the previous pointer has a dated copy. It is not installed or visually accepted.
+
 Activity now selects explicit supported sources/exclusions and reviews any session
 with correctly gated mark/pause/resume/stop/deletion. Design together reviews selected
 aggregate context for Codex/Claude and consumes confirmation once in its actual form.
