@@ -29,7 +29,7 @@ await store.initialize("personal"); await store.initialize("work", "work");
 await store.update("personal", "synthetic-ui-readout", state => { state.deviceSnapshots = [{ schema: "switchyard-device-snapshot/v1", identity: { deviceId: "a".repeat(64), keyboardId: source.firmwareIdentity.keyboardId, viaProtocol: 9, vialProtocol: part.definitionId.startsWith("wcass") ? 4 : 6, controller: "unknown" }, capturedAt: new Date().toISOString(), definition, rows, cols, layers: 1, keymap_raw: [layer], layoutOptions: packed, configurationOnly: true }]; });
 const refuse = async () => { throw Error("This demonstration uses synthetic data. Hardware, native tasks, accounts and desktop changes are unavailable here."); };
 const suite = createSuite({ store, agents: { discovery: async () => [], close: async () => {}, stopCompartment: async () => {} }, voice: { discovery: async () => ({ available: false, reason: "Microphone capture is outside this demonstration." }) }, foreground: { implemented: false, close: async () => {}, stopCompartment: async () => {} }, devices: { list: async () => [], close: async () => {} } });
-const allowed = new Set(["bootstrap", "snapshot", "compartment/select", "mode", "profile/save", "profile/select", "workflow/save", "roles/choices", "roles/bind-choice", "roles/dispatch", "devices/identify", "devices/list", "profile/package/export", "observation/start", "observation/mark", "observation/state", "observation/delete"]);
+const allowed = new Set(["bootstrap", "snapshot", "compartment/select", "mode", "profile/save", "profile/select", "workflow/save", "roles/choices", "roles/bind-choice", "roles/dispatch", "devices/identify", "devices/list", "profile/package/export", "profile/package/review", "profile/package/import", "profile/legends/export", "observation/start", "observation/mark", "observation/state", "observation/delete"]);
 const handle = suite.handle.bind(suite);
 const safeSuite = { ...suite, handle: async (path, body) => {
   const route = path.replace("/api/suite/", "");
@@ -46,20 +46,22 @@ const enrollment = await handle("/api/suite/agents/enroll", { compartment: "pers
 const sdk = switchyardAgent({ ...enrollment, baseUrl: origin + "/", compartment: "personal", agentId: "demo-agent" }), sessionId = randomUUID();
 await sdk.publish(sessionId, "ready");
 await handle("/api/suite/mode", { compartment: "personal", mode: "keyboard-only" });
-let stopped = false, timer, polling = false;
-timer = setInterval(async () => {
+let stopped = false, timer, polling = null;
+timer = setInterval(() => {
   if (stopped || polling) return;
-  polling = true;
+  polling = (async () => {
   try {
     if ((await store.snapshot("personal")).mode !== "keyboard-only") {
       await sdk.publish(sessionId, "ready");
       const { command } = await sdk.poll(); if (command) await sdk.acknowledge(command.id, "completed");
     }
   } catch { /* Workspace changes can reject the fixture's heartbeat. */ }
-  finally { polling = false; }
+  finally { polling = null; }
+  })();
 }, 5000);
 async function close() {
   if (stopped) return; stopped = true; clearInterval(timer);
+  await polling;
   server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); await server.cleanup();
   const current = await lstat(root); if (current.dev !== owner.dev || current.ino !== owner.ino || !current.isDirectory()) throw Error("Demo state ownership changed; preserve it for inspection.");
   await rm(root, { recursive: true, force: true }); keys.clear();

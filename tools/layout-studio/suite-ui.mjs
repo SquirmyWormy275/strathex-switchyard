@@ -1,8 +1,9 @@
 import { api, setActiveCompartment } from "/connection.mjs";
 import { mountRoles } from "./role-ui.mjs";
+import { mountPortable } from "./portable-ui.mjs";
 const $ = (id) => document.getElementById(id);
 
-export function mountSuite({ getProfile, loadProfile, previewProposal, notify, saved, onPolicy, onWorkflow }) {
+export function mountSuite({ getProfile, loadProfile, previewProposal, notify, saved, onPolicy, onWorkflow, download }) {
   let refreshGeneration = 0;
   let compartment = "personal", state = null, conversationId = null, proposedWorkflow = null, saveTimer, recorder, stream, audioSession, segmentTimer, voicePending = Promise.resolve(), voicePaused = true;
   const lines = (id) => $(id).value.split("\n").map((s) => s.trim()).filter(Boolean);
@@ -186,6 +187,7 @@ export function mountSuite({ getProfile, loadProfile, previewProposal, notify, s
   $("retry-voice").addEventListener("click", () => run(async () => { await api("/api/suite/voice/retry", { compartment, id: audioSession ?? state.voice.at(-1)?.id }); await refresh(); }));
   window.addEventListener("pagehide", () => { voicePaused = true; clearTimeout(segmentTimer); for (const track of stream?.getTracks() ?? []) track.stop(); });
   mountRoles({ notify, refresh });
+  mountPortable({ getProfile, persist: async () => { clearTimeout(saveTimer); await persist(); }, refresh, loadProfile, download, notify });
   document.addEventListener("switchyard-role-result", event => { if (event.detail.proposal) previewProposal(event.detail.proposal); });
   document.addEventListener("switchyard-refresh-request", () => run(refresh));
   const bootstrapWorkspace = () => run(async () => { const bootstrap = await api("/api/suite/bootstrap", {}); compartment = bootstrap.activeCompartment; setActiveCompartment(compartment); fillCompartments(bootstrap.compartments); $("local-voice-detail").textContent = bootstrap.voice.available ? bootstrap.voice.destination : bootstrap.voice.reason; await refresh(); workflowForm(state.workflow); if (state.profile && !getProfile()) loadProfile(state.profile); document.dispatchEvent(new Event("switchyard-profile-loaded")); });

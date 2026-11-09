@@ -94,6 +94,23 @@ Browser tooling currently fails before navigation/inspection with
 the in-app browser is unavailable. Do not claim visual/browser acceptance or
 replace browser tooling with an undocumented control channel.
 
+## Portability frontend checkpoint
+
+The UI now reviews portable v2 meanings before download and concrete import changes
+before clearing local bindings. Settings exposes digest-verified assignment references,
+A4 insert sheets and individual SVG pages with optional short labels. Twelve original
+groups pass 141 tests with zero skips and verified cleanup; the running synthetic server
+passes nine additional checks. [Evidence](evidence/portability-ui-source-summary.json).
+
+A preliminary ENOTEMPTY cleanup race was isolated to shared test-fixture retirement.
+The outer fixture now owns Suite close; the HTTP server joins its borrowed cleanup.
+The original failure record is retained and its exact owned staging was removed.
+No production lifetime contract changed.
+
+Continue with observation source/session selection and reviewed designer context,
+production editor command activation, and broader device controls. Browser tooling
+remains unavailable; no installed update or visual acceptance is claimed.
+
 ## Continue required product work
 
 Use the [requirement ledger](switchyard-requirements.md) as scope. Guided role/device controls, production editor activation/task attachment and broader supported external observation streams remain implementation work. Portability, controller and conversation backend paths have substantial coverage: identify the specific missing behavior before adding a subsystem. Additional Shield syntax is not a separate handover requirement and must not displace the required suite.

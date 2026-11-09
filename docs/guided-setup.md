@@ -52,10 +52,34 @@ a saved role control or native ChatGPT focus. Review the exact shortcut and host
 changes before applying. Trial, keep and restore retain their existing backend
 guards. Opening the keyboard-readout panel itself performs no discovery or HID I/O.
 
+## Take your setup with you
+
+Choose **Export profile** or open **Settings → Take your setup with you**.
+Review each control's portable role and meaning, then download the v2 profile.
+Accounts, local targets and credentials remain on this computer. A mode preference
+in the file never enables companion operation on another computer.
+
+Use **Import profile** to review the keyboard/workflow differences and the exact
+number of local connections that importing will clear. Confirm only after reviewing
+those effects. Unknown future versions preserve the original file; changed source
+definitions require a fresh review.
+
+In the same Settings panel, choose an assignment reference, all A4 insert sheets,
+or a single SVG page. Optional short print labels preserve the full action meaning
+in the reference. Each download verifies the backend's content digest. Print at
+actual size and measure the 15 mm reference before cutting; physical printer and
+keycap-fit acceptance remain pending.
+
+The twelve-group portability checkpoint passes 141 tests with zero skips and
+verified cleanup. Six new interaction cases use authenticated HTTP and encrypted
+stores. The running isolated server also passes nine portability/print checks.
+[Evidence](evidence/portability-ui-source-summary.json).
+
 ## What has and has not been verified
 
 Automated interaction checks execute the browser modules against an event/selection
-fixture and the real authenticated HTTP/encrypted-store backend. They cover named
+fixture. Role, device and portability cases use the real authenticated HTTP/encrypted-store
+backend; shortcut cases use a host request double and the real store. They cover named
 selection, empty selection, review-before-save, stale target refusal, workspace
 transitions, keyboard-only guidance and cached readouts without HID or state writes.
 They are not visual-browser acceptance. The original fourteen-group run passes

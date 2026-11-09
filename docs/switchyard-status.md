@@ -23,6 +23,12 @@ blocked by the browser tool failing before navigation/inspection; this is not a
 hardware or account limitation. Editor command activation and broader frontend
 flows remain implementation work. [Walkthrough and boundaries](guided-setup.md).
 
+Profile import/export now has a concrete v2 review before clearing local connections,
+and Settings offers digest-verified assignment references and A4/SVG legend sheets
+with optional short labels. Twelve groups pass 141 tests; nine checks pass against
+the running synthetic server. [Portability evidence](evidence/portability-ui-source-summary.json).
+These are software checks; browser and physical print acceptance remain pending.
+
 ## A working backend journey
 
 The repeatable demo uses the normal authenticated API, encrypted stores and

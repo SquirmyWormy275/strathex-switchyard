@@ -294,7 +294,6 @@ for (const consequence of consequences) $("action-consequence").append(option(co
 $("action-consequence").addEventListener("change", updateConsequenceHelp);
 fileInput("info-file", importInfo);
 fileInput("keymap-file", importKeymap);
-fileInput("plan-file", importSaved);
 fileInput("study-file", importStudy);
 $("layout-picker").addEventListener("change", (event) => { if (event.target.value && pendingInfo) { try { loadInfo(pendingInfo, event.target.value); } catch (error) { notify(error.message); } } });
 async function loadSample() {
@@ -334,7 +333,6 @@ $("action-cancel").addEventListener("click", resetEditor);
 document.addEventListener("keydown", (event) => { if (event.key === "Escape" && selectedActionId) { selectedActionId = null; render(); notify("Key selection cancelled."); } });
 window.addEventListener("beforeunload", (event) => { if (dirty) { event.preventDefault(); event.returnValue = ""; } });
 const portable = () => portableProfile(plan, profileIdentity.id, profileIdentity.name ?? plan.profile.name, profileWorkflow);
-$("export-json").addEventListener("click", () => { if (plan) { download("switchyard-profile.json", `${JSON.stringify(portable(), null, 2)}\n`, "application/json"); $("save-status").textContent = "Download requested. Confirm the file exists before closing this tab."; } });
 $("export-markdown").addEventListener("click", () => { if (plan) download("agentic-layout-review.md", planMarkdown(plan), "text/markdown"); });
 $("copy-json").addEventListener("click", async () => {
   if (!plan) return;
@@ -424,7 +422,7 @@ mountHome({ getProfile: () => plan ? portable() : null, usePreset: (value) => {
   document.dispatchEvent(new CustomEvent("switchyard-profile-loaded")); return true;
 }, notify });
 connection = connectWorkspace({ getPlan: () => plan, notify });
-mountSuite({ getProfile: () => plan ? portable() : null, loadProfile: (value) => { if (value) importSaved(value, true); else { plan = null; dirty = false; render(); } document.dispatchEvent(new Event("switchyard-profile-loaded")); }, previewProposal, notify, onPolicy: (allowed) => { exportAllowed = allowed; }, onWorkflow: (workflow) => { profileWorkflow = workflow; }, saved: () => { dirty = false; $("save-status").textContent = "Saved privately on this computer. Your layout will reopen after restart."; } });
+mountSuite({ getProfile: () => plan ? portable() : null, loadProfile: (value) => { if (value) importSaved(value, true); else { plan = null; dirty = false; render(); } document.dispatchEvent(new Event("switchyard-profile-loaded")); }, previewProposal, notify, download, onPolicy: (allowed) => { exportAllowed = allowed; }, onWorkflow: (workflow) => { profileWorkflow = workflow; }, saved: () => { dirty = false; $("save-status").textContent = "Saved privately on this computer. Your layout will reopen after restart."; } });
 mountDevices({ getProfile: () => plan ? portable() : null, onSnapshot: prepareSnapshot, notify });
 render();
 let resizeTimer;

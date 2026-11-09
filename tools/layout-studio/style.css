@@ -218,3 +218,8 @@ kbd { font: 11px/1.5 ui-monospace, SFMono-Regular, Consolas, monospace; color: #
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; } }
 
 .demo-banner { border: 1px solid #c9a962; background: #fff9e9; color: #66501e; padding: 10px 15px; margin-bottom: 20px; font-size: 12px; }
+
+.portable-meanings { display: grid; gap: 16px; }
+.portable-meaning { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 12px; padding-top: 14px; border-top: 1px solid var(--line); }
+.portable-meaning > strong { grid-column: 1 / -1; font-size: 13px; }
+.import-effects { padding: 14px; border-left: 2px solid #b58c40; background: #fcf7ea; }

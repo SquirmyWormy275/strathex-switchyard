@@ -28,7 +28,9 @@ export async function until(check) {
 export async function browserSurfaceFixture(fn) {
   return fixture(async context => {
     const ui = surface(), previous = { document: globalThis.document, location: globalThis.location, localStorage: globalThis.localStorage, fetch: globalThis.fetch };
-    const token = "r".repeat(43), server = createStudioServer({ suite: context.suite, token, bridge: { close() {} } });
+    // The outer fixture owns Suite retirement. The HTTP server borrows it so
+    // its asynchronous close hook cannot race the fixture's state cleanup.
+    const token = "r".repeat(43), server = createStudioServer({ suite: { ...context.suite, close: async () => {} }, token, bridge: { close() {} } });
     server.listen(0, "127.0.0.1"); await once(server, "listening");
     const origin = `http://127.0.0.1:${server.address().port}`, calls = [];
     globalThis.document = ui.document; globalThis.location = { hash: "" }; globalThis.localStorage = { getItem: () => token };
@@ -40,7 +42,7 @@ export async function browserSurfaceFixture(fn) {
     try {
       await fn({ ...context, ...ui, calls, refresh });
     } finally {
-      server.closeAllConnections(); await new Promise(resolve => server.close(resolve));
+      server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); await server.cleanup();
       Object.assign(globalThis, previous);
     }
   });
