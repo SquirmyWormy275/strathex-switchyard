@@ -458,3 +458,6 @@ This source is not yet normally installed or visually accepted. Approved tenant,
 license and live consent checks remain separate. Continue background-task
 launch/stop controls and exact attachment limitations; current full-platform CI
 and retained native host-action failures remain open.
+
+Copilot source 5670ba8c2aa6c413ad6d13feb1466669c77f9d83 has an immutable 35-asset frontend
+92f8dbcd0be9efdbaa2d3922d27c8a09c184db16fc745f64f32ac928a0807ebe. All source/bundle bytes and the dated prior pointer backup verify. It is not yet normally installed or visually accepted.

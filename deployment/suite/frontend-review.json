@@ -1,10 +1,10 @@
 {
   "schema": "switchyard-front-end-review/v1",
-  "digest": "f96ce01b96b12459fd39b89eca9e16ca826177eab8e749467d73584f48ac45c8",
+  "digest": "92f8dbcd0be9efdbaa2d3922d27c8a09c184db16fc745f64f32ac928a0807ebe",
   "files": [
     {
       "file": "index.html",
-      "sha256": "1c9f30249fc2589a5bb63f61b2658872bb9cc34d0d83d8df84f2cc3c14588f37"
+      "sha256": "438fbe4e7fed9359f72855696b51fccccbc8269aa6118284c5db13cbff7e3dce"
     },
     {
       "file": "app.mjs",
@@ -44,7 +44,11 @@
     },
     {
       "file": "conversation-ui.mjs",
-      "sha256": "21eb30e870948c43cff6a73aa251beb4878512d5bc5e72ed4c7df4a4b55a2e46"
+      "sha256": "8d85ddfbfcde69e4fd7b3839e8e610058f52ed6cb5d165b2548100b452da5e98"
+    },
+    {
+      "file": "copilot-ui.mjs",
+      "sha256": "66ce8f85ee756e147611a13bdd0bdb9e32e8384a47f41dbb89a36ad3900bb090"
     },
     {
       "file": "task-ui.mjs",
@@ -68,7 +72,7 @@
     },
     {
       "file": "suite-ui.mjs",
-      "sha256": "8f2b44476598d33054490c31b30b037b1dd75fd4a1ece6a2fa644695f21afadb"
+      "sha256": "f145e350f53b3b71640ed58a01e674234cb6bc0067e8b3de776be7c3f5c9e50d"
     },
     {
       "file": "workflow.mjs",
@@ -139,5 +143,5 @@
       "sha256": "3992ae079403cf41f6d99f9513b6d20ccbd96b976a658866b3915f15f43d4f13"
     }
   ],
-  "sourceCommit": "1c144fed61f750e4fd3171d6bfe0081d60d56be3"
+  "sourceCommit": "5670ba8c2aa6c413ad6d13feb1466669c77f9d83"
 }
