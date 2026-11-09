@@ -135,7 +135,15 @@ the complete cohort remain separate.
 - Bounded historical-name discovery is implemented and normally installed. Its
   native Windows follow-up passes in the complete a7958c4 cohort. Ten integration groups pass 80 tests/
   one existing skip; package/installation groups pass 26 tests, and typechecking
-  passes. Automatic authority/recipe assembly for removed paths remains unfinished.
+  passes. A new source checkpoint implements opted-in removed-path permission and
+  portable recipe assembly with 195 checks across 25 groups. Its Linux scan
+  finds a synthetic deleted-file secret without recreating the file. The immutable
+  frontend pin and normal installation are pending at this checkpoint.
+  [Contract and demonstration](removed-history-permissions.md).
+- Automatic native Windows scanner recipe/catalog generation remains unfinished.
+  The Windows save boundary currently writes the portable process recipe; it
+  does not convert it into the separately required guest manifest/catalog. The
+  existing Windows guest-double evidence uses its explicit Windows recipe.
   [Source evidence](evidence/history-path-discovery-source-summary.json).
 - Preserve the narrow Windows execution-UI margin and earlier intermittent native
   focus, host-action settlement and shortcut failures. Full source acceptance

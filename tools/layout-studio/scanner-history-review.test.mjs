@@ -11,7 +11,7 @@ import { repositoryShieldFixture } from "./test-support/repository-shield-fixtur
 import { windowsExecutionFixture } from "./test-support/windows-execution-fixture.mjs";
 import { runtimeGuardianStopped } from "./runtime-command.mjs";
 const input = f => ({ taskId: f.task.id, action: "shield_codebase_audit", planRevision: "automatic-history-1", historyDepth: 4 });
-const issueInput = r => Object.fromEntries(["taskId", "planRevision", "paths", "classifications", "actions", "lifetimeMinutes"].map(k => [k, r.scope[k]]));
+const issueInput = r => Object.fromEntries(["taskId", "planRevision", "paths", "classifications", "actions", "lifetimeMinutes", ...(r.scope.history ? ["history"] : [])].map(k => [k, r.scope[k]]));
 async function fixture(t) {
   const f = await authorityFixture(t, { executionActions: connectedExecutionActions("linux") });
   await writeFile(join(f.root, "app.js"), "SYNTHETIC_PRIVATE_OLD_SOURCE\n");
@@ -21,6 +21,42 @@ async function fixture(t) {
   await writeFile(join(f.root, "app.js"), "current clean source\n"); await unlink(join(f.root, "deleted.env")); await f.run("add", "app.js", "deleted.env"); await f.run("-c", "commit.gpgsign=false", "commit", "-m", "synthetic clean version");
   return { ...f, old };
 }
+
+test("removed history receives exact read-only authority without current-file ownership or general execution", async t => {
+  const f = await fixture(t);
+  await writeFile(join(f.root, "new.txt"), "new staged source"); await f.run("add", "new.txt");
+  const index = await readFile(join(f.root, ".git/index"));
+  const review = await f.service.reviewScanner("personal", { ...input(f), includeRemovedHistory: true });
+  assert.deepEqual(review.preparation.includedRemovedHistoryPaths, ["deleted.env"]);
+  assert.equal(review.scope.paths.includes("deleted.env"), false);
+  assert.deepEqual(review.scope.history.paths, [".gitignore", "app.js", "deleted.env", "task.txt"]);
+  assert.equal(review.scope.history.metadataSha256, review.preparation.historyMetadataSha256);
+  assert.equal(review.preparation.historyPathDiscovery.count, 0);
+  assert.equal(JSON.stringify(review).includes("SYNTHETIC_UNSELECTED_DELETED_SOURCE"), false);
+  const proposed = issueInput(review), history = proposed.history;
+  await assert.rejects(f.service.issue("personal", { ...proposed, history: { ...history, depth: 3 }, token: review.confirmation.token }), /history|historical/i);
+  assert.equal((await f.service.list("personal")).length, 0);
+  const grant = await f.service.issue("personal", { ...proposed, token: review.confirmation.token });
+  assert.deepEqual(grant.proposal.history, history);
+  let consumed = false;
+  await f.service.useHistoryInputs("personal", grant.id, input(f).action, history.paths, history.depth, async (report, bytes) => {
+    const row = report.versions.find(row => row.path === "deleted.env");
+    assert.equal(row.commit, f.old); assert.equal(bytes.get(row.objectId).toString(), "SYNTHETIC_UNSELECTED_DELETED_SOURCE\n"); consumed = true;
+  });
+  assert.equal(consumed, true);
+  for (const [paths, depth] of [[["deleted.env"], 4], [history.paths, 3], [[...history.paths, "foreign.env"], 4]]) {
+    await assert.rejects(f.service.useHistoryInputs("personal", grant.id, input(f).action, paths, depth, () => assert.fail("Unreviewed history must not reach consumption")), /history|historical/i);
+  }
+  for (const action of ["local_commit", "run_target", "shield_change_scan", "shield_supply_chain"]) await assert.rejects(f.service.review("personal", { ...proposed, actions: [action] }), /history|historical/i);
+  await assert.rejects(f.service.review("personal", { ...proposed, paths: [...proposed.paths, "deleted.env"] }), /task-owned/);
+  assert.deepEqual(await readFile(join(f.root, ".git/index")), index);
+  await f.run("-c", "commit.gpgsign=false", "commit", "--allow-empty", "-m", "synthetic history drift");
+  const afterDeliberateCommit = await readFile(join(f.root, ".git/index"));
+  await assert.rejects(f.service.resolve("personal", grant.id, input(f).action), /history|historical/i);
+  await assert.rejects(f.service.useHistoryInputs("personal", grant.id, input(f).action, history.paths, history.depth, () => assert.fail("Changed history must not be consumed")), /history|historical/i);
+  assert.deepEqual(await readFile(join(f.root, ".git/index")), afterDeliberateCommit);
+  await assert.rejects(access(join(f.root, "deleted.env")), { code: "ENOENT" });
+});
 
 test("authenticated automatic history preparation derives immutable versions and absent paths without source disclosure", async t => {
   const f = await fixture(t); await writeFile(join(f.root, "new.txt"), "new staged source"); await f.run("add", "new.txt");
@@ -49,13 +85,25 @@ test("authenticated automatic history preparation derives immutable versions and
 test("automatic history preparation refuses malformed or unsupported requests before native queries", async t => {
   const f = await fixture(t);
   for (const historyDepth of [undefined, null, "4", 0, 7, 1.5, {}, []]) await assert.rejects(f.service.reviewScanner("personal", { ...input(f), historyDepth }));
-  for (const extra of [{ includeIndex: "yes" }, { action: "shield_change_scan" }, { action: "shield_supply_chain" }, { paths: ["app.js"] }, { commits: [f.old] }, { ref: "main" }]) await assert.rejects(f.service.reviewScanner("personal", { ...input(f), ...extra }));
+  for (const extra of [{ includeIndex: "yes" }, { includeRemovedHistory: "yes" }, { includeRemovedHistory: null }, { action: "shield_change_scan" }, { action: "shield_supply_chain" }, { paths: ["app.js"] }, { commits: [f.old] }, { ref: "main" }]) await assert.rejects(f.service.reviewScanner("personal", { ...input(f), ...extra }));
+  const { historyDepth, ...noDepth } = input(f);
+  await assert.rejects(f.service.reviewScanner("personal", { ...noDepth, includeRemovedHistory: true }), /history depth/);
   assert.equal(f.counters().calls, 0); assert.equal((await f.store.snapshot("personal")).confirmationJournal?.length ?? 0, 0);
 });
 
 test("automatic history preparation refuses more than eight tracked paths without truncation", async t => {
   const f = await fixture(t); for (let i = 0; i < 6; i++) await writeFile(join(f.root, "added" + i), "small"); await f.run("add", "--all");
   await assert.rejects(f.service.reviewScanner("personal", input(f)), /1.8|bounds/); assert.equal((await f.store.snapshot("personal")).confirmationJournal?.length ?? 0, 0);
+});
+
+test("removed path discovery cannot silently truncate a historical permission", async t => {
+  const f = await fixture(t);
+  for (let i = 0; i < 6; i++) await writeFile(join(f.root, "removed" + i), "small");
+  await f.run("add", "--all"); await f.run("-c", "commit.gpgsign=false", "commit", "-m", "synthetic wider history");
+  for (let i = 0; i < 6; i++) await unlink(join(f.root, "removed" + i));
+  await f.run("add", "--all"); await f.run("-c", "commit.gpgsign=false", "commit", "-m", "synthetic removals");
+  await assert.rejects(f.service.reviewScanner("personal", { ...input(f), includeRemovedHistory: true, historyDepth: 6 }), /1.8|bounds/);
+  assert.equal((await f.store.snapshot("personal")).confirmationJournal?.length ?? 0, 0);
 });
 
 test("automatic history preparation refuses combined input overflow before confirmation", async t => {

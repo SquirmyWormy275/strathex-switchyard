@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { randomUUID, createHash } from "node:crypto";
-import { readFile, writeFile, mkdir, readdir, access } from "node:fs/promises";
+import { readFile, writeFile, mkdir, readdir, access, unlink } from "node:fs/promises";
 import { join } from "node:path";
 import { authorityFixture } from "./test-support/task-authority-fixture.mjs";
 import { scannerFixture } from "./test-support/shield-scanner-fixture.mjs";
@@ -96,14 +96,23 @@ test("draft assembly retains bounded staged and historical source descriptors in
 
 test("materialized draft requires fresh authority and execution review before an actual Linux scan", { skip: process.platform === "win32" }, async t => {
   const f = await fixture(t); await writeFile(join(f.root, "task.txt"), "-----BEGIN PRIVATE KEY-----\nSYNTHETIC_DRAFT_ONLY_SECRET");
+  await writeFile(join(f.root, "removed.env"), "-----BEGIN PRIVATE KEY-----\nSYNTHETIC_REMOVED_ONLY_SECRET");
+  await f.run("add", "removed.env"); await f.run("-c", "commit.gpgsign=false", "commit", "-m", "synthetic historical file");
+  await unlink(join(f.root, "removed.env")); await f.run("add", "removed.env"); await f.run("-c", "commit.gpgsign=false", "commit", "-m", "synthetic deletion");
   const saver = createScannerRecipeSave({ store: f.store, authority: f.service, now: f.now }); f.onCleanup(() => saver.close());
-  const index = await readFile(join(f.root, ".git/index")), head = await f.run("rev-parse", "HEAD"), saving = await saver.review("personal", input(f)), draft = saving.draft;
+  const index = await readFile(join(f.root, ".git/index")), head = await f.run("rev-parse", "HEAD"), saving = await saver.review("personal", { ...input(f), historyDepth: 4, includeRemovedHistory: true }), draft = saving.draft;
+  assert.equal(draft.authorityProposal.paths.includes("removed.env"), false);
+  assert.ok(draft.authorityProposal.history.paths.includes("removed.env"));
+  assert.equal(JSON.stringify(draft).includes("SYNTHETIC_REMOVED_ONLY_SECRET"), false);
   await assert.rejects(f.service.review("personal", draft.authorityProposal), /task-owned|classification/);
   assert.equal((await saver.apply("personal", { id: draft.id, token: saving.confirmation.token })).status, "saved");
   const review = await f.service.review("personal", draft.authorityProposal), grant = await f.service.issue("personal", { ...draft.authorityProposal, token: review.confirmation.token });
   const execution = createRepositoryExecution({ store: f.store, authority: f.service, stateDirectory: join(f.stage, "execution"), resolveScannerFixtures: (c, i) => f.feeds.resolve(c, i) }); f.onCleanup(() => execution.close());
   const proposal = { requestId: randomUUID(), authorityId: grant.id, manifestPath: draft.manifestPath, manifestSha256: draft.manifestSha256, action: draft.action }, ready = await execution.review("personal", proposal), request = { requestId: proposal.requestId, token: ready.confirmation.token }, result = await execution.apply("personal", request);
   assert.equal(result.status, "failed", JSON.stringify(result)); assert.ok(result.data.shieldReport.findings.some(row => row.path === "task.txt" && row.ruleId === "secret.private-key")); assert.equal(result.data.shieldReport.completeness, "incomplete"); assert.equal((await execution.apply("personal", request)).receiptId, result.receiptId);
+  assert.ok(result.data.shieldReport.findings.some(row => row.path.startsWith(".switchyard-history/") && row.path.endsWith("/removed.env") && row.ruleId === "secret.private-key"));
+  assert.equal(JSON.stringify(result).includes("SYNTHETIC_REMOVED_ONLY_SECRET"), false);
+  await assert.rejects(access(join(f.root, "removed.env")), { code: "ENOENT" });
   assert.deepEqual(await readFile(join(f.root, ".git/index")), index); assert.equal(await f.run("rev-parse", "HEAD"), head);
   const state = await f.store.snapshot("personal");
   assert.equal(await runtimeGuardianStopped(state.repositoryExecutions[0].ownedRuntime), true);

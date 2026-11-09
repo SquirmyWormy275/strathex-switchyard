@@ -24,6 +24,17 @@ come from already verified trees; they are not added to the scan or its permissi
 Deeper history and other branches remain uninspected.
 [Discovery evidence](evidence/history-path-discovery-source-summary.json).
 
+**Include files deleted from this history range** adds every supported removed
+path within the existing eight-path, six-commit limit. An oversized or unsupported
+selection is refused rather than partially included. The review names the deleted
+files and their immutable versions. Saving does not recreate them in the project.
+The separate permission form retains their exact starting commit, depth and
+history witness. These read-only versions cannot authorize a commit, ordinary
+program execution or a staged/current copy of the deleted path. Changing the task
+or action clears that historical selection; a changed history witness refuses
+saving, permission issuance or execution until reviewed again.
+[Implementation and synthetic scan evidence](evidence/removed-history-scope-source-summary.json).
+
 Confirming the save creates only the reviewed new control files. Existing source
 paths are never replaced. The saved setup offers two explicit next steps:
 

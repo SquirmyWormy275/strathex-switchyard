@@ -9,6 +9,7 @@ import { ignoredTreeRoots } from "./ignored-tree-policy.mjs";
 import { gitIndexPaths, gitIndexTreeFromEntries, gitIndexWindowsRawLimit } from "./git-index-inputs.mjs";
 import { historySelection, gitHistoryWindowsRawLimit } from "./git-history-inputs.mjs";
 import { assembleScannerRecipeDraft } from "./scanner-recipe-draft.mjs";
+import { taskHistoryScope, assertTaskHistoryWitness } from "./task-history-scope.mjs";
 const uuid = v => typeof v === "string" && /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/.test(v);
 const taskDigest = t => scopeHash([t.id, t.provider, t.sessionId, t.repositoryRoot, t.repositoryIdentity, t.accountFingerprint, t.status, t.nativeTransport, t.nativeIdentityVerified, t.launchPolicy]);
 const workspaceDigest = s => scopeHash([s.id, s.policy, s.mode, s.modeSelectedAt ?? null, s.accounts, s.taskAuthorityEpoch ?? 0]);
@@ -36,7 +37,8 @@ function proposal(input, executionActions = []) {
   if (includedIgnored.length && (actions.some(action => !linuxShieldActions.includes(action)) || includedIgnored.some(p => !ownedPaths.includes(p)))) throw Error("Ignored files may be explicitly owned only as read-only inputs to the pinned Shield scanner; commit, Run and pipeline authority are refused.");
   const excludedIgnoredTrees = ignoredTreeRoots(classifications.excludedIgnoredTrees ?? []);
   if (excludedIgnoredTrees.length && (actions.some(action => !linuxShieldActions.includes(action)) || [...all, ...ownedPaths].some(path => excludedIgnoredTrees.some(root => { const p = path.toLowerCase(), r = root.toLowerCase(); return p === r || p.startsWith(r + "/"); })))) throw Error("Generated-tree exclusions are explicit Shield-only policy outside every owned or individually classified path; commit, Run and pipeline authority are refused.");
-  return { taskId: input.taskId, planRevision: input.planRevision, paths: ownedPaths, lifetimeMinutes, actions: [...actions].sort(), classifications: { includedUntracked, excludedUntracked, ...(includedIgnored.length ? { includedIgnored } : {}), excludedIgnored, ...(excludedIgnoredTrees.length ? { excludedIgnoredTrees } : {}) } };
+  const history = Object.hasOwn(input, "history") ? taskHistoryScope(input.history, actions) : undefined;
+  return { taskId: input.taskId, planRevision: input.planRevision, paths: ownedPaths, lifetimeMinutes, actions: [...actions].sort(), classifications: { includedUntracked, excludedUntracked, ...(includedIgnored.length ? { includedIgnored } : {}), excludedIgnored, ...(excludedIgnoredTrees.length ? { excludedIgnoredTrees } : {}) }, ...(history ? { history } : {}) };
 }
 function taskIn(s, id) {
   const t = s.codingSessions?.find(t => t.id === id);
@@ -82,8 +84,16 @@ export function createTaskAuthority({ store, checkNative, isActive = async () =>
     if (typeof checkNative !== "function") throw new Error("The native task identity verifier is unavailable.");
     await checkNative(c, task);
     const authorize = async () => { const fresh = await access(c, task.id, generation, task.provider); if (taskDigest(fresh.task) !== binding || workspaceDigest(fresh.state) !== workspace) throw new Error("The exact task, account or workspace policy changed. Review again."); };
+    if (proposed.history) {
+      const history = taskHistoryScope(proposed.history, proposed.actions);
+      if (typeof inspection.historyInputs !== "function") throw Error("The native history input verifier is unavailable.");
+      await authorize();
+      assertTaskHistoryWitness(history, await inspection.historyInputs(c, task, history.paths, history.depth, authorize));
+      await authorize(); await checkNative(c, task); await authorize();
+    }
     await authorize(); const result = await inspection.capture(c, task, proposed.classifications, authorize); await authorize(); await checkNative(c, task); await authorize();
     const { snapshot, files } = result;
+    if (proposed.history && proposed.history.head !== snapshot.head) throw Error("The reviewed historical HEAD changed before the current-file snapshot.");
     if (snapshot.completeness !== "complete") throw new Error("The repository snapshot is incomplete. Classify every untracked/ignored input and keep files within supported inspection bounds before reviewing authority.");
     if (!snapshot.defaultBranch || !snapshot.branch || snapshot.branch === snapshot.defaultBranch || snapshot.detached) throw new Error("Select a verified non-default feature branch before reviewing local commit authority.");
     if (Object.keys(snapshot.submodules).length) throw new Error("Task authority for repositories with submodules is not implemented yet.");
@@ -113,11 +123,12 @@ export function createTaskAuthority({ store, checkNative, isActive = async () =>
   async function reviewCaptured(c, result, generation) {
     current(c, generation);
     const confirmation = await suiteConfirmations(store, c, result.task.provider, now).issue({ action: "issue_task_authority", sessionId: result.task.sessionId, targetSnapshotId: result.snapshot.id, scopeDigest: scope(c, result),
-      reason: "Authorize only the displayed connected host actions for these literal files, plan revision, native task/account and repository snapshot. Explicitly included ignored files are read-only inputs to the pinned Shield scanner, never commit or general execution inputs. Provider tools and native permissions stay unchanged. Every effect still needs its separate exact review." + (result.proposed.classifications.excludedIgnoredTrees?.length ? " The displayed ignored generated trees are excluded by explicit Shield-only policy: their directory identities are witnessed, their contents are not scanned or hashed, and this cannot establish a complete security pass." : ""), reauthenticated: false });
+      reason: "Authorize only the displayed connected host actions for these literal files, plan revision, native task/account and repository snapshot. Explicitly included ignored files are read-only inputs to the pinned Shield scanner, never commit or general execution inputs. Provider tools and native permissions stay unchanged. Every effect still needs its separate exact review." + (result.proposed.history ? " The separate historical permission covers only the displayed first-parent versions and exact history witness. It grants no ownership of a deleted working file, commit permission or general execution access." : "") + (result.proposed.classifications.excludedIgnoredTrees?.length ? " The displayed ignored generated trees are excluded by explicit Shield-only policy: their directory identities are witnessed, their contents are not scanned or hashed, and this cannot establish a complete security pass." : ""), reauthenticated: false });
     current(c, generation); return { status: "requires-confirmation", confirmation, scope: { ...result.proposed, provider: result.task.provider, sessionId: result.task.sessionId, accountFingerprint: result.task.accountFingerprint, repositoryRoot: result.task.repositoryRoot, repositoryIdentity: result.task.repositoryIdentity, targetSnapshot: result.snapshot, allowedActions: result.proposed.actions }, nativePermissionsChanged: false };
   }
   async function prepareScanner(c, input, generation) {
-      if (!input || Object.keys(input).some(key => !["taskId", "compartment", "action", "planRevision", "lifetimeMinutes", "includeIndex", "historyDepth"].includes(key)) || input.compartment !== undefined && input.compartment !== c || Object.hasOwn(input, "includeIndex") && typeof input.includeIndex !== "boolean" || !linuxShieldActions.includes(input.action)) throw Error("Prepare only one connected Shield action for one exact task; includeIndex must be a boolean, and custom paths, exclusions and imported approvals require their separate review.");
+      if (!input || Object.keys(input).some(key => !["taskId", "compartment", "action", "planRevision", "lifetimeMinutes", "includeIndex", "historyDepth", "includeRemovedHistory"].includes(key)) || input.compartment !== undefined && input.compartment !== c || Object.hasOwn(input, "includeIndex") && typeof input.includeIndex !== "boolean" || !linuxShieldActions.includes(input.action)) throw Error("Prepare only one connected Shield action for one exact task; includeIndex must be a boolean, and custom paths, exclusions and imported approvals require their separate review.");
+      if (Object.hasOwn(input, "includeRemovedHistory") && (typeof input.includeRemovedHistory !== "boolean" || input.includeRemovedHistory && !Object.hasOwn(input, "historyDepth"))) throw Error("Including removed history requires a boolean selection and explicit history depth.");
       if (Object.hasOwn(input, "historyDepth")) {
         if (typeof input.historyDepth !== "number" || !["shield_codebase_audit", "release_shield"].includes(input.action)) throw Error("Historical preparation requires an exact bounded depth and Codebase Audit or Release Shield.");
         historySelection(["placeholder"], input.historyDepth);
@@ -156,15 +167,32 @@ export function createTaskAuthority({ store, checkNative, isActive = async () =>
           indexInputs: witnessed.rows.map(row => ({ path: ".switchyard-index/" + row.path, sha256: row.sha256, size: row.size, source: { kind: "git-index", path: row.path, objectId: row.objectId, mode: row.mode } })) });
       }
       if (Object.hasOwn(input, "historyDepth")) {
-        const selected = historySelection(result.files.tracked.map(file => file.path), input.historyDepth);
+        let selected = historySelection(result.files.tracked.map(file => file.path), input.historyDepth);
         if (typeof inspection.historyInputs !== "function") throw Error("The native history input verifier is unavailable.");
         const authorize = async () => {
           const fresh = await access(c, result.task.id, generation, result.task.provider);
           if (taskDigest(fresh.task) !== result.binding || workspaceDigest(fresh.state) !== result.workspace) throw Error("The exact task, account or workspace changed during automatic history preparation.");
         };
         await checkNative(c, result.task); await authorize();
-        const witnessed = await inspection.historyInputs(c, result.task, selected.paths, selected.depth, authorize);
+        let witnessed = await inspection.historyInputs(c, result.task, selected.paths, selected.depth, authorize);
         await authorize(); await checkNative(c, result.task); await authorize();
+        if (input.includeRemovedHistory === true) {
+          const discovery = witnessed.pathDiscovery;
+          if (!discovery || discovery.head !== result.snapshot.head || discovery.omittedCount || discovery.unsupportedCount || discovery.count !== discovery.rows.length) throw Error("Removed history cannot be silently truncated or include unsupported names. Review a smaller bounded history range.");
+          const removed = discovery.rows.map(row => row.path);
+          // New staged paths may not have a historical version. They remain in
+          // current/index scope, never an invented history witness.
+          const complete = historySelection([...new Set([...witnessed.versions.map(row => row.path), ...removed])], selected.depth);
+          if (JSON.stringify(complete.paths) !== JSON.stringify(selected.paths)) {
+            selected = complete;
+            witnessed = await inspection.historyInputs(c, result.task, selected.paths, selected.depth, authorize);
+            await authorize(); await checkNative(c, result.task); await authorize();
+          }
+          const history = taskHistoryScope({ ...selected, head: witnessed.head, metadataSha256: witnessed.historyMetadataSha256 }, proposed.actions);
+          assertTaskHistoryWitness(history, witnessed);
+          result.proposed.history = history;
+          preparation.includedRemovedHistoryPaths = removed;
+        }
         if (witnessed.head !== result.snapshot.head || JSON.stringify(witnessed.paths) !== JSON.stringify(selected.paths) || witnessed.requestedDepth !== selected.depth) throw Error("The witnessed historical target changed from the exact reviewed task. Review again.");
         if (proposed.paths.length + (preparation.indexInputs?.length ?? 0) + witnessed.versions.length > 256) throw Error("The combined current, staged and historical scanner inputs exceed the 256-file bound.");
         if (process.platform === "win32" && witnessed.versions.reduce((sum, row) => sum + row.size, 0) + (preparation.indexInputs ?? []).reduce((sum, row) => sum + row.size, 0) > gitHistoryWindowsRawLimit) throw Error("The combined Git scanner inputs exceed the Windows 320 KiB transport subset.");
@@ -227,9 +255,10 @@ export function createTaskAuthority({ store, checkNative, isActive = async () =>
     async useHistoryInputs(c,id,action,paths,depth,consume){return exclusive(c,async generation=>{
       if(!["shield_codebase_audit","release_shield"].includes(action)||typeof consume!=="function"||typeof inspection.useHistoryInputs!=="function"||typeof checkNative!=="function")throw Error("Private history bytes require the connected Codebase Audit or Release Shield path.");
       const selected=historySelection(paths,depth),initial=await this.assertCurrent(c,id,action),binding=initial.record.taskDigest,workspace=initial.record.workspaceDigest;
-      if(selected.paths.some(path=>!initial.record.proposal.paths.includes(path)))throw Error("Every historical source path must belong to the exact task-owned file grant.");
+      const history = initial.record.proposal.history ? taskHistoryScope(initial.record.proposal.history, initial.record.proposal.actions) : undefined;
+      if (history ? selected.depth !== history.depth || JSON.stringify(selected.paths) !== JSON.stringify(history.paths) : selected.paths.some(path=>!initial.record.proposal.paths.includes(path))) throw Error("Every historical source path and depth must match the exact task-owned historical grant.");
       const authorize=async()=>{current(c,generation);const fresh=await this.assertCurrent(c,id,action);if(fresh.record.taskDigest!==binding||fresh.record.workspaceDigest!==workspace)throw Error("The reviewed history task or workspace binding changed.");};
-      await checkNative(c,initial.task);await authorize();const result=await inspection.useHistoryInputs(c,initial.task,selected.paths,selected.depth,consume,authorize);await authorize();await checkNative(c,initial.task);await authorize();return result;
+      await checkNative(c,initial.task);await authorize();const result=await inspection.useHistoryInputs(c,initial.task,selected.paths,selected.depth,async (report, bytes) => { if (history) assertTaskHistoryWitness(history, report); return consume(report, bytes); },authorize);await authorize();await checkNative(c,initial.task);await authorize();return result;
     });},
     async useIndexInputs(c, id, action, selectedPaths, consume) { return exclusive(c, async generation => {
       if (!linuxShieldActions.includes(action) || typeof consume !== "function" || typeof inspection.useIndexInputs !== "function" || typeof checkNative !== "function") throw Error("Private index input consumption is available only to the connected pinned Shield scanner.");

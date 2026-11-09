@@ -1,6 +1,7 @@
 import { withShieldGitInputs } from "./shield-git-inputs.mjs";
 import { shieldIndexFiles } from "./shield-index-inputs.mjs";
 import { shieldHistoryFiles } from "./shield-history-inputs.mjs";
+import { taskOwnsScannerSource } from "./task-history-scope.mjs";
 /** Separately reviewed task execution through existing policy, budget and receipt ledgers. */
 import { createHash } from "node:crypto";
 import { join } from "node:path";
@@ -55,7 +56,7 @@ export function createRepositoryExecution({store,authority,stateDirectory,platfo
       }
       const shield=await validateShieldRecipe({recipe,repositoryRoot:resolved.task.repositoryRoot,action:proposal.action,resolveFixtures:resolveScannerFixtures?input=>resolveScannerFixtures(c,input):undefined,resolveIndexInputs:(paths,consume)=>authority.useIndexInputs(c,resolved.record.id,proposal.action,paths,consume),resolveHistoryInputs:(paths,depth,consume)=>authority.useHistoryInputs(c,resolved.record.id,proposal.action,paths,depth,consume),now});
       const indexed = new Map(shield ? [...shieldIndexFiles(shield.request),...shieldHistoryFiles(shield.request)].map(file => [file.path, file]) : []);
-      for(const input of recipe.inputFiles)if((input.path.startsWith(shieldIndexPrefix)||input.path.startsWith(shieldHistoryPrefix))&&(!indexed.has(input.path)||!resolved.proposed.paths.includes(indexed.get(input.path).source.path)))throw Error("Every reserved scanner input needs an exact witnessed index source in this task-owned grant.");
+      for(const input of recipe.inputFiles)if((input.path.startsWith(shieldIndexPrefix)||input.path.startsWith(shieldHistoryPrefix))&&(!indexed.has(input.path)||!taskOwnsScannerSource(resolved.proposed,indexed.get(input.path).source)))throw Error("Every reserved scanner input needs its exact witnessed source in the current-file or separate historical grant.");
       return {verified,recipe,...(shield?{shield}:{})};
     }finally{read.bytes.fill(0);}
   }

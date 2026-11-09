@@ -4,6 +4,7 @@ const actions = { run_target: "Run a program", pipeline_local_gate: "Run a local
 const option = (value, label) => { const e = document.createElement("option"); e.value = value; e.textContent = label; return e; };
 const fields = ["authority-task", "authority-plan", "authority-action", "authority-lifetime", "authority-paths", "authority-included-untracked", "authority-excluded-untracked", "authority-included-ignored", "authority-excluded-ignored", "authority-excluded-trees"];
 const list = value => value.split(/\r?\n/).filter(line => line.length > 0);
+export const historicalPermissionSummary = history => history ? `Read-only historical files:\n${history.paths.join("\n")}\nFirst-parent depth: ${history.depth}\nStarting commit: ${history.head}\nHistory witness: ${history.metadataSha256}\nThese versions grant no current-file ownership, commit permission or general execution access.` : "";
 /** Literal paths belong in the human review; JSON fingerprints remain available separately. */
 export function permissionScopeSummary(scope) {
   const lines = [`Project: ${scope.repositoryRoot}`, `Tool: ${scope.provider === "codex" ? "Codex" : "Claude Code"}`, `Task: ${scope.taskId}`, `Native session: ${scope.sessionId}`, `Plan: ${scope.planRevision}`, `Permission lifetime: ${scope.lifetimeMinutes} minutes`, `Allowed actions: ${scope.allowedActions.map(action => actions[action] ?? action).join(", ")}`, "", "Included files:", ...scope.paths.map(path => `  ${path}`)];
@@ -11,12 +12,13 @@ export function permissionScopeSummary(scope) {
     const paths = scope.classifications?.[key] ?? [];
     if (paths.length) lines.push("", label + ":", ...paths.map(path => `  ${path}`));
   }
+  if (scope.history) lines.push("", historicalPermissionSummary(scope.history));
   return lines.join("\n");
 }
 /** Saving a grant never runs a recipe or changes provider permissions. */
 export function mountAuthority({ notify }) {
   const $ = id => document.getElementById(id);
-  let state = null, tasks = [], grants = [], generation = 0, busy = false, reviewed = null;
+  let state = null, tasks = [], grants = [], generation = 0, busy = false, reviewed = null, importedHistory = null;
   const permitted = () => state?.policy === "personal" && state.mode === "personal-companion";
   const task = () => tasks.find(t => t.id === $("authority-task").value);
   const selectedGrant = () => grants.find(g => g.id === $("authority-history").value);
@@ -28,7 +30,9 @@ export function mountAuthority({ notify }) {
     $("authority-history").disabled = busy || state?.policy !== "personal";
     $("revalidate-authority").disabled = busy || !permitted() || !selectedGrant();
     $("review-authority-revoke").disabled = busy || state?.policy !== "personal" || !selectedGrant() || selectedGrant().status !== "issued";
+    $("clear-authority-history").disabled = busy || !permitted() || !importedHistory;
   }
+  function displayHistory(history) { importedHistory = history ? structuredClone(history) : null; $("authority-history-selection").hidden = !importedHistory; $("authority-history-scope").textContent = historicalPermissionSummary(importedHistory); }
   function invalidate() { generation++; reviewed = null; $("authority-review-dialog").close(); $("authority-review-summary").textContent = ""; $("authority-review-details").textContent = ""; $("authority-exact-scope").open = false; controls(); }
   function renderHistory() {
     const row = selectedGrant();
@@ -47,6 +51,7 @@ export function mountAuthority({ notify }) {
     finally { busy = false; controls(); }
   }
   function clear() {
+    displayHistory(null);
     tasks = []; grants = []; $("authority-task").replaceChildren(); $("authority-history").replaceChildren();
     for (const id of fields.filter(id => !["authority-task", "authority-action"].includes(id))) $(id).value = "";
     $("authority-plan").value = "plan-1"; $("authority-lifetime").value = "15";
@@ -54,11 +59,14 @@ export function mountAuthority({ notify }) {
   }
   for (const id of fields) $(id).addEventListener("input", () => { invalidate(); });
   for (const id of fields) $(id).addEventListener("change", () => { invalidate(); });
+  for (const id of ["authority-task", "authority-action"]) $(id).addEventListener("change", () => { if (importedHistory) { displayHistory(null); $("authority-status").textContent = "The task or action changed. Reload a saved scanner setup to review its historical scope."; controls(); } });
+  $("clear-authority-history").addEventListener("click", () => { if (busy || !permitted()) return; displayHistory(null); invalidate(); $("authority-status").textContent = "Historical scope removed. Only the displayed current files will be reviewed."; });
   $("authority-history").addEventListener("change", () => { invalidate(); renderHistory(); });
   $("refresh-authorities").addEventListener("click", () => { invalidate(); void work(async context => { await inventory(context); if (context.current()) $("authority-status").textContent = "Saved permission metadata loaded. No native provider was queried and no program was started."; }); });
   $("review-authority").addEventListener("click", () => work(async context => {
     if (!permitted() || !task()) return;
     const proposal = { taskId: task().id, planRevision: $("authority-plan").value, actions: [$("authority-action").value], lifetimeMinutes: Number($("authority-lifetime").value), paths: list($("authority-paths").value), classifications: { includedUntracked: list($("authority-included-untracked").value), excludedUntracked: list($("authority-excluded-untracked").value), includedIgnored: list($("authority-included-ignored").value), excludedIgnored: list($("authority-excluded-ignored").value), excludedIgnoredTrees: list($("authority-excluded-trees").value) } };
+    if (importedHistory) proposal.history = structuredClone(importedHistory);
     $("authority-status").textContent = "Checking the selected native task and read-only Git/file metadata. No permission has been issued and no recipe has run.";
     const result = await api("/api/suite/coding/authority/review", { compartment: context.compartment, ...proposal }); if (!context.current()) return;
     reviewed = { kind: "issue", proposal: structuredClone(proposal), token: result.confirmation.token };
@@ -96,6 +104,8 @@ export function mountAuthority({ notify }) {
   document.addEventListener("switchyard-authority-proposal", event => {
     const { compartment, proposal } = event.detail;
     if (busy || !permitted() || compartment !== state.id || !tasks.some(t => t.id === proposal?.taskId) || proposal?.actions?.length !== 1 || !actions[proposal.actions[0]] || !Array.isArray(proposal.paths) || !proposal.paths.every(path => typeof path === "string")) return;
+    if (proposal.history && (!Array.isArray(proposal.history.paths) || !proposal.history.paths.every(path => typeof path === "string") || !["shield_codebase_audit", "release_shield"].includes(proposal.actions[0]))) return;
+    displayHistory(proposal.history);
     invalidate(); $("authority-task").value = proposal.taskId; $("authority-plan").value = proposal.planRevision; $("authority-action").value = proposal.actions[0]; $("authority-lifetime").value = String(proposal.lifetimeMinutes ?? 15); $("authority-paths").value = proposal.paths.join("\n");
     for (const [id, key] of [["authority-included-untracked", "includedUntracked"], ["authority-excluded-untracked", "excludedUntracked"], ["authority-included-ignored", "includedIgnored"], ["authority-excluded-ignored", "excludedIgnored"], ["authority-excluded-trees", "excludedIgnoredTrees"]]) $(id).value = (proposal.classifications?.[key] ?? []).join("\n");
     $("authority-controls").open = true; $("authority-status").textContent = "Saved scanner scope loaded for your review. Inspect the task and confirm a fresh permission; no approval or execution was imported."; controls();

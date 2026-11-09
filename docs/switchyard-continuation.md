@@ -162,7 +162,10 @@ submitted; probe processes/owned roots are retired. [Contract](codex-terminal-co
   session and has no verified live-only flag. Existing-window focus is not task
   attachment. Codex's narrow saved-history terminal is implemented; arbitrary
   prompts/configuration effects remain refused.
-- Continue observation, historical scanner permission/recipe assembly,
+- Finish automatic native Windows scanner recipe/catalog assembly. The current
+  Windows file-save boundary writes the portable process recipe, not a native
+  guest manifest/catalog. This is unfinished software, not unavailable hardware.
+- Continue observation,
   broader scanner coverage, managed-policy and later-platform scope in the
   requirement ledger. Separate unfinished software from hardware, tenant,
   microphone, graphical editor and browser acceptance dependencies.
@@ -174,3 +177,27 @@ visual acceptance remains blocked. Do not restore the old frontend freeze.
 Prior chronological checkpoints and original failures remain in
 [the previous continuation](https://github.com/SquirmyWormy275/strathex-switchyard/blob/167df7b125af93e46c0631b2a1b08d1ec9bec951/docs/switchyard-continuation.md)
 and linked evidence. Treat historical “next” paragraphs as history.
+
+## New source checkpoint awaiting installed adoption
+
+Deleted-history permission and portable recipe assembly now pass 25 distinct
+source groups / 195 tests with zero skips. The read-only scope pins exact paths,
+depth, HEAD and history witness; it does not extend current/index ownership.
+The Linux protected-save → fresh-permission → isolated-scan demonstration finds a
+synthetic secret in a deleted file, with unchanged project bytes and exact cleanup.
+The Windows Release path consumes actual Git blobs with an explicit guest double.
+Two new default-bounded groups cover closed authority and frontend selection/handoff.
+[Source evidence](evidence/removed-history-scope-source-summary.json).
+
+Private original receipts use **removed-history-**; all six checkout duplicates
+are removed. Preserve the original missing-feature RED, the corrected property-order
+confirmation mismatch, and the test fixture that compared index bytes across its
+own intentional commit. The corrected case checks exact bytes before that commit
+and exact post-commit bytes after drift refusals. Do not replay receipt cleanup.
+
+Frontend changes are `index.html`, `scanner-ui.mjs`, `authority-ui.mjs`. Publish
+source, pin all 36 assets to that immutable commit, verify packaging, then perform
+the ordinary backed-up update. Installed source remains **167df7b** until that
+readback completes. Updated installed verifiers pin the new history modules and
+Home bytes; they must run only after adopting this source. The agent metadata
+verifier adds three pure checks and one exact module hash. No live task is needed.

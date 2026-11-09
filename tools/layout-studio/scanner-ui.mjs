@@ -3,10 +3,11 @@ const actions = { shield_change_scan: "Selected changes", shield_codebase_audit:
 const option = (value, label) => { const e = document.createElement("option"); e.value = value; e.textContent = label; return e; };
 export function historicalScopeSummary(preparation) {
   if (!preparation.historyDepth) return "";
+  const included = preparation.includedRemovedHistoryPaths?.length ? `\n\nDeleted files included as historical versions:\n${preparation.includedRemovedHistoryPaths.join("\n")}\nThese are read-only Git versions. No deleted working file is recreated or granted current-file ownership.` : "";
   const discovery = preparation.historyPathDiscovery;
-  if (!discovery) return "\n\nHistorical name discovery is unavailable. History coverage remains incomplete.";
-  if (!discovery.count) return "\n\nNo additional removed paths were found in the inspected first-parent commits. Other branches and deeper history remain outside this review.";
-  return `\n\nHistorical files outside this scan: ${discovery.count}\nThese names occur in older inspected commits, are absent from the selected HEAD and are not among the selected history inputs. Their contents have not been read or included.\n${discovery.rows.map(row => row.path).join("\n")}${discovery.omittedCount ? `\n${discovery.omittedCount} additional names are not displayed (${discovery.unsupportedCount} unsupported paths or file types).` : ""}\nThis review does not grant permission to scan them. Other branches and deeper history remain uninspected.`;
+  if (!discovery) return included + "\n\nHistorical name discovery is unavailable. History coverage remains incomplete.";
+  if (!discovery.count) return included + "\n\nNo additional removed paths were found in the inspected first-parent commits. Other branches and deeper history remain outside this review.";
+  return included + `\n\nHistorical files outside this scan: ${discovery.count}\nThese names occur in older inspected commits, are absent from the selected HEAD and are not among the selected history inputs. Their contents have not been read or included.\n${discovery.rows.map(row => row.path).join("\n")}${discovery.omittedCount ? `\n${discovery.omittedCount} additional names are not displayed (${discovery.unsupportedCount} unsupported paths or file types).` : ""}\nThis review does not grant permission to scan them. Other branches and deeper history remain uninspected.`;
 }
 /** Readable scope first; the complete witnesses remain available for inspection. */
 export function scannerReviewSummary(result) {
@@ -37,6 +38,7 @@ export function mountScanner({ notify }) {
   function controls() {
     for (const id of ["scanner-task", "scanner-action", "scanner-plan", "scanner-feed", "scanner-advisory", "scanner-index", "scanner-history", "load-scanner-setup", "recover-scanner-saves"]) $(id).disabled = busy || !permitted();
     $("scanner-depth").disabled = busy || !permitted() || !["shield_codebase_audit", "release_shield"].includes($("scanner-action").value);
+    $("scanner-removed-history").disabled = $("scanner-depth").disabled || Number($("scanner-depth").value) === 0;
     $("review-scanner-save").disabled = busy || !permitted() || !task() || !usable("scanner").some(f => f.id === $("scanner-feed").value);
     $("confirm-scanner-save").disabled = busy || !reviewed;
     for (const id of ["use-scanner-scope", "use-scanner-recipe"]) $(id).disabled = busy || !permitted() || saved()?.status !== "saved" || saved()?.result?.status !== "saved";
@@ -63,13 +65,13 @@ export function mountScanner({ notify }) {
     finally { busy = false; controls(); }
   }
   function clear() {
-    tasks = []; feeds = []; saves = [];
+    tasks = []; feeds = []; saves = []; $("scanner-removed-history").checked = false;
     for (const id of ["scanner-task", "scanner-feed", "scanner-advisory", "scanner-history"]) $(id).replaceChildren();
     $("scanner-action").replaceChildren(...Object.entries(actions).map(([id, name]) => option(id, name)));
     $("scanner-plan").value = "scan-1"; $("scanner-index").checked = false; $("scanner-depth").value = "0"; $("scanner-feed-detail").textContent = "Load already installed feed metadata. Trust and freshness are checked again during review and saving."; render();
   }
-  for (const id of ["scanner-task", "scanner-action", "scanner-plan", "scanner-feed", "scanner-advisory", "scanner-index", "scanner-depth"]) {
-    const change = () => { invalidate(); if (id === "scanner-action" && !["shield_codebase_audit", "release_shield"].includes($(id).value)) $("scanner-depth").value = "0"; controls(); };
+  for (const id of ["scanner-task", "scanner-action", "scanner-plan", "scanner-feed", "scanner-advisory", "scanner-index", "scanner-depth", "scanner-removed-history"]) {
+    const change = () => { invalidate(); if (id === "scanner-action" && !["shield_codebase_audit", "release_shield"].includes($(id).value)) $("scanner-depth").value = "0"; if (Number($("scanner-depth").value) === 0) $("scanner-removed-history").checked = false; controls(); };
     $(id).addEventListener("change", change); $(id).addEventListener("input", change);
   }
   $("scanner-history").addEventListener("change", () => { invalidate(); render(); });
@@ -81,7 +83,7 @@ export function mountScanner({ notify }) {
   }); });
   $("review-scanner-save").addEventListener("click", () => work(async context => {
     if (!task()) return; const depth = Number($("scanner-depth").value), advisory = $("scanner-advisory").value;
-    const input = { taskId: task().id, action: $("scanner-action").value, planRevision: $("scanner-plan").value, scannerFixtureId: $("scanner-feed").value, ...(advisory ? { advisoryFixtureId: advisory } : {}), includeIndex: $("scanner-index").checked === true, ...(depth ? { historyDepth: depth } : {}) };
+    const input = { taskId: task().id, action: $("scanner-action").value, planRevision: $("scanner-plan").value, scannerFixtureId: $("scanner-feed").value, ...(advisory ? { advisoryFixtureId: advisory } : {}), includeIndex: $("scanner-index").checked === true, ...(depth ? { historyDepth: depth, includeRemovedHistory: $("scanner-removed-history").checked === true } : {}) };
     $("scanner-status").textContent = "Inspecting the selected native task, read-only repository inputs and signed feeds. No repository file has been written and no scan has run.";
     const result = await api("/api/suite/coding/scanner-save/review", { compartment: context.compartment, ...input }); if (!context.current()) return;
     reviewed = { id: result.draft.id, token: result.confirmation.token };
