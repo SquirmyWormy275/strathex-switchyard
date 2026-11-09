@@ -1,6 +1,6 @@
 {
   "schema": "switchyard-front-end-review/v1",
-  "digest": "184196a44a75798ae0bad063845336eed8f6c47c73d7a452ad2256e70e482893",
+  "digest": "6adafc7e4531d0156247377d1066d24ffaeb91160d7f5dc0aa551757baea1a2e",
   "files": [
     {
       "file": "index.html",
@@ -16,11 +16,11 @@
     },
     {
       "file": "workspace.mjs",
-      "sha256": "378e913d36fff330d3f2f63ffa1aa1f2228c124527d5c2a68f24c77d90b797ac"
+      "sha256": "3fd97d0a29bfae72f1a81cc0656b787158f600d194452fa57af80c6a2a767c71"
     },
     {
       "file": "connection.mjs",
-      "sha256": "8f4f2a7eff136667c4e3666ffb5a93c4056daac2df2a16246af1a6fd915c86cb"
+      "sha256": "8f3d9b4c6f0829f682cca4be65f088beb69cd20f7fd98390e7ae44816d556c34"
     },
     {
       "file": "vial-snapshot.mjs",
@@ -68,7 +68,7 @@
     },
     {
       "file": "client-ui.mjs",
-      "sha256": "4d71bbda9a5deeb08aed3ca4a86e788724528c9b11ed6454861304dc1e6c11d1"
+      "sha256": "cd10a724ae07cf2412a494e4b69b4d63beb8ecf66714c37b9dac6b8565eedd78"
     },
     {
       "file": "role-ui.mjs",
@@ -147,5 +147,5 @@
       "sha256": "3992ae079403cf41f6d99f9513b6d20ccbd96b976a658866b3915f15f43d4f13"
     }
   ],
-  "sourceCommit": "6f65b4f6bfc9ce17b17da711ef91d919342b1a61"
+  "sourceCommit": "12798e7916ff24919cc11c8c8fc7b89aed8f571a"
 }

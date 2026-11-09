@@ -25,7 +25,8 @@ const evidence = { schema: "switchyard-installed-signed-intent-metadata/v1", sou
 let failure;
 try {
   for (const [summary, files] of [
-    ["signed-physical-intent-source-summary.json", ["tools/layout-studio/physical-intent-contract.mjs", "tools/layout-studio/physical-intent.mjs"]],
+    ["signed-physical-intent-source-summary.json", ["tools/layout-studio/physical-intent.mjs"]],
+    ["claude-desktop-focus-source-summary.json", ["tools/layout-studio/physical-intent-contract.mjs"]],
     ["editor-project-choices-source-summary.json", ["tools/layout-studio/instance.mjs"]],
     ["voice-ui-source-summary.json", ["tools/layout-studio/serve.mjs"]]
   ]) {
@@ -40,6 +41,9 @@ try {
   const { closedIntent } = await import(pathToFileURL(join(root, "tools/layout-studio/physical-intent-contract.mjs")));
   for (const roleId of [1, true, null, [], {}, undefined]) assert.throws(() => closedIntent({ implementation: "switchyard.role/v1", roleId, intent: "status" }), /closed intent/);
   evidence.checks.push("installed role identities reject non-string coercion without a request");
+  assert.deepEqual(closedIntent({ implementation: "native-claude-desktop.focus/v1" }), { implementation: "native-claude-desktop.focus/v1" });
+  assert.throws(() => closedIntent({ implementation: "native-claude-code.focus/v1" }), /closed intent/);
+  evidence.checks.push("installed Claude Desktop physical meaning is distinct from Claude Code without a dispatch");
   let roleId;
   do { roleId = "verification-missing-" + randomUUID(); } while ((before.workflow?.roles ?? []).some(role => role.id === roleId) || (before.roleBindings ?? []).some(binding => binding.roleId === roleId));
   const selection = { implementation: "switchyard.role/v1", roleId, intent: "status", requestId: randomUUID() };
