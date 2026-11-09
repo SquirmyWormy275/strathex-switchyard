@@ -161,6 +161,9 @@ frontend pinned; this editor checkpoint does not change it.
 
 ## Keyboard frontend checkpoint
 
+Source 029ca57050f84b05dbdd580d05df9dbdbe438d11 has an immutable 27-asset review bundle
+a8e1b15fe918e9c4a4637d0ddb61b3040c47aa19f2d53c6d557cb5d09dde8ce1. All asset hashes and the prior dated pointer backup verify. This bundle is not installed or visually accepted.
+
 Advertised semantic keys, macros, physical choices, QMK settings, encoders,
 tap dances, combos, modifier overrides and Vial 6 alternate-repeat rules now have
 reviewed frontend controls. Cached planning performs no HID I/O. Apply/restore

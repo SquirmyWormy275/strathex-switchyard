@@ -1,10 +1,10 @@
 {
   "schema": "switchyard-front-end-review/v1",
-  "digest": "a7cf99137ad0dc0be8f5a6b7b9e529bd6f0068dd7166b8e9b294f1040b884f10",
+  "digest": "a8e1b15fe918e9c4a4637d0ddb61b3040c47aa19f2d53c6d557cb5d09dde8ce1",
   "files": [
     {
       "file": "index.html",
-      "sha256": "71089cd0dcfe2db18922124a8aa973dd42317b458d652b1f43b924d8696b9e99"
+      "sha256": "c74e2a7dc24066cd3e7161d1a85d212bee6c7396c4b5fd3c22862f07b5c7719e"
     },
     {
       "file": "app.mjs",
@@ -47,8 +47,28 @@
       "sha256": "21305677d67b99e401050c705c40535f059cc15cb7ccf7de696b65ef4be9c7b4"
     },
     {
+      "file": "device-diagnostic-ui.mjs",
+      "sha256": "232307a070a066f67c514b994463faf73755ff41af71afcc5517a835cc8ad903"
+    },
+    {
+      "file": "device-settings-ui.mjs",
+      "sha256": "79139f7982041772cdb864057c9199d4fc5672feb77e17b426dc9ac580d78d8e"
+    },
+    {
+      "file": "vial-settings.mjs",
+      "sha256": "8483d4580ad3c85aa2cbfe7dd99036d71a2f363ccae687e0ca50dce1d42e557c"
+    },
+    {
+      "file": "vial-keycodes.mjs",
+      "sha256": "ff1d6625e0f988be244a2588128394a21a714884d9b9df9fab1746945936781f"
+    },
+    {
+      "file": "vial-rules.mjs",
+      "sha256": "59f838c7ac1273ad137c34c5695a7858cd69a612007d4ea7cf7f9cae77d81ed1"
+    },
+    {
       "file": "device-ui.mjs",
-      "sha256": "4c762d10bc8378152b5b1b32e8498a6a9ade75efd131672116bb7099ca9d94d3"
+      "sha256": "b499aafdccf6e53ab2fcb3380d1b8b3bf7f27827bbc1b15eb34929f57da55073"
     },
     {
       "file": "shell.mjs",
@@ -76,7 +96,7 @@
     },
     {
       "file": "style.css",
-      "sha256": "1a6f576b4dc021cad1e572c76d568fac619e0224f58f3a18c55d234ec4693f34"
+      "sha256": "64cc60fdce28e0ea61a327efcf0a6cae8f7f16d4aa9655d60b6122e8bae573cd"
     },
     {
       "file": "sample-info.json",
@@ -91,5 +111,5 @@
       "sha256": "3992ae079403cf41f6d99f9513b6d20ccbd96b976a658866b3915f15f43d4f13"
     }
   ],
-  "sourceCommit": "5ef1713b7d9864ec6f73cda36f050d92d02ad3d4"
+  "sourceCommit": "029ca57050f84b05dbdd580d05df9dbdbe438d11"
 }

@@ -209,5 +209,13 @@
     "The new frontend is not installed; the existing installed release and all 54 workspaces are unchanged.",
     "Original-xwhatsit optional firmware features and solenoid state/control remain outside the verified capability contract."
   ],
-  "reviewBundle": null
+  "reviewBundle": {
+    "sourceCommit": "029ca57050f84b05dbdd580d05df9dbdbe438d11",
+    "digest": "a8e1b15fe918e9c4a4637d0ddb61b3040c47aa19f2d53c6d557cb5d09dde8ce1",
+    "assets": 27,
+    "allBytesVerified": true,
+    "priorPointerDatedBackupVerified": true,
+    "installed": false,
+    "visuallyAccepted": false
+  }
 }
