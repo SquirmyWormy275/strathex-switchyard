@@ -101,6 +101,12 @@ on role dispatch. Original bounds, scopes and cleanup are audited. The newer
 startup client pass does not accept the full Windows suite or shortcut recovery.
 [Retained failures](evidence/native-96ac214-failures-summary.json).
 
+The shortcut writer now reports separate fixed input-read and input-decoded
+stages. Eighteen original groups pass 33 tests with zero skips; the ten-second
+native bound and exact exit/readback requirements remain unchanged. This narrows
+future diagnosis, not resolution of the original native timeout.
+[Diagnostic evidence](evidence/shortcut-input-stages-summary.json).
+
 
 
 Startup recovery and shutdown are now corrected in source. Ordered recovery uses
@@ -403,6 +409,14 @@ limitations and normal frontend installation with the required state preservatio
 Browser visual acceptance still fails before navigation; do not bypass its tools.
 
 ## Continue required product work
+
+The refreshed synthetic preview at source dfa40fb passes nine checks, including
+all 36 frontend assets, exact named-role binding, one signed acknowledgement and
+stale-workspace refusal. Its old process exited and removed its synthetic state.
+Brave is present, but navigation still fails before page loading; no visual
+acceptance is inferred. The first check preceded the adapter heartbeat and is
+retained; the resumed check joins actual readiness.
+[Running demonstration](evidence/batched-inspection-running-demo-summary.json).
 
 Use the [requirement ledger](switchyard-requirements.md) as scope. Remaining observation/host-execution flows and native task attachment remain implementation work. Distinct client recipe/launch controls are now connected. The editor command registration and broader advertised firmware UI are now implemented; interactive acceptance is separate. Portability, controller and conversation backend paths have substantial coverage: identify the specific missing behavior before adding a subsystem. Additional Shield syntax is not a separate handover requirement and must not displace the required suite.
 

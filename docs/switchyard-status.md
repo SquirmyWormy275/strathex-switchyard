@@ -54,6 +54,12 @@ on role dispatch. Original bounds, scopes and cleanup are audited. The newer
 startup client pass does not accept the full Windows suite or shortcut recovery.
 [Retained failures](evidence/native-96ac214-failures-summary.json).
 
+The shortcut writer now reports separate fixed input-read and input-decoded
+stages. Eighteen original groups pass 33 tests with zero skips; the ten-second
+native bound and exact exit/readback requirements remain unchanged. This narrows
+future diagnosis, not resolution of the original native timeout.
+[Diagnostic evidence](evidence/shortcut-input-stages-summary.json).
+
 
 
 Workspace startup now commits its recovery stages in one protected transaction,
@@ -90,10 +96,13 @@ Original extension/registry backups verify; 1,393,488 bytes of owned staging are
 removed. Interactive editor activation and native task attachment remain separate.
 [Editor evidence](evidence/installed-editor-commands-summary.json).
 
-The running synthetic preview remains at source a351626 and passes ten checks.
-Brave reappeared in the browser inventory, but both supported navigation paths
-still fail before loading the page. Visual acceptance remains blocked.
-[Running demonstration](evidence/claude-launch-running-demo-summary.json).
+The refreshed synthetic preview at source dfa40fb passes nine checks, including
+all 36 frontend assets, exact named-role binding, one signed acknowledgement and
+stale-workspace refusal. Its old process exited and removed its synthetic state.
+Brave is present, but navigation still fails before page loading; no visual
+acceptance is inferred. The first check preceded the adapter heartbeat and is
+retained; the resumed check joins actual readiness.
+[Running demonstration](evidence/batched-inspection-running-demo-summary.json).
 
 The Windows client follow-up at installed source `0aeb317` passes all 31 groups and 340 tests with zero skips. Its exact merge/source tree, manifest, commands, original bounds, serial ordering and cleanup are audited. This accepts the Home and refusal-refresh corrections within the client lane; actual window/browser/hardware checks remain separate. [Native follow-up](evidence/client-native-0aeb317-summary.json).
 

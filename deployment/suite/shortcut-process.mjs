@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
 import { stopOwnedChild } from "../../tools/layout-studio/owned-process.mjs";
 
 export const shortcutExecutionTimeoutMs = 10000;
-const stages = ["script-started", "utility-loaded", "input-validated", "com-created", "shortcut-saved", "readback-verified"];
+const stages = ["script-started", "utility-loaded", "input-read", "input-decoded", "input-validated", "com-created", "shortcut-saved", "readback-verified"];
 const progressLines = stages.map(stage => `SXSY-SHORTCUT/1 ${stage}`);
 export async function prepareWindowsShortcut(request, { spawnProcess = spawn, stopChild = stopOwnedChild, timeoutMs = shortcutExecutionTimeoutMs } = {}) {
   const input = JSON.stringify(request);

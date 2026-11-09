@@ -9,8 +9,10 @@ $inputPipe = [IO.StreamReader]::new([Console]::OpenStandardInput(), $utf8)
 $outputPipe = [IO.StreamWriter]::new([Console]::OpenStandardOutput(), $utf8)
 $outputPipe.AutoFlush = $true
 $text = $inputPipe.ReadToEnd()
+[Console]::Out.WriteLine('SXSY-SHORTCUT/1 input-read')
 if ($text.Length -gt 8192) { throw 'Shortcut request exceeds its bound.' }
 $v = $text | ConvertFrom-Json
+[Console]::Out.WriteLine('SXSY-SHORTCUT/1 input-decoded')
 foreach ($path in @($v.path, $v.nodePath, $v.loader, $v.directory)) {
     if ($path -notmatch '^[A-Za-z]:[\\/]' -or $path -match '[\x00\r\n"]') { throw 'Unsupported exact shortcut path.' }
 }
