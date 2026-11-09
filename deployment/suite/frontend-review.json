@@ -1,6 +1,6 @@
 {
   "schema": "switchyard-front-end-review/v1",
-  "digest": "42bb51b8db8592fb10939b078ca39a2122624e87e9fd3ea3b5766fe8c827e09b",
+  "digest": "4fe51fece3b7c3034a8d0a2130030096b081a5149270648f52373a638ae413ba",
   "files": [
     {
       "file": "index.html",
@@ -20,7 +20,7 @@
     },
     {
       "file": "connection.mjs",
-      "sha256": "8f3d9b4c6f0829f682cca4be65f088beb69cd20f7fd98390e7ae44816d556c34"
+      "sha256": "4c8261e89e76da6c7b611c3ffe01303ec33b14e3cec110c210980cfae9f6f7bf"
     },
     {
       "file": "vial-snapshot.mjs",
@@ -36,7 +36,7 @@
     },
     {
       "file": "portable-ui.mjs",
-      "sha256": "4839a1bc0f584c986c40468bf3a9cb5b7bdc43f769e5bd454611098766c0186a"
+      "sha256": "9a6b6d699ae38fd1f9613a987edb15b1c611b6c43bab6f79d9f34fd12ed7cb2e"
     },
     {
       "file": "scanner-ui.mjs",
@@ -64,15 +64,15 @@
     },
     {
       "file": "execution-ui.mjs",
-      "sha256": "6d43e7eb999972243fa2b05f02cf2c3d9e2c2732f7a91830c5c36cb3c576fa56"
+      "sha256": "493de6690c767fdf62ecb4576dae8af975db13f2d7d693c9d10c54e283ab1cbc"
     },
     {
       "file": "client-ui.mjs",
-      "sha256": "bcf27b414af10b414d007c83d950c0493a4288ec4963640dcb19283cfc2bd91f"
+      "sha256": "7852a2fb748412afa3b847665c8e70c957cd7be87fe5408cb5362064c66ba782"
     },
     {
       "file": "role-ui.mjs",
-      "sha256": "4d13ba438148ac88f23da104cc926a3a562847e185682e209083067e7128782d"
+      "sha256": "1b956e5660461cf9246d4e5fe9f7e27db11fabc3eada733c1a44e253aeda0de3"
     },
     {
       "file": "suite-ui.mjs",
@@ -104,7 +104,7 @@
     },
     {
       "file": "device-ui.mjs",
-      "sha256": "b499aafdccf6e53ab2fcb3380d1b8b3bf7f27827bbc1b15eb34929f57da55073"
+      "sha256": "66ab0d1cf4af321a530508de022858734ec6afbb29f0f676552ac7e19ef29f10"
     },
     {
       "file": "shell.mjs",
@@ -147,5 +147,5 @@
       "sha256": "3992ae079403cf41f6d99f9513b6d20ccbd96b976a658866b3915f15f43d4f13"
     }
   ],
-  "sourceCommit": "df1edce9785ac8a54a25c13908c645aa53f8fd3e"
+  "sourceCommit": "a97ebe8504cfea30ff1d729470994c4633ca5169"
 }
