@@ -482,3 +482,6 @@ Normal installation of the account and background controls is next. Native exact
 interactive attachment remains implementation work. Browser visual review, live
 provider/task/tenant behavior, current complete Linux/Windows and retained native
 host-action failures remain separate acceptance work.
+
+Background-control source e4561ad58dd49e65fcaf39bae9e02d9828ea93cc has an immutable 35-asset frontend
+2159625c985e59a2291da1e3db4c98d80daa8a072b8c11d991fede5b5cbc2e51. All source/bundle bytes and the dated prior pointer backup verify. It is not yet normally installed or visually accepted.

@@ -70,5 +70,13 @@
     "A saved interactive session can request exact existing-window focus. Native interactive attachment/restart remains unfinished and is never inferred from focus.",
     "No real account, native task, model, terminal, hardware or microphone operation occurred.",
     "Browser visual acceptance, normal installation and newest full Linux/Windows acceptance remain separate."
-  ]
+  ],
+  "frontend": {
+    "sourceCommit": "e4561ad58dd49e65fcaf39bae9e02d9828ea93cc",
+    "digest": "2159625c985e59a2291da1e3db4c98d80daa8a072b8c11d991fede5b5cbc2e51",
+    "assets": 35,
+    "allSourceAndBundleBytesVerified": true,
+    "previousPointerBackup": "background-20261109T040236Z",
+    "installed": false
+  }
 }
