@@ -254,3 +254,26 @@ The installed checkpoint includes all guided frontend work above. Continue remai
 required observation sources and reviewed execution/scanner controls. Native exact-task
 attachment, interactive IDE, browser visual review and hardware/account acceptance
 remain separately tracked; the full Rev2 assignment is unfinished.
+
+## Reviewed execution frontend checkpoint
+
+Activity has a collapsed workbench for existing saved task permissions. The browser
+hashes a selected recipe, sends only its digest and exposes the backend's complete
+recipe, executable, input, isolation, budget and scanner review. Execution and exact
+owned stop require separate one-use confirmations. Admission, observed result,
+process exit, cleanup and historical receipt eligibility remain distinct. Refresh
+never retries a command, including after a lost successful reply.
+
+The source-only `scripts/demo-switchyard-execution.mjs --synthetic` journey uses
+actual authenticated HTTP and an owned Linux process in a disposable namespace,
+with a synthetic provider. Six checks pass: exact review, execution, independent
+exit/cleanup, duplicate-result identity and unchanged original files/index/HEAD.
+Its owned staging is removed. No installed user workspace/account/hardware is used.
+New authority issuance and scanner recipe creation remain frontend work. Browser
+visual acceptance and actual Windows guest/IDE checks remain separate.
+
+Nine original groups pass 69 tests with no skips; the final seven-case UI run
+adds lost-successful-reply coverage. Totals overlap. Eight running-preview checks
+pass. Original two DOM-settle failures are retained; tests now join the actual
+HTTP response before the unchanged two-second UI assertion. The HTTP/group/native
+bounds and backend checks are unchanged. [Evidence](evidence/execution-ui-source-summary.json).

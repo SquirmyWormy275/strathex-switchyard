@@ -234,3 +234,7 @@ kbd { font: 11px/1.5 ui-monospace, SFMono-Regular, Consolas, monospace; color: #
 .review-summary { white-space: pre-wrap; overflow-wrap: anywhere; }
 .client-catalog { margin-top: 20px; }
 .optional-device-settings label:has(> input[type="checkbox"]) { display: flex; flex-direction: row-reverse; justify-content: flex-end; align-items: start; gap: .5rem; }
+
+.execution-controls { margin-top: 1.5rem; }
+.execution-controls > .stack { margin-top: 1.25rem; }
+.execution-output { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 24rem; overflow: auto; }

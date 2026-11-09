@@ -21,7 +21,7 @@ test("suite bundles contain the actual offline backend, frozen frontend and lice
   const { createWindowsNativeFocus } = await import(pathToFileURL(join(bundle.directory, "tools/layout-studio/windows-native-focus.mjs")).href);
   assert.equal(typeof createWindowsNativeFocus, "function");
   for (const name of ["provider-desktop", "windows-provider-process"]) assert.equal(manifest.files.some(file => file.path === `apps/windows-companion/src/${name}.ts`), false, "Windows-only focus implementations must not inflate the Linux package.");
-  for (const name of ["index.html", "style.css", "app.mjs", "home.mjs", "shell.mjs", "keyboard-view.mjs", "suite-ui.mjs", "role-ui.mjs", "client-ui.mjs", "portable-ui.mjs", "observation-ui.mjs", "device-ui.mjs", "device-settings-ui.mjs", "device-diagnostic-ui.mjs", "model-f-catalog.json", "connection.mjs", "sample-info.json", "sample-keymap.json", "sample-study-report.json"]) {
+  for (const name of ["index.html", "style.css", "app.mjs", "home.mjs", "shell.mjs", "keyboard-view.mjs", "suite-ui.mjs", "role-ui.mjs", "client-ui.mjs", "execution-ui.mjs", "portable-ui.mjs", "observation-ui.mjs", "device-ui.mjs", "device-settings-ui.mjs", "device-diagnostic-ui.mjs", "model-f-catalog.json", "connection.mjs", "sample-info.json", "sample-keymap.json", "sample-study-report.json"]) {
     assert.equal(manifest.files.some(file => file.path === `tools/layout-studio/${name}`), false, "Browser-only modules and static assets must ship once in the frozen frontend.");
     assert.ok(manifest.files.some(file => file.path === `frontend/${name}`));
   }

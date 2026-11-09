@@ -52,6 +52,13 @@ execution authority. Twelve original groups pass 131 tests with one declared
 Windows skip; eight running-preview checks pass. Claude desktop's native launch
 remains unfinished. [Client controls](client-controls.md).
 
+Activity now has a collapsed reviewed-execution workbench for existing task
+permissions: recipe-file hashing, concrete recipe/isolation/budget review,
+separate execution and stop approvals, retained status and bounded output.
+A source-only demonstration runs an actual disposable Linux program through the
+authenticated API without an existing account. Permission issuance and scanner
+recipe creation still need frontend controls. [Execution controls](reviewed-execution-controls.md).
+
 ## Installed frontend verification
 
 The normal installed application now contains the guided setup, portability,

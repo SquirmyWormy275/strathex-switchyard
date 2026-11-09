@@ -2,6 +2,7 @@ import { api, setActiveCompartment } from "./connection.mjs";
 import { mountRoles } from "./role-ui.mjs";
 import { mountPortable } from "./portable-ui.mjs";
 import { mountClients } from "./client-ui.mjs";
+import { mountExecution } from "./execution-ui.mjs";
 import { mountObservation } from "./observation-ui.mjs";
 const $ = (id) => document.getElementById(id);
 
@@ -183,6 +184,7 @@ export function mountSuite({ getProfile, loadProfile, previewProposal, notify, s
   const observation = mountObservation({ notify, refresh });
   mountRoles({ notify, refresh });
   mountClients({ notify, download });
+  mountExecution({ notify });
   mountPortable({ getProfile, persist: async () => { clearTimeout(saveTimer); await persist(); }, refresh, loadProfile, download, notify });
   document.addEventListener("switchyard-role-result", event => { if (event.detail.proposal) previewProposal(event.detail.proposal); });
   document.addEventListener("switchyard-refresh-request", () => run(refresh));

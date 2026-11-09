@@ -27,26 +27,28 @@ export async function until(check) {
   while (!check()) { if (Date.now() >= end) throw Error("UI interaction did not settle within two seconds"); await new Promise(resolve => setTimeout(resolve, 5)); }
 }
 export async function browserSurfaceFixture(fn, overrides = {}) {
-  return fixture(async context => {
+  return fixture(context => withBrowserSurface(context, fn), overrides);
+}
+export async function withBrowserSurface(context, fn) {
     const ui = surface(), previous = { document: globalThis.document, location: globalThis.location, localStorage: globalThis.localStorage, fetch: globalThis.fetch };
     // The outer fixture owns Suite retirement. The HTTP server borrows it so
     // its asynchronous close hook cannot race the fixture's state cleanup.
     const token = "r".repeat(43), server = createStudioServer({ suite: { ...context.suite, close: async () => {} }, token, bridge: { close() {} } });
     server.listen(0, "127.0.0.1"); await once(server, "listening");
-    const origin = `http://127.0.0.1:${server.address().port}`, calls = [];
+    const origin = `http://127.0.0.1:${server.address().port}`, calls = [], responses = [];
     globalThis.document = ui.document; globalThis.location = { hash: "" }; globalThis.localStorage = { getItem: () => token };
     globalThis.fetch = (path, options) => {
       calls.push({ path, body: options.body ? JSON.parse(options.body) : null });
-      return previous.fetch(origin + path, { ...options, headers: { ...options.headers, Origin: origin } });
+      const response = previous.fetch(origin + path, { ...options, headers: { ...options.headers, Origin: origin } });
+      responses.push({ path, response }); return response;
     };
     const refresh = async () => ui.document.dispatchEvent(new CustomEvent("switchyard-compartment-state", { detail: await context.store.snapshot("personal") }));
     try {
-      await fn({ ...context, ...ui, calls, refresh });
+      await fn({ ...context, ...ui, calls, responses, refresh });
     } finally {
       // Retire pending browser work before taking away its document and HTTP host.
       ui.document.dispatchEvent(new Event("switchyard-workspace-changing"));
       server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); await server.cleanup();
       Object.assign(globalThis, previous);
     }
-  }, overrides);
 }

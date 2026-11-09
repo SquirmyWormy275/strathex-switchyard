@@ -5,7 +5,9 @@ run. It stages only the exact files granted to that task, runs the reviewed
 recipe inside Bubblewrap, retains native ownership, and reports the program's
 bounded result. A successful program exit does not mark the coding task done.
 
-This backend path is API-only while the frontend is frozen. The current policy
+The Studio now exposes [reviewed execution controls](reviewed-execution-controls.md)
+for existing saved task permissions. New permission/recipe creation remains
+separate frontend work. The current policy
 provides a read-only reviewed workspace, denied network and ambient credentials,
 and a 64 MiB temporary filesystem. It never mounts the live repository. The Windows platform now has its own reviewed guest Run and exact-stop adapter;
 its policy tests use a runner double and normal personal-host privileged setup
