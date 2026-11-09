@@ -47,7 +47,7 @@ await store.update("personal", "synthetic-ui-task-lifecycle", state => {
   );
 });
 const suite = createSuite({ store, agents: { discovery: async () => [], close: async () => {}, stopCompartment: async () => {} }, voice: { discovery: async () => ({ available: false, reason: "Microphone capture is outside this demonstration." }) }, foreground: { implemented: false, close: async () => {}, stopCompartment: async () => {} }, devices: { list: async () => [], close: async () => {} } });
-const allowed = new Set(["bootstrap", "snapshot", "compartment/select", "mode", "profile/save", "profile/select", "workflow/save", "roles/choices", "roles/bind-choice", "roles/dispatch", "devices/identify", "devices/list", "copilot/discovery", "copilot/requests", "copilot/requests/review", "copilot/requests/resolve", "native-focus/catalog", "integrations/catalog", "integrations/launches", "integrations/recipe", "coding/authority/list", "coding/execution/list", "coding/execution/stop/list", "coding/scanner-save/list", "host/scanner-fixtures/list", "profile/package/export", "profile/package/review", "profile/package/import", "profile/legends/export", "design/observations/review", "observation/start", "observation/mark", "observation/state", "observation/delete"]);
+const allowed = new Set(["bootstrap", "snapshot", "compartment/select", "mode", "profile/save", "profile/select", "workflow/save", "roles/choices", "roles/bind-choice", "roles/dispatch", "agents/revoke/review", "agents/revoke", "agents/outcome/review", "agents/outcome/resolve", "devices/identify", "devices/list", "copilot/discovery", "copilot/requests", "copilot/requests/review", "copilot/requests/resolve", "native-focus/catalog", "integrations/catalog", "integrations/launches", "integrations/recipe", "coding/authority/list", "coding/execution/list", "coding/execution/stop/list", "coding/scanner-save/list", "host/scanner-fixtures/list", "profile/package/export", "profile/package/review", "profile/package/import", "profile/legends/export", "design/observations/review", "observation/start", "observation/mark", "observation/state", "observation/delete"]);
 const handle = suite.handle.bind(suite);
 const safeSuite = { ...suite, handle: async (path, body) => {
   const route = path.replace("/api/suite/", "");
@@ -63,6 +63,13 @@ await handle("/api/suite/mode", { compartment: "personal", mode: "personal-compa
 const enrollment = await handle("/api/suite/agents/enroll", { compartment: "personal", id: "demo-agent", name: "Example builder · synthetic", capabilities: ["status"] });
 const sdk = switchyardAgent({ ...enrollment, baseUrl: origin + "/", compartment: "personal", agentId: "demo-agent" }), sessionId = randomUUID();
 await sdk.publish(sessionId, "ready");
+// A second isolated adapter leaves one authentic, deliberately uncertain claim.
+// No command is executed by this fixture and no model or external agent is contacted.
+const retiredEnrollment = await handle("/api/suite/agents/enroll", { compartment: "personal", id: "demo-retired-agent", name: "Example uncertain handoff · synthetic", capabilities: ["handoff"] });
+const retiredSdk = switchyardAgent({ ...retiredEnrollment, baseUrl: origin + "/" }), retiredSession = randomUUID();
+await retiredSdk.publish(retiredSession, "ready");
+await handle("/api/suite/agents/dispatch", { compartment: "personal", agentId: "demo-retired-agent", sessionId: retiredSession, intent: "handoff", content: "Synthetic handoff: review the keyboard setup. No external task was performed." });
+await retiredSdk.poll(); await retiredSdk.publish(retiredSession, "stopped");
 await handle("/api/suite/mode", { compartment: "personal", mode: "keyboard-only" });
 let stopped = false, timer, polling = null;
 timer = setInterval(() => {

@@ -113,6 +113,16 @@ Passing follow-ups do not establish the cause of earlier intermittent failures. 
 - [Restricted-storage retirement](evidence/restricted-storage-47c80be-failure-summary.json): retain native phase/error diagnostics and QUERY-only permissions.
 - [Host-action settlement](evidence/host-action-settlement-diagnostic-summary.json): the original two-second observation expired. Fixture cleanup and closed diagnostic tags improved; original 75 ms coordination/effect and 2,000 ms observation limits remain. The [15-test native follow-up](evidence/host-action-settlement-native-followup-summary.json) passes without proving the original cause.
 
+## Connected-agent frontend checkpoint
+
+Custom-agent inventory, exact reviewed revocation, uncertain retired-command
+acknowledgement and owned bundled-example retirement are connected. Eight cases
+pass in the 115-test source run; four complete-page groups pass 33 with overlap.
+The synthetic preview passes thirteen checks. Browser rendering, installed adoption
+and live agent acceptance remain separate. Enrollment remains the existing SDK
+flow. [Walkthrough](agent-maintenance-controls.md),
+[source evidence](evidence/agent-maintenance-ui-source-summary.json).
+
 ## Guided frontend source checkpoint
 
 Source 80b0bfe550b6c3ffb903ba53a5e1bf0d73a45a70 connects Home progress, named role choices, separate

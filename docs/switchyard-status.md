@@ -14,6 +14,13 @@ no merge or public release has been accepted.
 
 ## Guided frontend checkpoint
 
+Your tools now includes saved custom-agent inventory, separate exact revocation
+and uncertain-command reviews, and owned bundled-example retirement. Eight UI
+cases pass within 115 original checks; four complete-page groups pass 33 checks
+with overlap, and the running synthetic preview passes thirteen. Original bounds
+and cleanup verify. No installed agent action or browser visual acceptance is
+claimed. [Controls and evidence](agent-maintenance-controls.md).
+
 The owner lifted the frontend freeze and approved completing its flows. Home now
 shows the next setup step; saved readouts expose source/controller evidence;
 named role choices use the backend's digest-checked contract and separate reviews

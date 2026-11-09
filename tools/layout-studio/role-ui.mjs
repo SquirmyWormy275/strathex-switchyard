@@ -94,3 +94,84 @@ export function mountRoles({ notify, refresh, request = api }) {
   });
   controls();
 }
+
+/** Retire custom-agent authorization without inventing external task completion. */
+export function mountAgentMaintenance({ notify, refresh, request = api }) {
+  const $ = id => document.getElementById(id), date = at => Number.isFinite(at) ? new Date(at).toISOString() : "not observed";
+  let state = null, generation = 0, busy = false, review = null;
+  const agent = () => state?.agents.find(row => row.id === $("managed-agent-picker").value);
+  const command = () => agent()?.commands.find(row => row.id === $("managed-agent-command").value);
+  const permitted = () => state?.policy === "personal" && state?.mode === "personal-companion";
+  const example = () => ({ "custom-example": "custom", "langchain-example": "langchain" })[agent()?.id];
+  function invalidate() { generation++; review = null; $("agent-maintenance-dialog").close(); $("agent-maintenance-summary").textContent = ""; controls(); }
+  function controls() {
+    $("managed-agent-picker").disabled = busy || !state?.agents.length;
+    $("managed-agent-command").disabled = busy || !agent()?.commands.length;
+    $("refresh-managed-agents").disabled = busy || !state;
+    $("review-agent-revoke").disabled = busy || !permitted() || !agent() || agent().enrollmentStatus === "revoked";
+    $("review-agent-outcome").disabled = busy || !permitted() || command()?.status !== "uncertain-session-ended";
+    $("review-example-stop").hidden = !example();
+    $("review-example-stop").disabled = busy || state?.policy !== "personal" || !example();
+    $("confirm-agent-maintenance").disabled = busy || !review;
+  }
+  function renderCommand() {
+    const row = command(); $("managed-agent-command-detail").textContent = row ? `${row.intent} · ${row.status}\nCommand: ${row.id}\nOriginal session: ${row.sessionId}\nQueued: ${date(row.createdAt)}\nClaimed: ${date(row.claimedAt)}\n${row.provenance ?? "Saved local command state; external outcome unverified."}${row.content ? "\n\nRetained handoff:\n" + row.content : ""}\n\nAn adapter acknowledgement is a self-report; Switchyard has not independently verified the external task outcome.` : "No saved command selected."; controls();
+  }
+  function renderAgent() {
+    const row = agent(), previous = $("managed-agent-command").value;
+    $("managed-agent-detail").textContent = !row ? "No custom-agent connection is saved in this workspace." : `${row.name} · ${row.enrollmentStatus ?? "active"}\nAgent: ${row.id}\nSession: ${row.sessionId ?? "not observed"}\nSupported controls: ${row.capabilities.join(", ")}\nLast report: ${row.reportedStatus ?? "unknown"} at ${date(row.lastSeen)}\n${row.provenance ?? "Saved enrollment; a live session has not been verified."}\n${permitted() ? "Reports and permissions are checked again before dispatch." : "Agent changes require a Personal workspace in companion mode. Owned example retirement remains available in keyboard-only mode."}`;
+    $("managed-agent-command").replaceChildren(...[...(row?.commands ?? [])].reverse().map(c => option(c.id, `${c.intent} · ${c.status} · ${c.id}`)));
+    if (row?.commands.some(c => c.id === previous)) $("managed-agent-command").value = previous;
+    renderCommand();
+  }
+  async function run(fn) {
+    if (busy) return; busy = true; controls(); const version = generation, compartment = state?.id;
+    const valid = () => generation === version && state?.id === compartment;
+    try { await fn({ compartment, valid }); }
+    catch (error) { if (valid()) { $("managed-agent-status").textContent = error.message; notify(error.message); } }
+    finally { busy = false; controls(); }
+  }
+  function show(kind, input, summary) {
+    review = { kind, ...input }; $("agent-maintenance-summary").textContent = summary;
+    $("confirm-agent-maintenance").textContent = kind === "revoke" ? "Revoke this agent's access" : kind === "outcome" ? "Record this uncertainty review" : "Stop the owned example";
+    $("agent-maintenance-dialog").showModal(); controls();
+  }
+  $("managed-agent-picker").addEventListener("change", () => { invalidate(); renderAgent(); });
+  $("managed-agent-command").addEventListener("change", () => { invalidate(); renderCommand(); });
+  $("refresh-managed-agents").addEventListener("click", () => run(async () => { review = null; $("agent-maintenance-dialog").close(); await refresh(); }));
+  $("review-agent-revoke").addEventListener("click", () => run(async ({ compartment, valid }) => {
+    const row = agent(); if (!permitted() || !row || row.enrollmentStatus === "revoked") return;
+    const value = await request("/api/suite/agents/revoke/review", { compartment, agentId: row.id }); if (!valid()) return;
+    show("revoke", { agentId: row.id, token: value.confirmation.token }, `Revoke ${row.name} in workspace ${compartment}\n\nAgent: ${value.agentId}\nSession: ${value.sessionId ?? "not observed"}\nSaved role bindings removed: ${value.roleBindings}\nQueued commands cancelled locally: ${value.queued}\nClaimed commands retained as uncertain: ${value.claimed}\nExpires: ${value.confirmation.record.expiresAt}\n\n${value.confirmation.record.reason}\n\nA bundled example is stopped only if this host still owns its exact process. External process exit and task completion remain unverified. Reconnecting later requires a deliberate new enrollment and new role bindings.`);
+  }));
+  $("review-agent-outcome").addEventListener("click", () => run(async ({ compartment, valid }) => {
+    const row = agent(), claim = command(); if (!permitted() || !row || claim?.status !== "uncertain-session-ended") return;
+    const value = await request("/api/suite/agents/outcome/review", { compartment, agentId: row.id, commandId: claim.id }); if (!valid()) return;
+    show("outcome", { agentId: row.id, commandId: claim.id, token: value.confirmation.token }, `Review an uncertain ${value.command.intent} command for ${row.name}\n\nWorkspace: ${compartment}\nCommand: ${value.command.id}\nOriginal session: ${value.command.sessionId}\nClaimed: ${date(value.command.claimedAt)}\nExpires: ${value.confirmation.record.expiresAt}\n\n${value.confirmation.record.reason}${value.command.content ? "\n\nRetained handoff:\n" + value.command.content : ""}`);
+  }));
+  $("review-example-stop").addEventListener("click", () => {
+    if (busy || state?.policy !== "personal" || !example()) return;
+    show("stop", { example: example() }, `Stop the bundled ${example()} example in workspace ${state.id}\n\nOnly the exact child still owned by this Switchyard host can be stopped. A missing owner is reported as not observed; no PID search or unrelated process termination occurs.\n\nThis does not revoke its enrollment or prove any external task completed. Unconfirmed retirement prevents another example from starting.`);
+  });
+  $("cancel-agent-maintenance").addEventListener("click", () => { review = null; $("agent-maintenance-dialog").close(); controls(); });
+  $("agent-maintenance-dialog").addEventListener("close", () => { if (!$("agent-maintenance-dialog").open) { review = null; controls(); } });
+  $("confirm-agent-maintenance").addEventListener("click", () => run(async ({ compartment, valid }) => {
+    if (!review) return; const { kind, ...input } = review; review = null; $("agent-maintenance-dialog").close();
+    try {
+      const value = await request(kind === "revoke" ? "/api/suite/agents/revoke" : kind === "outcome" ? "/api/suite/agents/outcome/resolve" : "/api/suite/agents/example/stop", { compartment, ...input }); if (!valid()) return;
+      if (kind === "revoke") { if (value.status !== "revoked" || value.agentId !== input.agentId || value.externalProcessStopped !== false) throw Error("The exact agent revocation acknowledgement did not verify."); $("managed-agent-status").textContent = `Agent access revoked; saved history is preserved. External work remains unverified.${value.ownedExample ? " Owned example: " + value.ownedExample.status + ". " + value.ownedExample.evidence : ""}`; }
+      else if (kind === "outcome") { if (value.status !== "reviewed-unconfirmed" || value.commandId !== input.commandId || value.externalOutcomeVerified !== false || value.providerCommandSent !== false) throw Error("The exact uncertainty acknowledgement did not verify."); $("managed-agent-status").textContent = "Uncertainty review recorded. No command was sent or retried, and external completion remains unverified. The reviewed record is eligible for normal bounded history retention."; }
+      else { if (!["stopped", "not-observed", "stop-unconfirmed"].includes(value.status) || value.taskCompletionVerified !== false) throw Error("The owned example retirement acknowledgement did not verify."); $("managed-agent-status").textContent = `Owned example: ${value.status}. ${value.evidence} Task completion remains unverified.`; }
+    } catch (error) { if (valid()) { const message = `${error.message} Saved state will be refreshed; no operation or consumed confirmation is replayed.`; $("managed-agent-status").textContent = message; notify(message); } }
+    finally { if (valid()) await refresh(); }
+  }));
+  document.addEventListener("switchyard-workspace-changing", () => { state = null; invalidate(); $("managed-agent-picker").replaceChildren(); $("managed-agent-status").textContent = "Choose a workspace."; renderAgent(); });
+  document.addEventListener("switchyard-compartment-state", event => {
+    const previous = $("managed-agent-picker").value, changed = state?.id !== event.detail.id; state = event.detail; invalidate();
+    $("managed-agent-picker").replaceChildren(...state.agents.map(a => option(a.id, a.name + (a.enrollmentStatus === "revoked" ? " · access revoked" : ""))));
+    if (state.agents.some(a => a.id === previous)) $("managed-agent-picker").value = previous;
+    if (changed) $("managed-agent-status").textContent = "Saved connections loaded. No agent was contacted or commanded.";
+    renderAgent();
+  });
+  renderAgent();
+}

@@ -1,5 +1,5 @@
 import { api, setActiveCompartment } from "./connection.mjs";
-import { mountRoles } from "./role-ui.mjs";
+import { mountRoles, mountAgentMaintenance } from "./role-ui.mjs";
 import { mountPortable } from "./portable-ui.mjs";
 import { mountClients, mountNativeFocus } from "./client-ui.mjs";
 import { mountExecution } from "./execution-ui.mjs";
@@ -184,6 +184,7 @@ export function mountSuite({ getProfile, loadProfile, previewProposal, notify, s
   mountRoles({ notify, refresh });
   mountClients({ notify, download });
   mountNativeFocus({ notify });
+  mountAgentMaintenance({ notify, refresh });
   mountExecution({ notify });
   mountAuthority({ notify });
   mountScanner({ notify });

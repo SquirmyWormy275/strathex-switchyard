@@ -62,9 +62,11 @@ The tests use synthetic credentials and isolated workspaces. Normal installed
 inside its 27-check metadata update, with six exact tested module hashes and all
 54 workspaces preserved. No live agent is revoked or started by that update.
 [Installed evidence](evidence/installed-agent-security-summary.json).
-Live installed revocation, native Windows execution and frontend controls remain
-separate; the frontend is still frozen. This is authorization retirement, not
-deletion of unresolved history.
+Live installed revocation and native Windows execution remain separate. The
+approved frontend now exposes separate exact revocation and uncertainty reviews
+under **Your tools → Manage connected agents**. See the
+[controls walkthrough](agent-maintenance-controls.md). Authorization retirement
+preserves unresolved history.
 
 ## Review an uncertain claim
 
