@@ -96,6 +96,9 @@ replace browser tooling with an undocumented control channel.
 
 ## Portability frontend checkpoint
 
+Source 2689f764969c1e4c93b88027aa8a14e034433816 has an immutable 21-asset review bundle
+a0b06b5de6453b682acaaaf6b13552b619e3e98bdae8f8f6ce3ff3f09508ce38. All bytes verify; its prior pointer has a dated copy. It is not installed or visually accepted.
+
 The UI now reviews portable v2 meanings before download and concrete import changes
 before clearing local bindings. Settings exposes digest-verified assignment references,
 A4 insert sheets and individual SVG pages with optional short labels. Twelve original

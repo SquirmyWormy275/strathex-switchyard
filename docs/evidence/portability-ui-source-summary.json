@@ -110,5 +110,12 @@
   "limitations": [
     "Event/selection fixtures and authenticated HTTP demonstration are not browser visual acceptance.",
     "No installed update, hardware, account, native-task, microphone or printer/cap-fit acceptance."
-  ]
+  ],
+  "sourceCommit": "2689f764969c1e4c93b88027aa8a14e034433816",
+  "preparedFrontend": {
+    "digest": "a0b06b5de6453b682acaaaf6b13552b619e3e98bdae8f8f6ce3ff3f09508ce38",
+    "files": 21,
+    "installed": false,
+    "visualBrowserAccepted": false
+  }
 }
