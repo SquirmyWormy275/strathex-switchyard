@@ -25,7 +25,13 @@ physical shortcuts. The frontend also stops sending empty workflow content to
 homepage launch controls. Nine original failures are retained; sixteen groups
 pass 237 tests with one declared skip after correction. The authenticated UI
 demonstration reaches the real launch service with a synthetic portal. This
-latest correction awaits normal installed adoption and native Windows follow-up.
+correction is installed at source `58ecd54`. All 36 served assets, 26 API
+checks and 107 installed checks pass, preserving all 54 semantic workspaces.
+The running synthetic preview verifies signed SDK acknowledgement and stale-workspace
+refusal; the seven-stage connected backend journey passes. Native Windows
+follow-up and browser visual acceptance remain separate.
+[Installed evidence](evidence/installed-reviewed-role-summary.json),
+[running demonstration](evidence/reviewed-role-running-demo-summary.json).
 [Evidence](evidence/reviewed-role-dispatch-source-summary.json).
 
 The Windows Claude Desktop catalog now leads directly to its native setup or

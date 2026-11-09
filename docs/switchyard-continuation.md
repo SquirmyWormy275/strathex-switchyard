@@ -22,10 +22,10 @@ Start with [current status](switchyard-status.md), the [requirement ledger](swit
 
 | Identity | Verified checkpoint |
 | --- | --- |
-| Source | `fc7c71f4030926a253d7eecfb1e5220d011a9594` |
-| Release | `181fc3619c7e1fdcd5f715aa654f1fc804de164d9c0ae75ab9764f347e327ffc` |
-| Rollback | `bbf92036b0c6b666640b6c09a3ea677e1c4fd397dc00900d5a8fdde679dc32b8` |
-| Frontend | `2c5d0f951991b4d0ab81cdd6ef3f5503c0b5f53563f31a3ba2d8f2908201f2ad` |
+| Source | `58ecd54db3f2c740c3b311ca6c89eb0f1dfe06fa` |
+| Release | `a06c648661bb7b6ca366dda1966858d26af732518cfdec4c3f6830a41eccf32d` |
+| Rollback | `181fc3619c7e1fdcd5f715aa654f1fc804de164d9c0ae75ab9764f347e327ffc` |
+| Frontend | `d345d11a40b2e7e90d3348851450b43bd0f4274d971c278a784c10bff3356c47` |
 
 The approved frontend is installed at the normal local address. All 36 served assets
 and twenty-six API/inventory metadata/refusal checks pass. Eight installed verifiers pass 107 checks
@@ -36,12 +36,12 @@ workspace changes audit metadata only. No physical keyboard, native provider,
 account, model or microphone operation occurred.
 
 The normal update retained and verified dated launcher backups and current plus
-one rollback. The payload contains 574 files/5,052,022 bytes. Its exact prepared
-575-file/5,155,806-byte bundle is removed after identity/hash verification. The
+one rollback. The payload contains 574 files/5,052,400 bytes. Its exact prepared
+575-file/5,156,184-byte bundle is removed after identity/hash verification. The
 private access token intentionally changed with the frontend digest; use the normal
 launcher/new endpoint rather than restoring the old token. Host-facing owner,
 Copilot and signed-intent checks ran sequentially. Do not repeat executed update
-or cleanup scripts. [Installed evidence](evidence/installed-client-navigation-summary.json).
+or cleanup scripts. [Installed evidence](evidence/installed-reviewed-role-summary.json).
 
 All original workspace modes and all three conversation records are preserved.
 Selected Personal was already in companion mode; the pending conversation lives
@@ -106,7 +106,7 @@ Only bounded digest-verified JSON receipts remain locally outside the checkout. 
 
 ## Recent backend behavior
 
-- Reviewed frontend role dispatch now carries active/persisted workspace selection through effect boundaries and result attribution. Homepage role requests omit content except for explicit handoffs. Nine red cases are retained; final sixteen groups pass 237 tests/one declared skip. Normal installed adoption and native Windows follow-up remain pending. [Evidence](evidence/reviewed-role-dispatch-source-summary.json).
+- Reviewed frontend role dispatch now carries active/persisted workspace selection through effect boundaries and result attribution. Homepage role requests omit content except for explicit handoffs. Nine red cases are retained; final sixteen groups pass 237 tests/one declared skip. Normal installed adoption passes 62 served/API and 107 metadata checks; native Windows follow-up remains pending. [Evidence](evidence/reviewed-role-dispatch-source-summary.json).
 - Earlier Linux source `574958f` run `42570104922`, job `129005270185`, failed on the unchanged pinned Bubblewrap download with HTTP 504/curl 22 before tests. The original log/hash is retained; no manual retry or bound change. [Receipt](evidence/linux-574-download-failure-summary.json).
 
 - The Claude Desktop catalog now leads directly to exact Windows native setup with passive metadata readback and workspace-change fencing. Five groups/59 tests pass with no skips. Normal installed adoption passes 62 served/API and 107 metadata checks with all 54 workspaces preserved. Browser acceptance remains blocked. [Evidence](evidence/client-native-navigation-source-summary.json).
@@ -122,6 +122,8 @@ Only bounded digest-verified JSON receipts remain locally outside the checkout. 
 - Claude task/design admission accepts exactly reviewed 2.1.308, 2.1.317 and 2.1.319; unknown versions refuse before account/task reservation. The original version refusal and failing task-version regression are retained. Earlier real read-only version/account checks verified independent guardian exits without prompts or login changes. [Admission evidence](evidence/claude-version-admission-summary.json).
 - Claude and Codex status recording captures the original recording generation and provider observation time, preventing queued results from entering resumed or replacement consent. Unknown/stale status stays explicit. Original failing regressions remain retained. [Claude evidence](evidence/claude-status-consent-summary.json), [Codex evidence](evidence/codex-status-consent-summary.json).
 - Signed external-agent reports retain occurrence time across Node/Python SDK queues and encrypted-state waits, with the same consent boundaries. [Evidence](evidence/external-agent-consent-source-summary.json).
+
+The current synthetic preview at `http://127.0.0.1:33519` passes seven checks, including all 36 served assets, signed SDK acknowledgement and stale workspace refusal. Its private access URL is not published. The previous owned preview was gracefully stopped and its state removed. The seven-stage backend demo also passes at installed source `58ecd54` and removes its temporary state. [Running evidence](evidence/reviewed-role-running-demo-summary.json).
 
 The connected backend demo runs with `node scripts/demo-switchyard-backend.mjs --synthetic`. Seven stages use normal encrypted stores, authenticated HTTP and signed SDK: F77 Dvorak setup, role binding/status dispatch, observation/refinement, saved-state recovery, portable import and Work-policy refusals. The agent and second host are explicit fixtures; temporary servers/state are removed. This grants no live provider, hardware, microphone or UI acceptance. [Demo](backend-demonstration.md), [native Windows demo](evidence/backend-connected-demo-native-summary.json).
 

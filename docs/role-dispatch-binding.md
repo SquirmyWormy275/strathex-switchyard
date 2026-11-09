@@ -21,6 +21,14 @@ are included in the original bounded Windows client lane. Visual and native
 Windows follow-up remain separate.
 [Evidence](evidence/reviewed-role-dispatch-source-summary.json).
 
+Normal installed source `58ecd54` passes 62 served/API checks and 107
+metadata checks with all 54 semantic workspaces preserved. The running synthetic
+preview sends one status request to an independently running signed SDK, observes
+its acknowledgement and refuses stale review after a workspace change. The
+seven-stage backend journey also passes; browser rendering remains unverified.
+[Installed evidence](evidence/installed-reviewed-role-summary.json),
+[running demonstration](evidence/reviewed-role-running-demo-summary.json).
+
 Reassigning a workflow role invalidates a custom-agent request that has not yet
 entered the queue. The enqueue transaction checks the exact binding and role
 definition under the same state lease as the command write. Changing the target,
