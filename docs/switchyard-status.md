@@ -20,7 +20,7 @@ named role choices use the backend's digest-checked contract and separate review
 for saving and dispatching. Host shortcut review can select a saved role control.
 An isolated interactive demonstration is available. Browser visual acceptance is
 blocked by the browser tool failing before navigation/inspection; this is not a
-hardware or account limitation. Broader client and execution frontend flows remain implementation work. [Walkthrough and boundaries](guided-setup.md).
+hardware or account limitation. Broader execution frontend flows remain implementation work. [Walkthrough and boundaries](guided-setup.md).
 
 Profile import/export now has a concrete v2 review before clearing local connections,
 and Settings offers digest-verified assignment references and A4/SVG legend sheets
@@ -51,6 +51,18 @@ destinations and exposes retained launch outcomes. Recipes carry no account or
 execution authority. Twelve original groups pass 131 tests with one declared
 Windows skip; eight running-preview checks pass. Claude desktop's native launch
 remains unfinished. [Client controls](client-controls.md).
+
+## Installed frontend verification
+
+The normal installed application now contains the guided setup, portability,
+observation, keyboard and distinct-client controls at source `9784aa9`, release
+`47143a9f`. All 28 frontend asset hashes and four API checks pass; eight metadata
+verifiers pass 100 checks. All 54 semantic workspaces, 57 workflow definitions,
+selection and the pending keyboard-only conversation are preserved. Dated launcher
+backups and one rollback verify; the temporary prepared package is removed.
+The original stale verifier failures remain recorded. No live hardware or native
+account/task operation was used, and browser visual acceptance remains blocked.
+[Exact installed evidence](evidence/installed-frontend-controls-summary.json).
 
 ## A working backend journey
 

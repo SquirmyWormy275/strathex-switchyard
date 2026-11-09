@@ -18,20 +18,37 @@ Start with [current status](switchyard-status.md), the [requirement ledger](swit
 - Normal application updates must retain a dated backup/reason and verify persistent-file readback. Keep current plus one rollback, all workspace identities/semantic snapshots and selection. Prepare and verify a new immutable frontend bundle for intentional UI updates.
 - Never manually dispatch, cancel or retry CI, expand deadlines, add skips or weaken assertions to obtain a pass. Normal branch pushes schedule checks. Re-read remote status before reporting a result.
 
-## Current installed backend
+## Current installed application
 
 | Identity | Verified checkpoint |
 | --- | --- |
-| Source | `9266c1248af9a8f8c8bd355b5b0b150bcc957e0e` |
-| Release | `0c71eced8cddd1d184b430947fbe11f79a791c3328ea1a99cc21af714facc297` |
-| Rollback | `8aa0cc4c80cfd45c1c48c0725139be7a1e1870fb2bbc749ecd849d026100d1dc` |
-| Frozen frontend | `24100ef601b810efb0cda95e4fe0842d2944560734b02c4cf482c25e19150543` |
+| Source | `9784aa9134fc1eca8c22852dfb7583afe01f5b1d` |
+| Release | `47143a9fa5de873a1d6f10bc738ef5c703be64af15727eb8e31ffddfa629ffc7` |
+| Rollback | `0c71eced8cddd1d184b430947fbe11f79a791c3328ea1a99cc21af714facc297` |
+| Frontend | `8114b09fc9d33c6e79b65a58ba58b719629b29bf6e8cd3290b91c09d90ebe35f` |
 
-The normal installed update passes **102 metadata/refusal checks across 59 exact module hashes**. All 54 semantic workspaces, four profiles, 57 workflows, selection and one pending keyboard-only conversation are preserved. 53 sealed files are byte-identical; one changes audit metadata only. The selected Personal workspace returns a complete empty saved-project inventory without native observation or task authority. Populated inventory has separate source/native coverage.
+The approved frontend is installed at the normal local address. All 28 served assets
+and four API metadata/refusal checks pass. Eight installed verifiers pass 100 checks
+with 58 exact module hashes; the workflow verifier checks all 57 definitions.
+All 54 semantic workspaces, Personal selection and the pending keyboard-only
+conversation remain intact. 53 sealed files are byte-identical; the remaining
+workspace changes audit metadata only. No physical keyboard, native provider,
+account, model or microphone operation occurred.
 
-Dated backup and launcher readback verify. The payload has 554 files/4,750,121 bytes; current plus one rollback remain. Its exact 555-file/4,849,605-byte prepared bundle is removed. Host-facing task-owner, Copilot-journal and signed-intent verifiers run sequentially. Do not repeat executed installation or cleanup scripts. [Installed evidence](evidence/installed-codex-status-consent-summary.json).
+The normal update retained and verified dated launcher backups and current plus
+one rollback. The payload contains 563 files/4,876,464 bytes. Its exact prepared
+564-file/4,978,029-byte bundle is removed after identity/hash verification. The
+private access token intentionally changed with the frontend digest; use the normal
+launcher/new endpoint rather than restoring the old token. Host-facing owner,
+Copilot and signed-intent checks ran sequentially. Do not repeat executed update
+or cleanup scripts. [Installed evidence](evidence/installed-frontend-controls-summary.json).
 
-Complete Linux at the same source is accepted: **356 groups, 2,333 passing tests, 32 declared skips**. Original receipt `e19a2513-00d0-4f53-b1b1-726f467955f4` preserves manifest, commands, bounds and cleanup. The unit exited zero; its checkout, nine dependency aliases, 803 generated files/11,910,385 bytes, test parent and active marker are removed. Other worktrees remain untouched. No complete Linux run is active.
+The original stale packaging-source and frozen-Home verifier failures are retained.
+Their exact pins now reference the tested frontend revision, with historical
+evidence and behavioral assertions unchanged. Browser visual acceptance is still
+blocked before inspection; this installation is not visual approval.
+
+Complete Linux at the earlier `9266c12` source is accepted: **356 groups, 2,333 passing tests, 32 declared skips**. Original receipt `e19a2513-00d0-4f53-b1b1-726f467955f4` preserves manifest, commands, bounds and cleanup. The unit exited zero; its checkout, nine dependency aliases, 803 generated files/11,910,385 bytes, test parent and active marker are removed. Other worktrees remain untouched. No complete Linux run is active.
 
 The temporary wrapper's original syntax failure preceded every test and remains retained. The corrected reusable private template uses whole-token placeholder replacement and syntax-checks the wrapper before launch. Do not rerun executed start/audit/cleanup scripts. [Complete Linux evidence](evidence/linux-9266c12-complete-summary.json).
 
@@ -230,3 +247,10 @@ Use the [requirement ledger](switchyard-requirements.md) as scope. Remaining obs
 Keep unfinished software separate from checks requiring physical F77/B122 hardware, an approved Microsoft tenant, interactive Windows/UAC/guest access, a live microphone or approved native task/account operations. A synthetic provider or installed metadata-only proof does not accept those external behaviors.
 
 Publish tested source and evidence regularly. Retain original failures and frontend review artifacts; remove only verified owned staging. Keep this file focused on current state and actionable next work; use linked evidence and Git history for older checkpoints.
+
+## Next implementation work
+
+The installed checkpoint includes all guided frontend work above. Continue remaining
+required observation sources and reviewed execution/scanner controls. Native exact-task
+attachment, interactive IDE, browser visual review and hardware/account acceptance
+remain separately tracked; the full Rev2 assignment is unfinished.

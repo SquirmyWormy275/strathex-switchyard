@@ -26,7 +26,8 @@ let failure;
 try {
   for (const [summary, files] of [
     ["signed-physical-intent-source-summary.json", ["tools/layout-studio/physical-intent-contract.mjs", "tools/layout-studio/physical-intent.mjs"]],
-    ["editor-project-choices-source-summary.json", ["tools/layout-studio/instance.mjs", "tools/layout-studio/serve.mjs"]]
+    ["editor-project-choices-source-summary.json", ["tools/layout-studio/instance.mjs"]],
+    ["frontend-host-provenance-source-summary.json", ["tools/layout-studio/serve.mjs"]]
   ]) {
     const source = JSON.parse(await readFile(new URL("../docs/evidence/" + summary, import.meta.url), "utf8"));
     const sourceFiles = source.sourceFiles ?? Object.fromEntries(source.files.map(file => [file.path, file.sha256]));
