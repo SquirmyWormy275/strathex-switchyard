@@ -139,6 +139,5 @@ existing account/session/policy checks and action-specific reviews.
 
 Seven groups pass 101 tests with one declared platform skip, plus both TypeScript
 checks. The demonstration uses real encrypted storage and authenticated HTTP with
-explicit synthetic agent sessions. Frontend picker activation and live
-account/task/UI acceptance remain unfinished.
+explicit synthetic agent sessions. The guided frontend now uses this contract with named choices and separate save/dispatch reviews. Live account/task and visual browser acceptance remain unfinished. See [guided setup](guided-setup.md).
 [Source evidence](evidence/role-choices-source-summary.json).

@@ -8,14 +8,14 @@ Start with [current status](switchyard-status.md), the [requirement ledger](swit
 
 ## Preserve the user's boundaries
 
-- Home/catalog frontend and editor command activation are frozen for owner review. No asset/UI changes, browser automation or reloads during backend work.
+- The owner explicitly approved “Yes—finish the frontend too.” Home/catalog, guided setup, role/device controls, editor activation and browser verification may now proceed. Preserve the prior immutable review bundle as rollback evidence; all hardware/account boundaries below still apply.
 - Continue normally without delegation. Claude Code is a contingency for actual token exhaustion; compaction is not exhaustion.
 - Use cached F77 readouts and pinned source only. No new HID, unlock, write, reset, flash, bootloader, solenoid or electrical operation. Preserve firmware Dvorak and US host input. The [26-file source audit](solenoid-capability-audit.md) establishes handler capabilities, not physical/electrical acceptance.
 - No live login/logout/account switching, model requests, real native task creation/resume or installed agent enrollment/revocation/commands in backend checks. Use isolated synthetic providers and explicit read-only metadata.
 - Keep Windows descendant token access at QUERY mask **8** and process access at **0x101000**. Do not widen ACLs, SID/account rules or privileges, or add identity/runtime fallbacks. Only newly owned anonymous pipes receive their scoped ACLs.
 - Preserve the repaired native ChatGPT main-window voice, hidden overlay, saved artwork and desktop guard. No Seagate, game, mount or display work.
 - No new local SDK, runtime, model or dependency downloads. Use existing Node 24.14.0 and `.tools/dotnet-8.0.424`. Put the actual pinned Node bin directory first on PATH for supervised builds; mise shims fail in isolated homes without project trust. Do not change trust settings.
-- Normal application updates must retain a dated backup/reason and verify persistent-file readback. Keep current plus one rollback, all workspace identities/semantic snapshots, selection and frozen frontend.
+- Normal application updates must retain a dated backup/reason and verify persistent-file readback. Keep current plus one rollback, all workspace identities/semantic snapshots and selection. Prepare and verify a new immutable frontend bundle for intentional UI updates.
 - Never manually dispatch, cancel or retry CI, expand deadlines, add skips or weaken assertions to obtain a pass. Normal branch pushes schedule checks. Re-read remote status before reporting a result.
 
 ## Current installed backend
@@ -56,12 +56,12 @@ Next remote checks:
 2. Follow ordinary source run `42539354478` and full package run `42539354588` at `7529718`, or their exact newer-source replacements. Require the complete release job to pass its remaining native publishing/packaging stages. Source and package test-stage acceptance do not establish a finished release.
 3. Preserve the two `db24634` preliminary HTTP 504 failures before tests (jobs `128691327134` and `128691327237`); no receipts exist. The next normal source push can schedule a fresh run. Do not dispatch/cancel/retry CI manually.
 
-The frontend-freeze clarification is pending with the owner. Until answered, continue independent backend/package work without changing Home/catalog/editor activation.
+The frontend clarification is resolved: the owner approved completing it. Continue backend/package verification alongside the guided frontend implementation.
 Only bounded digest-verified JSON receipts remain locally outside the checkout. ZIPs were read in memory; no native runtime archive or disposable checkout is retained. Package verification keeps ordered builds/compiled consumers followed by at most two independent children. [Scheduling contract](evidence/windows-paired-verification-summary.json).
 
 ## Recent backend behavior
 
-- Signed saved-project discovery and exact-project task choices are implemented in both typed editor clients. Current protected owner/load/task records and workspace policy determine eligibility. Listing does not inspect a native provider, write state or grant execution. Fresh exact review remains mandatory. Picker/command activation is frozen. [Contract](coding-task-owners.md#find-eligible-saved-projects).
+- Signed saved-project discovery and exact-project task choices are implemented in both typed editor clients. Current protected owner/load/task records and workspace policy determine eligibility. Listing does not inspect a native provider, write state or grant execution. Fresh exact review remains mandatory. Picker/command activation may now be implemented. [Contract](coding-task-owners.md#find-eligible-saved-projects).
 - Named role choices provide readable local connection labels and digest-checked binding. Listing/binding is separate from dispatch authority. [Contract](role-dispatch-binding.md#choose-a-saved-connection-by-name).
 - Claude task/design admission accepts exactly reviewed 2.1.308, 2.1.317 and 2.1.319; unknown versions refuse before account/task reservation. The original version refusal and failing task-version regression are retained. Earlier real read-only version/account checks verified independent guardian exits without prompts or login changes. [Admission evidence](evidence/claude-version-admission-summary.json).
 - Claude and Codex status recording captures the original recording generation and provider observation time, preventing queued results from entering resumed or replacement consent. Unknown/stale status stays explicit. Original failing regressions remain retained. [Claude evidence](evidence/claude-status-consent-summary.json), [Codex evidence](evidence/codex-status-consent-summary.json).
@@ -78,6 +78,19 @@ Passing follow-ups do not establish the cause of earlier intermittent failures. 
 - [Native focus retirement](evidence/native-focus-retirement-failure-summary.json): exit/recording and deadline/rejection diagnostics are available; the original two-second retirement bound remains.
 - [Restricted-storage retirement](evidence/restricted-storage-47c80be-failure-summary.json): retain native phase/error diagnostics and QUERY-only permissions.
 - [Host-action settlement](evidence/host-action-settlement-diagnostic-summary.json): the original two-second observation expired. Fixture cleanup and closed diagnostic tags improved; original 75 ms coordination/effect and 2,000 ms observation limits remain. The [15-test native follow-up](evidence/host-action-settlement-native-followup-summary.json) passes without proving the original cause.
+
+## Guided frontend work now in progress
+
+The owner-approved frontend connects Home progress, named role choices, separate
+connection/action reviews, cached-readout source inspection and role shortcut
+review. Saved-readout import now preserves the captured typing layer and persists
+a separate profile. See [the walkthrough](guided-setup.md). Production editor
+activation and broader controls remain independent implementation work.
+
+Browser tooling currently fails before navigation/inspection with
+`Cannot read properties of undefined (reading 'timeoutMs')`. Reset did not help;
+the in-app browser is unavailable. Do not claim visual/browser acceptance or
+replace browser tooling with an undocumented control channel.
 
 ## Continue required product work
 

@@ -7,6 +7,7 @@ import { mountDevices } from "/device-ui.mjs";
 import { showWorkspace, showInspector } from "/shell.mjs";
 import { drawKeyboard } from "/keyboard-view.mjs";
 import { mountHome } from "/home.mjs";
+import { unpackChoices } from "/geometry.mjs";
 
 const $ = (id) => document.getElementById(id);
 let plan = null;
@@ -24,6 +25,7 @@ let pendingSnapshot = null;
 let profileWorkflow = null;
 let exportAllowed = true;
 let selectedKeyId = null;
+document.addEventListener("switchyard-workspace-changing", () => { pendingSnapshot = null; pendingProposal = null; $("profile-dialog").close(); });
 
 function option(value, label = value) { const item = document.createElement("option"); item.value = value; item.textContent = label; return item; }
 function notify(message, undo) {
@@ -354,10 +356,13 @@ function previewProposal(value) {
 function prepareSnapshot(value) {
   const choices = snapshotChoices(value);
   pendingSnapshot = value;
+  let recordedChoices = [];
+  try { recordedChoices = unpackChoices(value.definition, value.layoutOptions); } catch { /* unknown physical choices require selection */ }
   $("snapshot-choices").replaceChildren(...choices.map((choice, i) => {
     const label = document.createElement("label"); label.textContent = choice.label;
     const select = document.createElement("select"); select.id = `snapshot-choice-${i}`;
     select.append(option("", "Choose physical arrangement"), ...choice.options.map((name, index) => option(String(index), name)));
+    if (Number.isInteger(recordedChoices[i])) select.value = String(recordedChoices[i]);
     label.append(select); return label;
   }));
   $("snapshot-options").hidden = false;
@@ -374,10 +379,11 @@ $("load-snapshot").addEventListener("click", () => {
     const profile = importVialSnapshot(pendingSnapshot, selects.map((s) => Number(s.value)));
     if (!mayReplacePlan()) return;
     const carried = plan?.profile.evidence === "source-reference";
-    plan = carried ? rebaseTypingLayer(plan, profile) : newPlan(profile); profileIdentity = { id: "saved-keyboard", name: profile.name };
+    plan = carried ? rebaseTypingLayer(plan, profile) : newPlan(profile); profileIdentity = { id: `profile-${crypto.randomUUID()}`, name: profile.name };
     if (!carried) profileWorkflow = null;
     pendingInfo = null; pendingKeymap = null; selectedActionId = null; selectedKeyId = null; pendingProposal = null;
-    resetEditor(); dirty = false; render();
+    resetEditor(); markDirty(); render(); $("profile-dialog").close();
+    document.dispatchEvent(new Event("switchyard-profile-loaded"));
     notify("Saved geometry and layer zero loaded. Device firmware, controller, current layout and physical arrangement remain unverified.");
   } catch (error) { notify(error.message); }
 });
@@ -418,7 +424,7 @@ mountHome({ getProfile: () => plan ? portable() : null, usePreset: (value) => {
   document.dispatchEvent(new CustomEvent("switchyard-profile-loaded")); return true;
 }, notify });
 connection = connectWorkspace({ getPlan: () => plan, notify });
-mountSuite({ getProfile: () => plan ? portable() : null, loadProfile: (value) => { if (value) importSaved(value, true); else { plan = null; dirty = false; render(); } }, previewProposal, notify, onPolicy: (allowed) => { exportAllowed = allowed; }, onWorkflow: (workflow) => { profileWorkflow = workflow; }, saved: () => { dirty = false; $("save-status").textContent = "Saved privately on this computer. Your layout will reopen after restart."; } });
+mountSuite({ getProfile: () => plan ? portable() : null, loadProfile: (value) => { if (value) importSaved(value, true); else { plan = null; dirty = false; render(); } document.dispatchEvent(new Event("switchyard-profile-loaded")); }, previewProposal, notify, onPolicy: (allowed) => { exportAllowed = allowed; }, onWorkflow: (workflow) => { profileWorkflow = workflow; }, saved: () => { dirty = false; $("save-status").textContent = "Saved privately on this computer. Your layout will reopen after restart."; } });
 mountDevices({ getProfile: () => plan ? portable() : null, onSnapshot: prepareSnapshot, notify });
 render();
 let resizeTimer;

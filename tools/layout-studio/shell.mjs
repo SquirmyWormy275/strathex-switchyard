@@ -13,3 +13,5 @@ for (const button of document.querySelectorAll("[data-inspector]")) button.addEv
 document.querySelector(".wordmark").addEventListener("click", (event) => { event.preventDefault(); showWorkspace("home"); });
 document.getElementById("open-profile").addEventListener("click", () => document.getElementById("profile-dialog").showModal());
 document.getElementById("close-profile").addEventListener("click", () => document.getElementById("profile-dialog").close());
+
+document.getElementById("role-design-link").addEventListener("click", () => { showWorkspace("keyboard"); showInspector("design"); document.getElementById("design-message").focus(); });

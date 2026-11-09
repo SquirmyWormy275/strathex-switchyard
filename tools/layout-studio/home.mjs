@@ -4,7 +4,24 @@ import { showWorkspace } from "./shell.mjs";
 const $ = (id) => document.getElementById(id);
 const option = (value, label) => { const o = document.createElement("option"); o.value = value; o.textContent = label; return o; };
 export function mountHome({ getProfile, usePreset, notify }) {
-  let catalog, current, resizeTimer;
+  let catalog, current, resizeTimer, workspace = null;
+  function progress() {
+    const profile = getProfile(), reference = profile?.plan.profile.evidence === "source-reference", connections = workspace?.roleBindings?.length ?? 0;
+    $("setup-layout-state").textContent = profile ? profile.name : "Choose your keyboard. The four controls are ready to edit.";
+    $("setup-typing-state").textContent = !profile ? "Keep the arrangement already on your keyboard." : reference ? "Reference layout only. Import or inspect a saved keyboard readout next." : "Saved typing layer available. A physical typing check is still yours to make.";
+    $("setup-tools-state").textContent = connections ? `${connections} saved control ${connections === 1 ? "connection" : "connections"}. Review one and give it a try.` : workspace?.mode === "keyboard-only" ? "Keyboard-only mode. Enable the companion when you are ready to connect tools." : "Connect each control to a named task or agent.";
+    $("home-continue").textContent = !profile ? "Choose my layout" : reference ? "Review my typing layer" : workspace?.mode === "keyboard-only" ? "Set up my companion" : connections ? "Try a connected control" : "Connect my tools";
+    $("home-setup-status").textContent = profile ? "Your editable plan is available. Device programming and desktop shortcuts need a separate review." : "Choose a layout to begin. Device and shortcut changes always have their own review.";
+  }
+  document.addEventListener("switchyard-compartment-state", event => { workspace = event.detail; progress(); });
+  document.addEventListener("switchyard-profile-loaded", progress);
+  document.addEventListener("switchyard-plan-change", progress);
+  $("home-continue").addEventListener("click", () => {
+    const profile = getProfile();
+    if (!profile) { $("catalog-model").focus(); $("starter-title").scrollIntoView({ block: "start", behavior: "smooth" }); }
+    else if (profile.plan.profile.evidence === "source-reference") $("home-read-keyboard").click();
+    else showWorkspace(workspace?.mode === "keyboard-only" ? "settings" : "agents");
+  });
   const examples = [
     ["01 / Return", "Back to the task you left.", "Your builder is working on the export screen. Return opens that same conversation, so you can continue without hunting through tabs."],
     ["02 / Progress", "Know what needs your attention.", "The builder reports that its draft is ready for review. The status includes its source; an agent’s report is kept separate from verified test evidence."],
@@ -66,11 +83,15 @@ export function mountHome({ getProfile, usePreset, notify }) {
     $("setup-next").classList.add("setup-selected"); $("setup-next").scrollIntoView({ behavior: "smooth", block: "nearest" }); notify("Starting layout ready. Your typing and firmware have not changed.");
   });
   $("customize-setup").addEventListener("click", () => { if (!getProfile() && current && !usePreset(current.portable)) return; showWorkspace("keyboard"); });
-  $("home-read-keyboard").addEventListener("click", () => { showWorkspace("keyboard"); const panel = $("discover-devices").closest("details"); panel.open = true; panel.scrollIntoView({ block: "nearest" }); $("discover-devices").click(); });
+  $("home-read-keyboard").addEventListener("click", () => { showWorkspace("keyboard"); const panel = $("discover-devices").closest("details"); panel.open = true; panel.scrollIntoView({ block: "start" }); $("saved-device-picker").focus(); });
   window.addEventListener("resize", () => { clearTimeout(resizeTimer); resizeTimer = setTimeout(draw, 100); });
   fetch("/model-f-catalog.json").then((r) => { if (!r.ok) throw new Error("The offline model catalog is unavailable."); return r.json(); }).then((value) => {
     catalog = value; $("catalog-model").replaceChildren(...["Model F", "Beam Spring", "Proposed designs"].map((name) => { const group = document.createElement("optgroup"); group.label = name; group.append(...catalog.models.filter((m) => m.group === name).map((m) => option(m.id, `${m.name}${m.status !== "listed-model" ? " · proposed" : ""}`))); return group; }));
     $("catalog-model").value = "f77-classic";
+    const saved = getProfile();
+    if (saved?.id.startsWith("model-f-") && catalog.models.some(model => `model-f-${model.id}` === saved.id)) $("catalog-model").value = saved.id.slice(8);
+    if (saved?.plan.profile.name.includes("Dvorak")) $("catalog-typing").value = "dvorak";
     $("catalog-coverage").textContent = `${catalog.models.filter((m) => m.status === "listed-model").length} listed models · ${catalog.models.filter((m) => m.status !== "listed-model").length} proposed designs · checked ${catalog.checkedAt}`; chooseModel();
   }).catch((e) => { $("catalog-evidence").textContent = e.message; notify(e.message); });
+  progress();
 }

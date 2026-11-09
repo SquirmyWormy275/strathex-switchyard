@@ -20,8 +20,7 @@ through signed Linux/Windows clients, followed by existing exact-project task
 choices. Protected owner/load/task records and current workspace policy determine
 eligibility. Listing performs no native observation or write and grants no task
 authority; the selected task still requires fresh review. The encrypted-store-to-
-client demonstration uses an explicit provider double. Frontend picker/command
-activation remains frozen for owner review.
+client demonstration uses an explicit provider double. The owner has lifted the frontend freeze. Named role/device setup is now connected; production editor picker/command activation remains implementation work.
 [Contract](coding-task-owners.md#find-eligible-saved-projects),
 37 focused groups/117 tests, zero skips, and both TypeScript checks pass.
 [source evidence](evidence/editor-project-choices-source-summary.json).
@@ -41,7 +40,7 @@ Complete Windows source `4db5948` now passes all 462 groups/2,910 tests with 246
 
 The earlier installed-source Linux `2c6497f` passes 351 groups/2,312 tests with 32 declared skips.
 It covers the installed guided role choices and external-agent consent corrections.
-The frontend picker remains frozen. Native Windows client `9d230ac` passes
+The later guided frontend checkpoint connects the named role picker; visual acceptance is pending. Native Windows client `9d230ac` passes
 250 tests with no skips. Complete Windows releases `e5a5781` and `6727054`
 were interrupted without final receipts. A separate complete-source workflow
 now preserves every original group across bounded workers and requires a final

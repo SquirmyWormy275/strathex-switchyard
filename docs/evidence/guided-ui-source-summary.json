@@ -1,0 +1,127 @@
+{
+  "schema": "switchyard-guided-ui-source-evidence/v1",
+  "scope": "Guided Home, saved readouts, named role choices and reviewed role shortcuts",
+  "visualBrowserAccepted": false,
+  "installedUpdateAccepted": false,
+  "hardwareOperations": 0,
+  "realAccountOperations": 0,
+  "runs": [
+    {
+      "receiptId": "2431672a-d2aa-498f-9d8e-d5c701e157b1",
+      "sha256": "84e280eae8716c3cbc18afc0cfeb8b06304fef63f702a8c679e453a4617f35c8",
+      "totals": {
+        "required": 14,
+        "passed": 14,
+        "failed": 0,
+        "tests": 156,
+        "passedTests": 156,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "originalBoundsPreserved": true,
+      "ownedCleanupComplete": true,
+      "files": [
+        "scripts/demo-switchyard-backend.test.mjs",
+        "scripts/windows-complete-shards.test.mjs",
+        "scripts/run-isolated-tests.test.mjs",
+        "deployment/suite/release.test.mjs",
+        "tools/layout-studio/model.test.mjs",
+        "tools/layout-studio/catalog.test.mjs",
+        "tools/layout-studio/catalog-identity.test.mjs",
+        "tools/layout-studio/readout-profiles.test.mjs",
+        "tools/layout-studio/configuration.test.mjs",
+        "tools/layout-studio/suite.test.mjs",
+        "tools/layout-studio/devices.test.mjs",
+        "tools/layout-studio/guided-role-choices.test.mjs",
+        "tools/layout-studio/role-ui.test.mjs",
+        "tools/layout-studio/device-ui.test.mjs"
+      ]
+    },
+    {
+      "receiptId": "a8249776-e75e-48aa-bd3f-6ddfa8b4f793",
+      "sha256": "6601d71d9232ba5e886aaf0e58d87c0a47e8e8e54d324843b9f1744c5bfc9913",
+      "totals": {
+        "required": 5,
+        "passed": 5,
+        "failed": 0,
+        "tests": 40,
+        "passedTests": 40,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "originalBoundsPreserved": true,
+      "ownedCleanupComplete": true,
+      "files": [
+        "scripts/run-isolated-tests.test.mjs",
+        "deployment/suite/release.test.mjs",
+        "tools/layout-studio/role-ui.test.mjs",
+        "tools/layout-studio/device-ui.test.mjs",
+        "tools/layout-studio/connection-ui.test.mjs"
+      ]
+    }
+  ],
+  "sourceFiles": [
+    {
+      "file": "tools/layout-studio/app.mjs",
+      "sha256": "51e6dd37ae681c8ba4669d5a8f281a17c0cf3abfdba8751e165f3549a23fee52"
+    },
+    {
+      "file": "tools/layout-studio/home.mjs",
+      "sha256": "abff351fb1fa3a9e53b2fa23c5eeeafa5c15f131150e132b291846b76cbf572e"
+    },
+    {
+      "file": "tools/layout-studio/shell.mjs",
+      "sha256": "4716eea0bda29d56d197cd66e3a55d6a1c7a043eaa032b68c7ef0ebc5bd56859"
+    },
+    {
+      "file": "tools/layout-studio/suite-ui.mjs",
+      "sha256": "38fbd8631bbe2d5edcb5195b6873005564f7ec3894c067502121de96d09b359c"
+    },
+    {
+      "file": "tools/layout-studio/role-ui.mjs",
+      "sha256": "9d09a0c6f84d0faead7c9fc85694459122b5b6d7c029f1f561f9d3f4da102d19"
+    },
+    {
+      "file": "tools/layout-studio/device-ui.mjs",
+      "sha256": "4c762d10bc8378152b5b1b32e8498a6a9ade75efd131672116bb7099ca9d94d3"
+    },
+    {
+      "file": "tools/layout-studio/connection.mjs",
+      "sha256": "ad546223f2961e656738c4db1ea6b7787ef360c5cf3e0efa0ac8bcf6258a1e14"
+    },
+    {
+      "file": "tools/layout-studio/keyboard-view.mjs",
+      "sha256": "757325b40f0bf6567300be62c38753f11a88b7930b476e6fbf66cc3371374f31"
+    },
+    {
+      "file": "tools/layout-studio/index.html",
+      "sha256": "a3e9e0f31e0d5c5968e13680f0b61698bb5942406f704724bbf4e9391d4db86f"
+    },
+    {
+      "file": "tools/layout-studio/style.css",
+      "sha256": "21b75b67dee65cc70e06546f30458ed84caafdf0e3eae33e8a191fad6d6c78c9"
+    }
+  ],
+  "interactionCoverage": [
+    "empty selection stays disabled",
+    "named target reviewed before save",
+    "save performs no dispatch",
+    "changed target refuses without rebinding",
+    "late workspace results discarded",
+    "keyboard-only choices unavailable",
+    "historical readout inspection does not call HID or change state",
+    "cached import clears on workspace transition",
+    "late shortcut review discarded",
+    "reference layout cannot enable host shortcut review"
+  ],
+  "limitations": [
+    "Event/selection fixtures are not a visual browser.",
+    "Browser tool fails before navigation/inspection; reset did not fix it and the in-app browser is unavailable.",
+    "Native editor activation and broader frontend controls remain implementation work.",
+    "No hardware, live account, native-task, microphone or installed acceptance is claimed."
+  ]
+}

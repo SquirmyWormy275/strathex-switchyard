@@ -12,12 +12,13 @@ export function drawKeyboard(surface, profile, actions = [], { selectedKeyId = n
     if (onKey) button.type = "button";
     button.className = `key${assigned.length ? " has-action" : ""}${selectedKeyId === key.id ? " selected-key" : ""}${picking ? " pick-target" : ""}${key.shape ? " shaped-key" : ""}`;
     button.style.left = `${pixel(key.x * unit)}px`; button.style.top = `${pixel(key.y * unit)}px`;
-    button.style.width = `${pixel(key.w * unit - 3)}px`; button.style.height = `${pixel(key.h * unit - 3)}px`;
+    const keyWidth = pixel(key.w * unit - 3), keyHeight = pixel(key.h * unit - 3);
+    button.style.width = `${keyWidth}px`; button.style.height = `${keyHeight}px`;
     if (key.rotation) { button.style.transform = `rotate(${key.rotation}deg)`; button.style.transformOrigin = "0 0"; }
     if (key.shape) {
       const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg"), path = document.createElementNS(svg.namespaceURI, "path");
-      svg.setAttribute("viewBox", `0 0 ${key.w * unit} ${key.h * unit}`); svg.setAttribute("preserveAspectRatio", "none"); svg.setAttribute("aria-hidden", "true");
-      const points = outlinePoints(key).map(([x, y]) => [pixel(x * unit), pixel(y * unit)]);
+      svg.setAttribute("viewBox", `0 0 ${keyWidth} ${keyHeight}`); svg.setAttribute("preserveAspectRatio", "none"); svg.setAttribute("aria-hidden", "true");
+      const points = outlinePoints(key).map(([x, y]) => [pixel(x / key.w * keyWidth), pixel(y / key.h * keyHeight)]);
       path.setAttribute("d", points.map(([x, y], i) => `${i ? "L" : "M"}${x},${y}`).join(" ") + " Z"); path.setAttribute("vector-effect", "non-scaling-stroke"); svg.append(path); button.append(svg);
       button.style.clipPath = `polygon(${outlinePoints(key).map(([x, y]) => `${x / key.w * 100}% ${y / key.h * 100}%`).join(",")})`;
     }

@@ -6,7 +6,9 @@ Switchyard is a local keyboard workspace for people who move between coding
 agents, editors and conversations. It starts with a ready-made arrangement:
 return to your task, check progress, review work, and leave a handoff. Choose your
 Model F Labs keyboard, use the recommended setup, then connect your tools.
-The configurator stays behind **Customize**.
+The configurator stays behind **Customize**. The [guided setup walkthrough](docs/guided-setup.md) connects a saved typing layer to named tool controls.
+
+For an isolated interactive example, run `node scripts/demo-switchyard-ui.mjs --synthetic`. It uses a synthetic F77 and agent with fresh encrypted state; hardware, accounts and desktop changes are unavailable in that demo.
 
 ## Try the starting experience on Linux
 

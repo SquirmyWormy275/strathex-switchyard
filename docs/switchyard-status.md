@@ -12,6 +12,17 @@ validation. Work is published on
 [draft PR 20](https://github.com/SquirmyWormy275/strathex-switchyard/pull/20);
 no merge or public release has been accepted.
 
+## Guided frontend checkpoint
+
+The owner lifted the frontend freeze and approved completing its flows. Home now
+shows the next setup step; saved readouts expose source/controller evidence;
+named role choices use the backend's digest-checked contract and separate reviews
+for saving and dispatching. Host shortcut review can select a saved role control.
+An isolated interactive demonstration is available. Browser visual acceptance is
+blocked by the browser tool failing before navigation/inspection; this is not a
+hardware or account limitation. Editor command activation and broader frontend
+flows remain implementation work. [Walkthrough and boundaries](guided-setup.md).
+
 ## A working backend journey
 
 The repeatable demo uses the normal authenticated API, encrypted stores and

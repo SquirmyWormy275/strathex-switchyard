@@ -1,13 +1,18 @@
 import { api, setActiveCompartment } from "/connection.mjs";
+import { mountRoles } from "./role-ui.mjs";
 const $ = (id) => document.getElementById(id);
 
 export function mountSuite({ getProfile, loadProfile, previewProposal, notify, saved, onPolicy, onWorkflow }) {
+  let refreshGeneration = 0;
   let compartment = "personal", state = null, conversationId = null, proposedWorkflow = null, saveTimer, recorder, stream, audioSession, segmentTimer, voicePending = Promise.resolve(), voicePaused = true;
   const lines = (id) => $(id).value.split("\n").map((s) => s.trim()).filter(Boolean);
   async function run(fn) { try { return await fn(); } catch (e) { $("suite-status").textContent = e.message; notify(e.message); return null; } }
   function workflowForm(workflow) { $("workflow-name").value = workflow.name; $("workflow-steps").value = workflow.steps.map((s) => typeof s === "string" ? s : s.label).join("\n"); $("workflow-roles").value = workflow.roles.map((r) => typeof r === "string" ? r : r.label).join("\n"); }
   async function refresh() {
-    state = await api("/api/suite/snapshot", { compartment });
+    const target = compartment, version = ++refreshGeneration;
+    const snapshot = await api("/api/suite/snapshot", { compartment: target });
+    if (version !== refreshGeneration || target !== compartment) return;
+    state = snapshot;
     onPolicy(state.policyRules.export);
     onWorkflow(state.workflow);
     $("operating-mode").value = state.mode ?? (state.policy === "work" ? "managed-companion" : "personal-companion");
@@ -19,17 +24,6 @@ export function mountSuite({ getProfile, loadProfile, previewProposal, notify, s
     const provider = $("conversation-provider").value;
     $("conversation-provider").replaceChildren(...state.policyRules.providers.filter((p) => ["codex", "claude-code", "microsoft-365-copilot"].includes(p)).map((p) => { const o = document.createElement("option"); o.value = p; o.textContent = ({ codex: "Codex · installed account", "claude-code": "Claude Code · installed account", "microsoft-365-copilot": "Microsoft 365 Copilot · approved account" })[p]; return o; }));
     if ([...$("conversation-provider").options].some((o) => o.value === provider)) $("conversation-provider").value = provider;
-    const roleSelection = $("role-picker").value, targetSelection = $("role-target").value;
-    $("role-picker").replaceChildren(...state.workflow.roles.map((r) => { const o = document.createElement("option"); o.value = r.id; o.textContent = r.label; return o; }));
-    if ([...$("role-picker").options].some((o) => o.value === roleSelection)) $("role-picker").value = roleSelection;
-    $("role-target").replaceChildren(...[
-      ...state.conversations.filter((c) => c.sessionId && state.policyRules.providers.includes(c.provider)).map((c) => ({ value: `${c.provider}|${c.id}`, label: `${c.provider} · exact conversation ${c.sessionId.slice(0, 10)}` })),
-      ...state.agents.filter((a) => a.sessionId).map((a) => ({ value: `custom-agent|${a.id}`, label: `${a.name} · ${a.reportedStatus} · authenticated self-report` }))
-    ].map((target) => { const o = document.createElement("option"); o.value = target.value; o.textContent = target.label; return o; }));
-    if ([...$("role-target").options].some((o) => o.value === targetSelection)) $("role-target").value = targetSelection;
-    $("role-summary").textContent = state.roleBindings?.length ? state.roleBindings.map((b) => `${state.workflow.roles.find((r) => r.id === b.roleId)?.label ?? b.roleId}: ${b.intent} → ${b.provider}`).join(" · ") : "Save workflow roles, connect a conversation or example, then bind an exact target. Missing or stale targets never launch a replacement.";
-    const latestIntent = state.intentResults?.at(-1);
-    if (latestIntent) $("role-result").textContent = `${latestIntent.intent}: ${latestIntent.result.reply ?? latestIntent.result.status ?? "reported"}. ${latestIntent.result.provenance ?? ""}`;
     const history = $("conversation-history"); history.replaceChildren();
     for (const c of state.conversations.slice(-4)) for (const m of c.messages) { const article = document.createElement("p"); article.className = `message ${m.role}`; const label = document.createElement("strong"); label.textContent = m.role === "user" ? "You" : c.provider; const content = document.createElement("span"); content.textContent = m.text; article.append(label, content); history.append(article); }
     const active = state.observations.find((o) => o.status === "recording" || o.status === "paused") ?? state.observations.at(-1);
@@ -55,6 +49,7 @@ export function mountSuite({ getProfile, loadProfile, previewProposal, notify, s
     await api("/api/suite/profile/save", { compartment: target, profile: p });
     if (target === compartment && JSON.stringify(getProfile()) === serialized) {
       saved();
+      document.dispatchEvent(new Event("switchyard-profile-loaded"));
       if (p.workflow && JSON.stringify(state.workflow) !== JSON.stringify(p.workflow)) { await refresh(); workflowForm(state.workflow); }
     }
   }
@@ -81,17 +76,34 @@ export function mountSuite({ getProfile, loadProfile, previewProposal, notify, s
     await api("/api/suite/profile/save", { compartment, profile: copy });
     loadProfile(copy); await refresh(); workflowForm(state.workflow); $("profile-copy-name").value = ""; notify("Separate layout saved privately. The previous profile remains available.");
   }));
+  let switching = false;
+  function workspaceBusy(value) {
+    switching = value; $("compartment-picker").disabled = value; $("operating-mode").disabled = value;
+    $("save-workspace").disabled = value; document.querySelector(".app-main").inert = value;
+  }
   $("compartment-picker").addEventListener("change", () => run(async () => {
+    if (switching) return;
+    const nextCompartment = $("compartment-picker").value;
     if (!voicePaused || recorder?.state === "recording") { $("compartment-picker").value = compartment; throw new Error("Pause or stop voice before switching compartments."); }
-    await voicePending; await persist(); compartment = $("compartment-picker").value; setActiveCompartment(compartment);
-    await api("/api/suite/compartment/select", { compartment }); conversationId = null;
-    await refresh(); workflowForm(state.workflow);
-    if (state.profile) loadProfile(state.profile); else loadProfile(null);
+    workspaceBusy(true); document.dispatchEvent(new Event("switchyard-workspace-changing"));
+    try {
+      await voicePending; clearTimeout(saveTimer); await persist();
+      await api("/api/suite/compartment/select", { compartment: nextCompartment });
+      compartment = nextCompartment; setActiveCompartment(compartment); conversationId = null;
+    } finally {
+      $("compartment-picker").value = compartment;
+      try { await refresh(); workflowForm(state.workflow); loadProfile(state.profile ?? null); }
+      finally { workspaceBusy(false); }
+    }
   }));
   $("operating-mode").addEventListener("change", () => run(async () => {
+    if (switching) return;
     const mode = $("operating-mode").value;
-    if (mode === "keyboard-only") { await releaseMicrophone(); if (audioSession) await api("/api/suite/voice/state", { compartment, id: audioSession, status: "paused" }); }
-    await api("/api/suite/mode", { compartment, mode }); await refresh();
+    workspaceBusy(true); document.dispatchEvent(new Event("switchyard-workspace-changing"));
+    try {
+      if (mode === "keyboard-only") { await releaseMicrophone(); if (audioSession) await api("/api/suite/voice/state", { compartment, id: audioSession, status: "paused" }); }
+      await api("/api/suite/mode", { compartment, mode });
+    } finally { try { await refresh(); } finally { workspaceBusy(false); } }
   }));
   $("create-work-compartment").addEventListener("click", () => run(async () => { await api("/api/suite/compartment/create", { compartment: "work", policy: "work" }); const bootstrap = await api("/api/suite/bootstrap", {}); fillCompartments(bootstrap.compartments); notify("Copilot-only Work compartment created with its own protected key. No work account or client data was accessed."); }));
   $("copilot-work-setup").addEventListener("click", () => run(async () => { await api("/api/suite/compartment/create", { compartment: "work", policy: "work" }); const bootstrap = await api("/api/suite/bootstrap", {}); fillCompartments(bootstrap.compartments); notify("Copilot-only Work is ready. Select it in the workspace menu; account enrollment remains a separate, deliberate step."); }));
@@ -110,8 +122,6 @@ export function mountSuite({ getProfile, loadProfile, previewProposal, notify, s
   $("new-design-conversation").addEventListener("click", () => { conversationId = null; $("design-status").textContent = "Ready for a new conversation. Earlier conversations are kept in this compartment."; });
   $("refresh-agent-targets").addEventListener("click", () => run(refresh));
   for (const [button, example] of [["start-custom-example", "custom"], ["start-langchain-example", "langchain"]]) $(button).addEventListener("click", () => run(async () => { const r = await api("/api/suite/agents/example", { compartment, example }); $("role-result").textContent = `${r.status}. Refresh targets after its authenticated ready event.`; }));
-  $("bind-agent-role").addEventListener("click", () => run(async () => { const [provider, targetId] = $("role-target").value.split("|"); await api("/api/suite/roles/bind", { compartment, provider, targetId, roleId: $("role-picker").value, intent: $("role-intent").value }); await refresh(); notify("Exact role target saved locally. Portable profiles keep the role meaning, without this account or session binding."); }));
-  $("try-agent-role").addEventListener("click", () => run(async () => { const r = await api("/api/suite/roles/dispatch", { compartment, roleId: $("role-picker").value, intent: $("role-intent").value, content: $("role-handoff").value }); $("role-result").textContent = `${r.reply ?? r.status ?? "reported"}. ${r.provenance ?? ""}`; if (r.proposal) previewProposal(r.proposal); await refresh(); }));
   $("design-form").addEventListener("submit", (event) => { event.preventDefault(); void run(async () => {
     if (!getProfile()) throw new Error("Load your keyboard before asking for a key arrangement.");
     const message = $("design-message").value; $("send-design").disabled = true;
@@ -175,7 +185,10 @@ export function mountSuite({ getProfile, loadProfile, previewProposal, notify, s
   $("delete-voice").addEventListener("click", () => run(async () => { await releaseMicrophone(); await api("/api/suite/voice/delete", { compartment, id: audioSession ?? state.voice.at(-1)?.id }); audioSession = null; $("voice-transcript").value = ""; await refresh(); }));
   $("retry-voice").addEventListener("click", () => run(async () => { await api("/api/suite/voice/retry", { compartment, id: audioSession ?? state.voice.at(-1)?.id }); await refresh(); }));
   window.addEventListener("pagehide", () => { voicePaused = true; clearTimeout(segmentTimer); for (const track of stream?.getTracks() ?? []) track.stop(); });
-  const bootstrapWorkspace = () => run(async () => { const bootstrap = await api("/api/suite/bootstrap", {}); compartment = bootstrap.activeCompartment; setActiveCompartment(compartment); fillCompartments(bootstrap.compartments); $("local-voice-detail").textContent = bootstrap.voice.available ? bootstrap.voice.destination : bootstrap.voice.reason; await refresh(); workflowForm(state.workflow); if (state.profile && !getProfile()) loadProfile(state.profile); });
+  mountRoles({ notify, refresh });
+  document.addEventListener("switchyard-role-result", event => { if (event.detail.proposal) previewProposal(event.detail.proposal); });
+  document.addEventListener("switchyard-refresh-request", () => run(refresh));
+  const bootstrapWorkspace = () => run(async () => { const bootstrap = await api("/api/suite/bootstrap", {}); compartment = bootstrap.activeCompartment; setActiveCompartment(compartment); fillCompartments(bootstrap.compartments); $("local-voice-detail").textContent = bootstrap.voice.available ? bootstrap.voice.destination : bootstrap.voice.reason; await refresh(); workflowForm(state.workflow); if (state.profile && !getProfile()) loadProfile(state.profile); document.dispatchEvent(new Event("switchyard-profile-loaded")); });
   document.addEventListener("switchyard-local-connected", bootstrapWorkspace);
   void bootstrapWorkspace();
   return { persist, refresh: () => run(refresh) };
