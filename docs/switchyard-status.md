@@ -14,6 +14,13 @@ no merge or public release has been accepted.
 
 ## Guided frontend checkpoint
 
+Voice notes now expose exact saved-note history, separate correction/draft actions
+and reviewed deletion. Workspace and mode changes release capture, and late
+permission responses cannot start a microphone in a new workspace. Bounded
+segmentation, saved-audio retry and lost replies have fourteen interaction cases,
+including the full page. No live microphone or recognizer was used.
+[Controls and source evidence](voice-note-controls.md).
+
 Your tools now includes saved custom-agent inventory, separate exact revocation
 and uncertain-command reviews, and owned bundled-example retirement. Eight UI
 cases pass within 115 original checks; four complete-page groups pass 33 checks

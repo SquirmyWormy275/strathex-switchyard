@@ -1,0 +1,165 @@
+{
+  "schema": "switchyard-voice-ui-source-evidence/v1",
+  "scope": "Saved voice-note selection, bounded capture and exact workspace retirement, separate correction/draft actions, pending-audio retry and reviewed deletion",
+  "runs": [
+    {
+      "receiptId": "000bed35-8ab5-44ef-8363-b3453043a4c7",
+      "sha256": "37e4cc92484123a6f0a541a35f7e5594d64c75f9eacb1d1808142f8e48b0f36d",
+      "success": true,
+      "totals": {
+        "required": 8,
+        "passed": 8,
+        "failed": 0,
+        "tests": 86,
+        "passedTests": 86,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "files": [
+        "scripts/windows-backend-shards.test.mjs",
+        "deployment/suite/release.test.mjs",
+        "tools/layout-studio/suite.test.mjs",
+        "tools/layout-studio/conversation-ui.test.mjs",
+        "tools/layout-studio/copilot-ui.test.mjs",
+        "tools/layout-studio/observation-ui.test.mjs",
+        "tools/layout-studio/voice-ui.test.mjs",
+        "tools/layout-studio/voice-queue.test.mjs"
+      ],
+      "originalBoundsPreserved": true,
+      "ownedCleanupComplete": true
+    },
+    {
+      "receiptId": "da447734-04a3-4ee1-b608-514db6f1f418",
+      "sha256": "bd6c43d070e097f20897dd0bce9198b0846b635f8e60a0c876b98195ea345672",
+      "success": true,
+      "totals": {
+        "required": 9,
+        "passed": 9,
+        "failed": 0,
+        "tests": 114,
+        "passedTests": 114,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "files": [
+        "scripts/windows-backend-shards.test.mjs",
+        "scripts/run-isolated-tests.test.mjs",
+        "deployment/suite/release.test.mjs",
+        "tools/layout-studio/suite.test.mjs",
+        "tools/layout-studio/conversation-ui.test.mjs",
+        "tools/layout-studio/copilot-ui.test.mjs",
+        "tools/layout-studio/observation-ui.test.mjs",
+        "tools/layout-studio/voice-ui.test.mjs",
+        "tools/layout-studio/voice-queue.test.mjs"
+      ],
+      "originalBoundsPreserved": true,
+      "ownedCleanupComplete": true
+    },
+    {
+      "receiptId": "4ef9922e-be40-4afe-be8b-0b6d5529b305",
+      "sha256": "69bb16fe3d7b3d2a224cdbc363ac2fd1ba900e793c874e839f1f0f81c4aea482",
+      "success": true,
+      "totals": {
+        "required": 1,
+        "passed": 1,
+        "failed": 0,
+        "tests": 14,
+        "passedTests": 14,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "files": [
+        "tools/layout-studio/voice-ui.test.mjs"
+      ],
+      "originalBoundsPreserved": true,
+      "ownedCleanupComplete": true
+    }
+  ],
+  "originalFailures": [
+    {
+      "receiptId": "1bc85afa-4dfd-4cba-90cf-dbfa74e9cae5",
+      "sha256": "eb57c2e5a9abebe359ae4eaeb2e2350ae76e03745633dd791da6178914777f87",
+      "success": false,
+      "totals": {
+        "required": 8,
+        "passed": 7,
+        "failed": 1,
+        "tests": 83,
+        "passedTests": 82,
+        "failedTests": 1,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "files": [
+        "scripts/windows-backend-shards.test.mjs",
+        "deployment/suite/release.test.mjs",
+        "tools/layout-studio/suite.test.mjs",
+        "tools/layout-studio/conversation-ui.test.mjs",
+        "tools/layout-studio/copilot-ui.test.mjs",
+        "tools/layout-studio/observation-ui.test.mjs",
+        "tools/layout-studio/voice-ui.test.mjs",
+        "tools/layout-studio/voice-queue.test.mjs"
+      ],
+      "originalBoundsPreserved": true,
+      "ownedCleanupComplete": true
+    }
+  ],
+  "failureCorrections": [
+    "The original delayed-permission test removed its document before the stale handler finished. Explicit UI disposal now joins that handler; the fixture releases its gates and waits before teardown. The failed receipt and original two-second assertions remain."
+  ],
+  "interactionCases": 14,
+  "sourceFiles": {
+    "tools/layout-studio/voice-ui.mjs": "6938d308cb0aa44fc8c3a9d1d2406b4ff2c83449de37816367eae40f0c439d75",
+    "tools/layout-studio/voice-ui.test.mjs": "217ffc48cbbe44a84ed729e885eae827f925a77101744b8ac0b75ed7e12e11e7",
+    "tools/layout-studio/index.html": "b4777b899e02f04afc622302080f16ccb70cf75358ec33c105c83cf3f843c606",
+    "tools/layout-studio/suite-ui.mjs": "59d4be49e488316aa5859d15199f4482b203913288a11f1ad96f2c8db80a9d7d",
+    "tools/layout-studio/suite.mjs": "75738ddd2059c6e46c7ed42230dace3ebc56073554d6ac120ad7ebe1c4e10e6d",
+    "tools/layout-studio/voice-queue.mjs": "7bb766c854078b98ec29b1ce87aef3a7fbdd359386f24d9762dabc2aae886a60",
+    "tools/layout-studio/serve.mjs": "0b1ec5e9de268824aac047a9cbf5b06d85bde376053c87291e8b4a6db364cd21",
+    "deployment/suite/release.mjs": "3c0f52e5571d34cf549f7ecb5fd6483683a87eb3acaf0b8abc6c65c157036f61",
+    "scripts/demo-switchyard-ui.mjs": "5b20d1c40df5a000d32573db3ac6d66931aaf92ed709be13ea74a9c5b825920b"
+  },
+  "livePreview": {
+    "checks": [
+      "exact served voice-ui.mjs",
+      "exact served suite-ui.mjs",
+      "exact served index.html",
+      "two saved synthetic voice notes remain readable in keyboard-only mode",
+      "preview explicitly refuses microphone capture and runtime execution",
+      "unauthenticated transcript correction refused",
+      "interactive preview refuses voice/start",
+      "interactive preview refuses voice/segment",
+      "interactive preview refuses voice/retry",
+      "Work cannot review a Personal voice identity",
+      "exact selected synthetic correction persists without altering another note",
+      "deletion refuses absent original note",
+      "other workspace data and selection unchanged; no design request sent"
+    ],
+    "finalServedSha256": {
+      "voice-ui.mjs": "6938d308cb0aa44fc8c3a9d1d2406b4ff2c83449de37816367eae40f0c439d75",
+      "suite-ui.mjs": "59d4be49e488316aa5859d15199f4482b203913288a11f1ad96f2c8db80a9d7d",
+      "index.html": "b4777b899e02f04afc622302080f16ccb70cf75358ec33c105c83cf3f843c606"
+    },
+    "synthetic": true,
+    "microphoneOpened": false,
+    "localRecognizerStarted": false,
+    "modelRequests": 0,
+    "hardwareOpened": false
+  },
+  "boundaries": [
+    "Authenticated HTTP, encrypted storage and durable audio queue are real; browser microphone/MediaRecorder and recognition are explicit synthetic doubles. No real microphone or recognizer ran.",
+    "The complete page flushes and pauses the original note before changing mode, then clears Personal voice history on Work selection. Late permission/start replies cannot create capture in the new workspace.",
+    "At most three local segments queue before capture pauses. Lost replies never replay audio; successful saved segments remove audio and preserve corrected transcript continuity.",
+    "Transcript saving and placing it in a design draft are separate. Existing unsent draft text is preserved; no model request is inferred.",
+    "Deletion reviews the selected note and retains copied design text. Browser rendering, recognition quality, actual microphone/device and current complete-platform acceptance remain separate.",
+    "Normal installed adoption remains separate from this source evidence."
+  ],
+  "counting": "Run totals overlap; do not add them as unique assertions."
+}

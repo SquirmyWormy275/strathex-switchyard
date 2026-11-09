@@ -113,6 +113,16 @@ Passing follow-ups do not establish the cause of earlier intermittent failures. 
 - [Restricted-storage retirement](evidence/restricted-storage-47c80be-failure-summary.json): retain native phase/error diagnostics and QUERY-only permissions.
 - [Host-action settlement](evidence/host-action-settlement-diagnostic-summary.json): the original two-second observation expired. Fixture cleanup and closed diagnostic tags improved; original 75 ms coordination/effect and 2,000 ms observation limits remain. The [15-test native follow-up](evidence/host-action-settlement-native-followup-summary.json) passes without proving the original cause.
 
+## Voice-note frontend checkpoint
+
+Saved-note history, separate correction and design-draft actions, reviewed deletion
+and bounded capture are connected. Mode/workspace transitions release the exact
+microphone and late permission/start replies cannot cross that boundary. Fourteen
+interaction cases include the complete page. HTTP/storage/queue are real; browser
+media and recognition are explicit doubles. Normal installed adoption, browser
+rendering and live microphone acceptance remain separate.
+[Controls](voice-note-controls.md), [source evidence](evidence/voice-ui-source-summary.json).
+
 ## Connected-agent frontend checkpoint
 
 Custom-agent inventory, exact reviewed revocation, uncertain retired-command

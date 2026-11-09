@@ -308,6 +308,7 @@ export const requiredGroups = [
   { file: "tools/layout-studio/connection-ui.test.mjs" },
   { file: "tools/layout-studio/portable-ui.test.mjs" },
   { file: "tools/layout-studio/observation-ui.test.mjs" },
+  { file: "tools/layout-studio/voice-ui.test.mjs" },
   { file: "tools/layout-studio/conversation-role-boundaries.test.mjs" },
   { file: "tools/layout-studio/client-launch.test.mjs", ...(process.platform !== "win32" ? { expectedSkipped: 1 } : {}) },
   { file: "tools/layout-studio/physical-intent.test.mjs" },
