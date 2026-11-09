@@ -1,0 +1,377 @@
+{
+  "schema": "switchyard-source-evidence/v1",
+  "sourceBefore": "72e7c22c00c7131722c0c368fe598a2785705b99",
+  "problem": "After acknowledgement, legacy thread/read lacked the fresh account checks already required by startup and paginated reads.",
+  "correction": "Bracket every admitted legacy thread/read with original-account reads. Withhold replies and revoke acknowledgement on mismatch; retain one original acknowledgement after successful repeated reads.",
+  "sourceFiles": {
+    "tools/layout-studio/codex-editor-history.mjs": "ac66868ae8ee8611dc929d038dd3ffde788ed74ce7ee85fd0a8f68f0618310b6",
+    "tools/layout-studio/codex-editor-relay.mjs": "13e378b96179c64699062bffefb0303a993a0f79b16e4b35968cfd71ee95a3c0",
+    "tools/layout-studio/codex-retained-editor-client.mjs": "7947a1306fdea46195abc4cde6ce8839a1bff417daaf0344fa419f8a626b6f0e"
+  },
+  "runs": [
+    {
+      "label": "red",
+      "runId": "00d4ccbf-01d2-4ded-9709-eda807de0055",
+      "receiptSha256": "aa9a445a6edf37e2c4535d818f705c5a0faf38cf033b5fd333a34193073a5606",
+      "success": false,
+      "totals": {
+        "required": 2,
+        "passed": 0,
+        "failed": 2,
+        "tests": 37,
+        "passedTests": 34,
+        "failedTests": 3,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "groups": [
+        {
+          "file": "tools/layout-studio/codex-editor-relay.test.mjs",
+          "durationMs": 188,
+          "timeoutMs": 45000,
+          "counts": {
+            "total": 25,
+            "passed": 23,
+            "failed": 2,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          },
+          "outputDigest": "54fe512b82caffd748a2c5ee9b4c27df03b34b6f7035d710b6c169f57f0fb975",
+          "cleanupCompleted": true
+        },
+        {
+          "file": "tools/layout-studio/codex-retained-editor-client.test.mjs",
+          "durationMs": 158,
+          "timeoutMs": 45000,
+          "counts": {
+            "total": 12,
+            "passed": 11,
+            "failed": 1,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          },
+          "outputDigest": "6939ab3c56f138b8c0fce4392281ec4fe36f1c239deeffbcfc79d62c0ffababf",
+          "cleanupCompleted": true
+        }
+      ]
+    },
+    {
+      "label": "focused",
+      "runId": "3ceea52c-e709-4aaf-ab89-ad5d9213388c",
+      "receiptSha256": "4b2a9d32d460f7cece5a2990d854a6b782a52ddfa7b22d1cb56bfaf243d5343c",
+      "success": true,
+      "totals": {
+        "required": 2,
+        "passed": 2,
+        "failed": 0,
+        "tests": 37,
+        "passedTests": 37,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "groups": [
+        {
+          "file": "tools/layout-studio/codex-editor-relay.test.mjs",
+          "durationMs": 194,
+          "timeoutMs": 45000,
+          "counts": {
+            "total": 25,
+            "passed": 25,
+            "failed": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          },
+          "outputDigest": "e085eab6c96726620845194fe51142bc6434f7af560d33fc335553c4cea8753d",
+          "cleanupCompleted": true
+        },
+        {
+          "file": "tools/layout-studio/codex-retained-editor-client.test.mjs",
+          "durationMs": 169,
+          "timeoutMs": 45000,
+          "counts": {
+            "total": 12,
+            "passed": 12,
+            "failed": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          },
+          "outputDigest": "6c390dcb1bf848a544c8d19aacc5581dc145db16b9a93e4ebbe4bf908fa0b515",
+          "cleanupCompleted": true
+        }
+      ]
+    },
+    {
+      "label": "integration",
+      "runId": "0c97a4e6-e7f8-45f6-b355-b77f6430f38f",
+      "receiptSha256": "a5ca3d3b61dbcbcab5af5aec1aef29600b5e504ce83654aebe9b9b78450eeb42",
+      "success": true,
+      "totals": {
+        "required": 13,
+        "passed": 13,
+        "failed": 0,
+        "tests": 140,
+        "passedTests": 139,
+        "failedTests": 0,
+        "skippedTests": 1,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "groups": [
+        {
+          "file": "tools/layout-studio/windows-codex-editor-connection.test.mjs",
+          "durationMs": 656,
+          "timeoutMs": 45000,
+          "counts": {
+            "total": 9,
+            "passed": 9,
+            "failed": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          },
+          "outputDigest": "d1c7ced7345e3fbf715bca5f609853ca68096953c03df6aaf50dc2769c849588",
+          "cleanupCompleted": true
+        },
+        {
+          "file": "tools/layout-studio/coding-editor-connections.test.mjs",
+          "durationMs": 15406,
+          "timeoutMs": 45000,
+          "counts": {
+            "total": 10,
+            "passed": 10,
+            "failed": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          },
+          "outputDigest": "0c8c881686793df436e8e4b0f4955b23a5e5a7a9de2bcf9589f959918d5ac691",
+          "cleanupCompleted": true
+        },
+        {
+          "file": "tools/layout-studio/codex-editor-protocol.test.mjs",
+          "durationMs": 151,
+          "timeoutMs": 45000,
+          "counts": {
+            "total": 9,
+            "passed": 9,
+            "failed": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          },
+          "outputDigest": "eec578dc998937788fc46357bf4544e1d01a61a6bf24d377cd132bb098600f2a",
+          "cleanupCompleted": true
+        },
+        {
+          "file": "tools/layout-studio/codex-editor-relay.test.mjs",
+          "durationMs": 188,
+          "timeoutMs": 45000,
+          "counts": {
+            "total": 25,
+            "passed": 25,
+            "failed": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          },
+          "outputDigest": "8064e346cf9f1f68da1a00c421c0dc8fd94e8a47744f2fbd12ce281fdb22041e",
+          "cleanupCompleted": true
+        },
+        {
+          "file": "tools/layout-studio/codex-retained-editor-client.test.mjs",
+          "durationMs": 159,
+          "timeoutMs": 45000,
+          "counts": {
+            "total": 12,
+            "passed": 12,
+            "failed": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          },
+          "outputDigest": "627c66ea3de9933d3f3d8e1b1bbc95fa92b8b1d5fa71ec7072dfe84e5d8a7765",
+          "cleanupCompleted": true
+        },
+        {
+          "file": "tools/layout-studio/windows-coding-editor-connections.test.mjs",
+          "durationMs": 7602,
+          "timeoutMs": 45000,
+          "counts": {
+            "total": 9,
+            "passed": 8,
+            "failed": 0,
+            "cancelled": 0,
+            "skipped": 1,
+            "todo": 0
+          },
+          "outputDigest": "a3ba99e72de36f19f34adca84c17f2d666332d7f06bd1e8b79e77e8a55febde6",
+          "cleanupCompleted": true
+        },
+        {
+          "file": "tools/layout-studio/codex-editor-ingress.test.mjs",
+          "durationMs": 11809,
+          "timeoutMs": 45000,
+          "counts": {
+            "total": 13,
+            "passed": 13,
+            "failed": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          },
+          "outputDigest": "4d7bf9e52ffe346217438f3c83458e87139d54f6cfc0ec3e696a774fb4413d71",
+          "cleanupCompleted": true
+        },
+        {
+          "file": "tools/layout-studio/codex-editor-ingress-owner.test.mjs",
+          "durationMs": 1654,
+          "timeoutMs": 45000,
+          "counts": {
+            "total": 9,
+            "passed": 9,
+            "failed": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          },
+          "outputDigest": "5555f06cd3c977d53013cad4067c76d8face2a7fa7f0611c5c31b269df9fa2f7",
+          "cleanupCompleted": true
+        },
+        {
+          "file": "apps/vscode-extension/test/codex-terminal.test.ts",
+          "durationMs": 101,
+          "timeoutMs": 45000,
+          "counts": {
+            "total": 4,
+            "passed": 4,
+            "failed": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          },
+          "outputDigest": "8df114510f36234aef33931f0e472d18d39becc67fff09f93a3fe9eddab217bf",
+          "cleanupCompleted": true
+        },
+        {
+          "file": "apps/vscode-extension/test/codex-windows-terminal.test.ts",
+          "durationMs": 119,
+          "timeoutMs": 45000,
+          "counts": {
+            "total": 3,
+            "passed": 3,
+            "failed": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          },
+          "outputDigest": "eb5ad3d7b663e554e6e8f9d2ed41a53436979bd278c9bc9dd68a8b80524d1326",
+          "cleanupCompleted": true
+        },
+        {
+          "file": "apps/vscode-extension/test/studio-windows-editor-launch.test.ts",
+          "durationMs": 1365,
+          "timeoutMs": 45000,
+          "counts": {
+            "total": 13,
+            "passed": 13,
+            "failed": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          },
+          "outputDigest": "510960d99c4ce0991ac3f5577622a4a48dfd75e209dc2b185e90f5f14c54f4b2",
+          "cleanupCompleted": true
+        },
+        {
+          "file": "apps/vscode-extension/test/studio-editor-launch.test.ts",
+          "durationMs": 4472,
+          "timeoutMs": 45000,
+          "counts": {
+            "total": 22,
+            "passed": 22,
+            "failed": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          },
+          "outputDigest": "0360b116ab1e8bc0da109da94db7bc74d16c91e1ac25dfffe91dc145cc40354f",
+          "cleanupCompleted": true
+        },
+        {
+          "file": "apps/vscode-extension/test/studio-editor-session.test.ts",
+          "durationMs": 4659,
+          "timeoutMs": 45000,
+          "counts": {
+            "total": 2,
+            "passed": 2,
+            "failed": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          },
+          "outputDigest": "aeed126b93211983dd84e7ffa9386f187f3d5843866ea992ab33b5fa219bce27",
+          "cleanupCompleted": true
+        }
+      ]
+    },
+    {
+      "label": "package",
+      "runId": "93c37621-6d50-41df-82b3-85005d9983cc",
+      "receiptSha256": "5303435d1f5b34799fb1bb75458ff13bc64f42cbd372a65eb7c22fb61c7fd453",
+      "success": true,
+      "totals": {
+        "required": 1,
+        "passed": 1,
+        "failed": 0,
+        "tests": 5,
+        "passedTests": 5,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "groups": [
+        {
+          "file": "deployment/suite/release.test.mjs",
+          "durationMs": 2781,
+          "timeoutMs": 45000,
+          "counts": {
+            "total": 5,
+            "passed": 5,
+            "failed": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          },
+          "outputDigest": "57034066888fba13b149b8d34202511ed4e624dc7b578fb4d9f9b613eb1edb4f",
+          "cleanupCompleted": true
+        }
+      ]
+    }
+  ],
+  "typecheck": {
+    "command": "node node_modules/typescript/bin/tsc --noEmit -p tsconfig.json",
+    "exitCode": 0
+  },
+  "coverage": [
+    "Account differs before query: no thread/read dispatched",
+    "Account differs during query: no history reply delivered",
+    "Direct Linux relay and retained Windows composition",
+    "Repeated successful history reads preserve exactly one acknowledgement",
+    "Existing cancellation, bounded queue, foreign task, permission and paginated history tests",
+    "Original complete package bounds and cleanup"
+  ],
+  "limitations": [
+    "All account changes are synthetic; no live account/task/model action",
+    "Installed source remains 42655aa until a normal update",
+    "Active complete Linux run uses predecessor 72e7c22",
+    "Latest complete Windows and graphical editor acceptance remain separate"
+  ]
+}

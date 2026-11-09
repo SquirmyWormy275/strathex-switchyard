@@ -100,6 +100,29 @@ test('native pre-resume metadata is withheld if its original account changes dur
   await assert.rejects(f.relay.receive({ id: 2, method: 'thread/read', params: { threadId: target.sessionId } }));
   assert.equal(f.delivered.some(m => m.id === 2), false); assert.equal(f.relay.observation().protocolAcknowledged, false);
 });
+test('acknowledged legacy reads check the original account before querying and before releasing history', async t => {
+  for (const change of ['before', 'during']) {
+    let changed = false;
+    const f = fixture(t, { reply: async (m,r) => {
+      if (m.method === 'thread/read' && change === 'during') changed = true;
+      if (m.method === 'account/read' && changed) r.account.email = 'other@example.invalid';
+    } });
+    await f.ready(); await f.relay.receive(resume()); changed = change === 'before';
+    await assert.rejects(f.relay.receive({ id: 3, method: 'thread/read', params: { threadId: target.sessionId, includeTurns: true } }));
+    assert.equal(f.calls.filter(m => m.method === 'thread/read').length, change === 'before' ? 0 : 1);
+    assert.equal(f.delivered.some(m => m.id === 3), false); assert.equal(f.relay.observation().protocolAcknowledged, false);
+    assert.equal(f.client.closed, true); assert.equal(f.acknowledgements.length, 1);
+  }
+});
+test('repeated acknowledged legacy reads retain one original acknowledgement after fresh account checks', async t => {
+  const f = fixture(t); await f.ready(); await f.relay.receive(resume());
+  for (const id of [3, 4]) {
+    await f.relay.receive({ id, method: 'thread/read', params: { threadId: target.sessionId, includeTurns: true } });
+    assert.deepEqual(f.calls.slice(-3).map(m => m.method), ['account/read', 'thread/read', 'account/read']);
+    assert.equal(f.delivered.at(-1).id, id); assert.equal(f.relay.observation().protocolAcknowledged, true);
+  }
+  assert.equal(f.acknowledgements.length, 1);
+});
 test('native project configuration reads preserve exact cwd, effective restrictions and original account', async t => {
   const ready = async hooks => {
     const f = fixture(t, { reply: async (m,r) => { if (m.method === 'initialize') r.userAgent = 'codex-tui/0.167.0 (synthetic)'; await hooks?.(m,r); } });

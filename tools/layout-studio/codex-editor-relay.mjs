@@ -140,11 +140,13 @@ export function createCodexEditorRelay({ target, client, assertCurrent, send, on
       const startupRead = nativeTui && phase === 'ready' && !attempted;
       require((acknowledged || startupRead) && exact(m.params, ['threadId','includeTurns']) && m.params.threadId === selected.sessionId && (m.params.includeTurns === undefined || typeof m.params.includeTurns === 'boolean')
         && (!startupRead || m.params.includeTurns !== true));
-      if (startupRead) await account('switchyard-before-read-' + ++accountSequence);
+      // An acknowledged connection still needs fresh account evidence for every
+      // legacy history read, including a provider change without a notification.
+      await account('switchyard-before-read-' + ++accountSequence);
       const result = await request(m.method, startupRead ? { threadId: selected.sessionId, includeTurns: false } : m.params);
       require(result?.thread?.id === selected.sessionId && result.thread.cwd === selected.repositoryRoot && ['idle','active'].includes(result.thread.status?.type));
-      if (startupRead) await account('switchyard-after-read-' + ++accountSequence);
-      await deliver({ id: m.id, result }); return;
+      await account('switchyard-after-read-' + ++accountSequence);
+      await deliver({ id: m.id, result }); acknowledged = attempted && witness.observation().protocolAcknowledged; return;
     }
     // No default forwarding. Turn, login, config-write, other-task and unknown
     // requests have no authority under this reviewed attachment permission.

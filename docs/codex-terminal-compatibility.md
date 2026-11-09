@@ -54,6 +54,16 @@ bytes are removed after original guardian exit and exact file verification.
 Per-turn edits, anchor cursors, ascending reads and experimental history methods
 remain refused. History reads grant no prompt or tool authority.
 
+Legacy `thread/read` now also verifies the original account before querying and
+after receiving a reply, including reads after acknowledgement. A mismatched
+account prevents delivery and closes the connection; successful repeated reads
+retain the one original acknowledgement. Three failing regressions reproduce the
+earlier omission. Thirteen integration groups pass 139 tests with one existing
+skip, package checks pass five, and typechecking passes. Account changes use
+explicit doubles. This later correction is not yet installed at `42655aa`, and
+the active full Linux run at `72e7c22` predates it.
+[Legacy read correction](evidence/codex-legacy-read-account-summary.json).
+
 ## Earlier legacy demonstration and checks
 
 The native CLI, production WebSocket handshake and production relay ran in an

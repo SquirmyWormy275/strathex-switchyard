@@ -58,6 +58,25 @@ test('closing a retained channel joins its pending RPC and suppresses the late r
   assert.equal(stopped,true);assert.equal(f.killed(),false);assert.equal(f.native.listenerCount('notification'),0);
 });
 
+test('retained legacy history is withheld when the original account changes before or during its read', async t => {
+  for (const change of ['before', 'during']) {
+    let changed = false;
+    const f = await fixture(t, { reply: async (m,r) => {
+      if (m.method === 'thread/read' && change === 'during') changed = true;
+      if (m.method === 'account/read' && changed) r.account.email = 'other@example.invalid';
+    } }), c = f.create(), delivered = [], acknowledgements = [];
+    const relay = createCodexEditorRelay({ client: c, target, platform: 'win32', signal: new AbortController().signal,
+      assertCurrent: async () => {}, send: async m => delivered.push(m), onAcknowledged: async o => acknowledgements.push(o) });
+    t.after(() => relay.stop());
+    await relay.receive({ id: 1, method: 'initialize', params: init }); await relay.receive({ method: 'initialized', params: {} });
+    await relay.receive({ id: 2, method: 'thread/resume', params: resume }); changed = change === 'before';
+    await assert.rejects(relay.receive({ id: 3, method: 'thread/read', params: { threadId: target.sessionId, includeTurns: true } }));
+    assert.equal(f.calls.filter(m => m.method === 'thread/read').length, change === 'before' ? 0 : 1);
+    assert.equal(delivered.some(m => m.id === 3), false); assert.equal(relay.observation().protocolAcknowledged, false);
+    assert.equal(acknowledgements.length, 1); assert.equal(c.closed, true); assert.equal(f.native.closed, true);
+  }
+});
+
 test('retained configuration reads preserve the selected project and refuse ineffective restrictions', async t => {
   const f = await fixture(t), {c} = await f.ready(), params = { includeLayers: true, cwd: target.repositoryRoot };
   await c.request('config/read', params); assert.deepEqual(f.calls.at(-1).params, params);
