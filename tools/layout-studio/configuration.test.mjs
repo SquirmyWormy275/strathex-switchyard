@@ -101,6 +101,14 @@ test("native VS Code rejects spoofed classes, alternate editors, PID reuse and m
   await assert.rejects(focusNativeVscode(reused.hypr, { readProcess: reused.readProcess, assertCurrent: async () => { if (++checks === 2) reused.process.startTicks = "22222"; } }), /changed before focus/); assert.equal(reused.calls.some(call => call[0] === "dispatch"), false);
 });
 
+test("Claude Desktop shortcut compilation is navigation only with its own closed implementation", () => {
+  const compiled = compileConnection(plan(), "summon", "native-claude-desktop.focus/v1");
+  assert.equal(compiled.label, "Show Claude Desktop"); assert.equal(compiled.shortcut, "SUPER + ALT + F1");
+  const changed = plan(); changed.actions[0].consequence = "read_only";
+  assert.throws(() => compileConnection(changed, "summon", "native-claude-desktop.focus/v1"), /navigation/);
+  assert.throws(() => compileConnection(plan(), "summon", "native-claude-code.focus/v1"), /unavailable/);
+});
+
 test("another application sharing VS Code's class cannot steal the exact native editor target", async () => {
   const f = chatgptFocusFixture(); f.process.executable = "/usr/share/code/code"; f.window.initialClass = "com.microsoft.VSCode";
   f.windows.push({ ...f.window, pid: 124, address: "0x456" });

@@ -38,3 +38,29 @@ test("a source-reference layout cannot enable host shortcut review", () => brows
   change("connection-action", "progress"); change("connection-role-target", "0");
   await until(() => discovered); assert.equal($("review-connection").disabled, true);
 }));
+
+test("Windows Claude Desktop shortcut selection requires its saved identity and sends only the exact navigation implementation", () => browserSurfaceFixture(async ({ $, change, click, document, store }) => {
+  const { connectWorkspace } = await import("./connection.mjs");
+  const calls = [], plan = { profile: { evidence: "saved-snapshot" }, actions: [{ id: "summon", label: "Return to my app" }] };
+  connectWorkspace({ getPlan: () => plan, notify() {}, request: async (path, body) => {
+    calls.push({ path, body });
+    if (path === "/api/discovery") return { shortcuts: true, platform: "win32", hostLayouts: ["US"], checkedAt: new Date().toISOString(), keyboard: { status: "saved", message: "Fixture" }, chatgpt: { status: "unavailable" } };
+    if (path === "/api/transactions") return [];
+    if (path === "/api/review") return { reviewId: "synthetic-navigation", shortcut: "SUPER CTRL F1", label: "Show Claude Desktop", changes: ["Synthetic shortcut review"] };
+    throw Error("No host mutation is available in this fixture");
+  } });
+  document.dispatchEvent(new CustomEvent("switchyard-compartment-state", { detail: await store.snapshot("personal") }));
+  await until(() => [...$("connection-implementation").options].some(o => o.value === "native-claude-desktop.focus/v1"));
+  change("connection-action", "summon"); change("connection-implementation", "native-claude-desktop.focus/v1");
+  assert.equal($("review-connection").disabled, true);
+  await store.update("personal", "synthetic-reviewed-image", s => { s.nativeWindowsClaude = { identity: { executableSha256: "a".repeat(64) } }; });
+  document.dispatchEvent(new CustomEvent("switchyard-compartment-state", { detail: await store.snapshot("personal") }));
+  await until(() => !$("review-connection").disabled); click("review-connection");
+  await until(() => $("host-review-dialog").open);
+  assert.equal(calls.find(row => row.path === "/api/review").body.implementation, "native-claude-desktop.focus/v1");
+  assert.match($("connection-description").textContent, /Claude Desktop/);
+  assert.equal(calls.some(row => row.path === "/api/apply"), false);
+  await store.update("personal", "synthetic-keyboard-only", s => { s.mode = "keyboard-only"; });
+  document.dispatchEvent(new CustomEvent("switchyard-compartment-state", { detail: await store.snapshot("personal") }));
+  assert.equal($("host-review-dialog").open, false); assert.equal($("review-connection").disabled, true);
+}));

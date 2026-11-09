@@ -1,4 +1,4 @@
-/** Reviewed Windows ChatGPT and VS Code focus. No provider launch, typing or account control. */
+/** Reviewed Windows native app focus. No provider launch, typing or account control. */
 import { createHash, randomUUID } from "node:crypto";
 import { dirname, join, win32 } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -8,14 +8,15 @@ import { desktopEnvironment } from "./process-environment.mjs";
 
 const targets = Object.freeze({
   "native-chatgpt.focus/v1": Object.freeze({ provider: "native-chatgpt", nativeProvider: "chatgpt_desktop", key: "nativeWindowsChatgpt", label: "ChatGPT" }),
-  "native-vscode.focus/v1": Object.freeze({ provider: "native-vscode", nativeProvider: "vscode", key: "nativeWindowsVscode", label: "VS Code" })
+  "native-vscode.focus/v1": Object.freeze({ provider: "native-vscode", nativeProvider: "vscode", key: "nativeWindowsVscode", label: "VS Code" }),
+  "native-claude-desktop.focus/v1": Object.freeze({ provider: "claude-desktop", nativeProvider: "claude_desktop", key: "nativeWindowsClaude", label: "Claude Desktop" })
 });
 const targetFor = value => {
   if (typeof value !== "string" || !Object.hasOwn(targets, value)) throw Error("Native Windows focus for this application remains unfinished.");
   return targets[value];
 };
 const hash = value => createHash("sha256").update(JSON.stringify(value)).digest("hex");
-const scope = state => hash([state.policy, state.mode, state.modeSelectedAt ?? null, state.accounts, state.taskAuthorityEpoch ?? 0, state.nativeWindowsChatgpt ?? null, ...(state.nativeWindowsVscode ? [state.nativeWindowsVscode] : [])]);
+const scope = state => hash([state.policy, state.mode, state.modeSelectedAt ?? null, state.accounts, state.taskAuthorityEpoch ?? 0, state.nativeWindowsChatgpt ?? null, ...(state.nativeWindowsVscode ? [state.nativeWindowsVscode] : []), ...(state.nativeWindowsClaude ? [state.nativeWindowsClaude] : [])]);
 const uuid = value => typeof value === "string" && /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/.test(value);
 const exact = (value, keys) => value && typeof value === "object" && !Array.isArray(value) && Object.keys(value).sort().join() === keys.slice().sort().join();
 const validOwner = value => exact(value, ["processId", "processStartTime"]) && Number.isSafeInteger(value.processId) && value.processId > 0 && value.processId <= 0x7fffffff && typeof value.processStartTime === "string" && /^[1-9][0-9]{0,19}$/.test(value.processStartTime) && BigInt(value.processStartTime) <= 0xffffffffffffffffn;
@@ -26,7 +27,7 @@ const providerModule = () => import("../../apps/windows-companion/src/provider-d
 const entryFor = async (target, path, signature) => {
   const module = await providerModule();
   return target.nativeProvider === "vscode" ? module.createWindowsEditorFocusTarget({ path, ...signature })
-    : module.createFixedProviderDesktopCatalog({ chatgpt_desktop: { path, ...signature } }).get("chatgpt_desktop");
+    : module.createFixedProviderDesktopCatalog({ [target.nativeProvider]: { path, ...signature } }).get(target.nativeProvider);
 };
 const signatureFor = identity => ({ signerSubject: identity.signerSubject, signerThumbprint: identity.signerThumbprint });
 function exactSignatureProbe() {

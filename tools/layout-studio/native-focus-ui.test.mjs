@@ -14,8 +14,8 @@ async function fixture(fn, platform = "linux") {
     f.root = c.root; f.path = join(c.root, "ChatGPT.exe"); f.helper = join(c.root, "Switchyard.Hotkeys.exe");
     await writeFile(f.path, "synthetic app bytes"); await writeFile(f.helper, "synthetic native helper");
     const { mountNativeFocus } = await import("./client-ui.mjs"); mountNativeFocus({ notify: message => f.notices.push(message) });
-    await c.refresh(); await until(() => c.$("native-app-picker").options.length === 2 && !c.$("refresh-native-apps").disabled);
-    await fn({ ...c, f, window });
+    await c.refresh(); await until(() => c.$("native-app-picker").options.length === (platform === "win32" ? 3 : 2) && !c.$("refresh-native-apps").disabled);
+    await fn({ ...c, f, window, platform });
   }, {
     platform,
     hypr: async (command, argument) => {
@@ -46,7 +46,7 @@ async function fixture(fn, platform = "linux") {
   });
 }
 async function openReview(c, id) { c.click(id); await until(() => c.$("native-app-review-dialog").open && !c.$("confirm-native-app-review").disabled); }
-async function settled(c) { await until(() => !c.$("refresh-native-apps").disabled && c.$("native-app-picker").options.length === 2); }
+async function settled(c) { await until(() => !c.$("refresh-native-apps").disabled && c.$("native-app-picker").options.length === (c.platform === "win32" ? 3 : 2)); }
 async function setup(c) {
   c.$("native-app-path").value = c.f.path; c.$("native-app-path").dispatchEvent(new Event("input"));
   await openReview(c, "review-native-app-setup"); c.click("confirm-native-app-review");
@@ -112,6 +112,25 @@ test("lost Windows configuration reply refreshes exact saved identity without re
   assert.match(c.$("native-app-detail").textContent, /Saved ChatGPT executable/); assert.equal(c.$("review-native-app-focus").disabled, false);
   assert.equal(c.calls.filter(row => row.path.endsWith("native-focus/configure")).length, 1); assert.equal(c.f.effects, 0);
 }, "win32"));
+
+test("Windows Claude Desktop selection reviews and focuses only its separately saved native application", () => fixture(async c => {
+  let sharedRefreshes = 0; c.document.addEventListener("switchyard-refresh-request", () => { sharedRefreshes++; });
+  c.change("native-app-picker", "native-claude-desktop.focus/v1");
+  assert.equal(c.$("review-native-app-focus").disabled, true); assert.match(c.$("native-app-detail").textContent, /Claude Desktop/);
+  await setup(c); await until(() => sharedRefreshes === 1); const saved = await c.store.snapshot("personal");
+  assert.equal(saved.nativeWindowsClaude.identity.productIdentity.productId, "anthropic.claude-desktop");
+  assert.equal(saved.nativeWindowsChatgpt, undefined); assert.equal(c.f.effects, 0);
+  await openReview(c, "review-native-app-focus"); assert.match(c.$("native-app-review-summary").textContent, /open Claude Desktop/);
+  c.click("confirm-native-app-review"); await until(() => c.$("native-app-status").textContent.includes("Claude Desktop window was focused")); await settled(c);
+  assert.equal(c.f.effects, 1); assert.equal(c.calls.find(row => row.path.endsWith("native-focus/focus")).body.implementation, "native-claude-desktop.focus/v1");
+  c.change("native-app-picker", "native-chatgpt.focus/v1"); assert.equal(c.$("review-native-app-focus").disabled, true);
+}, "win32"));
+
+test("Linux refuses Claude Desktop focus without probing another application or showing a configured choice", () => fixture(async c => {
+  assert(![...c.$("native-app-picker").options].some(row => row.value === "native-claude-desktop.focus/v1"));
+  await assert.rejects(c.suite.handle("/api/suite/native-focus/focus", { compartment: "personal", implementation: "native-claude-desktop.focus/v1", requestId: "11111111-1111-4111-8111-111111111111" }), /Linux is unfinished/);
+  assert.equal(c.f.probes, 0); assert.equal(c.f.effects, 0);
+}));
 
 test("Windows retired-helper review preserves the original uncertain result and cannot refocus the app", () => fixture(async c => {
   await setup(c);

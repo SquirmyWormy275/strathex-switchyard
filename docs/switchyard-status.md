@@ -14,6 +14,20 @@ no merge or public release has been accepted.
 
 ## Guided frontend checkpoint
 
+Windows Claude Desktop now connects exact executable review, saved identity,
+window focus and navigation shortcuts. Twelve groups pass 177 checks; a final
+four-group UI run passes 39 with overlap. The helper builds offline with warnings
+as errors and passes its portable self-test and Linux refusal. Both temporary
+build copies are removed; the original incomplete staging failure is retained.
+Interactive Windows image/window acceptance, Linux Claude focus and application
+launch remain separate. [Controls and evidence](windows-native-focus.md).
+Normal installed adoption of this source is pending.
+
+Latest audited Linux release run `42568708712` at `947d982` failed before tests:
+the unchanged pinned Bubblewrap download returned HTTP 504. No test was skipped
+by changing the plan, and no manual retry was requested. The completed local
+`4e3feb4` run remains separate source evidence.
+
 Claude Code now has a separately opted-in hook observation path and an exact-session
 settings preview. Ten hook cases and two UI cases pass within eight original
 groups/111 checks, including actual independent Node processes and encrypted

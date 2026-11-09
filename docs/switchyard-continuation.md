@@ -105,6 +105,9 @@ Only bounded digest-verified JSON receipts remain locally outside the checkout. 
 
 ## Recent backend behavior
 
+- Windows Claude Desktop is connected through native executable review, saved identity, focus, physical dispatch and shortcut controls. Source verification passes 177 checks plus 39 final UI checks with overlap; offline helper build/self-test passes. Actual Windows image/window acceptance, Linux Claude focus and launch remain separate. Normal installed adoption is pending. [Source evidence](evidence/claude-desktop-focus-source-summary.json).
+- Linux release run `42568708712`, job `129000860981`, at `947d982` failed before tests when the pinned Bubblewrap download returned HTTP 504. Preserve the failure; no manual retry/cancel/dispatch or bound change. [Receipt](evidence/linux-947-download-failure-summary.json).
+
 - Claude hook observations now have a separate source, exact destination/session recipe preview and local stdin command. Eight groups/111 tests and fourteen running-preview checks pass, with independent Node processes and encrypted storage. The original expired synthetic-fixture failure is retained. No actual Claude settings, hook invocation, account or task was touched. Normal installed adoption now passes 58 served/API and 103 installed checks with all 54 semantic workspaces preserved; native hook invocation and browser acceptance remain separate. [Contract](claude-hook-observation.md), [source evidence](evidence/claude-hook-source-summary.json).
 
 - Signed saved-project discovery and exact-project task choices are implemented in both typed editor clients. Current protected owner/load/task records and workspace policy determine eligibility. Listing does not inspect a native provider, write state or grant execution. Fresh exact review remains mandatory. Picker/command activation may now be implemented. [Contract](coding-task-owners.md#find-eligible-saved-projects).

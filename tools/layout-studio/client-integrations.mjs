@@ -6,7 +6,7 @@ export function createClientIntegrations({ store, platform = process.platform, h
       const s = await store.snapshot(c);
       return { schema: "switchyard-native-focus-catalog/v1", platform,
         permitted: s.policy === "personal" && s.mode === "personal-companion", supported: ["linux", "win32"].includes(platform),
-        entries: [["native-chatgpt.focus/v1", "ChatGPT", "nativeWindowsChatgpt"], ["native-vscode.focus/v1", "VS Code", "nativeWindowsVscode"]].map(([implementation, name, key]) => {
+        entries: [["native-chatgpt.focus/v1", "ChatGPT", "nativeWindowsChatgpt"], ["native-vscode.focus/v1", "VS Code", "nativeWindowsVscode"], ...(platform === "win32" ? [["native-claude-desktop.focus/v1", "Claude Desktop", "nativeWindowsClaude"]] : [])].map(([implementation, name, key]) => {
           const saved = s[key];
           return { implementation, name, configured: platform === "linux" || !!saved?.identity,
             identity: platform === "win32" && saved?.identity ? { executablePath: saved.identity.canonicalExecutablePath, sha256: saved.identity.executableSha256, signer: saved.identity.signerSubject } : null };

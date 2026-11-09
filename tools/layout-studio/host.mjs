@@ -65,9 +65,11 @@ export const nativeChatgptWindow = (hypr = runHypr, readProcess = linuxProcess) 
 export const nativeVscodeWindow = (hypr = runHypr, readProcess = linuxProcess) => nativeWindow(nativeTargets.vscode, hypr, readProcess);
 export const focusNativeChatgpt = (hypr = runHypr, options) => focusNativeWindow(nativeTargets.chatgpt, hypr, options);
 export const focusNativeVscode = (hypr = runHypr, options) => focusNativeWindow(nativeTargets.vscode, hypr, options);
+const unavailableClaudeFocus = async () => { throw new Error("Claude Desktop focus on Linux is unfinished. No Claude Code, web or other application was selected."); };
 export const nativeFocusImplementations = Object.freeze({
   "native-chatgpt.focus/v1": Object.freeze({ provider: "native-chatgpt", inspect: nativeChatgptWindow, focus: focusNativeChatgpt }),
-  "native-vscode.focus/v1": Object.freeze({ provider: "native-vscode", inspect: nativeVscodeWindow, focus: focusNativeVscode })
+  "native-vscode.focus/v1": Object.freeze({ provider: "native-vscode", inspect: nativeVscodeWindow, focus: focusNativeVscode }),
+  "native-claude-desktop.focus/v1": Object.freeze({ provider: "claude-desktop", inspect: unavailableClaudeFocus, focus: unavailableClaudeFocus })
 });
 
 async function ownedFile(path, privateFile = false) {

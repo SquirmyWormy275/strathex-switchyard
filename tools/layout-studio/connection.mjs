@@ -36,6 +36,17 @@ export function connectWorkspace({ getPlan, notify, request = api }) {
   let snapshot = null, roleTargets = [], workspace = null, generation = 0;
   const roleTarget = () => $("connection-role-target").value === "" ? null : roleTargets[Number($("connection-role-target").value)];
   const roleConnection = () => $("connection-implementation").value === "switchyard.role/v1";
+  const nativeApps = {
+    "native-chatgpt.focus/v1": { name: "ChatGPT", saved: "nativeWindowsChatgpt" },
+    "native-vscode.focus/v1": { name: "VS Code", saved: "nativeWindowsVscode" },
+    "native-claude-desktop.focus/v1": { name: "Claude Desktop", saved: "nativeWindowsClaude" }
+  };
+  function implementations() {
+    const previous = $("connection-implementation").value;
+    const rows = [["switchyard.role/v1", "Run a connected role control"], ...Object.entries(nativeApps).filter(([id]) => id !== "native-claude-desktop.focus/v1" || snapshot?.platform === "win32").map(([id, app]) => [id, `Show native ${app.name}`])];
+    $("connection-implementation").replaceChildren(...rows.map(([id, name]) => { const o = document.createElement("option"); o.value = id; o.textContent = name; return o; }));
+    $("connection-implementation").value = rows.some(([id]) => id === previous) ? previous : "switchyard.role/v1";
+  }
   function invalidate() {
     generation++; reviewed = null;
     $("host-review-dialog").close();
@@ -50,9 +61,11 @@ export function connectWorkspace({ getPlan, notify, request = api }) {
     controls();
   }
   function controls() {
+    const app = nativeApps[$("connection-implementation").value];
+    const nativeReady = workspace?.policy === "personal" && workspace?.mode === "personal-companion" && app && (snapshot?.platform === "win32" ? !!workspace[app.saved]?.identity : snapshot?.platform === "linux" && ($("connection-implementation").value === "native-chatgpt.focus/v1" ? snapshot.chatgpt?.status === "focusable" : $("connection-implementation").value === "native-vscode.focus/v1"));
     $("connection-role-wrap").hidden = !roleConnection();
-    $("connection-description").textContent = roleConnection() ? "Installs a shortcut for the saved role control. Its target is checked again whenever the shortcut runs." : "Focuses the verified native ChatGPT main window. This does not resume a particular task.";
-    $("review-connection").disabled = busy || !getPlan() || getPlan().profile.evidence === "source-reference" || !$("connection-action").value || !snapshot?.shortcuts || (roleConnection() ? !roleTarget() || workspace?.mode === "keyboard-only" : snapshot.chatgpt?.status !== "focusable");
+    $("connection-description").textContent = roleConnection() ? "Installs a shortcut for the saved role control. Its target is checked again whenever the shortcut runs." : `Focuses the verified native ${app?.name ?? "application"} main window. Open the app first; Windows also requires its saved executable review in Your tools. This does not start an app or resume a particular task.`;
+    $("review-connection").disabled = busy || !getPlan() || getPlan().profile.evidence === "source-reference" || !$("connection-action").value || !snapshot?.shortcuts || (roleConnection() ? !roleTarget() || workspace?.mode === "keyboard-only" : !nativeReady);
     $("apply-connection").disabled = busy || !reviewed;
     $("restore-connection").disabled = busy || !receipt || !["prepared", "applying", "applied", "kept", "recovery-pending"].includes(receipt.status);
     $("trial-connection").disabled = busy || !receipt || !["applied", "kept"].includes(receipt.status);
@@ -90,6 +103,7 @@ export function connectWorkspace({ getPlan, notify, request = api }) {
       $("discovery-status").textContent = "Design workspace available. Local host connection unavailable.";
       $("discovery-detail").textContent = error.message;
     }
+    implementations();
     controls();
   }
   document.addEventListener("switchyard-workspace-changing", () => { generation++; workspace = null; roleTargets = []; reviewed = null; $("host-review-dialog").close(); controls(); });

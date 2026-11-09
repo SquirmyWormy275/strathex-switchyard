@@ -148,7 +148,14 @@ export function mountNativeFocus({ notify }) {
       else { if (result.windowFocusVerified !== true || result.taskResumptionVerified !== false) throw Error("The focus acknowledgement did not verify; no repeat was attempted."); $("native-app-status").textContent = result.summary; }
     } catch (error) {
       if (valid()) { const message = `${error.message} ${review.kind === "configure" ? "Saved setup is refreshed below; the confirmation is not replayed." : review.kind === "focus" ? `Request ${review.requestId}. Focus may have occurred if its reply was lost. Check the app before another deliberate request.` : "The original helpers remain subject to independent exit verification."}`; $("native-app-status").textContent = message; notify(message); }
-    } finally { if (valid()) await load({ preserveStatus: true }); }
+    } finally {
+      if (valid()) {
+        await load({ preserveStatus: true });
+        // Refresh the shared saved setup after either a confirmed save or a
+        // lost acknowledgement, so shortcut choices use server readback.
+        if (review.kind === "configure" && state?.id === c) document.dispatchEvent(new Event("switchyard-refresh-request"));
+      }
+    }
   }));
   document.addEventListener("switchyard-workspace-changing", () => { state = null; catalog = null; $("native-app-path").value = ""; $("native-app-status").textContent = "Choose a workspace."; invalidate(); render(); });
   document.addEventListener("switchyard-compartment-state", event => { state = event.detail; $("native-app-path").value = ""; void load(); });

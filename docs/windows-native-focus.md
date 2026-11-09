@@ -1,6 +1,6 @@
-# Reviewed Windows ChatGPT and VS Code focus
+# Reviewed Windows native app focus
 
-The Suite backend can review an exact local ChatGPT or stable Microsoft VS Code executable, save its identity
+The Suite can review an exact local ChatGPT, Claude Desktop or stable Microsoft VS Code executable, save its identity
 in the selected encrypted workspace, and focus its one verified existing window.
 This is navigation only: it does not establish the signed-in account, identify a
 conversation, resume a task, launch an application or submit a prompt.
@@ -8,8 +8,11 @@ conversation, resume a task, launch an application or submit a prompt.
 The service and authenticated gateway are implemented and exercised with the real
 encrypted store, executable hashing and native protocol parser. Windows process,
 Authenticode and window responses are synthetic in those checks. Actual Windows
-desktop acceptance remains pending. The frozen frontend has no new configuration
-controls. Project selection and task-specific IDE attachment remain unfinished.
+desktop acceptance remains pending. In **Your tools → Native apps**, choose the
+application, review its installed executable, save that exact identity, then
+review returning to its already open window. **Customize → Connect to this
+computer** can review a navigation shortcut after that setup. Project selection
+and task-specific IDE attachment remain unfinished.
 
 ## Explicit configuration
 
@@ -17,7 +20,7 @@ The existing authenticated, same-origin Suite API provides these routes:
 
 | Route | Input and result |
 | --- | --- |
-| `POST /api/suite/native-focus/review` | `implementation: "native-chatgpt.focus/v1"` or `"native-vscode.focus/v1"`, and an exact `executablePath`; returns the observed identity, one-use `reviewId` and required confirmation text. |
+| `POST /api/suite/native-focus/review` | `implementation: "native-chatgpt.focus/v1"`, `"native-vscode.focus/v1"` or `"native-claude-desktop.focus/v1"`, and an exact `executablePath`; returns the observed identity, one-use `reviewId` and required confirmation text. |
 | `POST /api/suite/native-focus/configure` | The exact `reviewId` and `confirmation`; revalidates the application before saving the configuration. |
 | `POST /api/suite/intent` | The implementation and a request UUID; dispatches only within the actual selected workspace. No executable path or command is accepted here. |
 | `POST /api/suite/native-focus/recover` | No operation selectors; observes original helper retirement without repeating focus. This works in keyboard-only mode. |
@@ -51,6 +54,24 @@ sets the company and product-name fields used by the native image check. Actual
 installed Windows image acceptance is still required.
 
 ## One focus attempt and its recovery
+
+Claude Desktop has its own encrypted configuration and compiled desktop product
+identity. It cannot reuse a ChatGPT request or select Claude Code. The existing
+native helper still requires exact executable bytes, Authenticode identity,
+file identity and Windows product/company metadata. An installed package update
+requires a fresh review. No MSIX family, entrypoint or publisher is guessed, and
+no package registration or settings are changed. The official Windows app uses
+[per-user MSIX deployment](https://support.claude.com/en/articles/12622703-deploy-claude-desktop-for-windows).
+Its real installed image must still pass this boundary; software fixtures are
+not evidence that a particular released image does.
+
+Linux Claude Desktop focus and application launching remain unfinished. The
+[official Linux beta](https://support.claude.com/en/articles/10065433-install-claude-desktop)
+targets Ubuntu/Debian; the presence of a Claude Code URL handler on this Arch
+workstation does not establish that installation. Linux requests refuse without
+probing or focusing a substitute application. The Windows controls are exercised
+through authenticated HTTP and encrypted storage with native signature/window
+doubles. [Claude Desktop source evidence](evidence/claude-desktop-focus-source-summary.json).
 
 Every attempt holds a cross-process desktop lease. Before any provider request,
 the focus-only helper's exact PID and creation time are written to the encrypted

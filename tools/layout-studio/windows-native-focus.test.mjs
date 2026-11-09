@@ -132,6 +132,36 @@ test("missing, duplicate or changed application targets refuse without a focus a
   assert.equal(f.effects, 0); assert.equal(f.sessions.length, 2);
 });
 
+test("Claude Desktop keeps its own reviewed image and request identity, never selecting Claude Code or ChatGPT", async t => {
+  const f = await fixture(t), claude = "native-claude-desktop.focus/v1", path = join(f.root, "Claude.exe");
+  await writeFile(path, "synthetic Claude Desktop image"); await f.configure();
+  await assert.rejects(f.service.focus("personal", claude, { requestId: randomUUID() }), /Review and configure/);
+  const review = await f.configure(claude, path); assert.match(review.confirmation, /^Trust Windows Claude Desktop /);
+  const saved = (await f.store.snapshot("personal")).nativeWindowsClaude;
+  assert.equal(saved.implementation, claude); assert.equal(saved.identity.productIdentity.productId, "anthropic.claude-desktop");
+  assert.equal(saved.identity.productIdentity.role, "desktop");
+  const requestId = randomUUID(), result = await f.service.focus("personal", claude, { requestId });
+  assert.equal(result.provider, "claude-desktop"); assert.equal(result.windowFocusVerified, true);
+  for (const key of ["accountVerified", "projectVerified", "taskResumptionVerified", "modelPromptSubmitted"]) assert.equal(result[key], false);
+  assert.equal((await f.service.focus("personal", claude, { requestId })).replayed, true);
+  await assert.rejects(f.service.focus("personal", implementation, { requestId }), /cannot be replayed/);
+  assert.equal(f.effects, 1); assert(f.requests.filter(r => r.action).every(r => r.provider === "claude_desktop"));
+  assert(f.sessions.every(s => s.terminated));
+  await writeFile(path, "changed Claude Desktop image");
+  await assert.rejects(f.service.focus("personal", claude, { requestId: randomUUID() }), /identity changed/);
+  assert.equal(f.effects, 1);
+});
+
+test("changing a saved Claude Desktop identity invalidates an outstanding other-app review", async t => {
+  const f = await fixture(t), claude = "native-claude-desktop.focus/v1";
+  const review = await f.service.review("personal", { implementation, executablePath: f.executablePath });
+  await f.configure(claude);
+  await assert.rejects(f.service.configure("personal", { reviewId: review.reviewId, confirmation: review.confirmation }), /changed/);
+  await f.store.update("work", "synthetic-work-mode", s => { s.mode = "managed-companion"; }); f.active = "work";
+  await assert.rejects(f.service.review("work", { implementation: claude, executablePath: f.executablePath }), /prohibit|permit|allowed/i);
+  assert.equal(f.effects, 0); assert.equal(f.sessions.length, 0);
+});
+
 test("current policy and executable bytes are checked at the native final-effect barrier and after readback", async t => {
   const f = await fixture(t);
   for (const mutation of ["before-selection", "before-mode", "before-bytes", "after-mode"]) {
@@ -273,8 +303,15 @@ test("authenticated Suite routes review and configure exact Windows focus, dispa
   const editorReview = await api("native-focus/review", { implementation: "native-vscode.focus/v1", executablePath: codePath }); assert.equal(editorReview.status, 200);
   assert.equal((await api("native-focus/configure", { reviewId: editorReview.body.reviewId, confirmation: editorReview.body.confirmation })).status, 200);
   const editorFocus = await api("intent", { implementation: "native-vscode.focus/v1", requestId: randomUUID() }); assert.equal(editorFocus.status, 200); assert.equal(editorFocus.body.provider, "native-vscode"); assert.equal(editorFocus.body.projectVerified, false);
+  const claude = "native-claude-desktop.focus/v1", claudePath = join(f.root, "Claude.exe"); await writeFile(claudePath, "synthetic gateway Claude Desktop");
+  const claudeReview = await api("native-focus/review", { implementation: claude, executablePath: claudePath }); assert.equal(claudeReview.status, 200);
+  assert.equal((await api("native-focus/configure", { reviewId: claudeReview.body.reviewId, confirmation: claudeReview.body.confirmation })).status, 200);
+  const claudeFocus = await api("native-focus/focus", { compartment: "personal", implementation: claude, requestId: randomUUID() });
+  assert.equal(claudeFocus.status, 200); assert.equal(claudeFocus.body.provider, "claude-desktop"); assert.equal(claudeFocus.body.taskResumptionVerified, false);
+  assert.equal((await f.suite.authorizeConnection("personal", { implementation: claude })).available, true);
   assert.equal((await api("compartment/select", { compartment: "work" })).status, 200);
-  assert.equal((await api("intent", { implementation, requestId: randomUUID(), compartment: "personal" })).status, 409); assert.equal(f.effects, 2);
+  assert.equal((await api("intent", { implementation, requestId: randomUUID(), compartment: "personal" })).status, 409);
+  assert.equal((await api("intent", { implementation: claude, requestId: randomUUID(), compartment: "personal" })).status, 409); assert.equal(f.effects, 3);
 });
 
 test("Suite preserves selection on an uncertain original focus helper and saves keyboard-only without claiming stop", async t => {

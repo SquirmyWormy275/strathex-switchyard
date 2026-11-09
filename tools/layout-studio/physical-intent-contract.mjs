@@ -2,7 +2,7 @@
 const intents = ["summon", "resume", "review", "handoff", "status", "cancel"];
 export function closedIntent(value) {
   if (!value || typeof value !== "object" || Array.isArray(value)) throw Error("Physical shortcut is outside the closed intent contract.");
-  if (["native-chatgpt.focus/v1", "native-vscode.focus/v1"].includes(value.implementation)) return { implementation: value.implementation };
+  if (["native-chatgpt.focus/v1", "native-vscode.focus/v1", "native-claude-desktop.focus/v1"].includes(value.implementation)) return { implementation: value.implementation };
   if (value.implementation === "switchyard.role/v1" && typeof value.roleId === "string" && /^[A-Za-z0-9_.:-]{1,64}$/.test(value.roleId) && intents.includes(value.intent)) return { implementation: value.implementation, roleId: value.roleId, intent: value.intent };
   throw Error("Physical shortcut is outside the closed intent contract.");
 }
