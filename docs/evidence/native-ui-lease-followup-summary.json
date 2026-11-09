@@ -1,0 +1,656 @@
+{
+  "schema": "switchyard-native-ui-lease-followup/v1",
+  "at": "2026-11-09T11:34:07.429430+00:00",
+  "sourceCommit": "f4dcc7930294512f4f725c6163cbbf8cdf65ca32",
+  "mergeCommit": "4c07cb3b6fe73a01ff381cba434f9068ebbcecb9",
+  "sourceTree": "8b13d64536f31a7428156989c903f19b8c54fd8d",
+  "workflowRunId": 42607816380,
+  "workers": [
+    {
+      "shard": "7",
+      "jobId": 129128646045,
+      "artifactId": 13668753598,
+      "archiveSha256": "1f765beb77a025e926bf83784af3460b3942d361d48794348362850e3dbf62c1",
+      "envelopeSha256": "bae3185e8bb0b4d9ffcc591c9f225136f810c7112d0826e288d1902094b1ad21",
+      "receiptSha256": "c638706bd2726b5bb61e82d41d9a14227286735a36031e4b1f244424c948e691",
+      "receiptId": "01577ff2-eb96-482f-afd0-e9ceb775621d",
+      "totals": {
+        "required": 21,
+        "passed": 21,
+        "failed": 0,
+        "tests": 316,
+        "passedTests": 307,
+        "failedTests": 0,
+        "skippedTests": 9,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "children": [
+        {
+          "file": "deployment/suite/installation.test.mjs",
+          "pattern": "interrupted installation recovery accepts the full release file ceiling plus its manifest and preserves unrelated edits",
+          "durationMs": 10154,
+          "effectiveTimeoutMs": 120000,
+          "testCounts": {
+            "total": 1,
+            "passed": 1,
+            "failed": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          }
+        },
+        {
+          "file": "tools/layout-studio/model.test.mjs",
+          "pattern": null,
+          "durationMs": 727,
+          "effectiveTimeoutMs": 45000,
+          "testCounts": {
+            "total": 10,
+            "passed": 10,
+            "failed": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          }
+        },
+        {
+          "file": "tools/layout-studio/suite.test.mjs",
+          "pattern": null,
+          "durationMs": 18429,
+          "effectiveTimeoutMs": 120000,
+          "testCounts": {
+            "total": 37,
+            "passed": 37,
+            "failed": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          }
+        },
+        {
+          "file": "tools/layout-studio/repository-execution-staging.test.mjs",
+          "pattern": null,
+          "durationMs": 1577,
+          "effectiveTimeoutMs": 45000,
+          "testCounts": {
+            "total": 2,
+            "passed": 2,
+            "failed": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          }
+        },
+        {
+          "file": "tools/layout-studio/repository-windows-shield-python-records.test.mjs",
+          "pattern": null,
+          "durationMs": 60694,
+          "effectiveTimeoutMs": 300000,
+          "testCounts": {
+            "total": 2,
+            "passed": 2,
+            "failed": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          }
+        },
+        {
+          "file": "tools/layout-studio/repository-shield-pypi.test.mjs",
+          "pattern": null,
+          "durationMs": 528,
+          "effectiveTimeoutMs": 300000,
+          "testCounts": {
+            "total": 6,
+            "passed": 0,
+            "failed": 0,
+            "cancelled": 0,
+            "skipped": 6,
+            "todo": 0
+          }
+        },
+        {
+          "file": "tools/layout-studio/vial-dynamic.test.mjs",
+          "pattern": null,
+          "durationMs": 206,
+          "effectiveTimeoutMs": 45000,
+          "testCounts": {
+            "total": 9,
+            "passed": 9,
+            "failed": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          }
+        },
+        {
+          "file": "tools/layout-studio/scanner-ui.test.mjs",
+          "pattern": null,
+          "durationMs": 38800,
+          "effectiveTimeoutMs": 45000,
+          "testCounts": {
+            "total": 7,
+            "passed": 7,
+            "failed": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          }
+        },
+        {
+          "file": "tools/layout-studio/windows-native-focus.test.mjs",
+          "pattern": null,
+          "durationMs": 15350,
+          "effectiveTimeoutMs": 45000,
+          "testCounts": {
+            "total": 28,
+            "passed": 28,
+            "failed": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          }
+        },
+        {
+          "file": "tools/layout-studio/foreground.test.mjs",
+          "pattern": null,
+          "durationMs": 3925,
+          "effectiveTimeoutMs": 45000,
+          "testCounts": {
+            "total": 15,
+            "passed": 15,
+            "failed": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          }
+        },
+        {
+          "file": "tools/layout-studio/coding-task-owners.test.mjs",
+          "pattern": "changed creator account or original task repository refuses binding and retires the exact owned listener",
+          "durationMs": 2560,
+          "effectiveTimeoutMs": 45000,
+          "testCounts": {
+            "total": 1,
+            "passed": 1,
+            "failed": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          }
+        },
+        {
+          "file": "tools/layout-studio/agents-claude.test.mjs",
+          "pattern": null,
+          "durationMs": 11760,
+          "effectiveTimeoutMs": 120000,
+          "testCounts": {
+            "total": 14,
+            "passed": 14,
+            "failed": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          }
+        },
+        {
+          "file": "packages/protocol/test/raw-hid.test.ts",
+          "pattern": null,
+          "durationMs": 244,
+          "effectiveTimeoutMs": 45000,
+          "testCounts": {
+            "total": 3,
+            "passed": 3,
+            "failed": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          }
+        },
+        {
+          "file": "packages/control-plane/test/redaction.test.ts",
+          "pattern": null,
+          "durationMs": 203,
+          "effectiveTimeoutMs": 45000,
+          "testCounts": {
+            "total": 4,
+            "passed": 4,
+            "failed": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          }
+        },
+        {
+          "file": "apps/windows-companion/test/configured-network.test.ts",
+          "pattern": null,
+          "durationMs": 955,
+          "effectiveTimeoutMs": 45000,
+          "testCounts": {
+            "total": 11,
+            "passed": 11,
+            "failed": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          }
+        },
+        {
+          "file": "apps/windows-companion/test/hardware-signal-dispatcher.test.ts",
+          "pattern": null,
+          "durationMs": 2118,
+          "effectiveTimeoutMs": 45000,
+          "testCounts": {
+            "total": 12,
+            "passed": 12,
+            "failed": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          }
+        },
+        {
+          "file": "apps/windows-companion/test/provider-gateway.test.ts",
+          "pattern": null,
+          "durationMs": 1428,
+          "effectiveTimeoutMs": 45000,
+          "testCounts": {
+            "total": 19,
+            "passed": 19,
+            "failed": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          }
+        },
+        {
+          "file": "apps/windows-companion/test/sandbox-installation.test.ts",
+          "pattern": null,
+          "durationMs": 441,
+          "effectiveTimeoutMs": 45000,
+          "testCounts": {
+            "total": 5,
+            "passed": 5,
+            "failed": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          }
+        },
+        {
+          "file": "apps/windows-companion/test/mediated-git.test.ts",
+          "pattern": "detached-HEAD review creates an exact feature branch before any commit and requires a fresh target",
+          "durationMs": 2664,
+          "effectiveTimeoutMs": 45000,
+          "testCounts": {
+            "total": 1,
+            "passed": 1,
+            "failed": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          }
+        },
+        {
+          "file": "apps/vscode-extension/test/controller.test.ts",
+          "pattern": null,
+          "durationMs": 1266,
+          "effectiveTimeoutMs": 45000,
+          "testCounts": {
+            "total": 126,
+            "passed": 123,
+            "failed": 0,
+            "cancelled": 0,
+            "skipped": 3,
+            "todo": 0
+          }
+        },
+        {
+          "file": "apps/linux-companion/test/omarchy-capabilities.test.ts",
+          "pattern": null,
+          "durationMs": 227,
+          "effectiveTimeoutMs": 45000,
+          "testCounts": {
+            "total": 3,
+            "passed": 3,
+            "failed": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          }
+        }
+      ]
+    },
+    {
+      "shard": "11",
+      "jobId": 129128645733,
+      "artifactId": 13668933609,
+      "archiveSha256": "b4a2816109ce169928835222d02ebfb1ae5c38c7450a0c54e6f479c14db0f4b1",
+      "envelopeSha256": "257da58c1d5d7fe0fb8b72898e1ff0578d2d7a205374d0c75fbc62016b9fe1ef",
+      "receiptSha256": "33ce850c5980e72c57d35cd048f3aceb8ac2304276c17a61a414a58a628c5800",
+      "receiptId": "6142f288-653c-4e2e-b556-850e902a2644",
+      "totals": {
+        "required": 21,
+        "passed": 21,
+        "failed": 0,
+        "tests": 154,
+        "passedTests": 147,
+        "failedTests": 0,
+        "skippedTests": 7,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "children": [
+        {
+          "file": "scripts/verify-copilot-journal-host.test.mjs",
+          "pattern": null,
+          "durationMs": 5978,
+          "effectiveTimeoutMs": 45000,
+          "testCounts": {
+            "total": 8,
+            "passed": 8,
+            "failed": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          }
+        },
+        {
+          "file": "tools/layout-studio/keyless-lease-pool.test.mjs",
+          "pattern": null,
+          "durationMs": 6390,
+          "effectiveTimeoutMs": 45000,
+          "testCounts": {
+            "total": 14,
+            "passed": 14,
+            "failed": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          }
+        },
+        {
+          "file": "tools/layout-studio/repository-recovery.test.mjs",
+          "pattern": null,
+          "durationMs": 8650,
+          "effectiveTimeoutMs": 120000,
+          "testCounts": {
+            "total": 8,
+            "passed": 7,
+            "failed": 0,
+            "cancelled": 0,
+            "skipped": 1,
+            "todo": 0
+          }
+        },
+        {
+          "file": "tools/layout-studio/repository-shield-ignored-trees.test.mjs",
+          "pattern": null,
+          "durationMs": 17944,
+          "effectiveTimeoutMs": 300000,
+          "testCounts": {
+            "total": 2,
+            "passed": 1,
+            "failed": 0,
+            "cancelled": 0,
+            "skipped": 1,
+            "todo": 0
+          }
+        },
+        {
+          "file": "tools/layout-studio/repository-shield-cargo-artifacts.test.mjs",
+          "pattern": null,
+          "durationMs": 53629,
+          "effectiveTimeoutMs": 300000,
+          "testCounts": {
+            "total": 11,
+            "passed": 9,
+            "failed": 0,
+            "cancelled": 0,
+            "skipped": 2,
+            "todo": 0
+          }
+        },
+        {
+          "file": "tools/layout-studio/execution-ui.test.mjs",
+          "pattern": null,
+          "durationMs": 44641,
+          "effectiveTimeoutMs": 45000,
+          "testCounts": {
+            "total": 7,
+            "passed": 7,
+            "failed": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          }
+        },
+        {
+          "file": "tools/layout-studio/physical-intent.test.mjs",
+          "pattern": null,
+          "durationMs": 6850,
+          "effectiveTimeoutMs": 45000,
+          "testCounts": {
+            "total": 11,
+            "passed": 11,
+            "failed": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          }
+        },
+        {
+          "file": "tools/layout-studio/runtime-lifecycle.test.mjs",
+          "pattern": null,
+          "durationMs": 9401,
+          "effectiveTimeoutMs": 45000,
+          "testCounts": {
+            "total": 11,
+            "passed": 11,
+            "failed": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          }
+        },
+        {
+          "file": "tools/layout-studio/runtime-consumers.test.mjs",
+          "pattern": null,
+          "durationMs": 178,
+          "effectiveTimeoutMs": 45000,
+          "testCounts": {
+            "total": 3,
+            "passed": 3,
+            "failed": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          }
+        },
+        {
+          "file": "tools/layout-studio/coding-task-owners.test.mjs",
+          "pattern": "two service instances serialize duplicate admission through the real private kernel lease",
+          "durationMs": 2175,
+          "effectiveTimeoutMs": 45000,
+          "testCounts": {
+            "total": 1,
+            "passed": 1,
+            "failed": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          }
+        },
+        {
+          "file": "tools/layout-studio/coding-task-owners.test.mjs",
+          "pattern": "late ownership drift and stopped startup cannot acknowledge a retained connection as current",
+          "durationMs": 2416,
+          "effectiveTimeoutMs": 45000,
+          "testCounts": {
+            "total": 1,
+            "passed": 1,
+            "failed": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          }
+        },
+        {
+          "file": "tools/layout-studio/codex-editor-relay.test.mjs",
+          "pattern": null,
+          "durationMs": 400,
+          "effectiveTimeoutMs": 45000,
+          "testCounts": {
+            "total": 25,
+            "passed": 25,
+            "failed": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          }
+        },
+        {
+          "file": "firmware/verify-require-compiler.test.mjs",
+          "pattern": null,
+          "durationMs": 2226,
+          "effectiveTimeoutMs": 45000,
+          "testCounts": {
+            "total": 1,
+            "passed": 1,
+            "failed": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          }
+        },
+        {
+          "file": "packages/control-plane/test/reanchor.test.ts",
+          "pattern": null,
+          "durationMs": 2596,
+          "effectiveTimeoutMs": 45000,
+          "testCounts": {
+            "total": 20,
+            "passed": 20,
+            "failed": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          }
+        },
+        {
+          "file": "apps/windows-companion/test/bootstrap.test.ts",
+          "pattern": null,
+          "durationMs": 6775,
+          "effectiveTimeoutMs": 45000,
+          "testCounts": {
+            "total": 12,
+            "passed": 12,
+            "failed": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          }
+        },
+        {
+          "file": "apps/windows-companion/test/effect-target-transition.test.ts",
+          "pattern": null,
+          "durationMs": 489,
+          "effectiveTimeoutMs": 45000,
+          "testCounts": {
+            "total": 3,
+            "passed": 3,
+            "failed": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          }
+        },
+        {
+          "file": "apps/windows-companion/test/provider-desktop-effects.test.ts",
+          "pattern": null,
+          "durationMs": 365,
+          "effectiveTimeoutMs": 45000,
+          "testCounts": {
+            "total": 3,
+            "passed": 3,
+            "failed": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          }
+        },
+        {
+          "file": "apps/windows-companion/test/runtime-provisioning.test.ts",
+          "pattern": null,
+          "durationMs": 345,
+          "effectiveTimeoutMs": 45000,
+          "testCounts": {
+            "total": 2,
+            "passed": 2,
+            "failed": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          }
+        },
+        {
+          "file": "apps/windows-companion/test/mediated-git.test.ts",
+          "pattern": "mediated local commit uses an exact task-owned private index and reconciles the shared index to its committed tree",
+          "durationMs": 3557,
+          "effectiveTimeoutMs": 45000,
+          "testCounts": {
+            "total": 1,
+            "passed": 1,
+            "failed": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          }
+        },
+        {
+          "file": "apps/vscode-extension/test/studio-editor-commands.test.ts",
+          "pattern": null,
+          "durationMs": 370,
+          "effectiveTimeoutMs": 45000,
+          "testCounts": {
+            "total": 7,
+            "passed": 7,
+            "failed": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          }
+        },
+        {
+          "file": "apps/linux-companion/test/linux-process-supervisor.test.ts",
+          "pattern": null,
+          "durationMs": 286,
+          "effectiveTimeoutMs": 45000,
+          "testCounts": {
+            "total": 3,
+            "passed": 0,
+            "failed": 0,
+            "cancelled": 0,
+            "skipped": 3,
+            "todo": 0
+          }
+        }
+      ]
+    }
+  ],
+  "audit": {
+    "originalManifestCommandsBoundsSkips": true,
+    "sourceTreesMatch": true,
+    "originalSerialOrder": true,
+    "outputBounds": true,
+    "ownedTreeCleanup": true,
+    "completeWindowsAcceptance": false
+  },
+  "limits": [
+    "Full Windows cohort and package acceptance remain separate.",
+    "Execution UI passes at 44,641 ms against its unchanged 45,000 ms file limit; margin remains narrow.",
+    "Passing follow-up does not erase prior failures or establish actual graphical/native-account/device acceptance.",
+    "Successful receipt does not retain full TAP phase output; no unsupported timing breakdown is inferred."
+  ]
+}

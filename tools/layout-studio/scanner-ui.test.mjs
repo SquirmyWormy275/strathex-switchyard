@@ -88,5 +88,10 @@ test("staged and bounded history selections reach the exact review without expos
   c.$("scanner-index").checked = true; c.change("scanner-index", ""); c.change("scanner-depth", "1"); await review(c);
   const input = c.calls.findLast(r => r.path.endsWith("scanner-save/review")).body; assert.equal(input.includeIndex, true); assert.equal(input.historyDepth, 1); assert.equal(input.action, "shield_codebase_audit");
   const summary = c.$("scanner-review-summary").textContent; assert.match(summary, /indexInputs/); assert.match(summary, /historyInputs/); assert.equal(summary.includes(privateText), false); assert.equal(c.$("scanner-review-files").children.some(e => e.children[1].textContent.includes(privateText)), false); assert.equal(c.writes(), 0);
+  assert.match(summary, /No additional removed paths were found/);
+  const { historicalScopeSummary } = await import("./scanner-ui.mjs");
+  const names = historicalScopeSummary({ historyDepth: 2, historyPathDiscovery: { count: 3, omittedCount: 2, unsupportedCount: 1, rows: [{ path: "deleted.env" }] } });
+  assert.match(names, /Historical files outside this scan: 3/); assert.match(names, /deleted.env/); assert.match(names, /2 additional names are not displayed \(1 unsupported/); assert.match(names, /does not grant permission/);
+  assert.match(historicalScopeSummary({ historyDepth: 1 }), /unavailable/); assert.equal(historicalScopeSummary({}), "");
   c.change("scanner-action", "shield_supply_chain"); assert.equal(c.$("scanner-depth").value, "0"); assert.equal(c.$("scanner-depth").disabled, true); assert.equal(c.$("scanner-review-dialog").open, false);
 }));

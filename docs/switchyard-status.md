@@ -69,9 +69,15 @@ to state-update/guardian waits, with short Git command durations. A source
 correction removes the lease worker's 25 ms input polling delay, preserving all
 file identities, ownership, durable writes and deadlines. Nine local groups pass
 82 tests/one existing skip; two offline builds and 2,117 portable checks pass.
-Native acceptance remains pending. The earlier repeated-focus failure remains
-unresolved. [Measurements](evidence/native-ui-timing-failure-summary.json),
+Both original UI files and the full Windows source cohort now pass with unchanged
+limits. Execution UI still has only 359 ms of margin. The earlier repeated-focus
+failure remains unresolved. [Measurements](evidence/native-ui-timing-failure-summary.json),
 [correction](evidence/lease-blocking-source-summary.json).
+
+Complete Windows source `f4dcc79` passes **482 groups, 3,157 tests and 246 declared
+skips**. All 23 workers and the native collector pass; original receipts, commands,
+bounds, serial order, source trees and cleanup are audited.
+[Complete native evidence](evidence/complete-windows-f4dcc79-summary.json).
 
 The synthetic running preview is separately proven at `dfa40fb`: nine checks
 cover served assets, a named role, signed acknowledgement and stale-workspace
@@ -79,8 +85,13 @@ refusal. [Demonstration receipt](evidence/batched-inspection-running-demo-summar
 
 ## Remaining implementation and defects
 
-- Verify the Windows lease-input correction against the scanner/execution UI file timeouts. Preserve
-  earlier intermittent native focus, host-action settlement and shortcut failures.
+- Publish and normally install bounded historical-name discovery. Ten integration
+  groups pass 80 tests/one existing skip; package/installation groups pass 26 tests,
+  and typechecking passes. It adds no query, blob read or permission.
+  [Source evidence](evidence/history-path-discovery-source-summary.json).
+- Preserve the narrow Windows execution-UI margin and earlier intermittent native
+  focus, host-action settlement and shortcut failures. Full source acceptance
+  does not establish later-source or current package acceptance.
 - Finish the Linux Claude Desktop binding and launch/focus path for a verified
   supported installation. Windows controls do not establish Linux support.
 - Resolve exact interactive attachment limits. Codex's reviewed terminal supports

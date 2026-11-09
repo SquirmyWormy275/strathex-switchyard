@@ -17,8 +17,17 @@ for work that remains.
 | Real Codex 0.167 terminal | `42655aa` | Synthetic saved history rendered through the production relay, including paginated older history. No model prompt or live task. [Contract](codex-terminal-compatibility.md). |
 | Audited Windows client | `3222727` | 31 groups, 362 passes, zero skips. Includes retained legacy-history account regressions; predates the lease-input correction. [Evidence](evidence/native-client-3222727-summary.json). |
 | Windows UI failure measurements | `72e7c22` / `7317371` | Original scanner/execution files exceed 45 seconds. State and guardian waits dominate the observed phases; timings overlap. [Failed receipts](evidence/native-ui-timing-failure-summary.json). |
-| Windows lease input correction | `f4dcc79` | Two offline builds, 2,117 portable checks and nine local groups/82 passes/one existing skip. Native performance and pipe acceptance pending. [Source evidence](evidence/lease-blocking-source-summary.json). |
+| Windows lease input correction | `f4dcc79` | Two offline builds, 2,117 portable checks and nine local groups/82 passes/one existing skip. Native complete-source follow-up passes below. [Source evidence](evidence/lease-blocking-source-summary.json). |
 | Earlier complete Windows package | `7529718` | 462 groups, 2,910 passes, 246 declared skips; eight jobs pass. This does not accept later source. [Receipt](evidence/windows-package-7529718-summary.json). |
+
+The lease correction now has complete native source acceptance at `f4dcc79`:
+482 groups, 3,157 passes and 246 declared skips. All 23 workers and the native
+collector pass; original receipts, commands, bounds and cleanup are audited.
+[Complete Windows receipt](evidence/complete-windows-f4dcc79-summary.json).
+The later historical-name discovery passes ten integration groups/80 tests/one
+existing skip and eighteen package/installation groups/26 tests, with typecheck.
+Installation and Windows follow-up remain pending.
+[Discovery evidence](evidence/history-path-discovery-source-summary.json).
 
 Counts from overlapping runs must not be added. The complete Linux result predates
 the later account-read correction. The installed app, extension and synthetic

@@ -126,16 +126,33 @@ remain. Native EOF cases are retained and extended with successful fragmented
 frames plus 24 sequenced round trips. Nine original groups pass 82/one existing
 skip; two offline managed builds and 2,117 portable checks pass. Typecheck and
 cleanup verify; all 206 owned build files (3,688,439 bytes) are removed. **Do not
-replay build cleanup. Native performance/pipe acceptance remains pending** on
-the next normal push. [Source evidence](evidence/lease-blocking-source-summary.json).
+replay build cleanup.** Native acceptance is recorded below. [Source evidence](evidence/lease-blocking-source-summary.json).
 This Windows helper-only change needs no Linux app reinstall.
 
 The correction is published at **f4dcc7930294512f4f725c6163cbbf8cdf65ca32**.
-Normal-push full-source run **42607816380** has helper success; worker 7
-**129128646045** and worker 11 **129128645733** were queued at 11:23 UTC.
-Client run **42607816341** is separate. Re-read their actual results before
-claiming native acceptance. Pending jobs can be superseded by another normal
-branch push even with `cancel-in-progress: false`; batch follow-up checkpoints.
+Normal-push full-source run **42607816380** passes all 25 jobs: helper, all
+23 original workers and native collector **129137656566**. All **482 groups /
+3,157 passes / 246 declared skips** are audited against the exact original
+manifest, commands, bounds, serial order, source/merge tree, output and cleanup.
+The native collector artifact **13670098291** matches the independent audit.
+Its receipt SHA-256 is
+fdb6cc8920be7df5c7db8e4555c2acaf3301a43a0b813d49c59df6515c0ca075.
+[Full native evidence](evidence/complete-windows-f4dcc79-summary.json).
+
+Scanner UI passes in 38,800 ms and execution UI in 44,641 ms against original
+45,000 ms limits. The execution margin is narrow; earlier failures remain.
+Native lease tests retain original EOF/owner-loss and added fragment/round-trip
+assertions. No downloaded ZIP or helper binary was retained locally; original
+JSON receipts remain private. **Do not replay their download/audit scripts.**
+
+Docs checkpoint **4cf8e9fee48ccb4c6c1d5e0cc7b01940ca4f18a3** is published.
+The next implementation discovers bounded historical names from already verified
+trees, without additional queries, blob reads or authority. Ten original groups
+pass 80 tests/one existing skip; eighteen package/installation groups pass 26
+tests; typecheck passes. Original receipts are privately retained and duplicate
+checkout receipts removed. Normal installation and Windows acceptance of this
+later source still need completion.
+[Source evidence](evidence/history-path-discovery-source-summary.json).
 
 Native client source **3222727** is now audited: run **42604386508**, job
 **129118530980**, all **31 groups / 362 tests / zero skips**. Original source/merge
@@ -197,9 +214,10 @@ focus is not task attachment.
 
 ## Continue independent work
 
-1. The complete Linux run and cleanup are finished; continue current Windows receipt review.
-2. Diagnose Windows UI delays from original native measurements; correct the
-   actual cause without weakening persistence, ownership or tests.
+1. Complete Linux cleanup and the f4dcc79 Windows source audit are finished.
+2. Publish and normally install bounded historical-name discovery with a fresh
+   immutable frontend and full saved-workspace/launcher readback. Preserve current
+   plus one rollback and remove only verified owned staging.
 3. Continue Linux Claude Desktop and exact interactive attachment limitations
    with supported native contracts; keep missing platform evidence explicit.
 4. Carry the remaining observation/scanner/managed-policy/later-platform scope

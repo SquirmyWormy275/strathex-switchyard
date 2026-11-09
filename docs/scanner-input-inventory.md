@@ -80,9 +80,18 @@ reserved paths and source descriptors for the [historical scanner](historical-sh
 It also returns the observed HEAD, selected paths/depth, metadata digest, stopping
 boundary, shallow flag, absent versions and explicit coverage gaps. New staged
 paths absent from the selected commits stay absent; no source version is invented.
-Only names currently tracked are automatically selected. Historical paths removed
-from the current repository require the separate explicit reader and remain
-outside this automatic authority path.
+Only names currently tracked are automatically selected. The same verified commit
+trees also reveal unselected names absent from the selected HEAD.
+
+`historyPathDiscovery` displays up to 64 portable regular-file names with their
+latest observed commit and object identity. Exact omitted and unsupported counts
+remain visible; other branches, deeper history and renames stay outside the
+review. Discovery adds no Git query, blob read, scan input or permission. Its
+separate metadata digest does not change the existing selected-input witness.
+
+The scanner setup dialog calls out these historical files as outside the scan.
+They still require a separate explicit history reader; automatic permission and
+recipe assembly for removed paths remain unfinished.
 
 At most eight tracked paths and 48 historical versions fit this preparation.
 The reader retains its 256 KiB per-blob and 448 KiB aggregate unique-byte limits.
@@ -170,13 +179,13 @@ The verifier removes its own large sparse build fixture after inspection, before
 the separate scanner authority review. Existing authority still requires exact classified file hashes. A separate
 [reviewed generated-tree policy](ignored-build-tree-policy.md) can now exclude
 whole named ignored roots using explicit directory-identity witnesses; the
-preview does not apply that policy or grant it. The automatic current-file review
-above now assembles supported bounded selections. General complete-target scan assembly, persisted
-operator-configured general exclusions,
-history scanning and the frontend remain unfinished implementation. A separate
+preview does not apply that policy or grant it. The automatic review and connected
+frontend above assemble supported current, staged and bounded-history selections.
+General complete-target coverage, automatic removed-path scan authority and
+operator-configured general exclusions remain unfinished implementation. A separate
 [explicit Linux staged-input scan](staged-shield-inputs.md) now preserves both
 index and worktree origin; bounded staged descriptors can now be prepared above.
-Automatic complete recipe assembly remains unfinished. Windows staging now has contract checks;
+Reviewed recipe assembly and saving are connected for the supported selection. Windows staging has contract checks;
 actual NTFS/guest acceptance remains separate.
 See [explicit ignored scanner inputs](ignored-scanner-inputs.md) for the distinct
 reviewed read-only scan path.

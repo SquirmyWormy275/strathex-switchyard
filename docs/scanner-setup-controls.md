@@ -11,6 +11,13 @@ signed feed content. The dialog displays the exact new directory, generated
 control files and hashes, proposed permission scope and remaining coverage limits.
 Each generated file can be expanded to read its full text.
 
+Bounded history review also lists names found in older inspected commits but
+absent from the selected HEAD and outside the selected history inputs. Up to 64
+portable regular-file names appear, with exact omitted/unsupported counts. Names
+come from already verified trees; they are not added to the scan or its permission.
+Deeper history and other branches remain uninspected.
+[Discovery evidence](evidence/history-path-discovery-source-summary.json).
+
 Confirming the save creates only the reviewed new control files. Existing source
 paths are never replaced. The saved setup offers two explicit next steps:
 

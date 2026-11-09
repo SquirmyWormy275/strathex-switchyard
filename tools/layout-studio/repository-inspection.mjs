@@ -11,7 +11,7 @@ import { verifyRepositoryIdentity } from "./coding-task-identity.mjs";
 import { shieldInventoryQueries, buildShieldInputInventory } from "./shield-input-inventory.mjs";
 import { ignoredTreeRoots, ignoredTreeQuery, assertIgnoredTreeListing, ignoredTreeWitness } from "./ignored-tree-policy.mjs";
 import { gitIndexPaths, gitIndexLimits, gitIndexListingQuery, gitIndexBatchQuery, selectGitIndexEntries, gitIndexBatchInput, witnessGitIndexBatch, gitIndexWitnessReport } from "./git-index-inputs.mjs";
-import { historySelection, historyRevisionQuery, historyTreeQuery, historyCommitList, historyCommitInput, witnessHistoryCommits, verifyHistoryChain, historyTreeEntries, historyWitnessReport } from "./git-history-inputs.mjs";
+import { historySelection, historyRevisionQuery, historyTreeQuery, historyCommitList, historyCommitInput, witnessHistoryCommits, verifyHistoryChain, historyTreeEntries, historyPathDiscovery, historyWitnessReport } from "./git-history-inputs.mjs";
 
 const queries = new Set([
   ["rev-parse", "--show-toplevel"], ["remote", "get-url", "origin"], ["branch", "--show-current"],
@@ -152,13 +152,14 @@ export function createRepositoryInspection({ store, command = runRuntimeCommand,
           const revisionQuery=historyRevisionQuery(selectedHistory.depth);historyQueries.add(JSON.stringify(revisionQuery));
           const revisionText=await read(revisionQuery),listed=historyCommitList(revisionText,head,selectedHistory);allowedBatchInput=historyCommitInput(listed.commits);
           const rawCommits=await runner.run(gitIndexBatchQuery,task.repositoryRoot,allowedBatchInput);allowedBatchInput=undefined;if(rawCommits.exitCode)throw Error("Raw history commit objects are unavailable.");
-          const commits=witnessHistoryCommits(rawCommits.stdout,listed.commits),shallow=shallowText==="true\n",stopping=verifyHistoryChain(commits,listed,shallow),versions=[],absent=[],trees=[];
-          for(const commit of commits){const args=historyTreeQuery(commit.commit,selectedHistory.paths);historyQueries.add(JSON.stringify(args));const found=historyTreeEntries(await read(args),commit.commit,selectedHistory.paths,commit.tree);versions.push(...found.versions);absent.push({commit:commit.commit,paths:found.absent});trees.push({commit:commit.commit,objects:found.treeObjects,sha256:found.treeWitnessSha256});}
+          const commits=witnessHistoryCommits(rawCommits.stdout,listed.commits),shallow=shallowText==="true\n",stopping=verifyHistoryChain(commits,listed,shallow),versions=[],absent=[],trees=[],listings=[];
+          for(const commit of commits){const args=historyTreeQuery(commit.commit,selectedHistory.paths);historyQueries.add(JSON.stringify(args));const found=historyTreeEntries(await read(args),commit.commit,selectedHistory.paths,commit.tree);versions.push(...found.versions);absent.push({commit:commit.commit,paths:found.absent});trees.push({commit:commit.commit,objects:found.treeObjects,sha256:found.treeWitnessSha256});listings.push({commit:commit.commit,entries:found.entries,treeWitnessSha256:found.treeWitnessSha256});}
+          const pathDiscovery=historyPathDiscovery(selectedHistory,listings);
           const objectIds=[...new Set(versions.map(version=>version.objectId))],entries=objectIds.map((objectId,i)=>({path:`history-blob-${i}`,mode:"100644",objectId}));let blobs=[];
           if(entries.length){allowedBatchInput=gitIndexBatchInput(entries);const result=await runner.run(gitIndexBatchQuery,task.repositoryRoot,allowedBatchInput);allowedBatchInput=undefined;if(result.exitCode)throw Error("Selected historical blob bytes are unavailable.");blobs=(await witnessGitIndexBatch(result.stdout,entries,consumeHistory?(row,bytes)=>{blobCopies.set(row.objectId,Buffer.from(bytes));}:undefined)).map(({objectId,size,sha256})=>({objectId,size,sha256}));}
           const finalRevisions=await read(revisionQuery),finalShallow=await read(["rev-parse","--is-shallow-repository"]);
           if(finalRevisions!==revisionText||finalShallow!==shallowText)throw Error("The repository revision or shallow boundary changed during historical witnessing.");
-          await check();await verifyRepositoryIdentity(task);const report={...historyWitnessReport({head,selection:selectedHistory,commits,shallow,stopping,versions,absent,blobs,trees,observedAt:new Date(now()).toISOString()}),repositoryRoot:task.repositoryRoot,observationOnly:true};
+          await check();await verifyRepositoryIdentity(task);const report={...historyWitnessReport({head,selection:selectedHistory,commits,shallow,stopping,versions,absent,blobs,trees,pathDiscovery,observedAt:new Date(now()).toISOString()}),repositoryRoot:task.repositoryRoot,observationOnly:true};
           if(!consumeHistory)return report;
           const consumed=await consumeHistory(report,blobCopies);await check();
           if(await read(revisionQuery)!==revisionText||await read(["rev-parse","--is-shallow-repository"])!==shallowText)throw Error("The historical revision or shallow boundary changed while preparing private scanner inputs.");

@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { writeFile, readFile, access } from "node:fs/promises";
+import { writeFile, readFile, access, unlink } from "node:fs/promises";
 import { join } from "node:path";
 import { authorityFixture } from "./test-support/task-authority-fixture.mjs";
 import { connectedExecutionActions } from "./repository-execution-actions.mjs";
@@ -14,9 +14,11 @@ const input = f => ({ taskId: f.task.id, action: "shield_codebase_audit", planRe
 const issueInput = r => Object.fromEntries(["taskId", "planRevision", "paths", "classifications", "actions", "lifetimeMinutes"].map(k => [k, r.scope[k]]));
 async function fixture(t) {
   const f = await authorityFixture(t, { executionActions: connectedExecutionActions("linux") });
-  await writeFile(join(f.root, "app.js"), "SYNTHETIC_PRIVATE_OLD_SOURCE\n"); await f.run("add", "app.js"); await f.run("-c", "commit.gpgsign=false", "commit", "-m", "SYNTHETIC_PRIVATE_COMMIT_MESSAGE");
+  await writeFile(join(f.root, "app.js"), "SYNTHETIC_PRIVATE_OLD_SOURCE\n");
+  await writeFile(join(f.root, "deleted.env"), "SYNTHETIC_UNSELECTED_DELETED_SOURCE\n");
+  await f.run("add", "app.js", "deleted.env"); await f.run("-c", "commit.gpgsign=false", "commit", "-m", "SYNTHETIC_PRIVATE_COMMIT_MESSAGE");
   const old = (await f.run("rev-parse", "HEAD")).trim();
-  await writeFile(join(f.root, "app.js"), "current clean source\n"); await f.run("add", "app.js"); await f.run("-c", "commit.gpgsign=false", "commit", "-m", "synthetic clean version");
+  await writeFile(join(f.root, "app.js"), "current clean source\n"); await unlink(join(f.root, "deleted.env")); await f.run("add", "app.js", "deleted.env"); await f.run("-c", "commit.gpgsign=false", "commit", "-m", "synthetic clean version");
   return { ...f, old };
 }
 
@@ -32,8 +34,13 @@ test("authenticated automatic history preparation derives immutable versions and
   const p = review.preparation; assert.equal(p.policy, "bounded-current-and-history/v1"); assert.equal(p.historyHead, head); assert.equal(p.historyDepth, 4); assert.equal(p.historyStopping.kind, "root");
   assert.deepEqual(p.historyPaths, [".gitignore", "app.js", "new.txt", "task.txt"]); assert.equal(p.historyInputs.length, 8); assert.ok(p.historyAbsent.every(row => row.paths.includes("new.txt")));
   const old = p.historyInputs.find(row => row.source.commit === f.old && row.source.path === "app.js"); assert.ok(old); assert.equal(old.path, ".switchyard-history/" + f.old + "/app.js"); assert.equal(old.source.objectId, (await f.run("rev-parse", f.old + ":app.js")).trim()); assert.equal(old.source.depth, 4);
+  assert.equal(p.historyPathDiscovery.count, 1); assert.equal(p.historyPathDiscovery.omittedCount, 0);
+  assert.deepEqual(p.historyPathDiscovery.rows.map(row => [row.path, row.latestObservedCommit]), [["deleted.env", f.old]]);
+  assert.equal(p.historyPathDiscovery.sourceBytesRead, false); assert.equal(p.historyPathDiscovery.authorityGranted, false);
+  assert(p.historyGaps.includes("unselected_removed_history_paths"));
+  assert(!review.scope.paths.includes("deleted.env")); assert(!p.historyInputs.some(row => row.source.path === "deleted.env"));
   for (const key of ["scanPerformed", "authorityGranted", "securityCoverageComplete"]) assert.equal(p[key], false);
-  for (const text of ["SYNTHETIC_PRIVATE_OLD_SOURCE", "SYNTHETIC_PRIVATE_COMMIT_MESSAGE", "synthetic@example.invalid"]) assert.equal(JSON.stringify(review).includes(text), false);
+  for (const text of ["SYNTHETIC_PRIVATE_OLD_SOURCE", "SYNTHETIC_UNSELECTED_DELETED_SOURCE", "SYNTHETIC_PRIVATE_COMMIT_MESSAGE", "synthetic@example.invalid"]) assert.equal(JSON.stringify(review).includes(text), false);
   assert.ok(review.scope.paths.every(path => !path.startsWith(".switchyard-history/"))); assert.equal(p.historyGaps.includes("worktree_and_index_not_scanned"), true);
   const grant = await f.service.issue("personal", { ...issueInput(review), token: review.confirmation.token }); assert.ok(grant.id);
   assert.deepEqual(await readFile(join(f.root, ".git/index")), original); assert.equal((await f.run("rev-parse", "HEAD")).trim(), head);

@@ -75,12 +75,42 @@ export function historyTreeEntries(output,commit,paths,expectedTree){
     try{const actual=createHash(commit.length===40?"sha1":"sha256").update(`tree ${raw.length}\0`).update(raw).digest("hex");if(actual!==tree.objectId)throw Error("The complete historical tree bytes do not match the commit's immutable tree object.");trees.push({path,objectId:tree.objectId,sha256:digest(raw)});}finally{raw.fill(0);}
   }
   for(const path of selected){const entry=entries.get(path);if(!entry)continue;if(!["100644","100755"].includes(entry.mode))throw Error("Selected history paths must be exact regular blobs; links, submodules and directories are refused.");versions.push({commit,path,mode:entry.mode,objectId:entry.objectId});}
-  return{versions,absent:selected.filter(path=>!entries.has(path)),treeObjects:trees.length,treeWitnessSha256:digest(JSON.stringify(trees))};
+  return{versions,absent:selected.filter(path=>!entries.has(path)),treeObjects:trees.length,treeWitnessSha256:digest(JSON.stringify(trees)),entries:[...entries.values()]};
 }
-export function historyWitnessReport({head,selection,commits,shallow,stopping,versions,absent,blobs,trees,observedAt}){
+/** Names from already verified trees only. Never read or authorize another blob. */
+export function historyPathDiscovery(selection, listings) {
+  const selected = new Set(historySelection(selection.paths, selection.depth).paths);
+  if (!Array.isArray(listings) || !listings.length || listings.length > selection.depth
+    || new Set(listings.map(row => row.commit)).size !== listings.length
+    || listings.some(row => !oid(row.commit) || !/^[a-f0-9]{64}$/.test(row.treeWitnessSha256 ?? "")
+      || !Array.isArray(row.entries) || row.entries.length > gitHistoryLimits.treeEntries)) throw Error("Historical name discovery requires the original bounded verified tree listings.");
+  const headPaths = new Set(listings[0].entries.map(row => row.path)), removed = new Map();
+  for (const listing of listings.slice(1)) for (const entry of listing.entries) {
+    if (entry.mode === "040000" || headPaths.has(entry.path) || selected.has(entry.path) || removed.has(entry.path)) continue;
+    removed.set(entry.path, { path: entry.path, mode: entry.mode, objectId: entry.objectId, latestObservedCommit: listing.commit });
+  }
+  let unsupportedCount = 0;
+  const supported = [...removed.values()].filter(row => {
+    try {
+      historySelection([row.path]);
+      if (!["100644", "100755"].includes(row.mode)) throw Error("Not a regular historical file.");
+      return true;
+    } catch { unsupportedCount++; return false; }
+  }).sort((a, b) => a.path < b.path ? -1 : a.path > b.path ? 1 : 0);
+  const rows = supported.slice(0, 64), material = {
+    policy: "bounded-unselected-paths-absent-from-head/v1", head: listings[0].commit,
+    requestedDepth: selection.depth, observedCommitCount: listings.length,
+    count: removed.size, omittedCount: removed.size - rows.length, unsupportedCount, limit: 64, rows,
+    treeWitnesses: listings.map(({ commit, treeWitnessSha256 }) => ({ commit, sha256: treeWitnessSha256 }))
+  };
+  return { ...material, metadataSha256: digest(JSON.stringify(material)), sourceBytesRead: false,
+    authorityGranted: false, scanPerformed: false, completeness: "metadata-only" };
+}
+export function historyWitnessReport({head,selection,commits,shallow,stopping,versions,absent,blobs,trees,pathDiscovery,observedAt}){
   const byObject=new Map(blobs.map(blob=>[blob.objectId,blob]));
   const witnessed=versions.map(version=>{const blob=byObject.get(version.objectId);if(!blob)throw Error("A selected history blob has no exact byte witness.");return{...version,size:blob.size,sha256:blob.sha256};});
   const material={head,paths:selection.paths,requestedDepth:selection.depth,commits,shallow,stopping,versions:witnessed,absent,trees:trees??[]},gaps=["repository_scope_unverified","non_first_parent_history_not_inspected","other_refs_not_inspected","commit_messages_not_scanned","worktree_and_index_not_scanned","renames_not_followed"];
   if(stopping.kind!=="root")gaps.push(stopping.kind==="depth"?"history_depth_limited":"shallow_history_boundary");if(shallow&&!gaps.includes("shallow_history_boundary"))gaps.push("shallow_history_boundary");
-  return{schema:"switchyard-git-history-inputs/v1",version:1,policy:"bounded-first-parent-selected-paths/v1",...material,observedAt,sourceBytesWitnessed:witnessed.length>0,sourceBytesReturned:false,scanPerformed:false,authorityGranted:false,gateEligible:false,completeness:"incomplete",historyMetadataSha256:digest(JSON.stringify(material)),gaps,limits:{...gitHistoryLimits}};
+  if (pathDiscovery?.count > 0) gaps.push("unselected_removed_history_paths");
+  return{schema:"switchyard-git-history-inputs/v1",version:1,policy:"bounded-first-parent-selected-paths/v1",...material,...(pathDiscovery ? {pathDiscovery} : {}),observedAt,sourceBytesWitnessed:witnessed.length>0,sourceBytesReturned:false,scanPerformed:false,authorityGranted:false,gateEligible:false,completeness:"incomplete",historyMetadataSha256:digest(JSON.stringify(material)),gaps,limits:{...gitHistoryLimits}};
 }

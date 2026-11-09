@@ -86,8 +86,14 @@ Both managed targets build offline without warnings; the portable proof passes
 2,117 checks. Nine focused groups pass 82 tests with one existing Windows-only
 skip. The native test retains its original owner-loss and malformed-frame cases,
 adds successful fragmented frames and records 24 exact acquire/release cycles.
-All 206 owned build files (3,688,439 bytes) are removed. **Native performance and
-pipe acceptance of this change remain pending.**
+All 206 owned build files (3,688,439 bytes) are removed. Native source `f4dcc79`
+now passes all 482 original groups: 3,157 passes and 246 declared skips. All 23
+worker receipts and the native collector match the independent audit. The state
+lock group passes ten applicable tests with its one Linux-only skip. Scanner UI
+passes in 38,800 ms and execution UI in 44,641 ms against unchanged 45,000 ms
+limits; execution still has a narrow margin.
+[Native follow-up](evidence/native-ui-lease-followup-summary.json),
+[complete source evidence](evidence/complete-windows-f4dcc79-summary.json).
 [Source evidence](evidence/lease-blocking-source-summary.json).
 
 ## Earlier startup checkpoints

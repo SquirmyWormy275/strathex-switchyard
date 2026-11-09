@@ -76,12 +76,13 @@ accept later changes.
 | Native Linux repository inspection | Twelve real Git guardians, at most four concurrent reads, independent exit and unchanged repository bytes. [Receipt](docs/evidence/batched-inspection-source-summary.json) |
 | Complete Linux suite, `72e7c22` | 376 groups, 2,574 passing tests, 32 declared skips; later account-read correction has separate scoped evidence. [Receipt](docs/evidence/linux-72e7c22-complete-summary.json) |
 | Windows client lane, `3222727` | 31 groups, 362 passing tests, zero skips; later lease correction and full-suite acceptance remain separate. [Receipt](docs/evidence/native-client-3222727-summary.json) |
+| Complete Windows source, `f4dcc79` | 482 groups, 3,157 passing tests, 246 declared skips; all 23 workers and native collector pass with original limits and audited cleanup. [Receipt](docs/evidence/complete-windows-f4dcc79-summary.json) |
 | Earlier Windows package, `7529718` | 462 groups, 2,910 passing tests, 246 declared skips; bundle construction and smoke checks pass. [Receipt](docs/evidence/windows-package-7529718-summary.json) |
 
 **Unfinished software:** Linux Claude Desktop focus/launch and the broader
-observation and scanner capabilities tracked in the ledger. Windows scanner and
-execution screens still exceed their test limits; a repeated-focus cycle also
-has a retained failure. These remain unresolved.
+observation and scanner capabilities tracked in the ledger. The Windows UI files
+now pass their original limits, though execution retains a narrow timing margin.
+Earlier repeated-focus and other intermittent native failures remain recorded.
 [Retained Windows failures](docs/evidence/native-48bf450-results-summary.json).
 
 **Separate acceptance checks:** browser task/visual review, physical F77/B122

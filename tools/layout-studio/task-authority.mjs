@@ -171,7 +171,7 @@ export function createTaskAuthority({ store, checkNative, isActive = async () =>
         const refreshed = await capture(c, proposed, generation);
         if (refreshed.snapshot.id !== result.snapshot.id || refreshed.binding !== result.binding || refreshed.workspace !== result.workspace) throw Error("The scanner target changed after historical witnessing. Review again.");
         Object.assign(preparation, { policy: preparation.indexInputs ? "bounded-current-index-and-history/v1" : "bounded-current-and-history/v1", historyHead: witnessed.head, historyPaths: selected.paths, historyDepth: selected.depth,
-          historyMetadataSha256: witnessed.historyMetadataSha256, historyStopping: witnessed.stopping, historyShallow: witnessed.shallow, historyAbsent: witnessed.absent, historyGaps: witnessed.gaps,
+          historyMetadataSha256: witnessed.historyMetadataSha256, historyStopping: witnessed.stopping, historyShallow: witnessed.shallow, historyAbsent: witnessed.absent, historyGaps: witnessed.gaps, historyPathDiscovery: witnessed.pathDiscovery ?? null,
           historyInputs: witnessed.versions.map(row => ({ path: ".switchyard-history/" + row.commit + "/" + row.path, sha256: row.sha256, size: row.size, source: { kind: "git-history", path: row.path, commit: row.commit, objectId: row.objectId, mode: row.mode, depth: selected.depth } })) });
       }
       return { result, preparation };

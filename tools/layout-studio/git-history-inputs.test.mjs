@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {createHash} from "node:crypto";
-import {historySelection,historyRevisionQuery,historyTreeQuery,historyCommitList,historyCommitInput,witnessHistoryCommits,verifyHistoryChain,historyTreeEntries,historyWitnessReport} from "./git-history-inputs.mjs";
+import {historySelection,historyRevisionQuery,historyTreeQuery,historyCommitList,historyCommitInput,witnessHistoryCommits,verifyHistoryChain,historyTreeEntries,historyPathDiscovery,historyWitnessReport} from "./git-history-inputs.mjs";
 const sha=bytes=>createHash("sha256").update(bytes).digest("hex");
 function tree(entries,algorithm="sha1"){const bytes=Buffer.concat(entries.flatMap(entry=>[Buffer.from(`${entry.mode==="040000"?"40000":entry.mode} ${entry.name}\0`),Buffer.from(entry.objectId,"hex")]));return createHash(algorithm).update(`tree ${bytes.length}\0`).update(bytes).digest("hex");}
 function commit({parent,other,algorithm="sha1",body}={}){
@@ -31,4 +31,30 @@ test("historical tree witnesses use exact selected regular paths, preserve absen
 test("history report authenticates selected metadata only and keeps limited traversal and missing coverage explicit",()=>{
   const root=commit(),row=witnessHistoryCommits(root.output,[root.id])[0],selection=historySelection(["app.js"],1),objectId="b".repeat(40),report=historyWitnessReport({head:root.id,selection,commits:[row],shallow:false,stopping:{kind:"root",nextFirstParent:null},versions:[{commit:root.id,path:"app.js",mode:"100644",objectId}],absent:[],blobs:[{objectId,size:6,sha256:sha("source")}],observedAt:"2026-11-05T00:00:00.000Z"});
   assert.equal(report.sourceBytesWitnessed,true);assert.equal(report.sourceBytesReturned,false);assert.equal(report.scanPerformed,false);assert.equal(report.authorityGranted,false);assert.equal(report.gateEligible,false);assert.equal(report.completeness,"incomplete");assert.ok(report.gaps.includes("non_first_parent_history_not_inspected"));assert.ok(report.gaps.includes("commit_messages_not_scanned"));assert.equal(JSON.stringify(report).includes("PRIVATE_COMMIT_MESSAGE"),false);assert.match(report.historyMetadataSha256,/^[a-f0-9]{64}$/);
+});
+test("verified historical names expose bounded unselected removals without expanding selected inputs", () => {
+  for (const algorithm of ["sha1", "sha256"]) {
+    const length = algorithm === "sha1" ? 40 : 64, head = "a".repeat(length), old = "b".repeat(length), older = "c".repeat(length), objectId = "d".repeat(length);
+    const selected = historySelection(["app.js", "gone00.txt"], 3);
+    const present = [{ mode: "100644", name: "app.js", objectId }];
+    const removed = Array.from({ length: 70 }, (_, i) => ({ mode: "100644", name: `gone${String(i).padStart(2, "0")}.txt`, objectId }));
+    const unsupported = [{ mode: "120000", name: "old-link", objectId }, { mode: "100644", name: "x".repeat(385), objectId }];
+    const listing = (commit, entries) => {
+      const text = entries.map(row => `${row.mode} blob ${row.objectId}\t${row.name}\0`).join("");
+      const verified = historyTreeEntries(text, commit, selected.paths, tree(entries, algorithm));
+      return { commit, entries: verified.entries, treeWitnessSha256: verified.treeWitnessSha256 };
+    };
+    const headTree = listing(head, present), oldTree = listing(old, [...present, ...removed, ...unsupported]);
+    const report = historyPathDiscovery(selected, [headTree, oldTree, listing(older, [...present, ...removed])]);
+    assert.equal(report.count, 71); assert.equal(report.rows.length, 64); assert.equal(report.omittedCount, 7); assert.equal(report.unsupportedCount, 2);
+    assert.equal(report.rows[0].path, "gone01.txt"); assert.equal(report.rows.at(-1).path, "gone64.txt");
+    assert(report.rows.every(row => row.latestObservedCommit === old && row.objectId === objectId));
+    assert.equal(report.sourceBytesRead, false); assert.equal(report.authorityGranted, false); assert.equal(report.scanPerformed, false);
+    assert.equal(report.completeness, "metadata-only"); assert.equal(report.observedCommitCount, 3); assert.match(report.metadataSha256, /^[a-f0-9]{64}$/);
+    assert(!JSON.stringify(report).includes("x".repeat(385))); assert(!report.rows.some(row => selected.paths.includes(row.path)));
+    assert.equal(historyPathDiscovery(selected, [headTree]).count, 0);
+    assert.throws(() => historyPathDiscovery(selected, [headTree, headTree]));
+    assert.throws(() => historyPathDiscovery(selected, [{ ...headTree, treeWitnessSha256: "invented" }]));
+    assert.throws(() => historyPathDiscovery(selected, [{ ...headTree, entries: Array(4097).fill(present[0]) }]));
+  }
 });

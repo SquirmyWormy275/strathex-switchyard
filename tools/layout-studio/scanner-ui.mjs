@@ -1,6 +1,13 @@
 import { api } from "./connection.mjs";
 const actions = { shield_change_scan: "Selected changes", shield_codebase_audit: "Selected codebase", shield_supply_chain: "Dependencies", release_shield: "Release inputs" };
 const option = (value, label) => { const e = document.createElement("option"); e.value = value; e.textContent = label; return e; };
+export function historicalScopeSummary(preparation) {
+  if (!preparation.historyDepth) return "";
+  const discovery = preparation.historyPathDiscovery;
+  if (!discovery) return "\n\nHistorical name discovery is unavailable. History coverage remains incomplete.";
+  if (!discovery.count) return "\n\nNo additional removed paths were found in the inspected first-parent commits. Other branches and deeper history remain outside this review.";
+  return `\n\nHistorical files outside this scan: ${discovery.count}\nThese names occur in older inspected commits, are absent from the selected HEAD and are not among the selected history inputs. Their contents have not been read or included.\n${discovery.rows.map(row => row.path).join("\n")}${discovery.omittedCount ? `\n${discovery.omittedCount} additional names are not displayed (${discovery.unsupportedCount} unsupported paths or file types).` : ""}\nThis review does not grant permission to scan them. Other branches and deeper history remain uninspected.`;
+}
 /** Generate and save a setup; authority and scan execution remain separate steps. */
 export function mountScanner({ notify }) {
   const $ = id => document.getElementById(id);
@@ -56,7 +63,7 @@ export function mountScanner({ notify }) {
     $("scanner-status").textContent = "Inspecting the selected native task, read-only repository inputs and signed feeds. No repository file has been written and no scan has run.";
     const result = await api("/api/suite/coding/scanner-save/review", { compartment: context.compartment, ...input }); if (!context.current()) return;
     reviewed = { id: result.draft.id, token: result.confirmation.token };
-    $("scanner-review-summary").textContent = `${result.confirmation.record.reason}\n\nProject: ${result.draft.repositoryRoot}\nNew directory: ${result.draft.directory}\nAction: ${actions[result.draft.action]}\nManifest: ${result.draft.manifestPath}\nSHA-256: ${result.draft.manifestSha256}\nExpires: ${result.review.expiresAt}\n\nSelected inputs, exclusions and coverage limits:\n${JSON.stringify(result.draft.preparation, null, 2)}\n\nProposed later task permission:\n${JSON.stringify(result.draft.authorityProposal, null, 2)}\n\nVerified feed metadata:\n${JSON.stringify(result.draft.feeds, null, 2)}`;
+    $("scanner-review-summary").textContent = `${result.confirmation.record.reason}\n\nProject: ${result.draft.repositoryRoot}\nNew directory: ${result.draft.directory}\nAction: ${actions[result.draft.action]}\nManifest: ${result.draft.manifestPath}\nSHA-256: ${result.draft.manifestSha256}\nExpires: ${result.review.expiresAt}${historicalScopeSummary(result.draft.preparation)}\n\nSelected inputs, exclusions and coverage limits:\n${JSON.stringify(result.draft.preparation, null, 2)}\n\nProposed later task permission:\n${JSON.stringify(result.draft.authorityProposal, null, 2)}\n\nVerified feed metadata:\n${JSON.stringify(result.draft.feeds, null, 2)}`;
     $("scanner-review-files").replaceChildren(...result.draft.files.map(file => { const details = document.createElement("details"), summary = document.createElement("summary"), text = document.createElement("pre"); summary.textContent = `${file.path} · ${file.size} bytes · SHA-256 ${file.sha256}`; text.className = "execution-output"; text.textContent = file.content; details.append(summary, text); return details; }));
     $("scanner-review-dialog").showModal();
   }));
