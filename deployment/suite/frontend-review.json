@@ -1,6 +1,6 @@
 {
   "schema": "switchyard-front-end-review/v1",
-  "digest": "3265d16737fae14d99c7c5a0792af4c5e7cd743320f0abc84263bf22490770ed",
+  "digest": "00140e1b02bcacc4077219d67b2a796fa798e7ccdc04b95e6d16b9e6f6f4219a",
   "files": [
     {
       "file": "index.html",
@@ -40,7 +40,7 @@
     },
     {
       "file": "scanner-ui.mjs",
-      "sha256": "a3dc1330989e4b2a255747cf78c015c9f969b01b7bfafe70fe12b6e3eb21549c"
+      "sha256": "cf3b97166dc31bd50ffd79073a21b9286d43212c85398f57693ef9dc5abcf0f0"
     },
     {
       "file": "feed-ui.mjs",
@@ -147,5 +147,5 @@
       "sha256": "3992ae079403cf41f6d99f9513b6d20ccbd96b976a658866b3915f15f43d4f13"
     }
   ],
-  "sourceCommit": "434c40316e4bbd810d3f53cf298f25ef220828e7"
+  "sourceCommit": "c44b6805f16a3ab63b0d9212cd1e199c728b7739"
 }
