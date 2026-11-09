@@ -119,7 +119,7 @@
   "completeSourceAcceptance": false,
   "limitations": [
     "Both target files pass on native Windows at this source, including the extensionless provider under both package module contexts. This is a scoped source follow-up; the separate full package job is pending.",
-    "This source predates the explicit directory-junction alias refusal assertions at 6089285. Those assertions remain pending native verification.",
+    "This source predates the explicit directory-junction alias refusal assertions at 6089285. Those assertions now pass separately in windows-package-db24634-tests-summary.json.",
     "The original 90fa879 package failures and local failed regression are retained; production recovery identity checks were not weakened.",
     "The native task uses a synthetic provider. No live model, account switching, interactive desktop, physical keyboard or guest acceptance is claimed."
   ]

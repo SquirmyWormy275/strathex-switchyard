@@ -23,7 +23,7 @@
     "unchangedScenarioManifestVerified": true,
     "npmCliFromPinnedWindowsNodeDirectory": true
   },
-  "workflowCollectorAcceptance": "pending",
+  "workflowCollectorAcceptance": "accepted",
   "manifestSha256": "cc4cd1d1eb5cea40b54b93bb53580141dfecb77be2536fdb9ae2ea92bc3d50da",
   "totals": {
     "required": 462,
@@ -895,8 +895,17 @@
   "packageAcceptance": false,
   "limitations": [
     "This accepts the complete distributed source at 4db5948, including exact Claude version admission, both native status-consent corrections and the native package fixture corrections. Full package acceptance remains separate.",
-    "This source predates the explicit directory-junction recovery assertion at 6089285; its native acceptance remains pending.",
+    "This source predates the explicit directory-junction recovery assertion at 6089285; its separate native acceptance is now recorded in windows-package-db24634-tests-summary.json.",
     "Earlier intermittent native focus, restricted-storage retirement and host-action settlement failures remain preserved; this passing follow-up does not prove their causes are resolved.",
     "No interactive Windows account, desktop, guest, microphone or hardware acceptance is claimed."
-  ]
+  ],
+  "nativeCollector": {
+    "jobId": 128674177410,
+    "artifactId": 13610348561,
+    "archiveBytes": 2613,
+    "archiveSha256": "afbedd51ddc279301f416ada7fb940c5d1d2e5a976e0357752ce51d7ce5a80d6",
+    "summarySha256": "b7da86668732f01e3dde933334f43a50f9f514ba01f25e667e7d4e47d3c2af6b",
+    "exactAuditedScopeCohortsManifestAndTotalsMatched": true
+  },
+  "workflowJobsPassed": 23
 }

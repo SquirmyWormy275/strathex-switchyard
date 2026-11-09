@@ -37,7 +37,7 @@ The temporary wrapper's original syntax failure preceded every test and remains 
 
 ## Current Windows verification
 
-Source `4db5948e63df68501b56ac4d6690f3a86cf001e4` passes all **462 groups, 2,910 tests and 246 declared skips**. All 21 original worker receipts are independently audited against the source/merge tree, toolchain, manifest, commands, bounds and cleanup. Run `42461208384` uses merge `29faa91ee774e760c62e658e676df3cc916d79c1`, tree `3c4d0b86eaa8f6f59ec07897d4ed25888d63693e`. Its native collector still needs final acceptance. [Complete source evidence](evidence/complete-windows-4db5948-summary.json).
+Source `4db5948e63df68501b56ac4d6690f3a86cf001e4` passes all **462 groups, 2,910 tests and 246 declared skips**. All 21 original worker receipts are independently audited against the source/merge tree, toolchain, manifest, commands, bounds and cleanup. Run `42461208384` uses merge `29faa91ee774e760c62e658e676df3cc916d79c1`, tree `3c4d0b86eaa8f6f59ec07897d4ed25888d63693e`. Its native collector is accepted: exact scope, manifest, all cohort identities/digests and totals match the independent audit; all 23 workflow jobs pass. [Complete source evidence](evidence/complete-windows-4db5948-summary.json).
 
 The earlier full package run `42397684952` at `90fa879` completed all 462 groups in about 61 minutes, within its existing 90-minute limit. **Two native fixture assertions failed.** The receipt has 2,900 passes, two failures and 246 declared skips, with exact cleanup. Preserve the [audited original failure](evidence/windows-package-90fa879-failure-summary.json).
 
@@ -46,14 +46,17 @@ The earlier full package run `42397684952` at `90fa879` completed all 462 groups
 
 Both corrected files pass **22 native Windows tests with zero skips** at `4db5948`; their two complete workers pass 48 groups/328 tests with 15 declared skips. [Scoped native follow-up](evidence/windows-fixture-native-4db5948-summary.json), [local regressions and corrections](evidence/windows-package-fixture-corrections-summary.json). This is source evidence, not full package acceptance.
 
-The later `6089285` native test creates an owned directory junction, checks identical helper bytes and regular-file status, refuses the alias as saved identity, then accepts the untouched original canonical row. Its local three-group run passes 29 tests with five declared platform skips; the alias assertions themselves still require native verification. No production identity is rewritten or relaxed.
+The later `6089285` native test creates an owned directory junction, checks identical helper bytes and regular-file status, refuses the alias as saved identity, then accepts the untouched original canonical row. Its local three-group run passes 29 tests with five declared platform skips; the alias assertions now pass inside the independently audited `db24634` Windows package test receipt. No production identity is rewritten or relaxed.
+
+The latest source `db24634` also has a passing native collector and all 462 package test groups pass (2,910 tests; 246 declared skips). The package receipt is independently audited. Release construction then fails with CA1416 in the standalone provider helper's `EditorEndpointSecurity` method. The local Windows guard now fixes the identical compiler invocation while preserving warnings-as-errors, ACL/identity checks and QUERY-only access. The portable self-test and two Linux refusals pass; eight original contract groups pass 48 tests/one declared skip. Its 34-file/561,965-byte build staging is removed with original/corrected logs retained and no package downloads. [Package stage](evidence/windows-package-db24634-tests-summary.json), [compiler correction](evidence/provider-helper-platform-source-summary.json).
 
 Next remote checks:
 
-1. Read the final native collector for source run `42461208384` and compare its accepted receipt set with the independently audited set.
-2. Inspect full package run `42461208376` at `4db5948`. Require every original group, unchanged bounds/skips and verified child/tree cleanup; preliminary shards are not package acceptance.
-3. Find the actual native follow-up carrying the alias assertion. At `6089285`, source run `42461742832` and package run `42461742807` were queued. Later normal pushes may supersede queued runs; verify exact source/tree, not just the historical run ID.
+1. Inspect the ordinary CI run from the compiler correction. The shared helper workflow now first publishes the standalone provider helper with the existing pinned offline toolchain and requires its native self-test. Its 15-minute bound is unchanged. Look for the bounded `SXSY-PROVIDER-HELPER-PREFLIGHT` receipt.
+2. Require the complete release job to pass its remaining native publishing/packaging stages. Source and package test-stage acceptance do not establish a finished release.
+3. Preserve the two `db24634` preliminary HTTP 504 failures before tests (jobs `128691327134` and `128691327237`); no receipts exist. The next normal source push can schedule a fresh run. Do not dispatch/cancel/retry CI manually.
 
+The frontend-freeze clarification is pending with the owner. Until answered, continue independent backend/package work without changing Home/catalog/editor activation.
 Only bounded digest-verified JSON receipts remain locally outside the checkout. ZIPs were read in memory; no native runtime archive or disposable checkout is retained. Package verification keeps ordered builds/compiled consumers followed by at most two independent children. [Scheduling contract](evidence/windows-paired-verification-summary.json).
 
 ## Recent backend behavior

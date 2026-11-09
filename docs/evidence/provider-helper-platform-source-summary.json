@@ -1,0 +1,109 @@
+{
+  "schema": "switchyard-provider-helper-platform-correction/v1",
+  "baseCommit": "db2463431cff362ce3ef0ab47ffe3c74080b4745",
+  "problem": "The standalone net8.0 provider helper failed CA1416 analysis because EditorEndpointSecurity had no local Windows guard. The combined Windows-targeted state helper did not expose this standalone build failure.",
+  "correction": "Refuse non-Windows calls before native security access. Keep all endpoint identity, ACL, digest and QUERY-only rules and warnings-as-errors unchanged.",
+  "originalNativeFailures": [
+    {
+      "source": "4db5948",
+      "workflowRunId": 42461208376,
+      "jobId": 128676548690
+    },
+    {
+      "source": "db24634",
+      "workflowRunId": 42462775807,
+      "jobId": 128695124989
+    }
+  ],
+  "localBuild": {
+    "sdkVersion": "8.0.424",
+    "targetFramework": "net8.0",
+    "configuration": "Release",
+    "originalExitCode": 1,
+    "correctedExitCode": 0,
+    "identicalBuildCommand": true,
+    "originalLogSha256": "a385d2c9d2617c6889371bf5aa721adce00815442860394e2c0e287cea237bca",
+    "correctedLogSha256": "156ce0771759378c093c855c5dc39ca7978fb70252259d0fb7d147e9bae31926",
+    "packageSources": [],
+    "packagesDownloaded": 0,
+    "warningsAsErrors": true
+  },
+  "localRuntimeChecks": [
+    {
+      "args": [
+        "--self-test"
+      ],
+      "exitCode": 0,
+      "status": "ok",
+      "focusOnlyPolicyVerified": true,
+      "nativeEditorPolicyVerified": true,
+      "tokenAccessMask": 8,
+      "windowFocused": false,
+      "currentProcessVerified": null,
+      "ownerQueryVerified": null
+    },
+    {
+      "args": [
+        "--editor-endpoint-v1"
+      ],
+      "exitCode": 65,
+      "errorCode": "windows_required"
+    },
+    {
+      "args": [
+        "--editor-endpoint-fixture-v1"
+      ],
+      "exitCode": 65,
+      "errorCode": "windows_required"
+    }
+  ],
+  "contracts": {
+    "receiptId": "d52ab4a2-4f15-422f-87fa-21c33c1f1b36",
+    "receiptSha256": "e8340dc5406c4ad3da6cdd116f5dc7bcba4fad0b1d75577ac1ef4e32953e4830",
+    "totals": {
+      "required": 8,
+      "passed": 8,
+      "failed": 0,
+      "tests": 49,
+      "passedTests": 48,
+      "failedTests": 0,
+      "skippedTests": 1,
+      "cancelledTests": 0,
+      "todoTests": 0
+    },
+    "originalCommandsBoundsSkipsAndCleanupVerified": true
+  },
+  "sourceFiles": [
+    {
+      "file": "apps/windows-companion/provider-desktop-helper/EditorEndpoint.cs",
+      "sha256": "e70df55dff39a131cd27007ec7726f54888ceacc95fb90e5dcbbb25d88dab147"
+    },
+    {
+      "file": ".github/workflows/switchyard-windows-state-helper.yml",
+      "sha256": "9ad852603b5ca665c32ccbe4d4f22d6043989e59876f9f2ab920e1e61d2f071e"
+    }
+  ],
+  "earlyNativePreflight": {
+    "workflow": ".github/workflows/switchyard-windows-state-helper.yml",
+    "standalonePublishBeforeSourceMatrix": true,
+    "existingPinnedOfflineToolchain": true,
+    "jobBoundMinutes": 15,
+    "nativeSelfTestRequired": true,
+    "noWindowFocus": true,
+    "tokenAccessMask": 8,
+    "acceptance": "pending"
+  },
+  "nativePackageAcceptance": false,
+  "temporaryBuildRemoved": true,
+  "limitations": [
+    "The local build and portable self-test run on Linux using the existing SDK; they do not establish native Windows endpoint or release acceptance.",
+    "The eight contract groups pass with the original one platform skip. The new native standalone publish/self-test and full release must pass on ordinary CI.",
+    "All 462 tests in the db24634 Windows package receipt pass; its later native helper compile failure and the two preliminary HTTP 504 infrastructure failures remain retained."
+  ],
+  "cleanup": {
+    "files": 34,
+    "bytes": 561965,
+    "originalAndCorrectedLogsVerified": true,
+    "noPackageDownloads": true
+  }
+}

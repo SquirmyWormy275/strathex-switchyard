@@ -95,7 +95,7 @@
     "targetSkips": 0,
     "evidence": "windows-fixture-native-4db5948-summary.json",
     "packageAcceptance": false,
-    "laterAliasAssertionsAccepted": false
+    "laterAliasAssertionsAccepted": true
   },
   "nativePackageAcceptance": false,
   "limitations": [
@@ -121,8 +121,14 @@
       "todoTests": 0
     },
     "originalCommandsBoundsSkipsAndCleanupVerified": true,
-    "nativeWindowsAcceptance": "pending",
+    "nativeWindowsAcceptance": {
+      "sourceCommit": "db2463431cff362ce3ef0ab47ffe3c74080b4745",
+      "workflowRunId": 42462775807,
+      "receiptId": "55b07028-1f80-40f7-8bf8-4b1c2a94cf0a",
+      "evidence": "windows-package-db24634-tests-summary.json",
+      "originalBoundsAndCleanupVerified": true
+    },
     "behavior": "The existing native case creates an owned directory junction, checks identical helper bytes and regular-file status, refuses that alias as saved identity, and accepts the untouched original canonical ownership row. It neither rewrites an original saved helper identity nor grants recovery through an alias.",
-    "limitation": "The native alias assertions are skipped on Linux and are not yet accepted by this local receipt."
+    "limitation": "The native alias assertions pass in the original full package test group; complete release acceptance remains blocked by the later standalone provider-helper build."
   }
 }

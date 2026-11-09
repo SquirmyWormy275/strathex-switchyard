@@ -23,6 +23,7 @@ internal static partial class Program
     // local administrators may have effective allow entries.
     private static byte[] EditorEndpointSecurity(SafeFileHandle handle, SecurityIdentifier user)
     {
+        if (!OperatingSystem.IsWindows()) throw new ProtocolException("windows_required");
         if (EndpointGetSecurityInfo(handle, 1, 5, out _, out _, out _, out _, out IntPtr descriptor) != 0)
             throw new ProtocolException("endpoint_security_unavailable");
         try
