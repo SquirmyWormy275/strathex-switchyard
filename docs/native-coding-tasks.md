@@ -14,8 +14,10 @@ It does not configure an API key or choose a
 fallback account. File changes and command execution are outside this route.
 Saved native conversation context can be used by the model.
 
-The task controls below are backend APIs. The frontend is frozen for review;
-these new controls are not yet exposed there. Claude text tasks use the same protected review lifecycle;
+The task controls below are backend APIs. Frontend work is authorized; task
+creation and reviewed native text still need their frontend flow. Saved
+[configuration-design conversations](saved-conversation-controls.md) now have
+their own history and account-binding controls. Claude text tasks use the same protected review lifecycle;
 first-turn creation and continuation have separate native contracts and their
 installed acceptance passed native creation and continuation with two synthetic
 text turns; interactive client attachment remains separate. Reviewed [task authority](task-authority.md) is now connected to fresh repository

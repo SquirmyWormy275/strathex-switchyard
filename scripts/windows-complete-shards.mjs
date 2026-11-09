@@ -12,7 +12,7 @@ const hash = value => createHash("sha256").update(value).digest("hex");
 const key = group => JSON.stringify([group.file, group.pattern ?? null]);
 const integer = value => Number.isSafeInteger(value) && value >= 0;
 const same = (actual, expected, message) => assert.deepEqual(actual, expected, message);
-export const completeWindowsShards = Object.freeze([...Array.from({ length: 20 }, (_, i) => String(i + 1)), "assembly"]);
+export const completeWindowsShards = Object.freeze([...Array.from({ length: 22 }, (_, i) => String(i + 1)), "assembly"]);
 assert.equal(costs.schema, "switchyard-windows-backend-costs/v1");
 assert(Array.isArray(costs.groups) && costs.groups.length <= 640);
 assert.equal(costs.fallbackCostMs, 60000);
@@ -32,7 +32,7 @@ export function selectCompleteWindowsShard(shard, groups = requiredGroups) {
   // Builds, PowerShell verification and tests that read compiled outputs share
   // one worker, retaining their original dependency order.
   if (shard === "assembly") return groups.filter(requiresAssembly);
-  const loads = Array(20).fill(0), assignments = new Map();
+  const loads = Array(22).fill(0), assignments = new Map();
   const ranked = groups.filter(group => !requiresAssembly(group)).map((group, index) => ({ group, index, cost: completeWindowsCost(group) }))
     .sort((a, b) => b.cost - a.cost || a.index - b.index);
   for (const { group, cost } of ranked) {

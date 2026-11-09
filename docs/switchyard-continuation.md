@@ -256,8 +256,8 @@ Publish tested source and evidence regularly. Retain original failures and front
 
 ## Next implementation work
 
-The installed checkpoint includes all guided frontend work above. Continue remaining
-required observation sources, feed trust setup and native attachment limitations. Native exact-task
+The installed checkpoint includes guided controls, scanner setup and feed trust.
+Continue coding-task creation/text frontend controls and native attachment limitations. Native exact-task
 attachment, interactive IDE, browser visual review and hardware/account acceptance
 remain separately tracked; the full Rev2 assignment is unfinished.
 
@@ -370,8 +370,30 @@ exact state is removed. No real key/feed/account/device is enrolled or used.
 [Controls](feed-maintenance-controls.md), [evidence](evidence/feed-ui-source-summary.json).
 
 Source af0bc2c489ba515756e6532be9b13a79903b4ed2 has an immutable 32-asset frontend
-82309a37b568526dcf3f64d1ab0e4d9b6d2ffaa61eaf63e4da101911b4cadd67. All bytes and the prior dated pointer backup verify. It is not installed or visually accepted.
-The normal installation remains the accepted `47143a9f`/28-asset release.
+82309a37b568526dcf3f64d1ab0e4d9b6d2ffaa61eaf63e4da101911b4cadd67. All bytes and the prior dated pointer backup verify. It is installed in the verified `db142f7c` release above; visual acceptance remains blocked.
 Continue remaining account/task frontend controls, exact native attachment
 limitations and normal installed/frontend verification. Browser tooling remains
 blocked before inspection; current complete Linux/Windows acceptance is open.
+
+## Saved designer conversations
+
+The saved-history picker now selects exact context without provider I/O, separates
+volatile drafts by workspace/assistant/conversation, and connects legacy account
+review/binding and explicit native status. Overlapping submits refuse. Lost
+replies preserve drafts and require deliberate context selection before another
+send; late workspace/layout results cannot replace current work. Original account
+identity remains unknown after legacy binding. Native cancellation is scoped to
+the pending conversation and displays the backend result.
+
+Nine interaction cases, eight original groups/73 tests and three final groups/23
+tests pass with overlap and no skips. Eight live-preview checks pass. Original
+20-worker scheduling failure remains retained; 22 software workers plus ordered
+assembly keep all cases, historical costs, 950000 ms allowance, child bounds and
+20-minute job limit. Latest full-platform CI acceptance remains separate.
+[Controls](saved-conversation-controls.md), [evidence](evidence/conversation-ui-source-summary.json).
+
+The fresh preview has two explicit synthetic design conversations. Native account,
+model, status and binding operations remain refused there. Its predecessor's
+exact process and owned state were retired. Continue native coding-task creation,
+reviewed-text/recovery controls and exact attachment limitations; the full Rev2
+suite remains unfinished. Do not confuse UI source with the installed checkpoint.

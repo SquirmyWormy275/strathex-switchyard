@@ -63,6 +63,14 @@ implicit authority or execution. [Execution controls](reviewed-execution-control
 
 ## Current broader CI failures
 
+Saved design conversations now have a local history picker, separate account
+binding review, explicit native status, destination-specific drafts and lost-reply
+handling. Eight original groups pass 73 tests; three final interaction groups pass
+23 with overlap. Eight running synthetic-preview checks pass. The complete source
+lane now uses 22 software workers plus assembly after the retained original
+20-worker workload check fails with the new group. Bounds and cases are unchanged.
+[Conversation controls and evidence](saved-conversation-controls.md).
+
 The `ce89c78` Linux job and one Windows source worker fail the historical workload
 budget check as new frontend tests exceed the six-worker allowance. The source
 now redistributes every original case across eight workers; the 20-minute worker

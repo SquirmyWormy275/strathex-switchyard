@@ -6,12 +6,13 @@ import { mountExecution } from "./execution-ui.mjs";
 import { mountAuthority } from "./authority-ui.mjs";
 import { mountScanner } from "./scanner-ui.mjs";
 import { mountFeeds } from "./feed-ui.mjs";
+import { mountConversations } from "./conversation-ui.mjs";
 import { mountObservation } from "./observation-ui.mjs";
 const $ = (id) => document.getElementById(id);
 
 export function mountSuite({ getProfile, loadProfile, previewProposal, notify, saved, onPolicy, onWorkflow, download }) {
   let refreshGeneration = 0;
-  let compartment = "personal", state = null, conversationId = null, proposedWorkflow = null, saveTimer, recorder, stream, audioSession, segmentTimer, voicePending = Promise.resolve(), voicePaused = true;
+  let compartment = "personal", state = null, proposedWorkflow = null, saveTimer, recorder, stream, audioSession, segmentTimer, voicePending = Promise.resolve(), voicePaused = true;
   const lines = (id) => $(id).value.split("\n").map((s) => s.trim()).filter(Boolean);
   async function run(fn) { try { return await fn(); } catch (e) { $("suite-status").textContent = e.message; notify(e.message); return null; } }
   function workflowForm(workflow) { $("workflow-name").value = workflow.name; $("workflow-steps").value = workflow.steps.map((s) => typeof s === "string" ? s : s.label).join("\n"); $("workflow-roles").value = workflow.roles.map((r) => typeof r === "string" ? r : r.label).join("\n"); }
@@ -23,15 +24,13 @@ export function mountSuite({ getProfile, loadProfile, previewProposal, notify, s
     onPolicy(state.policyRules.export);
     onWorkflow(state.workflow);
     $("operating-mode").value = state.mode ?? (state.policy === "work" ? "managed-companion" : "personal-companion");
-    document.dispatchEvent(new CustomEvent("switchyard-compartment-state", { detail: state }));
     $("policy-summary").textContent = `${state.policy === "work" ? "Copilot-only Work" : "Personal"} · ${state.policyRules.providers.join(", ")} · ${state.policyRules.recording ? "recording allowed by policy" : "recording prohibited"} · ${state.policyRules.export ? "portable export allowed" : "exports prohibited"} · ${state.policyRules.retentionDays}-day session retention. This is an application routing boundary, not an OS sandbox.`;
     for (const id of ["export-json", "export-markdown", "copy-json", "copy-assistant-context"]) $(id).disabled = !state.policyRules.export || !getProfile();
     $("start-voice").disabled = !state.policyRules.recording;
     const provider = $("conversation-provider").value;
     $("conversation-provider").replaceChildren(...state.policyRules.providers.filter((p) => ["codex", "claude-code", "microsoft-365-copilot"].includes(p)).map((p) => { const o = document.createElement("option"); o.value = p; o.textContent = ({ codex: "Codex · installed account", "claude-code": "Claude Code · installed account", "microsoft-365-copilot": "Microsoft 365 Copilot · approved account" })[p]; return o; }));
     if ([...$("conversation-provider").options].some((o) => o.value === provider)) $("conversation-provider").value = provider;
-    const history = $("conversation-history"); history.replaceChildren();
-    for (const c of state.conversations.slice(-4)) for (const m of c.messages) { const article = document.createElement("p"); article.className = `message ${m.role}`; const label = document.createElement("strong"); label.textContent = m.role === "user" ? "You" : c.provider; const content = document.createElement("span"); content.textContent = m.text; article.append(label, content); history.append(article); }
+    document.dispatchEvent(new CustomEvent("switchyard-compartment-state", { detail: state }));
     const v = state.voice.at(-1);
     if (v && !recorder?.state?.includes("recording") && document.activeElement !== $("voice-transcript")) $("voice-transcript").value = v.reviewedTranscript || v.transcript;
     $("voice-status").textContent = v ? `${v.status} · ${v.chunks.filter((c) => c.status === "transcribed").length} transcribed segments · ${v.chunks.filter((c) => c.pendingAudio).length} saved audio segments awaiting retry` : "Local CPU transcription. Microphone starts only when you choose Start voice. Audio is removed after successful transcription; transcript stays encrypted until its retention period or deletion.";
@@ -90,7 +89,7 @@ export function mountSuite({ getProfile, loadProfile, previewProposal, notify, s
     try {
       await voicePending; clearTimeout(saveTimer); await persist();
       await api("/api/suite/compartment/select", { compartment: nextCompartment });
-      compartment = nextCompartment; setActiveCompartment(compartment); conversationId = null;
+      compartment = nextCompartment; setActiveCompartment(compartment);
     } finally {
       $("compartment-picker").value = compartment;
       try { await refresh(); workflowForm(state.workflow); loadProfile(state.profile ?? null); }
@@ -119,27 +118,30 @@ export function mountSuite({ getProfile, loadProfile, previewProposal, notify, s
   }));
   function fillCompartments(list) { $("compartment-picker").replaceChildren(...list.map((c) => { const o = document.createElement("option"); o.value = c.id; o.textContent = c.id === "work" ? "Work · Copilot only" : c.id === "personal" ? "Personal" : c.id; return o; })); $("compartment-picker").value = compartment; }
   $("save-workflow").addEventListener("click", () => run(async () => { const workflow = { name: $("workflow-name").value, steps: lines("workflow-steps"), roles: lines("workflow-roles") }; await api("/api/suite/workflow/save", { compartment, workflow }); proposedWorkflow = null; await refresh(); notify("Workflow saved. Steps and roles remain editable."); }));
-  $("conversation-provider").addEventListener("change", () => { conversationId = null; $("design-status").textContent = "The next message starts a deliberate connection with the selected provider. Earlier conversations and key assignments are preserved."; });
-  $("new-design-conversation").addEventListener("click", () => { conversationId = null; $("design-status").textContent = "Ready for a new conversation. Earlier conversations are kept in this compartment."; });
   $("refresh-agent-targets").addEventListener("click", () => run(refresh));
   for (const [button, example] of [["start-custom-example", "custom"], ["start-langchain-example", "langchain"]]) $(button).addEventListener("click", () => run(async () => { const r = await api("/api/suite/agents/example", { compartment, example }); $("role-result").textContent = `${r.status}. Refresh targets after its authenticated ready event.`; }));
   $("design-form").addEventListener("submit", (event) => { event.preventDefault(); void run(async () => {
     if (!getProfile()) throw new Error("Load your keyboard before asking for a key arrangement.");
-    const message = $("design-message").value, destination = $("conversation-provider").value, target = compartment, profile = JSON.stringify(getProfile()); $("send-design").disabled = true;
+    const context = conversations.begin();
+    let submitted = false;
+    const message = $("design-message").value, destination = context.destination, target = context.compartment, profile = JSON.stringify(getProfile());
     $("design-status").textContent = `Connecting to ${$("conversation-provider").value} with this layout and your message. Tools are disabled for configuration design.`;
     try {
       await persist();
-      if (target !== compartment || destination !== $("conversation-provider").value || profile !== JSON.stringify(getProfile())) throw Error("The workspace, assistant or layout changed. Review your message before sending.");
-      const version = refreshGeneration, observationReview = observation.takeReview(destination);
-      const response = await api("/api/suite/design", { compartment: target, provider: destination, message, plan: getProfile().plan, conversationId, ...(observationReview ? { observationReview } : {}) });
-      if (version !== refreshGeneration || target !== compartment || destination !== $("conversation-provider").value) return;
-      conversationId = response.conversationId; proposedWorkflow = response.workflow; workflowForm(proposedWorkflow);
+      if (!context.current() || profile !== JSON.stringify(getProfile())) throw Error("The workspace, assistant or layout changed. Review your message before sending.");
+      const observationReview = observation.takeReview(destination);
+      submitted = true;
+      const response = await api("/api/suite/design", { compartment: target, provider: destination, message, plan: getProfile().plan, conversationId: context.conversationId, ...(observationReview ? { observationReview } : {}) });
+      if (profile !== JSON.stringify(getProfile())) throw Error("The layout changed while the assistant was replying. Inspect saved context before using its proposal.");
+      if (!conversations.accepted(context, response.conversationId)) return;
+      proposedWorkflow = response.workflow; workflowForm(proposedWorkflow);
       if (response.proposal) previewProposal(response.proposal);
       $("design-status").textContent = `${response.reply}\nReview the proposed layout above and the proposed process below. Save only what you want to keep.`;
       $("design-message").value = ""; await refresh();
-    } finally { $("send-design").disabled = false; }
+    } catch (error) { conversations.failed(context, error, submitted); notify(error.message); }
+    finally { conversations.finish(); }
   }); });
-  $("cancel-design").addEventListener("click", () => run(async () => { await api("/api/suite/design/cancel", { compartment, conversationId }); $("design-status").textContent = "Cancellation requested for the exact owned turn. Your draft is preserved."; }));
+  $("cancel-design").addEventListener("click", () => run(async () => { const context = conversations.cancellation(); const result = await api("/api/suite/design/cancel", { compartment: context.compartment, conversationId: context.conversationId }); if (context.current()) $("design-status").textContent = `${result.status}. Your draft is preserved; this does not verify task completion.`; }));
 
   async function sendSegment(blob, id, segmentCompartment, segmentSession) {
     if (!blob.size) return;
@@ -185,6 +187,7 @@ export function mountSuite({ getProfile, loadProfile, previewProposal, notify, s
   $("retry-voice").addEventListener("click", () => run(async () => { await api("/api/suite/voice/retry", { compartment, id: audioSession ?? state.voice.at(-1)?.id }); await refresh(); }));
   window.addEventListener("pagehide", () => { voicePaused = true; clearTimeout(segmentTimer); for (const track of stream?.getTracks() ?? []) track.stop(); });
   const observation = mountObservation({ notify, refresh });
+  const conversations = mountConversations({ notify, refresh });
   mountRoles({ notify, refresh });
   mountClients({ notify, download });
   mountExecution({ notify });

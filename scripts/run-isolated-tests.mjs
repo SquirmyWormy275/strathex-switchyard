@@ -297,6 +297,7 @@ export const requiredGroups = [
   { file: "tools/layout-studio/authority-ui.test.mjs" },
   { file: "tools/layout-studio/scanner-ui.test.mjs" },
   { file: "tools/layout-studio/feed-ui.test.mjs" },
+  { file: "tools/layout-studio/conversation-ui.test.mjs" },
   { file: "tools/layout-studio/device-ui.test.mjs" },
   { file: "tools/layout-studio/device-settings-ui.test.mjs" },
   { file: "tools/layout-studio/device-diagnostic-ui.test.mjs" },

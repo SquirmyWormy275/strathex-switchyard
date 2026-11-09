@@ -44,6 +44,8 @@ Copilot-only policy. Imported layouts never enable providers or recording.
   evidence and the controls still being implemented.
 - [Editor task controls](docs/editor-task-controls.md): browse saved projects,
   review an exact terminal connection and return to its owned terminal.
+- [Saved design conversations](docs/saved-conversation-controls.md): reopen exact
+  context, inspect native status and review an older account binding separately.
 - [Reviewed native coding text](docs/native-coding-tasks.md): follow an exact task,
   approve bounded text and recover an uncertain turn without automatic retry.
 - [Microsoft work conversations](docs/copilot-request-recovery.md): keep the exact

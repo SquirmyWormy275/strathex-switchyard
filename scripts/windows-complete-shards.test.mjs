@@ -51,7 +51,7 @@ test("complete Windows workers cover the original manifest once, preserving buil
   }
   assert(selections.slice(0, -1).every(groups => groups.length > 0 && groups.every(g => !g.args && !consumers.has(g.file))));
   assert(selections.slice(0, -1).every(groups => groups.reduce((n, g) => n + completeWindowsCost(g), 0) <= 950000));
-  for (const bad of ["0", "21", "01", 1, undefined]) assert.throws(() => selectCompleteWindowsShard(bad));
+  for (const bad of ["0", "23", "01", 1, undefined]) assert.throws(() => selectCompleteWindowsShard(bad));
   for (const changed of [requiredGroups.slice(1), [...requiredGroups, requiredGroups[0]], requiredGroups.map((g, i) => i ? g : { ...g, timeoutMs: 45001 })]) assert.throws(() => selectCompleteWindowsShard("1", changed));
 });
 test("the complete receipt audit accepts only a full same-source cohort and reports package acceptance separately", () => {
