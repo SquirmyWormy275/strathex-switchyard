@@ -125,5 +125,13 @@
     "Current complete Linux/Windows and the retained native host-action failure remain separate.",
     "Claude owned background-session launch/stop and interactive exact-task attachment are not provided by these dedicated-text controls.",
     "Installed adoption is separate from this source checkpoint."
-  ]
+  ],
+  "frontend": {
+    "digest": "f96ce01b96b12459fd39b89eca9e16ca826177eab8e749467d73584f48ac45c8",
+    "assets": 34,
+    "sourceCommit": "1c144fed61f750e4fd3171d6bfe0081d60d56be3",
+    "immutableBytesVerified": true,
+    "installed": false,
+    "visualAcceptance": false
+  }
 }

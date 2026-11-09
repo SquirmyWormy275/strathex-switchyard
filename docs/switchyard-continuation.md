@@ -428,3 +428,6 @@ No live account/task/model/hardware action occurred. Continue background-task
 controls, approved-work request recovery/account controls, exact attachment
 limitations and installed adoption. Do not equate synthetic transport proofs with
 live native acceptance or the blocked visual review.
+
+Task UI source 1c144fed61f750e4fd3171d6bfe0081d60d56be3 has an immutable 34-asset frontend
+f96ce01b96b12459fd39b89eca9e16ca826177eab8e749467d73584f48ac45c8. All bytes and the dated prior-pointer backup verify. Installed adoption and browser visual acceptance remain separate.
