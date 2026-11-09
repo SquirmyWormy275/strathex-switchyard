@@ -258,6 +258,7 @@ if ($providerDesktopSelfTest.schema -cne 'sxsy-b122.provider-desktop-self-test' 
   $providerDesktopSelfTest.desktopProtocolVersion -ne 2 -or $providerDesktopSelfTest.processBirthGrammarVerified -ne $true -or
   $providerDesktopSelfTest.focusOnlyPolicyVerified -ne $true -or
   $providerDesktopSelfTest.nativeEditorPolicyVerified -ne $true -or
+  $providerDesktopSelfTest.claudeLaunchPolicyVerified -ne $true -or
   $providerDesktopSelfTest.ownerQueryVerified -ne $true -or
   $providerDesktopSelfTest.currentProcessVerified -ne $true -or $providerDesktopSelfTest.tokenAccessMask -ne 8 -or $providerDesktopSelfTest.windowFocused -ne $false
 ) { throw 'The portable provider-desktop helper returned an invalid process birth/current-user QUERY-only self-test receipt.' }

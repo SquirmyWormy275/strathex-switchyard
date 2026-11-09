@@ -20,6 +20,8 @@ no full Linux run remains active. Later source changes have focused evidence.
 
 ## Guided frontend checkpoint
 
+Claude Desktop’s owned Windows launch transport now passes eight groups/93 tests and both offline helper builds. Its final review/API/frontend connection remains implementation work; no actual app or account was used. Exact owner persistence, normal-launch limits and process-birth readback are tested. The 2.8 MB build staging is removed. [Transport evidence](evidence/owned-claude-launch-port-summary.json).
+
 Latest normal installed source `531587b` includes bounded repository inspection, Home navigation and saved-role refresh. All 36 assets, 29 API checks and 107 installed metadata checks pass; all 54 semantic workspaces and 57 workflows remain intact. Current plus one rollback remain, and the verified prepared bundle is removed. The current synthetic preview passes nine checks. Browser visual acceptance remains blocked before inspection. [Installed evidence](evidence/installed-repository-inspection-startup-summary.json), [running demonstration](evidence/role-refusal-refresh-running-demo-summary.json).
 
 The Windows client follow-up at installed source `0aeb317` passes all 31 groups and 340 tests with zero skips. Its exact merge/source tree, manifest, commands, original bounds, serial ordering and cleanup are audited. This accepts the Home and refusal-refresh corrections within the client lane; actual window/browser/hardware checks remain separate. [Native follow-up](evidence/client-native-0aeb317-summary.json).

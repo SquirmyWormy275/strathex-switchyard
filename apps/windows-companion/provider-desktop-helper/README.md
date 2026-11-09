@@ -3,7 +3,8 @@
 This Windows helper provides exact native process/window operations for reviewed
 desktop executables. The commissioned companion can focus or launch through its
 attested catalog. The Suite embeds the same implementation behind a separate
-focus-only boundary.
+focus-only boundary. A separately owned Claude launch transport is implemented;
+its Suite review, API and frontend connection remain unfinished.
 
 The Suite now connects explicit executable review, protected configuration,
 physical-intent dispatch and original-owner recovery for ChatGPT and stable
@@ -18,12 +19,13 @@ acceptance are still pending.
 | --- | --- |
 | `--stdio-v2` | Commissioned companion discovery, focus and fixed-profile launch. |
 | `--native-desktop-focus-v3` | Owner witness first, then discovery/focus only, including the separate VS Code target. Launch is refused. |
+| `--native-claude-launch-v1` | Owner witness first, then Claude Desktop listing or normal launch with no arguments. Focus, other apps and extra-window requests refuse. Not yet called by the Suite. |
 | `--native-desktop-owner-v1` | Read-only observation of an original PID/creation-time identity. |
 | `--self-test` | Portable grammar/policy checks and native self-process checks when on Windows. |
 | `--managed-terminal-v1` | Separate reviewed managed-terminal descriptor; unchanged version 1. |
 
 The Suite's `Switchyard.Hotkeys.exe` exposes the focus-only and owner-query
-entries, plus `--native-desktop-self-test`. It refuses the broader desktop
+entries, the new closed Claude launch entry, and `--native-desktop-self-test`. It refuses the broader desktop
 stdio, earlier focus-only v2 and managed-terminal entries. It links this source
 through its project file; no second native implementation is copied.
 
@@ -96,3 +98,13 @@ Earlier source checkpoints retain
 and [focus-only packaging evidence](../../../docs/evidence/windows-focus-only-source-summary.json).
 Broader companion launches retain their kill-on-close Job Object until an exact
 new surface verifies; this launch capability is absent from Suite focus mode.
+
+The Claude launch port requires `claudeLaunchOnly: true` and the same mandatory
+owner/retirement callbacks. It is mutually exclusive with focus-only mode. Its
+launch result additionally requires the new process creation identity; missing
+birth data cannot establish success. The unchanged final authorization barrier
+and kill-on-close launch job remain in force. Eight original groups pass 93 tests;
+both helper targets build offline with warnings as errors, pass portable policy
+self-tests and refuse launch on Linux. All 91 staging files/2,827,058 bytes are
+removed. The Suite launch flow and actual Windows application acceptance remain
+separate. [Transport evidence](../../../docs/evidence/owned-claude-launch-port-summary.json).

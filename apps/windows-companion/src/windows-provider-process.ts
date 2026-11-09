@@ -95,6 +95,8 @@ export interface WindowsProviderDesktopProcessPortOptions {
   readonly transport?: ProviderDesktopHelperTransport;
   /** Closed Suite mode: native discovery/focus only, never provider launch. */
   readonly focusOnly?: boolean;
+  /** Separately owned Suite mode: list/normal launch of Claude Desktop only. */
+  readonly claudeLaunchOnly?: boolean;
   readonly onHelperOwned?: (owner: ProviderDesktopHelperOwner) => Promise<void>;
   readonly onHelperStopped?: (owner: ProviderDesktopHelperOwner) => Promise<void>;
   /** Injectable only so non-Windows protocol tests can prove ambient values are removed. */
@@ -199,6 +201,8 @@ export class WindowsProviderDesktopProcessPort implements ProviderDesktopProcess
   private readonly transport: ProviderDesktopHelperTransport;
   private readonly environment: Readonly<Record<string, string>>;
   private readonly focusOnly: boolean;
+  private readonly claudeLaunchOnly: boolean;
+  private readonly persistentOwner: boolean;
   private readonly onHelperOwned?: WindowsProviderDesktopProcessPortOptions["onHelperOwned"];
   private readonly onHelperStopped?: WindowsProviderDesktopProcessPortOptions["onHelperStopped"];
   private busy = false;
@@ -207,7 +211,11 @@ export class WindowsProviderDesktopProcessPort implements ProviderDesktopProcess
   constructor(options: WindowsProviderDesktopProcessPortOptions) {
     if (options.focusOnly !== undefined && typeof options.focusOnly !== "boolean") throw new Error("The provider helper mode must be a literal boolean.");
     this.focusOnly = options.focusOnly === true;
-    if (this.focusOnly && (typeof options.onHelperOwned !== "function" || typeof options.onHelperStopped !== "function")) throw new Error("Focus-only helpers require exact owner and retirement persistence callbacks.");
+    if (options.claudeLaunchOnly !== undefined && typeof options.claudeLaunchOnly !== "boolean") throw new Error("The Claude launch mode must be a literal boolean.");
+    this.claudeLaunchOnly = options.claudeLaunchOnly === true;
+    if (this.focusOnly && this.claudeLaunchOnly) throw new Error("Native focus and Claude launch modes are mutually exclusive.");
+    this.persistentOwner = this.focusOnly || this.claudeLaunchOnly;
+    if (this.persistentOwner && (typeof options.onHelperOwned !== "function" || typeof options.onHelperStopped !== "function")) throw new Error("Owned Suite helpers require exact owner and retirement persistence callbacks.");
     this.onHelperOwned = options.onHelperOwned;
     this.onHelperStopped = options.onHelperStopped;
     if (!isAbsolute(options.helperPath) || !/\.exe$/i.test(options.helperPath) || !digestPattern.test(options.helperSha256)) {
@@ -221,6 +229,7 @@ export class WindowsProviderDesktopProcessPort implements ProviderDesktopProcess
 
   async listRunning(identity: ProviderExecutableIdentity, signal: AbortSignal): Promise<readonly ProviderDesktopProcessObservation[]> {
     const provider = providerForIdentity(identity, this.focusOnly);
+    if (this.claudeLaunchOnly && provider !== "claude_desktop") throw new Error("The owned launch helper accepts only Claude Desktop.");
     return this.withSession(signal, async (session, requestId) => {
       await session.write(encodeRequest({
         schema: requestSchema,
@@ -243,6 +252,7 @@ export class WindowsProviderDesktopProcessPort implements ProviderDesktopProcess
   }
 
   async focusExisting(request: NativeFocusEffectRequest & { readonly process: ProviderDesktopProcessObservation }): Promise<Readonly<{ processId: number }>> {
+    if (this.claudeLaunchOnly) throw new Error("The owned Claude launch helper cannot focus an existing window.");
     validateEffectRequest(request, this.focusOnly);
     if (request.process.processId <= 0 || !Number.isSafeInteger(request.process.processId) || !surfacePattern.test(request.process.windowId)) {
       throw new Error("The expected provider surface identity is invalid.");
@@ -283,10 +293,12 @@ export class WindowsProviderDesktopProcessPort implements ProviderDesktopProcess
 
   async launch(request: ProviderProcessEffectRequest & { readonly args: readonly string[]; readonly requireDistinctSurface: boolean }): Promise<Readonly<{
     processId: number;
+    processStartTime?: string;
     surfaceId: string;
     distinctSurface: boolean;
   }>> {
     if (this.focusOnly) throw new Error("The focus-only provider helper cannot launch an application or a fresh surface.");
+    if (this.claudeLaunchOnly && (request.provider !== "claude_desktop" || request.requireDistinctSurface !== false || request.args.length !== 0)) throw new Error("The owned helper accepts only a normal Claude Desktop launch without arguments.");
     validateEffectRequest(request);
     validateFixedLaunchProfile(request.provider, request.args, request.requireDistinctSurface);
     return this.withSession(request.signal, async (session, requestId) => {
@@ -315,7 +327,8 @@ export class WindowsProviderDesktopProcessPort implements ProviderDesktopProcess
       if (typeof result.distinctSurface !== "boolean" || !result.distinctSurface || preexisting.includes(surfaceId)) {
         throw new Error("The provider helper did not prove a new distinct surface.");
       }
-      return { processId, surfaceId, distinctSurface: true };
+      const processStartTime = this.claudeLaunchOnly ? processBirthIdentity(result.processStartTime) : undefined;
+      return { processId, surfaceId, distinctSurface: true, ...(processStartTime ? { processStartTime } : {}) };
     });
   }
 
@@ -387,7 +400,7 @@ export class WindowsProviderDesktopProcessPort implements ProviderDesktopProcess
     const session = await this.transport.start({
       helperPath: canonicalHelperPath,
       helperSha256: this.helperSha256,
-      arguments: this.focusOnly ? ["--native-desktop-focus-v3"] : helperArguments,
+      arguments: this.focusOnly ? ["--native-desktop-focus-v3"] : this.claudeLaunchOnly ? ["--native-claude-launch-v1"] : helperArguments,
       environment: this.environment
     });
     const owner: OwnedHelper = { session }; this.owner = owner;
@@ -403,7 +416,7 @@ export class WindowsProviderDesktopProcessPort implements ProviderDesktopProcess
         return await aborted;
       }
       const operation = (async () => {
-        if (this.focusOnly) {
+        if (this.persistentOwner) {
           const identity = parseHelperOwner(await session.read(), session.processId);
           assertNotAborted(signal);
           owner.identity = identity;

@@ -132,6 +132,8 @@ Only bounded digest-verified JSON receipts remain locally outside the checkout. 
 
 ## Recent backend behavior
 
+- Native Claude launch transport is implemented behind `claudeLaunchOnly: true` / `--native-claude-launch-v1`. Only listing and normal Claude Desktop launch are accepted; exact helper ownership persists before requests and launched PID/birth/window must verify. Eight groups pass 93 tests, both helpers build offline with warnings as errors, portable policy self-tests and Linux refusals pass, and 91 staging files/2,827,058 bytes are removed. **Suite review, API and UI wiring remain unfinished.** Do not use the old broad helper entry or reuse a focus confirmation for launch. Native Windows follow-up remains pending. [Evidence](evidence/owned-claude-launch-port-summary.json).
+
 - Post-refusal role choices now refresh actual saved bindings/labels and disable stale controls if readback fails. Seven groups pass 88 tests; two original label failures are retained. Normal installed source `0aeb317` includes this correction and the Home update; 65 served/API checks and 107 metadata checks pass with all 54 workspaces preserved. [Evidence](evidence/role-refusal-refresh-source-summary.json).
 
 - Home's connected-control navigation now selects a saved role/intent and refreshes its named choices without dispatch or automatic confirmation. One original UI regression is retained; seven groups pass 87 tests with zero skips, including stale navigation refusal. Normal installed source `7a9f9c1` passes 65 served/API and 107 metadata checks with all 54 semantic workspaces preserved; browser acceptance remains pending. [Evidence](evidence/home-connected-control-source-summary.json).
@@ -612,3 +614,9 @@ The prior account/background release `bdbc8132` is the single rollback. Dated
 launcher backups and readback verify. No native focus or live provider/hardware
 action occurred. Do not rerun executed update/preflight/cleanup scripts.
 [Installed evidence](evidence/installed-native-app-controls-summary.json).
+
+## Next executable integration steps
+
+1. Finish the exact Claude Desktop launch review and durable UUID/result path around the new owned port. Recheck saved executable/account/workspace at the last effect boundary; an existing window refuses a new launch and an uncertain result cannot replay. Preserve the focus-only path.
+2. Connect the authenticated launch review/apply route and frontend confirmation to the native Claude catalog. Keep configuration trust, focus and launch approvals separate; test workspace changes, duplicate clicks and lost replies without actual app/account effects.
+3. Audit normal-push Windows follow-up for the original scanner/execution UI timeouts and the new native helper. No manual CI operations, expanded deadlines or new skips. Browser visual checks remain blocked because Brave is unavailable to the browser tool.

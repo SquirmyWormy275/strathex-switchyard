@@ -106,6 +106,68 @@ function envelope(request: Record<string, unknown>, kind: "ready" | "result" | "
 const helperOwner = Object.freeze({ processId: 7111, processStartTime: "133000000000000001" });
 const ownerHello = (changes = {}) => JSON.stringify({ schema: "switchyard-native-focus-owner/v1", ...helperOwner, ...changes });
 
+test("owned Claude launch persists its helper before requests and returns the new process birth", async context => {
+  const setup = await fixture(context), transport = new FakeTransport(), events: string[] = [];
+  transport.configure = session => {
+    session.responses.push(ownerHello());
+    session.onWrite = request => {
+      events.push(String(request.kind ?? request.action));
+      session.responses.push(request.kind === "authorize"
+        ? envelope(request, "result", { processId: 4200, processStartTime: "133000000000000002", surfaceId: "hwnd:20aa", distinctSurface: true })
+        : envelope(request, "ready", { authorizationToken: "a".repeat(64), preexistingSurfaceIds: [] }));
+    };
+  };
+  const processPort = new WindowsProviderDesktopProcessPort({ helperPath: setup.helperPath, helperSha256: digest("fixed native helper"), transport, hostEnvironment: { SystemRoot: "C:\\Windows" }, claudeLaunchOnly: true,
+    onHelperOwned: async owner => { assert.deepEqual(owner, helperOwner); assert.equal(transport.sessions[0]!.writes.length, 0); events.push("owned"); },
+    onHelperStopped: async owner => { assert.deepEqual(owner, helperOwner); assert(transport.sessions[0]!.terminated); events.push("stopped"); } });
+  const result = await processPort.launch({ provider: "claude_desktop", operationId: "owned-claude-launch", identity: setup.identity, args: [], requireDistinctSurface: false, signal: new AbortController().signal, shell: false, beforeEffect: async () => { events.push("reviewed"); } });
+  assert.deepEqual(transport.invocations[0]!.arguments, ["--native-claude-launch-v1"]);
+  assert.deepEqual(result, { processId: 4200, processStartTime: "133000000000000002", surfaceId: "hwnd:20aa", distinctSurface: true });
+  assert.deepEqual(events, ["owned", "launch", "reviewed", "authorize", "stopped"]);
+});
+
+test("owned Claude launch refuses mixed modes, missing persistence and other targets before helper startup", async context => {
+  const setup = await fixture(context), transport = new FakeTransport();
+  const options = { helperPath: setup.helperPath, helperSha256: digest("fixed native helper"), transport, hostEnvironment: { SystemRoot: "C:\\Windows" }, claudeLaunchOnly: true };
+  assert.throws(() => new WindowsProviderDesktopProcessPort(options), /persistence callbacks/);
+  const callbacks = { onHelperOwned: async () => {}, onHelperStopped: async () => {} };
+  assert.throws(() => new WindowsProviderDesktopProcessPort({ ...options, ...callbacks, focusOnly: true }), /mutually exclusive/);
+  const processPort = new WindowsProviderDesktopProcessPort({ ...options, ...callbacks });
+  const request = { provider: "claude_desktop" as const, operationId: "refused-launch", identity: setup.identity, args: [], requireDistinctSurface: false, signal: new AbortController().signal, shell: false as const, beforeEffect: async () => { assert.fail("refused mode cannot authorize an effect"); } };
+  for (const change of [{ args: ["--new-window"], requireDistinctSurface: true }, { args: ["prompt.txt"] }]) await assert.rejects(processPort.launch({ ...request, ...change }), /normal Claude Desktop launch/);
+  await assert.rejects(processPort.launch({ ...request, provider: "chatgpt_desktop" }), /normal Claude Desktop launch/);
+  await assert.rejects(processPort.listRunning({ ...setup.identity, productIdentity: { productId: "openai.chatgpt-desktop", displayName: "ChatGPT Desktop", publisher: "OpenAI, L.L.C.", role: "desktop" } }, request.signal), /only Claude Desktop/);
+  await assert.rejects(processPort.listRunning({ ...setup.identity, productIdentity: windowsEditorProductIdentity }, request.signal), /Claude Desktop|fixed desktop provider/);
+  await assert.rejects(processPort.focusExisting({ ...request, process: { processId: 4200, processStartTime: "133000000000000002", windowId: "hwnd:20aa", isForeground: false, identity: setup.identity } }), /cannot focus/);
+  assert.equal(transport.invocations.length, 0);
+});
+
+test("owned Claude launch cannot send requests after a failed owner write or replace an uncertain helper", async context => {
+  const setup = await fixture(context), transport = new FakeTransport(); let retired = false;
+  transport.configure = session => { session.responses.push(ownerHello()); };
+  const processPort = new WindowsProviderDesktopProcessPort({ helperPath: setup.helperPath, helperSha256: digest("fixed native helper"), transport, hostEnvironment: { SystemRoot: "C:\\Windows" }, claudeLaunchOnly: true,
+    onHelperOwned: async () => { throw Error("synthetic owner write failure"); },
+    onHelperStopped: async () => { if (!retired) throw Error("synthetic retirement failure"); } });
+  await assert.rejects(processPort.listRunning(setup.identity, new AbortController().signal), { code: "PROVIDER_HELPER_RETIREMENT_UNCONFIRMED" });
+  assert.equal(transport.sessions[0]!.writes.length, 0);
+  await assert.rejects(processPort.listRunning(setup.identity, new AbortController().signal), { code: "PROVIDER_HELPER_RETIREMENT_UNCONFIRMED" });
+  assert.equal(transport.invocations.length, 1); retired = true; assert.equal((await processPort.retireOwned()).stopped, true);
+});
+
+test("owned Claude launch rejects missing new-process birth even after an effect acknowledgement", async context => {
+  const setup = await fixture(context), transport = new FakeTransport(); let approvals = 0, retired = 0;
+  transport.configure = session => {
+    session.responses.push(ownerHello());
+    session.onWrite = request => { session.responses.push(request.kind === "authorize"
+      ? envelope(request, "result", { processId: 4200, surfaceId: "hwnd:20aa", distinctSurface: true })
+      : envelope(request, "ready", { authorizationToken: "b".repeat(64), preexistingSurfaceIds: [] })); };
+  };
+  const processPort = new WindowsProviderDesktopProcessPort({ helperPath: setup.helperPath, helperSha256: digest("fixed native helper"), transport, hostEnvironment: { SystemRoot: "C:\\Windows" }, claudeLaunchOnly: true,
+    onHelperOwned: async () => {}, onHelperStopped: async () => { retired++; } });
+  await assert.rejects(processPort.launch({ provider: "claude_desktop", operationId: "lost-new-birth", identity: setup.identity, args: [], requireDistinctSurface: false, signal: new AbortController().signal, shell: false, beforeEffect: async () => { approvals++; } }), /birth/);
+  assert.equal(approvals, 1); assert.equal(retired, 1); assert.equal(transport.invocations.length, 1);
+});
+
 test("VS Code is focus-only and cannot enter the companion provider or application-launch catalog", async context => {
   const setup = await fixture(context), identity = { ...setup.identity, productIdentity: windowsEditorProductIdentity }, transport = new FakeTransport();
   assert.deepEqual(providerIds, ["claude_desktop", "chatgpt_desktop", "claude_code", "codex"]);

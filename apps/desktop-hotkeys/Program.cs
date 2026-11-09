@@ -130,6 +130,7 @@ internal static class Program
     public static int Main(string[] args)
     {
         if (args.SequenceEqual(new[] { "--native-desktop-focus-v3" })) return Sxsy.B122.ProviderDesktopHelper.Program.Main(args);
+        if (args.SequenceEqual(new[] { "--native-claude-launch-v1" })) return Sxsy.B122.ProviderDesktopHelper.Program.Main(args);
         if (args.SequenceEqual(new[] { "--native-desktop-self-test" })) return Sxsy.B122.ProviderDesktopHelper.Program.Main(new[] { "--self-test" });
         if (args.SequenceEqual(new[] { "--native-desktop-owner-v1" })) return Sxsy.B122.ProviderDesktopHelper.Program.Main(args);
         if (args.SequenceEqual(new[] { "--editor-terminal-process-v1" })) return Sxsy.B122.ProviderDesktopHelper.Program.Main(args);

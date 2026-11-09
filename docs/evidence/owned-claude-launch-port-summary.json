@@ -1,0 +1,168 @@
+{
+  "schema": "switchyard-owned-claude-launch-port/v1",
+  "implementation": "Native transport foundation; the Suite review/API/frontend integration is unfinished.",
+  "sourceFiles": {
+    "apps/windows-companion/src/windows-provider-process.ts": "929b1e3c295817bacbd759b92ec789507a5f744c58f23ea5bcbbab3bba1ceb4a",
+    "apps/windows-companion/test/windows-provider-process.test.ts": "aa7fffee509f55c0cd67ea43440737352e8361240008b19c8a2f063d5d89839f",
+    "apps/windows-companion/provider-desktop-helper/Program.cs": "ad0240e833ec9f92c3e8aa5e2d6e731196ddaa4fb3e0a5aadb9d29ca521d5e91",
+    "apps/desktop-hotkeys/Program.cs": "e9f0342a855fac4a9370e8b5cd6820054ace4bcb63db1d542adea983c3a33a1a",
+    "scripts/verify-windows-standalone-helper.mjs": "a80722777a786fb5c0ed19b62b2f8c73230819903a5ba9823f7635f09fe6752b",
+    "deployment/windows/Test-B122PortableBundle.ps1": "26f24aa036a58383b222641e03e716f702e6bd9be9173e2c2627507e0e87415c"
+  },
+  "runs": [
+    {
+      "receiptId": "72b523ad-5531-4361-aea0-b73a01b7f0f0",
+      "sha256": "9135b0ffb89d32aa817e27dd6c44a5af89a3316ea40356f85f5bd3aff6c1cb22",
+      "success": false,
+      "totals": {
+        "required": 1,
+        "passed": 0,
+        "failed": 1,
+        "tests": 28,
+        "passedTests": 24,
+        "failedTests": 4,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "files": [
+        "apps/windows-companion/test/windows-provider-process.test.ts"
+      ],
+      "originalCommandsBoundsSkipsAndCleanupVerified": true,
+      "failures": [
+        {
+          "file": "apps/windows-companion/test/windows-provider-process.test.ts",
+          "counts": {
+            "total": 28,
+            "passed": 24,
+            "failed": 4,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          },
+          "diagnosticSha256": "f57edd7e9c1c69fb7070812c700fd21895ca96003add1dcdcd94b59c708e1e4f"
+        }
+      ]
+    },
+    {
+      "receiptId": "1f7e32ce-d921-4cfa-96fd-dc76dd1e9808",
+      "sha256": "eb717400a287cdb35a18bfcad8b7cb396c2fbf6a9a4a165640174aff01577e5c",
+      "success": false,
+      "totals": {
+        "required": 1,
+        "passed": 0,
+        "failed": 1,
+        "tests": 28,
+        "passedTests": 24,
+        "failedTests": 4,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "files": [
+        "apps/windows-companion/test/windows-provider-process.test.ts"
+      ],
+      "originalCommandsBoundsSkipsAndCleanupVerified": true,
+      "failures": [
+        {
+          "file": "apps/windows-companion/test/windows-provider-process.test.ts",
+          "counts": {
+            "total": 28,
+            "passed": 24,
+            "failed": 4,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          },
+          "diagnosticSha256": "b3487359e2277ccf12744513fae4f03a41564e42ede719d8a887a5af6e9efb11"
+        }
+      ]
+    },
+    {
+      "receiptId": "65e1af4d-c37e-404b-b0c5-3adb7b5e225a",
+      "sha256": "513f2fb4e23ce67a7127910cbe3e183ade5cad8dd7d0482ab8fb089224f99dc9",
+      "success": true,
+      "totals": {
+        "required": 1,
+        "passed": 1,
+        "failed": 0,
+        "tests": 28,
+        "passedTests": 28,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "files": [
+        "apps/windows-companion/test/windows-provider-process.test.ts"
+      ],
+      "originalCommandsBoundsSkipsAndCleanupVerified": true,
+      "failures": []
+    },
+    {
+      "receiptId": "4d19784b-e211-463e-8b9c-65940674940b",
+      "sha256": "1df0f04dca49ad5bceea414a5ab70e5e71e57685e394a245ae44f35648d13b88",
+      "success": true,
+      "totals": {
+        "required": 8,
+        "passed": 8,
+        "failed": 0,
+        "tests": 93,
+        "passedTests": 93,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "files": [
+        "deployment/suite/release.test.mjs",
+        "tools/layout-studio/integrations.test.mjs",
+        "tools/layout-studio/windows-native-focus.test.mjs",
+        "apps/windows-companion/test/provider-desktop.test.ts",
+        "apps/windows-companion/test/provider-desktop-adapter.test.ts",
+        "apps/windows-companion/test/provider-desktop-configuration.test.ts",
+        "apps/windows-companion/test/provider-desktop-effects.test.ts",
+        "apps/windows-companion/test/windows-provider-process.test.ts"
+      ],
+      "originalCommandsBoundsSkipsAndCleanupVerified": true,
+      "failures": []
+    }
+  ],
+  "fixtureCorrection": "The first new-test run omitted the explicit synthetic Windows SystemRoot. That setup failure is retained. The corrected fixture then produces four feature-contract failures before implementation.",
+  "behavior": [
+    "A new closed entry accepts only Claude Desktop list/normal launch, with empty arguments and no request for an extra window.",
+    "The exact helper PID/birth record must persist before any request. Unknown retirement retains the owner and prevents replacement.",
+    "The existing final-effect approval callback and independent child closure remain required. A successful owned launch must return the new process birth with its distinct window.",
+    "Focus-only v3, its VS Code allowance and the commissioned companion launch contract remain separate. No access-mask or identity fallback changes."
+  ],
+  "build": {
+    "receiptSha256": "8eee7676e4f28e38686f2ee4ce21a6dce7a6252edcb5be24b053c0d44dc9f13a",
+    "sdk": "8.0.424",
+    "targets": [
+      "standalone provider helper",
+      "combined Hotkeys helper"
+    ],
+    "offlineClearedPackageSources": true,
+    "warningsAsErrors": true,
+    "portableSelfTests": 2,
+    "linuxPlatformRefusals": 2,
+    "nativeWindowsOwnerChecks": "unperformed on Linux"
+  },
+  "cleanup": {
+    "receiptSha256": "2c9164af83d4163bcfad4aa2366645a3e5a1ed82f329d90f940ec72e02cbd4d0",
+    "files": 91,
+    "bytes": 2827058,
+    "manifestSha256": "90e48daef763a055cf31a2e4a78d615ead49356f7d972489d7fcca05f5f912d6",
+    "removed": true
+  },
+  "typecheck": {
+    "command": "node node_modules/typescript/bin/tsc --noEmit -p tsconfig.json",
+    "exitCode": 0
+  },
+  "limitations": [
+    "No real native application/account/task was launched, focused or changed. Native Windows executable/window behavior remains unaccepted.",
+    "The Suite does not yet call this launch mode or advertise native launch. Complete exact review, durable launch result handling and UI/API wiring next.",
+    "This is an additional native mode, not authority for an imported recipe or permission to reuse a focus confirmation for launch.",
+    "Original failure receipts are retained; overlapping test totals are not added together."
+  ]
+}

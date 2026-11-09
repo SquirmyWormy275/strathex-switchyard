@@ -84,12 +84,13 @@ internal static partial class Program
             }
         }
         bool focusOnly = args.Length == 1 && args[0] == "--native-desktop-focus-v3";
-        if (!focusOnly && (args.Length != 1 || args[0] != "--stdio-v2")) return 64;
+        bool claudeLaunchOnly = args.Length == 1 && args[0] == "--native-claude-launch-v1";
+        if (!focusOnly && !claudeLaunchOnly && (args.Length != 1 || args[0] != "--stdio-v2")) return 64;
         string requestId = "unknown";
         try
         {
             if (!OperatingSystem.IsWindows()) throw new ProtocolException("windows_required");
-            if (focusOnly)
+            if (focusOnly || claudeLaunchOnly)
             {
                 using var current = new SafeFileHandle(GetCurrentProcess(), ownsHandle: false);
                 AssertCurrentUserSession(current);
@@ -99,11 +100,12 @@ internal static partial class Program
             Request request = ParseRequest(line, focusOnly);
             requestId = request.RequestId;
             if (focusOnly && !IsFocusAction(request.Action)) throw new ProtocolException("focus_only_action_required");
+            if (claudeLaunchOnly && !IsClaudeLaunchAction(request.Action, request.Provider, request.Arguments.Length, request.RequireDistinctSurface)) throw new ProtocolException("normal_claude_launch_required");
             return request.Action switch
             {
                 "list" => List(request),
                 "focus" => Focus(request),
-                "launch" => Launch(request),
+                "launch" => Launch(request, claudeLaunchOnly),
                 _ => throw new ProtocolException("invalid_action")
             };
         }
@@ -120,6 +122,8 @@ internal static partial class Program
     }
 
     private static bool IsFocusAction(string action) => action is "list" or "focus";
+    private static bool IsClaudeLaunchAction(string action, string provider, int argumentCount, bool distinct) =>
+        provider == "claude_desktop" && (action is "list" or "launch") && argumentCount == 0 && !distinct;
     private static bool SupportsEditorFocus(string action, bool focusOnly) => focusOnly && IsFocusAction(action);
 
     private static int ObserveEditorTerminalProcess(bool peer = false)
@@ -307,8 +311,12 @@ internal static partial class Program
             && !new[] { "list", "focus", "launch", "managed_terminal" }.Any(action => SupportsEditorFocus(action, false))
             && !new[] { "launch", "managed_terminal", "authorize", "", "Focus" }.Any(action => SupportsEditorFocus(action, true))
             && NativeEditorProduct.ProductId == "microsoft.visual-studio-code";
-        bool ok = products && quoting && surfaces && births && focusOnlyPolicyVerified && nativeEditorPolicyVerified && currentProcessVerified != false && ownerQueryVerified != false;
-        Write(new { schema = "sxsy-b122.provider-desktop-self-test", version = 1, status = ok ? "ok" : "failed", desktopProtocolVersion = 2, processBirthGrammarVerified = births, focusOnlyPolicyVerified, nativeEditorPolicyVerified, currentProcessVerified, ownerQueryVerified, processId = Environment.ProcessId, processStartTime, tokenAccessMask = TokenQuery, windowFocused = false });
+        bool claudeLaunchPolicyVerified = IsClaudeLaunchAction("list", "claude_desktop", 0, false) && IsClaudeLaunchAction("launch", "claude_desktop", 0, false)
+            && !new[] { "focus", "managed_terminal", "authorize", "", "Launch" }.Any(action => IsClaudeLaunchAction(action, "claude_desktop", 0, false))
+            && !new[] { "chatgpt_desktop", "claude_code", "codex", "vscode", "unknown" }.Any(provider => IsClaudeLaunchAction("launch", provider, 0, false))
+            && !IsClaudeLaunchAction("launch", "claude_desktop", 1, false) && !IsClaudeLaunchAction("launch", "claude_desktop", 0, true);
+        bool ok = products && quoting && surfaces && births && focusOnlyPolicyVerified && nativeEditorPolicyVerified && claudeLaunchPolicyVerified && currentProcessVerified != false && ownerQueryVerified != false;
+        Write(new { schema = "sxsy-b122.provider-desktop-self-test", version = 1, status = ok ? "ok" : "failed", desktopProtocolVersion = 2, processBirthGrammarVerified = births, focusOnlyPolicyVerified, nativeEditorPolicyVerified, claudeLaunchPolicyVerified, currentProcessVerified, ownerQueryVerified, processId = Environment.ProcessId, processStartTime, tokenAccessMask = TokenQuery, windowFocused = false });
         return ok ? 0 : 1;
     }
 
@@ -481,7 +489,7 @@ internal static partial class Program
         return 0;
     }
 
-    private static int Launch(Request request)
+    private static int Launch(Request request, bool reportBirth = false)
     {
         ValidateFixedArguments(request);
         using SurfaceSet before = SurfaceSet.Acquire(request);
@@ -528,7 +536,18 @@ internal static partial class Program
             if (newSurface is null) throw new ProtocolException("launch_surface_timeout");
             newSurface.Revalidate();
             job.ReleaseSuccessfulProcess();
-            Write(new
+            if (reportBirth) Write(new
+            {
+                schema = ResponseSchema,
+                version = 2,
+                requestId = request.RequestId,
+                kind = "result",
+                processId = launched.ProcessId,
+                processStartTime = newSurface.StartTime,
+                surfaceId = newSurface.SurfaceId,
+                distinctSurface = !preexisting.Contains(newSurface.SurfaceId, StringComparer.Ordinal)
+            });
+            else Write(new
             {
                 schema = ResponseSchema,
                 version = 2,
