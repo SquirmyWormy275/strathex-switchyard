@@ -39,6 +39,32 @@ No merge, public release or visibility change is authorized.
   page loading. Do not use shell/CDP/Playwright outside CUA to bypass this or change
   Brave protections. The user's unrelated NIGHTWIRE tab stays untouched.
 
+## Active follow-up — readable reviews and full platform checks
+
+Published **9cc29a5b523358026c95a966dec7cf02b9feea1f** contains the installed
+history-discovery verifier/evidence. The next frontend change replaces the initial
+scanner-review JSON dump with readable paths and scope, keeping full technical
+evidence expandable. Two red regressions confirm stale hidden metadata after
+cancel/workspace change; all five original integration groups now pass **58**
+tests with zero skips. Typecheck and unique page IDs pass. Source evidence is in
+[readable scanner review](evidence/scanner-review-readable-source-summary.json).
+The source change still needs immutable frontend pinning, package checks, normal
+installation and served-state verification. No visual acceptance is claimed.
+
+A new complete Linux run for installed **a7958c4** is active, preserving all
+original 376 groups and limits. Private setup receipt **linux-a7958c4-setup.json**
+records its exact owned checkout, nine existing dependency aliases, supervisor
+and original worktrees. Run ID **853cc5ea-8dfa-43bd-89d8-84a8a8215e62**. Do not
+repeat setup or delete its running checkout. Its receipt/audit and owned cleanup
+remain to complete. The prior 72e7c22 cleanup below is historical and finished.
+
+All 23 workers for native Windows **a7958c4**, run **42612174584**, have passed.
+Original worker receipts are privately retained and independently audited:
+**482 groups / 3,158 passes / 246 declared skips**, original manifest, commands,
+bounds, skip inventory, serial worker order and cleanup. Native collector
+**129150916723** is still queued at this checkpoint. Private receipt prefixes:
+**native-a7958c4-**. No ZIP or helper binary was retained; do not repeat downloads.
+
 ## Current published and installed sources
 
 Published **c44b6805f16a3ab63b0d9212cd1e199c728b7739** adds historical-name

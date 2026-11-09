@@ -8,6 +8,24 @@ export function historicalScopeSummary(preparation) {
   if (!discovery.count) return "\n\nNo additional removed paths were found in the inspected first-parent commits. Other branches and deeper history remain outside this review.";
   return `\n\nHistorical files outside this scan: ${discovery.count}\nThese names occur in older inspected commits, are absent from the selected HEAD and are not among the selected history inputs. Their contents have not been read or included.\n${discovery.rows.map(row => row.path).join("\n")}${discovery.omittedCount ? `\n${discovery.omittedCount} additional names are not displayed (${discovery.unsupportedCount} unsupported paths or file types).` : ""}\nThis review does not grant permission to scan them. Other branches and deeper history remain uninspected.`;
 }
+/** Readable scope first; the complete witnesses remain available for inspection. */
+export function scannerReviewSummary(result) {
+  const { draft, review, confirmation } = result;
+  const groups = [
+    ["Current files", draft.request.files.filter(file => !file.source)],
+    ["Staged versions", draft.request.files.filter(file => file.source?.kind === "git-index")],
+    ["Historical versions", draft.request.files.filter(file => file.source?.kind === "git-history")]
+  ];
+  const selection = groups.map(([label, files]) => `${label} (${files.length})${files.length ? ":\n" + files.map(file => `${file.source?.path ?? file.path}${file.source?.commit ? ` · commit ${file.source.commit}` : ""} · ${file.size} bytes`).join("\n") : ""}`).join("\n\n");
+  const classifications = draft.authorityProposal.classifications;
+  const exclusions = [
+    ["Included ignored files", classifications.includedIgnored],
+    ["Excluded untracked files", classifications.excludedUntracked],
+    ["Excluded ignored files", classifications.excludedIgnored],
+    ["Excluded generated folders (contents uninspected)", classifications.excludedIgnoredTrees]
+  ].filter(([, paths]) => paths?.length).map(([label, paths]) => `${label}:\n${paths.join("\n")}`).join("\n\n");
+  return `${confirmation.record.reason}\n\nProject: ${draft.repositoryRoot}\nSave ${draft.files.length} new files in: ${draft.directory}\nPurpose: ${actions[draft.action]}\n\n${selection}${exclusions ? "\n\n" + exclusions : ""}${historicalScopeSummary(draft.preparation)}\n\nSigned feeds:\n${draft.feeds.map(feed => `${feed.kind === "scanner" ? "Scanner" : "Advisories"}: ${feed.id}`).join("\n")}\n\nAfter saving, review the task's file permission and then the scan itself. This setup has not run and does not establish complete security coverage.\nReview expires: ${review.expiresAt}`;
+}
 /** Generate and save a setup; authority and scan execution remain separate steps. */
 export function mountScanner({ notify }) {
   const $ = id => document.getElementById(id);
@@ -23,7 +41,11 @@ export function mountScanner({ notify }) {
     $("confirm-scanner-save").disabled = busy || !reviewed;
     for (const id of ["use-scanner-scope", "use-scanner-recipe"]) $(id).disabled = busy || !permitted() || saved()?.status !== "saved" || saved()?.result?.status !== "saved";
   }
-  function invalidate() { generation++; reviewed = null; $("scanner-review-dialog").close(); $("scanner-review-files").replaceChildren(); controls(); }
+  function clearReview() {
+    $("scanner-review-summary").textContent = ""; $("scanner-review-metadata").textContent = "";
+    $("scanner-review-technical").open = false; $("scanner-review-files").replaceChildren();
+  }
+  function invalidate() { generation++; reviewed = null; $("scanner-review-dialog").close(); clearReview(); controls(); }
   function render() {
     const row = saved();
     $("scanner-save-result").textContent = row ? `Project: ${row.draft.repositoryRoot}\nDirectory: ${row.draft.directory}\nStatus: ${row.status}\nManifest: ${row.draft.manifestPath}\nSHA-256: ${row.draft.manifestSha256}\nSaved files: ${row.draft.files.length}\n${row.result?.reason ?? row.result?.nextStep ?? "No file-save result has been confirmed."}\nSaving grants no task permission, starts no scan and establishes no complete security coverage.` : "No scanner setup selected. Existing source files are never replaced by this flow.";
@@ -63,12 +85,14 @@ export function mountScanner({ notify }) {
     $("scanner-status").textContent = "Inspecting the selected native task, read-only repository inputs and signed feeds. No repository file has been written and no scan has run.";
     const result = await api("/api/suite/coding/scanner-save/review", { compartment: context.compartment, ...input }); if (!context.current()) return;
     reviewed = { id: result.draft.id, token: result.confirmation.token };
-    $("scanner-review-summary").textContent = `${result.confirmation.record.reason}\n\nProject: ${result.draft.repositoryRoot}\nNew directory: ${result.draft.directory}\nAction: ${actions[result.draft.action]}\nManifest: ${result.draft.manifestPath}\nSHA-256: ${result.draft.manifestSha256}\nExpires: ${result.review.expiresAt}${historicalScopeSummary(result.draft.preparation)}\n\nSelected inputs, exclusions and coverage limits:\n${JSON.stringify(result.draft.preparation, null, 2)}\n\nProposed later task permission:\n${JSON.stringify(result.draft.authorityProposal, null, 2)}\n\nVerified feed metadata:\n${JSON.stringify(result.draft.feeds, null, 2)}`;
+    $("scanner-review-summary").textContent = scannerReviewSummary(result);
+    $("scanner-review-technical").open = false;
+    $("scanner-review-metadata").textContent = JSON.stringify({ manifestPath: result.draft.manifestPath, manifestSha256: result.draft.manifestSha256, preparation: result.draft.preparation, authorityProposal: result.draft.authorityProposal, feeds: result.draft.feeds }, null, 2);
     $("scanner-review-files").replaceChildren(...result.draft.files.map(file => { const details = document.createElement("details"), summary = document.createElement("summary"), text = document.createElement("pre"); summary.textContent = `${file.path} · ${file.size} bytes · SHA-256 ${file.sha256}`; text.className = "execution-output"; text.textContent = file.content; details.append(summary, text); return details; }));
     $("scanner-review-dialog").showModal();
   }));
   $("cancel-scanner-save").addEventListener("click", () => { reviewed = null; $("scanner-review-dialog").close(); controls(); });
-  $("scanner-review-dialog").addEventListener("close", () => { reviewed = null; $("scanner-review-files").replaceChildren(); controls(); });
+  $("scanner-review-dialog").addEventListener("close", () => { reviewed = null; clearReview(); controls(); });
   $("confirm-scanner-save").addEventListener("click", () => work(async context => {
     if (!reviewed) return; const approval = reviewed; reviewed = null; $("scanner-review-dialog").close();
     try {

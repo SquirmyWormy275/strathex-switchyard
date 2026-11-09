@@ -44,7 +44,9 @@ async function save(c) { c.click("confirm-scanner-save"); c.$("confirm-scanner-s
 
 test("scanner preparation exposes exact new control bytes and can be cancelled without a write or permission", async t => fixture(t, async c => {
   const before = await readdir(c.root); await review(c); assert.equal(c.$("scanner-review-files").children.length, 5); assert.match(c.$("scanner-review-summary").textContent, /synthetic-scanner/); assert.match(c.$("scanner-review-summary").textContent, /new directory/);
+  assert.match(c.$("scanner-review-summary").textContent, /Current files \(2\)/); assert.match(c.$("scanner-review-summary").textContent, /task.txt/); assert.equal(c.$("scanner-review-summary").textContent.includes("inventoryDigest"), false); const metadata = JSON.parse(c.$("scanner-review-metadata").textContent); assert.ok(metadata.authorityProposal.paths.includes("task.txt")); assert.equal(metadata.preparation.scanPerformed, false); assert.equal(c.$("scanner-review-technical").open, false); c.$("scanner-review-technical").open = true;
   assert.equal(c.writes(), 0); assert.deepEqual(await readdir(c.root), before); assert.equal((await c.service.list("personal")).length, 0); c.click("cancel-scanner-save"); await until(() => c.$("scanner-review-files").children.length === 0);
+  assert.equal(c.$("scanner-review-summary").textContent, ""); assert.equal(c.$("scanner-review-metadata").textContent, ""); assert.equal(c.$("scanner-review-technical").open, false);
   assert.equal(c.writes(), 0);
 }));
 
@@ -79,6 +81,7 @@ test("a lost successful save reply is recovered from its original history withou
 test("selection and workspace changes discard generated content and cannot carry a save approval", async t => fixture(t, async c => {
   await review(c); c.change("scanner-index", ""); assert.equal(c.$("scanner-review-dialog").open, false); assert.equal(c.$("scanner-review-files").children.length, 0); assert.equal(c.$("confirm-scanner-save").disabled, true);
   await review(c); c.document.dispatchEvent(new Event("switchyard-workspace-changing")); c.document.dispatchEvent(new CustomEvent("switchyard-compartment-state", { detail: await c.store.snapshot("work") }));
+  assert.equal(c.$("scanner-review-summary").textContent, ""); assert.equal(c.$("scanner-review-metadata").textContent, ""); assert.equal(c.$("scanner-review-technical").open, false);
   assert.equal(c.$("scanner-task").options.length, 0); assert.equal(c.$("scanner-review-files").children.length, 0); assert.equal(c.$("load-scanner-setup").disabled, true); const calls = c.calls.length; c.$("confirm-scanner-save").dispatchEvent(new Event("click")); assert.equal(c.calls.length, calls); assert.equal(c.writes(), 0);
 }));
 
@@ -87,7 +90,7 @@ test("staged and bounded history selections reach the exact review without expos
   const privateText = "PRIVATE_SOURCE_ONLY_HASHED_IN_SCANNER_UI_72f993"; await writeFile(join(c.root, "task.txt"), privateText);
   c.$("scanner-index").checked = true; c.change("scanner-index", ""); c.change("scanner-depth", "1"); await review(c);
   const input = c.calls.findLast(r => r.path.endsWith("scanner-save/review")).body; assert.equal(input.includeIndex, true); assert.equal(input.historyDepth, 1); assert.equal(input.action, "shield_codebase_audit");
-  const summary = c.$("scanner-review-summary").textContent; assert.match(summary, /indexInputs/); assert.match(summary, /historyInputs/); assert.equal(summary.includes(privateText), false); assert.equal(c.$("scanner-review-files").children.some(e => e.children[1].textContent.includes(privateText)), false); assert.equal(c.writes(), 0);
+  const summary = c.$("scanner-review-summary").textContent; assert.match(summary, /Staged versions \(2\)/); assert.match(summary, /Historical versions \(2\)/); const metadata = c.$("scanner-review-metadata").textContent; assert.match(metadata, /indexInputs/); assert.match(metadata, /historyInputs/); assert.equal(metadata.includes(privateText), false); assert.equal(summary.includes(privateText), false); assert.equal(c.$("scanner-review-files").children.some(e => e.children[1].textContent.includes(privateText)), false); assert.equal(c.writes(), 0);
   assert.match(summary, /No additional removed paths were found/);
   const { historicalScopeSummary } = await import("./scanner-ui.mjs");
   const names = historicalScopeSummary({ historyDepth: 2, historyPathDiscovery: { count: 3, omittedCount: 2, unsupportedCount: 1, rows: [{ path: "deleted.env" }] } });

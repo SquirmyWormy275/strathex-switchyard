@@ -1,5 +1,14 @@
 # Switchyard: implementation and acceptance
 
+The next frontend checkpoint makes scanner setup reviews readable and clears
+hidden project/scope metadata when a review is cancelled or its workspace changes.
+Five original integration groups pass 58 tests after two red regressions;
+immutable packaging and normal installation are next. [Evidence](evidence/scanner-review-readable-source-summary.json).
+A complete Linux run of installed a7958c4 is active. Its 23 native Windows workers
+pass 482 groups/3,158 tests with 246 declared skips; the final native collector
+is still queued. These results predate the readable-review change.
+
+
 Switchyard gives Model F keyboards consistent controls for returning to tasks,
 reviewing work and moving between tools. The application is installed and running
 on the Omarchy pilot. **The full Rev2 assignment remains unfinished.** The F77 is

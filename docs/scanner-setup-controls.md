@@ -7,9 +7,14 @@ native provider and downloads no feed.
 Choose current files, optional separately witnessed staged Git versions, and up
 to six first-parent commits for codebase/release review. Preparing the review
 checks the native task, read-only repository metadata, bounded source inputs and
-signed feed content. The dialog displays the exact new directory, generated
-control files and hashes, proposed permission scope and remaining coverage limits.
-Each generated file can be expanded to read its full text.
+signed feed content. The dialog starts with the project, new output directory, current/staged/historical
+file lists, exclusions, feed names and coverage limits. Each generated file expands
+to its exact text and hash. **Technical details and verification hashes** retains
+the complete preparation metadata and proposed permission scope; it starts closed.
+Cancelling or changing the form/workspace clears both views and the approval.
+[Readable-review and clearing regressions](evidence/scanner-review-readable-source-summary.json)
+pass 58 checks across five original integration groups. This frontend revision
+is awaiting immutable packaging and normal installation; visual acceptance remains separate.
 
 Bounded history review also lists names found in older inspected commits but
 absent from the selected HEAD and outside the selected history inputs. Up to 64
