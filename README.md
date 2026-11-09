@@ -70,7 +70,7 @@ accept later changes.
 
 | Scope | Verified result |
 | --- | --- |
-| Installed Linux application, `9b80f77` | 44 served/state/presentation and 123 metadata checks. App, task, device, profile and role reviews clear cancelled context. All 54 workspace definitions are preserved; Personal retains its expected shutdown revocation increment. [Receipt](docs/evidence/installed-review-context-summary.json) |
+| Installed Linux application, `167df7b` | 45 served/state/presentation and 126 metadata checks. App, task, device, profile and role reviews clear cancelled context. All 54 workspace definitions are preserved; Personal retains its expected shutdown revocation increment. [Receipt](docs/evidence/installed-desktop-host-summary.json) |
 | Running synthetic demonstration, `dfa40fb` | Nine checks: named connection, signed acknowledgement and stale-workspace refusal. [Receipt](docs/evidence/batched-inspection-running-demo-summary.json) |
 | Native Codex terminal, synthetic provider | Real 0.167 CLI renders legacy and paginated saved transcripts through the production relay; one narrowed resume, zero model prompts. [Receipt](docs/evidence/codex-native-paginated-history-summary.json) |
 | Native Linux repository inspection | Twelve real Git guardians, at most four concurrent reads, independent exit and unchanged repository bytes. [Receipt](docs/evidence/batched-inspection-source-summary.json) |

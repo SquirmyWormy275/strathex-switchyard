@@ -14,7 +14,11 @@ The verified executable binding and Linux launch/focus path remain unfinished.
 [Vendor requirements](https://code.claude.com/docs/en/desktop-linux),
 [source and host evidence](evidence/linux-desktop-host-support-summary.json).
 Six original integration groups pass 70 checks and one existing skip; the final
-metadata group passes 19 overlapping checks. Installed adoption remains pending.
+metadata group passes 19 overlapping checks. Normal installed `167df7b` passes
+45 served/state/catalog checks and 126 metadata checks across 66 exact modules.
+Its authenticated live catalog reports Omarchy as unsupported while keeping
+portable recipes and native authority separate. All user definitions are preserved;
+prepared staging is removed. [Installed evidence](evidence/installed-desktop-host-summary.json).
 
 On Windows, select **Claude desktop → Set up Claude Desktop** to move directly
 to its exact native-app setup. An already saved identity changes the link to

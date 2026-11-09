@@ -27,23 +27,23 @@ The [requirement ledger](switchyard-requirements.md) tracks the wider scope;
 
 ## Installed checkpoint
 
-The app uses source **9b80f77**; the pilot VS Code extension remains at **42655aa**.
+The app uses source **167df7b**; the pilot VS Code extension remains at **42655aa**.
 The app release is
-`ef51ea8dbe2e8784ff5a5202cbecea3164b8e957e3a585e1046acc769a541702`;
+`635d0718fd18734f65e2dd2f3ab537571d55d538d35815601884a14bddd2783d`;
 the frontend is `4fe51fece3b7`. Current plus one app rollback remain.
 
-- All 36 served assets and eight installation/API/state/presentation readbacks pass.
-- Nine installed verifiers pass 123 checks across 65 exact module hashes.
+- All 36 served assets and nine installation/API/state/presentation readbacks pass.
+- Nine installed verifiers pass 126 checks across 66 exact module hashes.
 - All 54 workspace definitions, 57 workflows, Personal selection and three
   conversations are preserved, including the pending keyboard-only record.
   53 semantic snapshots match exactly; Personal differs only by its expected
-  shutdown task-permission revocation counter, 79 → 80.
+  shutdown task-permission revocation counter, 80 → 81.
 - The extension's 53 payload files and eight installed module checks pass.
   Actual graphical editor activation remains unaccepted.
 - Dated launcher/editor backups verify. The latest prepared app package of
-  5,190,127 bytes is removed; previous prepared editor staging was already removed.
+  5,195,702 bytes is removed; previous prepared editor staging was already removed.
 
-[App receipt](evidence/installed-review-context-summary.json),
+[App receipt](evidence/installed-desktop-host-summary.json),
 [editor receipt](evidence/installed-editor-terminal-summary.json).
 
 ## Verification belongs to a source
@@ -107,7 +107,7 @@ The immutable frontend pin and normal installation are complete; all 36 served
 assets match and the prepared package is removed.
 [Evidence](evidence/review-context-source-summary.json).
 
-The next backend checkpoint reports Linux Claude Desktop host support in the
+The installed backend checkpoint reports Linux Claude Desktop host support in the
 existing client facts. Omarchy is unsupported by the vendor beta; malformed or
 unavailable metadata stays unverified. Six integration groups pass 70 checks/one
 existing skip. Native executable binding and launch/focus remain unfinished.
