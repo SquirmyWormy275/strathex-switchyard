@@ -14,6 +14,10 @@ and keyboard-only mode cannot enable these controls, and Linux offers no substit
 Five original groups pass 59 interaction/integration checks with no skips,
 including delayed-response refusal after a workspace change.
 [Source evidence](evidence/client-native-navigation-source-summary.json).
+The normal Linux installation contains this source and passes 62 served/API plus
+107 metadata checks, preserving all 54 workspaces. This verifies Linux refusal
+and saved metadata, not an actual Windows desktop.
+[Installed evidence](evidence/installed-client-navigation-summary.json).
 
 Choose **Review app launch** to inspect the fixed destination and workspace.
 **Request this app launch** is a separate action. Its receipt distinguishes an

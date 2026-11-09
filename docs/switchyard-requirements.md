@@ -9,15 +9,15 @@ entry point, evidence and remaining work. A hardware/account check does not excu
 unfinished independent software. Read [current status](switchyard-status.md) for
 accepted checkpoints and [verification](verification.md) for reproducible checks.
 
-Installed Linux source `23293d1` includes the 36-asset guided frontend, permissions,
+Installed Linux source `fc7c71f` includes the 36-asset guided frontend, permissions,
 scanner setup, signed-feed maintenance, reviewed execution, saved design
 conversations, coding-task text/background controls and approved-work account/
 recovery, exact native-app navigation, agent maintenance, saved voice notes,
-transcript import and Claude hook setup. All served asset
-hashes, twenty-two API/inventory checks and 103 metadata/refusal checks across 60 exact modules
+transcript import, Claude hook setup and direct client-to-native setup navigation. All served asset
+hashes, twenty-six API/inventory checks and 107 metadata/refusal checks across 62 exact modules
 pass, preserving all 54 semantic workspaces and 57 workflow definitions.
 Current plus one rollback remain and the prepared package is removed.
-[Installed evidence](evidence/installed-claude-hook-controls-summary.json).
+[Installed evidence](evidence/installed-client-navigation-summary.json).
 
 The installed source also includes [saved design-conversation controls](saved-conversation-controls.md):
 exact history selection, reviewed legacy account binding, explicit native status

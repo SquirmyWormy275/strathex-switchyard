@@ -86,14 +86,14 @@ execution, offline repository scans and recoverable installation. The Home and
 Model F catalog provide the starting experience; complete task/IDE attachment,
 broader observation sources and full scanner coverage remain unfinished.
 
-The installed application at `23293d1` includes guided setup, portable profiles,
+The installed application at `fc7c71f` includes guided setup, portable profiles,
 observation-assisted design, keyboard/client controls, task permissions, scanners,
 signed feeds and reviewed execution. Saved conversations, coding-task and account
 controls, native-app navigation, agent maintenance, voice notes, transcript import
 and separately opted-in Claude hook setup are connected. All 36 served hashes,
-22 API checks and 103 installed metadata checks pass; all 54 semantic workspaces
+26 API checks and 107 installed metadata checks pass; all 54 semantic workspaces
 and 57 workflows are preserved. Browser visual acceptance remains blocked.
-[Installed evidence](docs/evidence/installed-claude-hook-controls-summary.json).
+[Installed evidence](docs/evidence/installed-client-navigation-summary.json).
 
 Complete Linux `4e3feb4` passes **375 groups / 2,483 tests**, with 32 declared
 skips. It covers the guided frontend through voice-note controls; transcript import

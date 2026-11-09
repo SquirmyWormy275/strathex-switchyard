@@ -22,13 +22,13 @@ Start with [current status](switchyard-status.md), the [requirement ledger](swit
 
 | Identity | Verified checkpoint |
 | --- | --- |
-| Source | `49602de9f5482ec72542bb63313bb244674cef79` |
-| Release | `bbf92036b0c6b666640b6c09a3ea677e1c4fd397dc00900d5a8fdde679dc32b8` |
-| Rollback | `f9e73add415652feec892613ccca36b604a9d4ba2f33b10f86c11020f51e7479` |
-| Frontend | `6adafc7e4531d0156247377d1066d24ffaeb91160d7f5dc0aa551757baea1a2e` |
+| Source | `fc7c71f4030926a253d7eecfb1e5220d011a9594` |
+| Release | `181fc3619c7e1fdcd5f715aa654f1fc804de164d9c0ae75ab9764f347e327ffc` |
+| Rollback | `bbf92036b0c6b666640b6c09a3ea677e1c4fd397dc00900d5a8fdde679dc32b8` |
+| Frontend | `2c5d0f951991b4d0ab81cdd6ef3f5503c0b5f53563f31a3ba2d8f2908201f2ad` |
 
 The approved frontend is installed at the normal local address. All 36 served assets
-and twenty-five API/inventory metadata/refusal checks pass. Eight installed verifiers pass 106 checks
+and twenty-six API/inventory metadata/refusal checks pass. Eight installed verifiers pass 107 checks
 with 62 exact module hashes; the workflow verifier checks all 57 definitions.
 All 54 semantic workspaces, Personal selection and the pending keyboard-only
 conversation remain intact. 53 sealed files are byte-identical; the remaining
@@ -36,12 +36,12 @@ workspace changes audit metadata only. No physical keyboard, native provider,
 account, model or microphone operation occurred.
 
 The normal update retained and verified dated launcher backups and current plus
-one rollback. The payload contains 574 files/5,049,367 bytes. Its exact prepared
-575-file/5,153,151-byte bundle is removed after identity/hash verification. The
+one rollback. The payload contains 574 files/5,052,022 bytes. Its exact prepared
+575-file/5,155,806-byte bundle is removed after identity/hash verification. The
 private access token intentionally changed with the frontend digest; use the normal
 launcher/new endpoint rather than restoring the old token. Host-facing owner,
 Copilot and signed-intent checks ran sequentially. Do not repeat executed update
-or cleanup scripts. [Installed evidence](evidence/installed-claude-desktop-controls-summary.json).
+or cleanup scripts. [Installed evidence](evidence/installed-client-navigation-summary.json).
 
 All original workspace modes and all three conversation records are preserved.
 Selected Personal was already in companion mode; the pending conversation lives
@@ -112,8 +112,8 @@ Only bounded digest-verified JSON receipts remain locally outside the checkout. 
 
 ## Recent backend behavior
 
-- The Claude Desktop catalog now leads directly to exact Windows native setup with passive metadata readback and workspace-change fencing. Five groups/59 tests pass with no skips. This source still needs normal installed adoption and browser acceptance. [Evidence](evidence/client-native-navigation-source-summary.json).
-- Windows helper build and own-process self-test pass at `ece17a0`, run `42570708844`, job `129008065497`, exact merge tree `623501971159b3d2fcd1fc0ef28dc0566412594c`. Original toolchain/bound/QUERY 8 remain. Actual desktop and current full CI outcomes remain separate. [Evidence](evidence/native-helper-ece17a0-summary.json).
+- The Claude Desktop catalog now leads directly to exact Windows native setup with passive metadata readback and workspace-change fencing. Five groups/59 tests pass with no skips. Normal installed adoption passes 62 served/API and 107 metadata checks with all 54 workspaces preserved. Browser acceptance remains blocked. [Evidence](evidence/client-native-navigation-source-summary.json).
+- Windows helper build and own-process self-test pass at `ece17a0`, run `42570708844`, job `129008065497`, exact merge tree `623501971159b3d2fcd1fc0ef28dc0566412594c`. Original toolchain/bound/QUERY 8 remain. Its adjacent client job `129008372534` passes 28 groups/287 tests/zero skips with exact audited receipts. Actual desktop and current full CI outcomes remain separate. [Evidence](evidence/native-helper-ece17a0-summary.json).
 
 - Windows Claude Desktop is connected through native executable review, saved identity, focus, physical dispatch and shortcut controls. Source verification passes 177 checks plus 39 final UI checks with overlap; offline helper build/self-test passes. Actual Windows image/window acceptance, Linux Claude focus and launch remain separate. Normal installed adoption passes 61 served/API and 106 installed checks, with all 54 workspaces preserved. [Source evidence](evidence/claude-desktop-focus-source-summary.json).
 - Linux release run `42568708712`, job `129000860981`, at `947d982` failed before tests when the pinned Bubblewrap download returned HTTP 504. Preserve the failure; no manual retry/cancel/dispatch or bound change. [Receipt](evidence/linux-947-download-failure-summary.json).
