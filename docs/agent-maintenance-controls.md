@@ -36,3 +36,9 @@ checks pass against the running synthetic demonstration. No installed agent was
 enrolled, revoked or commanded. Browser rendering and live agent acceptance remain
 separate. [Exact source evidence](evidence/agent-maintenance-ui-source-summary.json),
 [backend contract](custom-agent-revocation.md).
+
+Normal installed `b12319e` passes all 35 served-asset hashes and twelve API
+metadata/refusal checks, plus 100 checks from eight installed verifiers. All 54
+semantic workspaces, modes, conversations and selection remain intact. Dated
+launcher backups and one rollback verify; the exact prepared package is removed.
+[Installed evidence](evidence/installed-agent-maintenance-controls-summary.json).

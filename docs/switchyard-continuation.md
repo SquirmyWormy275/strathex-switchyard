@@ -22,13 +22,13 @@ Start with [current status](switchyard-status.md), the [requirement ledger](swit
 
 | Identity | Verified checkpoint |
 | --- | --- |
-| Source | `f28f01c50aa66e91a55c30860581cc622d30c882` |
-| Release | `176cd53e10ea34c9a026a6689f2796081003033774ffb4cb05e703d6cb69700a` |
-| Rollback | `bdbc8132faaf2de79e2633aa715e4440c129bae6f404374e19efa7769bfa80e3` |
-| Frontend | `5ee9bf6f9398531d5d4d3bf337391e1e910ca113432099756648c4f7fac9604b` |
+| Source | `b12319e861031c87c1a31b249bb3d9e8f295ef71` |
+| Release | `447f05ef97fad12a72686f226d65a2e07dbc5ae5d44c68b2d17760dd42d1e0c0` |
+| Rollback | `176cd53e10ea34c9a026a6689f2796081003033774ffb4cb05e703d6cb69700a` |
+| Frontend | `ee5975ed37a47c3ce2ce5564c933896e7d0c867f1e55f3cb24bde3f3cd14dd0c` |
 
 The approved frontend is installed at the normal local address. All 35 served assets
-and eight API metadata/refusal checks pass. Eight installed verifiers pass 100 checks
+and twelve API metadata/refusal checks pass. Eight installed verifiers pass 100 checks
 with 58 exact module hashes; the workflow verifier checks all 57 definitions.
 All 54 semantic workspaces, Personal selection and the pending keyboard-only
 conversation remain intact. 53 sealed files are byte-identical; the remaining
@@ -36,12 +36,12 @@ workspace changes audit metadata only. No physical keyboard, native provider,
 account, model or microphone operation occurred.
 
 The normal update retained and verified dated launcher backups and current plus
-one rollback. The payload contains 570 files/4,994,052 bytes. Its exact prepared
-571-file/5,097,205-byte bundle is removed after identity/hash verification. The
+one rollback. The payload contains 570 files/5,005,481 bytes. Its exact prepared
+571-file/5,108,635-byte bundle is removed after identity/hash verification. The
 private access token intentionally changed with the frontend digest; use the normal
 launcher/new endpoint rather than restoring the old token. Host-facing owner,
 Copilot and signed-intent checks ran sequentially. Do not repeat executed update
-or cleanup scripts. [Installed evidence](evidence/installed-native-app-controls-summary.json).
+or cleanup scripts. [Installed evidence](evidence/installed-agent-maintenance-controls-summary.json).
 
 All original workspace modes and all three conversation records are preserved.
 Selected Personal was already in companion mode; the pending conversation lives
@@ -118,8 +118,9 @@ Passing follow-ups do not establish the cause of earlier intermittent failures. 
 Custom-agent inventory, exact reviewed revocation, uncertain retired-command
 acknowledgement and owned bundled-example retirement are connected. Eight cases
 pass in the 115-test source run; four complete-page groups pass 33 with overlap.
-The synthetic preview passes thirteen checks. Browser rendering, installed adoption
-and live agent acceptance remain separate. Enrollment remains the existing SDK
+The synthetic preview passes thirteen checks. Normal installed adoption passes
+47 served-asset/API checks and 100 metadata checks. Browser rendering and live
+agent acceptance remain separate. Enrollment remains the existing SDK
 flow. [Walkthrough](agent-maintenance-controls.md),
 [source evidence](evidence/agent-maintenance-ui-source-summary.json).
 
