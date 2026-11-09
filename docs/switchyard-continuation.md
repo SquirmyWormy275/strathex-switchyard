@@ -111,7 +111,7 @@ The original failure record is retained and its exact owned staging was removed.
 No production lifetime contract changed.
 
 Continue with observation source/session selection and reviewed designer context,
-production editor command activation, and broader device controls. Browser tooling
+interactive editor command acceptance, and broader device controls. Browser tooling
 remains unavailable; no installed update or visual acceptance is claimed.
 
 ## Observation frontend checkpoint
@@ -135,6 +135,29 @@ encrypted saved canonical plan plus ordinary typing. Original bounds remain.
 Next: production editor command/project activation, broader device configuration
 controls, and the remaining external observation sources. Browser-tool and hardware/
 account checks remain distinct from these unfinished implementations.
+
+## Editor command source checkpoint
+
+The extension registers Browse Saved Project Tasks, Connect Saved Task in Terminal
+and Return to Connected Terminal without startup I/O. It selects only signed saved
+identities, requires the exact open project, and separately reviews launch. Source
+wiring reuses the existing Linux/Windows clients, native readers and launchers.
+Windows asks for the installed native executable and verifies its original digest;
+Linux reads the authenticated owner's exact PID executable. No identity/ACL/runtime
+fallback was added. Native task attachment remains explicitly unverified.
+
+Ten original groups pass 107 tests/one declared skip; three final groups pass 36
+with overlap, adding cancellation while the executable picker is unresolved.
+Full TypeScript checking passes. The final compiled CommonJS activation check
+passes with zero I/O and all three commands; 51 generated files/1,110,340 bytes are
+removed. The earlier compiled staging was also removed. No installed extension or
+live account/task action occurred. [Walkthrough](editor-task-controls.md),
+[evidence](evidence/editor-commands-source-summary.json).
+
+Continue broader device configuration controls, distinct client recipe controls
+and remaining required observation/host-execution flows. Interactive IDE, browser,
+hardware/account checks remain separate. Keep the current immutable 22-asset
+frontend pinned; this editor checkpoint does not change it.
 
 ## Continue required product work
 

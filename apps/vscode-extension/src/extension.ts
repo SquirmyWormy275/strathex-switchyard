@@ -1,4 +1,5 @@
 import * as vscode from "vscode";
+import { StudioEditorCommands } from "./studio-editor-commands.ts";
 import { existsSync } from "node:fs";
 import { isAbsolute, join, relative } from "node:path";
 import { homedir } from "node:os";
@@ -24,6 +25,7 @@ export { NamedPipeJsonLineTransport, ProvisionedNamedPipeJsonLineTransport, Wind
 export { ManagedSessionController, type ManagedSessionControllerOptions } from "./controller.ts";
 
 let controller: ManagedSessionController | undefined;
+let studioCommands: StudioEditorCommands | undefined;
 interface HostSecretReader extends ExtensionSecretReader { seal(cleartext: Uint8Array): Promise<string>; dispose(): Promise<void>; }
 let secretReader: HostSecretReader | undefined;
 
@@ -55,6 +57,7 @@ export function activate(context: vscode.ExtensionContext): void {
       extensionVersion: exactExtensionVersion(context)
     }
   );
+  studioCommands = new StudioEditorCommands(vscode as unknown as VscodeLike);
   void controller.start().catch(async () => {
     await vscode.window.showWarningMessage("SXSY-B122 could not initialize its local session registry.");
   });
@@ -96,8 +99,12 @@ export async function deactivate(): Promise<void> {
   controller = undefined;
   const activeSecretReader = secretReader;
   secretReader = undefined;
-  await deactivateManagedExtension(activeController, activeSecretReader);
-  // The extension owns no process, broker, terminal hook, or external action.
+  const activeStudioCommands = studioCommands; studioCommands = undefined;
+  const retired = await Promise.allSettled([
+    deactivateManagedExtension(activeController, activeSecretReader), activeStudioCommands?.close()
+  ]);
+  const failed = retired.filter((result): result is PromiseRejectedResult => result.status === "rejected");
+  if (failed.length) throw new AggregateError(failed.map(result => result.reason), "Some extension resources could not verify retirement.");
 }
 
 export function exactExtensionVersion(context: vscode.ExtensionContext): string {

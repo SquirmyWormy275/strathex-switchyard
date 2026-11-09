@@ -36,13 +36,13 @@ Copilot-only policy. Imported layouts never enable providers or recording.
 - [Portable profiles](docs/portable-profiles.md): review typing/geometry assumptions,
   stable intents and migration before connecting a second computer.
 - [Assignment references and legends](docs/assignment-legends.md): export saved
-  controls and source-sized relegendable-cap sheets; the frontend control is pending.
+  controls and source-sized relegendable-cap sheets from Settings.
 - [Application packaging](docs/suite-installation.md): build the private suite
   directory, verify its contents and run it independently of the checkout.
 - [Codex task bindings](docs/coding-task-bindings.md) and [Claude Code task
   bindings](docs/claude-task-bindings.md): exact native identities, actual host
   evidence and the controls still being implemented.
-- [Reviewed native coding text](docs/native-coding-tasks.md): follow an exact task,
+- [Editor task controls](docs/editor-task-controls.md): browse saved projects,\n  review an exact terminal connection and return to its owned terminal.\n- [Reviewed native coding text](docs/native-coding-tasks.md): follow an exact task,
   approve bounded text and recover an uncertain turn without automatic retry.
 - [Microsoft work conversations](docs/copilot-request-recovery.md): keep the exact
   enrolled account and recover a lost reply without silently sending it again.
@@ -73,10 +73,10 @@ This is a **partial development suite**, built and exercised on Omarchy Linux.
 The backend connects protected compartments, exact task identities, reviewed
 execution, offline repository scans and recoverable installation. The Home and
 Model F catalog provide the starting experience; complete task/IDE attachment,
-role/device controls and full scanner coverage remain unfinished.
+broader device controls and full scanner coverage remain unfinished.
 
 The latest installed backend (`9266c12`) passes **102 metadata/refusal checks
-across 59 exact modules** and preserves all 54 saved workspaces. It includes signed saved-project discovery, verified Claude Code 2.1.319 admission and recording-consent fixes for both named task adapters. Role, device and editor controls still need their frontend integration. [Installed evidence](docs/evidence/installed-codex-status-consent-summary.json).
+across 59 exact modules** and preserves all 54 saved workspaces. It includes signed saved-project discovery, verified Claude Code 2.1.319 admission and recording-consent fixes for both named task adapters. The newer source connects guided role/device setup, portable import/export, printable legends, observation-assisted design and editor commands. Its installed update and visual/interactive acceptance remain pending. [Installed evidence](docs/evidence/installed-codex-status-consent-summary.json).
 
 Complete Linux `9266c12` passes **356 groups / 2,333 tests**, with 32 declared
 skips. It covers the installed source, including exact Claude version admission

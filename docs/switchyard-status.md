@@ -35,6 +35,11 @@ aggregate summary with the next message; destination or source changes invalidat
 the review. Six frontend interaction cases and the live synthetic HTTP demonstration
 pass. [Observation evidence](evidence/observation-ui-source-summary.json).
 
+The editor now registers Browse Saved Tasks, Connect Saved Task in Terminal and
+Return to Connected Terminal. Seven interaction cases, TypeScript checking and a
+compiled no-I/O activation check pass. Native task attachment, interactive IDE and
+installed extension acceptance remain distinct. [Editor controls](editor-task-controls.md).
+
 ## A working backend journey
 
 The repeatable demo uses the normal authenticated API, encrypted stores and

@@ -163,7 +163,7 @@ identity, then freeze the result. Credentials, native sessions, task content,
 review tokens and launch authority are absent. Choose a project, call
 `editorChoices(repositoryRoot)`, then follow the existing exact review flow.
 An empty list means no eligible owned task is currently saved; it is not proof
-that the machine has no projects. Picker/command activation remains frozen.
+that the machine has no projects. Picker/command activation is now connected in the source extension.\n[Editor controls](editor-task-controls.md).
 [Source evidence](evidence/editor-project-choices-source-summary.json).
 Three native Windows groups pass 17 tests with original bounds and cleanup;
 providers and endpoint-reader doubles remain explicit.

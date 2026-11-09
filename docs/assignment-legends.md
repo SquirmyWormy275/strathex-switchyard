@@ -7,8 +7,10 @@ Local accounts, session IDs, paths, credentials and connection authority are exc
 The reference describes saved definitions; it does not claim hardware readback or
 an applied shortcut.
 
-The backend export is implemented. The export control in the frozen frontend
-is pending the next frontend iteration.
+The backend export and Settings controls are implemented. Choose a format/page
+and optional short labels under **Take your setup with you**. Downloads verify
+the content digest. Browser visual and physical print acceptance remain pending.
+[Guided walkthrough](guided-setup.md#take-your-setup-with-you).
 
 ## Available output
 
