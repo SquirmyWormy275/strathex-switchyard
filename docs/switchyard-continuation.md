@@ -41,6 +41,35 @@ No merge, public release or visibility change is authorized.
 
 ## Current published and installed sources
 
+Published **c44b6805f16a3ab63b0d9212cd1e199c728b7739** adds historical-name
+discovery and the full Windows receipt; **a7958c4b7cd22efdaa532d91ad4a3dc28150093b**
+pins its immutable frontend. That source is normally installed:
+release **3714ac7e4798230b85eee7dbe94ea67e28665303d0b0ce392faf236f8f6bf970**,
+rollback **2ee8827dd022ba676bff48f3b0639ef5d0d0f47c683cef12d806a7db6defc2ea**,
+frontend **00140e1b02bcacc4077219d67b2a796fa798e7ccdc04b95e6d16b9e6f6f4219a**.
+
+All 36 served assets and six installation/API/state readbacks pass. Nine
+verifiers pass **123 checks / 65 exact module hashes / 57 workflows**. All 54
+semantic workspaces, modes, Personal selection, three conversations and the
+pending keyboard-only record remain intact; 53 sealed files are byte-identical.
+Dated backup: **2026-11-09T11-52-52.170Z-a2928885-4a5a-45d5-8445-92ab6d6014f2**.
+The new frontend digest intentionally rotates local access; the normal launcher
+obtains the new private link. No provider, hardware, microphone or scanner action
+was started by the installed verification.
+
+All **576 prepared files / 5,186,299 bytes** are removed after identity/hash
+verification and independent installed-payload readback. The first cleanup
+refused differently formatted manifest JSON; exact semantic equality was verified
+before deletion. **Do not replay the history-discovery install/cleanup scripts.**
+The initial metadata verifier refused old source pins; its pins now name the
+audited discovery evidence and retain all prior assertions plus two new checks.
+An intermediate synthetic fixture escape error was fixed; neither failure made
+an external effect. Eight flag-refusal guards pass, plus ten direct release/
+application cases after frontend pinning (not an original full-run receipt).
+Private receipts use **history-discovery-installed-**.
+[Installed evidence](evidence/installed-history-discovery-summary.json).
+
+
 Latest source correction: acknowledged legacy `thread/read` now checks the
 original account before querying and before delivery, like paginated history.
 Three red cases reproduce the omission. Two focused groups pass 37; thirteen
@@ -61,30 +90,11 @@ All 126 cases pass; deep equality remains. Native Codex rejects CLI permission
 overrides; the relay still enforces read-only/on-request. Original CI/local
 failures remain. [Evidence](evidence/codex-controller-argument-expectation-summary.json).
 
-| Installed item | Identity |
-| --- | --- |
-| App source | `3222727b258b542d200d056817c3473d2da760ab` |
-| Pilot extension source | `42655aa0667dfbf06c88c560a1098ae65543ecf2` |
-| App release | `2ee8827dd022ba676bff48f3b0639ef5d0d0f47c683cef12d806a7db6defc2ea` |
-| Single app rollback | `753bd9bc1f77288934602e6011465107249c95527b80d00c8985964ac6a1dd3c` |
-| Frontend | `3265d16737fae14d99c7c5a0792af4c5e7cd743320f0abc84263bf22490770ed` |
-
-The app passes 69 served/API and 121 installed metadata checks across 65 exact
-modules. All saved semantic state above is preserved; 53 sealed files are
-byte-identical and one changes only audit metadata. The extension passes 53
-payload hashes and eight installed module checks. Its prior extension/registry
-are preserved in dated backup `20261109T102446Z`; other registry rows are unchanged.
-Actual editor GUI activation remains unaccepted.
-
-The latest prepared 576-file app package of 5,182,691 bytes is removed after
-exact identity/hash verification. Previous prepared app/editor packages are also
-removed. **Do not replay their update/preflight/cleanup scripts.** Private current
-update receipts use the prefix `legacy-account-installed-`; the dated backup is
-`2026-11-09T10-52-39.403Z-7e432606-9ed4-442e-affc-6995e8054599`.
-The installed app need not be rebuilt for
-subsequent docs/test-only commits.
-[App receipt](evidence/installed-legacy-account-summary.json),
+The earlier installed source 3222727 passed 69 served/API and 121 metadata
+checks. Its app/extension preparation and cleanup are finished; retain their
+original [app receipt](evidence/installed-legacy-account-summary.json) and
 [editor receipt](evidence/installed-editor-terminal-summary.json).
+Do not replay those older update or cleanup scripts.
 
 ## Complete Linux run — audited and cleaned
 
@@ -150,8 +160,8 @@ The next implementation discovers bounded historical names from already verified
 trees, without additional queries, blob reads or authority. Ten original groups
 pass 80 tests/one existing skip; eighteen package/installation groups pass 26
 tests; typecheck passes. Original receipts are privately retained and duplicate
-checkout receipts removed. Normal installation and Windows acceptance of this
-later source still need completion.
+checkout receipts removed. Normal installation is now complete as recorded above. Windows acceptance of
+this later source still needs completion.
 [Source evidence](evidence/history-path-discovery-source-summary.json).
 
 Native client source **3222727** is now audited: run **42604386508**, job
@@ -215,9 +225,10 @@ focus is not task attachment.
 ## Continue independent work
 
 1. Complete Linux cleanup and the f4dcc79 Windows source audit are finished.
-2. Publish and normally install bounded historical-name discovery with a fresh
-   immutable frontend and full saved-workspace/launcher readback. Preserve current
-   plus one rollback and remove only verified owned staging.
+2. Historical-name discovery is installed and staging cleanup is complete.
+   Continue its normal-push Windows follow-up and actual UI acceptance when the
+   supported browser-control connection works. No reinstallation is needed for
+   the subsequent verifier/evidence-only checkpoint.
 3. Continue Linux Claude Desktop and exact interactive attachment limitations
    with supported native contracts; keep missing platform evidence explicit.
 4. Carry the remaining observation/scanner/managed-policy/later-platform scope

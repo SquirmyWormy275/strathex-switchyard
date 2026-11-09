@@ -27,21 +27,21 @@ The [requirement ledger](switchyard-requirements.md) tracks the wider scope;
 
 ## Installed checkpoint
 
-The app uses source **3222727**; the pilot VS Code extension remains at **42655aa**.
+The app uses source **a7958c4**; the pilot VS Code extension remains at **42655aa**.
 The app release is
-`2ee8827dd022ba676bff48f3b0639ef5d0d0f47c683cef12d806a7db6defc2ea`;
-the frontend is `3265d16737fa`. Current plus one app rollback remain.
+`3714ac7e4798230b85eee7dbe94ea67e28665303d0b0ce392faf236f8f6bf970`;
+the frontend is `00140e1b02bc`. Current plus one app rollback remain.
 
-- All 36 served assets and 33 API/refusal checks pass.
-- Nine installed verifiers pass 121 checks across 65 exact module hashes.
+- All 36 served assets and six installation/API/state readbacks pass.
+- Nine installed verifiers pass 123 checks across 65 exact module hashes.
 - All 54 semantic workspaces, 57 workflow definitions, Personal selection and
   three conversations are preserved, including the pending keyboard-only record.
 - The extension's 53 payload files and eight installed module checks pass.
   Actual graphical editor activation remains unaccepted.
 - Dated launcher/editor backups verify. The latest prepared app package of
-  5,182,691 bytes is removed; previous prepared editor staging was already removed.
+  5,186,299 bytes is removed; previous prepared editor staging was already removed.
 
-[App receipt](evidence/installed-legacy-account-summary.json),
+[App receipt](evidence/installed-history-discovery-summary.json),
 [editor receipt](evidence/installed-editor-terminal-summary.json).
 
 ## Verification belongs to a source
@@ -85,9 +85,10 @@ refusal. [Demonstration receipt](evidence/batched-inspection-running-demo-summar
 
 ## Remaining implementation and defects
 
-- Publish and normally install bounded historical-name discovery. Ten integration
-  groups pass 80 tests/one existing skip; package/installation groups pass 26 tests,
-  and typechecking passes. It adds no query, blob read or permission.
+- Bounded historical-name discovery is implemented and normally installed. Its
+  native Windows follow-up remains pending. Ten integration groups pass 80 tests/
+  one existing skip; package/installation groups pass 26 tests, and typechecking
+  passes. Automatic authority/recipe assembly for removed paths remains unfinished.
   [Source evidence](evidence/history-path-discovery-source-summary.json).
 - Preserve the narrow Windows execution-UI margin and earlier intermittent native
   focus, host-action settlement and shortcut failures. Full source acceptance

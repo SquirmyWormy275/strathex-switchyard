@@ -70,7 +70,7 @@ accept later changes.
 
 | Scope | Verified result |
 | --- | --- |
-| Installed Linux application, `3222727` | 36 served assets, 33 API checks and 121 installed metadata checks; 54 semantic workspaces preserved. [Receipt](docs/evidence/installed-legacy-account-summary.json) |
+| Installed Linux application, `a7958c4` | 36 served assets and 123 installed metadata checks; all 54 semantic workspaces preserved. Bounded historical-file discovery is connected. [Receipt](docs/evidence/installed-history-discovery-summary.json) |
 | Running synthetic demonstration, `dfa40fb` | Nine checks: named connection, signed acknowledgement and stale-workspace refusal. [Receipt](docs/evidence/batched-inspection-running-demo-summary.json) |
 | Native Codex terminal, synthetic provider | Real 0.167 CLI renders legacy and paginated saved transcripts through the production relay; one narrowed resume, zero model prompts. [Receipt](docs/evidence/codex-native-paginated-history-summary.json) |
 | Native Linux repository inspection | Twelve real Git guardians, at most four concurrent reads, independent exit and unchanged repository bytes. [Receipt](docs/evidence/batched-inspection-source-summary.json) |

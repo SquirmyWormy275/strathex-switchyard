@@ -12,7 +12,7 @@ for work that remains.
 | --- | --- | --- |
 | Complete Linux source | `72e7c22` | 376 groups, 2,574 passes, 32 declared skips. Original commands, bounds, serial order and owned-tree cleanup audited. [Receipt](evidence/linux-72e7c22-complete-summary.json). |
 | Later legacy history account checks | `7317371` | Three regressions reproduced the omission; 13 integration groups pass 139 tests/one existing skip. Separate package and type checks pass. [Evidence](evidence/codex-legacy-read-account-summary.json). |
-| Installed Linux application | `3222727` | 69 served/API and 121 metadata checks, 65 exact module hashes, all 54 semantic workspaces and three conversations preserved. [Receipt](evidence/installed-legacy-account-summary.json). |
+| Installed Linux application | `a7958c4` | 42 served/installation/API/state and 123 metadata checks, 65 exact module hashes; all 54 semantic workspaces and three conversations preserved. [Receipt](evidence/installed-history-discovery-summary.json). |
 | Installed pilot editor extension | `42655aa` | 53 exact payload hashes and eight module checks. Actual graphical activation remains unaccepted. [Receipt](evidence/installed-editor-terminal-summary.json). |
 | Real Codex 0.167 terminal | `42655aa` | Synthetic saved history rendered through the production relay, including paginated older history. No model prompt or live task. [Contract](codex-terminal-compatibility.md). |
 | Audited Windows client | `3222727` | 31 groups, 362 passes, zero skips. Includes retained legacy-history account regressions; predates the lease-input correction. [Evidence](evidence/native-client-3222727-summary.json). |
@@ -26,7 +26,7 @@ collector pass; original receipts, commands, bounds and cleanup are audited.
 [Complete Windows receipt](evidence/complete-windows-f4dcc79-summary.json).
 The later historical-name discovery passes ten integration groups/80 tests/one
 existing skip and eighteen package/installation groups/26 tests, with typecheck.
-Installation and Windows follow-up remain pending.
+Normal installation now passes the checks above; Windows follow-up remains pending.
 [Discovery evidence](evidence/history-path-discovery-source-summary.json).
 
 Counts from overlapping runs must not be added. The complete Linux result predates
