@@ -1,0 +1,104 @@
+{
+  "schema": "switchyard-feed-ui-source-evidence/v1",
+  "scope": "Reviewed public-key trust, signed feed installation, separate revocation/removal and retained uncertain maintenance through authenticated HTTP",
+  "runs": [
+    {
+      "receiptId": "4275371a-946b-4a2b-9e00-b371f95781d5",
+      "sha256": "37d2620b92e3c958c2f54a2de3e004958fac4da510d4dd91749d7a7bb97b90da",
+      "totals": {
+        "required": 8,
+        "passed": 8,
+        "failed": 0,
+        "tests": 68,
+        "passedTests": 68,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "files": [
+        "scripts/windows-complete-shards.test.mjs",
+        "scripts/windows-backend-shards.test.mjs",
+        "scripts/run-isolated-tests.test.mjs",
+        "deployment/suite/release.test.mjs",
+        "tools/layout-studio/scanner-fixtures.test.mjs",
+        "tools/layout-studio/scanner-fixture-invalidation.test.mjs",
+        "tools/layout-studio/scanner-fixture-removal.test.mjs",
+        "tools/layout-studio/feed-ui.test.mjs"
+      ],
+      "originalBoundsPreserved": true,
+      "ownedCleanupComplete": true
+    },
+    {
+      "receiptId": "7c3f10c5-858a-479c-abcb-7f908680fe67",
+      "sha256": "6f425e0d70f49886045dea7ea4e39a3b694f8c9677825682edfa589df4b07060",
+      "totals": {
+        "required": 4,
+        "passed": 4,
+        "failed": 0,
+        "tests": 31,
+        "passedTests": 31,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "files": [
+        "tools/layout-studio/execution-ui.test.mjs",
+        "tools/layout-studio/authority-ui.test.mjs",
+        "tools/layout-studio/scanner-ui.test.mjs",
+        "tools/layout-studio/feed-ui.test.mjs"
+      ],
+      "originalBoundsPreserved": true,
+      "ownedCleanupComplete": true
+    }
+  ],
+  "overlap": "Eight original groups pass 68 tests. The final four UI groups pass 31 after adding closed local policy validation and a stale reply case; totals overlap.",
+  "interactionCases": 9,
+  "sourceFiles": {
+    "tools/layout-studio/feed-ui.mjs": "a31fe97e55665605028a74a494853957dfa6f25f427671eccdd792ab87596c5c",
+    "tools/layout-studio/feed-ui.test.mjs": "ace129b426b88293bc2a3eecb4524db2af2e495072d1a2dbd6d2ee07c09c2d54",
+    "tools/layout-studio/suite-ui.mjs": "6324afefd989ed4abcf18a9b93e88b3753d6378c12057e969c4c72f9c2a24409",
+    "tools/layout-studio/serve.mjs": "0bc1091a8f86470c1dade78d033c1f4c9a16d19138e7e6a5ea3d24b08532466a",
+    "tools/layout-studio/index.html": "3d7988fa1d04dbd429f1fea2b2e603968bd2e97838b3a5a9bbce03f8a111bc6d",
+    "deployment/suite/release.mjs": "5c4d5d389ce8a7ea7a4d7f34b61360920c06ba0fde0e07cb4fafd7e62a51d5e3"
+  },
+  "interactionBoundary": "Actual P-256 signed temporary files, registry file installation/removal, encrypted state and authenticated HTTP on Linux. Native provider and hardware operations are unused. Windows acceptance remains separate.",
+  "livePreview": {
+    "schema": "switchyard-feed-ui-preview/v1",
+    "origin": "http://127.0.0.1:44607",
+    "checks": [
+      "exact feed controls module served",
+      "feed, scanner, permission and execution controls served",
+      "preview remains keyboard-only",
+      "empty registry metadata grants no authority",
+      "preview refuses registry review",
+      "preview refuses registry apply",
+      "preview refuses registry recover"
+    ],
+    "registryEffects": 0,
+    "scansStarted": 0,
+    "hardwareOpened": false,
+    "modelRequests": 0,
+    "visualAcceptance": false,
+    "browserBlocker": "The supported browser tools fail before navigation/inspection with undefined timeoutMs; no alternate browser-control mechanism was used."
+  },
+  "priorPreview": {
+    "pid": 3991082,
+    "dev": 58,
+    "ino": 34036315,
+    "reason": "Retire the owned scanner preview before the signed-feed controls preview.",
+    "independentExitVerified": true,
+    "ownedStateRemoved": true
+  },
+  "limitations": [
+    "No real signing authority or feed is enrolled. Operator approval is still required for the concrete authority and package.",
+    "No installed update or browser visual acceptance is established.",
+    "Native Windows, accounts, task attachment and physical keyboard checks remain separate."
+  ],
+  "staticControls": {
+    "htmlIdsUnique": 386,
+    "feedIdsPresent": 21,
+    "localLinksVerified": 92
+  }
+}

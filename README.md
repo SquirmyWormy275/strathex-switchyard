@@ -51,6 +51,8 @@ Copilot-only policy. Imported layouts never enable providers or recording.
 - [Mediated repository effects](docs/mediated-repository-effects.md): follow a
   binary file through review, encrypted preservation, the durable policy broker
   and supervised native Git; run its disposable native demonstration.
+- [Signed scanner feeds](docs/feed-maintenance-controls.md): review public signing
+  keys, signed-feed installation, revocation and retained-file removal.
 - [Task permission controls](docs/task-permission-controls.md) → [scanner setup](docs/scanner-setup-controls.md) → [reviewed execution](docs/reviewed-execution-controls.md): choose a saved task, review its scope, and keep permission, file saving and execution separate.
 - [Current implementation and evidence](docs/switchyard-status.md): what runs,
   what has been checked, and what still needs implementation.

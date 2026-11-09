@@ -345,3 +345,26 @@ remain open. [Evidence](evidence/ci-capacity-ce89-summary.json).
 Do not dispatch/retry/cancel CI or transfer earlier package acceptance to this
 source. The next normal push schedules these checks. Continue the reviewed feed
 maintenance controls and remaining product integrations independently.
+
+## Signed-feed frontend checkpoint
+
+Settings now reviews public-key trust, signed feed installation, independent
+revocation, exact retained-file removal and interrupted-owner recovery. Public
+policy files are bounded and checked locally against the closed schema; private
+keys and extra fields never enter a request. Every effect still requires its own
+backend review and one-use confirmation. Lost replies preserve history without
+replay; form/workspace changes discard approval, including delayed file/review
+replies. Existing receipts are explicitly invalidated before registry changes.
+
+Nine interaction cases use actual P-256 signed temporary files, encrypted
+registry state and authenticated HTTP. Eight original groups pass 68 tests; the
+final four UI groups pass 31 with overlap, zero skips and verified original bounds
+and cleanup. Seven live-preview checks pass. The old owned preview exits and its
+exact state is removed. No real key/feed/account/device is enrolled or used.
+[Controls](feed-maintenance-controls.md), [evidence](evidence/feed-ui-source-summary.json).
+
+The immutable feed frontend source and digest are pinned in the next checkpoint.
+The normal installation remains the accepted `47143a9f`/28-asset release.
+Continue remaining account/task frontend controls, exact native attachment
+limitations and normal installed/frontend verification. Browser tooling remains
+blocked before inspection; current complete Linux/Windows acceptance is open.

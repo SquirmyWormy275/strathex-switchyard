@@ -9,9 +9,10 @@ that a repository is secure.
 
 ## Operator path
 
-Select a Personal companion workspace. The frontend remains frozen, so these
-are currently authenticated backend routes, with the same origin and private
-bearer boundary as the other Suite APIs.
+Select a Personal companion workspace and open Settings → Scanner signing keys
+and feeds. The [reviewed controls](feed-maintenance-controls.md) use these
+authenticated backend routes with the same origin and private bearer boundary
+as the other Suite APIs.
 
 | Route | Purpose |
 | --- | --- |
@@ -153,4 +154,4 @@ signing scratch, bundle and proof checkout are removed. Receipts
 The separate [baseline scanner](shield-baseline-scanner.md) now runs fixed code
 against reviewed source and explicitly copied public rule/advisory data for all
 four Linux Shield actions. Full repository/history/ecosystem/provenance coverage
-and frontend controls remain unfinished.
+remain incomplete; reviewed frontend controls are now connected.

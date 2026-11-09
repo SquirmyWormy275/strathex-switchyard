@@ -246,8 +246,9 @@ The separate Windows package job is still in progress.
 - Finish exact native task attachment and provider-specific desktop controls where
   supported. Signed saved-project selection and reviewed terminal connection are
   implemented; application focus does not establish task attachment.
-- Expose signed scanner feed/trust maintenance and remaining account/task controls
-  through reviewed forms. Extend optional external observation sources only within
+- Finish remaining account/task controls through reviewed forms. Signed feed/trust
+  installation, revocation, removal and recovery now have connected controls.
+  Extend optional external observation sources only within
   explicit session/source/destination/retention consent. Existing five-source
   recording and reviewed aggregate designer context are connected.
 - Preserve explicit scanner coverage limits: broader syntax, dependency resolution,

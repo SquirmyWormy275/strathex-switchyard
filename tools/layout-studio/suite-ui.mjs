@@ -5,6 +5,7 @@ import { mountClients } from "./client-ui.mjs";
 import { mountExecution } from "./execution-ui.mjs";
 import { mountAuthority } from "./authority-ui.mjs";
 import { mountScanner } from "./scanner-ui.mjs";
+import { mountFeeds } from "./feed-ui.mjs";
 import { mountObservation } from "./observation-ui.mjs";
 const $ = (id) => document.getElementById(id);
 
@@ -189,6 +190,7 @@ export function mountSuite({ getProfile, loadProfile, previewProposal, notify, s
   mountExecution({ notify });
   mountAuthority({ notify });
   mountScanner({ notify });
+  mountFeeds({ notify });
   mountPortable({ getProfile, persist: async () => { clearTimeout(saveTimer); await persist(); }, refresh, loadProfile, download, notify });
   document.addEventListener("switchyard-role-result", event => { if (event.detail.proposal) previewProposal(event.detail.proposal); });
   document.addEventListener("switchyard-refresh-request", () => run(refresh));

@@ -29,8 +29,8 @@ current task authority. A clean bounded scan never proves complete security cove
 
 The controls reuse [scanner drafts](scanner-recipe-drafts.md),
 [reviewed saving](scanner-recipe-saving.md), [task permissions](task-permission-controls.md)
-and [execution](reviewed-execution-controls.md). Feed trust installation remains
-a separate operator decision. Browser visual review and live native account,
+and [execution](reviewed-execution-controls.md). [Feed trust installation](feed-maintenance-controls.md) is a separate reviewed
+operator decision in Settings. Browser visual review and live native account,
 Windows guest and scanner-feed acceptance remain distinct from source tests.
 
 [Source tests and exact boundaries](evidence/scanner-ui-source-summary.json) record

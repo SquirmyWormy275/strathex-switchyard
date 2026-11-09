@@ -23,6 +23,7 @@ export const studioAssets = new Map([
   ["/observation-ui.mjs", ["observation-ui.mjs", "text/javascript; charset=utf-8"]],
   ["/portable-ui.mjs", ["portable-ui.mjs", "text/javascript; charset=utf-8"]],
   ["/scanner-ui.mjs", ["scanner-ui.mjs", "text/javascript; charset=utf-8"]],
+  ["/feed-ui.mjs", ["feed-ui.mjs", "text/javascript; charset=utf-8"]],
   ["/authority-ui.mjs", ["authority-ui.mjs", "text/javascript; charset=utf-8"]],
   ["/execution-ui.mjs", ["execution-ui.mjs", "text/javascript; charset=utf-8"]],
   ["/client-ui.mjs", ["client-ui.mjs", "text/javascript; charset=utf-8"]],
