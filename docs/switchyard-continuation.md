@@ -22,13 +22,13 @@ Start with [current status](switchyard-status.md), the [requirement ledger](swit
 
 | Identity | Verified checkpoint |
 | --- | --- |
-| Source | `531587b75ba7aac212072f6b2601fb3a3c5de105` |
-| Release | `f14f814bfc666c98b698d4ad083c94e4060dbfec89ac5cf92df268d079e3827e` |
-| Rollback | `6e750877ab5fbe8d6565de2ff15d1d10eedbae35a737fdee46a4a148afa04b54` |
-| Frontend | `c77f3fe8d57d71176023bd8dbad71c3c3f1c2a7f6d8747951137ce3f3c5b0aef` |
+| Source | `a3516267fe78d046b3b371098b550746639f4200` |
+| Release | `195f24092320c0b4588396bb421af22d8cb9d5e51d636a58f28ca7cdbbddd2f6` |
+| Rollback | `f14f814bfc666c98b698d4ad083c94e4060dbfec89ac5cf92df268d079e3827e` |
+| Frontend | `3cf2b5af65489f932603711ca6b4ea836b7b8b2b1c08dac14dd3dfbd89545e2b` |
 
 The approved frontend is installed at the normal local address. All 36 served assets
-and twenty-nine API/inventory metadata/refusal checks pass. Eight installed verifiers pass 107 checks
+and thirty-three API/inventory metadata/refusal checks pass. Eight installed verifiers pass 107 checks
 with 62 exact module hashes; the workflow verifier checks all 57 definitions.
 All 54 semantic workspaces, Personal selection and the pending keyboard-only
 conversation remain intact. 53 sealed files are byte-identical; the remaining
@@ -36,13 +36,14 @@ workspace changes audit metadata only. No physical keyboard, native provider,
 account, model or microphone operation occurred.
 
 The normal update retained and verified dated launcher backups and current plus
-one rollback. The payload contains 574 files/5,055,935 bytes. Its exact prepared
-575-file/5,159,719-byte bundle is removed after identity/hash verification. The
-private access URL is preserved with the unchanged frontend digest. An inherited
-readback assertion expected a new frontend; that failed check is retained and now
-requires identical frontend bytes and the preserved URL. Host-facing owner,
+one rollback. The payload contains 574 files/5,065,200 bytes. Its exact prepared
+575-file/5,168,984-byte bundle is removed after identity/hash verification. The
+private access URL was updated for the intentional new frontend digest. The
+original task-owner verifier failure retained an outdated Home hash; its exact
+pin and the Copilot pin now use the tested connected-launch evidence. All behavior
+assertions remain intact. Host-facing owner,
 Copilot and signed-intent checks ran sequentially. Do not repeat executed update
-or cleanup scripts. [Installed evidence](evidence/installed-repository-inspection-startup-summary.json).
+or cleanup scripts. [Installed evidence](evidence/installed-claude-launch-controls-summary.json).
 
 All original workspace modes and all three conversation records are preserved.
 Selected Personal was already in companion mode; the pending conversation lives
@@ -161,7 +162,7 @@ Only bounded digest-verified JSON receipts remain locally outside the checkout. 
 - Claude and Codex status recording captures the original recording generation and provider observation time, preventing queued results from entering resumed or replacement consent. Unknown/stale status stays explicit. Original failing regressions remain retained. [Claude evidence](evidence/claude-status-consent-summary.json), [Codex evidence](evidence/codex-status-consent-summary.json).
 - Signed external-agent reports retain occurrence time across Node/Python SDK queues and encrypted-state waits, with the same consent boundaries. [Evidence](evidence/external-agent-consent-source-summary.json).
 
-The current synthetic preview at `http://127.0.0.1:35019` passes nine checks against source `0aeb317`, including all 36 served assets, exact reviewed choice, signed SDK acknowledgement and stale workspace refusal. Its private access URL is not published. Previous owned previews at 37943 and 33519 were gracefully stopped and their state removed. The seven-stage backend journey has separate passing evidence at `51ce508`; later changes leave its backend unchanged. [Running evidence](evidence/role-refusal-refresh-running-demo-summary.json).
+The current synthetic preview at `http://127.0.0.1:37733` passes ten checks against source `a351626`, including all 36 served assets, exact reviewed choice, signed SDK acknowledgement and stale-workspace refusal. Its private access URL is not published. The previous owned preview at 35019 was gracefully stopped, original PID/birth pinned, and its owned state removed. The separate seven-stage backend and actual isolated Linux execution demonstrations retain their source-specific evidence. [Running evidence](evidence/claude-launch-running-demo-summary.json).
 
 The connected backend demo runs with `node scripts/demo-switchyard-backend.mjs --synthetic`. Seven stages use normal encrypted stores, authenticated HTTP and signed SDK: F77 Dvorak setup, role binding/status dispatch, observation/refinement, saved-state recovery, portable import and Work-policy refusals. The agent and second host are explicit fixtures; temporary servers/state are removed. This grants no live provider, hardware, microphone or UI acceptance. [Demo](backend-demonstration.md), [native Windows demo](evidence/backend-connected-demo-native-summary.json).
 

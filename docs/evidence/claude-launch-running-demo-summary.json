@@ -1,0 +1,29 @@
+{
+  "schema": "switchyard-claude-launch-running-demo/v1",
+  "sourceCommit": "a3516267fe78d046b3b371098b550746639f4200",
+  "frontend": "3cf2b5af65489f932603711ca6b4ea836b7b8b2b1c08dac14dd3dfbd89545e2b",
+  "origin": "http://127.0.0.1:37733",
+  "checks": [
+    "all 36 served frontend assets match the installed review",
+    "unauthenticated saved-state access refused",
+    "named synthetic role saves once and stale choice refuses",
+    "pre-binding reviewed choice refuses without queuing a replacement target",
+    "reviewed frontend route queues exact status and independently running signed SDK acknowledges it",
+    "stale reviewed role refuses after selecting Work",
+    "returning to Personal cannot revive the old confirmation",
+    "one original command and four planned controls remain after returning",
+    "preview refuses actual launch and native focus",
+    "synthetic preview refuses normal native Claude launch reviews and effects"
+  ],
+  "success": true,
+  "synthetic": true,
+  "modelPrompts": 0,
+  "hardwareOperations": 0,
+  "nativeAppEffects": 0,
+  "accountOperations": 0,
+  "browserVisualAcceptance": false,
+  "backendJourneyEvidence": "repository-inspection-connected-demo-summary.json",
+  "serverStartedAtSource": "a3516267fe78d046b3b371098b550746639f4200",
+  "backendSourceUnchanged": true,
+  "previewRetainedForReview": true
+}
