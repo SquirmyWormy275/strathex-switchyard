@@ -46,6 +46,12 @@ relock controls. Fifteen original groups pass 128 tests with zero skips, plus ei
 running-server checks; the transport is synthetic. No physical device was touched.
 [Controls and limits](keyboard-settings-ui.md).
 
+Your tools now separates each documented client surface, reviews fixed launch
+destinations and exposes retained launch outcomes. Recipes carry no account or
+execution authority. Twelve original groups pass 131 tests with one declared
+Windows skip; eight running-preview checks pass. Claude desktop's native launch
+remains unfinished. [Client controls](client-controls.md).
+
 ## A working backend journey
 
 The repeatable demo uses the normal authenticated API, encrypted stores and

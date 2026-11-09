@@ -116,3 +116,9 @@ acceptance remain separate.
 Production editor command activation, additional device controls and the remaining
 flows in the [requirement ledger](switchyard-requirements.md) are still implementation
 work. This guided checkpoint is not completion of the full Rev2 suite.
+
+## Open a documented client
+
+Your tools also lists distinct product surfaces, exact destinations and workspace
+limits. Review a launch separately, or download a declarative recipe. The isolated
+demo exposes metadata and refuses real launches. [Client walkthrough](client-controls.md).

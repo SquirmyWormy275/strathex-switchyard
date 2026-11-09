@@ -231,3 +231,6 @@ kbd { font: 11px/1.5 ui-monospace, SFMono-Regular, Consolas, monospace; color: #
 .device-checks label { display: flex; align-items: center; gap: .5rem; flex-direction: row-reverse; justify-content: flex-end; }
 .device-checks input[type="checkbox"] { width: auto; flex: 0 0 auto; }
 .optional-device-settings fieldset { min-width: 0; margin: 0; padding: 1rem; border: 1px solid var(--line, #41454d); border-radius: .25rem; }
+.review-summary { white-space: pre-wrap; overflow-wrap: anywhere; }
+.client-catalog { margin-top: 20px; }
+.optional-device-settings label:has(> input[type="checkbox"]) { display: flex; flex-direction: row-reverse; justify-content: flex-end; align-items: start; gap: .5rem; }

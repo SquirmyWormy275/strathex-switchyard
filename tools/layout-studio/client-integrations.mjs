@@ -6,7 +6,7 @@ export function createClientIntegrations({ store, platform = process.platform, h
     async recipe(c, input) {
       if (Object.keys(input).some(k => !["compartment", "id"].includes(k))) throw new Error("Select only one exact documented recipe ID; imported commands, URLs and approval fields are not accepted.");
       const s = await store.snapshot(c), recipe = validateClientRecipe(clientRecipe(input.id));
-      if (s.policy !== "personal" && !(s.policy === "work" && recipe.provider === "microsoft-365-copilot")) throw new Error("This provider is prohibited in the selected compartment. No alternate recipe was substituted.");
+      if (!clientCatalog({ policy: s.policy, mode: s.mode, platform }).find(entry => entry.id === recipe.id).policyPermitsProvider) throw new Error("This provider is prohibited in the selected compartment. No alternate recipe was substituted.");
       return { recipe, providerAccountVerified: false, hostActionAuthorized: false, hostLaunchRequired: true, modelPromptSubmitted: false };
     }
   };

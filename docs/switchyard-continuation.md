@@ -199,9 +199,30 @@ or installed-app update occurred. Keep the newly pinned immutable review bundle
 and all prior review evidence. Next implementation: client recipe/launch controls,
 remaining observation/host-execution flows and native task attachment limitations.
 
+## Client frontend checkpoint
+
+Your tools now exposes five distinct documented client surfaces, authority-free
+recipe download, separate exact-destination launch review and retained outcomes.
+UI selection/workspace changes discard review; late results cannot populate a
+new workspace. Portal acceptance does not imply a verified account or exact task.
+Claude desktop's native launch remains unfinished and has no web fallback.
+
+The actual-HTTP UI regression caught Microsoft 365 advertised in Personal although
+its existing launch policy refused it. Catalog and recipe admission now agree with
+that policy; the original failure is retained. The final 12 groups pass 131 tests
+with one declared native Windows metadata skip. Five UI cases use real encrypted
+state/launch service with a synthetic portal and guardian. Eight running-preview
+checks pass; all real launches remain refused by the demonstration. Prior preview
+state was gracefully removed. No installed app/account/task action occurred.
+[Walkthrough](client-controls.md), [evidence](evidence/client-ui-source-summary.json).
+
+Continue remaining observation/host-execution frontend work, native attachment
+limitations and normal frontend installation with the required state preservation.
+Browser visual acceptance still fails before navigation; do not bypass its tools.
+
 ## Continue required product work
 
-Use the [requirement ledger](switchyard-requirements.md) as scope. Distinct client recipe controls, remaining observation/host-execution flows and native task attachment remain implementation work. The editor command registration and broader advertised firmware UI are now implemented; interactive acceptance is separate. Portability, controller and conversation backend paths have substantial coverage: identify the specific missing behavior before adding a subsystem. Additional Shield syntax is not a separate handover requirement and must not displace the required suite.
+Use the [requirement ledger](switchyard-requirements.md) as scope. Remaining observation/host-execution flows and native task attachment remain implementation work. Distinct client recipe/launch controls are now connected. The editor command registration and broader advertised firmware UI are now implemented; interactive acceptance is separate. Portability, controller and conversation backend paths have substantial coverage: identify the specific missing behavior before adding a subsystem. Additional Shield syntax is not a separate handover requirement and must not displace the required suite.
 
 Keep unfinished software separate from checks requiring physical F77/B122 hardware, an approved Microsoft tenant, interactive Windows/UAC/guest access, a live microphone or approved native task/account operations. A synthetic provider or installed metadata-only proof does not accept those external behaviors.
 

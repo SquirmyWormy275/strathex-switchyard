@@ -42,6 +42,8 @@ test("client discovery keeps offline configuration useful and Work recipes canno
   const store = memoryStore(), service = createClientIntegrations({ store, platform: "linux" });
   const personal = await service.catalog("personal"), work = await service.catalog("work");
   assert.equal(personal.entries.every(e => e.capabilities.hostLaunchConnected === false && e.account === "not-verified" && e.session === "not-identified" && e.importedAuthority === false), true);
+  assert.equal(personal.entries.find(e => e.provider === "microsoft-365-copilot").policyPermitsProvider, false);
+  await assert.rejects(service.recipe("personal", { id: "microsoft-365-copilot-web" }), /prohibited/);
   assert.equal(work.entries.filter(e => e.policyPermitsProvider).length, 1); assert.equal(work.entries.find(e => e.policyPermitsProvider).provider, "microsoft-365-copilot");
   assert.equal(work.entries.find(e => e.provider === "github-copilot").policyPermitsProvider, false);
   await assert.rejects(service.recipe("work", { id: "github-copilot-web" }), /prohibited/);
