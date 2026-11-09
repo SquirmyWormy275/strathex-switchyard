@@ -173,5 +173,14 @@
     "Browser visual/responsive inspection remains blocked by browser-control failure.",
     "Interaction cases use explicit native transport/namespace doubles; the separate demonstration uses an actual Linux program.",
     "Actual Windows guest, installed application update and live native task/account acceptance are separate."
-  ]
+  ],
+  "reviewBundle": {
+    "sourceCommit": "048cd10bae3db199d3cfc2edc1e9d7949143bc69",
+    "digest": "d5abd2fc0efd447a2e25d3b47ac4ec3afb8a61aa1ea21319112212395fee8dc0",
+    "assets": 29,
+    "allBytesVerified": true,
+    "priorPointerDatedBackupVerified": true,
+    "installed": false,
+    "visuallyAccepted": false
+  }
 }

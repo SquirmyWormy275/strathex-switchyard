@@ -257,6 +257,9 @@ remain separately tracked; the full Rev2 assignment is unfinished.
 
 ## Reviewed execution frontend checkpoint
 
+Source 048cd10bae3db199d3cfc2edc1e9d7949143bc69 has an immutable 29-asset frontend
+d5abd2fc0efd447a2e25d3b47ac4ec3afb8a61aa1ea21319112212395fee8dc0. All bytes and the prior dated pointer backup verify. It is not installed or visually accepted.
+
 Activity has a collapsed workbench for existing saved task permissions. The browser
 hashes a selected recipe, sends only its digest and exposes the backend's complete
 recipe, executable, input, isolation, budget and scanner review. Execution and exact
