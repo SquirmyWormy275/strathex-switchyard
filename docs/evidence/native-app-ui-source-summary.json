@@ -158,7 +158,7 @@
     "assets": 35,
     "gitBytesVerified": true,
     "priorPointerBackup": "native-app-20261109T042456Z",
-    "installed": false,
+    "installed": true,
     "visuallyAccepted": false
   },
   "installationRegression": {
@@ -177,5 +177,6 @@
     },
     "originalBoundsPreserved": true,
     "ownedCleanupComplete": true
-  }
+  },
+  "installedEvidence": "installed-native-app-controls-summary.json"
 }

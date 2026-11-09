@@ -22,13 +22,13 @@ Start with [current status](switchyard-status.md), the [requirement ledger](swit
 
 | Identity | Verified checkpoint |
 | --- | --- |
-| Source | `00fd64306593336d3589d6c3d335d29f33464341` |
-| Release | `bdbc8132faaf2de79e2633aa715e4440c129bae6f404374e19efa7769bfa80e3` |
-| Rollback | `4330746ca22b5544dd0257e646a129dfb2275ab6b325c5ec5f9c5b5bb727f99c` |
-| Frontend | `2159625c985e59a2291da1e3db4c98d80daa8a072b8c11d991fede5b5cbc2e51` |
+| Source | `f28f01c50aa66e91a55c30860581cc622d30c882` |
+| Release | `176cd53e10ea34c9a026a6689f2796081003033774ffb4cb05e703d6cb69700a` |
+| Rollback | `bdbc8132faaf2de79e2633aa715e4440c129bae6f404374e19efa7769bfa80e3` |
+| Frontend | `5ee9bf6f9398531d5d4d3bf337391e1e910ca113432099756648c4f7fac9604b` |
 
 The approved frontend is installed at the normal local address. All 35 served assets
-and four API metadata/refusal checks pass. Eight installed verifiers pass 100 checks
+and eight API metadata/refusal checks pass. Eight installed verifiers pass 100 checks
 with 58 exact module hashes; the workflow verifier checks all 57 definitions.
 All 54 semantic workspaces, Personal selection and the pending keyboard-only
 conversation remain intact. 53 sealed files are byte-identical; the remaining
@@ -36,12 +36,12 @@ workspace changes audit metadata only. No physical keyboard, native provider,
 account, model or microphone operation occurred.
 
 The normal update retained and verified dated launcher backups and current plus
-one rollback. The payload contains 570 files/4,980,769 bytes. Its exact prepared
-571-file/5,083,921-byte bundle is removed after identity/hash verification. The
+one rollback. The payload contains 570 files/4,994,052 bytes. Its exact prepared
+571-file/5,097,205-byte bundle is removed after identity/hash verification. The
 private access token intentionally changed with the frontend digest; use the normal
 launcher/new endpoint rather than restoring the old token. Host-facing owner,
 Copilot and signed-intent checks ran sequentially. Do not repeat executed update
-or cleanup scripts. [Installed evidence](evidence/installed-lifecycle-controls-summary.json).
+or cleanup scripts. [Installed evidence](evidence/installed-native-app-controls-summary.json).
 
 All original workspace modes and all three conversation records are preserved.
 Selected Personal was already in companion mode; the pending conversation lives
@@ -516,3 +516,14 @@ still unaccepted. Native signatures, processes/windows and helper transports in
 UI cases are explicit doubles. No live desktop, account, provider, task, HID or
 microphone action occurred. Claude desktop launch and exact interactive task
 attachment remain implementation work. Do not infer either from native app focus.
+
+Normal native-app-controls installation now passes at `f28f01c`, release
+`176cd53e`: 35 assets/eight passive metadata/refusal checks plus all eight installed
+verifiers/100 checks/58 exact modules. All 54 semantic workspaces, 57 workflows,
+three conversations, modes and Personal selection are preserved. Fifty-three sealed
+files are byte-identical; one changes audit metadata only. The exact prepared
+571-file/5,097,205-byte package is removed after identity/payload verification.
+The prior account/background release `bdbc8132` is the single rollback. Dated
+launcher backups and readback verify. No native focus or live provider/hardware
+action occurred. Do not rerun executed update/preflight/cleanup scripts.
+[Installed evidence](evidence/installed-native-app-controls-summary.json).

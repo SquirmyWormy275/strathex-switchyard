@@ -2180,3 +2180,23 @@ controlled clock proves the existing two-second deadline retains the original
 pending write and blocks replacement until it completes. Root cause and native
 package acceptance remain unresolved.
 [Native failure](evidence/native-focus-retirement-failure-summary.json).
+
+## Native app controls and installed readback
+
+The nine interaction cases in `native-focus-ui.test.mjs` exercise passive metadata,
+review/cancel, exact Linux target dispatch, Windows executable review/save, lost
+replies, changed bytes, two-Personal-workspace drift, helper retirement in
+keyboard-only mode and late workspace results. Six original groups pass 80 tests;
+five final groups pass 68 with overlap. Eighteen installation groups pass 29.
+Every original bound, skip count and cleanup is audited. The original missing-Work
+fixture and queued-close failures remain in the source evidence.
+
+The running synthetic preview passes eleven checks. Normal source `f28f01c`,
+release `176cd53e`, passes 43 served-asset/metadata/refusal checks and eight installed
+verifiers with 100 checks across 58 exact module hashes. All 54 semantic workspaces
+and 57 definitions remain intact. Dated launcher copies and current plus one
+rollback verify; the exact prepared package is removed. No desktop focus, native
+provider, account, hardware or microphone operation occurred. Browser visual
+acceptance, current full-platform acceptance, Claude desktop launch and exact
+interactive task attachment remain separate. [Source evidence](evidence/native-app-ui-source-summary.json),
+[installed evidence](evidence/installed-native-app-controls-summary.json).

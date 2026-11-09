@@ -119,7 +119,7 @@ native probe. A new workspace-bound focus route refuses stale reviews across two
 Personal workspaces as well as Work. Nine UI cases pass within six groups/80 tests;
 eleven running-preview checks pass. Original missing-Work-fixture and queued
 dialog-close failures remain retained. The corrected dialog ignores an old close
-event after reopening. Source, installation and visual acceptance remain distinct.
+event after reopening. Normal installation is verified below; visual acceptance remains separate.
 [Controls and exact evidence](native-app-controls.md).
 
 ## Current broader CI failures
@@ -143,18 +143,19 @@ tree and local reproduction are retained. No current full-platform pass is claim
 The normal installed application includes guided setup, portability, observation,
 keyboard/client controls, permissions/scanners/feeds/execution, saved design
 conversations, coding-task text/background controls and approved-work account/
-recovery controls at source `00fd643`,
-release `bdbc8132`. All 35 served asset hashes and four API checks pass; eight
+recovery controls plus exact native-app navigation at source `f28f01c`,
+release `176cd53e`. All 35 served asset hashes and eight API checks pass; eight
 installed verifiers pass 100 checks across 58 exact modules. All 54 semantic
 workspaces, 57 workflow definitions, modes, selection and conversation records
 remain intact. Fifty-three sealed files are byte-identical; one changes audit only.
 
-Dated launcher backups verify and the previous `4330746c` release is the single
-rollback. The 570-file payload is 4,980,769 bytes; its exact prepared copy
-(571 files/5,083,921 bytes) is removed after identity/hash verification. No live
+Dated launcher backups verify and the previous `bdbc8132` release is the single
+rollback. The 570-file payload is 4,994,052 bytes; its exact prepared copy
+(571 files/5,097,205 bytes) is removed after identity/hash verification. No live
 account/task/model or hardware operation occurred. Visual acceptance remains
-blocked before browser inspection. [Exact installed evidence](evidence/installed-lifecycle-controls-summary.json).
-Earlier [34-asset](evidence/installed-task-controls-summary.json),
+blocked before browser inspection. [Exact installed evidence](evidence/installed-native-app-controls-summary.json).
+Earlier [account/background controls](evidence/installed-lifecycle-controls-summary.json),
+[34-asset](evidence/installed-task-controls-summary.json),
 [32-asset](evidence/installed-scanner-controls-summary.json) and
 [28-asset](evidence/installed-frontend-controls-summary.json) evidence is retained.
 

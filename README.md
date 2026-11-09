@@ -83,14 +83,14 @@ execution, offline repository scans and recoverable installation. The Home and
 Model F catalog provide the starting experience; complete task/IDE attachment,
 broader observation sources and full scanner coverage remain unfinished.
 
-The installed application at `00fd643` includes guided setup, portable profiles,
+The installed application at `f28f01c` includes guided setup, portable profiles,
 observation-assisted design, advertised keyboard controls and distinct client
 recipes, plus task permissions, scanner setup, signed feeds and reviewed execution.
 Saved design conversations, coding-task text/background controls and approved-work
-account/recovery controls are connected. Its 35 served asset hashes, four API checks and 100 metadata/refusal
+account/recovery and exact native-app navigation controls are connected. Its 35 served asset hashes, eight API checks and 100 metadata/refusal
 checks pass; all 54 semantic workspaces and 57 workflows are preserved.
 Browser visual/interactive acceptance remains blocked and is not inferred from
-HTTP tests. [Installed evidence](docs/evidence/installed-lifecycle-controls-summary.json).
+HTTP tests. [Installed evidence](docs/evidence/installed-native-app-controls-summary.json).
 
 Complete Linux `9266c12` passes **356 groups / 2,333 tests**, with 32 declared
 skips. It covers that earlier source, including exact Claude version admission
