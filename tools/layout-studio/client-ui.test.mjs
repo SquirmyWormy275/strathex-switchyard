@@ -16,7 +16,9 @@ async function fixture(fn, effect) {
     const { mountClients } = await import("./client-ui.mjs"), downloads = [], notices = [];
     mountClients({ notify: text => notices.push(text), download: (...args) => downloads.push(args) }); const before = await c.store.snapshot("personal"); await c.refresh(); await until(() => c.$("client-picker").options.length === 5);
     await fn({ ...c, before, downloads, notices, effects: () => calls });
-  }, { clientLaunch });
+  // This fixture exercises the Linux portal double on every host. Keep the
+  // catalog on that same explicit platform instead of mixing in Windows facts.
+  }, { clientLaunch, platform: "linux" });
 }
 async function review(c) { c.click("review-client-launch"); await until(() => c.$("client-review-dialog").open && !c.$("confirm-client-launch").disabled); }
 

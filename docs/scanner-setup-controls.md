@@ -13,7 +13,7 @@ to its exact text and hash. **Technical details and verification hashes** retain
 the complete preparation metadata and proposed permission scope; it starts closed.
 Cancelling or changing the form/workspace clears both views and the approval.
 [Readable-review and clearing regressions](evidence/scanner-review-readable-source-summary.json)
-pass 58 checks across five original integration groups. Normal installed **167df7b** passes 45 served/state/presentation checks and 123
+pass 58 checks across five original integration groups. Normal installed **167df7b** passes 45 served/state/presentation checks and 126
 metadata checks. Prepared staging is removed; visual acceptance remains separate.
 [Installed receipt](evidence/installed-desktop-host-summary.json).
 

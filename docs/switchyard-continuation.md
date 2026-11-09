@@ -116,6 +116,15 @@ correction acceptance awaits normal branch-push follow-up; do not manually retry
 cancel or expand deadlines. [Failure/correction](evidence/windows-bootstrap-contention-summary.json).
 Preserve earlier intermittent focus, shortcut and host-action failures in status.
 
+Native **167df7b** worker 9, job **129170296960**, failed the Linux host-label
+assertion in `client-ui.test.mjs`: the portable Linux portal double was paired
+with the actual Windows catalog. Its 20-group receipt is audited (19 pass), with
+unchanged bounds and exact cleanup. Private receipt:
+**native-167df7b-worker9-original.json**. The fixture now selects `platform: linux`
+for both ports; no production branch or assertion changed. Two local groups pass
+24 checks. Normal-push native follow-up is pending.
+[Evidence](evidence/client-platform-fixture-summary.json).
+
 ## Demonstration and acceptance limits
 
 The installed app runs at **http://127.0.0.1:43177/**. Its normal launcher supplies
@@ -126,6 +135,8 @@ documentation and retrying did not restore inspection. Native app inventory is
 empty. No browser graphical acceptance is claimed. Do not re-ask the user to
 change Brave settings; this error occurs in the tool before page inspection.
 The unrelated NIGHTWIRE tab is untouched.
+The supported in-app browser alternative is unavailable (`Browser is not
+available: iab`); it did not create a review tab. No bypass was used.
 
 An older synthetic preview runs at **http://127.0.0.1:34713**, source **dfa40fb**.
 Its private link is in the original local receipt. Nine checks establish the

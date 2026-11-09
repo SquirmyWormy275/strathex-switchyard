@@ -122,6 +122,14 @@ production bootstrap behavior are unchanged. Two local harness groups pass 32
 checks; actual native acceptance is pending.
 [Original failure and correction](evidence/windows-bootstrap-contention-summary.json).
 
+The native **167df7b** worker 9 also exposed a UI test platform mismatch: its
+Linux portal double used the Windows catalog, so the Linux host label assertion
+failed. All 20 original worker groups and cleanup are audited; 19 passed. The
+fixture now selects the same explicit Linux platform for both ports, retaining
+every assertion. Two original local groups pass 24 checks. Native follow-up and
+the complete cohort remain separate.
+[Failure and fixture correction](evidence/client-platform-fixture-summary.json).
+
 ## Remaining implementation and defects
 
 - Bounded historical-name discovery is implemented and normally installed. Its
