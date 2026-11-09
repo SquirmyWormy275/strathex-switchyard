@@ -10,9 +10,9 @@ for work that remains.
 
 | Scope | Source | Accepted result and limits |
 | --- | --- | --- |
-| Complete Linux source | `72e7c22` | 376 groups, 2,574 passes, 32 declared skips. Original commands, bounds, serial order and owned-tree cleanup audited. [Receipt](evidence/linux-72e7c22-complete-summary.json). |
+| Complete Linux source | `a7958c4` | 376 groups, 2,578 passes, 32 declared skips. Original commands, bounds, serial order and owned-tree cleanup audited. [Receipt](evidence/linux-a7958c4-complete-summary.json). |
 | Later legacy history account checks | `7317371` | Three regressions reproduced the omission; 13 integration groups pass 139 tests/one existing skip. Separate package and type checks pass. [Evidence](evidence/codex-legacy-read-account-summary.json). |
-| Installed Linux application | `2fb81bc` | 44 served/installation/API/state/presentation and 123 metadata checks, 65 exact module hashes. 54 workspace definitions and three conversations preserved; Personal has only the expected shutdown revocation increment. [Receipt](evidence/installed-scanner-readable-summary.json). |
+| Installed Linux application | `9b80f77` | 44 served/installation/API/state/presentation and 123 metadata checks, 65 exact module hashes. 54 workspace definitions and three conversations preserved; Personal has only the expected shutdown revocation increment. [Receipt](evidence/installed-review-context-summary.json). |
 | Installed pilot editor extension | `42655aa` | 53 exact payload hashes and eight module checks. Actual graphical activation remains unaccepted. [Receipt](evidence/installed-editor-terminal-summary.json). |
 | Real Codex 0.167 terminal | `42655aa` | Synthetic saved history rendered through the production relay, including paginated older history. No model prompt or live task. [Contract](codex-terminal-compatibility.md). |
 | Audited Windows client | `3222727` | 31 groups, 362 passes, zero skips. Includes retained legacy-history account regressions; predates the lease-input correction. [Evidence](evidence/native-client-3222727-summary.json). |
@@ -29,12 +29,11 @@ The later historical-name discovery passes ten integration groups/80 tests/one
 existing skip and eighteen package/installation groups/26 tests, with typecheck.
 The native follow-up is included in the complete a7958c4 source result above.
 The newer readable-review frontend has 58 integration passes, 26 package checks
-and eight verifier guards; normal installed checks are recorded above. A full
-Linux run at a7958c4 remains active and does not yet establish acceptance.
+and eight verifier guards; normal installed checks are recorded above. The complete Linux a7958c4 run is accepted above and its temporary checkout is removed.
 [Discovery evidence](evidence/history-path-discovery-source-summary.json).
 
-Counts from overlapping runs must not be added. The complete Linux result predates
-the later account-read correction. The installed app, extension and synthetic
+Counts from overlapping runs must not be added. The complete Linux result includes the account-read correction and predates
+the later frontend changes. The installed app, extension and synthetic
 preview have separate source identities.
 
 ## Run the platform checks

@@ -9,7 +9,7 @@ entry point, evidence and remaining work. A hardware/account check does not excu
 unfinished independent software. Read [current status](switchyard-status.md) for
 accepted checkpoints and [verification](verification.md) for reproducible checks.
 
-Installed Linux source `2fb81bc` includes the 36-asset guided frontend, permissions,
+Installed Linux source `9b80f77` includes the 36-asset guided frontend, permissions,
 scanner setup, signed-feed maintenance, reviewed execution, saved design
 conversations, coding-task text/background controls and approved-work account/
 recovery, exact native-app navigation, agent maintenance, saved voice notes,
@@ -17,9 +17,9 @@ transcript import, Claude hook setup and direct client-to-native setup navigatio
 hashes, eight installation/API/state/presentation checks and 123 metadata/refusal checks across 65 exact modules
 pass. All 54 workspace definitions and 57 workflows remain intact; 53 semantic
 snapshots match exactly and Personal differs only by its expected shutdown
-permission-revocation counter increment from 78 to 79.
+permission-revocation counter increment from 79 to 80.
 Current plus one rollback remain and the prepared package is removed.
-[Installed evidence](evidence/installed-scanner-readable-summary.json).
+[Installed evidence](evidence/installed-review-context-summary.json).
 Reviewed role dispatch carries the active and persisted workspace identity;
 the current synthetic running demonstration verifies acknowledgement and stale
 selection refusal. [Demonstration](evidence/claude-launch-running-demo-summary.json).

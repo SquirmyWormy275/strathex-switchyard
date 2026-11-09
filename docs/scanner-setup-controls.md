@@ -13,9 +13,9 @@ to its exact text and hash. **Technical details and verification hashes** retain
 the complete preparation metadata and proposed permission scope; it starts closed.
 Cancelling or changing the form/workspace clears both views and the approval.
 [Readable-review and clearing regressions](evidence/scanner-review-readable-source-summary.json)
-pass 58 checks across five original integration groups. Normal installed **2fb81bc** passes 44 served/state/presentation checks and 123
+pass 58 checks across five original integration groups. Normal installed **9b80f77** passes 44 served/state/presentation checks and 123
 metadata checks. Prepared staging is removed; visual acceptance remains separate.
-[Installed receipt](evidence/installed-scanner-readable-summary.json).
+[Installed receipt](evidence/installed-review-context-summary.json).
 
 Bounded history review also lists names found in older inspected commits but
 absent from the selected HEAD and outside the selected history inputs. Up to 64

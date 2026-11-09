@@ -27,23 +27,23 @@ The [requirement ledger](switchyard-requirements.md) tracks the wider scope;
 
 ## Installed checkpoint
 
-The app uses source **2fb81bc**; the pilot VS Code extension remains at **42655aa**.
+The app uses source **9b80f77**; the pilot VS Code extension remains at **42655aa**.
 The app release is
-`f609168aee5ff3796d9d3ad44e80d27db8c21041d8dacc921f243e35891bfe72`;
-the frontend is `42bb51b8db85`. Current plus one app rollback remain.
+`ef51ea8dbe2e8784ff5a5202cbecea3164b8e957e3a585e1046acc769a541702`;
+the frontend is `4fe51fece3b7`. Current plus one app rollback remain.
 
 - All 36 served assets and eight installation/API/state/presentation readbacks pass.
 - Nine installed verifiers pass 123 checks across 65 exact module hashes.
 - All 54 workspace definitions, 57 workflows, Personal selection and three
   conversations are preserved, including the pending keyboard-only record.
   53 semantic snapshots match exactly; Personal differs only by its expected
-  shutdown task-permission revocation counter, 78 → 79.
+  shutdown task-permission revocation counter, 79 → 80.
 - The extension's 53 payload files and eight installed module checks pass.
   Actual graphical editor activation remains unaccepted.
 - Dated launcher/editor backups verify. The latest prepared app package of
-  5,188,326 bytes is removed; previous prepared editor staging was already removed.
+  5,190,127 bytes is removed; previous prepared editor staging was already removed.
 
-[App receipt](evidence/installed-scanner-readable-summary.json),
+[App receipt](evidence/installed-review-context-summary.json),
 [editor receipt](evidence/installed-editor-terminal-summary.json).
 
 ## Verification belongs to a source
@@ -99,11 +99,12 @@ The synthetic running preview is separately proven at `dfa40fb`: nine checks
 cover served assets, a named role, signed acknowledgement and stale-workspace
 refusal. [Demonstration receipt](evidence/batched-inspection-running-demo-summary.json).
 
-The next frontend checkpoint clears cancelled and invalidated review context
+The installed frontend checkpoint clears cancelled and invalidated review context
 across app launch, execution, device, profile, shortcut and role controls. Eight
 regressions reproduce the original stale content; 12 original groups pass 103
 checks with no skips. The first handoff fixture failure is retained separately.
-This source still needs its immutable frontend pin and normal installed update.
+The immutable frontend pin and normal installation are complete; all 36 served
+assets match and the prepared package is removed.
 [Evidence](evidence/review-context-source-summary.json).
 
 ## Remaining implementation and defects

@@ -39,44 +39,29 @@ No merge, public release or visibility change is authorized.
   page loading. Do not use shell/CDP/Playwright outside CUA to bypass this or change
   Brave protections. The user's unrelated NIGHTWIRE tab stays untouched.
 
-## Current checkpoint — readable scanner review installed
+## Current installed checkpoint — review context cleared
 
-Published source **df1edce9785ac8a54a25c13908c645aa53f8fd3e** replaces the initial
-scanner-review JSON dump with readable paths/scope and expandable exact metadata.
-Two red regressions confirm stale hidden metadata after cancellation and workspace
-change; five original integration groups now pass **58 tests**, zero skips.
-Immutable frontend pin **2fb81bc345b6fab85838672b1c054a74c5fa0233** is published
-and normally installed as release
-**f609168aee5ff3796d9d3ad44e80d27db8c21041d8dacc921f243e35891bfe72**,
-frontend **42bb51b8db8592fb10939b078ca39a2122624e87e9fd3ea3b5766fe8c827e09b**.
-Rollback is **3714ac7e4798230b85eee7dbe94ea67e28665303d0b0ce392faf236f8f6bf970**.
+Published source **a97ebe8504cfea30ff1d729470994c4633ca5169** clears stale review
+context; immutable frontend pin **9b80f77d345f6c531f10487a4c07b83b6cc64fa6** is
+normally installed. Release:
+**ef51ea8dbe2e8784ff5a5202cbecea3164b8e957e3a585e1046acc769a541702**.
+Frontend: **4fe51fece3b7c3034a8d0a2130030096b081a5149270648f52373a638ae413ba**.
+Rollback: **f609168aee5ff3796d9d3ad44e80d27db8c21041d8dacc921f243e35891bfe72**.
 
 All **44 served/installation/API/state/presentation checks** and **123 metadata
 checks / 65 exact module hashes** pass. All 54 workspace definitions, 57 workflows,
 modes, selection, three conversations and the pending keyboard-only record remain.
-53 semantic snapshots match exactly. Personal differs only by its expected
-original-owner shutdown permission-revocation counter **78 → 79**, independently
-verified against the exact pre-update hash and one original shutdown audit event.
-Do not restore that counter. The first strict readback correctly refused this
-difference; the final receipt records it explicitly, not as full semantic equality.
-One concise console line retained an incorrect equality boolean; both private and
-public full receipts correctly record the exception.
+53 semantic snapshots match exactly. Personal differs only by its verified
+original-owner shutdown permission-revocation counter **79 → 80**. Do not restore
+that counter or report full semantic equality. Nine installed verifiers pass on
+their first attempt. Eighteen original package groups pass 26 tests, zero skips.
 
-The old Home hash caused one task-owner metadata verifier failure. Both Home
-verifiers now pin the tested readable-review page; all original assertions remain.
-An in-memory formatter fixture initially lacked browser globals; explicit no-I/O
-globals corrected it without changing the installed module. All original failures
-remain recorded. Eighteen package/installation groups pass 26 tests; eight verifier
-guards pass. Their original receipts are privately copied and duplicate checkout
-receipts removed. Source and installed receipts:
-[readable review](evidence/scanner-review-readable-source-summary.json),
-[installed result](evidence/installed-scanner-readable-summary.json).
-
-The normal dated backup is **2026-11-09T12-15-08.289Z-05d655c8-7e63-4e38-a9ae-0e6d5cb77df3**.
-All **576 prepared files / 5,188,326 bytes** are removed after exact ownership/hash
+The dated backup is **2026-11-09T12-34-31.738Z-480200ec-183c-4e72-aff4-c4d768b43d93**.
+All **576 prepared files / 5,190,127 bytes** are removed after exact ownership/hash
 and independent installed-payload verification. Current plus one rollback remain.
-Private receipts use **scanner-readable-**. **Do not replay install or cleanup.**
+Private receipts use **review-context-**. **Do not replay install or cleanup.**
 The new frontend rotates local access; the normal launcher obtains the fresh link.
+[Installed result](evidence/installed-review-context-summary.json).
 
 ## Complete Linux verification — audited and removed
 
@@ -89,7 +74,7 @@ parent, nine aliases and **806 generated files / 12,507,506 bytes** are removed;
 all three original worktrees remain. Do not replay setup, audit or cleanup.
 [Complete Linux evidence](evidence/linux-a7958c4-complete-summary.json).
 
-## Next frontend checkpoint — source verified
+## Review-context source verification
 
 Cancelled and invalidated app, native-app, execution, device, portable profile,
 shortcut, role and agent-maintenance reviews now clear their displayed context.
@@ -100,9 +85,8 @@ is retained separately from the corrected regression. Private receipts use
 **review-context-**; all duplicate checkout receipts are removed.
 [Source evidence](evidence/review-context-source-summary.json).
 
-Pin this tested source in the immutable 36-asset frontend, run original package
-checks, then normally update the installed app with a dated backup and exact
-state readback. The currently installed 2fb81bc update above is already complete.
+The immutable 36-asset pin, package checks, normal update and cleanup are complete
+as recorded above. No reinstallation is needed for evidence-only edits.
 
 ## Latest complete Windows acceptance
 
@@ -305,7 +289,7 @@ focus is not task attachment.
 ## Continue independent work
 
 1. Complete a7958c4 Linux/Windows source audits and Linux cleanup are finished.
-   Finish the new review-context frontend pin, package checks and normal update.
+   The review-context frontend pin, package checks, normal update and cleanup are complete.
 2. Historical-name discovery is installed and staging cleanup is complete.
    Its complete native Windows acceptance is recorded above. Continue the new
    frontend's normal-push follow-up and actual UI acceptance when the supported
