@@ -100,5 +100,14 @@
     "htmlIdsUnique": 386,
     "feedIdsPresent": 21,
     "localLinksVerified": 92
+  },
+  "reviewBundle": {
+    "sourceCommit": "af0bc2c489ba515756e6532be9b13a79903b4ed2",
+    "digest": "82309a37b568526dcf3f64d1ab0e4d9b6d2ffaa61eaf63e4da101911b4cadd67",
+    "assets": 32,
+    "allBytesVerified": true,
+    "priorPointerDatedBackupVerified": true,
+    "installed": false,
+    "visuallyAccepted": false
   }
 }

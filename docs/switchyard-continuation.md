@@ -363,7 +363,8 @@ and cleanup. Seven live-preview checks pass. The old owned preview exits and its
 exact state is removed. No real key/feed/account/device is enrolled or used.
 [Controls](feed-maintenance-controls.md), [evidence](evidence/feed-ui-source-summary.json).
 
-The immutable feed frontend source and digest are pinned in the next checkpoint.
+Source af0bc2c489ba515756e6532be9b13a79903b4ed2 has an immutable 32-asset frontend
+82309a37b568526dcf3f64d1ab0e4d9b6d2ffaa61eaf63e4da101911b4cadd67. All bytes and the prior dated pointer backup verify. It is not installed or visually accepted.
 The normal installation remains the accepted `47143a9f`/28-asset release.
 Continue remaining account/task frontend controls, exact native attachment
 limitations and normal installed/frontend verification. Browser tooling remains
