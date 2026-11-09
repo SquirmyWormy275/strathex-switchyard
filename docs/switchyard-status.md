@@ -96,21 +96,21 @@ tree and local reproduction are retained. No current full-platform pass is claim
 
 ## Installed frontend verification
 
-The normal installed application now contains guided setup, portability,
-observation, keyboard and distinct-client controls, plus task permissions,
-scanner setup, signed feeds and reviewed execution at source `1b00198`, release
-`db142f7c`. All 32 frontend asset hashes and four API checks pass; eight metadata
-verifiers pass 100 checks. All 54 semantic workspaces, 57 workflow definitions,
-selection and the pending keyboard-only conversation are preserved. Dated launcher
-backups and one rollback verify; the temporary prepared package is removed.
-The original stale verifier failures remain recorded. No live hardware or native
-account/task operation was used, and browser visual acceptance remains blocked.
-[Exact installed evidence](evidence/installed-scanner-controls-summary.json).
-The 567-file payload retains the prior `47143a9f` release as its single rollback.
-Its exact prepared copy (568 files/5,038,815 bytes) is removed after identity and
-hash verification. All original workspace modes and conversation records remain
-intact; selected Personal was already in companion mode before this update.
-The earlier 28-asset installation remains [historical evidence](evidence/installed-frontend-controls-summary.json).
+The normal installed application includes guided setup, portability, observation,
+keyboard/client controls, permissions/scanners/feeds/execution, saved design
+conversations and dedicated coding-task text controls at source `cf6a94a`,
+release `4330746c`. All 34 served asset hashes and four API checks pass; eight
+installed verifiers pass 100 checks across 58 exact modules. All 54 semantic
+workspaces, 57 workflow definitions, modes, selection and conversation records
+remain intact. Fifty-three sealed files are byte-identical; one changes audit only.
+
+Dated launcher backups verify and the previous `db142f7c` release is the single
+rollback. The 569-file payload is 4,964,724 bytes; its exact prepared copy
+(570 files/5,067,650 bytes) is removed after identity/hash verification. No live
+account/task/model or hardware operation occurred. Visual acceptance remains
+blocked before browser inspection. [Exact installed evidence](evidence/installed-task-controls-summary.json).
+Earlier [32-asset](evidence/installed-scanner-controls-summary.json) and
+[28-asset](evidence/installed-frontend-controls-summary.json) evidence is retained.
 
 ## A working backend journey
 

@@ -22,12 +22,12 @@ Start with [current status](switchyard-status.md), the [requirement ledger](swit
 
 | Identity | Verified checkpoint |
 | --- | --- |
-| Source | `1b00198c71ef41d85995d3d974e104fa7859c613` |
-| Release | `db142f7c6fa6d2717856d709d739135bfd6cf04ddeb2dca2e8c4f500196ff916` |
-| Rollback | `47143a9fa5de873a1d6f10bc738ef5c703be64af15727eb8e31ffddfa629ffc7` |
-| Frontend | `82309a37b568526dcf3f64d1ab0e4d9b6d2ffaa61eaf63e4da101911b4cadd67` |
+| Source | `cf6a94a7359847addf3209b04dd8ca3f2370a2b6` |
+| Release | `4330746ca22b5544dd0257e646a129dfb2275ab6b325c5ec5f9c5b5bb727f99c` |
+| Rollback | `db142f7c6fa6d2717856d709d739135bfd6cf04ddeb2dca2e8c4f500196ff916` |
+| Frontend | `f96ce01b96b12459fd39b89eca9e16ca826177eab8e749467d73584f48ac45c8` |
 
-The approved frontend is installed at the normal local address. All 32 served assets
+The approved frontend is installed at the normal local address. All 34 served assets
 and four API metadata/refusal checks pass. Eight installed verifiers pass 100 checks
 with 58 exact module hashes; the workflow verifier checks all 57 definitions.
 All 54 semantic workspaces, Personal selection and the pending keyboard-only
@@ -36,12 +36,12 @@ workspace changes audit metadata only. No physical keyboard, native provider,
 account, model or microphone operation occurred.
 
 The normal update retained and verified dated launcher backups and current plus
-one rollback. The payload contains 567 files/4,936,344 bytes. Its exact prepared
-568-file/5,038,815-byte bundle is removed after identity/hash verification. The
+one rollback. The payload contains 569 files/4,964,724 bytes. Its exact prepared
+570-file/5,067,650-byte bundle is removed after identity/hash verification. The
 private access token intentionally changed with the frontend digest; use the normal
 launcher/new endpoint rather than restoring the old token. Host-facing owner,
 Copilot and signed-intent checks ran sequentially. Do not repeat executed update
-or cleanup scripts. [Installed evidence](evidence/installed-scanner-controls-summary.json).
+or cleanup scripts. [Installed evidence](evidence/installed-task-controls-summary.json).
 
 All original workspace modes and all three conversation records are preserved.
 Selected Personal was already in companion mode; the pending conversation lives
@@ -256,7 +256,8 @@ Publish tested source and evidence regularly. Retain original failures and front
 
 ## Next implementation work
 
-The installed checkpoint includes guided controls, scanner setup and feed trust.
+The installed checkpoint includes guided controls, scanner setup, feed trust,
+saved design conversations and dedicated coding-task text controls.
 Continue remaining background-task controls, account integration recovery and native attachment limitations. Native exact-task
 attachment, interactive IDE, browser visual review and hardware/account acceptance
 remain separately tracked; the full Rev2 assignment is unfinished.
@@ -431,3 +432,9 @@ live native acceptance or the blocked visual review.
 
 Task UI source 1c144fed61f750e4fd3171d6bfe0081d60d56be3 has an immutable 34-asset frontend
 f96ce01b96b12459fd39b89eca9e16ca826177eab8e749467d73584f48ac45c8. All bytes and the dated prior-pointer backup verify. Installed adoption and browser visual acceptance remain separate.
+
+Normal installation of `cf6a94a` now verifies the 34-asset task frontend at release
+`4330746c`: 38 served/metadata checks plus 100 installed checks, 54 semantic
+workspaces and all modes/conversations/selection preserved. Dated backups and
+one rollback verify; the exact 570-file prepared package is removed.
+[Installed evidence](evidence/installed-task-controls-summary.json).
