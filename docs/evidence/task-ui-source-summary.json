@@ -1,0 +1,129 @@
+{
+  "schema": "switchyard-task-ui-source-evidence/v1",
+  "scope": "Dedicated native text task creation/reservation, exact-session binding, reviewed text, cancellation, retained results and deliberate uncertainty/recovery controls",
+  "runs": [
+    {
+      "receiptId": "afe382ec-3272-41bc-9b17-dcd85e8ccd37",
+      "sha256": "7c858429b4b34ce81d11ce282c963db4b3d33a20f4e88129d545a1808162aff4",
+      "success": false,
+      "totals": {
+        "required": 8,
+        "passed": 7,
+        "failed": 1,
+        "tests": 100,
+        "passedTests": 98,
+        "failedTests": 2,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "files": [
+        "scripts/windows-complete-shards.test.mjs",
+        "deployment/suite/release.test.mjs",
+        "tools/layout-studio/conversation-ui.test.mjs",
+        "tools/layout-studio/task-ui.test.mjs",
+        "tools/layout-studio/coding-sessions.test.mjs",
+        "tools/layout-studio/codex-submissions.test.mjs",
+        "tools/layout-studio/claude-submissions.test.mjs",
+        "tools/layout-studio/claude-coding.test.mjs"
+      ],
+      "originalBoundsPreserved": true,
+      "ownedCleanupComplete": true
+    },
+    {
+      "receiptId": "cd39c05f-b0c8-4eef-94d4-6d6c271baef5",
+      "sha256": "2db5fcb80dab2e9f66e0e6b835da5f50c7131ae6219a79d3be3a4223ebc899c0",
+      "success": true,
+      "totals": {
+        "required": 8,
+        "passed": 8,
+        "failed": 0,
+        "tests": 102,
+        "passedTests": 102,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "files": [
+        "scripts/windows-complete-shards.test.mjs",
+        "deployment/suite/release.test.mjs",
+        "tools/layout-studio/conversation-ui.test.mjs",
+        "tools/layout-studio/task-ui.test.mjs",
+        "tools/layout-studio/coding-sessions.test.mjs",
+        "tools/layout-studio/codex-submissions.test.mjs",
+        "tools/layout-studio/claude-submissions.test.mjs",
+        "tools/layout-studio/claude-coding.test.mjs"
+      ],
+      "originalBoundsPreserved": true,
+      "ownedCleanupComplete": true
+    },
+    {
+      "receiptId": "983867cc-5757-4caf-8d40-2ef0e93d1e7a",
+      "sha256": "12eb40a2dfa249a9bc8cd6bd7abbdef6b5c72e933f889d44094cd649892a14e7",
+      "success": true,
+      "totals": {
+        "required": 6,
+        "passed": 6,
+        "failed": 0,
+        "tests": 65,
+        "passedTests": 65,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "files": [
+        "scripts/windows-backend-shards.test.mjs",
+        "scripts/run-isolated-tests.test.mjs",
+        "tools/layout-studio/execution-ui.test.mjs",
+        "tools/layout-studio/authority-ui.test.mjs",
+        "tools/layout-studio/conversation-ui.test.mjs",
+        "tools/layout-studio/task-ui.test.mjs"
+      ],
+      "originalBoundsPreserved": true,
+      "ownedCleanupComplete": true
+    }
+  ],
+  "interactionCases": 11,
+  "overlap": "Eight original groups pass 102 tests; six final groups pass 65 with overlap after adding keyboard-only outcome review. Do not sum these as distinct tests.",
+  "sourceFiles": {
+    "tools/layout-studio/task-ui.mjs": "90c7655a0b4492eac7b07b4945673577277a1fc3b43f354fc91adf0dc54a7693",
+    "tools/layout-studio/task-ui.test.mjs": "ef355eda652e54a1e69ae83eb3f30d1aede23903bba52d23baa1809d3d6000a7",
+    "tools/layout-studio/connection.mjs": "8f4f2a7eff136667c4e3666ffb5a93c4056daac2df2a16246af1a6fd915c86cb",
+    "tools/layout-studio/suite-ui.mjs": "8f2b44476598d33054490c31b30b037b1dd75fd4a1ece6a2fa644695f21afadb",
+    "tools/layout-studio/index.html": "1c9f30249fc2589a5bb63f61b2658872bb9cc34d0d83d8df84f2cc3c14588f37",
+    "tools/layout-studio/serve.mjs": "aa1e510b0f8129a6ac4ce4cf8c3cdded90d60598d15bb3d620ca308523278c9d",
+    "deployment/suite/release.mjs": "f1b28fd9c509602ccc7b1760364d6293e813c0579b388d7412d50ad353bd6ad0",
+    "scripts/run-isolated-tests.mjs": "ed85e651a1aaffd211385b740f2584c7aa41113e6ac392ebb3205574e0e128bd",
+    "scripts/demo-switchyard-ui.mjs": "26273b354ebeed43228b9425058ea38cbf258de2ab2734c9e23aa153fbaea535"
+  },
+  "livePreview": {
+    "checks": [
+      "exact served task-ui.mjs",
+      "exact served connection.mjs",
+      "exact served suite-ui.mjs",
+      "exact served index.html",
+      "synthetic reserved task is readable without native identity or provider authority",
+      "demo refuses coding/codex/create",
+      "demo refuses coding/claude/text/create",
+      "demo refuses coding/codex/bind",
+      "demo refuses coding/codex/turns/review",
+      "demo refuses coding/claude/turns/submit",
+      "demo refuses coding/claude/turns/recovery/submit"
+    ],
+    "synthetic": true,
+    "modelRequests": 0,
+    "hardwareOpened": false
+  },
+  "originalFailures": "The first run records 98 passes and two fixture assertions that assumed uninitialized codingSessions/codingTurns collections existed. Corrected those assertions to require the actual absent collections after cancellation/refusal. No production behavior, assertion of effects, child deadline or skip changed.",
+  "clientWait": "New text-submit and resume-only text-submit routes use the same 130-second browser response wait as design messages, accommodating the existing 120-second native turn limit. Metadata requests retain 15 seconds. Native limits, test deadlines and cancellation ownership are unchanged.",
+  "limitations": [
+    "Native account/task transports are explicit doubles. HTTP, encrypted stores, actual directory identity, creation/binding service and durable reviewed-text lifecycle are real. Original production Codex/Claude adapter groups are included separately.",
+    "No real account, task creation/resume, model request, native terminal attachment, hardware or microphone operation occurred.",
+    "Browser visual and responsive acceptance remain blocked before inspection.",
+    "Current complete Linux/Windows and the retained native host-action failure remain separate.",
+    "Claude owned background-session launch/stop and interactive exact-task attachment are not provided by these dedicated-text controls.",
+    "Installed adoption is separate from this source checkpoint."
+  ]
+}

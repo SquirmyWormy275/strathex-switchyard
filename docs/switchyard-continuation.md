@@ -257,7 +257,7 @@ Publish tested source and evidence regularly. Retain original failures and front
 ## Next implementation work
 
 The installed checkpoint includes guided controls, scanner setup and feed trust.
-Continue coding-task creation/text frontend controls and native attachment limitations. Native exact-task
+Continue remaining background-task controls, account integration recovery and native attachment limitations. Native exact-task
 attachment, interactive IDE, browser visual review and hardware/account acceptance
 remain separately tracked; the full Rev2 assignment is unfinished.
 
@@ -400,3 +400,31 @@ suite remains unfinished. Do not confuse UI source with the installed checkpoint
 
 Conversation source 9bb9fffc35fe083912f9fdd09f5a995b52c45848 has an immutable 33-asset frontend
 9e54d5d38129a4c75b47a3f0b1b0a6e03487004059d7170bd971a1b67677b8fd. All bytes and the dated prior-pointer backup verify. This newer source is not yet the installed release or visually accepted.
+
+
+## Dedicated coding-task controls
+
+Your tools now connects dedicated Codex/Claude text creation/reservation, exact
+existing-session binding, metadata status, one-use reviewed text, in-flight
+cancellation, retained replies and deliberate outcome/recovery/deletion. Creation
+and binding have separate concrete local confirmation; native account/root checks
+occur on apply. Claude reserves an explicitly unverified requested identity until
+its first exact native reply. Existing external bindings retain their original
+runtime and do not acquire text authority.
+
+Eleven UI cases use actual HTTP, encrypted stores, directory identity and the
+protected creation/text lifecycle with explicit native transport doubles.
+Eight original groups pass 102 tests; six final groups pass 65 with overlap, zero
+skips and original child bounds/cleanup verified. The first two fixture failures
+expected empty collections instead of absent ones and are retained. Eleven live
+preview checks pass with synthetic history and all task effects refused.
+The old exact preview process and state are retired.
+[Walkthrough](coding-task-controls.md), [evidence](evidence/task-ui-source-summary.json).
+
+Text-submit routes now use the existing design-message browser wait of 130 seconds
+to accommodate the existing 120-second native turn contract; metadata stays at
+15 seconds. Native/test deadlines and cancellation identities are unchanged.
+No live account/task/model/hardware action occurred. Continue background-task
+controls, approved-work request recovery/account controls, exact attachment
+limitations and installed adoption. Do not equate synthetic transport proofs with
+live native acceptance or the blocked visual review.

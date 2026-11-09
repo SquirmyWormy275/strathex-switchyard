@@ -48,6 +48,8 @@ Copilot-only policy. Imported layouts never enable providers or recording.
   context, inspect native status and review an older account binding separately.
 - [Reviewed native coding text](docs/native-coding-tasks.md): follow an exact task,
   approve bounded text and recover an uncertain turn without automatic retry.
+- [Coding-task controls](docs/coding-task-controls.md): create a dedicated task,
+  review exact messages and inspect retained replies or uncertain outcomes.
 - [Microsoft work conversations](docs/copilot-request-recovery.md): keep the exact
   enrolled account and recover a lost reply without silently sending it again.
 - [Mediated repository effects](docs/mediated-repository-effects.md): follow a

@@ -21,7 +21,7 @@ export async function api(path, body, { selectedWorkspace = false } = {}) {
   const response = await fetch(path, {
     method: body === undefined ? "GET" : "POST",
     headers: { Authorization: `Bearer ${localStorage.getItem(credentialKey) ?? ""}`, ...(body === undefined ? {} : { "Content-Type": "application/json" }) },
-    ...(body === undefined ? {} : { body: JSON.stringify(selectedWorkspace ? body : { compartment: activeCompartment, ...body }) }), signal: AbortSignal.timeout(path.endsWith("/design") || path.endsWith("/voice/segment") ? 130000 : 15000)
+    ...(body === undefined ? {} : { body: JSON.stringify(selectedWorkspace ? body : { compartment: activeCompartment, ...body }) }), signal: AbortSignal.timeout(path.endsWith("/design") || path.endsWith("/voice/segment") || /^\/api\/suite\/coding\/(codex|claude)\/turns\/(recovery\/)?submit$/.test(path) ? 130000 : 15000)
   });
   const value = await response.json();
   if (!response.ok) throw new Error(value.error ?? "The local connection is unavailable.");

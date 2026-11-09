@@ -61,8 +61,6 @@ separate frontend controls. Scanner setup now reviews generated control files,
 saves them separately and hands their scope/recipe to those controls without
 implicit authority or execution. [Execution controls](reviewed-execution-controls.md).
 
-## Current broader CI failures
-
 Saved design conversations now have a local history picker, separate account
 binding review, explicit native status, destination-specific drafts and lost-reply
 handling. Eight original groups pass 73 tests; three final interaction groups pass
@@ -70,6 +68,17 @@ handling. Eight original groups pass 73 tests; three final interaction groups pa
 lane now uses 22 software workers plus assembly after the retained original
 20-worker workload check fails with the new group. Bounds and cases are unchanged.
 [Conversation controls and evidence](saved-conversation-controls.md).
+
+Your tools now connects dedicated Codex/Claude text tasks, exact existing-session
+binding, separate text review/send, cancellation, retained replies and deliberate
+uncertainty/recovery/deletion. Eleven interaction cases use real HTTP/encrypted
+state with explicit native transport doubles. Eight original groups pass 102
+tests; six final groups pass 65 with overlap. Eleven running-preview checks pass.
+The original two empty-collection fixture failures remain retained. Background
+task launch/stop and exact interactive attachment remain separate work.
+[Task controls and evidence](coding-task-controls.md).
+
+## Current broader CI failures
 
 The `ce89c78` Linux job and one Windows source worker fail the historical workload
 budget check as new frontend tests exceed the six-worker allowance. The source
