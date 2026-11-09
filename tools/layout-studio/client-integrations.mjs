@@ -9,6 +9,7 @@ export function createClientIntegrations({ store, platform = process.platform, h
         entries: [["native-chatgpt.focus/v1", "ChatGPT", "nativeWindowsChatgpt"], ["native-vscode.focus/v1", "VS Code", "nativeWindowsVscode"], ...(platform === "win32" ? [["native-claude-desktop.focus/v1", "Claude Desktop", "nativeWindowsClaude"]] : [])].map(([implementation, name, key]) => {
           const saved = s[key];
           return { implementation, name, configured: platform === "linux" || !!saved?.identity,
+            launchImplementation: platform === "win32" && key === "nativeWindowsClaude" ? "native-claude-desktop.launch/v1" : null,
             identity: platform === "win32" && saved?.identity ? { executablePath: saved.identity.canonicalExecutablePath, sha256: saved.identity.executableSha256, signer: saved.identity.signerSubject } : null };
         }),
         history: ((s.nativeFocusOperations ?? []).slice(-64)).map(row => ({ requestId: row.id, implementation: row.implementation ?? "native-chatgpt.focus/v1", kind: row.kind, status: row.status, effectAuthorized: row.effectAuthorized, helpersRetired: (row.helpers ?? []).every(h => h.stopped === true), summary: row.result?.summary ?? null })),
@@ -22,6 +23,7 @@ export function createClientIntegrations({ store, platform = process.platform, h
         // process/window. This does not change the exported launch recipe.
         nativeNavigation: entry.id === "claude-desktop" && platform === "win32" ? {
           implementation: "native-claude-desktop.focus/v1", configured: !!s.nativeWindowsClaude?.identity,
+          launchImplementation: "native-claude-desktop.launch/v1",
           permitted: s.policy === "personal" && s.mode === "personal-companion", windowObserved: false
         } : null
       }));

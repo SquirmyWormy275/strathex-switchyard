@@ -21,9 +21,9 @@ export function mountClients({ notify, download }) {
     const entry = selected(); $("client-facts").replaceChildren();
     $("client-source").hidden = !entry;
     if (!entry) { $("client-launch-history").replaceChildren(); $("client-status").textContent = "Choose a documented client in this workspace."; controls(); return; }
-    const availability = !entry.policyPermitsProvider ? "Unavailable under this workspace policy" : !entry.recipePlatformSupported ? "This platform is not supported by the recipe" : entry.nativeNavigation ? !entry.nativeNavigation.permitted ? "Choose Personal companion mode to set up window controls" : entry.nativeNavigation.configured ? "Saved for window controls. Open Claude Desktop, then use its controls below." : "Set up the installed app to return to its open window" : !entry.capabilities.hostLaunchConnected ? "Native launch integration is unfinished" : !entry.companionModeSelected ? "Choose companion mode to enable an explicit launch" : "Ready for an explicitly reviewed launch request";
+    const availability = !entry.policyPermitsProvider ? "Unavailable under this workspace policy" : !entry.recipePlatformSupported ? "This platform is not supported by the recipe" : entry.nativeNavigation ? !entry.nativeNavigation.permitted ? "Choose Personal companion mode to set up window controls" : entry.nativeNavigation.configured ? "Saved for window controls. Review opening Claude Desktop or return to its existing window." : "Set up the installed app to open it or return to its window" : !entry.capabilities.hostLaunchConnected ? "Native launch integration is unfinished" : !entry.companionModeSelected ? "Choose companion mode to enable an explicit launch" : "Ready for an explicitly reviewed launch request";
     const facts = [["Surface", entry.surface], ["Destination", entry.recipe.target.url ?? entry.recipe.target.applicationId], ["Availability", availability], ["Before use", entry.requirements.join(". ")], ["Scope", entry.limits.join(". ")], ["Account and task", "Not verified or selected by opening this surface"]];
-    if (entry.nativeNavigation) facts.splice(3, 0, ["Window controls", "The exact open window is verified when you request focus. No window has been inspected by this catalog."], ["Opening the app", "Automatic native launch is unfinished. Open Claude Desktop yourself first."]);
+    if (entry.nativeNavigation) facts.splice(3, 0, ["Window controls", "The exact open window is verified when you request focus. No window has been inspected by this catalog."], ["Opening the app", "Review a normal launch in Claude Desktop controls. Existing windows refuse a new launch; returning to a window is a separate action."]);
     $("client-facts").append(...facts.flatMap(([name, value]) => { const dt = document.createElement("dt"), dd = document.createElement("dd"); dt.textContent = name; dd.textContent = value; return [dt, dd]; }));
     $("client-source").href = entry.source.url; $("client-source").textContent = `Vendor documentation · source checked ${entry.source.verifiedAt}`;
     $("client-launch-history").replaceChildren(...launches.filter(row => row.recipeId === entry.id).slice(-5).reverse().map(row => { const item = document.createElement("li"); item.textContent = `${row.result?.status ?? row.status} · native helper exit ${row.nativeOwnerStoppedVerified === true ? "verified" : "unconfirmed"}${row.cleanupPending ? " · cleanup pending" : ""}. ${row.result?.summary ?? "No application, account or task acceptance is inferred."}`; return item; }));
@@ -96,6 +96,8 @@ export function mountNativeFocus({ notify }) {
     $("native-app-path").disabled = busy || !allowed;
     $("review-native-app-setup").disabled = busy || !allowed || !windows || !$("native-app-path").value.trim();
     $("review-native-app-focus").disabled = busy || !allowed || !selected()?.configured;
+    $("review-native-app-launch").hidden = !selected()?.launchImplementation;
+    $("review-native-app-launch").disabled = busy || !allowed || !selected()?.configured || !selected()?.launchImplementation;
     $("recover-native-app").hidden = !windows;
     $("recover-native-app").disabled = busy || !windows || !catalog.history.some(row => !row.helpersRetired);
     $("confirm-native-app-review").disabled = busy || !reviewed;
@@ -103,8 +105,8 @@ export function mountNativeFocus({ notify }) {
   function render() {
     const app = selected();
     $("native-app-detail").textContent = !app ? "Connect a workspace to see supported native apps." : !catalog.supported ? "Native window navigation is not implemented for this platform." : !catalog.permitted ? "Native app navigation requires a Personal workspace in companion mode." : catalog.platform === "linux" ? `${app.name} uses its fixed local executable and an exact current-user main window. ChatGPT uses the repaired native launcher. Open the app before returning to it.` : app.identity ? `Saved ${app.name} executable: ${app.identity.executablePath}\nSHA-256: ${app.identity.sha256}\nSigner: ${app.identity.signer}\nInstallation changes require a new review.` : `Review the installed ${app.name} executable before returning to its window.`;
-    $("native-app-history").replaceChildren(...(catalog?.history ?? []).filter(row => row.implementation === app?.implementation).slice(-5).reverse().map(row => {
-      const item = document.createElement("li"); item.textContent = `${row.kind} · ${row.status} · request ${row.requestId}\nHelper retirement ${row.helpersRetired ? "verified" : "unconfirmed"}. ${row.summary ?? (row.effectAuthorized ? "The effect may have occurred. No automatic retry is made." : "No focus authorization was recorded.")}`; return item;
+    $("native-app-history").replaceChildren(...(catalog?.history ?? []).filter(row => row.implementation === app?.implementation || row.implementation === app?.launchImplementation).slice(-5).reverse().map(row => {
+      const item = document.createElement("li"); item.textContent = `${row.kind} · ${row.status} · request ${row.requestId}\nHelper retirement ${row.helpersRetired ? "verified" : "unconfirmed"}. ${row.summary ?? (row.effectAuthorized ? "The effect may have occurred. No automatic retry is made." : "No native effect authorization was recorded.")}`; return item;
     }));
     controls();
   }
@@ -132,7 +134,7 @@ export function mountNativeFocus({ notify }) {
   }
   function show(kind, value, summary) {
     reviewed = { kind, ...value }; $("native-app-review-summary").textContent = summary;
-    $("confirm-native-app-review").textContent = kind === "configure" ? "Save this exact application" : kind === "recover" ? "Check original helper retirement" : "Return to this open app";
+    $("confirm-native-app-review").textContent = kind === "configure" ? "Save this exact application" : kind === "recover" ? "Check original helper retirement" : kind === "launch" ? "Open Claude Desktop" : "Return to this open app";
     $("native-app-review-dialog").showModal(); controls();
   }
   $("refresh-native-apps").addEventListener("click", () => { void load(); });
@@ -152,6 +154,12 @@ export function mountNativeFocus({ notify }) {
     const app = selected(); if (busy || !catalog?.permitted || !catalog.supported || !app?.configured) return;
     show("focus", { implementation: app.implementation, requestId: crypto.randomUUID() }, `Return to the open ${app.name} app in workspace ${state.id}\n\nSwitchyard will verify the current app process and its single main window, then focus and read back that window. A missing, ambiguous or changed target refuses. No app is started.\n\nThis chooses the app's current verified main window, not a particular account, project, conversation or coding task. It sends no text and does not resume work.`);
   });
+  $("review-native-app-launch").addEventListener("click", () => run(async ({ c, valid }) => {
+    const app = selected(); if (!catalog?.permitted || catalog.platform !== "win32" || !app?.configured || !app.launchImplementation) return;
+    const review = await api("/api/suite/native-launch/review", { compartment: c, implementation: app.launchImplementation }); if (!valid()) return;
+    if (review.implementation !== app.launchImplementation || review.identity?.executableSha256 !== app.identity.sha256 || review.existingWindowPolicy !== "refuse-new-launch" || !Array.isArray(review.arguments) || review.arguments.length) throw Error("The native launch review changed. Refresh the saved setup and review again.");
+    show("launch", { implementation: review.implementation, reviewId: review.reviewId, confirmation: review.confirmation, requestId: crypto.randomUUID() }, `Open Claude Desktop in workspace ${c}\n\nExecutable: ${review.identity.canonicalExecutablePath}\nSHA-256: ${review.identity.executableSha256}\nSigner: ${review.identity.signerSubject}\nExpires: ${new Date(review.expiresAt).toISOString()}\n\nOpen the saved application normally, with no arguments. If Claude Desktop already has a window, this request refuses; use “Review return to app” separately.\n\nClaude Desktop may use its existing signed-in account. Switchyard does not select or verify that account, open a project or conversation, send text, or resume a task. Foreground focus is not guaranteed.`);
+  }));
   $("recover-native-app").addEventListener("click", () => {
     if (busy || catalog?.platform !== "win32") return;
     show("recover", {}, `Check retained helper retirement in workspace ${state.id}\n\nObserve the exact original Switchyard helpers. This does not retry focus, close the external app, or turn an uncertain earlier effect into a verified success.`);
@@ -161,13 +169,14 @@ export function mountNativeFocus({ notify }) {
   $("confirm-native-app-review").addEventListener("click", () => run(async ({ c, valid }) => {
     if (!reviewed) return; const review = reviewed; reviewed = null; $("native-app-review-dialog").close();
     try {
-      const result = review.kind === "configure" ? await api("/api/suite/native-focus/configure", { compartment: c, reviewId: review.reviewId, confirmation: review.confirmation }) : review.kind === "recover" ? await api("/api/suite/native-focus/recover", { compartment: c }) : await api("/api/suite/native-focus/focus", { compartment: c, implementation: review.implementation, requestId: review.requestId });
+      const result = review.kind === "configure" ? await api("/api/suite/native-focus/configure", { compartment: c, reviewId: review.reviewId, confirmation: review.confirmation }) : review.kind === "recover" ? await api("/api/suite/native-focus/recover", { compartment: c }) : review.kind === "launch" ? await api("/api/suite/native-launch/apply", { compartment: c, implementation: review.implementation, reviewId: review.reviewId, confirmation: review.confirmation, requestId: review.requestId }) : await api("/api/suite/native-focus/focus", { compartment: c, implementation: review.implementation, requestId: review.requestId });
       if (!valid()) return;
-      if (review.kind === "configure") { if (result.configured !== true || result.executableSha256 !== review.sha256) throw Error("The saved application acknowledgement did not match this exact review."); $("native-app-path").value = ""; $("native-app-status").textContent = "Exact application saved. Open it before returning to its window."; }
+      if (review.kind === "configure") { if (result.configured !== true || result.executableSha256 !== review.sha256) throw Error("The saved application acknowledgement did not match this exact review."); $("native-app-path").value = ""; $("native-app-status").textContent = review.implementation === "native-claude-desktop.focus/v1" ? "Exact application saved. Review opening Claude Desktop, or return to its existing window." : "Exact application saved. Open it before returning to its window."; }
       else if (review.kind === "recover") { if (result.helpersRetired !== true) throw Error("Original helper retirement is still unconfirmed."); $("native-app-status").textContent = "Original helpers retired. Earlier uncertain focus outcomes remain unverified; the external app was not closed."; }
+      else if (review.kind === "launch") { if (result.applicationOpenedVerified !== true || result.windowFocusVerified !== false || result.accountVerified !== false || result.taskResumptionVerified !== false) throw Error("The launch acknowledgement did not verify; no repeat was attempted."); $("native-app-status").textContent = result.summary; }
       else { if (result.windowFocusVerified !== true || result.taskResumptionVerified !== false) throw Error("The focus acknowledgement did not verify; no repeat was attempted."); $("native-app-status").textContent = result.summary; }
     } catch (error) {
-      if (valid()) { const message = `${error.message} ${review.kind === "configure" ? "Saved setup is refreshed below; the confirmation is not replayed." : review.kind === "focus" ? `Request ${review.requestId}. Focus may have occurred if its reply was lost. Check the app before another deliberate request.` : "The original helpers remain subject to independent exit verification."}`; $("native-app-status").textContent = message; notify(message); }
+      if (valid()) { const message = `${error.message} ${review.kind === "configure" ? "Saved setup is refreshed below; the confirmation is not replayed." : ["focus", "launch"].includes(review.kind) ? `Request ${review.requestId}. ${review.kind === "launch" ? "Launch" : "Focus"} may have occurred if its reply was lost. Check the app before another deliberate request.` : "The original helpers remain subject to independent exit verification."}`; $("native-app-status").textContent = message; notify(message); }
     } finally {
       if (valid()) {
         await load({ preserveStatus: true });

@@ -20,7 +20,11 @@ no full Linux run remains active. Later source changes have focused evidence.
 
 ## Guided frontend checkpoint
 
-Claude Desktop’s owned Windows launch transport now passes eight groups/93 tests and both offline helper builds. Its final review/API/frontend connection remains implementation work; no actual app or account was used. Exact owner persistence, normal-launch limits and process-birth readback are tested. The 2.8 MB build staging is removed. [Transport evidence](evidence/owned-claude-launch-port-summary.json).
+Windows Claude Desktop normal launch now connects its exact executable review, authenticated API, durable ownership/receipts and separate frontend confirmation. Seven groups pass 114 tests; four additional package/transport groups pass 72, with overlap. Typechecking passes. Existing windows refuse a launch, changed selection is fenced through final authorization, and uncertain replies never repeat. Actual Windows app/account acceptance and Linux Claude launch remain separate. [Connected evidence](evidence/claude-launch-connected-source-summary.json).
+
+Windows client run 42579643586 at source 531587b failed before tests because the pinned Python 3.13.3 download returned HTTP 504. No test receipt was produced; the source/merge tree and original failure are retained. No manual retry or limit change was made. [Prerequisite failure](evidence/client-native-531587b-prerequisite-failure-summary.json).
+
+Claude Desktop’s owned Windows launch transport now passes eight groups/93 tests and both offline helper builds. Its final review/API/frontend connection now has the separate source evidence above; no actual app or account was used. Exact owner persistence, normal-launch limits and process-birth readback are tested. The 2.8 MB build staging is removed. [Transport evidence](evidence/owned-claude-launch-port-summary.json).
 
 Latest normal installed source `531587b` includes bounded repository inspection, Home navigation and saved-role refresh. All 36 assets, 29 API checks and 107 installed metadata checks pass; all 54 semantic workspaces and 57 workflows remain intact. Current plus one rollback remain, and the verified prepared bundle is removed. The current synthetic preview passes nine checks. Browser visual acceptance remains blocked before inspection. [Installed evidence](evidence/installed-repository-inspection-startup-summary.json), [running demonstration](evidence/role-refusal-refresh-running-demo-summary.json).
 

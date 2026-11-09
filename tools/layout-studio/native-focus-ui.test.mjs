@@ -38,6 +38,7 @@ async function fixture(fn, platform = "linux") {
           return {
             async listRunning(identity) { f.probes++; await start(); await stop(); return f.windows ? [{ processId: 4100, processStartTime: "133000000000000001", windowId: "hwnd:1234", identity }] : []; },
             async focusExisting(input) { await start(); await input.beforeEffect(); f.effects++; await stop(); return { processId: 4100 }; },
+            async launch(input) { await start(); await input.beforeEffect(); f.effects++; await stop(); return { processId: 4100, processStartTime: "133000000000000001", surfaceId: "hwnd:1234", distinctSurface: true }; },
             async retireOwned() { await stop(); return { stopped: !owned }; }
           };
         }
@@ -46,7 +47,7 @@ async function fixture(fn, platform = "linux") {
   });
 }
 async function openReview(c, id) { c.click(id); await until(() => c.$("native-app-review-dialog").open && !c.$("confirm-native-app-review").disabled); }
-async function settled(c) { await until(() => !c.$("refresh-native-apps").disabled && c.$("native-app-picker").options.length === (c.platform === "win32" ? 3 : 2)); }
+async function settled(c) { await until(() => !c.$("refresh-native-apps").disabled && !c.$("native-app-picker").disabled && c.$("native-app-picker").options.length === (c.platform === "win32" ? 3 : 2)); }
 async function setup(c) {
   c.$("native-app-path").value = c.f.path; c.$("native-app-path").dispatchEvent(new Event("input"));
   await openReview(c, "review-native-app-setup"); c.click("confirm-native-app-review");
@@ -198,5 +199,61 @@ test("late Windows executable review cannot populate a replacement workspace", (
     c.$("native-app-path").value = c.f.path; c.$("native-app-path").dispatchEvent(new Event("input")); c.click("review-native-app-setup"); await until(() => entered);
     c.document.dispatchEvent(new Event("switchyard-workspace-changing")); c.document.dispatchEvent(new CustomEvent("switchyard-compartment-state", { detail: await c.store.snapshot("work") })); release(); await settled(c);
     assert.equal(c.$("native-app-review-dialog").open, false); assert.equal(c.$("native-app-path").value, ""); assert.equal(c.$("review-native-app-focus").disabled, true); assert.equal(c.f.effects, 0);
+  } finally { release(); globalThis.fetch = fetch; }
+}, "win32"));
+
+test("Claude normal launch has a separate cancellable review and one confirmed effect", () => fixture(async c => {
+  assert.equal(c.$("review-native-app-launch").hidden, true);
+  c.change("native-app-picker", "native-claude-desktop.focus/v1");
+  assert.equal(c.$("review-native-app-launch").disabled, true); await setup(c); c.f.windows = false;
+  await openReview(c, "review-native-app-launch");
+  assert.match(c.$("native-app-review-summary").textContent, /no arguments/);
+  assert.match(c.$("native-app-review-summary").textContent, /existing signed-in account/);
+  assert.equal(c.f.effects, 0); assert.equal(c.f.probes, 0);
+  c.click("cancel-native-app-review"); assert.equal(c.f.effects, 0);
+  await openReview(c, "review-native-app-launch"); c.click("confirm-native-app-review");
+  assert.equal(c.$("confirm-native-app-review").disabled, true);
+  c.$("confirm-native-app-review").dispatchEvent(new Event("click"));
+  await until(() => c.$("native-app-status").textContent.includes("opened one verified process")); await settled(c);
+  assert.equal(c.f.effects, 1); assert.equal(c.calls.filter(row => row.path.endsWith("native-launch/apply")).length, 1);
+  assert.match(c.$("native-app-history").children[0].textContent, /launch · completed/);
+  c.click("refresh-native-apps"); await settled(c); assert.equal(c.f.effects, 1);
+}, "win32"));
+
+test("Claude launch UI refuses existing windows and retains a lost successful response without replay", () => fixture(async c => {
+  c.change("native-app-picker", "native-claude-desktop.focus/v1"); await setup(c);
+  await openReview(c, "review-native-app-launch"); c.click("confirm-native-app-review");
+  await until(() => c.f.notices.some(row => /existing window/.test(row))); await settled(c); assert.equal(c.f.effects, 0);
+  c.f.windows = false; const fetch = globalThis.fetch;
+  globalThis.fetch = async (path, options) => { const response = await fetch(path, options); if (path.endsWith("native-launch/apply")) throw Error("Synthetic lost launch response"); return response; };
+  try {
+    await openReview(c, "review-native-app-launch"); c.click("confirm-native-app-review");
+    await until(() => c.$("native-app-status").textContent.includes("Synthetic lost launch response")); await settled(c);
+  } finally { globalThis.fetch = fetch; }
+  assert.equal(c.f.effects, 1); assert.match(c.$("native-app-status").textContent, /Launch may have occurred/);
+  assert.match(c.$("native-app-history").children[0].textContent, /launch · completed/);
+  c.click("refresh-native-apps"); await settled(c); assert.equal(c.f.effects, 1);
+}, "win32"));
+
+test("Claude launch review cannot be confirmed after UI selection or persisted workspace changes", () => fixture(async c => {
+  c.change("native-app-picker", "native-claude-desktop.focus/v1"); await setup(c); c.f.windows = false;
+  await openReview(c, "review-native-app-launch"); c.change("native-app-picker", "native-chatgpt.focus/v1");
+  assert.equal(c.$("native-app-review-dialog").open, false); assert.equal(c.$("review-native-app-launch").hidden, true);
+  c.change("native-app-picker", "native-claude-desktop.focus/v1"); await openReview(c, "review-native-app-launch");
+  await c.suite.handle("/api/suite/compartment/select", { compartment: "work" });
+  c.click("confirm-native-app-review"); await until(() => c.f.notices.some(row => /selected workspace changed/.test(row))); await settled(c);
+  assert.equal(c.f.effects, 0); assert.equal(c.f.probes, 0);
+}, "win32"));
+
+test("a delayed Claude launch review cannot populate a replacement workspace", () => fixture(async c => {
+  c.change("native-app-picker", "native-claude-desktop.focus/v1"); await setup(c);
+  const fetch = globalThis.fetch; let release, entered = false; const wait = new Promise(resolve => { release = resolve; });
+  globalThis.fetch = async (path, options) => { const response = await fetch(path, options); if (path.endsWith("native-launch/review")) { entered = true; await wait; } return response; };
+  try {
+    c.click("review-native-app-launch"); await until(() => entered);
+    c.document.dispatchEvent(new Event("switchyard-workspace-changing"));
+    c.document.dispatchEvent(new CustomEvent("switchyard-compartment-state", { detail: await c.store.snapshot("work") }));
+    release(); await settled(c);
+    assert.equal(c.$("native-app-review-dialog").open, false); assert.equal(c.$("review-native-app-launch").disabled, true); assert.equal(c.f.effects, 0);
   } finally { release(); globalThis.fetch = fetch; }
 }, "win32"));

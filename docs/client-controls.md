@@ -8,8 +8,8 @@ reference. Browsing the catalog contacts no provider and starts no application.
 On Windows, select **Claude desktop → Set up Claude Desktop** to move directly
 to its exact native-app setup. An already saved identity changes the link to
 **Go to Claude Desktop controls**. Navigation reads saved metadata only; it does
-not inspect or focus a window. Open Claude Desktop first, then separately review
-returning to that window. Automatic native launch remains unfinished. Work policy
+not inspect or focus a window. Review a normal launch from those controls, or
+separately review returning to an existing window. Work policy
 and keyboard-only mode cannot enable these controls, and Linux offers no substitute.
 Five original groups pass 59 interaction/integration checks with no skips,
 including delayed-response refusal after a workspace change.
@@ -29,14 +29,15 @@ A **Download recipe** action exports only the documented declarative target.
 The file carries no credential, account, session or execution approval. Work
 policy keeps export disabled and exposes only Microsoft 365. Personal exposes
 its distinct supported clients; Microsoft 365 stays in Work, matching the
-existing provider policy. Claude desktop's native launch remains unfinished and
-its launch control stays disabled; no web replacement is selected.
+existing provider policy. Claude Desktop uses the separate saved-executable launch
+review in its native controls; this homepage launch button stays disabled and no
+web replacement is selected.
 
 For exact saved coding-task connections, use the separate
 [editor controls](editor-task-controls.md). The client homepage controls do not
 resume a repository session or submit a prompt.
 
-**Your tools → Return to an open app** connects the separate exact native ChatGPT
+**Your tools → Open or return to an app** connects the separate exact native ChatGPT
 and VS Code focus paths, plus Claude Desktop on Windows, with executable review and retained helper
 recovery. [Native app walkthrough](native-app-controls.md).
 

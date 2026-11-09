@@ -1,0 +1,226 @@
+{
+  "schema": "switchyard-claude-launch-connected-source/v1",
+  "implementation": "Windows normal Claude Desktop launch now connects separate exact review, authenticated Suite routes, owned native transport, protected receipts and frontend controls.",
+  "sourceFiles": {
+    "tools/layout-studio/windows-native-focus.mjs": "e304d6c79eebf48140e003f23e72ef957028393902b7897eb17ced451e7a2ecf",
+    "tools/layout-studio/windows-native-focus.test.mjs": "7f58430501a0d8c6f2f3e5e13cefa118728fd0c8a66666afb4dcd8254aaba207",
+    "tools/layout-studio/suite.mjs": "ed84e3a20cf4125cfc0e28933c8f4ffe280dc260ee4282d012116059b98445ec",
+    "tools/layout-studio/client-integrations.mjs": "9e239fe96c2f28f2171b4c84fd3d3db9d10da03bbcf9af3e0522701239e51233",
+    "tools/layout-studio/client-ui.mjs": "bcf27b414af10b414d007c83d950c0493a4288ec4963640dcb19283cfc2bd91f",
+    "tools/layout-studio/index.html": "f1925f8be7b2f775824d6a5060ea1fac2125ac63820826d9d32283e52a8e7384",
+    "tools/layout-studio/native-focus-ui.test.mjs": "27d41cae6077b14a924ee71265f196ccb035eb8971005e4731205c9718df299b"
+  },
+  "runs": [
+    {
+      "receiptId": "64993784-7e88-40f2-b1d0-5052ab548ee1",
+      "sha256": "ce7ec9d090dbdef3a7e01409cacbe075ab43d1528b7684f818df9abc2647bf7a",
+      "success": false,
+      "totals": {
+        "required": 1,
+        "passed": 0,
+        "failed": 1,
+        "tests": 27,
+        "passedTests": 19,
+        "failedTests": 8,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "files": [
+        "tools/layout-studio/windows-native-focus.test.mjs"
+      ],
+      "originalCommandsBoundsSkipsAndCleanupVerified": true,
+      "failures": [
+        {
+          "file": "tools/layout-studio/windows-native-focus.test.mjs",
+          "counts": {
+            "total": 27,
+            "passed": 19,
+            "failed": 8,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          },
+          "diagnosticSha256": "67b5e7e7326af50828c03e4a5475ee9ce4c73b0a002958e0404ac2c8b22c2785"
+        }
+      ]
+    },
+    {
+      "receiptId": "a7390028-579d-4e04-89bb-7162dc3860ce",
+      "sha256": "6898812ac62dcc6477ffea7df0e56b04808f00e1f567523ec30e1df41d701364",
+      "success": true,
+      "totals": {
+        "required": 1,
+        "passed": 1,
+        "failed": 0,
+        "tests": 27,
+        "passedTests": 27,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "files": [
+        "tools/layout-studio/windows-native-focus.test.mjs"
+      ],
+      "originalCommandsBoundsSkipsAndCleanupVerified": true,
+      "failures": []
+    },
+    {
+      "receiptId": "35f0e02c-b642-48fe-9b08-0ac99ef0b103",
+      "sha256": "330726d3c8b7067defe5bdb98573103babd4ddf1fbcddbaa478d15dca19436a0",
+      "success": false,
+      "totals": {
+        "required": 7,
+        "passed": 6,
+        "failed": 1,
+        "tests": 114,
+        "passedTests": 113,
+        "failedTests": 1,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "files": [
+        "tools/layout-studio/configuration.test.mjs",
+        "tools/layout-studio/integrations.test.mjs",
+        "tools/layout-studio/client-ui.test.mjs",
+        "tools/layout-studio/native-focus-ui.test.mjs",
+        "tools/layout-studio/connection-ui.test.mjs",
+        "tools/layout-studio/native-focus-gateway.test.mjs",
+        "tools/layout-studio/windows-native-focus.test.mjs"
+      ],
+      "originalCommandsBoundsSkipsAndCleanupVerified": true,
+      "failures": [
+        {
+          "file": "tools/layout-studio/native-focus-ui.test.mjs",
+          "counts": {
+            "total": 18,
+            "passed": 17,
+            "failed": 1,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          },
+          "diagnosticSha256": "083a5a91825f8f73cfb65193ef2dd34cef37d141283c7f20af45bff7535a235b"
+        }
+      ]
+    },
+    {
+      "receiptId": "0df28eff-57a1-4838-8474-fd1b7730ecc9",
+      "sha256": "659c8fb3e538b925c0617e813c90b6bf6a228036d0bd7e508866d5d2d66aa869",
+      "success": false,
+      "totals": {
+        "required": 7,
+        "passed": 6,
+        "failed": 1,
+        "tests": 114,
+        "passedTests": 113,
+        "failedTests": 1,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "files": [
+        "tools/layout-studio/configuration.test.mjs",
+        "tools/layout-studio/integrations.test.mjs",
+        "tools/layout-studio/client-ui.test.mjs",
+        "tools/layout-studio/native-focus-ui.test.mjs",
+        "tools/layout-studio/connection-ui.test.mjs",
+        "tools/layout-studio/native-focus-gateway.test.mjs",
+        "tools/layout-studio/windows-native-focus.test.mjs"
+      ],
+      "originalCommandsBoundsSkipsAndCleanupVerified": true,
+      "failures": [
+        {
+          "file": "tools/layout-studio/native-focus-ui.test.mjs",
+          "counts": {
+            "total": 18,
+            "passed": 17,
+            "failed": 1,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          },
+          "diagnosticSha256": "0616eb76dfce76019fb4e9c66efd09ce0c6fc5df141891c07e113cfd5288d50d"
+        }
+      ]
+    },
+    {
+      "receiptId": "e3a3a4a4-2b30-47df-a778-d807bd6c2544",
+      "sha256": "fccbc27c152f8ec9a720cc7bb03483f895a1cd2e4ffe5500719daefb3384cf6a",
+      "success": true,
+      "totals": {
+        "required": 7,
+        "passed": 7,
+        "failed": 0,
+        "tests": 114,
+        "passedTests": 114,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "files": [
+        "tools/layout-studio/configuration.test.mjs",
+        "tools/layout-studio/integrations.test.mjs",
+        "tools/layout-studio/client-ui.test.mjs",
+        "tools/layout-studio/native-focus-ui.test.mjs",
+        "tools/layout-studio/connection-ui.test.mjs",
+        "tools/layout-studio/native-focus-gateway.test.mjs",
+        "tools/layout-studio/windows-native-focus.test.mjs"
+      ],
+      "originalCommandsBoundsSkipsAndCleanupVerified": true,
+      "failures": []
+    },
+    {
+      "receiptId": "53d46f11-cad3-4300-8453-d9e05d5f2bb3",
+      "sha256": "b19a96626dae075c88a436465d32764b47d6e7b53b141d4d8ae01b6e7bef9f20",
+      "success": true,
+      "totals": {
+        "required": 4,
+        "passed": 4,
+        "failed": 0,
+        "tests": 72,
+        "passedTests": 72,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "files": [
+        "deployment/suite/release.test.mjs",
+        "deployment/suite/application.test.mjs",
+        "tools/layout-studio/suite.test.mjs",
+        "apps/windows-companion/test/windows-provider-process.test.ts"
+      ],
+      "originalCommandsBoundsSkipsAndCleanupVerified": true,
+      "failures": []
+    }
+  ],
+  "behavior": [
+    "Saved application identity does not authorize launch; a distinct expiring one-use launch review is required.",
+    "Both review and application preserve the exact selected workspace and persisted generation. Changes at the final native authorization refuse.",
+    "Only the normal Claude Desktop application is allowed, with empty arguments. Existing windows refuse; there is no automatic focus, extra window or provider substitution.",
+    "Protected helper ownership precedes every request; original retirement, image identity and account policy remain required. Completed identical request IDs return their original result; uncertain requests never repeat.",
+    "The UI distinguishes launch from focus, invalidates changed choices/workspaces, prevents duplicate confirmation and retains lost-response uncertainty with refreshed saved receipts.",
+    "A verified launched process/window does not imply foreground focus, account verification, project/conversation attachment or task resumption."
+  ],
+  "fixtureCorrections": [
+    "Original feature red cases are retained.",
+    "Two UI runs retained a new fixture failure: its high-level click helper asserts the button is enabled, so attempting a second click after the first disabled it aborted before awaiting the request. The test now explicitly verifies disabled state, dispatches an extra synthetic event to exercise the busy fence, and joins visible readiness.",
+    "The shared settled predicate additionally requires the native picker to be enabled so pending catalog refresh cannot count as complete. Original two-second render and forty-five-second file limits remain unchanged."
+  ],
+  "typecheck": {
+    "command": "node node_modules/typescript/bin/tsc --noEmit -p tsconfig.json",
+    "exitCode": 0
+  },
+  "nativeFoundation": "owned-claude-launch-port-summary.json",
+  "limitations": [
+    "Native signatures/processes/windows are synthetic in connected tests; no actual provider app, account or task was opened.",
+    "Linux Claude Desktop launch remains unfinished; Windows installed application and UI acceptance remain separate.",
+    "The packaged normal application still uses the prior frontend until the intentional immutable frontend update is installed.",
+    "Brave automation remains unavailable before tab inspection; no visual acceptance is claimed.",
+    "Test totals overlap; later package checks are separate from the seven-group 114-test connected run."
+  ]
+}

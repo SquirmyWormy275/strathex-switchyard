@@ -571,6 +571,20 @@ export function createSuite({ store = createSuiteStore(), platform = process.pla
         const { compartment: _compartment, workspaceBaseUrl: _baseUrl, ...input } = body;
         return path.endsWith("/review") ? windowsNativeFocus.review(compartment, input) : windowsNativeFocus.configure(compartment, input);
       }
+      if (path === "/api/suite/native-launch/review" || path === "/api/suite/native-launch/apply") {
+        if (!Object.hasOwn(body, "compartment") || body.implementation !== "native-claude-desktop.launch/v1") throw Error("Review only the exact native Claude Desktop launch in its selected workspace.");
+        await loadSelection();
+        const selected = activeCompartment, context = await selectedIntentContext(selected);
+        const assertCurrent = async () => {
+          if (compartment !== selected) throw Error("The selected workspace changed after this native launch review.");
+          await context.assertCurrent();
+          await store.authorize(selected, { provider: "claude-desktop" });
+          context.assertCurrentState();
+        };
+        await assertCurrent();
+        const { compartment: _compartment, workspaceBaseUrl: _baseUrl, ...input } = body;
+        return path.endsWith("/review") ? windowsNativeFocus.reviewLaunch(selected, input, { assertCurrent }) : windowsNativeFocus.launch(selected, input, { assertCurrent });
+      }
       if (path === "/api/suite/intent" || path === "/api/suite/native-focus/focus") {
         if (Object.keys(body).some(k => !["compartment", "implementation", "roleId", "intent", "requestId", "workspaceBaseUrl"].includes(k))) throw new Error("Physical dispatch is outside the closed intent contract.");
         const reviewedNative = path === "/api/suite/native-focus/focus";

@@ -1,14 +1,15 @@
-# Reviewed Windows native app focus
+# Reviewed Windows native app controls
 
 The Suite can review an exact local ChatGPT, Claude Desktop or stable Microsoft VS Code executable, save its identity
 in the selected encrypted workspace, and focus its one verified existing window.
 This is navigation only: it does not establish the signed-in account, identify a
-conversation, resume a task, launch an application or submit a prompt.
+conversation, resume a task or submit a prompt. A separate reviewed action can now
+open Claude Desktop normally; it refuses if a window already exists.
 
 The service and authenticated gateway are implemented and exercised with the real
 encrypted store, executable hashing and native protocol parser. Windows process,
 Authenticode and window responses are synthetic in those checks. Actual Windows
-desktop acceptance remains pending. In **Your tools → Return to an open app**, choose the
+desktop acceptance remains pending. In **Your tools → Open or return to an app**, choose the
 application, review its installed executable, save that exact identity, then
 review returning to its already open window. **Customize → Connect to this
 computer** can review a navigation shortcut after that setup. Project selection
@@ -53,6 +54,36 @@ targets. Microsoft's [Windows build metadata](https://github.com/microsoft/vscod
 sets the company and product-name fields used by the native image check. Actual
 installed Windows image acceptance is still required.
 
+## Open Claude Desktop deliberately
+
+After saving its executable, choose **Review opening Claude Desktop**. The review
+shows the exact executable, signer, SHA-256, selected workspace and expiry.
+**Open Claude Desktop** consumes that review once. A configured identity or focus
+confirmation alone cannot authorize launch. No arguments, extra window request,
+imported executable or alternate app is accepted.
+
+The authenticated routes are POST /api/suite/native-launch/review with the
+explicit selected compartment and implementation "native-claude-desktop.launch/v1",
+then /api/suite/native-launch/apply with those fields and the exact reviewId,
+confirmation and original requestId. Both routes enforce the active selection
+and Personal companion policy. The original persisted selection witness remains
+bound through launch review and the final native effect authorization.
+
+The closed owned helper first checks for existing windows. If one exists, use the
+separate return-to-app control. Otherwise it revalidates the saved image, records
+its ownership before requests and requires a second authorization before starting
+the normal app. A successful result verifies the new process birth and window,
+then independently retires the helper. It does not verify foreground focus,
+account, project, conversation or task resumption.
+
+Completed duplicate requests return their original receipt. Missing or uncertain
+replies never trigger a second launch. Changed image, account policy, workspace,
+expired review or unresolved helper retirement refuses. Catalog refresh reads
+saved metadata and receipts only. This path is tested through authenticated HTTP
+and the actual encrypted store with synthetic native responses; actual Windows
+application acceptance remains separate.
+[Connected source evidence](evidence/claude-launch-connected-source-summary.json).
+
 ## One focus attempt and its recovery
 
 Windows discovery now exposes the implemented shortcut controls. Previously it
@@ -81,7 +112,7 @@ no package registration or settings are changed. The official Windows app uses
 Its real installed image must still pass this boundary; software fixtures are
 not evidence that a particular released image does.
 
-Linux Claude Desktop focus and application launching remain unfinished. The
+Linux Claude Desktop focus and launch remain unfinished. The
 [official Linux beta](https://support.claude.com/en/articles/10065433-install-claude-desktop)
 targets Ubuntu/Debian; the presence of a Claude Code URL handler on this Arch
 workstation does not establish that installation. Linux requests refuse without

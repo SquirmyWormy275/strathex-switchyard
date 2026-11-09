@@ -35,7 +35,7 @@ Copilot-only policy. Imported layouts never enable providers or recording.
   CPU voice, configuration HID and LangChain environment from pinned hashes.
 - [Voice notes and transcript import](docs/voice-note-controls.md): review words before using them in a design draft.
 - [Claude hook observations](docs/claude-hook-observation.md): opt in to fixed status metadata from one exact session.
-- [Native app navigation](docs/windows-native-focus.md): review an exact Windows ChatGPT, Claude Desktop or VS Code installation before returning to its open window.
+- [Native app navigation](docs/windows-native-focus.md): review an exact Windows ChatGPT, Claude Desktop or VS Code installation before returning to its window; separately review a normal Claude Desktop launch.
 - [Portable profiles](docs/portable-profiles.md): review typing/geometry assumptions,
   stable intents and migration before connecting a second computer.
 - [Assignment references and legends](docs/assignment-legends.md): export saved

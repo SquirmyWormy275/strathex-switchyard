@@ -32,7 +32,7 @@ async function fixture(t) {
     observeExit: async (_helper, owner, signal) => { f.observedOwners.push(structuredClone(owner)); await f.beforeObserve?.(signal); return f.observedExit; },
     processFactory: options => new WindowsProviderDesktopProcessPort({ ...options, hostEnvironment: { SystemRoot: "C:\\Windows" }, transport: {
       async start(invocation) {
-        assert.deepEqual(invocation.arguments, ["--native-desktop-focus-v3"]);
+        assert.deepEqual(invocation.arguments, [options.claudeLaunchOnly ? "--native-claude-launch-v1" : "--native-desktop-focus-v3"]);
         const owner = { processId: 7111 + f.sessions.length, processStartTime: String(133000000000000010n + BigInt(f.sessions.length)) };
         const responses = [JSON.stringify({ schema: "switchyard-native-focus-owner/v1", ...owner })];
         let waiting, ended = false;
@@ -45,7 +45,8 @@ async function fixture(t) {
             const envelope = (kind, body) => JSON.stringify({ schema: "sxsy-b122.provider-desktop-response", version: 2, requestId: value.requestId, kind, ...body });
             if (value.action === "list") push(envelope("result", { observations: f.observations }));
             else if (value.action === "focus") { await f.beforeReady(); if (!ended) push(envelope("ready", { ...surface, authorizationToken: "a".repeat(64) })); }
-            else if (value.kind === "authorize") { f.effects++; await f.afterEffect(); push(envelope("result", { ...surface, windowFocusVerified: true })); }
+            else if (value.action === "launch") { await f.beforeReady(); if (!ended) push(envelope("ready", { authorizationToken: "a".repeat(64), preexistingSurfaceIds: f.observations.map(row => row.surfaceId) })); }
+            else if (value.kind === "authorize") { f.effects++; await f.afterEffect(); push(envelope("result", { ...surface, ...(options.claudeLaunchOnly ? { distinctSurface: true } : { windowFocusVerified: true }) })); }
             else throw Error("Unexpected native request");
           },
           async read() { if (responses.length) return responses.shift(); if (ended) throw Error("synthetic helper closed"); return new Promise((resolve, reject) => { waiting = { resolve, reject }; }); },
@@ -65,6 +66,61 @@ async function fixture(t) {
   });
   return f;
 }
+
+const launchImplementation = "native-claude-desktop.launch/v1";
+async function launchFixture(t) {
+  const f = await fixture(t), path = join(f.root, "Claude.exe");
+  await writeFile(path, "synthetic reviewed Claude");
+  await f.configure("native-claude-desktop.focus/v1", path); f.observations = [];
+  f.launchInput = async () => {
+    const review = await f.service.reviewLaunch("personal", { implementation: launchImplementation });
+    return { implementation: launchImplementation, reviewId: review.reviewId, confirmation: review.confirmation, requestId: randomUUID() };
+  };
+  f.claudePath = path; return f;
+}
+
+test("Claude launch review is separate from configured trust and records one exact acknowledged launch", async t => {
+  const f = await launchFixture(t), sealed = join(f.root, "private/personal.sealed.json"), before = await readFile(sealed);
+  const input = await f.launchInput(); assert.deepEqual(await readFile(sealed), before); assert.equal(f.sessions.length, 0);
+  await assert.rejects(f.service.launch("personal", { ...input, confirmation: "Trust Windows Claude Desktop" }));
+  const result = await f.service.launch("personal", input);
+  assert.equal(result.applicationOpenedVerified, true); assert.equal(result.windowFocusVerified, false); assert.equal(result.accountVerified, false); assert.equal(result.taskResumptionVerified, false);
+  assert.equal(result.processStartTime, surface.processStartTime); assert.equal(f.effects, 1); assert.equal(f.sessions.length, 2);
+  const record = (await f.store.snapshot("personal")).nativeFocusOperations.at(-1);
+  assert.equal(record.kind, "launch"); assert.equal(record.status, "completed"); assert(record.helpers.every(h => h.stopped));
+  assert.equal((await f.service.launch("personal", input)).replayed, true); assert.equal(f.effects, 1); assert.equal(f.sessions.length, 2);
+  await assert.rejects(f.service.launch("personal", { ...input, requestId: randomUUID() }), /review/);
+  await assert.rejects(f.service.launch("personal", { ...input, confirmation: "changed" }), /replayed|review/);
+});
+
+test("an existing Claude window refuses launch without silently focusing or opening another window", async t => {
+  const f = await launchFixture(t), input = await f.launchInput(); f.observations = [surface];
+  await assert.rejects(f.service.launch("personal", input), /existing|already open/);
+  assert.equal(f.effects, 0); assert.equal(f.sessions.length, 1); assert.equal(f.requests.some(row => row.action === "launch" || row.action === "focus"), false);
+});
+
+test("Claude launch review cannot survive changed image, account, workspace selection or expiry", async t => {
+  for (const mutation of ["image", "account", "selection", "expiry"]) await t.test(mutation, async sub => {
+    const f = await launchFixture(sub), input = await f.launchInput();
+    if (mutation === "image") await writeFile(f.claudePath, "changed reviewed image");
+    if (mutation === "account") await f.store.update("personal", "synthetic-revocation", s => { s.accounts.push("changed"); });
+    if (mutation === "selection") f.active = "work";
+    if (mutation === "expiry") f.now += 300001;
+    await assert.rejects(f.service.launch("personal", input)); assert.equal(f.effects, 0);
+    assert.equal(f.requests.some(row => row.kind === "authorize"), false);
+  });
+});
+
+test("Claude launch rechecks workspace at the native effect barrier and retains a lost successful reply", async t => {
+  const f = await launchFixture(t), refused = await f.launchInput(); f.beforeReady = async () => { f.active = "work"; };
+  await assert.rejects(f.service.launch("personal", refused), /workspace/); assert.equal(f.effects, 0);
+  f.active = "personal"; f.beforeReady = async () => {}; const lost = await f.launchInput();
+  f.afterEffect = async () => { throw Error("synthetic lost launch reply"); };
+  await assert.rejects(f.service.launch("personal", lost), /lost launch reply/); assert.equal(f.effects, 1);
+  const original = (await f.store.snapshot("personal")).nativeFocusOperations.find(row => row.id === lost.requestId);
+  assert.equal(original.status, "outcome-unconfirmed"); assert.equal(original.effectAuthorized, true); assert(original.helpers.every(h => h.stopped));
+  f.afterEffect = async () => {}; await assert.rejects(f.service.launch("personal", lost), /cannot be replayed/); assert.equal(f.effects, 1);
+});
 
 test("native application review is local, one-use and bound to encrypted exact executable identity", async t => {
   const f = await fixture(t), file = join(f.root, "private/personal.sealed.json"), before = await readFile(file);
@@ -329,4 +385,40 @@ test("Suite preserves selection on an uncertain original focus helper and saves 
   assert.equal(f.sessions.length, 1); assert.equal(f.effects, 0);
   f.exitUnknown = false;
   const stopped = await f.suite.handle("/api/suite/mode", { mode: "keyboard-only" }); assert.equal(stopped.ownedProcessesStopped, true); assert.equal(f.sessions.length, 1);
+});
+
+test("authenticated Claude launch routes enforce closed reviews, exact selection and single durable effects", async t => {
+  const f = await launchFixture(t);
+  f.suite = createSuite({ store: f.store, platform: "win32", windowsNativeFocusFactory: options => createWindowsNativeFocus({ ...f.options, ...options }), agents: { discovery: async () => [], close() {} }, voice: { discovery: async () => ({ available: false }) } });
+  f.server = createStudioServer({ token: "synthetic-native-launch-token", suite: f.suite, platform: "win32", bridge: {} });
+  f.server.listen(0, "127.0.0.1"); await once(f.server, "listening");
+  const origin = "http://127.0.0.1:" + f.server.address().port;
+  const api = async (route, body, headers = {}) => {
+    const response = await fetch(origin + "/api/suite/" + route, { method: "POST", headers: { Origin: origin, "Content-Type": "application/json", Authorization: "Bearer synthetic-native-launch-token", ...headers }, body: JSON.stringify(body) });
+    return { status: response.status, body: await response.json() };
+  };
+  const input = { compartment: "personal", implementation: launchImplementation };
+  assert.equal((await api("native-launch/review", input, { Authorization: "Bearer unrelated" })).status, 401);
+  assert.equal((await api("native-launch/review", input, { Origin: "https://unrelated.invalid" })).status, 403);
+  for (const value of [{ implementation: launchImplementation }, { ...input, args: [] }, { ...input, implementation: "native-chatgpt.launch/v1" }, { ...input, compartment: "work" }]) assert.equal((await api("native-launch/review", value)).status, 409);
+  const review = await api("native-launch/review", input); assert.equal(review.status, 200, JSON.stringify(review.body)); assert.equal(f.sessions.length, 0);
+  const request = { ...input, requestId: randomUUID(), reviewId: review.body.reviewId, confirmation: review.body.confirmation };
+  assert.equal((await api("native-launch/apply", { ...request, args: [] })).status, 409);
+  assert.equal((await api("native-launch/apply", { ...request, confirmation: "Trust Windows Claude Desktop" })).status, 409);
+  const result = await api("native-launch/apply", request); assert.equal(result.status, 200, JSON.stringify(result.body)); assert.equal(result.body.applicationOpenedVerified, true); assert.equal(f.effects, 1);
+  assert.equal((await api("native-launch/apply", request)).body.replayed, true); assert.equal(f.effects, 1);
+  const catalog = await api("native-focus/catalog", { compartment: "personal" });
+  assert.equal(catalog.body.entries.find(row => row.name === "Claude Desktop").launchImplementation, launchImplementation);
+  assert(catalog.body.entries.filter(row => row.name !== "Claude Desktop").every(row => row.launchImplementation === null));
+  assert.equal(catalog.body.history.at(-1).kind, "launch"); assert.equal(catalog.body.history.at(-1).helpersRetired, true);
+  const snapshot = await api("snapshot", { compartment: "personal" }); assert.equal(Object.hasOwn(snapshot.body, "nativeFocusOperations"), false);
+  const stale = await api("native-launch/review", input); assert.equal(stale.status, 200);
+  await api("compartment/select", { compartment: "work" }); await api("compartment/select", { compartment: "personal" });
+  assert.equal((await api("native-launch/apply", { ...input, requestId: randomUUID(), reviewId: stale.body.reviewId, confirmation: stale.body.confirmation })).status, 409); assert.equal(f.effects, 1);
+  const final = await api("native-launch/review", input); assert.equal(final.status, 200);
+  // A separate writer changing persisted selection must fence the final
+  // authorization before this Suite learns its new generation.
+  f.beforeReady = async () => { await f.store.selection("work"); };
+  const changed = await api("native-launch/apply", { ...input, requestId: randomUUID(), reviewId: final.body.reviewId, confirmation: final.body.confirmation });
+  assert.equal(changed.status, 409); assert.equal(f.effects, 1);
 });
