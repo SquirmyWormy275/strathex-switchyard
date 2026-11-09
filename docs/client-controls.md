@@ -22,6 +22,10 @@ For exact saved coding-task connections, use the separate
 [editor controls](editor-task-controls.md). The client homepage controls do not
 resume a repository session or submit a prompt.
 
+**Your tools → Return to an open app** connects the separate exact native ChatGPT
+and VS Code focus paths, with Windows executable review and retained helper
+recovery. [Native app walkthrough](native-app-controls.md).
+
 Five interaction cases use the actual authenticated API, encrypted state and
 launch service with a synthetic portal/guardian. Twelve original test groups
 pass **131 tests**, with **one declared native Windows skip**. The running isolated

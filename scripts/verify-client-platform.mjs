@@ -15,6 +15,7 @@ files.add("scripts/vscode-windows-runtime.test.mjs");
 files.add("apps/vscode-extension/test/studio-windows-native.test.ts");
 files.add("apps/vscode-extension/test/studio-windows-editor-launch.test.ts");
 files.add("apps/vscode-extension/test/studio-windows-editor-files.test.ts");
+files.add("tools/layout-studio/native-focus-ui.test.mjs");
 const groups = requiredGroups.filter(g => files.has(g.file));
 if (groups.length !== files.size) throw new Error("The exact client platform verification inventory changed.");
 const { receipt, receiptPath } = await runVerification({ groups });

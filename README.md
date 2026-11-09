@@ -42,6 +42,7 @@ Copilot-only policy. Imported layouts never enable providers or recording.
 - [Codex task bindings](docs/coding-task-bindings.md) and [Claude Code task
   bindings](docs/claude-task-bindings.md): exact native identities, actual host
   evidence and the controls still being implemented.
+- [Native app controls](docs/native-app-controls.md): review a return to ChatGPT or VS Code and configure exact Windows application identity.
 - [Editor task controls](docs/editor-task-controls.md): browse saved projects,
   review an exact terminal connection and return to its owned terminal.
 - [Saved design conversations](docs/saved-conversation-controls.md): reopen exact

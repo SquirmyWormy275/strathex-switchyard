@@ -70,3 +70,87 @@ export function mountClients({ notify, download }) {
   document.addEventListener("switchyard-compartment-state", event => { state = event.detail; void load(); });
   controls();
 }
+
+/** Exact native navigation. Reading saved setup never probes or focuses a window. */
+export function mountNativeFocus({ notify }) {
+  const $ = id => document.getElementById(id);
+  let state = null, catalog = null, generation = 0, busy = false, reviewed = null;
+  const selected = () => catalog?.entries.find(row => row.implementation === $("native-app-picker").value);
+  const current = (version, c) => generation === version && state?.id === c;
+  function invalidate() { generation++; reviewed = null; $("native-app-review-dialog").close(); controls(); }
+  function controls() {
+    const allowed = !!catalog?.supported && !!catalog?.permitted, windows = catalog?.platform === "win32";
+    $("native-app-picker").disabled = busy || !catalog;
+    $("refresh-native-apps").disabled = busy || !state;
+    $("native-app-setup").hidden = !windows;
+    $("native-app-path").disabled = busy || !allowed;
+    $("review-native-app-setup").disabled = busy || !allowed || !windows || !$("native-app-path").value.trim();
+    $("review-native-app-focus").disabled = busy || !allowed || !selected()?.configured;
+    $("recover-native-app").hidden = !windows;
+    $("recover-native-app").disabled = busy || !windows || !catalog.history.some(row => !row.helpersRetired);
+    $("confirm-native-app-review").disabled = busy || !reviewed;
+  }
+  function render() {
+    const app = selected();
+    $("native-app-detail").textContent = !app ? "Connect a workspace to see supported native apps." : !catalog.supported ? "Native window navigation is not implemented for this platform." : !catalog.permitted ? "Native app navigation requires a Personal workspace in companion mode." : catalog.platform === "linux" ? `${app.name} uses its fixed local executable and an exact current-user main window. ChatGPT uses the repaired native launcher. Open the app before returning to it.` : app.identity ? `Saved ${app.name} executable: ${app.identity.executablePath}\nSHA-256: ${app.identity.sha256}\nSigner: ${app.identity.signer}\nInstallation changes require a new review.` : `Review the installed ${app.name} executable before returning to its window.`;
+    $("native-app-history").replaceChildren(...(catalog?.history ?? []).filter(row => row.implementation === app?.implementation).slice(-5).reverse().map(row => {
+      const item = document.createElement("li"); item.textContent = `${row.kind} · ${row.status} · request ${row.requestId}\nHelper retirement ${row.helpersRetired ? "verified" : "unconfirmed"}. ${row.summary ?? (row.effectAuthorized ? "The effect may have occurred. No automatic retry is made." : "No focus authorization was recorded.")}`; return item;
+    }));
+    controls();
+  }
+  async function load({ preserveStatus = false } = {}) {
+    if (!state) return;
+    const choice = $("native-app-picker").value, c = state.id; catalog = null; invalidate(); render(); const version = generation;
+    try {
+      const value = await api("/api/suite/native-focus/catalog", { compartment: c }); if (!current(version, c)) return;
+      catalog = value; $("native-app-picker").replaceChildren(...value.entries.map(row => option(row.implementation, row.name)));
+      if (value.entries.some(row => row.implementation === choice)) $("native-app-picker").value = choice;
+      if (!preserveStatus) $("native-app-status").textContent = "Saved setup loaded. No app was opened, inspected or focused.";
+      render();
+    } catch (error) { if (current(version, c)) { $("native-app-status").textContent = error.message; notify(error.message); } }
+  }
+  async function run(fn) {
+    if (busy) return; busy = true; controls(); const version = generation, c = state?.id;
+    try { await fn({ c, valid: () => current(version, c) }); }
+    catch (error) { if (current(version, c)) { $("native-app-status").textContent = error.message; notify(error.message); } }
+    finally { busy = false; controls(); }
+  }
+  function show(kind, value, summary) {
+    reviewed = { kind, ...value }; $("native-app-review-summary").textContent = summary;
+    $("confirm-native-app-review").textContent = kind === "configure" ? "Save this exact application" : kind === "recover" ? "Check original helper retirement" : "Return to this open app";
+    $("native-app-review-dialog").showModal(); controls();
+  }
+  $("refresh-native-apps").addEventListener("click", () => { void load(); });
+  $("native-app-picker").addEventListener("change", () => { $("native-app-path").value = ""; invalidate(); render(); });
+  $("native-app-path").addEventListener("input", () => { invalidate(); controls(); });
+  $("review-native-app-setup").addEventListener("click", () => run(async ({ c, valid }) => {
+    const app = selected(); if (!catalog?.permitted || catalog.platform !== "win32" || !app) return;
+    const review = await api("/api/suite/native-focus/review", { compartment: c, implementation: app.implementation, executablePath: $("native-app-path").value.trim() }); if (!valid()) return;
+    show("configure", { reviewId: review.reviewId, confirmation: review.confirmation, implementation: app.implementation, sha256: review.identity.executableSha256 }, `Save ${app.name} for workspace ${c}\n\nExecutable: ${review.identity.canonicalExecutablePath}\nSHA-256: ${review.identity.executableSha256}\nSigner: ${review.identity.signerSubject}\nCertificate: ${review.identity.signerThumbprint}\nExpires: ${new Date(review.expiresAt).toISOString()}\n\nThis saves an exact local executable identity. It does not open the app, focus a window, change an account or attach a task.`);
+  }));
+  $("review-native-app-focus").addEventListener("click", () => {
+    const app = selected(); if (busy || !catalog?.permitted || !catalog.supported || !app?.configured) return;
+    show("focus", { implementation: app.implementation, requestId: crypto.randomUUID() }, `Return to the open ${app.name} app in workspace ${state.id}\n\nSwitchyard will verify the current app process and its single main window, then focus and read back that window. A missing, ambiguous or changed target refuses. No app is started.\n\nThis chooses the app's current verified main window, not a particular account, project, conversation or coding task. It sends no text and does not resume work.`);
+  });
+  $("recover-native-app").addEventListener("click", () => {
+    if (busy || catalog?.platform !== "win32") return;
+    show("recover", {}, `Check retained helper retirement in workspace ${state.id}\n\nObserve the exact original Switchyard helpers. This does not retry focus, close the external app, or turn an uncertain earlier effect into a verified success.`);
+  });
+  $("cancel-native-app-review").addEventListener("click", () => { reviewed = null; $("native-app-review-dialog").close(); controls(); });
+  $("native-app-review-dialog").addEventListener("close", () => { if (!$("native-app-review-dialog").open) { reviewed = null; controls(); } });
+  $("confirm-native-app-review").addEventListener("click", () => run(async ({ c, valid }) => {
+    if (!reviewed) return; const review = reviewed; reviewed = null; $("native-app-review-dialog").close();
+    try {
+      const result = review.kind === "configure" ? await api("/api/suite/native-focus/configure", { compartment: c, reviewId: review.reviewId, confirmation: review.confirmation }) : review.kind === "recover" ? await api("/api/suite/native-focus/recover", { compartment: c }) : await api("/api/suite/native-focus/focus", { compartment: c, implementation: review.implementation, requestId: review.requestId });
+      if (!valid()) return;
+      if (review.kind === "configure") { if (result.configured !== true || result.executableSha256 !== review.sha256) throw Error("The saved application acknowledgement did not match this exact review."); $("native-app-path").value = ""; $("native-app-status").textContent = "Exact application saved. Open it before returning to its window."; }
+      else if (review.kind === "recover") { if (result.helpersRetired !== true) throw Error("Original helper retirement is still unconfirmed."); $("native-app-status").textContent = "Original helpers retired. Earlier uncertain focus outcomes remain unverified; the external app was not closed."; }
+      else { if (result.windowFocusVerified !== true || result.taskResumptionVerified !== false) throw Error("The focus acknowledgement did not verify; no repeat was attempted."); $("native-app-status").textContent = result.summary; }
+    } catch (error) {
+      if (valid()) { const message = `${error.message} ${review.kind === "configure" ? "Saved setup is refreshed below; the confirmation is not replayed." : review.kind === "focus" ? `Request ${review.requestId}. Focus may have occurred if its reply was lost. Check the app before another deliberate request.` : "The original helpers remain subject to independent exit verification."}`; $("native-app-status").textContent = message; notify(message); }
+    } finally { if (valid()) await load({ preserveStatus: true }); }
+  }));
+  document.addEventListener("switchyard-workspace-changing", () => { state = null; catalog = null; $("native-app-path").value = ""; $("native-app-status").textContent = "Choose a workspace."; invalidate(); render(); });
+  document.addEventListener("switchyard-compartment-state", event => { state = event.detail; $("native-app-path").value = ""; void load(); });
+  render();
+}

@@ -293,6 +293,7 @@ export const requiredGroups = [
   { file: "tools/layout-studio/guided-role-choices.test.mjs" },
   { file: "tools/layout-studio/role-ui.test.mjs" },
   { file: "tools/layout-studio/client-ui.test.mjs" },
+  { file: "tools/layout-studio/native-focus-ui.test.mjs" },
   { file: "tools/layout-studio/execution-ui.test.mjs" },
   { file: "tools/layout-studio/authority-ui.test.mjs" },
   { file: "tools/layout-studio/scanner-ui.test.mjs" },

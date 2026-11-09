@@ -20,7 +20,7 @@ named role choices use the backend's digest-checked contract and separate review
 for saving and dispatching. Host shortcut review can select a saved role control.
 An isolated interactive demonstration is available. Browser visual acceptance is
 blocked by the browser tool failing before navigation/inspection; this is not a
-hardware or account limitation. Broader execution frontend flows remain implementation work. [Walkthrough and boundaries](guided-setup.md).
+hardware or account limitation. The connected execution controls are described below. [Walkthrough and boundaries](guided-setup.md).
 
 Profile import/export now has a concrete v2 review before clearing local connections,
 and Settings offers digest-verified assignment references and A4/SVG legend sheets
@@ -75,7 +75,7 @@ uncertainty/recovery/deletion. Eleven interaction cases use real HTTP/encrypted
 state with explicit native transport doubles. Eight original groups pass 102
 tests; six final groups pass 65 with overlap. Eleven running-preview checks pass.
 The original two empty-collection fixture failures remain retained. Background
-task launch/stop and exact interactive attachment remain separate work.
+task controls are connected below; exact interactive attachment remains unfinished.
 [Task controls and evidence](coding-task-controls.md).
 
 Approved-work account controls now use explicit sign-in/check/exact-stop actions,
@@ -91,10 +91,9 @@ checks pass, including keyboard-only acknowledgement and replay refusal. The
 original browser-fixture initialization failure remains retained.
 [Account controls and evidence](copilot-account-controls.md).
 
-This source is not yet normally installed or visually accepted. Approved tenant,
-license and live consent checks remain separate. Continue background-task
-launch/stop controls and exact attachment limitations; current full-platform CI
-and retained native host-action failures remain open.
+The account and background controls are now installed at `00fd643`, with their
+exact evidence below. Approved tenant, license and live consent checks remain
+separate. Current full-platform CI and retained native host-action failures remain open.
 
 Claude background-task controls now connect reviewed empty launch, native
 identity reconciliation, separately reviewed exact stop and an existing-window
@@ -110,10 +109,18 @@ transports are explicit doubles; no live task, model or desktop action occurred.
 [Task walkthrough](coding-task-controls.md),
 [exact evidence](evidence/background-ui-source-summary.json).
 
-Normal installation of the account and background controls is next. Native exact
-interactive attachment remains implementation work. Browser visual review, live
+Native exact interactive attachment remains implementation work. Browser visual review, live
 provider/task/tenant behavior, current complete Linux/Windows and retained native
 host-action failures remain separate acceptance work.
+
+Native app controls now connect reviewed return to ChatGPT and VS Code, Windows
+executable setup and retained helper retirement. Passive saved metadata starts no
+native probe. A new workspace-bound focus route refuses stale reviews across two
+Personal workspaces as well as Work. Nine UI cases pass within six groups/80 tests;
+eleven running-preview checks pass. Original missing-Work-fixture and queued
+dialog-close failures remain retained. The corrected dialog ignores an old close
+event after reopening. Source, installation and visual acceptance remain distinct.
+[Controls and exact evidence](native-app-controls.md).
 
 ## Current broader CI failures
 

@@ -58,7 +58,7 @@ export function createSuite({ store = createSuiteStore(), platform = process.pla
   claudeSubmissions ??= createClaudeSubmissions({ store });
   claudeCoding ??= createClaudeCoding({ store });
   const custom = createCustomAgents({ store });
-  const clients = createClientIntegrations({ store, hostLaunchPlatforms: ["linux", "win32"] });
+  const clients = createClientIntegrations({ store, platform, hostLaunchPlatforms: ["linux", "win32"] });
   const voiceQueue = createVoiceQueue({ store, voice });
   const readoutProfiles = createReadoutProfiles({ store, catalog: sourceCatalog });
   foreground ??= process.platform === "linux" ? { implemented: true, read: async (c, beforeStart) => { await beforeStart(); return { available: true, category: surfaceForClass(JSON.parse(await hypr("activewindow", "-j")).class), provenance: "Hyprland application class; no task identity" }; }, stopCompartment: async () => ({ stopped: true }), close: async () => {} } : { implemented: false };
@@ -551,17 +551,24 @@ export function createSuite({ store = createSuiteStore(), platform = process.pla
         if (Object.keys(body).some(key => !["compartment", "workspaceBaseUrl"].includes(key))) throw Error("Native focus recovery observes only original helper retirement.");
         return windowsNativeFocus.recover(compartment);
       }
+      if (path === "/api/suite/native-focus/catalog") {
+        if (Object.keys(body).some(key => !["compartment", "workspaceBaseUrl"].includes(key))) throw Error("Read only this workspace's saved native app configuration.");
+        return clients.focusCatalog(compartment);
+      }
       if (path === "/api/suite/native-focus/review" || path === "/api/suite/native-focus/configure") {
         const { compartment: _compartment, workspaceBaseUrl: _baseUrl, ...input } = body;
         return path.endsWith("/review") ? windowsNativeFocus.review(compartment, input) : windowsNativeFocus.configure(compartment, input);
       }
-      if (path === "/api/suite/intent") {
+      if (path === "/api/suite/intent" || path === "/api/suite/native-focus/focus") {
         if (Object.keys(body).some(k => !["compartment", "implementation", "roleId", "intent", "requestId", "workspaceBaseUrl"].includes(k))) throw new Error("Physical dispatch is outside the closed intent contract.");
+        const reviewedNative = path === "/api/suite/native-focus/focus";
+        if (reviewedNative && (!Object.hasOwn(body, "compartment") || Object.keys(body).some(k => !["compartment", "implementation", "requestId", "workspaceBaseUrl"].includes(k)) || !Object.hasOwn(nativeFocusImplementations, body.implementation))) throw Error("Return only to an exact native app in its reviewed workspace.");
         await loadSelection();
         const selected = activeCompartment, context = await selectedIntentContext(selected);
         if (Object.hasOwn(nativeFocusImplementations, body.implementation)) {
           const native = nativeFocusImplementations[body.implementation];
           const assertCurrent = async () => {
+            if (reviewedNative && compartment !== selected) throw Error("The selected workspace changed after this native app review.");
             await context.assertCurrent();
             await store.authorize(selected, { provider: native.provider });
             context.assertCurrentState();
