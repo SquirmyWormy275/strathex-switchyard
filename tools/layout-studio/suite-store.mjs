@@ -115,6 +115,13 @@ export function createSuiteStore({ root = join(process.env.XDG_STATE_HOME || (pr
     if (state.codingTurns) state.codingTurns = state.codingTurns.filter((e) => ["reserved", "submitting", "submitted", "outcome-unconfirmed", "cancellation-requested", "interrupted"].includes(e.status) || e.ownedRuntime && e.ownedRuntimeStoppedVerified !== true || e.updatedAt >= cutoff);
     state.voice = state.voice.filter((e) => e.updatedAt >= cutoff).slice(-100);
   }
+  async function applyUpdate(state, operation, fn, request = {}) {
+    permit(state, request); prune(state);
+    const result = await fn(state);
+    if (JSON.stringify(state).length > 4 * 1024 * 1024) throw new Error("Compartment data limit reached. Review retention and delete older sessions.");
+    state.audit.push({ at: clock(), operation: /^[a-z-]{1,40}$/.test(operation) ? operation : "operation", outcome: "completed" });
+    return result;
+  }
   function putProfile(s, p) {
     s.profiles ??= []; s.profileHistory ??= [];
     const index = s.profiles.findIndex((entry) => entry.profile.id === p.id);
@@ -157,17 +164,29 @@ export function createSuiteStore({ root = join(process.env.XDG_STATE_HOME || (pr
       await privateWrite(join(root, "active-compartment.json"), JSON.stringify({ id: value, generation: randomUUID() }));
       return value;
     },
-    async initialize(id = "personal", policy) {
+    async initialize(id = "personal", policy, recovery = []) {
       validate(id); if (policy !== undefined && (typeof policy !== "string" || !Object.hasOwn(templates, policy))) throw new Error("Choose Personal or Copilot-only Work policy.");
+      if (!Array.isArray(recovery) || recovery.length > 8 || recovery.some(step => !step || Object.keys(step).sort().join() !== "apply,operation" || typeof step.operation !== "string" || !/^[a-z-]{1,40}$/.test(step.operation) || typeof step.apply !== "function")) throw Error("Initialization recovery requires bounded local callbacks.");
       return serializeState(root, id, () => withStateLock(root, id, async (lease) => {
         await privateDirectory(root);
         let exists = false; try { await lstat(path(id)); exists = true; } catch (e) { if (e.code !== "ENOENT") throw e; }
-        if (exists) { const existing = await read(id); if (policy !== undefined && existing.policy !== policy) throw new Error("The stored compartment policy differs; it cannot be silently replaced."); return { id, policy: existing.policy }; }
-        policy ??= id === "work" ? "work" : "personal";
-        lease.assert(); await key(id, true);
+        let state;
+        if (exists) {
+          state = await read(id);
+          if (policy !== undefined && state.policy !== policy) throw new Error("The stored compartment policy differs; it cannot be silently replaced.");
+          if (!recovery.length) return { id, policy: state.policy };
+        } else {
+          policy ??= id === "work" ? "work" : "personal";
+          lease.assert(); await key(id, true);
+          state = { schema: "switchyard-suite-state/v1", id, policy, mode: "keyboard-only", accounts: [], profile: null, workflow: { name: "My workflow", steps: [], roles: [] }, conversations: [], observations: [], voice: [], agents: [], audit: [] };
+        }
+        // Recovery reads and commits under the same original kernel lease.
+        // Another process cannot insert an effect between recovery stages,
+        // and a failed later stage cannot leave an earlier stage committed.
+        for (const step of recovery) { lease.assert(); await applyUpdate(state, step.operation, step.apply); }
         lease.assert();
-        await write(id, { schema: "switchyard-suite-state/v1", id, policy, mode: "keyboard-only", accounts: [], profile: null, workflow: { name: "My workflow", steps: [], roles: [] }, conversations: [], observations: [], voice: [], agents: [], audit: [] });
-        return { id, policy };
+        await write(id, state);
+        return { id, policy: state.policy };
       }));
     },
     async list() {
@@ -244,7 +263,7 @@ export function createSuiteStore({ root = join(process.env.XDG_STATE_HOME || (pr
       const saved = s.portablePackages?.find((p) => p.definitionDigest === portableDefinitionDigest(s.profile));
       return { document: preferences ? createPortablePackage(s.profile, preferences) : saved?.document ?? createPortablePackage(s.profile), metadataStatus: preferences ? "explicit-export-preferences" : saved ? "preserved" : "derived-requires-review", localConnectionsIncluded: false };
     },
-    async update(id, operation, fn, request = {}) { return mutate(id, async (s) => { permit(s, request); prune(s); const result = await fn(s); if (JSON.stringify(s).length > 4 * 1024 * 1024) throw new Error("Compartment data limit reached. Review retention and delete older sessions."); s.audit.push({ at: clock(), operation: /^[a-z-]{1,40}$/.test(operation) ? operation : "operation", outcome: "completed" }); return result; }); },
+    async update(id, operation, fn, request = {}) { return mutate(id, s => applyUpdate(s, operation, fn, request)); },
     async credential(id, purpose, value, request) { await this.authorize(id, request); if (value === undefined) return secrets.get(id, purpose); if (typeof value !== "string" || value.length < 1 || value.length > 16000) throw new Error("Credential is invalid."); await secrets.set(id, purpose, value); return { reference: `${id}:${purpose}` }; },
     async route(source, destination, content, provider) { await this.authorize(source, { destination, provider }); await this.authorize(destination, { provider }); return { source, destination, content }; },
     async enforceRetention(id) { return mutate(id, (s) => { prune(s); return { retained: true }; }); }

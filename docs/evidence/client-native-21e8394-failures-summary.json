@@ -1,0 +1,99 @@
+{
+  "schema": "switchyard-client-native-failures/v1",
+  "sourceCommit": "21e8394a13bc6b937e4eb2dc79bc9fd04420273d",
+  "mergeCommit": "22afee4a1ebac5d6f2f8a079e0dc8c51bb130307",
+  "sourceTree": "b784cc30219513b56ec5524e757b089e1a9ad0b4",
+  "workflowRunId": 42581425615,
+  "jobId": 129042638096,
+  "jobConclusion": "failure",
+  "originalJobBoundMinutes": 15,
+  "receiptId": "abe009e7-f305-4bc2-aba6-f9a5e2460b64",
+  "receiptSha256": "d1641434e0f4829e73a015243fb7f22cdc9643350e3badc4a8930e5555503e58",
+  "artifactId": 13658570697,
+  "artifactSha256": "357514b12f5e3fff9a1e109de9c4f6e96b43a2f62681e6bd9834bd495415b3a9",
+  "totals": {
+    "required": 31,
+    "passed": 29,
+    "failed": 2,
+    "tests": 313,
+    "passedTests": 312,
+    "failedTests": 1,
+    "skippedTests": 0,
+    "cancelledTests": 0,
+    "todoTests": 0
+  },
+  "failures": [
+    {
+      "file": "tools/layout-studio/role-dispatch.test.mjs",
+      "timeout": true,
+      "effectiveTimeoutMs": 45000,
+      "durationMs": 45239,
+      "counts": null,
+      "cleanupCompleted": true,
+      "diagnosticSha256": "21f7f3f05841a8310b24899a3acbb115323092709a249d13cf26785ffde44a0e"
+    },
+    {
+      "file": "tools/layout-studio/native-focus-ui.test.mjs",
+      "timeout": false,
+      "effectiveTimeoutMs": 45000,
+      "durationMs": 23390,
+      "counts": {
+        "total": 14,
+        "passed": 13,
+        "failed": 1,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "cleanupCompleted": true,
+      "diagnosticSha256": "651791ba7c5f6aa1f412ac7eeb4c3f3dbf61a6ba489e501662585595e35971cc"
+    }
+  ],
+  "files": [
+    "scripts/vscode-windows-runtime.test.mjs",
+    "deployment/suite/release.test.mjs",
+    "tools/layout-studio/suite.test.mjs",
+    "tools/layout-studio/integrations.test.mjs",
+    "tools/layout-studio/role-dispatch.test.mjs",
+    "tools/layout-studio/guided-role-choices.test.mjs",
+    "tools/layout-studio/role-ui.test.mjs",
+    "tools/layout-studio/native-focus-ui.test.mjs",
+    "tools/layout-studio/connection-ui.test.mjs",
+    "tools/layout-studio/client-launch.test.mjs",
+    "tools/layout-studio/physical-intent.test.mjs",
+    "tools/layout-studio/native-focus-gateway.test.mjs",
+    "tools/layout-studio/windows-native-focus.test.mjs",
+    "tools/layout-studio/windows-terminal-process.test.mjs",
+    "tools/layout-studio/windows-editor-endpoint.test.mjs",
+    "tools/layout-studio/windows-terminal-peer.test.mjs",
+    "tools/layout-studio/editor-websocket-frames.test.mjs",
+    "tools/layout-studio/windows-editor-ingress.test.mjs",
+    "tools/layout-studio/windows-codex-editor-connection.test.mjs",
+    "tools/layout-studio/windows-owned-stdio.test.mjs",
+    "tools/layout-studio/codex-windows-tasks.test.mjs",
+    "tools/layout-studio/codex-retained-editor-client.test.mjs",
+    "tools/layout-studio/windows-editor-journal.test.mjs",
+    "tools/layout-studio/windows-editor-recovery.test.mjs",
+    "tools/layout-studio/windows-coding-editor-connections.test.mjs",
+    "apps/windows-companion/test/repository-runtime.test.ts",
+    "apps/vscode-extension/test/codex-windows-terminal.test.ts",
+    "apps/vscode-extension/test/studio-windows-task-client.test.ts",
+    "apps/vscode-extension/test/studio-windows-native.test.ts",
+    "apps/vscode-extension/test/studio-windows-editor-launch.test.ts",
+    "apps/vscode-extension/test/studio-windows-editor-files.test.ts"
+  ],
+  "originalCommandsBoundsSkipsAndCleanupVerified": true,
+  "serialScheduleVerified": true,
+  "sourceManifestForWindowsVerified": true,
+  "localNativeBinaryDownloaded": false,
+  "observations": [
+    "The 27-case role-dispatch file exceeds its original 45-second bound after 22 completed cases. Partial TAP has no final count and is not accepted.",
+    "The native-focus UI fixture removes a still-locked Work state file while a delayed review/catalog operation finishes. The newer connected-launch source already tightens its settled predicate to require the native picker enabled; actual follow-up remains pending.",
+    "Native helper publishing and self-test succeed in the preceding job; this does not accept the failed client lane."
+  ],
+  "limitations": [
+    "No workflow retry, cancellation, deadline expansion, new skip or weakened assertion was used.",
+    "The bounded 5,327-byte ZIP was hashed in memory; only its JSON receipt is retained.",
+    "Native Windows app/window, keyboard, account and visual acceptance remain separate."
+  ]
+}

@@ -14,11 +14,26 @@ no merge or public release has been accepted.
 
 Complete Linux source `49602de` passes **376 groups, 2,508 tests and 32 declared
 skips**. Original commands, bounds, skips, serial build order and child cleanup
-verify. Its owned checkout, nine aliases and 805 generated files are removed;
-no full Linux run remains active. Later source changes have focused evidence.
+verify. Its owned checkout, nine aliases and 805 generated files are removed.
+A complete run at `96ac214` is now in progress; it is not accepted yet.
 [Complete source evidence](evidence/linux-49602de-complete-summary.json).
 
 ## Guided frontend checkpoint
+
+Workspace startup now commits its recovery stages in one protected transaction,
+reducing repeated native lock startup. Shutdown joins pending startup and selection
+work before returning. A regression reproduced the original premature shutdown;
+ten final groups pass 147 tests with one declared Windows-only skip, and typechecking
+passes. This source is not yet installed or accepted on Windows.
+[Source and regression evidence](evidence/atomic-startup-source-summary.json).
+
+Installed source `a351626` now passes the native Windows client lane: **31 groups,
+353 tests, zero skips**. Its exact source/merge tree, original commands, deadlines,
+serial ordering and cleanup are audited. The earlier `21e8394` timeout and UI
+cleanup failure remain retained. Role dispatch passes at 44.445 seconds under its
+45-second limit; the startup optimization requires its own native follow-up.
+[Passing client evidence](evidence/client-native-a351626-summary.json),
+[original failures](evidence/client-native-21e8394-failures-summary.json).
 
 Windows Claude Desktop normal launch now connects its exact executable review, authenticated API, durable ownership/receipts and separate frontend confirmation. Seven groups pass 114 tests; four additional package/transport groups pass 72, with overlap. Typechecking passes. Existing windows refuse a launch, changed selection is fenced through final authorization, and uncertain replies never repeat. Actual Windows app/account acceptance and Linux Claude launch remain separate. [Connected evidence](evidence/claude-launch-connected-source-summary.json).
 

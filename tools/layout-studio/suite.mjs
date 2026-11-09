@@ -125,26 +125,32 @@ export function createSuite({ store = createSuiteStore(), platform = process.pla
     exampleStops.set(key, stopping);
     try { return await stopping; } finally { if (exampleStops.get(key) === stopping) exampleStops.delete(key); }
   }
+  function assertOpen() { if (closed) throw new Error("This local suite is closed."); }
   async function initialize(id, policy) {
-    if (started.has(id)) { if (policy !== undefined) await store.initialize(id, policy); return; }
-    if (initializing.has(id)) { await initializing.get(id); if (policy !== undefined) await store.initialize(id, policy); return; }
+    assertOpen();
+    if (initializing.has(id)) { await initializing.get(id); assertOpen(); if (policy !== undefined) await initialize(id, policy); return; }
+    if (started.has(id) && policy === undefined) return;
     const pending = (async () => {
-      await store.initialize(id, policy);
-      await store.update(id, "restart-recovery", (s) => { for (const o of s.observations) if (["recording", "paused"].includes(o.status)) o.status = "interrupted"; for (const v of s.voice) if (v.status === "recording") v.status = "paused"; for (const c of s.conversations) if (c.status === "pending") c.status = "interrupted"; for (const t of s.deviceTransactions ?? []) if (t.status === "applying") t.status = "recovery-pending"; for (const t of s.codingSessions ?? []) if (t.status === "creating") t.status = "creation-uncertain"; for (const launch of s.clientLaunches ?? []) if (["reserved", "launching"].includes(launch.status)) launch.status = "outcome-unconfirmed"; for (const effect of s.repositoryEffects ?? []) if (["reserved", "executing"].includes(effect.status)) effect.status = "recovery-required"; for (const review of s.repositoryCommitReviews ?? []) if (review.status === "executing") review.status = "recovery-required"; for (const review of s.repositoryExecutionReviews ?? []) if (["executing", "running"].includes(review.status)) review.status = "outcome-unconfirmed"; for (const t of s.codingTurns ?? []) if (["reserved", "submitting", "submitted", "cancellation-requested"].includes(t.status)) t.status = "outcome-unconfirmed"; });
-      await store.update(id, "claude-creation-recovery", (s) => { for (const task of s.codingSessions ?? []) if (task.provider === "claude-code" && task.nativeTransport === "owned-print" && task.nativeIdentityVerified === false && (s.codingTurns ?? []).some((turn) => turn.taskId === task.id && !["failed-before-turn"].includes(turn.status))) task.status = "creation-uncertain"; });
-      await fixtureAdministration.recover?.(id);
-      await scannerRecipeSave.recover(id);
-      await repositoryExecution.recoverCompartment?.(id);
-      if(id==="personal")await storageSetup.recover?.();
+      if (started.has(id)) { await store.initialize(id, policy); assertOpen(); return; }
+      await store.initialize(id, policy, [
+        { operation: "restart-recovery", apply: (s) => { for (const o of s.observations) if (["recording", "paused"].includes(o.status)) o.status = "interrupted"; for (const v of s.voice) if (v.status === "recording") v.status = "paused"; for (const c of s.conversations) if (c.status === "pending") c.status = "interrupted"; for (const t of s.deviceTransactions ?? []) if (t.status === "applying") t.status = "recovery-pending"; for (const t of s.codingSessions ?? []) if (t.status === "creating") t.status = "creation-uncertain"; for (const launch of s.clientLaunches ?? []) if (["reserved", "launching"].includes(launch.status)) launch.status = "outcome-unconfirmed"; for (const effect of s.repositoryEffects ?? []) if (["reserved", "executing"].includes(effect.status)) effect.status = "recovery-required"; for (const review of s.repositoryCommitReviews ?? []) if (review.status === "executing") review.status = "recovery-required"; for (const review of s.repositoryExecutionReviews ?? []) if (["executing", "running"].includes(review.status)) review.status = "outcome-unconfirmed"; for (const t of s.codingTurns ?? []) if (["reserved", "submitting", "submitted", "cancellation-requested"].includes(t.status)) t.status = "outcome-unconfirmed"; } },
+        { operation: "claude-creation-recovery", apply: (s) => { for (const task of s.codingSessions ?? []) if (task.provider === "claude-code" && task.nativeTransport === "owned-print" && task.nativeIdentityVerified === false && (s.codingTurns ?? []).some((turn) => turn.taskId === task.id && !["failed-before-turn"].includes(turn.status))) task.status = "creation-uncertain"; } }
+      ]);
+      assertOpen(); await fixtureAdministration.recover?.(id);
+      assertOpen(); await scannerRecipeSave.recover(id);
+      assertOpen(); await repositoryExecution.recoverCompartment?.(id);
+      assertOpen(); if(id==="personal")await storageSetup.recover?.();
+      assertOpen();
       started.add(id);
     })();
     initializing.set(id, pending);
     try { await pending; } finally { if (initializing.get(id) === pending) initializing.delete(id); }
   }
   async function loadSelection() {
+    assertOpen();
     if (selectionLoaded) return;
-    selectionLoading ??= (async () => { await initialize("personal"); activeCompartment = await store.selection(); await initialize(activeCompartment); selectionLoaded = true; })().finally(() => { selectionLoading = null; });
-    await selectionLoading;
+    selectionLoading ??= (async () => { await initialize("personal"); const selected = await store.selection(); assertOpen(); activeCompartment = selected; await initialize(activeCompartment); assertOpen(); selectionLoaded = true; })().finally(() => { selectionLoading = null; });
+    await selectionLoading; assertOpen();
   }
   async function selectedIntentContext(selected) {
     const generation = selectionGeneration;
@@ -301,10 +307,14 @@ export function createSuite({ store = createSuiteStore(), platform = process.pla
       }
       if (path === "/api/suite/bootstrap") {
         await loadSelection();
-        return { compartments: await store.list(), activeCompartment, agents: await agents.discovery(), voice: await voice.discovery() };
+        const compartments = await store.list(); assertOpen();
+        const discoveredAgents = await agents.discovery(); assertOpen();
+        const discoveredVoice = await voice.discovery(); assertOpen();
+        return { compartments, activeCompartment, agents: discoveredAgents, voice: discoveredVoice };
       }
       if (path === "/api/suite/compartment/create") { await initialize(compartment, body.policy); return { id: compartment }; }
       if (!started.has(compartment)) { const list = await store.list(); if (!list.some((c) => c.id === compartment)) throw new Error("Choose or create this compartment first."); await initialize(compartment); }
+      assertOpen();
       if (path === "/api/suite/compartment/select") {
         await loadSelection();
         const previous = activeCompartment, switching = previous !== compartment;
@@ -770,13 +780,13 @@ export function createSuite({ store = createSuiteStore(), platform = process.pla
       if (binding.targetKind === "client-surface") return { available: true, implementation: connection.implementation, provider: binding.provider, roleId: binding.roleId, intent: binding.intent, capability: "launch-only", recipeId: binding.targetId, sessionIdentified: false, evidence: "exact fixed homepage launch request; no account, window focus, resume or conversation identity verified" };
       return { available: true, implementation: connection.implementation, provider: binding.provider, roleId: binding.roleId, intent: binding.intent, evidence: binding.targetKind === "coding-task" ? "exact coding-task identity; runtime status or owned read-only daemon resume, without window focus, completion or mediated-control authority" : "exact owned configuration conversation or authenticated adapter session; not general coding-task control" };
     },
-    async close() { closed = true; const boundaryStops = await Promise.allSettled([(async () => {
+    async close() { closed = true; const startupStops = [...initializing.values(), ...(selectionLoading ? [selectionLoading] : [])]; const boundaryStops = await Promise.allSettled([(async () => {
         let editorError;
         try { const result = await codingEditorConnections?.close(); if (result && result.stopped !== true) throw Error("Original editor connection retirement is unconfirmed."); } catch (error) { editorError = error; }
         await codingEditorAuthorizations.close();
         const results = await codingTaskOwners.close();
         if (!Array.isArray(results) || results.some(r => r?.stopped !== true)) throw new Error("Original coding task owner exit is unconfirmed.");
         if (editorError) throw editorError;
-      })(), windowsNativeFocus.close(), copilot.close?.(), matrixDiagnostics.close(), repositoryExecution.close(), repositoryCommits.close(), repositoryRecovery.close(), clientLaunch.close(), scannerRecipeSave.close(), taskAuthority.close(), storageSetup.close(), fixtureAdministration.close(), shieldExceptions.close()]); readoutProfiles.close(); for (const timer of monitors.values()) clearForeground(timer); monitors.clear(); for (const key of new Set([...examples.keys(), ...exampleStarts.keys()])) exampleGenerations.set(key, (exampleGenerations.get(key) ?? 0) + 1); await Promise.allSettled(exampleStarts.values()); let claudeStopError; try { await claudeSubmissions.close(); } catch (error) { claudeStopError = error; } const providerStops = await Promise.allSettled([foreground.close?.(), agents.close(), coding.close?.(), codexSubmissions.close(), voiceQueue.close(), claudeCoding.close?.(), keyboardIndicators.close().then(result => { if (result.stopped !== true) throw new Error("Owned indicator probe exit is unconfirmed."); }), ...exampleStops.values(), ...[...examples].map(async ([key, child]) => { if (!(await retireExample(key, child)).stopped) throw new Error("Owned bundled example exit is unconfirmed."); })]); if (claudeStopError) throw claudeStopError; const failedProvider = providerStops.find(r => r.status === "rejected"); if (failedProvider) throw failedProvider.reason; const failedBoundary = boundaryStops.find(r => r.status === "rejected"); if (failedBoundary) throw failedBoundary.reason; }
+      })(), windowsNativeFocus.close(), copilot.close?.(), matrixDiagnostics.close(), repositoryExecution.close(), repositoryCommits.close(), repositoryRecovery.close(), clientLaunch.close(), scannerRecipeSave.close(), taskAuthority.close(), storageSetup.close(), fixtureAdministration.close(), shieldExceptions.close()]); readoutProfiles.close(); for (const timer of monitors.values()) clearForeground(timer); monitors.clear(); for (const key of new Set([...examples.keys(), ...exampleStarts.keys()])) exampleGenerations.set(key, (exampleGenerations.get(key) ?? 0) + 1); await Promise.allSettled(exampleStarts.values()); let claudeStopError; try { await claudeSubmissions.close(); } catch (error) { claudeStopError = error; } const providerStops = await Promise.allSettled([foreground.close?.(), agents.close(), coding.close?.(), codexSubmissions.close(), voiceQueue.close(), claudeCoding.close?.(), keyboardIndicators.close().then(result => { if (result.stopped !== true) throw new Error("Owned indicator probe exit is unconfirmed."); }), ...exampleStops.values(), ...[...examples].map(async ([key, child]) => { if (!(await retireExample(key, child)).stopped) throw new Error("Owned bundled example exit is unconfirmed."); })]); await Promise.allSettled(startupStops); if (claudeStopError) throw claudeStopError; const failedProvider = providerStops.find(r => r.status === "rejected"); if (failedProvider) throw failedProvider.reason; const failedBoundary = boundaryStops.find(r => r.status === "rejected"); if (failedBoundary) throw failedBoundary.reason; }
   };
 }

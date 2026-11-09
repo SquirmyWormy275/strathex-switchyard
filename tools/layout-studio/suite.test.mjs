@@ -84,8 +84,8 @@ test("independent compartment encryption rejects swapping and tampering, with pr
 }));
 
 test("concurrent suite bootstrap recovers a compartment once and never silently changes its existing policy", () => fixture(async ({ store }) => {
-  let recoveries = 0; const update = store.update.bind(store);
-  store.update = async (id, operation, ...args) => { if (operation === "restart-recovery") recoveries++; return update(id, operation, ...args); };
+  let recoveries = 0; const initialize = store.initialize.bind(store);
+  store.initialize = (id, policy, recovery = []) => initialize(id, policy, recovery.map(step => ({ ...step, apply: state => { if (step.operation === "restart-recovery") recoveries++; return step.apply(state); } })));
   const suite = createSuite({ store, agents: { discovery: async () => [], close() {} }, voice: { discovery: async () => ({ available: false }) } });
   try {
     await Promise.all([suite.handle("/api/suite/bootstrap"), suite.handle("/api/suite/bootstrap")]);
@@ -683,4 +683,89 @@ test("an unconfirmed native probe or initialization exit blocks every provider r
       stopped = true; assert.equal((await service.stopCompartment("personal")).stopped, true);
     } finally { stopped = true; await service.close(); }
   }
+}));
+
+test("initialization recovery commits its ordered stages atomically and preserves bytes on a later failure", () => fixture(async ({ store, root, secrets }) => {
+  await store.initialize("personal");
+  const file = join(root, "personal.sealed.json"), original = await readFile(file);
+  await assert.rejects(store.initialize("personal", undefined, [
+    { operation: "first-recovery", apply: state => { state.workflow.name = "must roll back"; } },
+    { operation: "second-recovery", apply: state => { assert.equal(state.workflow.name, "must roll back"); throw Error("synthetic later recovery failure"); } }
+  ]), /later recovery failure/);
+  assert.deepEqual(await readFile(file), original);
+  const peer = createSuiteStore({ root, secrets }); let entered, release;
+  const ready = new Promise(resolve => { entered = resolve; }), gate = new Promise(resolve => { release = resolve; });
+  const recovering = store.initialize("personal", undefined, [
+    { operation: "first-recovery", apply: async state => { state.workflow.name = "first"; entered(); await gate; } },
+    { operation: "second-recovery", apply: state => { assert.equal(state.workflow.name, "first"); state.workflow.name = "recovered"; } }
+  ]);
+  let writer;
+  try {
+    await ready;
+    writer = peer.update("personal", "peer-after-recovery", state => { assert.equal(state.workflow.name, "recovered"); state.workflow.name = "peer"; });
+    release(); await recovering; await writer;
+    const state = await store.snapshot("personal");
+    assert.equal(state.workflow.name, "peer");
+    assert.deepEqual(state.audit.map(row => row.operation), ["first-recovery", "second-recovery", "peer-after-recovery"]);
+  } finally { release(); await Promise.allSettled([recovering, ...(writer ? [writer] : [])]); }
+  let touched = false;
+  await assert.rejects(store.initialize("personal", "work", [{ operation: "unexpected-recovery", apply: () => { touched = true; } }]), /policy differs/);
+  assert.equal(touched, false);
+  const beforeInvalid = await readFile(file);
+  for (const recovery of [[{ operation: "invalid", apply: "not callable" }], [{ operation: "invalid", apply() {}, extra: true }], Array.from({ length: 9 }, () => ({ operation: "too-many", apply() {} }))]) await assert.rejects(store.initialize("personal", undefined, recovery), /bounded local callbacks/);
+  assert.deepEqual(await readFile(file), beforeInvalid);
+}));
+
+test("one startup transaction retains all prior recovery outcomes including uncertain Claude creation", () => fixture(async ({ store }) => {
+  await store.initialize("personal");
+  await store.update("personal", "synthetic-interrupted-state", state => {
+    const updatedAt = Date.now();
+    state.observations = [{ id: "recorded", status: "recording", updatedAt }];
+    state.voice = [{ id: "voice", status: "recording", updatedAt }];
+    state.conversations = [{ id: "conversation", status: "pending", updatedAt }];
+    state.deviceTransactions = [{ status: "applying" }];
+    state.codingSessions = [{ id: "uncertain", provider: "claude-code", nativeTransport: "owned-print", nativeIdentityVerified: false, status: "registered" }, { id: "clean", provider: "claude-code", nativeTransport: "owned-print", nativeIdentityVerified: false, status: "registered" }, { id: "creating", status: "creating" }];
+    state.codingTurns = [{ taskId: "uncertain", status: "submitting", updatedAt }, { taskId: "clean", status: "failed-before-turn", updatedAt }];
+    state.clientLaunches = [{ status: "launching" }];
+    state.repositoryEffects = [{ status: "executing" }];
+    state.repositoryCommitReviews = [{ status: "executing" }];
+    state.repositoryExecutionReviews = [{ status: "running" }];
+  });
+  const suite = createSuite({ store, agents: { discovery: async () => [], close() {} }, voice: { discovery: async () => ({ available: false }) },
+    repositoryExecution: { recoverCompartment: async () => {}, close: async () => {} } });
+  try {
+    await suite.handle("/api/suite/bootstrap"); const state = await store.snapshot("personal");
+    assert.equal(state.observations[0].status, "interrupted"); assert.equal(state.voice[0].status, "paused"); assert.equal(state.conversations[0].status, "interrupted");
+    assert.equal(state.deviceTransactions[0].status, "recovery-pending");
+    assert.deepEqual(state.codingSessions.map(row => row.status), ["creation-uncertain", "registered", "creation-uncertain"]);
+    assert.deepEqual(state.codingTurns.map(row => row.status), ["outcome-unconfirmed", "failed-before-turn"]);
+    assert.equal(state.clientLaunches[0].status, "outcome-unconfirmed"); assert.equal(state.repositoryEffects[0].status, "recovery-required"); assert.equal(state.repositoryCommitReviews[0].status, "recovery-required"); assert.equal(state.repositoryExecutionReviews[0].status, "outcome-unconfirmed");
+    assert.deepEqual(state.audit.filter(row => ["restart-recovery", "claude-creation-recovery"].includes(row.operation)).map(row => row.operation), ["restart-recovery", "claude-creation-recovery"]);
+  } finally { await suite.close(); }
+}));
+
+test("closing the suite joins its original startup lease and prevents later recovery or discovery", () => fixture(async ({ store }) => {
+  let entered, release, providersClosing;
+  const ready = new Promise(resolve => { entered = resolve; }), gate = new Promise(resolve => { release = resolve; });
+  const providersStopped = new Promise(resolve => { providersClosing = resolve; });
+  const initialize = store.initialize.bind(store); let extraRecovery = 0, discovery = 0;
+  store.initialize = (id, policy, recovery = []) => initialize(id, policy, recovery.map((step, index) => ({ ...step,
+    apply: async state => { if (index === 0) { entered(); await gate; } return step.apply(state); }
+  })));
+  const suite = createSuite({ store,
+    agents: { discovery: async () => { discovery++; return []; }, close: async () => { providersClosing(); } },
+    voice: { discovery: async () => { discovery++; return { available: false }; } },
+    fixtureAdministration: { recover: async () => { extraRecovery++; }, close: async () => {} }
+  });
+  const startup = suite.handle("/api/suite/bootstrap"); startup.catch(() => {});
+  let closing, closeDone = false;
+  try {
+    await ready; closing = suite.close().then(() => { closeDone = true; });
+    await providersStopped; await new Promise(resolve => setImmediate(resolve));
+    assert.equal(closeDone, false, "shutdown must not return while its original startup lease is held");
+    await assert.rejects(suite.handle("/api/suite/compartment/create", { compartment: "late" }), /closed/);
+    release(); await assert.rejects(startup, /closed/); await closing;
+    assert.equal(extraRecovery, 0); assert.equal(discovery, 0);
+    assert.deepEqual((await store.list()).map(row => row.id), ["personal"]);
+  } finally { release(); await Promise.allSettled([startup, ...(closing ? [closing] : [suite.close()])]); }
 }));

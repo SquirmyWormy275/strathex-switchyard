@@ -62,7 +62,7 @@ preserves every original command, bound, skip and child cleanup. The original
 serial schedule and four builds before compiled consumers verify. Its unit exits
 zero. The owned checkout, nine dependency aliases, 805 generated files/11,926,549
 bytes, empty test parent and active marker are removed. Other worktrees remain
-untouched. No complete Linux run is active. This source includes transcript import,
+untouched. A newer complete Linux run is active as recorded below. This source includes transcript import,
 Claude hooks and native-client changes. The later catalog navigation and reviewed
 role corrections retain separate focused evidence.
 [Complete Linux evidence](evidence/linux-49602de-complete-summary.json).
@@ -72,6 +72,34 @@ evidence. Do not rerun executed start/audit/cleanup scripts.
 [Prior complete Linux evidence](evidence/linux-9266c12-complete-summary.json).
 
 ## Current Windows verification
+
+Startup recovery and shutdown are now corrected in source. Ordered recovery uses
+one original kernel lease and one encrypted commit; a later failure leaves the
+original bytes intact. Shutdown joins startup/selection promises and refuses later
+recovery or discovery. The original regression is retained. Ten final groups pass
+147 tests with one original Windows-only skip; typechecking passes. This source
+still needs normal installation and native Windows follow-up.
+[Evidence](evidence/atomic-startup-source-summary.json).
+
+Full Linux source `96ac2148bf0e023878abb1ae5daf493f5677a832` is running in the owned
+checkout `/home/kingoftheeast/.sxf-9gfmg93x/s`, unit
+`switchyard-verification-96ac214-1794211773.service`, receipt ID
+`cfd737eb-5968-4777-ae1e-51a1f2c0f573`. The private runtime-verification directory
+contains `linux-full-active.json` and the `linux-full-96ac214-{progress,result}.json`
+records. Do not start a duplicate, cancel it or replay its start script. On exit,
+audit the original 376-group manifest, commands, bounds, declared skips and cleanup,
+then remove only its identity-verified generated files, nine aliases, owned
+checkout, empty test parent and active marker. It predates the startup correction.
+
+Native Windows client `a351626` passes 31 groups/353 tests with zero skips in run
+42583312203, job 129048176520. Merge/source tree, original bounds, serial schedule
+and cleanup are audited. The earlier `21e8394` client run has two retained failures:
+role dispatch exceeds 45 seconds and native UI fixture cleanup encounters a locked
+Work file. The newer readiness predicate passes in the a351626 follow-up; role
+dispatch finishes at 44.445 seconds, so the startup optimization still needs
+independent native acceptance. No manual CI operation or limit change occurred.
+[Passing evidence](evidence/client-native-a351626-summary.json),
+[original failures](evidence/client-native-21e8394-failures-summary.json).
 
 Windows Claude Desktop normal launch now connects its exact executable review, authenticated API, durable ownership/receipts and separate frontend confirmation. Seven groups pass 114 tests; four additional package/transport groups pass 72, with overlap. Typechecking passes. Existing windows refuse a launch, changed selection is fenced through final authorization, and uncertain replies never repeat. Actual Windows app/account acceptance and Linux Claude launch remain separate. [Connected evidence](evidence/claude-launch-connected-source-summary.json).
 
