@@ -68,12 +68,34 @@ evidence. Do not rerun executed start/audit/cleanup scripts.
 
 ## Current Windows verification
 
+The permission review now shows literal Windows project paths and readable task,
+action, file and exclusion summaries. Full scope/fingerprints remain available in
+a collapsed details section and clear on workspace changes. Nine focused cases
+and six integration groups/63 tests pass, with overlap and zero skips. The native
+literal-path failure and intermediate fixture/edit failures are retained.
+This frontend source still needs its immutable package, installation and native
+Windows follow-up. [Source evidence](evidence/permission-review-source-summary.json).
+
+Installed startup source 99784a7 passes the native Windows client lane: 31 groups,
+356 tests, zero skips. Role dispatch finishes at 38.705 seconds within its
+original 45-second bound; this is not a controlled benchmark.
+[Native evidence](evidence/client-native-99784a7-summary.json).
+
+The later full-source cohort at 96ac214 has four failed workers: scanner/execution
+UI file deadlines, JSON-escaped project paths in the permission review, and one
+native shortcut writer timeout at utility-loaded. Its client lane also times out
+on role dispatch. Original bounds, scopes and cleanup are audited. The newer
+startup client pass does not accept the full Windows suite or shortcut recovery.
+[Retained failures](evidence/native-96ac214-failures-summary.json).
+
+
+
 Startup recovery and shutdown are now corrected in source. Ordered recovery uses
 one original kernel lease and one encrypted commit; a later failure leaves the
 original bytes intact. Shutdown joins startup/selection promises and refuses later
 recovery or discovery. The original regression is retained. Ten final groups pass
 147 tests with one original Windows-only skip; typechecking passes. This source
-is installed and verified above; native Windows follow-up remains pending.
+is installed and verified above; the native client follow-up passes, while complete Windows verification remains pending.
 [Evidence](evidence/atomic-startup-source-summary.json).
 
 The pilot VS Code extension is updated from source 99784a7 through the existing
@@ -88,9 +110,9 @@ UUID in other extension registry rows; every other field verifies unchanged.
 The original exact-JSON readback refusal is retained in the evidence.
 [Installed editor evidence](evidence/installed-editor-commands-summary.json).
 
-Native client follow-up for the startup correction: run 42586125624, helper job
-129056434432 passed; client job 129057118505 is running at its native test step.
-No final receipt has been accepted. No manual CI operation is authorized.
+Native client run 42586125624 at source 99784a7 passes, including helper job
+129056434432 and client job 129057118505. Receipt
+678ada16-6cfb-46df-a58a-6291b8f6f925 is audited. No manual CI operation occurred.
 
 Native Windows client `a351626` passes 31 groups/353 tests with zero skips in run
 42583312203, job 129048176520. Merge/source tree, original bounds, serial schedule

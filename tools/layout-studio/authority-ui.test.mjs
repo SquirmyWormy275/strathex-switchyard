@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { authorityFixture } from "./test-support/task-authority-fixture.mjs";
-import { withBrowserSurface, until } from "./test-support/browser-ui.mjs";
+import { browserSurfaceFixture, withBrowserSurface, until } from "./test-support/browser-ui.mjs";
 import { createSuite } from "./suite.mjs";
 
 async function fixture(t, fn) {
@@ -19,9 +19,21 @@ async function fixture(t, fn) {
 async function review(c) { c.click("review-authority"); await c.responses.findLast(r => r.path.endsWith("/authority/review")).response; await until(() => c.$("authority-review-dialog").open && !c.$("confirm-authority").disabled); }
 async function confirm(c) { c.click("confirm-authority"); c.$("confirm-authority").dispatchEvent(new Event("click")); await c.responses.findLast(r => /authority\/(issue|revoke)$/.test(r.path)).response; await until(() => !c.$("refresh-authorities").disabled); }
 
+test("permission review presents literal Windows paths and readable file exclusions", () => browserSurfaceFixture(async () => {
+  const { permissionScopeSummary } = await import("./authority-ui.mjs");
+  const repositoryRoot = 'C:\\Work\\Client "A"\\<review>', paths = ['src\\entry.ts', 'literal "quoted".txt'];
+  const summary = permissionScopeSummary({ repositoryRoot, taskId: "saved-task", provider: "codex", sessionId: "native-session", planRevision: "reviewed-plan", lifetimeMinutes: 15,
+    allowedActions: ["run_target"], paths, classifications: { includedUntracked: ["new.txt"], excludedUntracked: ["private.txt"], includedIgnored: [], excludedIgnored: ["secret.txt"], excludedIgnoredTrees: ["generated"] } });
+  assert.ok(summary.includes(repositoryRoot)); for (const path of paths) assert.ok(summary.includes(path));
+  assert.match(summary, /Run a program/); assert.match(summary, /15 minutes/);
+  assert.match(summary, /Excluded untracked files:\n  private.txt/); assert.match(summary, /Excluded ignored files:\n  secret.txt/); assert.match(summary, /Excluded generated folders:\n  generated/);
+  assert.doesNotMatch(summary, /"repositoryRoot":|"allowedActions":/);
+}));
+
 test("saved native task selection performs no inspection until an explicit exact permission review", async t => fixture(t, async c => {
   assert.equal(c.counters().nativeChecks, 0); c.click("refresh-authorities"); await until(() => !c.$("refresh-authorities").disabled); assert.equal(c.counters().nativeChecks, 0);
   await review(c); assert.ok(c.counters().nativeChecks > 0); assert.match(c.$("authority-review-summary").textContent, /task.txt/); assert.ok(c.$("authority-review-summary").textContent.includes(c.root)); assert.match(c.$("authority-review-summary").textContent, /read-only|Provider tools and native permissions stay unchanged/);
+  assert.equal(JSON.parse(c.$("authority-review-details").textContent).repositoryRoot, c.root); assert.equal(c.$("authority-exact-scope").open, false);
   assert.equal((await c.service.list("personal")).length, 0); c.click("cancel-authority"); assert.equal((await c.service.list("personal")).length, 0);
   await review(c); c.change("authority-plan", "changed-plan"); assert.equal(c.$("authority-review-dialog").open, false); assert.equal(c.$("confirm-authority").disabled, true);
 }));
@@ -48,6 +60,7 @@ test("a separately reviewed revocation still works in keyboard-only mode and nev
 test("Work and workspace changes clear pending scope and refuse local permission controls", async t => fixture(t, async c => {
   await review(c); const before = c.calls.length; c.document.dispatchEvent(new Event("switchyard-workspace-changing")); c.document.dispatchEvent(new CustomEvent("switchyard-compartment-state", { detail: await c.store.snapshot("work") }));
   assert.equal(c.$("authority-review-dialog").open, false); assert.equal(c.$("authority-task").options.length, 0); assert.equal(c.$("authority-paths").value, ""); assert.equal(c.$("refresh-authorities").disabled, true);
+  assert.equal(c.$("authority-review-summary").textContent, ""); assert.equal(c.$("authority-review-details").textContent, ""); assert.equal(c.$("authority-exact-scope").open, false);
   c.$("confirm-authority").dispatchEvent(new Event("click")); assert.equal(c.calls.length, before); assert.equal((await c.service.list("personal")).length, 0);
 }));
 

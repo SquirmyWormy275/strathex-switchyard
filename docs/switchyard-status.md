@@ -21,11 +21,33 @@ evidence and normal installed verification.
 
 ## Guided frontend checkpoint
 
+The permission review now shows literal Windows project paths and readable task,
+action, file and exclusion summaries. Full scope/fingerprints remain available in
+a collapsed details section and clear on workspace changes. Nine focused cases
+and six integration groups/63 tests pass, with overlap and zero skips. The native
+literal-path failure and intermediate fixture/edit failures are retained.
+This frontend source still needs its immutable package, installation and native
+Windows follow-up. [Source evidence](evidence/permission-review-source-summary.json).
+
+Installed startup source 99784a7 passes the native Windows client lane: 31 groups,
+356 tests, zero skips. Role dispatch finishes at 38.705 seconds within its
+original 45-second bound; this is not a controlled benchmark.
+[Native evidence](evidence/client-native-99784a7-summary.json).
+
+The later full-source cohort at 96ac214 has four failed workers: scanner/execution
+UI file deadlines, JSON-escaped project paths in the permission review, and one
+native shortcut writer timeout at utility-loaded. Its client lane also times out
+on role dispatch. Original bounds, scopes and cleanup are audited. The newer
+startup client pass does not accept the full Windows suite or shortcut recovery.
+[Retained failures](evidence/native-96ac214-failures-summary.json).
+
+
+
 Workspace startup now commits its recovery stages in one protected transaction,
 reducing repeated native lock startup. Shutdown joins pending startup and selection
 work before returning. A regression reproduced the original premature shutdown;
 ten final groups pass 147 tests with one declared Windows-only skip, and typechecking
-passes. This source is installed as `99784a7`; its Windows follow-up is running.
+passes. This source is installed as `99784a7`; its native Windows client follow-up passes; full-suite follow-up remains pending.
 [Source and regression evidence](evidence/atomic-startup-source-summary.json).
 
 Prior installed source `a351626` passes the native Windows client lane: **31 groups,

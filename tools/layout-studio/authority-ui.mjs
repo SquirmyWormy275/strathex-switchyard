@@ -4,6 +4,15 @@ const actions = { run_target: "Run a program", pipeline_local_gate: "Run a local
 const option = (value, label) => { const e = document.createElement("option"); e.value = value; e.textContent = label; return e; };
 const fields = ["authority-task", "authority-plan", "authority-action", "authority-lifetime", "authority-paths", "authority-included-untracked", "authority-excluded-untracked", "authority-included-ignored", "authority-excluded-ignored", "authority-excluded-trees"];
 const list = value => value.split(/\r?\n/).filter(line => line.length > 0);
+/** Literal paths belong in the human review; JSON fingerprints remain available separately. */
+export function permissionScopeSummary(scope) {
+  const lines = [`Project: ${scope.repositoryRoot}`, `Tool: ${scope.provider === "codex" ? "Codex" : "Claude Code"}`, `Task: ${scope.taskId}`, `Native session: ${scope.sessionId}`, `Plan: ${scope.planRevision}`, `Permission lifetime: ${scope.lifetimeMinutes} minutes`, `Allowed actions: ${scope.allowedActions.map(action => actions[action] ?? action).join(", ")}`, "", "Included files:", ...scope.paths.map(path => `  ${path}`)];
+  for (const [key, label] of [["includedUntracked", "Included untracked files"], ["excludedUntracked", "Excluded untracked files"], ["includedIgnored", "Included ignored files (scanner inputs only)"], ["excludedIgnored", "Excluded ignored files"], ["excludedIgnoredTrees", "Excluded generated folders"]]) {
+    const paths = scope.classifications?.[key] ?? [];
+    if (paths.length) lines.push("", label + ":", ...paths.map(path => `  ${path}`));
+  }
+  return lines.join("\n");
+}
 /** Saving a grant never runs a recipe or changes provider permissions. */
 export function mountAuthority({ notify }) {
   const $ = id => document.getElementById(id);
@@ -20,7 +29,7 @@ export function mountAuthority({ notify }) {
     $("revalidate-authority").disabled = busy || !permitted() || !selectedGrant();
     $("review-authority-revoke").disabled = busy || state?.policy !== "personal" || !selectedGrant() || selectedGrant().status !== "issued";
   }
-  function invalidate() { generation++; reviewed = null; $("authority-review-dialog").close(); controls(); }
+  function invalidate() { generation++; reviewed = null; $("authority-review-dialog").close(); $("authority-review-summary").textContent = ""; $("authority-review-details").textContent = ""; $("authority-exact-scope").open = false; controls(); }
   function renderHistory() {
     const row = selectedGrant();
     $("authority-record").textContent = row ? `Project: ${row.grant.repositoryRoot}\nPlan: ${row.proposal.planRevision}\nStatus: ${row.status}\nExpires: ${row.grant.expiresAt}\nActions: ${row.grant.allowedActions.map(a => actions[a] ?? a).join(", ")}\nFiles: ${row.proposal.paths.join(", ")}\nCurrent task and repository: require fresh revalidation. Provider permissions and task completion are unchanged.` : "No saved permission selected.";
@@ -54,7 +63,8 @@ export function mountAuthority({ notify }) {
     const result = await api("/api/suite/coding/authority/review", { compartment: context.compartment, ...proposal }); if (!context.current()) return;
     reviewed = { kind: "issue", proposal: structuredClone(proposal), token: result.confirmation.token };
     $("authority-review-title").textContent = "Review task permission";
-    $("authority-review-summary").textContent = `${result.confirmation.record.reason}\n\nExact scope:\n${JSON.stringify(result.scope, null, 2)}\n\nThis approval only saves a host task permission. Each program, scan or repository effect still requires its own review.`;
+    $("authority-review-summary").textContent = `${permissionScopeSummary(result.scope)}\n\n${result.confirmation.record.reason}\n\nThis approval only saves a host task permission. Each program, scan or repository effect still requires its own review.`;
+    $("authority-review-details").textContent = JSON.stringify(result.scope, null, 2); $("authority-exact-scope").open = false;
     $("confirm-authority").textContent = "Save this task permission"; $("authority-review-dialog").showModal();
   }));
   $("revalidate-authority").addEventListener("click", () => work(async context => {
@@ -67,10 +77,11 @@ export function mountAuthority({ notify }) {
     const row = selectedGrant(); reviewed = { kind: "revoke", id: row.id };
     $("authority-review-title").textContent = "Revoke this task permission";
     $("authority-review-summary").textContent = `Project: ${row.grant.repositoryRoot}\nPlan: ${row.proposal.planRevision}\nPermission: ${row.id}\nActions: ${row.grant.allowedActions.join(", ")}\n\nRevoke this saved grant. This does not undo earlier effects or prove an owned process has stopped. Use the execution's separate stop review when needed.`;
+    $("authority-review-details").textContent = JSON.stringify(row.grant, null, 2); $("authority-exact-scope").open = false;
     $("confirm-authority").textContent = "Revoke this permission"; $("authority-review-dialog").showModal(); controls();
   });
   $("cancel-authority").addEventListener("click", () => { reviewed = null; $("authority-review-dialog").close(); controls(); });
-  $("authority-review-dialog").addEventListener("close", () => { reviewed = null; controls(); });
+  $("authority-review-dialog").addEventListener("close", () => { reviewed = null; $("authority-review-summary").textContent = ""; $("authority-review-details").textContent = ""; $("authority-exact-scope").open = false; controls(); });
   $("confirm-authority").addEventListener("click", () => work(async context => {
     if (!reviewed) return; const review = reviewed; reviewed = null; $("authority-review-dialog").close();
     let id = review.id;
