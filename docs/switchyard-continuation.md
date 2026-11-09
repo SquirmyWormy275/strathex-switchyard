@@ -22,9 +22,9 @@ Start with [current status](switchyard-status.md), the [requirement ledger](swit
 
 | Identity | Verified checkpoint |
 | --- | --- |
-| Source | `85f1ec4adc7d48f61fed7b92db39c65e46c5df2f` |
-| Release | `5e6ef12d38e6d8890c3ebc0e29fd422828c1099a6f950165863ed08457f56661` |
-| Rollback | `8d08efa74a9cd297ec674956aef6e3f1418f1c0b67ef9a841d9317719954bbb4` |
+| Source | `ec28d09fe42a13e9715af3fe2d3fe0da5bf1557e` |
+| Release | `a171ce4545d15c0a62be9e4070dd4e45dc419305480824b4f1774b88c8e50dbb` |
+| Rollback | `5e6ef12d38e6d8890c3ebc0e29fd422828c1099a6f950165863ed08457f56661` |
 | Frontend | `3265d16737fae14d99c7c5a0792af4c5e7cd743320f0abc84263bf22490770ed` |
 
 The approved frontend is installed at the normal local address. All 36 served assets
@@ -36,12 +36,12 @@ workspace changes audit metadata only. No physical keyboard, native provider,
 account, model or microphone operation occurred.
 
 The normal update retains dated launcher backups and current plus one rollback.
-The payload contains 574 files/5,068,548 bytes. Its exact prepared
-575-file/5,172,332-byte bundle is removed after identity/hash verification.
-The new immutable frontend and rotated private access URL both verify. All eight verifiers
+The payload contains 574 files/5,069,400 bytes. Its exact prepared
+575-file/5,173,184-byte bundle is removed after identity/hash verification.
+The frontend digest and private access URL remain unchanged in this backend update. All eight verifiers
 pass with no failed verifier in this update. Host-facing owner, Copilot and
 signed-intent checks run sequentially. Do not repeat executed update or cleanup
-scripts. [Installed evidence](evidence/installed-permission-summary.json).
+scripts. [Installed evidence](evidence/installed-batched-inspection-summary.json).
 
 All original workspace modes and all three conversation records are preserved.
 Selected Personal was already in companion mode; the pending conversation lives
@@ -75,8 +75,8 @@ deadlines remain unchanged. Seven integration groups pass 58 tests; four further
 consumer groups pass 24. A native Linux demonstration verifies twelve actual Git
 guardians, four concurrent queries, independent exit and unchanged repository
 bytes, with all owned staging removed. Typechecking passes. The two original
-scheduling failures remain retained. Windows deadline acceptance and normal
-installation of this source remain pending.
+scheduling failures remain retained. This source is installed at ec28d09 with 69 served/API and 107 metadata checks;
+all 54 semantic workspaces remain intact. Windows deadline acceptance is pending.
 [Source and demonstration](evidence/batched-inspection-source-summary.json).
 
 The permission review now shows literal Windows project paths and readable task,

@@ -28,8 +28,8 @@ deadlines remain unchanged. Seven integration groups pass 58 tests; four further
 consumer groups pass 24. A native Linux demonstration verifies twelve actual Git
 guardians, four concurrent queries, independent exit and unchanged repository
 bytes, with all owned staging removed. Typechecking passes. The two original
-scheduling failures remain retained. Windows deadline acceptance and normal
-installation of this source remain pending.
+scheduling failures remain retained. This source is installed at ec28d09 with 69 served/API and 107 metadata checks;
+all 54 semantic workspaces remain intact. Windows deadline acceptance is pending.
 [Source and demonstration](evidence/batched-inspection-source-summary.json).
 
 The permission review now shows literal Windows project paths and readable task,
@@ -83,12 +83,12 @@ Windows client run 42579643586 at source 531587b failed before tests because the
 
 Claude Desktop’s owned Windows launch transport now passes eight groups/93 tests and both offline helper builds. Its final review/API/frontend connection now has the separate source evidence above; no actual app or account was used. Exact owner persistence, normal-launch limits and process-birth readback are tested. The 2.8 MB build staging is removed. [Transport evidence](evidence/owned-claude-launch-port-summary.json).
 
-Latest normal installed source 85f1ec4 includes readable permission summaries,
-atomic recovery, joined shutdown, native launch controls and Home navigation.
+Latest normal installed source ec28d09 adds bounded concurrent Git inspection
+and shortcut diagnostics to the readable permission review and guided controls.
 All 36 assets, 33 API checks and 107 installed metadata checks pass; all 54
 semantic workspaces, three conversations, modes, selection and 57 workflows remain
-intact. Current plus one rollback remain; the 5,172,332-byte prepared package is
-removed. [Installed evidence](evidence/installed-permission-summary.json).
+intact. Current plus one rollback remain; the 5,173,184-byte prepared package is
+removed. [Installed evidence](evidence/installed-batched-inspection-summary.json).
 
 The pilot VS Code extension is updated from source 99784a7. Its 53 payload files,
 three saved-task commands and installed-module registration/refusal checks pass.

@@ -9,7 +9,7 @@ entry point, evidence and remaining work. A hardware/account check does not excu
 unfinished independent software. Read [current status](switchyard-status.md) for
 accepted checkpoints and [verification](verification.md) for reproducible checks.
 
-Installed Linux source `85f1ec4` includes the 36-asset guided frontend, permissions,
+Installed Linux source `ec28d09` includes the 36-asset guided frontend, permissions,
 scanner setup, signed-feed maintenance, reviewed execution, saved design
 conversations, coding-task text/background controls and approved-work account/
 recovery, exact native-app navigation, agent maintenance, saved voice notes,
@@ -17,7 +17,7 @@ transcript import, Claude hook setup and direct client-to-native setup navigatio
 hashes, thirty-three API/inventory checks and 107 metadata/refusal checks across 62 exact modules
 pass, preserving all 54 semantic workspaces and 57 workflow definitions.
 Current plus one rollback remain and the prepared package is removed.
-[Installed evidence](evidence/installed-permission-summary.json).
+[Installed evidence](evidence/installed-batched-inspection-summary.json).
 Reviewed role dispatch carries the active and persisted workspace identity;
 the current synthetic running demonstration verifies acknowledgement and stale
 selection refusal. [Demonstration](evidence/claude-launch-running-demo-summary.json).
@@ -94,8 +94,8 @@ deadlines remain unchanged. Seven integration groups pass 58 tests; four further
 consumer groups pass 24. A native Linux demonstration verifies twelve actual Git
 guardians, four concurrent queries, independent exit and unchanged repository
 bytes, with all owned staging removed. Typechecking passes. The two original
-scheduling failures remain retained. Windows deadline acceptance and normal
-installation of this source remain pending.
+scheduling failures remain retained. This source is installed at ec28d09 with 69 served/API and 107 metadata checks;
+all 54 semantic workspaces remain intact. Windows deadline acceptance is pending.
 [Source and demonstration](evidence/batched-inspection-source-summary.json).
 
 The new [Claude hook bridge](claude-hook-observation.md) implements a separate
