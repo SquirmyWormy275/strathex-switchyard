@@ -114,9 +114,28 @@ Continue with observation source/session selection and reviewed designer context
 production editor command activation, and broader device controls. Browser tooling
 remains unavailable; no installed update or visual acceptance is claimed.
 
+## Observation frontend checkpoint
+
+Activity now selects explicit supported sources/exclusions and reviews any session
+with correctly gated mark/pause/resume/stop/deletion. Design together reviews selected
+aggregate context for Codex/Claude and consumes confirmation once in its actual form.
+No record operation implicitly sends data. Six interaction cases pass; thirteen
+original groups pass 130 tests, and seven final groups pass 52 with overlap.
+The running synthetic HTTP demo passes eight checks without a model request.
+[Evidence](evidence/observation-ui-source-summary.json).
+
+The complete-form fixture exposed a late role-inventory teardown and an expectation
+using the unnormalized input plan. Fixture teardown now invalidates browser work
+before removing its document; the request is checked against the displayed and
+encrypted saved canonical plan plus ordinary typing. Original bounds remain.
+
+Next: production editor command/project activation, broader device configuration
+controls, and the remaining external observation sources. Browser-tool and hardware/
+account checks remain distinct from these unfinished implementations.
+
 ## Continue required product work
 
-Use the [requirement ledger](switchyard-requirements.md) as scope. Guided role/device controls, production editor activation/task attachment and broader supported external observation streams remain implementation work. Portability, controller and conversation backend paths have substantial coverage: identify the specific missing behavior before adding a subsystem. Additional Shield syntax is not a separate handover requirement and must not displace the required suite.
+Use the [requirement ledger](switchyard-requirements.md) as scope. Broader device controls, production editor activation/task attachment and additional external observation streams remain implementation work. Portability, controller and conversation backend paths have substantial coverage: identify the specific missing behavior before adding a subsystem. Additional Shield syntax is not a separate handover requirement and must not displace the required suite.
 
 Keep unfinished software separate from checks requiring physical F77/B122 hardware, an approved Microsoft tenant, interactive Windows/UAC/guest access, a live microphone or approved native task/account operations. A synthetic provider or installed metadata-only proof does not accept those external behaviors.
 

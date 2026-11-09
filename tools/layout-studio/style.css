@@ -223,3 +223,5 @@ kbd { font: 11px/1.5 ui-monospace, SFMono-Regular, Consolas, monospace; color: #
 .portable-meaning { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 12px; padding-top: 14px; border-top: 1px solid var(--line); }
 .portable-meaning > strong { grid-column: 1 / -1; font-size: 13px; }
 .import-effects { padding: 14px; border-left: 2px solid #b58c40; background: #fcf7ea; }
+
+.panel fieldset{margin:0;padding:14px;border:1px solid var(--line);border-radius:6px;display:grid;gap:10px}.panel fieldset legend{padding:0 6px;font-weight:600}.observation-summary{font-size:.88rem;overflow-wrap:anywhere}.observation-summary p{margin:.4em 0}#design-observation-sessions{max-height:16rem;overflow:auto}

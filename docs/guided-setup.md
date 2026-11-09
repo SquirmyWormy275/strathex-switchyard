@@ -52,6 +52,26 @@ a saved role control or native ChatGPT focus. Review the exact shortcut and host
 changes before applying. Trial, keep and restore retain their existing backend
 guards. Opening the keyboard-readout panel itself performs no discovery or HID I/O.
 
+## Learn from a demonstration
+
+In **Activity**, explicitly choose event marks, app categories, connected-agent
+events, Switchyard shortcut results or editor results. Unsupported sources remain
+unavailable; choosing an event stream does not observe arbitrary applications.
+Choose category exclusions before starting. Retention and local destination appear
+beside the Start button.
+
+Review any saved session, mark an event while recording, pause/resume, stop, or
+review deletion. Stopped sessions cannot be resumed. In **Design together**, select
+up to eight paused/stopped sessions and review the aggregate summary for Codex or
+Claude. **Include with next message** prepares one request; **Discuss** sends it.
+The summary contains counts and sampled category time, with provenance and limits.
+It does not establish intent, completion or time saved.
+
+Six UI cases pass, including the designer form against authenticated HTTP and a
+synthetic provider response. The thirteen-group run passes 130 tests; the final
+seven groups pass 52 with overlap. Eight checks pass on the running isolated server.
+[Evidence](evidence/observation-ui-source-summary.json).
+
 ## Take your setup with you
 
 Choose **Export profile** or open **Settings → Take your setup with you**.

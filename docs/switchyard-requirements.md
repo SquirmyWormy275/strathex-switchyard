@@ -107,7 +107,7 @@ The first package check exceeded its original limit by 4,711 bytes. Lossless
 compression of the first-party catalog index restores the bound, with all sixteen
 installation/recovery scenarios passing. No upstream source or frozen frontend
 bytes change. Five installed observation metadata checks pass in the 71-check update;
-new native acceptance and frontend selection controls remain pending.
+frontend source/session selection and one-request reviewed designer context now pass six interaction cases. New visual browser and native account acceptance remain pending.
 [Installed evidence](evidence/installed-observation-design-summary.json). [Contract](observation-assisted-design.md),
 [source evidence](evidence/design-observations-source-summary.json).
 

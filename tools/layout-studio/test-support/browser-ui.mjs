@@ -16,6 +16,7 @@ class Element extends EventTarget {
 function surface() {
   const document = new EventTarget(), elements = new Map();
   document.createElement = () => new Element();
+  document.createTextNode = text => ({ textContent: text });
   document.getElementById = id => { if (!elements.has(id)) elements.set(id, new Element()); return elements.get(id); };
   const $ = document.getElementById;
   const intent = new Element(); intent.value = "status"; intent.textContent = "Check progress"; $("role-intent").replaceChildren(intent);
@@ -25,7 +26,7 @@ export async function until(check) {
   const end = Date.now() + 2000;
   while (!check()) { if (Date.now() >= end) throw Error("UI interaction did not settle within two seconds"); await new Promise(resolve => setTimeout(resolve, 5)); }
 }
-export async function browserSurfaceFixture(fn) {
+export async function browserSurfaceFixture(fn, overrides = {}) {
   return fixture(async context => {
     const ui = surface(), previous = { document: globalThis.document, location: globalThis.location, localStorage: globalThis.localStorage, fetch: globalThis.fetch };
     // The outer fixture owns Suite retirement. The HTTP server borrows it so
@@ -42,8 +43,10 @@ export async function browserSurfaceFixture(fn) {
     try {
       await fn({ ...context, ...ui, calls, refresh });
     } finally {
+      // Retire pending browser work before taking away its document and HTTP host.
+      ui.document.dispatchEvent(new Event("switchyard-workspace-changing"));
       server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); await server.cleanup();
       Object.assign(globalThis, previous);
     }
-  });
+  }, overrides);
 }

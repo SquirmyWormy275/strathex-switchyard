@@ -5,10 +5,18 @@ Claude configuration request. This connects recorded activity to the existing
 editable workflow and layout proposal. Sending a request never applies that
 proposal, changes a key, starts a task or installs a role binding.
 
-The selection controls remain unfinished in the frozen frontend. The working
-demonstration uses the authenticated local HTTP API, real encrypted storage and
-synthetic provider processes/protocols. It does not establish live account, model
-or user-interface acceptance.
+The frontend now exposes source selection and session controls in **Activity**.
+In **Design together → Use a demonstration**, choose up to eight paused or stopped
+sessions, review the exact aggregate summary for the selected assistant, and choose
+**Include with next message**. Sending **Discuss** consumes that review once.
+Changing the destination or selected data requires a new review. Clear the
+selection to send a message without activity.
+
+The six interaction cases include the complete designer form through authenticated
+HTTP/encrypted storage with a synthetic provider response. The local demonstration
+also reviews a recorded summary without starting a provider. Visual browser and
+live-account/model acceptance remain pending.
+[Frontend evidence](evidence/observation-ui-source-summary.json).
 
 ## Review and send
 

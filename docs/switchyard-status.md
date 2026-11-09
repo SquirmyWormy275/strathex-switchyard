@@ -29,6 +29,12 @@ with optional short labels. Twelve groups pass 141 tests; nine checks pass again
 the running synthetic server. [Portability evidence](evidence/portability-ui-source-summary.json).
 These are software checks; browser and physical print acceptance remain pending.
 
+Activity now connects source selection, exclusions, historical session review and
+pause/resume/stop/deletion. Design together can include one explicitly reviewed
+aggregate summary with the next message; destination or source changes invalidate
+the review. Six frontend interaction cases and the live synthetic HTTP demonstration
+pass. [Observation evidence](evidence/observation-ui-source-summary.json).
+
 ## A working backend journey
 
 The repeatable demo uses the normal authenticated API, encrypted stores and
