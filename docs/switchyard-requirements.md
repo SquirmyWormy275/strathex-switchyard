@@ -23,6 +23,12 @@ and lost-reply handling. Dedicated coding-task creation and reviewed-text fronte
 flows are now connected; background-task controls and exact attachment remain implementation work. Visual, hardware and live account acceptance
 remain separate.
 
+The approved-work account UI now uses explicit sign-in/check/stop controls and
+separate one-use acknowledgement of uncertain delivery. Actual designer requests
+carry durable UUIDs; lost replies never cause automatic replay.
+[Account controls](copilot-account-controls.md). Normal installed adoption and
+approved-tenant acceptance remain separate.
+
 The latest backend feature lists eligible saved projects and distinct task counts
 through signed Linux/Windows clients, followed by existing exact-project task
 choices. Protected owner/load/task records and current workspace policy determine

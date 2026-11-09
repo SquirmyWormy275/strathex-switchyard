@@ -10,6 +10,7 @@ import { createSuite } from "../tools/layout-studio/suite.mjs";
 import { createStudioServer } from "../tools/layout-studio/serve.mjs";
 import { standardPreset } from "../tools/layout-studio/catalog.mjs";
 import { layoutChoices } from "../tools/layout-studio/geometry.mjs";
+import { createCopilotRequests } from "../tools/layout-studio/copilot-requests.mjs";
 import { switchyardAgent } from "../integrations/agent-sdk.mjs";
 
 if (process.argv.slice(2).join(" ") !== "--synthetic") throw Error("Usage: node scripts/demo-switchyard-ui.mjs --synthetic");
@@ -26,6 +27,11 @@ for (let i = 0; i < 10; i++) codes[String((i + 1) % 10)] = i + 30;
 for (const [i, key] of preset.portable.plan.profile.keys.entries()) layer[key.matrix[0]][key.matrix[1]] = codes[key.baseKeycode?.replace(/^KC_/, "")] ?? 0x7000 + i;
 const options = layoutChoices(definition), packed = part.choices.reduce((v, choice, i) => v * 2 ** Math.ceil(Math.log2(options[i].options.length)) + choice, 0);
 await store.initialize("personal"); await store.initialize("work", "work");
+const syntheticAccount = "11111111-1111-1111-1111-111111111111:33333333-3333-3333-3333-333333333333";
+await store.update("work", "synthetic-copilot-outcome", state => { state.mode = "managed-companion"; state.accounts = [syntheticAccount]; });
+const requests = createCopilotRequests({ store }), pending = await requests.reserve("work", { account: syntheticAccount, clientId: "22222222-2222-2222-2222-222222222222", conversationId: "synthetic-work-design", sessionId: null, scopeDigest: "e".repeat(64), requestId: randomUUID() }, () => {});
+await requests.enter("work", pending.row.id, "creating", () => {}); await requests.fail("work", pending.row.id);
+await store.update("work", "synthetic-copilot-keyboard-only", state => { state.mode = "keyboard-only"; });
 await store.update("personal", "synthetic-ui-readout", state => { state.deviceSnapshots = [{ schema: "switchyard-device-snapshot/v1", identity: { deviceId: "a".repeat(64), keyboardId: source.firmwareIdentity.keyboardId, viaProtocol: 9, vialProtocol: part.definitionId.startsWith("wcass") ? 4 : 6, controller: "unknown" }, capturedAt: new Date().toISOString(), definition, rows, cols, layers: 1, keymap_raw: [layer], layoutOptions: packed, configurationOnly: true }]; });
 const refuse = async () => { throw Error("This demonstration uses synthetic data. Hardware, native tasks, accounts and desktop changes are unavailable here."); };
 await store.update("personal", "synthetic-ui-conversations", state => { state.conversations = [
@@ -34,7 +40,7 @@ await store.update("personal", "synthetic-ui-conversations", state => { state.co
 ]; });
 await store.update("personal", "synthetic-ui-task", state => { state.codingSessions = [{ schema: "switchyard-coding-session/v1", id: "demo-text-task", provider: "claude-code", label: "Example reserved text task · synthetic", repositoryRoot: "/synthetic/project", repositoryIdentity: { device: "0", inode: "1" }, sessionId: randomUUID(), accountFingerprint: "d".repeat(64), nativeTransport: "owned-print", nativeIdentityVerified: false, backgroundId: null, launchPolicy: "tools-disabled/plan", status: "registered", createdAt: Date.now() }]; });
 const suite = createSuite({ store, agents: { discovery: async () => [], close: async () => {}, stopCompartment: async () => {} }, voice: { discovery: async () => ({ available: false, reason: "Microphone capture is outside this demonstration." }) }, foreground: { implemented: false, close: async () => {}, stopCompartment: async () => {} }, devices: { list: async () => [], close: async () => {} } });
-const allowed = new Set(["bootstrap", "snapshot", "compartment/select", "mode", "profile/save", "profile/select", "workflow/save", "roles/choices", "roles/bind-choice", "roles/dispatch", "devices/identify", "devices/list", "integrations/catalog", "integrations/launches", "integrations/recipe", "coding/authority/list", "coding/execution/list", "coding/execution/stop/list", "coding/scanner-save/list", "host/scanner-fixtures/list", "profile/package/export", "profile/package/review", "profile/package/import", "profile/legends/export", "design/observations/review", "observation/start", "observation/mark", "observation/state", "observation/delete"]);
+const allowed = new Set(["bootstrap", "snapshot", "compartment/select", "mode", "profile/save", "profile/select", "workflow/save", "roles/choices", "roles/bind-choice", "roles/dispatch", "devices/identify", "devices/list", "copilot/discovery", "copilot/requests", "copilot/requests/review", "copilot/requests/resolve", "integrations/catalog", "integrations/launches", "integrations/recipe", "coding/authority/list", "coding/execution/list", "coding/execution/stop/list", "coding/scanner-save/list", "host/scanner-fixtures/list", "profile/package/export", "profile/package/review", "profile/package/import", "profile/legends/export", "design/observations/review", "observation/start", "observation/mark", "observation/state", "observation/delete"]);
 const handle = suite.handle.bind(suite);
 const safeSuite = { ...suite, handle: async (path, body) => {
   const route = path.replace("/api/suite/", "");

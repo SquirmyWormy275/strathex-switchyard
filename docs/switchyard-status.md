@@ -78,6 +78,24 @@ The original two empty-collection fixture failures remain retained. Background
 task launch/stop and exact interactive attachment remain separate work.
 [Task controls and evidence](coding-task-controls.md).
 
+Approved-work account controls now use explicit sign-in/check/exact-stop actions,
+with no background polling. Exact cancellation aborts only that pending sign-in;
+a foreign workspace cannot consume or delete its device-code session. The actual
+designer sends a durable UUID. Local request inventory, separate one-use outcome
+review and acknowledgement preserve remote uncertainty without replay or logout.
+
+Ten interaction cases use real HTTP/encrypted state with synthetic Microsoft
+responses. Eight final original groups pass 119 tests; three other groups pass 21 with
+overlap, zero skips and original bounds/cleanup verified. Fourteen running-preview
+checks pass, including keyboard-only acknowledgement and replay refusal. The
+original browser-fixture initialization failure remains retained.
+[Account controls and evidence](copilot-account-controls.md).
+
+This source is not yet normally installed or visually accepted. Approved tenant,
+license and live consent checks remain separate. Continue background-task
+launch/stop controls and exact attachment limitations; current full-platform CI
+and retained native host-action failures remain open.
+
 ## Current broader CI failures
 
 The `ce89c78` Linux job and one Windows source worker fail the historical workload

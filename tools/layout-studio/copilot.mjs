@@ -123,11 +123,14 @@ export function createCopilot({ store, fetcher = fetch, now = () => Date.now(), 
     },
     async pollLogin(compartment, loginId) {
       const login = logins.get(loginId);
-      if (!login || login.compartment !== compartment || now() > login.expires) { logins.delete(loginId); throw new Error("Microsoft sign-in expired. Start a new explicit sign-in."); }
-      await store.authorize(compartment, { provider });
-      if (login.polling || now() < login.nextPoll) return { status: "pending", interval: login.interval };
-      const scope = operation(compartment); login.polling = true;
+      if (!login || login.compartment !== compartment) throw new Error("That exact Microsoft sign-in expired or is not pending in this workspace.");
+      if (now() > login.expires) { logins.delete(loginId); throw new Error("Microsoft sign-in expired. Start a new explicit sign-in."); }
+      const scope = operation(compartment); scope.loginId = loginId; let polling = false;
+      scope.requestCheck = async () => { if (logins.get(loginId) !== login) throw Error("The exact Microsoft sign-in was stopped before its next request."); };
       try {
+        await scope.current();
+        if (login.polling || now() < login.nextPoll) return { status: "pending", interval: login.interval };
+        login.polling = true; polling = true;
         if (scope.generation !== login.generation) throw new Error("Microsoft sign-in was stopped; start a new explicit sign-in.");
         login.nextPoll = now() + login.interval * 1000;
         const r = await tokenRequest(login.tenantId, { grant_type: "urn:ietf:params:oauth:grant-type:device_code", client_id: login.clientId, device_code: login.deviceCode }, scope);
@@ -139,7 +142,19 @@ export function createCopilot({ store, fetcher = fetch, now = () => Date.now(), 
         if (now() > login.expires) throw new Error("Microsoft sign-in expired before its result could be accepted.");
         const c = await verifyCredential(compartment, r.body, login, scope); scope.assert(); logins.delete(loginId);
         return { status: "connected", account: c.account };
-      } finally { login.polling = false; scope.finish(); }
+      } finally { if (polling) login.polling = false; scope.finish(); }
+    },
+    async cancelLogin(compartment, loginId) {
+      if (typeof loginId !== "string" || !guid.test(loginId)) throw Error("Choose the exact Microsoft sign-in started in this workspace.");
+      const login = logins.get(loginId);
+      if (!login || login.compartment !== compartment) throw Error("That exact sign-in is no longer pending in this workspace. Inspect the saved account; no logout was attempted.");
+      logins.delete(loginId);
+      const pending = [...operations].filter(scope => scope.compartment === compartment && scope.loginId === loginId);
+      for (const scope of pending) scope.abort();
+      let timer;
+      try { await Promise.race([Promise.all(pending.map(scope => scope.done)), new Promise(resolve => { timer = setTimeout(resolve, 1000); })]); }
+      finally { clearTimeout(timer); }
+      return { status: "stopped", localRequestsSettled: pending.every(scope => !operations.has(scope)), remoteCancellationVerified: false, accountRemoved: false };
     },
     async design({ compartment, message, plan: input, conversationId, requestId }, { assertCurrent: assertRoleCurrent = async () => {}, assertCurrentState: assertRoleState = () => {} } = {}) {
       await store.authorize(compartment, { provider }); const plan = parsePlan(input);

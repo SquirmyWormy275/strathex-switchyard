@@ -8,6 +8,7 @@ import { mountScanner } from "./scanner-ui.mjs";
 import { mountFeeds } from "./feed-ui.mjs";
 import { mountConversations } from "./conversation-ui.mjs";
 import { mountTasks } from "./task-ui.mjs";
+import { mountCopilot } from "./copilot-ui.mjs";
 import { mountObservation } from "./observation-ui.mjs";
 const $ = (id) => document.getElementById(id);
 
@@ -108,15 +109,6 @@ export function mountSuite({ getProfile, loadProfile, previewProposal, notify, s
   }));
   $("create-work-compartment").addEventListener("click", () => run(async () => { await api("/api/suite/compartment/create", { compartment: "work", policy: "work" }); const bootstrap = await api("/api/suite/bootstrap", {}); fillCompartments(bootstrap.compartments); notify("Copilot-only Work compartment created with its own protected key. No work account or client data was accessed."); }));
   $("copilot-work-setup").addEventListener("click", () => run(async () => { await api("/api/suite/compartment/create", { compartment: "work", policy: "work" }); const bootstrap = await api("/api/suite/bootstrap", {}); fillCompartments(bootstrap.compartments); notify("Copilot-only Work is ready. Select it in the workspace menu; account enrollment remains a separate, deliberate step."); }));
-  $("connect-copilot").addEventListener("click", () => run(async () => {
-    const login = await api("/api/suite/copilot/login", { compartment, tenantId: $("copilot-tenant").value.trim(), clientId: $("copilot-client").value.trim(), approved: $("copilot-approved").checked });
-    $("copilot-status").textContent = `Open ${login.verificationUrl} yourself and enter ${login.userCode}. Review Microsoft's requested permissions before consenting. This code expires in ${Math.floor(login.expiresIn / 60)} minutes.`;
-    for (let n = 0; n < Math.floor(login.expiresIn / login.interval); n++) {
-      await new Promise((resolve) => setTimeout(resolve, login.interval * 1000));
-      const result = await api("/api/suite/copilot/poll", { compartment, loginId: login.loginId });
-      if (result.status === "connected") { $("copilot-status").textContent = "Approved work account enrolled. Graph preview conversation capabilities will be checked on use. No GitHub Copilot or personal-provider fallback is enabled."; await refresh(); break; }
-    }
-  }));
   function fillCompartments(list) { $("compartment-picker").replaceChildren(...list.map((c) => { const o = document.createElement("option"); o.value = c.id; o.textContent = c.id === "work" ? "Work · Copilot only" : c.id === "personal" ? "Personal" : c.id; return o; })); $("compartment-picker").value = compartment; }
   $("save-workflow").addEventListener("click", () => run(async () => { const workflow = { name: $("workflow-name").value, steps: lines("workflow-steps"), roles: lines("workflow-roles") }; await api("/api/suite/workflow/save", { compartment, workflow }); proposedWorkflow = null; await refresh(); notify("Workflow saved. Steps and roles remain editable."); }));
   $("refresh-agent-targets").addEventListener("click", () => run(refresh));
@@ -132,7 +124,7 @@ export function mountSuite({ getProfile, loadProfile, previewProposal, notify, s
       if (!context.current() || profile !== JSON.stringify(getProfile())) throw Error("The workspace, assistant or layout changed. Review your message before sending.");
       const observationReview = observation.takeReview(destination);
       submitted = true;
-      const response = await api("/api/suite/design", { compartment: target, provider: destination, message, plan: getProfile().plan, conversationId: context.conversationId, ...(observationReview ? { observationReview } : {}) });
+      const response = await api("/api/suite/design", { compartment: target, provider: destination, message, plan: getProfile().plan, conversationId: context.conversationId, ...(context.requestId ? { requestId: context.requestId } : {}), ...(observationReview ? { observationReview } : {}) });
       if (profile !== JSON.stringify(getProfile())) throw Error("The layout changed while the assistant was replying. Inspect saved context before using its proposal.");
       if (!conversations.accepted(context, response.conversationId)) return;
       proposedWorkflow = response.workflow; workflowForm(proposedWorkflow);
@@ -196,6 +188,7 @@ export function mountSuite({ getProfile, loadProfile, previewProposal, notify, s
   mountScanner({ notify });
   mountFeeds({ notify });
   mountTasks({ notify, refresh });
+  mountCopilot({ notify, refresh });
   mountPortable({ getProfile, persist: async () => { clearTimeout(saveTimer); await persist(); }, refresh, loadProfile, download, notify });
   document.addEventListener("switchyard-role-result", event => { if (event.detail.proposal) previewProposal(event.detail.proposal); });
   document.addEventListener("switchyard-refresh-request", () => run(refresh));

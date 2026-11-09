@@ -1,0 +1,191 @@
+{
+  "schema": "switchyard-copilot-ui-source-evidence/v1",
+  "scope": "Explicit approved-work sign-in/check/exact-stop, durable designer submission IDs and separate one-use uncertain-outcome acknowledgement",
+  "runs": [
+    {
+      "receiptId": "b6090f92-3763-4f06-a585-bfb7e56e7875",
+      "sha256": "7fcd947054439cba907d4ce5a211dbaae3859c7f78d04065a029dccba8ccc7c2",
+      "success": false,
+      "totals": {
+        "required": 8,
+        "passed": 7,
+        "failed": 1,
+        "tests": 109,
+        "passedTests": 108,
+        "failedTests": 1,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "files": [
+        "scripts/windows-backend-shards.test.mjs",
+        "scripts/run-isolated-tests.test.mjs",
+        "tools/layout-studio/copilot-account-binding.test.mjs",
+        "tools/layout-studio/copilot-lifecycle.test.mjs",
+        "tools/layout-studio/copilot-requests.test.mjs",
+        "tools/layout-studio/suite.test.mjs",
+        "tools/layout-studio/conversation-ui.test.mjs",
+        "tools/layout-studio/copilot-ui.test.mjs"
+      ],
+      "originalBoundsPreserved": true,
+      "ownedCleanupComplete": true
+    },
+    {
+      "receiptId": "ab2b7553-62ec-491e-a35f-624c5be2955f",
+      "sha256": "8dc58e03afc1a699733e80ffb0a56852ea2381c4918603cbc3b2866f5f68b1c7",
+      "success": true,
+      "totals": {
+        "required": 8,
+        "passed": 8,
+        "failed": 0,
+        "tests": 118,
+        "passedTests": 118,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "files": [
+        "scripts/windows-backend-shards.test.mjs",
+        "scripts/run-isolated-tests.test.mjs",
+        "tools/layout-studio/copilot-account-binding.test.mjs",
+        "tools/layout-studio/copilot-lifecycle.test.mjs",
+        "tools/layout-studio/copilot-requests.test.mjs",
+        "tools/layout-studio/suite.test.mjs",
+        "tools/layout-studio/conversation-ui.test.mjs",
+        "tools/layout-studio/copilot-ui.test.mjs"
+      ],
+      "originalBoundsPreserved": true,
+      "ownedCleanupComplete": true
+    },
+    {
+      "receiptId": "5ed823ce-666d-4b5f-a705-b37e73592b28",
+      "sha256": "5385c6eb22e66f0744bc040fe59b43a31210bb2f85a2f4b6afd0848f507d5fb4",
+      "success": true,
+      "totals": {
+        "required": 3,
+        "passed": 3,
+        "failed": 0,
+        "tests": 21,
+        "passedTests": 21,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "files": [
+        "deployment/suite/release.test.mjs",
+        "tools/layout-studio/copilot-ui.test.mjs",
+        "tools/layout-studio/observation-ui.test.mjs"
+      ],
+      "originalBoundsPreserved": true,
+      "ownedCleanupComplete": true
+    },
+    {
+      "receiptId": "bd07d3a6-e77d-4a9c-a944-cbdaa0fc8d6d",
+      "sha256": "5f39e3fc255eaef5d5e7026bc1c3e6769186ce10cde66de19d07063701a549d2",
+      "success": true,
+      "totals": {
+        "required": 8,
+        "passed": 8,
+        "failed": 0,
+        "tests": 119,
+        "passedTests": 119,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "files": [
+        "scripts/windows-backend-shards.test.mjs",
+        "scripts/run-isolated-tests.test.mjs",
+        "tools/layout-studio/copilot-account-binding.test.mjs",
+        "tools/layout-studio/copilot-lifecycle.test.mjs",
+        "tools/layout-studio/copilot-requests.test.mjs",
+        "tools/layout-studio/suite.test.mjs",
+        "tools/layout-studio/conversation-ui.test.mjs",
+        "tools/layout-studio/copilot-ui.test.mjs"
+      ],
+      "originalBoundsPreserved": true,
+      "ownedCleanupComplete": true
+    },
+    {
+      "receiptId": "d533f5e5-9ff2-4ce4-a90f-905b7b0e65cd",
+      "sha256": "fe3530c452fac39733725e0e21206f3e55e3d64b9873f3f6cff95b823b97d104",
+      "success": true,
+      "totals": {
+        "required": 8,
+        "passed": 8,
+        "failed": 0,
+        "tests": 119,
+        "passedTests": 119,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "files": [
+        "scripts/windows-backend-shards.test.mjs",
+        "scripts/run-isolated-tests.test.mjs",
+        "tools/layout-studio/copilot-account-binding.test.mjs",
+        "tools/layout-studio/copilot-lifecycle.test.mjs",
+        "tools/layout-studio/copilot-requests.test.mjs",
+        "tools/layout-studio/suite.test.mjs",
+        "tools/layout-studio/conversation-ui.test.mjs",
+        "tools/layout-studio/copilot-ui.test.mjs"
+      ],
+      "originalBoundsPreserved": true,
+      "ownedCleanupComplete": true
+    }
+  ],
+  "interactionCases": 10,
+  "overlap": "Eight final original groups pass 119 tests after the cancellation/policy-wait regression; three other final groups pass 21 with overlap. Earlier 118- and 119-test runs are retained. Do not sum these as distinct tests.",
+  "sourceFiles": {
+    "tools/layout-studio/copilot-ui.mjs": "66ce8f85ee756e147611a13bdd0bdb9e32e8384a47f41dbb89a36ad3900bb090",
+    "tools/layout-studio/copilot-ui.test.mjs": "5ba8335274e617069085b650bdaf8afcc7e4c3a9870bf6442e8aa2be3b3928e3",
+    "tools/layout-studio/copilot.mjs": "6625a1640fdf7786c464b660c394b0bf0732b07fe1fad18a1b7c50435007ecd3",
+    "tools/layout-studio/copilot-lifecycle.test.mjs": "97a4fc3944edfa816d704f09590ee325c927324067eabcf9b9820bfc87d060fc",
+    "tools/layout-studio/conversation-ui.mjs": "8d85ddfbfcde69e4fd7b3839e8e610058f52ed6cb5d165b2548100b452da5e98",
+    "tools/layout-studio/suite.mjs": "6d89fa64eb7c883f32261c9a6a50cedb8778827ecc9d283226a3cdfa5abcb512",
+    "tools/layout-studio/suite-ui.mjs": "f145e350f53b3b71640ed58a01e674234cb6bc0067e8b3de776be7c3f5c9e50d",
+    "tools/layout-studio/index.html": "438fbe4e7fed9359f72855696b51fccccbc8269aa6118284c5db13cbff7e3dce",
+    "tools/layout-studio/serve.mjs": "2ef1817c076ddaaf4ed843e31c1b00a3f48d0cf29da6dd195200f86eb33902c8",
+    "deployment/suite/release.mjs": "3c0f52e5571d34cf549f7ecb5fd6483683a87eb3acaf0b8abc6c65c157036f61",
+    "scripts/run-isolated-tests.mjs": "90288a480309aa5b95dec92c6bb85a405cfca37058e379c7a238356bfee620c5",
+    "scripts/demo-switchyard-ui.mjs": "5cfddfeac2e81f24c7c7486eb0a4def69411009ab1e6dc1baa1a7865eb290fe1"
+  },
+  "livePreview": {
+    "checks": [
+      "exact served copilot-ui.mjs",
+      "exact served conversation-ui.mjs",
+      "exact served suite-ui.mjs",
+      "exact served index.html",
+      "Work starts keyboard-only; generic snapshot excludes private request journal",
+      "explicit local request metadata retains uncertainty without credentials",
+      "exact local one-use uncertainty review in keyboard-only mode",
+      "separate acknowledgement retains remote uncertainty and emits no prompt",
+      "consumed acknowledgement cannot be replayed",
+      "demo refuses copilot/login",
+      "demo refuses copilot/poll",
+      "demo refuses copilot/login/cancel",
+      "demo refuses design",
+      "Personal selection and keyboard-only mode restored"
+    ],
+    "synthetic": true,
+    "modelRequests": 0,
+    "hardwareOpened": false
+  },
+  "originalFailures": "The first run imports the browser module before installing the fixture location/document. Its ReferenceError and receipt remain retained. The fixture now imports after creating its browser surface, like the existing interaction fixtures. Production behavior, assertions, child bounds and skips are unchanged. A subsequent final-run manifest probe named a nonexistent serve.test.mjs and refused before running; corrected selection uses the existing release, observation and Copilot UI groups.",
+  "backendCorrections": [
+    "Exact sign-in cancellation invalidates only its original device-code session and aborts matching verification scopes, reporting local settlement without logout or remote-cancellation claims.",
+    "Scope ownership starts before asynchronous policy authorization; cancellation during that wait reports unsettled ownership and blocks later token exchange.",
+    "A poll from another workspace refuses without deleting the original workspace device-code session."
+  ],
+  "limitations": [
+    "Microsoft responses are explicit doubles. HTTP, encrypted state, kernel ownership, account/delivery service and one-use confirmations are real.",
+    "No approved work tenant, account, model, native task, hardware or microphone operation occurred.",
+    "Browser visual and responsive acceptance remain blocked before inspection.",
+    "Latest complete Windows/Linux acceptance remains pending and separate.",
+    "Normal installed adoption is separate from this source checkpoint."
+  ]
+}

@@ -50,8 +50,8 @@ Copilot-only policy. Imported layouts never enable providers or recording.
   approve bounded text and recover an uncertain turn without automatic retry.
 - [Coding-task controls](docs/coding-task-controls.md): create a dedicated task,
   review exact messages and inspect retained replies or uncertain outcomes.
-- [Microsoft work conversations](docs/copilot-request-recovery.md): keep the exact
-  enrolled account and recover a lost reply without silently sending it again.
+- [Microsoft work account controls](docs/copilot-account-controls.md): connect an
+  approved account and review uncertain replies without silently sending them again.
 - [Mediated repository effects](docs/mediated-repository-effects.md): follow a
   binary file through review, encrypted preservation, the durable policy broker
   and supervised native Git; run its disposable native demonstration.

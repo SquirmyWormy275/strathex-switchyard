@@ -1,5 +1,8 @@
 # A lost Copilot reply does not mean “send it again”
 
+The [Work account and outcome controls](copilot-account-controls.md) now connect
+these routes in Your tools, with separate review and acknowledgement.
+
 Switchyard records a design request in its encrypted workspace before creating a
 Microsoft conversation or submitting chat. It records the returned conversation
 identity before sending the first message. Lost acknowledgements, interrupted

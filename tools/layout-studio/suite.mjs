@@ -625,6 +625,10 @@ export function createSuite({ store = createSuiteStore(), platform = process.pla
       if (path === "/api/suite/integrations/recipe") { const { workspaceBaseUrl, ...proposal } = body; return clients.recipe(compartment, proposal); }
       if (path === "/api/suite/copilot/login") return copilot.beginLogin(compartment, body);
       if (path === "/api/suite/copilot/poll") return copilot.pollLogin(compartment, body.loginId);
+      if (path === "/api/suite/copilot/login/cancel") {
+        if (Object.keys(body).some(key => !["compartment", "loginId", "workspaceBaseUrl"].includes(key))) throw Error("Stop only the exact pending Microsoft sign-in; account and replay fields are refused.");
+        return copilot.cancelLogin(compartment, body.loginId);
+      }
       if (path === "/api/suite/design/observations/review") {
         if (Object.keys(body).some(key => !["compartment", "workspaceBaseUrl", "provider", "sessionIds"].includes(key))) throw new Error("Review only the selected observation sessions and intended designer.");
         return reviewDesignObservations(await store.snapshot(compartment, { provider: body.provider }), body.provider, body.sessionIds);

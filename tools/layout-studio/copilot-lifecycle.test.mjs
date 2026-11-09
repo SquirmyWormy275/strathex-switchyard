@@ -57,6 +57,20 @@ test("fresh workspace policy readback rejects a returned body even when no expli
   let active = true; const f = await copilotFixture(t, { isActive: async () => active }); f.hook(async () => { active = false; });
   await assert.rejects(f.design(), /no longer active/); assert.equal(f.calls.length, 1); assert.equal((await f.store.snapshot("work")).conversations.length, 0);
 });
+test("exact sign-in cancellation while policy authorization is pending prevents later token exchange", async t => {
+  let clock = Date.now();
+  const f = await copilotFixture(t, { now: () => clock, fetcher: async () => new Response(JSON.stringify({ device_code: "SYNTHETIC", user_code: "EXAMPLE", verification_uri: "https://microsoft.com/devicelogin", interval: 5, expires_in: 900 })) });
+  const login = await f.api.beginLogin("work", { tenantId, clientId, approved: true }); clock += 6000;
+  const authorize = f.store.authorize.bind(f.store); let release, paused = false;
+  f.store.authorize = async (...args) => { const result = await authorize(...args); if (!paused) { paused = true; await new Promise(resolve => { release = resolve; }); } return result; };
+  const pending = assert.rejects(f.api.pollLogin("work", login.loginId), /stopped/);
+  try {
+    const deadline = Date.now() + 2000;
+    while (!release) { if (Date.now() >= deadline) throw Error("Original policy authorization did not enter"); await new Promise(resolve => setTimeout(resolve, 5)); }
+    const stopped = await f.api.cancelLogin("work", login.loginId); assert.equal(stopped.localRequestsSettled, false);
+    release(); await pending; assert.equal(f.calls.length, 1); assert.equal((await f.store.snapshot("work")).copilotAccount, undefined);
+  } finally { release?.(); f.store.authorize = authorize; await pending; }
+});
 test("a stop after private history persistence cannot return success or pretend the already received remote reply was undone", async t => {
   const f = await copilotFixture(t), update = f.store.update.bind(f.store); let stopped;
   f.store.update = async (...args) => { const value = await update(...args); if (args[1] === "m365-design") stopped = await f.api.stopCompartment("work"); return value; };

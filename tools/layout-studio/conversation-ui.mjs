@@ -85,9 +85,9 @@ export function mountConversations({ notify, refresh }) {
   controls();
   return {
     id: () => selected,
-    begin() { if ($("send-design").disabled) throw Error("Choose an available conversation and review any account binding or uncertain reply before sending."); const ctx = context(); sending = true; activeSend = ctx; controls(); return ctx; },
+    begin() { if ($("send-design").disabled) throw Error("Choose an available conversation and review any account binding or uncertain reply before sending."); const ctx = { ...context(), ...(provider === "microsoft-365-copilot" ? { requestId: crypto.randomUUID() } : {}) }; sending = true; activeSend = ctx; controls(); return ctx; },
     accepted(ctx, id) { if (!ctx.current()) return false; drafts.delete(key()); selected = id; uncertain = false; return true; },
-    failed(ctx, error, submitted = true) { if (!ctx.current()) return; uncertain = submitted; $("design-status").textContent = submitted ? `Reply unconfirmed: ${error.message}. Your draft is preserved. Refresh saved conversations and deliberately select the exact context before sending again. No automatic retry was made.` : `Message not sent: ${error.message}. Your draft is preserved.`; },
+    failed(ctx, error, submitted = true) { if (!ctx.current()) return; uncertain = submitted; $("design-status").textContent = submitted ? `Reply unconfirmed: ${error.message}. Your draft is preserved.${ctx.requestId ? " Microsoft submission: " + ctx.requestId + ". Review saved delivery outcomes in Your tools before another message." : ""} Refresh saved conversations and deliberately select the exact context before sending again. No automatic retry was made.` : `Message not sent: ${error.message}. Your draft is preserved.`; },
     cancellation() { if ($("cancel-design").disabled) throw Error("Choose the exact pending native conversation before cancellation."); const ctx = context(); return { ...ctx, conversationId: activeSend?.compartment === state.id && activeSend.destination === provider ? activeSend.conversationId : ctx.conversationId }; },
     finish() { sending = false; activeSend = null; controls(); }
   };

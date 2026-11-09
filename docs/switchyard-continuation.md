@@ -258,7 +258,7 @@ Publish tested source and evidence regularly. Retain original failures and front
 
 The installed checkpoint includes guided controls, scanner setup, feed trust,
 saved design conversations and dedicated coding-task text controls.
-Continue remaining background-task controls, account integration recovery and native attachment limitations. Native exact-task
+Continue remaining background-task controls and native attachment limitations. Approved-work account/recovery controls are now implemented in the source checkpoint below. Native exact-task
 attachment, interactive IDE, browser visual review and hardware/account acceptance
 remain separately tracked; the full Rev2 assignment is unfinished.
 
@@ -438,3 +438,23 @@ Normal installation of `cf6a94a` now verifies the 34-asset task frontend at rele
 workspaces and all modes/conversations/selection preserved. Dated backups and
 one rollback verify; the exact 570-file prepared package is removed.
 [Installed evidence](evidence/installed-task-controls-summary.json).
+
+## Approved-work account and recovery controls
+
+Approved-work account controls now use explicit sign-in/check/exact-stop actions,
+with no background polling. Exact cancellation aborts only that pending sign-in;
+a foreign workspace cannot consume or delete its device-code session. The actual
+designer sends a durable UUID. Local request inventory, separate one-use outcome
+review and acknowledgement preserve remote uncertainty without replay or logout.
+
+Ten interaction cases use real HTTP/encrypted state with synthetic Microsoft
+responses. Eight final original groups pass 119 tests; three other groups pass 21 with
+overlap, zero skips and original bounds/cleanup verified. Fourteen running-preview
+checks pass, including keyboard-only acknowledgement and replay refusal. The
+original browser-fixture initialization failure remains retained.
+[Account controls and evidence](copilot-account-controls.md).
+
+This source is not yet normally installed or visually accepted. Approved tenant,
+license and live consent checks remain separate. Continue background-task
+launch/stop controls and exact attachment limitations; current full-platform CI
+and retained native host-action failures remain open.
