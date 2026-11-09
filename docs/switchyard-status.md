@@ -21,6 +21,30 @@ evidence and normal installed verification.
 
 ## Guided frontend checkpoint
 
+The latest Linux release check exposed one stale controller expectation: native
+remote resume no longer accepts CLI permission overrides. Its exact argument
+assertion now matches the production builder; all 126 controller cases pass with
+zero skips under the original bound. The original CI and local failures are
+retained. Relay read-only/on-request enforcement is unchanged. This focused pass
+does not accept the complete Linux suite.
+[Controller evidence](evidence/codex-controller-argument-expectation-summary.json).
+
+The installed app and editor extension now use source `42655aa`. Native Codex
+0.167 renders legacy and paginated saved transcripts through the production
+relay with a synthetic provider. A two-page demonstration verifies original
+cursors, account checks and one narrowed resume. The app passes 69 served/API
+and 115 installed metadata checks; the extension passes 53 payload hashes and
+eight module checks. All 54 semantic workspaces and three conversations remain
+intact. Prepared app/editor packages totaling 6,576,128 bytes are removed.
+[App evidence](evidence/installed-paginated-terminal-summary.json),
+[editor evidence](evidence/installed-editor-terminal-summary.json),
+[native demonstration](evidence/codex-native-paginated-history-summary.json).
+
+Windows source `48bf450` passes the 31-group/356-test client lane, but the full
+run fails scanner/execution UI deadlines and a repeated-focus test. Original
+source/merge identities, commands, bounds, skips and cleanup are audited.
+[Windows results](evidence/native-48bf450-results-summary.json).
+
 Repository inspection now runs the same independent metadata queries in groups
 of four after root verification, joining every started sibling before failure or
 cleanup. The final index witness, query allowlist, owner quota and original
@@ -83,14 +107,14 @@ Windows client run 42579643586 at source 531587b failed before tests because the
 
 Claude Desktop’s owned Windows launch transport now passes eight groups/93 tests and both offline helper builds. Its final review/API/frontend connection now has the separate source evidence above; no actual app or account was used. Exact owner persistence, normal-launch limits and process-birth readback are tested. The 2.8 MB build staging is removed. [Transport evidence](evidence/owned-claude-launch-port-summary.json).
 
-Latest normal installed source ec28d09 adds bounded concurrent Git inspection
+Prior installed source ec28d09 added bounded concurrent Git inspection
 and shortcut diagnostics to the readable permission review and guided controls.
 All 36 assets, 33 API checks and 107 installed metadata checks pass; all 54
 semantic workspaces, three conversations, modes, selection and 57 workflows remain
 intact. Current plus one rollback remain; the 5,173,184-byte prepared package is
 removed. [Installed evidence](evidence/installed-batched-inspection-summary.json).
 
-The pilot VS Code extension is updated from source 99784a7. Its 53 payload files,
+The prior pilot VS Code extension update used source 99784a7. Its 53 payload files,
 three saved-task commands and installed-module registration/refusal checks pass.
 Original extension/registry backups verify; 1,393,488 bytes of owned staging are
 removed. Interactive editor activation and native task attachment remain separate.

@@ -1208,7 +1208,8 @@ test("Linux Codex start binds the App Server thread ID, task, repository, and ex
     assert.equal(saved?.threadId, "019a36f0-1345-7345-b123-123456789abc");
     assert.equal(saved?.taskId, "task-7");
     assert.equal(saved?.targetSnapshotId, "a".repeat(64));
-    assert.deepEqual(vscode.terminalOptions.at(-1)?.shellArgs, ["resume", "--remote", "unix:///synthetic/control.sock", "--sandbox", "read-only", "--ask-for-approval", "on-request", "--cd", root, "019a36f0-1345-7345-b123-123456789abc"]);
+    // Native remote resume rejects CLI permission overrides; the relay enforces the reviewed permissions.
+    assert.deepEqual(vscode.terminalOptions.at(-1)?.shellArgs, ["resume", "--remote", "unix:///synthetic/control.sock", "--cd", root, "019a36f0-1345-7345-b123-123456789abc"]);
     assert.equal(bridge.registered.at(-1)?.metadata["sxsy-b122.codex.threadId"], "019a36f0-1345-7345-b123-123456789abc");
     assert.deepEqual(bridge.registered.at(-1)?.capabilities, ["registered"]);
     const terminal = vscode.createdTerminals[0]!, registeredCount = bridge.registered.length;

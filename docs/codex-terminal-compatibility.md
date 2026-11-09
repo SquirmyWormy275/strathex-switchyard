@@ -7,8 +7,11 @@ The paginated path also renders two saved pages, loading the older turn through
 its original continuation cursor. **Live-provider and actual VS Code GUI
 acceptance remain separate.**
 
-The installed Switchyard application remains `ec28d09`, and the installed
-extension remains source `99784a7`; this source change has not been installed.
+The installed Switchyard application and pilot VS Code extension now use source
+`42655aa`. The app passes 69 served/API and 115 installed metadata checks; the
+extension passes exact payload hashes and eight installed module checks.
+[Application evidence](evidence/installed-paginated-terminal-summary.json),
+[editor evidence](evidence/installed-editor-terminal-summary.json).
 
 ## Connection and permission contract
 

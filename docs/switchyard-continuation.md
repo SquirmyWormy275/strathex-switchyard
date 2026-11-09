@@ -22,57 +22,58 @@ Start with [current status](switchyard-status.md), the [requirement ledger](swit
 
 | Identity | Verified checkpoint |
 | --- | --- |
-| Source | `ec28d09fe42a13e9715af3fe2d3fe0da5bf1557e` |
-| Release | `a171ce4545d15c0a62be9e4070dd4e45dc419305480824b4f1774b88c8e50dbb` |
-| Rollback | `5e6ef12d38e6d8890c3ebc0e29fd422828c1099a6f950165863ed08457f56661` |
+| Source (app and extension) | `42655aa0667dfbf06c88c560a1098ae65543ecf2` |
+| Release | `753bd9bc1f77288934602e6011465107249c95527b80d00c8985964ac6a1dd3c` |
+| Rollback | `a171ce4545d15c0a62be9e4070dd4e45dc419305480824b4f1774b88c8e50dbb` |
 | Frontend | `3265d16737fae14d99c7c5a0792af4c5e7cd743320f0abc84263bf22490770ed` |
 
-The approved frontend is installed at the normal local address. All 36 served assets
-and thirty-three API/inventory metadata/refusal checks pass. Eight installed verifiers pass 107 checks
-with 62 exact module hashes; the workflow verifier checks all 57 definitions.
-All 54 semantic workspaces, Personal selection and the pending keyboard-only
-conversation remain intact. 53 sealed files are byte-identical; the remaining
-workspace changes audit metadata only. No physical keyboard, native provider,
+The normal app update contains the native Codex terminal handshake, restricted
+bootstrap and paginated history. All 36 served assets and 33 API/refusal checks
+pass. Nine installed verifiers pass 115 checks across 65 exact module hashes,
+including all 57 workflow definitions. All 54 semantic workspaces, their modes,
+Personal selection, three conversations and the pending keyboard-only record
+remain intact. 53 sealed files are byte-identical; one changes audit metadata only.
+The access URL and frontend digest are unchanged. No hardware, real native task,
 account, model or microphone operation occurred.
 
-The normal update retains dated launcher backups and current plus one rollback.
-The payload contains 574 files/5,069,400 bytes. Its exact prepared
-575-file/5,173,184-byte bundle is removed after identity/hash verification.
-The frontend digest and private access URL remain unchanged in this backend update. All eight verifiers
-pass with no failed verifier in this update. Host-facing owner, Copilot and
-signed-intent checks run sequentially. Do not repeat executed update or cleanup
-scripts. [Installed evidence](evidence/installed-batched-inspection-summary.json).
+Dated launcher backups and current plus one rollback verify. The installed payload
+has 575 files/5,078,561 bytes. Its prepared 576-file/5,182,490-byte bundle is removed
+only after identity/hash verification. Nine verifiers pass; host-facing checks
+run sequentially. Do not replay update or cleanup scripts.
+[Installed app evidence](evidence/installed-paginated-terminal-summary.json).
 
-All original workspace modes and all three conversation records are preserved.
-Selected Personal was already in companion mode; the pending conversation lives
-in a different keyboard-only workspace. The initial read-only preflight's incorrect
-mode assumption remains recorded and was corrected before mutation. The prior
-28-asset installation remains [historical evidence](evidence/installed-frontend-controls-summary.json).
+The pilot extension now has the corrected native remote-resume argument builders.
+Its 53 payload files and eight installed CommonJS argument/command checks pass.
+The prior 54-file/1,132,216-byte extension and registry are preserved in the dated
+backup `20261109T102446Z`. All other registry rows remain exactly unchanged.
+Prepared 54-file/1,393,638-byte staging is removed, with all three original build
+guardians independently exited. Initial wrapper/readback errors are retained.
+No editor window was reloaded; actual graphical activation remains unaccepted.
+[Installed editor evidence](evidence/installed-editor-terminal-summary.json).
 
-The original stale packaging-source and frozen-Home verifier failures are retained.
-Their exact pins now reference the tested frontend revision, with historical
-evidence and behavioral assertions unchanged. Browser visual acceptance is still
-blocked before inspection; this installation is not visual approval.
-
-Complete Linux 96ac214 is accepted: **376 groups, 2,549 passing tests,
-32 declared skips**. Receipt cfd737eb-5968-4777-ae1e-51a1f2c0f573 preserves every
-original command, bound, skip and child cleanup, serial schedule and four builds
-before compiled consumers. The unit exits zero. Its owned checkout, nine dependency
-aliases, 805 generated files/11,931,780 bytes, empty test parent and active marker
-are removed. No full Linux run is active. This source predates the startup fix.
+Complete Linux 96ac214 remains the last independently audited complete local run:
+376 groups/2,549 passing tests/32 original skips. Its checkout, nine dependency
+aliases and 805 generated files are removed. No local full Linux run is active.
 [Complete Linux evidence](evidence/linux-96ac214-complete-summary.json).
 
-The earlier `9266c12` wrapper syntax failure and corrected run remain historical
-evidence. Do not rerun executed start/audit/cleanup scripts.
-[Prior complete Linux evidence](evidence/linux-9266c12-complete-summary.json).
-
 ## Current Windows verification
+
+Current Linux source `42655aa` release run `42599935484` fails the controller's
+outdated remote-resume CLI permission argument expectation. The corrected exact
+array passes all 126 cases, zero skips, under its original 45-second bound;
+production arguments and relay permissions do not change. Preserve original
+CI/local failure evidence. This is not complete Linux acceptance.
+[Controller evidence](evidence/codex-controller-argument-expectation-summary.json).
+
+Next: publish the installed checkpoint and corrected controller expectation;
+investigate Windows scanner/execution UI file deadlines using measured phase
+timings. Do not infer performance acceptance from the Linux pass or relax bounds.
 
 Native Codex paginated history is now connected for the reviewed 0.167 terminal.
 An isolated actual TUI renders two saved item pages and loads the older turn
 through its original cursor. Thirteen integration groups pass 136 tests with one
 existing skip; final history/package groups pass 39 with zero skips. Four owned
-probe roots/93,752 bytes are removed. Source remains uninstalled.
+probe roots/93,752 bytes are removed. This source is installed above.
 [Evidence](evidence/codex-native-paginated-history-summary.json).
 
 At source 48bf450, the Windows client lane passes all 31 groups/356 tests with
@@ -92,7 +93,7 @@ synthetic saved task and transcript through the production handshake and relay,
 with no reconnect or model prompt. Optional catalog queries receive local errors;
 they never reach the provider. All twelve diagnostic roots and 254,286 bytes are
 removed. The later paginated demonstration is recorded above; live-provider and actual
-IDE acceptance remain separate. These source changes are not installed.
+IDE acceptance remain separate. These source changes are now installed above.
 [Current native contract](codex-terminal-compatibility.md),
 [audited evidence](evidence/codex-native-bootstrap-summary.json).
 

@@ -57,9 +57,10 @@ The subsequent [native terminal compatibility check](codex-terminal-compatibilit
 exercises the real 0.167 TUI with the production handshake/relay and a synthetic
 provider. Startup, a narrowed read-only resume and rendering of a synthetic saved
 legacy transcript now pass. Thirteen integration groups pass 128 tests with one
-existing platform skip; the final focused run passes 27. Paginated history,
-authenticated provider acceptance and actual VS Code GUI acceptance remain
-separate. [Bootstrap evidence](evidence/codex-native-bootstrap-summary.json).
+existing platform skip; the final focused run passes 27. The subsequent paginated
+path renders two saved pages in the actual terminal and passes 39 final
+history/package checks. Authenticated provider and actual VS Code GUI acceptance
+remain separate. [Bootstrap evidence](evidence/codex-native-bootstrap-summary.json).
 
 The review uses the [official App Server contract](https://learn.chatgpt.com/docs/app-server),
 [0.166 feature parser](https://github.com/openai/codex/blob/rust-v0.166.0/codex-rs/features/src/lib.rs),

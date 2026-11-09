@@ -70,19 +70,19 @@ accept later changes.
 
 | Scope | Verified result |
 | --- | --- |
-| Installed Linux application, `ec28d09` | 36 served assets, 33 API checks and 107 installed metadata checks; 54 semantic workspaces preserved. [Receipt](docs/evidence/installed-batched-inspection-summary.json) |
+| Installed Linux application, `42655aa` | 36 served assets, 33 API checks and 115 installed metadata checks; 54 semantic workspaces preserved. [Receipt](docs/evidence/installed-paginated-terminal-summary.json) |
 | Running synthetic demonstration, `dfa40fb` | Nine checks: named connection, signed acknowledgement and stale-workspace refusal. [Receipt](docs/evidence/batched-inspection-running-demo-summary.json) |
-| Native Codex terminal, synthetic provider | Real 0.167 CLI renders a saved legacy transcript through the production relay; one narrowed resume, zero model prompts. [Receipt](docs/evidence/codex-native-bootstrap-summary.json) |
+| Native Codex terminal, synthetic provider | Real 0.167 CLI renders legacy and paginated saved transcripts through the production relay; one narrowed resume, zero model prompts. [Receipt](docs/evidence/codex-native-paginated-history-summary.json) |
 | Native Linux repository inspection | Twelve real Git guardians, at most four concurrent reads, independent exit and unchanged repository bytes. [Receipt](docs/evidence/batched-inspection-source-summary.json) |
 | Complete Linux suite, `96ac214` | 376 groups, 2,549 passing tests, 32 declared skips. [Receipt](docs/evidence/linux-96ac214-complete-summary.json) |
-| Windows client lane, `99784a7` | 31 groups, 356 passing tests, zero skips. [Receipt](docs/evidence/client-native-99784a7-summary.json) |
+| Windows client lane, `48bf450` | 31 groups, 356 passing tests, zero skips; the full Windows suite still fails. [Receipt](docs/evidence/native-48bf450-results-summary.json) |
 | Earlier Windows package, `7529718` | 462 groups, 2,910 passing tests, 246 declared skips; bundle construction and smoke checks pass. [Receipt](docs/evidence/windows-package-7529718-summary.json) |
 
-**Unfinished software:** paginated native task history, Linux Claude Desktop
-focus/launch, and the broader observation and scanner capabilities tracked in the
-ledger. The latest full Windows failures include two UI timeouts and a shortcut
-writer timeout; their resolution is not established by Linux results.
-[Retained Windows failures](docs/evidence/native-96ac214-failures-summary.json).
+**Unfinished software:** Linux Claude Desktop focus/launch and the broader
+observation and scanner capabilities tracked in the ledger. Windows scanner and
+execution screens still exceed their test limits; a repeated-focus cycle also
+has a retained failure. These remain unresolved.
+[Retained Windows failures](docs/evidence/native-48bf450-results-summary.json).
 
 **Separate acceptance checks:** browser task/visual review, physical F77/B122
 changes, approved Microsoft tenant access, live native accounts/tasks, interactive
