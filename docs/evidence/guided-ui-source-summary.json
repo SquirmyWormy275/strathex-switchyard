@@ -123,5 +123,30 @@
     "Browser tool fails before navigation/inspection; reset did not fix it and the in-app browser is unavailable.",
     "Native editor activation and broader frontend controls remain implementation work.",
     "No hardware, live account, native-task, microphone or installed acceptance is claimed."
-  ]
+  ],
+  "sourceCommit": "80b0bfe550b6c3ffb903ba53a5e1bf0d73a45a70",
+  "preparedFrontend": {
+    "digest": "9d69c8411788228a23a6ce3f45801f77c50fbde8b0652c94620b4aed5d4eeb79",
+    "files": 20,
+    "immutableAssetsVerified": true,
+    "visualAccepted": false,
+    "installed": false
+  },
+  "syntheticInteractiveServerBackend": {
+    "passed": true,
+    "stages": [
+      "bootstrap",
+      "F77 reference",
+      "cached source match",
+      "typing-layer preservation",
+      "named connection",
+      "status dispatch",
+      "hardware/native-task refusal",
+      "workspace isolation"
+    ],
+    "controls": 4,
+    "visualBrowserAccepted": false,
+    "realHardwareOpened": false,
+    "realAccountsUsed": false
+  }
 }

@@ -79,13 +79,15 @@ Passing follow-ups do not establish the cause of earlier intermittent failures. 
 - [Restricted-storage retirement](evidence/restricted-storage-47c80be-failure-summary.json): retain native phase/error diagnostics and QUERY-only permissions.
 - [Host-action settlement](evidence/host-action-settlement-diagnostic-summary.json): the original two-second observation expired. Fixture cleanup and closed diagnostic tags improved; original 75 ms coordination/effect and 2,000 ms observation limits remain. The [15-test native follow-up](evidence/host-action-settlement-native-followup-summary.json) passes without proving the original cause.
 
-## Guided frontend work now in progress
+## Guided frontend source checkpoint
 
-The owner-approved frontend connects Home progress, named role choices, separate
+Source 80b0bfe550b6c3ffb903ba53a5e1bf0d73a45a70 connects Home progress, named role choices, separate
 connection/action reviews, cached-readout source inspection and role shortcut
 review. Saved-readout import now preserves the captured typing layer and persists
 a separate profile. See [the walkthrough](guided-setup.md). Production editor
 activation and broader controls remain independent implementation work.
+
+The prepared immutable frontend is 9d69c8411788228a23a6ce3f45801f77c50fbde8b0652c94620b4aed5d4eeb79. Its 20 assets verify and the prior pointer has a dated copy. It is not installed or visually accepted. The fourteen-group source run passes 156 tests; five final groups pass 40 tests with overlap, preserving original bounds and cleanup. The separate interactive server passes eight backend stages with synthetic data. [Evidence](evidence/guided-ui-source-summary.json).
 
 Browser tooling currently fails before navigation/inspection with
 `Cannot read properties of undefined (reading 'timeoutMs')`. Reset did not help;
