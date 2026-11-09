@@ -20,11 +20,21 @@ no full Linux run remains active. Later source changes have focused evidence.
 
 ## Guided frontend checkpoint
 
+Post-refusal role refresh now reads current saved labels and disables stale
+choices if that read fails. Two UI regressions reproduced stale labels; seven
+groups pass 88 tests. Windows client source `51ce508` remains failed with 334
+passes and one asynchronous fixture-teardown error. The corrected test joins
+visible readiness under the unchanged deadline; native follow-up is pending.
+[Source correction](evidence/role-refusal-refresh-source-summary.json),
+[original Windows failure](evidence/client-native-51ce508-failure-summary.json).
+
 Home's connected-control step now selects a saved role and its actual intent,
 refreshes choices and brings the next button into focus. It previously left an
 unrelated control selected and disabled. Seven groups pass 87 checks, including
 the integrated Home/role HTTP journey and late-navigation refusal. Normal
-installed adoption and browser visual acceptance remain separate.
+installed source `7a9f9c1` passes 65 served/API and 107 metadata checks with all
+54 semantic workspaces preserved. Browser visual acceptance remains separate.
+[Installed evidence](evidence/installed-home-role-summary.json).
 [Source evidence](evidence/home-connected-control-source-summary.json).
 
 Native Windows client source `58ecd54` passes all **31 groups and 327 tests with

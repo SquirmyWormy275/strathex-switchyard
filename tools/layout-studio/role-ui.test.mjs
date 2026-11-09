@@ -68,11 +68,13 @@ for (const change of ["another target", "same target", "role label", "same works
     c.click("confirm-role-connection");
     await until(() => c.responses.some(row => /\/roles\/dispatch(?:-choice)?$/.test(row.path)));
     await c.responses.find(row => /\/roles\/dispatch(?:-choice)?$/.test(row.path)).response;
-    await until(() => !c.$("role-connection-dialog").open);
+    await until(() => !c.$("role-connection-dialog").open && !c.$("try-agent-role").disabled);
     const state = await c.store.snapshot("personal");
     assert.equal(state.agents.every(agent => agent.commands.length === 0), true, "confirmation must not queue a command for a changed reviewed choice");
     assert.equal(state.intentResults?.length ?? 0, 0);
     assert.match(c.$("role-result").textContent, /reviewed role connection changed/);
+    if (change === "another target") assert.match(c.$("role-target").selectedOptions[0].textContent, /^beta/);
+    if (change === "role label") assert.equal(c.$("role-picker").selectedOptions[0].textContent, "Replacement role");
   }));
 }
 
@@ -118,6 +120,16 @@ test("named picker uses the real HTTP contract, requires review, and saves witho
   assert.equal(calls.some(call => call.path.endsWith("/dispatch")), false);
 }));
 
+test("a failed refresh after refusal preserves the error and disables stale connection controls", () => uiFixture(async c => {
+  c.mount({ refresh: async () => { throw Error("Synthetic saved-state read unavailable"); } });
+  await c.refresh(); await until(() => !c.$("try-agent-role").disabled);
+  c.click("try-agent-role"); await c.bind("beta"); c.click("confirm-role-connection");
+  await until(() => !c.$("role-connection-dialog").open && /Saved connections could not be refreshed/.test(c.$("role-choice-status").textContent));
+  assert.match(c.$("role-result").textContent, /reviewed role connection changed/);
+  assert.equal(c.$("try-agent-role").disabled, true); assert.equal(c.$("bind-agent-role").disabled, true);
+  assert.equal((await c.store.snapshot("personal")).agents.every(agent => agent.commands.length === 0), true);
+}));
+
 test("a late old-workspace inventory cannot repopulate or enable the picker", () => uiFixture(async ({ mount, refresh, $, document, store }) => {
   let resolve, entered;
   const called = new Promise(done => { entered = done; });
@@ -135,7 +147,7 @@ test("a changed saved connection refuses the reviewed choice and preserves the o
   change("role-target", "1"); click("bind-agent-role");
   await store.update("personal", "synthetic-ui-race", state => { state.agents.find(agent => agent.id === "beta").sessionId = "replacement-beta"; });
   click("confirm-role-connection"); await until(() => /saved role connection changed/.test($("role-result").textContent));
-  await until(() => !$("role-connection-dialog").open);
+  await until(() => !$("role-connection-dialog").open && !$("try-agent-role").disabled);
   assert.equal((await store.snapshot("personal")).roleBindings[0].targetId, "alpha");
   assert.equal(((await store.snapshot("personal")).agentCommands ?? []).length, 0);
 }));

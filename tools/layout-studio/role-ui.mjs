@@ -90,7 +90,16 @@ export function mountRoles({ notify, refresh, request = api }) {
       notify($("role-result").textContent);
       document.dispatchEvent(new CustomEvent("switchyard-role-result", { detail: result }));
       await refresh();
-    } catch (error) { if (review.generation === generation) { $("role-result").textContent = error.message; notify(error.message); await choicesForRole(); } }
+    } catch (error) {
+      if (review.generation === generation) {
+        $("role-result").textContent = error.message; notify(error.message);
+        invalidate(); const version = generation;
+        try { await refresh(); }
+        catch (refreshError) {
+          if (version === generation) { state = null; invalidate(); $("role-choice-status").textContent = `Saved connections could not be refreshed. Reconnect the workspace before trying again. ${refreshError.message}`; }
+        }
+      }
+    }
     finally { busy = false; $("role-connection-dialog").close(); controls(); }
   });
   $("compartment-picker").addEventListener("change", () => { state = null; invalidate(); });

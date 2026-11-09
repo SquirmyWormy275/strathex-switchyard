@@ -1,0 +1,79 @@
+{
+  "schema": "switchyard-client-native-verification/v1",
+  "sourceCommit": "51ce508041ca17ea724a5fb97744d59245aa72c7",
+  "mergeCommit": "98bb46aa75fbbbe9e35330b3fe9e6ae5d85bca77",
+  "sourceTree": "6d24dfcf7daf4dc47af943fa6892e3f1e5ad36e7",
+  "workflowRunId": 42575533662,
+  "jobId": 129023767717,
+  "jobConclusion": "failure",
+  "originalJobBoundMinutes": 15,
+  "receiptId": "5b21a7a0-0802-43bd-8e19-a24b4eef68fe",
+  "receiptSha256": "781ea50fece04d0ac87ddbae5e900139fd73c2fb2cbb8808060fdd6ec4eb3129",
+  "artifactSha256": "9feca86d6063891abade6d8d189e60bb15872d29fe6e3a02e1acf77c6998cbb3",
+  "totals": {
+    "required": 31,
+    "passed": 30,
+    "failed": 1,
+    "tests": 335,
+    "passedTests": 334,
+    "failedTests": 1,
+    "skippedTests": 0,
+    "cancelledTests": 0,
+    "todoTests": 0
+  },
+  "files": [
+    "scripts/vscode-windows-runtime.test.mjs",
+    "deployment/suite/release.test.mjs",
+    "tools/layout-studio/suite.test.mjs",
+    "tools/layout-studio/integrations.test.mjs",
+    "tools/layout-studio/role-dispatch.test.mjs",
+    "tools/layout-studio/guided-role-choices.test.mjs",
+    "tools/layout-studio/role-ui.test.mjs",
+    "tools/layout-studio/native-focus-ui.test.mjs",
+    "tools/layout-studio/connection-ui.test.mjs",
+    "tools/layout-studio/client-launch.test.mjs",
+    "tools/layout-studio/physical-intent.test.mjs",
+    "tools/layout-studio/native-focus-gateway.test.mjs",
+    "tools/layout-studio/windows-native-focus.test.mjs",
+    "tools/layout-studio/windows-terminal-process.test.mjs",
+    "tools/layout-studio/windows-editor-endpoint.test.mjs",
+    "tools/layout-studio/windows-terminal-peer.test.mjs",
+    "tools/layout-studio/editor-websocket-frames.test.mjs",
+    "tools/layout-studio/windows-editor-ingress.test.mjs",
+    "tools/layout-studio/windows-codex-editor-connection.test.mjs",
+    "tools/layout-studio/windows-owned-stdio.test.mjs",
+    "tools/layout-studio/codex-windows-tasks.test.mjs",
+    "tools/layout-studio/codex-retained-editor-client.test.mjs",
+    "tools/layout-studio/windows-editor-journal.test.mjs",
+    "tools/layout-studio/windows-editor-recovery.test.mjs",
+    "tools/layout-studio/windows-coding-editor-connections.test.mjs",
+    "apps/windows-companion/test/repository-runtime.test.ts",
+    "apps/vscode-extension/test/codex-windows-terminal.test.ts",
+    "apps/vscode-extension/test/studio-windows-task-client.test.ts",
+    "apps/vscode-extension/test/studio-windows-native.test.ts",
+    "apps/vscode-extension/test/studio-windows-editor-launch.test.ts",
+    "apps/vscode-extension/test/studio-windows-editor-files.test.ts"
+  ],
+  "originalCommandsBoundsSkipsAndCleanupVerified": true,
+  "serialScheduleVerified": true,
+  "sourceManifestForWindowsVerified": true,
+  "localNativeBinaryDownloaded": false,
+  "failures": [
+    {
+      "file": "tools/layout-studio/role-ui.test.mjs",
+      "counts": {
+        "total": 9,
+        "passed": 8,
+        "failed": 1,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "diagnostic": "TAP version 13\n# (node:5844) ExperimentalWarning: Transform Types is an experimental feature and might change at any time\n# (Use `node --trace-warnings ...` to show where the warning was created)\n# Subtest: confirming an open control review refuses another target changed in another window\nok 1 - confirming an open control review refuses another target changed in another window\n  ---\n  duration_ms: 1115.889\n  type: 'test'\n  ...\n# Subtest: confirming an open control review refuses same target changed in another window\nok 2 - confirming an open control review refuses same target changed in another window\n  ---\n  duration_ms: 1061.3314\n  type: 'test'\n  ...\n# Subtest: confirming an open control review refuses role label changed in another window\nok 3 - confirming an open control review refuses role label changed in another window\n  ---\n  duration_ms: 1072.7241\n  type: 'test'\n  ...\n# Subtest: confirming an open control review refuses same workspace selection changed in another window\nnot ok 4 - confirming an open control review refuses same workspace selection changed in another window\n  ---\n  duration_ms: 918.2713\n  type: 'test'\n  location: 'D:\\\\a\\\\strathex-switchyard\\\\strathex-switchyard\\\\tools\\\\layout-studio\\\\role-ui.test.mjs:10:3'\n  failureType: 'uncaughtException'\n  error: \"Cannot read properties of undefined (reading 'getElementById')\"\n  code: 'ERR_TEST_FAILURE'\n  name: 'TypeError'\n  stack: |-\n    $ (file:///D:[redacted].mjs:9:28)\n    Element.<anonymous> (file:///D:[redacted].mjs:82:29)\n  ...\n# Subtest: a saved homepage role can be reviewed and tried without sending empty workflow content\nok 5 - a saved homepage role can be reviewed and tried without sending empty workflow content\n  ---\n  duration_ms: 1396.3542\n  type: 'test'\n  ...\n# Subtest: named picker uses the real HTTP contract, requires review, and saves without dispatch\nok 6 - named picker uses the real HTTP contract, requires review, and saves without dispatch\n  ---\n  duration_ms: 1071.8645\n  type: 'test'\n  ...\n# Subtest: a late old-workspace inventory cannot repopulate or enable the picker\nok 7 - a late old-workspace inventory cannot repopulate or enable the picker\n  ---\n  duration_ms: 1007.2182\n  type: 'test'\n  ...\n# Subtest: a changed saved connection refuses the reviewed choice and preserves the original binding\nok 8 - a changed saved connection refuses the reviewed choice and preserves the original binding\n  ---\n  duration_ms: 1130.4527\n  type: 'test'\n  ...\n# Subtest: keyboard-only mode returns useful guidance without querying or enabling a connection\nok 9 - keyboard-only mode returns useful guidance without querying or enabling a connection\n  ---\n  duration_ms: 1003.7595\n  type: 'test'\n  ...\n1..9\n# tests 9\n# suites 0\n# pass 8\n# fail 1\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 11313.7244\n"
+    }
+  ],
+  "limitations": [
+    "Native metadata, protocol, encrypted store, helper ownership and UI fixture coverage; no actual client window, shortcut, account, tenant, task, hardware or visual acceptance.",
+    "The exact-choice confirmation guards passed their native assertions; this lane remains failed because one UI fixture restored its global document before asynchronous post-refusal refresh completed. A later source correction joins visible readiness; native follow-up remains separate."
+  ]
+}

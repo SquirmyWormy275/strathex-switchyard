@@ -1,5 +1,18 @@
 # Keep a command with its original role binding
 
+After a refused confirmation, the picker now refreshes the saved workspace before
+offering another review. An independent rebind or role rename therefore shows its
+current label. If that read fails, stale choices are disabled and the original
+refusal remains visible. Nothing is retried. Two regressions reproduced the stale
+labels; seven groups pass 88 tests with zero skips.
+[Refresh evidence](evidence/role-refusal-refresh-source-summary.json).
+
+The Windows client run at `51ce508` remains failed: 334 tests passed and one UI
+case accessed its borrowed document after fixture teardown. Assertions now join
+the visible ready state before returning the document. Original deadlines and
+production command guards remain unchanged; native follow-up is still pending.
+[Original native failure](evidence/client-native-51ce508-failure-summary.json).
+
 An open **Try this connected control** review now retains the exact choice shown
 in its dialog. If another window changes the binding, role, connection identity
 or saved workspace selection before confirmation, the request refuses. Rebinding

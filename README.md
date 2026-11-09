@@ -86,14 +86,14 @@ execution, offline repository scans and recoverable installation. The Home and
 Model F catalog provide the starting experience; complete task/IDE attachment,
 broader observation sources and full scanner coverage remain unfinished.
 
-The installed application at `51ce508` includes guided setup, portable profiles,
+The installed application at `7a9f9c1` includes guided setup, portable profiles,
 observation-assisted design, keyboard/client controls, task permissions, scanners,
 signed feeds and reviewed execution. Saved conversations, coding-task and account
 controls, native-app navigation, agent maintenance, voice notes, transcript import
 and separately opted-in Claude hook setup are connected. All 36 served hashes,
 29 API checks and 107 installed metadata checks pass; all 54 semantic workspaces
 and 57 workflows are preserved. Browser visual acceptance remains blocked.
-[Installed evidence](docs/evidence/installed-reviewed-role-choice-summary.json).
+[Installed evidence](docs/evidence/installed-home-role-summary.json).
 The running synthetic demonstration verifies named-role dispatch, independent SDK
 acknowledgement and workspace-change refusal through the current served frontend;
 the seven-stage connected backend journey also passes.
