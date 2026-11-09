@@ -23,7 +23,7 @@ For exact saved coding-task connections, use the separate
 resume a repository session or submit a prompt.
 
 **Your tools → Return to an open app** connects the separate exact native ChatGPT
-and VS Code focus paths, with Windows executable review and retained helper
+and VS Code focus paths, plus Claude Desktop on Windows, with executable review and retained helper
 recovery. [Native app walkthrough](native-app-controls.md).
 
 Five interaction cases use the actual authenticated API, encrypted state and

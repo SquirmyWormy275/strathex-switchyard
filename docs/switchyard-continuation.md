@@ -22,26 +22,26 @@ Start with [current status](switchyard-status.md), the [requirement ledger](swit
 
 | Identity | Verified checkpoint |
 | --- | --- |
-| Source | `23293d1a48efeb1324603b4d1bc4369a6172ad33` |
-| Release | `f9e73add415652feec892613ccca36b604a9d4ba2f33b10f86c11020f51e7479` |
-| Rollback | `ff9e2aa65185f7dd9c2839619bb05ab16d230660abc1e44bf467723c0f73e7a4` |
-| Frontend | `184196a44a75798ae0bad063845336eed8f6c47c73d7a452ad2256e70e482893` |
+| Source | `49602de9f5482ec72542bb63313bb244674cef79` |
+| Release | `bbf92036b0c6b666640b6c09a3ea677e1c4fd397dc00900d5a8fdde679dc32b8` |
+| Rollback | `f9e73add415652feec892613ccca36b604a9d4ba2f33b10f86c11020f51e7479` |
+| Frontend | `6adafc7e4531d0156247377d1066d24ffaeb91160d7f5dc0aa551757baea1a2e` |
 
 The approved frontend is installed at the normal local address. All 36 served assets
-and twenty-two API/inventory metadata/refusal checks pass. Eight installed verifiers pass 103 checks
-with 60 exact module hashes; the workflow verifier checks all 57 definitions.
+and twenty-five API/inventory metadata/refusal checks pass. Eight installed verifiers pass 106 checks
+with 62 exact module hashes; the workflow verifier checks all 57 definitions.
 All 54 semantic workspaces, Personal selection and the pending keyboard-only
 conversation remain intact. 53 sealed files are byte-identical; the remaining
 workspace changes audit metadata only. No physical keyboard, native provider,
 account, model or microphone operation occurred.
 
 The normal update retained and verified dated launcher backups and current plus
-one rollback. The payload contains 574 files/5,046,103 bytes. Its exact prepared
-575-file/5,149,887-byte bundle is removed after identity/hash verification. The
+one rollback. The payload contains 574 files/5,049,367 bytes. Its exact prepared
+575-file/5,153,151-byte bundle is removed after identity/hash verification. The
 private access token intentionally changed with the frontend digest; use the normal
 launcher/new endpoint rather than restoring the old token. Host-facing owner,
 Copilot and signed-intent checks ran sequentially. Do not repeat executed update
-or cleanup scripts. [Installed evidence](evidence/installed-claude-hook-controls-summary.json).
+or cleanup scripts. [Installed evidence](evidence/installed-claude-desktop-controls-summary.json).
 
 All original workspace modes and all three conversation records are preserved.
 Selected Personal was already in companion mode; the pending conversation lives
@@ -105,7 +105,7 @@ Only bounded digest-verified JSON receipts remain locally outside the checkout. 
 
 ## Recent backend behavior
 
-- Windows Claude Desktop is connected through native executable review, saved identity, focus, physical dispatch and shortcut controls. Source verification passes 177 checks plus 39 final UI checks with overlap; offline helper build/self-test passes. Actual Windows image/window acceptance, Linux Claude focus and launch remain separate. Normal installed adoption is pending. [Source evidence](evidence/claude-desktop-focus-source-summary.json).
+- Windows Claude Desktop is connected through native executable review, saved identity, focus, physical dispatch and shortcut controls. Source verification passes 177 checks plus 39 final UI checks with overlap; offline helper build/self-test passes. Actual Windows image/window acceptance, Linux Claude focus and launch remain separate. Normal installed adoption passes 61 served/API and 106 installed checks, with all 54 workspaces preserved. [Source evidence](evidence/claude-desktop-focus-source-summary.json).
 - Linux release run `42568708712`, job `129000860981`, at `947d982` failed before tests when the pinned Bubblewrap download returned HTTP 504. Preserve the failure; no manual retry/cancel/dispatch or bound change. [Receipt](evidence/linux-947-download-failure-summary.json).
 
 - Claude hook observations now have a separate source, exact destination/session recipe preview and local stdin command. Eight groups/111 tests and fourteen running-preview checks pass, with independent Node processes and encrypted storage. The original expired synthetic-fixture failure is retained. No actual Claude settings, hook invocation, account or task was touched. Normal installed adoption now passes 58 served/API and 103 installed checks with all 54 semantic workspaces preserved; native hook invocation and browser acceptance remain separate. [Contract](claude-hook-observation.md), [source evidence](evidence/claude-hook-source-summary.json).

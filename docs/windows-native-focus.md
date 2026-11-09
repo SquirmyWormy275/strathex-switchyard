@@ -8,7 +8,7 @@ conversation, resume a task, launch an application or submit a prompt.
 The service and authenticated gateway are implemented and exercised with the real
 encrypted store, executable hashing and native protocol parser. Windows process,
 Authenticode and window responses are synthetic in those checks. Actual Windows
-desktop acceptance remains pending. In **Your tools → Native apps**, choose the
+desktop acceptance remains pending. In **Your tools → Return to an open app**, choose the
 application, review its installed executable, save that exact identity, then
 review returning to its already open window. **Customize → Connect to this
 computer** can review a navigation shortcut after that setup. Project selection
@@ -62,6 +62,14 @@ host layout remains unknown, app windows remain unobserved, and the native helpe
 still verifies the US host layout and chord at registration. Five groups/78 tests
 pass through the real authenticated discovery route and pure metadata checks.
 [Discovery evidence](evidence/windows-shortcut-discovery-source-summary.json).
+
+The normal Linux installation contains these exact sources and passes 61 served
+asset/API checks and 106 installed metadata checks across 62 module hashes. All
+54 semantic workspaces, 57 workflow definitions and three conversations remain
+intact. The current release and one rollback remain; both prepared copies are
+removed after digest/ownership verification. This accepts the installed Linux
+refusal and metadata boundaries, not an interactive Windows desktop.
+[Installed evidence](evidence/installed-claude-desktop-controls-summary.json).
 
 Claude Desktop has its own encrypted configuration and compiled desktop product
 identity. It cannot reuse a ChatGPT request or select Claude Code. The existing

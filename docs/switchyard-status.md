@@ -21,7 +21,9 @@ as errors and passes its portable self-test and Linux refusal. Both temporary
 build copies are removed; the original incomplete staging failure is retained.
 Interactive Windows image/window acceptance, Linux Claude focus and application
 launch remain separate. [Controls and evidence](windows-native-focus.md).
-Normal installed adoption of this source is pending.
+Normal installed source `49602de` passes 61 served/API and 106 installed checks
+across 62 exact module hashes, with all 54 workspaces preserved.
+[Installed evidence](evidence/installed-claude-desktop-controls-summary.json).
 
 Windows discovery now exposes the implemented shortcut bridge, fixing a disabled
 frontend path. Five groups/78 checks pass without claiming keyboard layout,
