@@ -22,12 +22,12 @@ Start with [current status](switchyard-status.md), the [requirement ledger](swit
 
 | Identity | Verified checkpoint |
 | --- | --- |
-| Source | `cf6a94a7359847addf3209b04dd8ca3f2370a2b6` |
-| Release | `4330746ca22b5544dd0257e646a129dfb2275ab6b325c5ec5f9c5b5bb727f99c` |
-| Rollback | `db142f7c6fa6d2717856d709d739135bfd6cf04ddeb2dca2e8c4f500196ff916` |
-| Frontend | `f96ce01b96b12459fd39b89eca9e16ca826177eab8e749467d73584f48ac45c8` |
+| Source | `00fd64306593336d3589d6c3d335d29f33464341` |
+| Release | `bdbc8132faaf2de79e2633aa715e4440c129bae6f404374e19efa7769bfa80e3` |
+| Rollback | `4330746ca22b5544dd0257e646a129dfb2275ab6b325c5ec5f9c5b5bb727f99c` |
+| Frontend | `2159625c985e59a2291da1e3db4c98d80daa8a072b8c11d991fede5b5cbc2e51` |
 
-The approved frontend is installed at the normal local address. All 34 served assets
+The approved frontend is installed at the normal local address. All 35 served assets
 and four API metadata/refusal checks pass. Eight installed verifiers pass 100 checks
 with 58 exact module hashes; the workflow verifier checks all 57 definitions.
 All 54 semantic workspaces, Personal selection and the pending keyboard-only
@@ -36,12 +36,12 @@ workspace changes audit metadata only. No physical keyboard, native provider,
 account, model or microphone operation occurred.
 
 The normal update retained and verified dated launcher backups and current plus
-one rollback. The payload contains 569 files/4,964,724 bytes. Its exact prepared
-570-file/5,067,650-byte bundle is removed after identity/hash verification. The
+one rollback. The payload contains 570 files/4,980,769 bytes. Its exact prepared
+571-file/5,083,921-byte bundle is removed after identity/hash verification. The
 private access token intentionally changed with the frontend digest; use the normal
 launcher/new endpoint rather than restoring the old token. Host-facing owner,
 Copilot and signed-intent checks ran sequentially. Do not repeat executed update
-or cleanup scripts. [Installed evidence](evidence/installed-task-controls-summary.json).
+or cleanup scripts. [Installed evidence](evidence/installed-lifecycle-controls-summary.json).
 
 All original workspace modes and all three conversation records are preserved.
 Selected Personal was already in companion mode; the pending conversation lives
@@ -258,7 +258,7 @@ Publish tested source and evidence regularly. Retain original failures and front
 
 The installed checkpoint includes guided controls, scanner setup, feed trust,
 saved design conversations and dedicated coding-task text controls.
-Background-task and approved-work account/recovery controls are now implemented in the source checkpoints below. Continue normal installed adoption and native attachment limitations. Native exact-task
+Background-task and approved-work account/recovery controls are now implemented in the source checkpoints below. Continue native attachment limitations and current platform acceptance. Native exact-task
 attachment, interactive IDE, browser visual review and hardware/account acceptance
 remain separately tracked; the full Rev2 assignment is unfinished.
 
@@ -485,3 +485,13 @@ host-action failures remain separate acceptance work.
 
 Background-control source e4561ad58dd49e65fcaf39bae9e02d9828ea93cc has an immutable 35-asset frontend
 2159625c985e59a2291da1e3db4c98d80daa8a072b8c11d991fede5b5cbc2e51. All source/bundle bytes and the dated prior pointer backup verify. It is not yet normally installed or visually accepted.
+
+The account/background controls are now normally installed at source `00fd643`,
+release `bdbc8132`: 35 assets/four routes plus 100 installed checks pass, with
+58 exact modules, all 54 semantic workspaces and 57 definitions preserved.
+Eighteen installer/package/refusal groups pass 29 tests. Dated backups and
+one rollback verify; the owned 571-file/5,083,921-byte prepared package is
+removed. [Installed evidence](evidence/installed-lifecycle-controls-summary.json).
+Do not repeat executed lifecycle update/readback/cleanup scripts. Native exact
+attachment and Claude desktop launch remain unfinished implementation; browser,
+interactive IDE, live accounts/hardware and newest CI remain separate.

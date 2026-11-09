@@ -9,13 +9,14 @@ entry point, evidence and remaining work. A hardware/account check does not excu
 unfinished independent software. Read [current status](switchyard-status.md) for
 accepted checkpoints and [verification](verification.md) for reproducible checks.
 
-Installed Linux source `cf6a94a` includes the 34-asset guided frontend, permissions,
+Installed Linux source `00fd643` includes the 35-asset guided frontend, permissions,
 scanner setup, signed-feed maintenance, reviewed execution, saved design
-conversations and dedicated coding-task text controls. All served asset
+conversations, coding-task text/background controls and approved-work account/
+recovery controls. All served asset
 hashes, four API checks and 100 metadata/refusal checks across 58 exact modules
 pass, preserving all 54 semantic workspaces and 57 workflow definitions.
 Current plus one rollback remain and the prepared package is removed.
-[Installed evidence](evidence/installed-task-controls-summary.json).
+[Installed evidence](evidence/installed-lifecycle-controls-summary.json).
 
 The installed source also includes [saved design-conversation controls](saved-conversation-controls.md):
 exact history selection, reviewed legacy account binding, explicit native status

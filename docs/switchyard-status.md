@@ -135,18 +135,20 @@ tree and local reproduction are retained. No current full-platform pass is claim
 
 The normal installed application includes guided setup, portability, observation,
 keyboard/client controls, permissions/scanners/feeds/execution, saved design
-conversations and dedicated coding-task text controls at source `cf6a94a`,
-release `4330746c`. All 34 served asset hashes and four API checks pass; eight
+conversations, coding-task text/background controls and approved-work account/
+recovery controls at source `00fd643`,
+release `bdbc8132`. All 35 served asset hashes and four API checks pass; eight
 installed verifiers pass 100 checks across 58 exact modules. All 54 semantic
 workspaces, 57 workflow definitions, modes, selection and conversation records
 remain intact. Fifty-three sealed files are byte-identical; one changes audit only.
 
-Dated launcher backups verify and the previous `db142f7c` release is the single
-rollback. The 569-file payload is 4,964,724 bytes; its exact prepared copy
-(570 files/5,067,650 bytes) is removed after identity/hash verification. No live
+Dated launcher backups verify and the previous `4330746c` release is the single
+rollback. The 570-file payload is 4,980,769 bytes; its exact prepared copy
+(571 files/5,083,921 bytes) is removed after identity/hash verification. No live
 account/task/model or hardware operation occurred. Visual acceptance remains
-blocked before browser inspection. [Exact installed evidence](evidence/installed-task-controls-summary.json).
-Earlier [32-asset](evidence/installed-scanner-controls-summary.json) and
+blocked before browser inspection. [Exact installed evidence](evidence/installed-lifecycle-controls-summary.json).
+Earlier [34-asset](evidence/installed-task-controls-summary.json),
+[32-asset](evidence/installed-scanner-controls-summary.json) and
 [28-asset](evidence/installed-frontend-controls-summary.json) evidence is retained.
 
 ## A working backend journey
