@@ -151,5 +151,31 @@
     "Browser visual acceptance, normal installation and current full Linux/Windows acceptance remain separate.",
     "Claude desktop launch and exact interactive coding-task attachment remain unfinished implementation."
   ],
-  "counting": "Run totals overlap; do not add them as unique assertions."
+  "counting": "Run totals overlap; do not add them as unique assertions.",
+  "immutableFrontend": {
+    "sourceCommit": "a993aa3f9f3e5cebb6f241e41fcc7d054b8c32eb",
+    "digest": "5ee9bf6f9398531d5d4d3bf337391e1e910ca113432099756648c4f7fac9604b",
+    "assets": 35,
+    "gitBytesVerified": true,
+    "priorPointerBackup": "native-app-20261109T042456Z",
+    "installed": false,
+    "visuallyAccepted": false
+  },
+  "installationRegression": {
+    "receiptId": "e87d033d-480e-4203-ab51-a3f0c66436ce",
+    "sha256": "248b9cd6f5d5a4c6ac5d525928e540ffc7c0232dd14867ba5b4b19c03fd8cd8d",
+    "totals": {
+      "required": 18,
+      "passed": 18,
+      "failed": 0,
+      "tests": 29,
+      "passedTests": 29,
+      "failedTests": 0,
+      "skippedTests": 0,
+      "cancelledTests": 0,
+      "todoTests": 0
+    },
+    "originalBoundsPreserved": true,
+    "ownedCleanupComplete": true
+  }
 }

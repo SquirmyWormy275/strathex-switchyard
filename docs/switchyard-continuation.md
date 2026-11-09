@@ -495,3 +495,24 @@ removed. [Installed evidence](evidence/installed-lifecycle-controls-summary.json
 Do not repeat executed lifecycle update/readback/cleanup scripts. Native exact
 attachment and Claude desktop launch remain unfinished implementation; browser,
 interactive IDE, live accounts/hardware and newest CI remain separate.
+
+## Native app frontend checkpoint
+
+Source `a993aa3f9f3e5cebb6f241e41fcc7d054b8c32eb` connects exact ChatGPT/VS Code
+navigation, Windows executable review/configuration and original-helper retirement.
+The workspace-bound focus route refuses stale reviews between two Personal
+workspaces as well as Work; physical dispatch keeps its own active-workspace rule.
+Nine UI cases pass within six original groups/80 tests. Five final groups pass
+68 with overlap, zero skips and original bounds/cleanup verified. Eleven running
+preview checks pass. Missing Work-fixture and queued dialog-close failures remain
+retained. The new helper recovery control works in keyboard-only mode.
+[Walkthrough](native-app-controls.md), [evidence](evidence/native-app-ui-source-summary.json).
+
+The immutable 35-asset frontend is
+`5ee9bf6f9398531d5d4d3bf337391e1e910ca113432099756648c4f7fac9604b`;
+all Git and bundle bytes verify, with prior pointer/recipe backup
+`native-app-20261109T042456Z`. Normal installation is next; browser rendering is
+still unaccepted. Native signatures, processes/windows and helper transports in
+UI cases are explicit doubles. No live desktop, account, provider, task, HID or
+microphone action occurred. Claude desktop launch and exact interactive task
+attachment remain implementation work. Do not infer either from native app focus.
