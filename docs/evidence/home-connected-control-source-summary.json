@@ -1,0 +1,104 @@
+{
+  "schema": "switchyard-home-connected-control-source-evidence/v1",
+  "scope": "Home selects an existing connected role and supported intent, refreshes its named choices and moves focus without binding or dispatching.",
+  "runs": [
+    {
+      "receiptId": "5939c902-c57b-4966-aa98-af997bd7a597",
+      "sha256": "c35d469c697fd9d84e4e6eb275acf74e0801b73e5af211e676387770a6f7670e",
+      "success": false,
+      "totals": {
+        "required": 1,
+        "passed": 0,
+        "failed": 1,
+        "tests": 10,
+        "passedTests": 9,
+        "failedTests": 1,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "files": [
+        "tools/layout-studio/role-ui.test.mjs"
+      ],
+      "originalBoundsAndSkipsPreserved": true,
+      "ownedCleanupComplete": true,
+      "failures": [
+        {
+          "file": "tools/layout-studio/role-ui.test.mjs",
+          "counts": {
+            "total": 10,
+            "passed": 9,
+            "failed": 1,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          },
+          "diagnosticSha256": "5c5c4b3c50ecd906de54a6360d7ae06a6e5d427a9364d253abf32d5901b1b367"
+        }
+      ]
+    },
+    {
+      "receiptId": "c62ca378-ee2e-4960-83b8-cd6aeb533404",
+      "sha256": "6d96777634b558e497b0de431d6ac7557e3bbea8b0fe192428dd5acbde681043",
+      "success": true,
+      "totals": {
+        "required": 1,
+        "passed": 1,
+        "failed": 0,
+        "tests": 10,
+        "passedTests": 10,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "files": [
+        "tools/layout-studio/role-ui.test.mjs"
+      ],
+      "originalBoundsAndSkipsPreserved": true,
+      "ownedCleanupComplete": true,
+      "failures": []
+    },
+    {
+      "receiptId": "c3329bc4-0d72-4867-8965-7719bee6dc0e",
+      "sha256": "9597f0a739fd808806a88975a653b5f7f76180d8f65c22373e0602f0b8c336b0",
+      "success": true,
+      "totals": {
+        "required": 7,
+        "passed": 7,
+        "failed": 0,
+        "tests": 87,
+        "passedTests": 87,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "files": [
+        "deployment/suite/release.test.mjs",
+        "tools/layout-studio/catalog.test.mjs",
+        "tools/layout-studio/role-dispatch.test.mjs",
+        "tools/layout-studio/guided-role-choices.test.mjs",
+        "tools/layout-studio/role-ui.test.mjs",
+        "tools/layout-studio/agent-maintenance-ui.test.mjs",
+        "tools/layout-studio/voice-ui.test.mjs"
+      ],
+      "originalBoundsAndSkipsPreserved": true,
+      "ownedCleanupComplete": true,
+      "failures": []
+    }
+  ],
+  "sourceFiles": {
+    "tools/layout-studio/home.mjs": "81c0106a4145c79612ed2f1f74a84c834c258301b07a775ffb9d407636b05ccf",
+    "tools/layout-studio/role-ui.mjs": "182e87e98bc0ea182bc6f10b2bfabab18fa43ad214dd52fae5c997552d5a3247",
+    "tools/layout-studio/role-ui.test.mjs": "79997bcfee0f202c02df857ab5a2c840a48ed06bf852e04f74d27ac96ad758db"
+  },
+  "originalFailure": "Home opened the tools page but left the previous unsupported intent selected. Its promised connected control remained disabled.",
+  "boundaries": [
+    "The integrated Home/role fixture uses the real authenticated HTTP service and encrypted temporary store; catalog rendering is deliberately excluded from that navigation case.",
+    "Late responses after workspace or control changes cannot steal focus. Wrong-workspace, unbound and extra-authority event fields are ignored.",
+    "No navigation opens a confirmation, binds a target, queues a command or starts a native provider.",
+    "The DOM is an explicit interaction fixture. Browser visual, responsive and keyboard acceptance remain separate.",
+    "Original commands, bounds, skips and owned cleanup are preserved. Earlier focused totals overlap."
+  ]
+}

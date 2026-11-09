@@ -20,7 +20,11 @@ export function mountHome({ getProfile, usePreset, notify }) {
     const profile = getProfile();
     if (!profile) { $("catalog-model").focus(); $("starter-title").scrollIntoView({ block: "start", behavior: "smooth" }); }
     else if (profile.plan.profile.evidence === "source-reference") $("home-read-keyboard").click();
-    else showWorkspace(workspace?.mode === "keyboard-only" ? "settings" : "agents");
+    else {
+      showWorkspace(workspace?.mode === "keyboard-only" ? "settings" : "agents");
+      const connected = workspace?.mode !== "keyboard-only" && workspace?.roleBindings?.find(binding => workspace.workflow.roles.some(role => role.id === binding.roleId));
+      if (connected) document.dispatchEvent(new CustomEvent("switchyard-open-role-control", { detail: { compartment: workspace.id, roleId: connected.roleId, intent: connected.intent } }));
+    }
   });
   const examples = [
     ["01 / Return", "Back to the task you left.", "Your builder is working on the export screen. Return opens that same conversation, so you can continue without hunting through tabs."],

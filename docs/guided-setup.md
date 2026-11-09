@@ -4,6 +4,14 @@ Switchyard starts with four useful controls: return, progress, review and handof
 The frontend now connects saved layouts, typing evidence and named tool choices.
 Saving a connection, trying it and installing a shortcut are separate reviewed actions.
 
+After saving a typing layer and a tool connection, **Home → Try a connected
+control** selects that saved role and its control, refreshes compatible choices
+and brings the next button into focus. It does not send a command or open a
+confirmation automatically. If the connection is unavailable, its picker and
+explanation remain visible. A workspace or control change while loading cancels
+the navigation. Seven groups pass 87 interaction/catalog checks; browser visual
+acceptance remains separate. [Navigation evidence](evidence/home-connected-control-source-summary.json).
+
 ## Try the isolated demonstration
 
 With the repository's existing Node 24.14.0 environment:

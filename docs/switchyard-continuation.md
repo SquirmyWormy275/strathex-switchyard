@@ -114,6 +114,8 @@ Only bounded digest-verified JSON receipts remain locally outside the checkout. 
 
 ## Recent backend behavior
 
+- Home's connected-control navigation now selects a saved role/intent and refreshes its named choices without dispatch or automatic confirmation. One original UI regression is retained; seven groups pass 87 tests with zero skips, including stale navigation refusal. Normal installation and browser acceptance remain pending. [Evidence](evidence/home-connected-control-source-summary.json).
+
 - Open frontend role confirmations now use a dedicated exact-choice dispatch route. Independent rebinding, role/target metadata changes and same-name workspace selection invalidate the original displayed choice. Four failing UI regressions are retained; sixteen groups pass 245 tests/one declared skip, including leased enqueue and post-enqueue preservation. Normal installed adoption passes 65 served/API and 107 metadata checks; native Windows follow-up remains pending. [Evidence](evidence/reviewed-role-choice-source-summary.json).
 
 - Reviewed frontend role dispatch now carries active/persisted workspace selection through effect boundaries and result attribution. Homepage role requests omit content except for explicit handoffs. Nine red cases are retained; final sixteen groups pass 237 tests/one declared skip. Normal installed adoption passes 62 served/API and 107 metadata checks; native Windows follow-up remains pending. [Evidence](evidence/reviewed-role-dispatch-source-summary.json).

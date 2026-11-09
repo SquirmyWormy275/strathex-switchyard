@@ -62,6 +62,18 @@ export function mountRoles({ notify, refresh, request = api }) {
   $("role-picker").addEventListener("change", choicesForRole);
   $("role-intent").addEventListener("change", choicesForRole);
   $("role-target").addEventListener("change", () => { pending = null; controls(); });
+  document.addEventListener("switchyard-open-role-control", async event => {
+    const target = event.detail;
+    if (busy || !state || state.mode === "keyboard-only" || !target || Object.keys(target).sort().join() !== "compartment,intent,roleId" || target.compartment !== state.id
+      || !state.workflow.roles.some(role => role.id === target.roleId) || !state.roleBindings?.some(binding => binding.roleId === target.roleId && binding.intent === target.intent)
+      || ![...$("role-intent").options].some(option => option.value === target.intent)) return;
+    $("role-picker").value = target.roleId; $("role-intent").value = target.intent;
+    const loading = choicesForRole(), version = generation;
+    await loading;
+    if (version !== generation || state?.id !== target.compartment) return;
+    const destination = matchingBinding() ? $("try-agent-role") : $("role-target");
+    destination.scrollIntoView({ block: "center" }); destination.focus();
+  });
   $("bind-agent-role").addEventListener("click", () => openReview(false));
   $("try-agent-role").addEventListener("click", () => openReview(true));
   $("cancel-role-connection").addEventListener("click", () => $("role-connection-dialog").close());

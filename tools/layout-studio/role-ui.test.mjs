@@ -6,6 +6,57 @@ import { join } from "node:path";
 import { createClientLaunch } from "./client-launch.mjs";
 const uiFixture = fn => browserSurfaceFixture(async context => { const { mountRoles } = await import("./role-ui.mjs"); await fn({ ...context, mount: extra => mountRoles({ notify() {}, refresh: context.refresh, ...extra }) }); });
 
+test("Home's connected-control step selects its saved role and intent without dispatching", () => uiFixture(async c => {
+  const previousWindow = Object.getOwnPropertyDescriptor(globalThis, "window"), previousFetch = globalThis.fetch;
+  Object.defineProperty(globalThis, "window", { configurable: true, value: new EventTarget() });
+  const createElement = c.document.createElement;
+  c.document.createElement = (...args) => { const element = createElement(...args); element.setAttribute = () => {}; return element; };
+  c.document.querySelectorAll = () => []; c.document.querySelector = () => c.$("wordmark-fixture");
+  // Catalog rendering has its own geometry tests. This case exercises Home's
+  // saved-workspace navigation and the real authenticated role-choice service.
+  globalThis.fetch = (path, ...args) => path === "/model-f-catalog.json" ? Promise.resolve({ ok: false }) : previousFetch(path, ...args);
+  try {
+    const { mountHome } = await import("./home.mjs");
+    const profile = { name: "Saved synthetic typing layer", plan: { profile: { evidence: "saved-snapshot" } } };
+    mountHome({ getProfile: () => profile, usePreset: () => false, notify() {} }); c.mount(); await c.refresh();
+    await until(() => !c.$("try-agent-role").disabled);
+    const resume = c.document.createElement("option"); resume.value = "resume"; resume.textContent = "Return to task"; c.$("role-intent").append(resume);
+    c.change("role-intent", "resume"); await until(() => /No saved connection/.test(c.$("role-choice-status").textContent));
+    assert.equal(c.$("try-agent-role").disabled, true);
+    c.click("home-continue"); await until(() => c.$("try-agent-role").focused === true);
+    assert.equal(c.$("role-picker").value, "operator"); assert.equal(c.$("role-intent").value, "status");
+    assert.match(c.$("role-target-detail").textContent, /connected to this control/);
+    assert.equal(c.$("role-connection-dialog").open, false);
+    assert.equal(c.calls.some(row => /\/roles\/(bind-choice|dispatch|dispatch-choice)$/.test(row.path)), false);
+    assert.equal((await c.store.snapshot("personal")).agents.every(agent => agent.commands.length === 0), true);
+  } finally { globalThis.fetch = previousFetch; if (previousWindow) Object.defineProperty(globalThis, "window", previousWindow); else delete globalThis.window; }
+}));
+
+for (const change of ["workspace", "control"]) test(`a late Home navigation cannot steal focus after the ${change} changes`, () => uiFixture(async c => {
+  const { api } = await import("./connection.mjs"); let hold = false, entered, release;
+  const waiting = new Promise(resolve => { release = resolve; }), called = new Promise(resolve => { entered = resolve; });
+  c.mount({ request: async (...args) => { const result = await api(...args); if (hold && args[0].endsWith("/roles/choices")) { hold = false; entered(); await waiting; } return result; } });
+  await c.refresh(); await until(() => !c.$("try-agent-role").disabled);
+  const resume = c.document.createElement("option"); resume.value = "resume"; resume.textContent = "Return to task"; c.$("role-intent").append(resume);
+  hold = true;
+  c.document.dispatchEvent(new CustomEvent("switchyard-open-role-control", { detail: { compartment: "personal", roleId: "operator", intent: "status" } }));
+  await called;
+  if (change === "workspace") c.document.dispatchEvent(new Event("switchyard-workspace-changing"));
+  else c.change("role-intent", "resume");
+  release(); await new Promise(resolve => setImmediate(resolve));
+  assert.notEqual(c.$("try-agent-role").focused, true); assert.notEqual(c.$("role-target").focused, true);
+  assert.equal(c.$("role-connection-dialog").open, false);
+  assert.equal((await c.store.snapshot("personal")).agents.every(agent => agent.commands.length === 0), true);
+}));
+
+test("Home navigation ignores another workspace, unbound controls and extra authority fields", () => uiFixture(async c => {
+  c.mount(); await c.refresh(); await until(() => !c.$("try-agent-role").disabled);
+  const before = c.calls.length;
+  for (const patch of [{ compartment: "work" }, { roleId: "absent" }, { intent: "handoff" }, { dispatch: true }]) c.document.dispatchEvent(new CustomEvent("switchyard-open-role-control", { detail: { compartment: "personal", roleId: "operator", intent: "status", ...patch } }));
+  assert.equal(c.calls.length, before); assert.notEqual(c.$("try-agent-role").focused, true);
+  assert.equal(c.$("role-connection-dialog").open, false);
+}));
+
 for (const change of ["another target", "same target", "role label", "same workspace selection"]) {
   test(`confirming an open control review refuses ${change} changed in another window`, () => uiFixture(async c => {
     c.mount(); await c.refresh(); await until(() => !c.$("try-agent-role").disabled);
