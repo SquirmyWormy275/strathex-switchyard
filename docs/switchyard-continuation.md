@@ -328,3 +328,20 @@ The installed release remains `47143a9f` with its separately accepted 28 assets.
 Browser tooling still fails before inspection; no visual acceptance is inferred.
 Continue remaining required observation sources, feed trust setup, native exact-task
 attachment limitations and normal installed/frontend verification.
+
+## Latest CI follow-up
+
+Broader `ce89c78` checks failed: Linux and Windows shard 15 exceed the original
+preliminary scheduling allowance; Windows shard 11 records two host-action
+assertions then times out at 45 seconds. Native receipts and artifact digests are
+retained and independently checked against that source's Windows manifest.
+The growing suite now uses eight preliminary workers with unchanged historical
+costs, 950000 ms allowance, 20-minute job deadline, commands, skips and child bounds.
+All five local groups pass 59 tests; TypeScript checking passes. Two indefinite
+fixture gates use the existing two-second observer, without altering production
+code or the 75 ms coordination/effect bound. Native cause and follow-up acceptance
+remain open. [Evidence](evidence/ci-capacity-ce89-summary.json).
+
+Do not dispatch/retry/cancel CI or transfer earlier package acceptance to this
+source. The next normal push schedules these checks. Continue the reviewed feed
+maintenance controls and remaining product integrations independently.

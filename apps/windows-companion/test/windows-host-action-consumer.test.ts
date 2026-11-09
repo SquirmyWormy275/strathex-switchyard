@@ -368,16 +368,15 @@ test("restart retries only durable external completion after its queue settlemen
 test("stop aborts a non-settling post-barrier native effect and records ambiguity without hanging", async (context) => {
   const setup = await fixture(context);
   await queueAction(setup.queue, "focus_vscode", "operation-stop-post-barrier");
-  let crossed!: () => void;
-  const started = new Promise<void>((resolve) => { crossed = resolve; });
+  let crossed = false;
   setup.effects.implementation = async (request) => {
     await request.beforeEffect();
-    crossed();
+    crossed = true;
     return new Promise<WindowsHostActionEffectResult>(() => undefined);
   };
   const consumer = setup.create();
   await consumer.start();
-  await started;
+  await waitFor(() => crossed, "post-barrier stop fixture entering its native effect");
   const before = Date.now();
   await consumer.stop();
   assert.ok(Date.now() - before < 500, "stop waited on a non-settling native port");
@@ -388,17 +387,16 @@ test("stop aborts a non-settling post-barrier native effect and records ambiguit
 test("stop before the native barrier admits no effect and settles failed", async (context) => {
   const setup = await fixture(context);
   await queueAction(setup.queue, "focus_terminal", "operation-stop-pre-barrier");
-  let entered!: () => void;
-  const ready = new Promise<void>((resolve) => { entered = resolve; });
+  let entered = false;
   setup.effects.implementation = async (request) => {
-    entered();
+    entered = true;
     await new Promise<void>((resolve) => request.signal.addEventListener("abort", () => resolve(), { once: true }));
     await request.beforeEffect();
     return { disposition: "committed", summary: "must not commit" };
   };
   const consumer = setup.create();
   await consumer.start();
-  await ready;
+  await waitFor(() => entered, "pre-barrier stop fixture entering its native effect");
   await consumer.stop();
   assert.equal(setup.executor.records.length, 1);
   assert.equal(setup.executor.records[0]?.status, "failed");

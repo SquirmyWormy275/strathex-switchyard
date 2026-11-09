@@ -61,6 +61,22 @@ separate frontend controls. Scanner setup now reviews generated control files,
 saves them separately and hands their scope/recipe to those controls without
 implicit authority or execution. [Execution controls](reviewed-execution-controls.md).
 
+## Current broader CI failures
+
+The `ce89c78` Linux job and one Windows source worker fail the historical workload
+budget check as new frontend tests exceed the six-worker allowance. The source
+now redistributes every original case across eight workers; the 20-minute worker
+limit, 950,000 ms setup allowance, historical costs and all child bounds remain.
+Five local groups pass 59 tests with no skips, and TypeScript checking passes.
+
+A separate Windows host-action worker records two assertions, then reaches its
+original 45-second deadline. Its cause remains unresolved. Two indefinite fixture
+entry waits now use the existing two-second observer, retaining every assertion
+and the 75 ms effect/coordination limit. This is failure reporting, not proof of a
+production repair. Both original native receipts, exact ZIP digests, source/merge
+tree and local reproduction are retained. No current full-platform pass is claimed.
+[Failure evidence and scoped follow-up](evidence/ci-capacity-ce89-summary.json).
+
 ## Installed frontend verification
 
 The normal installed application now contains the guided setup, portability,
@@ -122,7 +138,7 @@ checkpoints are not cumulative acceptance of the latest suite.
 | Native Windows client `9d230ac` | **25 groups; 250 tests; zero skips.** Signed launcher composition plus native endpoint/process/socket contracts. [Evidence](evidence/editor-task-choices-native-client-summary.json). | Terminal/provider doubles do not establish interactive task handoff. |
 | Earlier complete Windows `dc755901` | **417 groups; 2,478 tests; 207 declared skips.** All workflow jobs passed. [Evidence](evidence/windows-complete-dc755901-summary.json). | This revision predates later backend changes. |
 
-The installed payload contains 554 files/4,750,121 bytes. Dated backup and launcher
+The earlier installed payload contained 554 files/4,750,121 bytes. Dated backup and launcher
 readback verify; current plus one rollback remain. Its exact 555-file/4,849,605-byte prepared
 bundle is removed. The complete Linux checkout, nine dependency aliases and
 803 generated files/11,907,805 bytes are also removed. The latest `cf3bb4c`
@@ -154,11 +170,11 @@ launcher is unavailable. The native attach command can restart a stopped session
 it must not be substituted for focus or status. Frontend activation and live
 terminal/model acceptance remain separate.
 
-## Windows package verification still in progress
+## Earlier Windows package construction failure
 
 The latest package at `db24634` passes **all 462 original groups/2,910 tests, with 246 declared skips**, including the helper-alias assertions. The full receipt independently verifies original commands, bounds, skips and cleanup. Release creation then fails compiling the standalone provider helper: `EditorEndpointSecurity` lacks a local Windows guard, producing CA1416 errors. Two preliminary jobs also fail with HTTP 504 before tests; they have no receipts and remain unaccepted. [Package test-stage evidence](evidence/windows-package-db24634-tests-summary.json).
 
-The method now refuses non-Windows access before native security inspection. The identical local build changes from failure to success with warnings-as-errors retained; the portable self-test and two non-Windows endpoint refusals pass. Eight original groups pass 48 tests with one declared skip. A new early CI preflight publishes the standalone helper using the existing pinned offline toolchain and requires its native self-test before source matrices. All 34 owned build files/561,965 bytes are removed; no packages were downloaded. Native Windows publish and own-process self-test now pass at `7529718`, with exact source/merge tree and QUERY 8 verified. The voice-helper target also compiles offline without new packages; its staging is removed. Full release confirmation remains pending. [Native correction](evidence/provider-helper-platform-native-summary.json), [Correction evidence](evidence/provider-helper-platform-source-summary.json).
+The method now refuses non-Windows access before native security inspection. The identical local build changes from failure to success with warnings-as-errors retained; the portable self-test and two non-Windows endpoint refusals pass. Eight original groups pass 48 tests with one declared skip. A new early CI preflight publishes the standalone helper using the existing pinned offline toolchain and requires its native self-test before source matrices. All 34 owned build files/561,965 bytes are removed; no packages were downloaded. Native Windows publish and own-process self-test now pass at `7529718`, with exact source/merge tree and QUERY 8 verified. The voice-helper target also compiles offline without new packages; its staging is removed. Full release confirmation subsequently passed at `7529718`, as recorded above. [Native correction](evidence/provider-helper-platform-native-summary.json), [Correction evidence](evidence/provider-helper-platform-source-summary.json).
 
 Complete package runs at `e5a5781` and `6727054` reached the existing 90-minute
 job boundary without final receipts. Partial output and preliminary shards do
@@ -223,19 +239,21 @@ The separate Windows package job is still in progress.
 
 ## Unfinished implementation
 
-- Guided role/device wiring, portable-profile review controls, scanner setup
-  controls, editor command activation and the complete connected frontend journey.
-  Home/catalog and editor activation remain frozen for owner review.
-- Guided project selection and task-specific IDE attachment beyond the implemented
-  scoped launch/selection contracts, and broader provider containment. The signed
-  project inventory backend is implemented; picker activation remains frozen.
-  37 groups/117 tests and both TypeScript checks pass.
-  [Project inventory](evidence/editor-project-choices-source-summary.json).
-- Additional external observation adapters and unsupported scanner coverage:
-  broader history and syntax, dependency/feature/target resolution, complete
-  archive contents, license text, publisher provenance and verified local
-  vulnerability context. The ledger records these limits; additional scanner
-  syntax must not displace the required Rev2 product work.
+- Complete the connected frontend journey and normal installed acceptance of the
+  newer scanner, task-permission and execution controls. Guided role/device wiring,
+  portable-profile review and editor command registration are implemented; the
+  owner approved frontend work. Visual acceptance remains separately blocked.
+- Finish exact native task attachment and provider-specific desktop controls where
+  supported. Signed saved-project selection and reviewed terminal connection are
+  implemented; application focus does not establish task attachment.
+- Expose signed scanner feed/trust maintenance and remaining account/task controls
+  through reviewed forms. Extend optional external observation sources only within
+  explicit session/source/destination/retention consent. Existing five-source
+  recording and reviewed aggregate designer context are connected.
+- Preserve explicit scanner coverage limits: broader syntax, dependency resolution,
+  complete archives, license text, publisher provenance and verified local
+  vulnerability context are not established by the bounded scanner. Additional
+  scanner syntax must not displace required Rev2 product work.
 
 ## Checks needing hardware, accounts or interactive access
 
