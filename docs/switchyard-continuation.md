@@ -46,8 +46,8 @@ original account before querying and before delivery, like paginated history.
 Three red cases reproduce the omission. Two focused groups pass 37; thirteen
 integration groups pass 139 with one existing skip; five package checks and
 typechecking pass. These counts overlap. Both direct and retained composition
-use synthetic accounts; no live effect occurs. This correction still needs
-normal installation, and the active full Linux `72e7c22` run predates it.
+use synthetic accounts; no live effect occurs. This correction is normally
+installed below; the completed full Linux `72e7c22` run predates it.
 [Source evidence](evidence/codex-legacy-read-account-summary.json).
 
 Published **72e7c22c00c7131722c0c368fe598a2785705b99** adds bounded UI phase
@@ -63,45 +63,51 @@ failures remain. [Evidence](evidence/codex-controller-argument-expectation-summa
 
 | Installed item | Identity |
 | --- | --- |
-| App and pilot extension source | `42655aa0667dfbf06c88c560a1098ae65543ecf2` |
-| App release | `753bd9bc1f77288934602e6011465107249c95527b80d00c8985964ac6a1dd3c` |
-| Single app rollback | `a171ce4545d15c0a62be9e4070dd4e45dc419305480824b4f1774b88c8e50dbb` |
+| App source | `3222727b258b542d200d056817c3473d2da760ab` |
+| Pilot extension source | `42655aa0667dfbf06c88c560a1098ae65543ecf2` |
+| App release | `2ee8827dd022ba676bff48f3b0639ef5d0d0f47c683cef12d806a7db6defc2ea` |
+| Single app rollback | `753bd9bc1f77288934602e6011465107249c95527b80d00c8985964ac6a1dd3c` |
 | Frontend | `3265d16737fae14d99c7c5a0792af4c5e7cd743320f0abc84263bf22490770ed` |
 
-The app passes 69 served/API and 115 installed metadata checks across 65 exact
+The app passes 69 served/API and 121 installed metadata checks across 65 exact
 modules. All saved semantic state above is preserved; 53 sealed files are
 byte-identical and one changes only audit metadata. The extension passes 53
 payload hashes and eight installed module checks. Its prior extension/registry
 are preserved in dated backup `20261109T102446Z`; other registry rows are unchanged.
 Actual editor GUI activation remains unaccepted.
 
-Prepared app/editor packages totaling 6,576,128 bytes are removed after exact
-identity/hash and original-guardian exit verification. **Do not replay their
-update/preflight/cleanup scripts.** The installed app need not be rebuilt for
+The latest prepared 576-file app package of 5,182,691 bytes is removed after
+exact identity/hash verification. Previous prepared app/editor packages are also
+removed. **Do not replay their update/preflight/cleanup scripts.** Private current
+update receipts use the prefix `legacy-account-installed-`; the dated backup is
+`2026-11-09T10-52-39.403Z-7e432606-9ed4-442e-affc-6995e8054599`.
+The installed app need not be rebuilt for
 subsequent docs/test-only commits.
-[App receipt](evidence/installed-paginated-terminal-summary.json),
+[App receipt](evidence/installed-legacy-account-summary.json),
 [editor receipt](evidence/installed-editor-terminal-summary.json).
 
-## Active full Linux run — finish and clean up
+## Complete Linux run — audited and cleaned
 
-Source `72e7c22` is running all 376 original Linux groups in an owned detached
-checkout, supervised by a temporary user systemd unit. It uses nine aliases to
-existing dependencies and installs nothing. Exact owner, checkout, aliases,
-original worktree inventory and unit are in the private runtime-verification
-marker `linux-full-72e7c22-owner.json`; progress/result filenames share that prefix.
+Source `72e7c22` passes all 376 original groups: **2,574 passing tests, 32 declared
+skips, zero failures/cancellations/todo**. Receipt
+`0b1a791a-b126-405f-9d5f-86092efe7eaf` has SHA-256
+`a3b85b8a2c50f636b3a00a4d28ee2df5c362c3a2956b2a696ce3969118cf6b5a`.
+The exact manifest, commands, effective bounds, skip inventory, serial order,
+original child/tree exits and cleanup are audited.
 
-Read the marker and latest progress rather than starting another run. Progress is
-not acceptance. On exit, audit the original receipt against this source's
-manifest, command arguments, each effective bound, declared skips, serial
-ordering, child/tree exits and cleanup. Preserve failures. Copy only the bounded
-receipt/evidence needed, inventory generated files and verify all path/file
-identities before removing this owned checkout, nine aliases and temporary
-parent. Confirm the supervisor exited and leave all original worktrees intact.
-Do not remove anything while the original run or descendants remain active.
+All 806 generated files (12,507,496 bytes, including the copied receipt), nine
+dependency aliases, owned checkout, runner and empty temporary parent are removed.
+The supervisor exited successfully and is stopped; all original worktrees remain.
+The only initial cleanup refusal was an unexpected empty artifacts directory;
+its emptiness was verified before adding that exact directory to the inventory.
+Private audit/cleanup receipts use `linux-72e7c22-`; **do not replay cleanup scripts**.
+No complete local run remains active.
+[Full Linux evidence](evidence/linux-72e7c22-complete-summary.json).
 
-The last accepted complete Linux source is `96ac214`: 376 groups, 2,549 passes,
-32 declared skips. Its staging is already removed.
-[Prior full receipt](evidence/linux-96ac214-complete-summary.json).
+This complete source predates the later legacy-account correction, which retains
+its separate 139-test integration and installed proof. Do not present this as an
+exact-head complete result. Current Windows and actual UI/hardware/accounts
+remain separate.
 
 ## Current Windows follow-up
 
@@ -158,7 +164,7 @@ focus is not task attachment.
 
 ## Continue independent work
 
-1. Finish/audit the active Linux run and exact cleanup.
+1. The complete Linux run and cleanup are finished; continue current Windows receipt review.
 2. Diagnose Windows UI delays from original native measurements; correct the
    actual cause without weakening persistence, ownership or tests.
 3. Continue Linux Claude Desktop and exact interactive attachment limitations

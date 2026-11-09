@@ -9,15 +9,15 @@ entry point, evidence and remaining work. A hardware/account check does not excu
 unfinished independent software. Read [current status](switchyard-status.md) for
 accepted checkpoints and [verification](verification.md) for reproducible checks.
 
-Installed Linux source `42655aa` includes the 36-asset guided frontend, permissions,
+Installed Linux source `3222727` includes the 36-asset guided frontend, permissions,
 scanner setup, signed-feed maintenance, reviewed execution, saved design
 conversations, coding-task text/background controls and approved-work account/
 recovery, exact native-app navigation, agent maintenance, saved voice notes,
 transcript import, Claude hook setup and direct client-to-native setup navigation. All served asset
-hashes, thirty-three API/inventory checks and 115 metadata/refusal checks across 65 exact modules
+hashes, thirty-three API/inventory checks and 121 metadata/refusal checks across 65 exact modules
 pass, preserving all 54 semantic workspaces and 57 workflow definitions.
 Current plus one rollback remain and the prepared package is removed.
-[Installed evidence](evidence/installed-paginated-terminal-summary.json).
+[Installed evidence](evidence/installed-legacy-account-summary.json).
 Reviewed role dispatch carries the active and persisted workspace identity;
 the current synthetic running demonstration verifies acknowledgement and stale
 selection refusal. [Demonstration](evidence/claude-launch-running-demo-summary.json).
@@ -49,10 +49,10 @@ its 15-test consumer group passes at `90fa879` without changing the original bou
 [Scoped follow-up](evidence/host-action-settlement-native-followup-summary.json).
 [Native inventory evidence](evidence/editor-project-choices-native-summary.json).
 
-Complete Linux source 96ac214 passes 376 groups/2,549 tests with 32 declared
-skips. Its owned checkout, nine aliases and generated staging are removed. It
-predates the startup correction, which has separate installed verification.
-[Accepted Linux evidence](evidence/linux-96ac214-complete-summary.json).
+Complete Linux source 72e7c22 passes 376 groups/2,574 tests with 32 declared
+skips. Its owned checkout, nine aliases and 806 generated files are removed. It
+predates the legacy account-read correction, which has separate integration and
+installed verification. [Accepted Linux evidence](evidence/linux-72e7c22-complete-summary.json).
 
 Windows client source a351626 passes 31 groups/353 tests with zero skips under
 the original limits. Its exact receipt and source tree are audited.

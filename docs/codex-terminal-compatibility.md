@@ -7,10 +7,10 @@ The paginated path also renders two saved pages, loading the older turn through
 its original continuation cursor. **Live-provider and actual VS Code GUI
 acceptance remain separate.**
 
-The installed Switchyard application and pilot VS Code extension now use source
-`42655aa`. The app passes 69 served/API and 115 installed metadata checks; the
+The installed Switchyard application uses source `3222727`; the pilot VS Code
+extension remains at `42655aa`. The app passes 69 served/API and 121 installed metadata checks; the
 extension passes exact payload hashes and eight installed module checks.
-[Application evidence](evidence/installed-paginated-terminal-summary.json),
+[Application evidence](evidence/installed-legacy-account-summary.json),
 [editor evidence](evidence/installed-editor-terminal-summary.json).
 
 ## Connection and permission contract
@@ -60,8 +60,9 @@ account prevents delivery and closes the connection; successful repeated reads
 retain the one original acknowledgement. Three failing regressions reproduce the
 earlier omission. Thirteen integration groups pass 139 tests with one existing
 skip, package checks pass five, and typechecking passes. Account changes use
-explicit doubles. This later correction is not yet installed at `42655aa`, and
-the active full Linux run at `72e7c22` predates it.
+explicit doubles. This later correction is now installed at `3222727`; fourteen
+installed in-memory terminal checks pass. The completed full Linux run at `72e7c22`
+predates the correction.
 [Legacy read correction](evidence/codex-legacy-read-account-summary.json).
 
 ## Earlier legacy demonstration and checks

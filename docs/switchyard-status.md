@@ -27,20 +27,21 @@ The [requirement ledger](switchyard-requirements.md) tracks the wider scope;
 
 ## Installed checkpoint
 
-The app and pilot VS Code extension use source **42655aa**. The app release is
-`753bd9bc1f77288934602e6011465107249c95527b80d00c8985964ac6a1dd3c`;
+The app uses source **3222727**; the pilot VS Code extension remains at **42655aa**.
+The app release is
+`2ee8827dd022ba676bff48f3b0639ef5d0d0f47c683cef12d806a7db6defc2ea`;
 the frontend is `3265d16737fa`. Current plus one app rollback remain.
 
 - All 36 served assets and 33 API/refusal checks pass.
-- Nine installed verifiers pass 115 checks across 65 exact module hashes.
+- Nine installed verifiers pass 121 checks across 65 exact module hashes.
 - All 54 semantic workspaces, 57 workflow definitions, Personal selection and
   three conversations are preserved, including the pending keyboard-only record.
 - The extension's 53 payload files and eight installed module checks pass.
   Actual graphical editor activation remains unaccepted.
-- Dated launcher/editor backups verify. Prepared app/editor staging totaling
-  6,576,128 bytes is removed.
+- Dated launcher/editor backups verify. The latest prepared app package of
+  5,182,691 bytes is removed; previous prepared editor staging was already removed.
 
-[App receipt](evidence/installed-paginated-terminal-summary.json),
+[App receipt](evidence/installed-legacy-account-summary.json),
 [editor receipt](evidence/installed-editor-terminal-summary.json).
 
 ## Verification belongs to a source
@@ -48,17 +49,17 @@ the frontend is `3265d16737fa`. Current plus one app rollback remain.
 A later source correction brackets acknowledged legacy history reads with fresh
 account checks. Three regressions reproduce the original gap; 13 integration
 groups pass 139 tests with one existing skip, five package checks pass, and
-typechecking passes. This correction is not yet normally installed and is later
-than the active full Linux run.
+typechecking passes. This correction is normally installed above and is later
+than the completed full Linux run.
 [Source evidence](evidence/codex-legacy-read-account-summary.json).
 
 | Source and scope | Result |
 | --- | --- |
-| `72e7c22`, complete Linux | Running from an isolated exact-commit checkout with existing dependencies. No complete result accepted yet. |
+| `72e7c22`, complete Linux | 376 groups, 2,574 passes, 32 declared skips. Exact manifest/commands/bounds and cleanup audited; temporary checkout, nine aliases and 806 generated files removed. [Receipt](evidence/linux-72e7c22-complete-summary.json) |
 | `6f9bacc`, controller correction | All 126 controller cases pass, zero skips. Exact remote-resume argument assertion corrected; production behavior and relay permissions unchanged. [Evidence](evidence/codex-controller-argument-expectation-summary.json) |
 | `72e7c22`, UI phase diagnostics | Six original groups pass 51 tests, zero skips. Original bounds and cleanup verify; no Windows performance correction claimed. [Evidence](evidence/ui-phase-timing-source-summary.json) |
 | `42655aa`, native terminal demonstration | Actual Codex 0.167 renders two synthetic history pages through original cursors, with one narrowed resume and no model prompt. [Contract and evidence](codex-terminal-compatibility.md) |
-| `96ac214`, last audited complete Linux | 376 groups, 2,549 passes, 32 declared skips. Owned checkout and generated files removed. [Receipt](evidence/linux-96ac214-complete-summary.json) |
+| `96ac214`, earlier complete Linux | 376 groups, 2,549 passes, 32 declared skips. Owned checkout and generated files removed. [Receipt](evidence/linux-96ac214-complete-summary.json) |
 | `48bf450`, audited Windows client | 31 groups, 356 passes, zero skips. Its full run fails two UI deadlines and a repeated-focus case. [Receipt and failures](evidence/native-48bf450-results-summary.json) |
 | `7529718`, earlier complete Windows package | 462 groups, 2,910 passes, 246 declared skips; all eight jobs pass. This does not accept later source. [Receipt](evidence/windows-package-7529718-summary.json) |
 
