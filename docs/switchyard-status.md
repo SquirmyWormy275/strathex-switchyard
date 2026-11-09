@@ -20,8 +20,7 @@ named role choices use the backend's digest-checked contract and separate review
 for saving and dispatching. Host shortcut review can select a saved role control.
 An isolated interactive demonstration is available. Browser visual acceptance is
 blocked by the browser tool failing before navigation/inspection; this is not a
-hardware or account limitation. Editor command activation and broader frontend
-flows remain implementation work. [Walkthrough and boundaries](guided-setup.md).
+hardware or account limitation. Broader client and execution frontend flows remain implementation work. [Walkthrough and boundaries](guided-setup.md).
 
 Profile import/export now has a concrete v2 review before clearing local connections,
 and Settings offers digest-verified assignment references and A4/SVG legend sheets
@@ -39,6 +38,13 @@ The editor now registers Browse Saved Tasks, Connect Saved Task in Terminal and
 Return to Connected Terminal. Seven interaction cases, TypeScript checking and a
 compiled no-I/O activation check pass. Native task attachment, interactive IDE and
 installed extension acceptance remain distinct. [Editor controls](editor-task-controls.md).
+
+The keyboard workbench now exposes advertised semantic keys, macros, layout and
+QMK settings, encoders, tap dances, combos, modifier overrides and alternate-repeat
+rules. Manual physical-key diagnostics have separate consent, stop and verified
+relock controls. Fifteen original groups pass 128 tests with zero skips, plus eight
+running-server checks; the transport is synthetic. No physical device was touched.
+[Controls and limits](keyboard-settings-ui.md).
 
 ## A working backend journey
 

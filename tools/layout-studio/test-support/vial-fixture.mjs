@@ -1,5 +1,8 @@
 import { createDeviceService } from "../devices.mjs";
-export function vialFixture() {
+import { qmkSettings } from "../vial-settings.mjs";
+export function vialFixture({ optionalStorage = false } = {}) {
+  const macro = Buffer.alloc(optionalStorage ? 96 : 0); if (macro.length) macro[0] = 88;
+  const settings = new Map(optionalStorage ? [[7, 200], [22, 0]] : []); let layoutOptions = 0;
   const deviceId = "d".repeat(64), raw = [[[4, 5]], [[1, 1]]], tapDances = [[0, 0, 0, 0, 200], [0x7777, 0x8888, 0x9999, 0xaaaa, 230]], combos = [[0, 0, 0, 0, 0], [0x7777, 0, 0, 0, 0x8888]], writes = [], state = { deviceTransactions: [], deviceSnapshots: [] };
   const definition = { matrix: { rows: 1, cols: 2 }, layouts: { keymap: [["0,0", "0,1"]] } }, encoders = new Map([["0:0", [4, 5]], ["0:2", [0x7777, 0x8888]], ["1:0", [0, 1]], ["1:2", [6, 7]]]), encoderReads = [];
   const keyOverrides = [[0, 0, 0, 0, 0, 0, 0], [0x7777, 0x8888, 0xabcd, 255, 255, 255, 64]], alternateRepeatKeys = [[0, 0, 0, 0], [0x7777, 0x8888, 255, 128]]; let rulesEnabled = false;
@@ -22,7 +25,9 @@ export function vialFixture() {
       else if (command === 3) { const value = encoders.get(`${operation}:${index}`); encoderReads.push({ layer: operation, index }); if (value) { r.fill(0); r.writeUInt16BE(value[0], 0); r.writeUInt16BE(value[1], 2); if (corruptEncoder && encoderChanged) { corruptEncoder = false; r[0] ^= 1; } } }
       else if (command === 4) { const value = encoders.get(`${operation}:${index}`), direction = r[4], after = r.readUInt16BE(5); writes.push({ kind: "encoder", layer: operation, index, direction, packet: [...r] }); encoderChanged = true; if (interruptEncoder) { interruptEncoder = false; value[direction] = value[direction] & 0xff00 | after & 255; if (unplugEncoder) disconnected = true; throw Error("Synthetic interrupted encoder"); } value[direction] = after; }
       else if (command === 5) { r.fill(255); r[0] = locked ? 0 : 1; r[1] = 0; }
-      else if (command === 9) r.fill(255);
+      else if (command === 9) { const cursor = r.readUInt16LE(2); r.fill(255); [...settings.keys()].filter(id => id > cursor).forEach((id, i) => r.writeUInt16LE(id, i * 2)); }
+      else if (command === 10) { const id = r.readUInt16LE(2); r.fill(0); r.writeUIntLE(settings.get(id), 1, qmkSettings[id].width); }
+      else if (command === 11) { const id = r.readUInt16LE(2); settings.set(id, r.readUIntLE(4, qmkSettings[id].width)); writes.push({ kind: "setting", id }); r.fill(0); }
       else if (command === 13) {
         if (operation === 0) { r.fill(0); r[0] = tapDances.length; r[1] = combos.length; r[2] = rulesEnabled ? keyOverrides.length : 0; r[3] = rulesEnabled ? alternateRepeatKeys.length : 0; r[31] = 3; }
         else {
@@ -44,12 +49,16 @@ export function vialFixture() {
     if (r[0] === 1) { r.writeUInt16BE(9, 1); return r; }
     if (r[0] === 0x11) { r[1] = 2; return r; }
     if (r[0] === 0x12) { const p = Buffer.alloc(8); raw.flat(2).forEach((v, i) => p.writeUInt16BE(v, i * 2)); p.copy(r, 4, r.readUInt16BE(1), r.readUInt16BE(1) + r[3]); return r; }
-    if ([0x0c, 0x0d].includes(r[0])) { r.fill(0, 1); return r; }
-    if (r[0] === 2) { r.writeUInt32BE(0, 2); return r; }
+    if (r[0] === 0x0c) { r[1] = macro.length ? 3 : 0; return r; }
+    if (r[0] === 0x0d) { r.writeUInt16BE(macro.length, 1); return r; }
+    if (r[0] === 0x0e) { const offset = r.readUInt16BE(1); macro.copy(r, 4, offset, offset + r[3]); return r; }
+    if (r[0] === 0x0f) { const offset = r.readUInt16BE(1); r.copy(macro, offset, 4, 4 + r[3]); writes.push({ kind: "macro", offset }); return r; }
+    if (r[0] === 2) { r.writeUInt32BE(layoutOptions, 2); return r; }
+    if (r[0] === 3) { layoutOptions = r.readUInt32BE(2); writes.push({ kind: "layout", value: layoutOptions }); return r; }
     if (r[0] === 5) { writes.push({ kind: "key", layer: r[1], row: r[2], col: r[3] }); raw[r[1]][r[2]][r[3]] = r.readUInt16BE(4); return r; }
     if (r[0] === 4) { r.writeUInt16BE(raw[r[1]][r[2]][r[3]], 4); return r; }
     throw Error("Unexpected VIA command");
   } });
   const options = { store, transportFactory, withDeviceLock };
-  return { deviceId, raw, keyOverrides, alternateRepeatKeys, enableRules: () => { rulesEnabled = true; }, definition, encoders, encoderReads, tapDances, combos, writes, state, options, service: createDeviceService(options), interrupt: (disconnect = false) => { interrupt = true; unplug = disconnect; }, interruptEncoder: (disconnect = false) => { interruptEncoder = true; unplugEncoder = disconnect; }, corruptEncoder: () => { corruptEncoder = true; }, reconnect: () => { disconnected = false; }, corrupt: () => { corrupt = true; }, locked: () => { locked = true; }, backupFailure: () => { failBaseline = true; }, protocol: (v) => { protocol = v; } };
+  return { deviceId, raw, macro, settings, keyOverrides, alternateRepeatKeys, enableRules: () => { rulesEnabled = true; }, definition, encoders, encoderReads, tapDances, combos, writes, state, options, service: createDeviceService(options), interrupt: (disconnect = false) => { interrupt = true; unplug = disconnect; }, interruptEncoder: (disconnect = false) => { interruptEncoder = true; unplugEncoder = disconnect; }, corruptEncoder: () => { corruptEncoder = true; }, reconnect: () => { disconnected = false; }, corrupt: () => { corrupt = true; }, locked: () => { locked = true; }, backupFailure: () => { failBaseline = true; }, protocol: (v) => { protocol = v; } };
 }

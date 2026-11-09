@@ -47,6 +47,9 @@ export function createMatrixDiagnostics({ store, devices, isActive, now = () => 
   }
   return {
     async review(c, { deviceId }) {
+      // A reloaded view has no session ID to stop. Retire expired consent before
+      // issuing a new review; no switch state is read by this cleanup.
+      if (sessions.has(c) && now() >= sessions.get(c).expiresAt) await stopCompartment(c);
       const fence = generation(c), { baseline, digest: scopeDigest } = await scope(c, deviceId);
       if (closed || generation(c) !== fence) throw new Error("The key test stopped during review.");
       for (const [id, r] of reviews) if (now() >= r.expiresAt) reviews.delete(id);

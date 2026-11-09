@@ -225,3 +225,9 @@ kbd { font: 11px/1.5 ui-monospace, SFMono-Regular, Consolas, monospace; color: #
 .import-effects { padding: 14px; border-left: 2px solid #b58c40; background: #fcf7ea; }
 
 .panel fieldset{margin:0;padding:14px;border:1px solid var(--line);border-radius:6px;display:grid;gap:10px}.panel fieldset legend{padding:0 6px;font-weight:600}.observation-summary{font-size:.88rem;overflow-wrap:anywhere}.observation-summary p{margin:.4em 0}#design-observation-sessions{max-height:16rem;overflow:auto}
+
+.optional-device-settings{margin-top:20px}.optional-device-settings>label,.optional-device-settings>.stack{margin-top:14px}.macro-step{padding:14px;border:1px solid var(--line);border-radius:5px;margin-top:10px}#device-review-summary{white-space:pre-wrap;overflow-wrap:anywhere}#device-key-editor{min-width:200px}
+.device-checks { display: grid; gap: .5rem; grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr)); }
+.device-checks label { display: flex; align-items: center; gap: .5rem; flex-direction: row-reverse; justify-content: flex-end; }
+.device-checks input[type="checkbox"] { width: auto; flex: 0 0 auto; }
+.optional-device-settings fieldset { min-width: 0; margin: 0; padding: 1rem; border: 1px solid var(--line, #41454d); border-radius: .25rem; }

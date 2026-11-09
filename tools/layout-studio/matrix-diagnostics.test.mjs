@@ -140,3 +140,12 @@ test("suite selection, keyboard-only and close revoke matrix sessions through th
     await suite.close(); await assert.rejects(call("devices/matrix/sample", started), /closed/);
   } finally { await suite.close(); }
 }));
+
+test("a fresh review retires expired capture after a view reload without reading switches", () => fixture(async ({ diagnostic, deviceId, time, packets }) => {
+  const old = await diagnostic.start("personal", approve(await diagnostic.review("personal", { deviceId })));
+  time.value += 60001; const before = queries(packets).length;
+  const next = await diagnostic.review("personal", { deviceId }); assert.equal(queries(packets).length, before);
+  await assert.rejects(diagnostic.sample("personal", old), /exact active/);
+  const started = await diagnostic.start("personal", approve(next)); assert.notEqual(started.id, old.id);
+  assert.equal(queries(packets).length, before); await diagnostic.stop("personal", started);
+}));

@@ -159,9 +159,35 @@ and remaining required observation/host-execution flows. Interactive IDE, browse
 hardware/account checks remain separate. Keep the current immutable 22-asset
 frontend pinned; this editor checkpoint does not change it.
 
+## Keyboard frontend checkpoint
+
+Advertised semantic keys, macros, physical choices, QMK settings, encoders,
+tap dances, combos, modifier overrides and Vial 6 alternate-repeat rules now have
+reviewed frontend controls. Cached planning performs no HID I/O. Apply/restore
+use the existing baseline/readback/recovery backend; unsafe typing replacements,
+unknown rule bits and stale workspace proposals are refused. Matrix diagnostics
+require a separate notice/consent, manual samples and separate verified relock.
+A new review retires expired capture left by a page reload without sampling keys.
+
+The final 15 original groups pass 128 tests with zero skips, including 11 firmware
+UI cases and four diagnostic UI cases using actual HTTP/encrypted state/codecs and
+a synthetic transport. Eight live synthetic-server checks verify the served assets,
+controls and hardware refusals. Earlier runs overlap. Original bounds and cleanup
+are retained. The first diagnostic UI attempt used the wrong policy projection;
+the first live-demo assertion expected 400 instead of the existing 409 refusal.
+Both findings are retained; backend policy and error behavior were not weakened.
+[Walkthrough](keyboard-settings-ui.md), [evidence](evidence/device-frontend-source-summary.json).
+
+Browser automation still fails before navigation, including the latest attempt.
+The previous owned preview was gracefully stopped and its synthetic state removed;
+a fresh isolated preview serves the new routes. No actual HID/account/model action
+or installed-app update occurred. Keep the newly pinned immutable review bundle
+and all prior review evidence. Next implementation: client recipe/launch controls,
+remaining observation/host-execution flows and native task attachment limitations.
+
 ## Continue required product work
 
-Use the [requirement ledger](switchyard-requirements.md) as scope. Broader device controls, production editor activation/task attachment and additional external observation streams remain implementation work. Portability, controller and conversation backend paths have substantial coverage: identify the specific missing behavior before adding a subsystem. Additional Shield syntax is not a separate handover requirement and must not displace the required suite.
+Use the [requirement ledger](switchyard-requirements.md) as scope. Distinct client recipe controls, remaining observation/host-execution flows and native task attachment remain implementation work. The editor command registration and broader advertised firmware UI are now implemented; interactive acceptance is separate. Portability, controller and conversation backend paths have substantial coverage: identify the specific missing behavior before adding a subsystem. Additional Shield syntax is not a separate handover requirement and must not displace the required suite.
 
 Keep unfinished software separate from checks requiring physical F77/B122 hardware, an approved Microsoft tenant, interactive Windows/UAC/guest access, a live microphone or approved native task/account operations. A synthetic provider or installed metadata-only proof does not accept those external behaviors.
 
