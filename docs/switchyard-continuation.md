@@ -159,9 +159,18 @@ submitted; probe processes/owned roots are retired. [Contract](codex-terminal-co
   session and has no verified live-only flag. Existing-window focus is not task
   attachment. Codex's narrow saved-history terminal is implemented; arbitrary
   prompts/configuration effects remain refused.
-- Finish automatic native Windows scanner recipe/catalog assembly. The current
-  Windows file-save boundary writes the portable process recipe, not a native
-  guest manifest/catalog. This is unfinished software, not unavailable hardware.
+- Native Windows scanner recipe generation is committed at **a7e6fe7**: drafts
+  target the Windows reviewed runner and refuse when the pinned runtime identity
+  changes during assembly. Linux: 16 focused groups / 193 tests, 4 declared
+  Windows-only skips; the broker proof project compiles locally. Native Windows
+  execution acceptance follows the normal-push complete Windows source run.
+- **35c3c61** fixes the "Switchyard Windows filesystem boundaries" regression
+  that failed every run from f4dcc79 through f48c1de: f4dcc79 expanded
+  `StateLeaseProtocolProof` from 50 to 53 checks, but
+  `scripts/verify-windows-storage-broker.mjs` still pinned 50. The exact-count
+  assertion remains. Run **42977967901** passes all filesystem, native-setup,
+  restricted-exchange and storage-contract jobs. Earlier "complete Windows"
+  claims referred to a different workflow and did not cover this one.
 - Continue observation,
   broader scanner coverage, managed-policy and later-platform scope in the
   requirement ledger. Separate unfinished software from hardware, tenant,
