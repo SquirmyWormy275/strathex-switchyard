@@ -171,6 +171,21 @@ submitted; probe processes/owned roots are retired. [Contract](codex-terminal-co
   assertion remains. Run **42977967901** passes all filesystem, native-setup,
   restricted-exchange and storage-contract jobs. Earlier "complete Windows"
   claims referred to a different workflow and did not cover this one.
+- **f114750** gives `windows-scanner-draft-execution` the sibling scanner bound
+  (native group finished at 45,105/45,132 ms with no failed assertion).
+  **e48e59f** accepts a link-free drive mapping for the pinned scanner runtime:
+  B122 runs the bundled Node from `subst B:`, which native realpath resolves to
+  `D:\a\...`. Links, junctions and identity drift still refuse. At e48e59f all
+  four Windows scanner groups pass natively, including under the B122 subst
+  drive (runs 43005306973, 43005306911).
+- Remaining red at e48e59f is not caused by these changes and is not accepted:
+  `scanner-ui.test.mjs` took 31–45 s on Windows at every commit since f48c1de
+  against its unchanged 45 s bound (45,120 and 45,145 ms failures); it needs a
+  faster test, not a larger bound. `council-runtime.test.ts` case 11 (f114750)
+  and `windows-host-action-consumer.test.ts` (e48e59f) each failed once and
+  passed on neighbouring commits. The same subst refusal remains in
+  `windows-reviewed-runner.mjs` `nativePins`; native tests inject pins, so it
+  is unexercised.
 - Continue observation,
   broader scanner coverage, managed-policy and later-platform scope in the
   requirement ledger. Separate unfinished software from hardware, tenant,
