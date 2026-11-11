@@ -8,7 +8,7 @@ import { scopeHash } from "./confirmations.mjs";
 
 const schema = "switchyard-windows-scanner-save/v1", ownerSchema = "switchyard-windows-scanner-save-owner/v1";
 const nativeHelper = fileURLToPath(new URL("../../runtime/hotkeys/Switchyard.Hotkeys.exe", import.meta.url));
-const names = ["engine.mjs", "scanner.json", "advisory.json", "request.json", "recipe.json"];
+const names = ["engine.mjs", "scanner.json", "advisory.json", "request.json", "recipe.json", "catalog.json"];
 const uuid = value => typeof value === "string" && /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/.test(value);
 const sha = bytes => createHash("sha256").update(bytes).digest("hex");
 const exact = (value, keys) => value && typeof value === "object" && !Array.isArray(value) && Object.keys(value).sort().join() === [...keys].sort().join();
@@ -17,7 +17,7 @@ const same = (a, b) => identity(a) && identity(b) && a.device === b.device && a.
 const metadata = (draft, file) => ({ path: file.path.slice(draft.directory.length + 1), sha256: file.sha256, size: file.size });
 
 export function validateWindowsScannerDraft(draft) {
-  if (!uuid(draft?.id) || draft.directory !== "switchyard-scan-" + draft.id || typeof draft.repositoryRoot !== "string" || draft.repositoryRoot.length > 2048 || !Array.isArray(draft.files) || ![4, 5].includes(draft.files.length)) throw Error("Choose one exact generated Windows scanner draft.");
+  if (!uuid(draft?.id) || draft.directory !== "switchyard-scan-" + draft.id || typeof draft.repositoryRoot !== "string" || draft.repositoryRoot.length > 2048 || !Array.isArray(draft.files) || ![4, 5, 6].includes(draft.files.length)) throw Error("Choose one exact generated Windows scanner draft.");
   const found = new Set();
   for (const file of draft.files) {
     const name = file.path?.slice(draft.directory.length + 1);
@@ -25,7 +25,7 @@ export function validateWindowsScannerDraft(draft) {
     found.add(name);
     if (Object.hasOwn(file, "content") && (typeof file.content !== "string" || Buffer.byteLength(file.content) !== file.size || sha(file.content) !== file.sha256)) throw Error("The Windows scanner control bytes changed.");
   }
-  if (names.filter(name => name !== "advisory.json").some(name => !found.has(name))) throw Error("The exact Windows scanner control set is incomplete.");
+  if (names.filter(name => !["advisory.json", "catalog.json"].includes(name)).some(name => !found.has(name))) throw Error("The exact Windows scanner control set is incomplete.");
 }
 
 export function createWindowsScannerRecipeFiles({ store, platform = process.platform, helper = nativeHelper, command = (exe, args, options) => runRuntimeCommand(exe, args, { ...options, windowsHelper: helper }), guardianStopped = scope => runtimeGuardianStopped(scope, { windowsHelper: helper }) } = {}) {

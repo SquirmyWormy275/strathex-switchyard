@@ -21,6 +21,7 @@
     <Compile Include="../../../../apps/desktop-hotkeys/WindowsStorageBrokerExchangeMapping.cs" Link="WindowsStorageBrokerExchangeMapping.cs" />
     <Compile Include="../../../../apps/desktop-hotkeys/WindowsStorageBrokerExchangeEngine.cs" Link="WindowsStorageBrokerExchangeEngine.cs" />
     <Compile Include="../../../../apps/desktop-hotkeys/ReviewedInputStager.cs" Link="ReviewedInputStager.cs" />
+    <Compile Include="../../../../apps/desktop-hotkeys/ScannerRecipeFiles.cs" Link="ScannerRecipeFiles.cs" />
     <Compile Include="../../../../apps/desktop-hotkeys/ReviewedIndexInputs.cs" Link="ReviewedIndexInputs.cs" />
     <Compile Include="../../../../apps/desktop-hotkeys/ReviewedHistoryInputs.cs" Link="ReviewedHistoryInputs.cs" />
     <Compile Include="../../../../apps/desktop-hotkeys/BoundedExchangeVolume.cs" Link="BoundedExchangeVolume.cs" />

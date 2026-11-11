@@ -23,7 +23,7 @@ export async function scannerDraftFixture(t, overrides = {}, { profile = false }
     await signScannerFixture({ ...signing, contentPath, outputDirectory, id: feed.id, kind, feedVersion: "synthetic-v1", toolName: "switchyard-baseline-scanner", toolVersion: "1", generatedAt: new Date(f.now() - 1000).toISOString(), expiresAt: new Date(f.now() + 3600000).toISOString(), maximumAgeSeconds: 7200 });
     await perform("install-fixture", { manifestPath: join(outputDirectory, "manifest.json") });
   }
-  const service = createTaskAuthority({ store: f.store, inspection: f.inspection, now: f.now, executionActions: connectedExecutionActions("linux"), checkNative: async () => {}, readScannerSources: (c, i) => feeds.readSources(c, i), resolveScannerFixtures: (c, i) => feeds.resolve(c, i), ...overrides });
+  const service = createTaskAuthority({ platform: "linux", store: f.store, inspection: f.inspection, now: f.now, executionActions: connectedExecutionActions("linux"), checkNative: async () => {}, readScannerSources: (c, i) => feeds.readSources(c, i), resolveScannerFixtures: (c, i) => feeds.resolve(c, i), ...overrides });
   f.onCleanup(() => service.close());
   f.timings.report("scanner-ready");
   return { ...f, feeds, perform, service };

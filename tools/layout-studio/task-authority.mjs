@@ -9,6 +9,7 @@ import { ignoredTreeRoots } from "./ignored-tree-policy.mjs";
 import { gitIndexPaths, gitIndexTreeFromEntries, gitIndexWindowsRawLimit } from "./git-index-inputs.mjs";
 import { historySelection, gitHistoryWindowsRawLimit } from "./git-history-inputs.mjs";
 import { assembleScannerRecipeDraft } from "./scanner-recipe-draft.mjs";
+import { captureWindowsScannerRuntime, assertWindowsScannerRuntime } from "./windows-scanner-runtime.mjs";
 import { taskHistoryScope, assertTaskHistoryWitness } from "./task-history-scope.mjs";
 const uuid = v => typeof v === "string" && /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/.test(v);
 const taskDigest = t => scopeHash([t.id, t.provider, t.sessionId, t.repositoryRoot, t.repositoryIdentity, t.accountFingerprint, t.status, t.nativeTransport, t.nativeIdentityVerified, t.launchPolicy]);
@@ -66,7 +67,7 @@ export async function assertTaskAuthorityReceiptState(state, review, receipt, no
   const decision=await ledger(state,now).evaluate({authorityId:record.id,repositoryRoot:task.repositoryRoot,sessionId:task.sessionId,taskId:task.id,planRevision:record.grant.planRevision,action:review.action});
   if(!decision.allowed)throw Error("The exact execution authority was revoked, expired or changed before receipt commit.");
 }
-export function createTaskAuthority({ store, checkNative, isActive = async () => true, inspection = createRepositoryInspection({ store, ownerKind: "task-authority" }), localCommitExecutionImplemented = false, executionActions = [], readScannerSources, resolveScannerFixtures, now = () => Date.now() } = {}) {
+export function createTaskAuthority({ store, checkNative, isActive = async () => true, inspection = createRepositoryInspection({ store, ownerKind: "task-authority" }), localCommitExecutionImplemented = false, executionActions = [], readScannerSources, resolveScannerFixtures, platform = process.platform, readWindowsScannerRuntime = captureWindowsScannerRuntime, now = () => Date.now() } = {}) {
   if (!Array.isArray(executionActions) || new Set(executionActions).size!==executionActions.length || executionActions.some(a => !connectedExecutionActions("linux").includes(a))) throw new Error("Choose only execution actions connected by this host implementation.");
   const generations = new Map(), pending = new Set(), seen = new Set(); let closed = false;
   const current = (c, generation) => { if (closed || generation !== (generations.get(c) ?? 0)) throw new Error("This task authority operation was stopped."); };
@@ -160,7 +161,7 @@ export function createTaskAuthority({ store, checkNative, isActive = async () =>
         await authorize(); await checkNative(c, result.task); await authorize();
         const entries = witnessed.rows.map(({ path, mode, objectId }) => ({ path, mode, objectId }));
         if (JSON.stringify(gitIndexPaths(entries.map(row => row.path))) !== JSON.stringify(selected) || witnessed.head !== result.snapshot.head || gitIndexTreeFromEntries(entries) !== result.snapshot.indexTree) throw Error("The witnessed index tree does not match the complete reviewed index tree. Review again.");
-        if (process.platform === "win32" && witnessed.rows.reduce((sum, row) => sum + row.size, 0) > gitIndexWindowsRawLimit) throw Error("The staged scanner inputs exceed the Windows 320 KiB transport subset.");
+        if (platform === "win32" && witnessed.rows.reduce((sum, row) => sum + row.size, 0) > gitIndexWindowsRawLimit) throw Error("The staged scanner inputs exceed the Windows 320 KiB transport subset.");
         const refreshed = await capture(c, proposed, generation);
         if (refreshed.snapshot.id !== result.snapshot.id || refreshed.binding !== result.binding || refreshed.workspace !== result.workspace) throw Error("The scanner target changed after index witnessing. Review again.");
         Object.assign(preparation, { policy: "bounded-current-and-index/v1", indexTree: result.snapshot.indexTree, indexMetadataSha256: witnessed.indexMetadataSha256,
@@ -195,7 +196,7 @@ export function createTaskAuthority({ store, checkNative, isActive = async () =>
         }
         if (witnessed.head !== result.snapshot.head || JSON.stringify(witnessed.paths) !== JSON.stringify(selected.paths) || witnessed.requestedDepth !== selected.depth) throw Error("The witnessed historical target changed from the exact reviewed task. Review again.");
         if (proposed.paths.length + (preparation.indexInputs?.length ?? 0) + witnessed.versions.length > 256) throw Error("The combined current, staged and historical scanner inputs exceed the 256-file bound.");
-        if (process.platform === "win32" && witnessed.versions.reduce((sum, row) => sum + row.size, 0) + (preparation.indexInputs ?? []).reduce((sum, row) => sum + row.size, 0) > gitHistoryWindowsRawLimit) throw Error("The combined Git scanner inputs exceed the Windows 320 KiB transport subset.");
+        if (platform === "win32" && witnessed.versions.reduce((sum, row) => sum + row.size, 0) + (preparation.indexInputs ?? []).reduce((sum, row) => sum + row.size, 0) > gitHistoryWindowsRawLimit) throw Error("The combined Git scanner inputs exceed the Windows 320 KiB transport subset.");
         const refreshed = await capture(c, proposed, generation);
         if (refreshed.snapshot.id !== result.snapshot.id || refreshed.binding !== result.binding || refreshed.workspace !== result.workspace) throw Error("The scanner target changed after historical witnessing. Review again.");
         Object.assign(preparation, { policy: preparation.indexInputs ? "bounded-current-index-and-history/v1" : "bounded-current-and-history/v1", historyHead: witnessed.head, historyPaths: selected.paths, historyDepth: selected.depth,
@@ -210,6 +211,7 @@ export function createTaskAuthority({ store, checkNative, isActive = async () =>
       return { ...await reviewCaptured(c, result, generation), preparation };
     }); },
     async prepareScannerDraft(c, input, internal = {}) { return exclusive(c, async generation => {
+      if (!["linux", "win32"].includes(platform)) throw Error("Scanner recipe generation requires a supported Linux or Windows platform.");
       const identifier = v => typeof v === "string" && /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/.test(v);
       if (!input || !identifier(input.scannerFixtureId) || Object.hasOwn(input, "advisoryFixtureId") && !identifier(input.advisoryFixtureId) || input.scannerFixtureId === input.advisoryFixtureId) throw Error("Choose one exact installed scanner feed and an optional distinct advisory feed.");
       const { scannerFixtureId, advisoryFixtureId, ...selection } = input;
@@ -224,11 +226,14 @@ export function createTaskAuthority({ store, checkNative, isActive = async () =>
       try {
         const expected = [[scannerFixtureId, "scanner"], ...(advisoryFixtureId ? [[advisoryFixtureId, "advisory"]] : [])];
         if (JSON.stringify(sources.map(item => [item.fixture.id, item.fixture.kind])) !== JSON.stringify(expected)) throw Error("The resolved draft feeds differ from the selected identities.");
-        const draft = await assembleScannerRecipeDraft({ result, preparation, sources, authorize, id: internal.id });
+        const windowsRuntime = platform === "win32" ? structuredClone(assertWindowsScannerRuntime(await readWindowsScannerRuntime())) : undefined;
+        await authorize();
+        const draft = await assembleScannerRecipeDraft({ result, preparation, sources, authorize, id: internal.id, platform, windowsRuntime });
         const refreshed = await capture(c, result.proposed, generation);
         if (refreshed.snapshot.id !== result.snapshot.id || refreshed.binding !== result.binding || refreshed.workspace !== result.workspace) throw Error("The scanner target changed while assembling the draft.");
         const freshFeeds = await resolveScannerFixtures(c, feedInput());
         if (JSON.stringify(freshFeeds) !== JSON.stringify(sources.map(item => item.fixture))) throw Error("The installed feed trust, content or expiry changed during draft assembly.");
+        if (windowsRuntime && scopeHash(windowsRuntime) !== scopeHash(assertWindowsScannerRuntime(await readWindowsScannerRuntime()))) throw Error("The original Windows scanner runtime identity changed during draft assembly.");
         await authorize(); return draft;
       } finally { for (const item of sources) item.bytes.fill(0); }
     }); },

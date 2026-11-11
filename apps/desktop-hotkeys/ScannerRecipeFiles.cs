@@ -14,7 +14,7 @@ internal static partial class ReviewedInputStager
     private const string ScannerSaveSchema = "switchyard-windows-scanner-save/v1";
     private const int ScannerControlLimit = 320 * 1024;
     private static readonly HashSet<string> ScannerControlNames = new(StringComparer.Ordinal)
-        { "engine.mjs", "scanner.json", "advisory.json", "request.json", "recipe.json" };
+        { "engine.mjs", "scanner.json", "advisory.json", "request.json", "recipe.json", "catalog.json" };
     private sealed record ScannerControl(string Path, string Sha256, int Size, JsonElement? Identity);
     [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
@@ -35,10 +35,10 @@ internal static partial class ReviewedInputStager
     }
     private static ScannerControl[] ScannerControls(JsonElement value, bool complete)
     {
-        if (value.ValueKind != JsonValueKind.Array || value.GetArrayLength() > (complete ? 5 : 4)) throw Invalid();
+        if (value.ValueKind != JsonValueKind.Array || value.GetArrayLength() > (complete ? 6 : 5)) throw Invalid();
         var files = value.EnumerateArray().Select(file => ScannerControlDescriptor(file, owned: true)).ToArray();
         if (files.Select(file => file.Path).Distinct(StringComparer.Ordinal).Count() != files.Length) throw Invalid();
-        if (complete && (files.Length is < 4 or > 5 || new[] { "engine.mjs", "scanner.json", "request.json", "recipe.json" }.Any(name => !files.Any(file => file.Path == name)))) throw Invalid();
+        if (complete && (files.Length is < 4 or > 6 || new[] { "engine.mjs", "scanner.json", "request.json", "recipe.json" }.Any(name => !files.Any(file => file.Path == name)))) throw Invalid();
         return files;
     }
     private static void ScannerDirectoryContents(string directory, IEnumerable<string> names)
@@ -47,7 +47,7 @@ internal static partial class ReviewedInputStager
         var actual = new List<string>();
         foreach (string entry in Directory.EnumerateFileSystemEntries(directory))
         {
-            if (actual.Count >= 5) throw Invalid(); actual.Add(Path.GetFileName(entry));
+            if (actual.Count >= 6) throw Invalid(); actual.Add(Path.GetFileName(entry));
         }
         if (!actual.Order(StringComparer.Ordinal).SequenceEqual(expected, StringComparer.Ordinal)) throw Invalid();
     }

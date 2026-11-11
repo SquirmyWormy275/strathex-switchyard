@@ -5,12 +5,16 @@ import { isAbsolute } from "node:path";
 import { NodeFileDigestReader } from "../../packages/control-plane/src/git-inspector.ts";
 import { validateRepositoryInputs } from "../../apps/windows-companion/src/repository-inputs.ts";
 import { validateShieldRequest } from "./shield-scanner-engine.mjs";
+import { parseWindowsReviewedRun, parseWindowsRunCatalog } from "./windows-reviewed-run.mjs";
+import { assertWindowsScannerRuntime } from "./windows-scanner-runtime.mjs";
 
 const sha = bytes => createHash("sha256").update(bytes).digest("hex");
 const reader = new NodeFileDigestReader({ maxFileBytes: 2 * 1024 * 1024 });
 const exactText = bytes => { const text = bytes.toString("utf8"); if (!Buffer.from(text).equals(bytes)) throw Error("Draft control files require exact UTF-8 bytes."); return text; };
 
-export async function assembleScannerRecipeDraft({ result, preparation, sources, authorize = async () => {}, id = randomUUID() }) {
+export async function assembleScannerRecipeDraft({ result, preparation, sources, authorize = async () => {}, id = randomUUID(), platform = process.platform, windowsRuntime }) {
+  if (!["linux", "win32"].includes(platform)) throw Error("Scanner recipe generation requires a supported Linux or Windows platform.");
+  if (platform === "win32") assertWindowsScannerRuntime(windowsRuntime);
   const root = result.task.repositoryRoot, action = result.proposed.actions[0];
   if (!isAbsolute(root) || result.proposed.actions.length !== 1 || !Array.isArray(sources) || sources.length < 1 || sources.length > 2) throw Error("Prepare one scanner action with one scanner and optional advisory feed.");
   const scanner = sources.find(s => s.fixture.kind === "scanner"), advisory = sources.find(s => s.fixture.kind === "advisory");
@@ -38,12 +42,24 @@ export async function assembleScannerRecipeDraft({ result, preparation, sources,
   const request = validateShieldRequest({ schema: "switchyard-shield-scan/v1", version: 1, action, scope: "reviewed-inputs", files: [...current, ...(preparation.indexInputs ?? []), ...(preparation.historyInputs ?? [])], scanner: feed(scanner), advisory: advisory ? feed(advisory) : null });
   const requestFile = generated("request.json", Buffer.from(JSON.stringify(request)));
   if (requestFile.size > 128 * 1024) throw Error("The scanner request exceeds its existing 128 KiB bound.");
+  let recipe, catalog;
+  if (platform === "win32") {
+    recipe = { id: action, executable: "C:\\B122\\tools\\node.exe", executableSha256: windowsRuntime.identity.sha256,
+      arguments: [`{INPUT_ROOT}\\${engine.path.replaceAll("/", "\\")}`, requestFile.path], workingRoot: "input", workingDirectory: ".",
+      environment: { NODE_ENV: "test" }, timeoutMs: 10000, maxOutputBytes: 524288, artifacts: [] };
+    catalog = generated("catalog.json", Buffer.from(JSON.stringify({ schema: "sxsy-b122.windows-sandbox-catalog", version: 1, recipes: [recipe] })));
+  }
   const inputFiles = validateRepositoryInputs([...files.map(({ path, sha256, size }) => ({ path, sha256, size })), ...request.files.map(({ path, sha256, size }) => ({ path, sha256, size }))].map(file => ({ ...file, classification: "non-production" })));
   if (inputFiles.length > 256) throw Error("The complete scanner recipe exceeds its 256-input bound.");
-  const recipe = { kind: "process", executable: process.execPath, args: [engine.path, requestFile.path], cwd: ".", environment: { NODE_ENV: "test" }, lifecycle: "foreground", isolation: "disposable", workspaceMode: "read-only", timeoutMs: 10000, maxOutputBytes: 524288, inputFiles };
-  const manifest = { schema: "sxsy-b122.repository-runtime", version: 1, repositoryRoot: root, allowedHttpsUrls: [], recipes: { [action]: recipe } };
+  recipe ??= { kind: "process", executable: process.execPath, args: [engine.path, requestFile.path], cwd: ".", environment: { NODE_ENV: "test" }, lifecycle: "foreground", isolation: "disposable", workspaceMode: "read-only", timeoutMs: 10000, maxOutputBytes: 524288, inputFiles };
+  const manifest = catalog ? { schema: "switchyard-windows-reviewed-run/v1", version: 1, recipeId: action, catalogPath: catalog.path, catalogSha256: catalog.sha256, inputFiles }
+    : { schema: "sxsy-b122.repository-runtime", version: 1, repositoryRoot: root, allowedHttpsUrls: [], recipes: { [action]: recipe } };
   const manifestFile = generated("recipe.json", Buffer.from(JSON.stringify(manifest)));
   if (manifestFile.size > 128 * 1024 || result.proposed.paths.length + files.length > 256) throw Error("The complete draft exceeds its existing manifest or authority bound.");
+  if (catalog) {
+    if (files.some(file => file.size > 320 * 1024)) throw Error("The Windows scanner control files exceed the existing 320 KiB private-pipe bound.");
+    parseWindowsRunCatalog(Buffer.from(catalog.content), parseWindowsReviewedRun(Buffer.from(manifestFile.content), manifestFile.sha256, action), windowsRuntime.identity.sha256);
+  }
   await authorize();
   return { schema: "switchyard-scanner-recipe-draft/v1", status: "draft", id, action, targetSnapshotId: result.snapshot.id, repositoryRoot: root, directory: prefix,
     binding: { taskId: result.task.id, provider: result.task.provider, sessionId: result.task.sessionId, taskDigest: result.binding, workspaceDigest: result.workspace },

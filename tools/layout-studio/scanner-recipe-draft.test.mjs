@@ -24,8 +24,8 @@ test("authenticated draft assembly returns exact generated controls without sour
   const before = { index: await readFile(join(f.root, ".git/index")), head: await f.run("rev-parse", "HEAD"), names: await readdir(f.root), journal: (await f.store.snapshot("personal")).confirmationJournal?.length ?? 0 };
   // Exercise the normal Suite factory wiring with a controlled native identity port.
   let service;
-  const suite = createSuite({ store: f.store, fixtureAdministration: f.feeds, agents: { close: async () => {} }, coding: { status: async () => ({}), close: async () => {} }, taskAuthorityFactory: options => (service = createTaskAuthority({ ...options, inspection: f.inspection, now: f.now })) }); f.onCleanup(() => suite.close());
-  const token = "D".repeat(43), server = createStudioServer({ suite, token, discover: async () => ({}) }); await new Promise(resolve => server.listen(0, "127.0.0.1", resolve)); f.onCleanup(() => new Promise(resolve => { server.closeAllConnections(); server.close(resolve); }));
+  const suite = createSuite({ platform: "linux", store: f.store, fixtureAdministration: f.feeds, agents: { close: async () => {} }, coding: { status: async () => ({}), close: async () => {} }, taskAuthorityFactory: options => (service = createTaskAuthority({ ...options, inspection: f.inspection, now: f.now })) });
+  const token = "D".repeat(43), server = createStudioServer({ suite, token, discover: async () => ({}) }); await new Promise(resolve => server.listen(0, "127.0.0.1", resolve)); f.onCleanup(async () => { await new Promise(resolve => { server.closeAllConnections(); server.close(resolve); }); await server.cleanup(); });
   const origin = `http://127.0.0.1:${server.address().port}`, call = auth => fetch(origin + "/api/suite/coding/authority/scanner-draft", { method: "POST", headers: { "Content-Type": "application/json", Origin: origin, ...(auth ? { Authorization: `Bearer ${token}` } : {}) }, body: JSON.stringify(input(f)) });
   assert.equal((await call(false)).status, 401); const response = await call(true), draft = await response.json(); assert.equal(response.status, 200, JSON.stringify(draft));
   assert.equal(draft.status, "draft"); assert.equal(draft.files.length, 5); assert.equal(JSON.stringify(draft).includes(secret), false);
@@ -48,7 +48,7 @@ test("draft selection rejects malformed feeds, commands and approvals before nat
 
 for (const change of ["worktree", "index", "account", "feed-revocation", "feed-expiry"]) test(`draft assembly refuses ${change} drift after its original witnesses`, async t => {
   const f = await fixture(t); let borrowed;
-  const service = createTaskAuthority({ store: f.store, inspection: f.inspection, now: f.now, executionActions: connectedExecutionActions("linux"), checkNative: async () => {}, resolveScannerFixtures: (c, i) => f.feeds.resolve(c, i), readScannerSources: async (c, i) => {
+  const service = createTaskAuthority({ platform: "linux", store: f.store, inspection: f.inspection, now: f.now, executionActions: connectedExecutionActions("linux"), checkNative: async () => {}, resolveScannerFixtures: (c, i) => f.feeds.resolve(c, i), readScannerSources: async (c, i) => {
     borrowed = await f.feeds.readSources(c, i);
     if (change === "worktree") await writeFile(join(f.root, "task.txt"), "changed after witnessing");
     if (change === "index") await f.run("add", "task.txt");
