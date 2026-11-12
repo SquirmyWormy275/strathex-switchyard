@@ -1,0 +1,34 @@
+{
+  "schema": "switchyard-restricted-storage-failure-summary/v1",
+  "sourceCommit": "47c80beee6ea9c8fdfcecba24f2e6c8ac3e056ae",
+  "workflowRun": 42357835746,
+  "job": 128359883652,
+  "success": false,
+  "checks": 6,
+  "restrictedClientChecks": 13,
+  "restrictedExchangeChecks": 31,
+  "hostExchangeChecks": 8,
+  "hostExchangeFailure": null,
+  "failedPhase": "native-exit-owner-14-guardian",
+  "childExit": {
+    "waitResult": 0,
+    "exitCode": 2,
+    "resultAvailable": true,
+    "childReportedSuccess": false,
+    "ownerReportedSuccess": false,
+    "completedChecks": 7,
+    "failedPhase": "native-exit-owner-14-guardian",
+    "failureCategory": "AssertionError",
+    "stateLockFailure": null
+  },
+  "descendantQueryChecks": 65,
+  "allDescendantQueryMasksEight": true,
+  "ownershipFailure": null,
+  "removalAttempted": false,
+  "postFailureStatus": "bootstrap-ready",
+  "cause": "Unresolved original guardian retirement; no retry, privilege widening or broad cleanup.",
+  "limits": [
+    "This independent restricted-storage failure is not covered by the passing client platform lane.",
+    "The CI fixture preserved its original protected installation and image; no cleanup success is inferred."
+  ]
+}

@@ -1,0 +1,504 @@
+{
+  "schema": "switchyard-history-path-discovery-source/v1",
+  "at": "2026-11-09T11:45:35.913Z",
+  "baseCommit": "4cf8e9fee48ccb4c6c1d5e0cc7b01940ca4f18a3",
+  "sources": [
+    {
+      "path": "tools/layout-studio/git-history-inputs.mjs",
+      "sha256": "fe51857c114b463ecc60c22dea9da5a55a8e3a4b48b007662cf28eeac491dcab"
+    },
+    {
+      "path": "tools/layout-studio/git-history-inputs.test.mjs",
+      "sha256": "3e3eff087df761767c8adc8cca6cd3069286520539cda31a6318e67634de07bb"
+    },
+    {
+      "path": "tools/layout-studio/repository-inspection.mjs",
+      "sha256": "77e5da4e50fad338efdcd29722a81b5659a54e77f558ee7109deaddb1c902055"
+    },
+    {
+      "path": "tools/layout-studio/task-authority.mjs",
+      "sha256": "dd8e7cd4db955d36889deaf3043af3d019bd2b2d59c5607acea664fb67f3d712"
+    },
+    {
+      "path": "tools/layout-studio/task-history-inputs.test.mjs",
+      "sha256": "156066cc5ac9d755207d8410bdd79702fdd0afbc350702f02e42a61db019714b"
+    },
+    {
+      "path": "tools/layout-studio/scanner-history-review.test.mjs",
+      "sha256": "1d5a2cebbedccc1fe3086bec30ce25dc8f8aa299286ec5c8c09404c43c0f284e"
+    },
+    {
+      "path": "tools/layout-studio/scanner-ui.mjs",
+      "sha256": "cf3b97166dc31bd50ffd79073a21b9286d43212c85398f57693ef9dc5abcf0f0"
+    },
+    {
+      "path": "tools/layout-studio/scanner-ui.test.mjs",
+      "sha256": "8a029193d861ae4a14c438a8f2080288250224d18bdc7d3404d664283123a4ab"
+    }
+  ],
+  "runs": [
+    {
+      "receiptId": "30d0a111-0b07-41e7-b989-7b518226487c",
+      "receiptSha256": "aa972df3ceeaa0602a7560bc5da7ede0d3480ebec6df5a4b0701ad1ef576e73f",
+      "totals": {
+        "required": 10,
+        "passed": 10,
+        "failed": 0,
+        "tests": 81,
+        "passedTests": 80,
+        "failedTests": 0,
+        "skippedTests": 1,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "children": [
+        {
+          "file": "tools/layout-studio/repository-shield-history.test.mjs",
+          "pattern": null,
+          "durationMs": 9020,
+          "effectiveTimeoutMs": 120000,
+          "tests": {
+            "total": 5,
+            "passed": 5,
+            "failed": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          }
+        },
+        {
+          "file": "tools/layout-studio/scanner-history-review.test.mjs",
+          "pattern": null,
+          "durationMs": 17717,
+          "effectiveTimeoutMs": 120000,
+          "tests": {
+            "total": 13,
+            "passed": 13,
+            "failed": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          }
+        },
+        {
+          "file": "tools/layout-studio/scanner-mixed-review.test.mjs",
+          "pattern": null,
+          "durationMs": 13085,
+          "effectiveTimeoutMs": 120000,
+          "tests": {
+            "total": 7,
+            "passed": 7,
+            "failed": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          }
+        },
+        {
+          "file": "tools/layout-studio/scanner-recipe-draft.test.mjs",
+          "pattern": null,
+          "durationMs": 14961,
+          "effectiveTimeoutMs": 120000,
+          "tests": {
+            "total": 12,
+            "passed": 12,
+            "failed": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          }
+        },
+        {
+          "file": "tools/layout-studio/git-history-inputs.test.mjs",
+          "pattern": null,
+          "durationMs": 107,
+          "effectiveTimeoutMs": 45000,
+          "tests": {
+            "total": 5,
+            "passed": 5,
+            "failed": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          }
+        },
+        {
+          "file": "tools/layout-studio/task-history-inputs.test.mjs",
+          "pattern": null,
+          "durationMs": 3744,
+          "effectiveTimeoutMs": 120000,
+          "tests": {
+            "total": 12,
+            "passed": 12,
+            "failed": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          }
+        },
+        {
+          "file": "tools/layout-studio/windows-history-inputs.test.mjs",
+          "pattern": null,
+          "durationMs": 206,
+          "effectiveTimeoutMs": 45000,
+          "tests": {
+            "total": 4,
+            "passed": 4,
+            "failed": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          }
+        },
+        {
+          "file": "tools/layout-studio/windows-history-staging.test.mjs",
+          "pattern": null,
+          "durationMs": 609,
+          "effectiveTimeoutMs": 45000,
+          "tests": {
+            "total": 14,
+            "passed": 13,
+            "failed": 0,
+            "cancelled": 0,
+            "skipped": 1,
+            "todo": 0
+          }
+        },
+        {
+          "file": "tools/layout-studio/repository-windows-shield-history.test.mjs",
+          "pattern": null,
+          "durationMs": 8660,
+          "effectiveTimeoutMs": 120000,
+          "tests": {
+            "total": 2,
+            "passed": 2,
+            "failed": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          }
+        },
+        {
+          "file": "tools/layout-studio/scanner-ui.test.mjs",
+          "pattern": null,
+          "durationMs": 12495,
+          "effectiveTimeoutMs": 45000,
+          "tests": {
+            "total": 7,
+            "passed": 7,
+            "failed": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          }
+        }
+      ],
+      "duplicateReceiptRemoved": true
+    },
+    {
+      "receiptId": "fd47415a-2a7b-4e2d-9a14-c8bab2f31c5a",
+      "receiptSha256": "6ac3edf5f9002520ade67169db4764b3b580b9fa0a2ef044f4914c4ad1c4c1eb",
+      "totals": {
+        "required": 18,
+        "passed": 18,
+        "failed": 0,
+        "tests": 26,
+        "passedTests": 26,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "children": [
+        {
+          "file": "deployment/suite/release.test.mjs",
+          "pattern": null,
+          "durationMs": 2401,
+          "effectiveTimeoutMs": 45000,
+          "tests": {
+            "total": 5,
+            "passed": 5,
+            "failed": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          }
+        },
+        {
+          "file": "deployment/suite/application.test.mjs",
+          "pattern": null,
+          "durationMs": 4319,
+          "effectiveTimeoutMs": 45000,
+          "tests": {
+            "total": 5,
+            "passed": 5,
+            "failed": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          }
+        },
+        {
+          "file": "deployment/suite/installation.test.mjs",
+          "pattern": "installation keeps current and one rollback version, records dated backups, preserves data and removes only owned entries",
+          "durationMs": 2914,
+          "effectiveTimeoutMs": 120000,
+          "tests": {
+            "total": 1,
+            "passed": 1,
+            "failed": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          }
+        },
+        {
+          "file": "deployment/suite/installation.test.mjs",
+          "pattern": "unowned or edited desktop entries and corrupted new releases preserve the current application",
+          "durationMs": 1223,
+          "effectiveTimeoutMs": 120000,
+          "tests": {
+            "total": 1,
+            "passed": 1,
+            "failed": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          }
+        },
+        {
+          "file": "deployment/suite/installation.test.mjs",
+          "pattern": "a failed persistent write restores every earlier launcher and the exact previous installation record",
+          "durationMs": 1588,
+          "effectiveTimeoutMs": 120000,
+          "tests": {
+            "total": 1,
+            "passed": 1,
+            "failed": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          }
+        },
+        {
+          "file": "deployment/suite/installation.test.mjs",
+          "pattern": "forced owner exit leaves a durable journal; another installer restores the exact before state without touching unrelated files",
+          "durationMs": 1656,
+          "effectiveTimeoutMs": 120000,
+          "tests": {
+            "total": 1,
+            "passed": 1,
+            "failed": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          }
+        },
+        {
+          "file": "deployment/suite/installation.test.mjs",
+          "pattern": "recovery preflights all edits before writing, and respects a committed update whose pending marker survived",
+          "durationMs": 1690,
+          "effectiveTimeoutMs": 120000,
+          "tests": {
+            "total": 1,
+            "passed": 1,
+            "failed": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          }
+        },
+        {
+          "file": "deployment/suite/installation.test.mjs",
+          "pattern": "active host connections block uninstall before any application stop or persistent mutation",
+          "durationMs": 1224,
+          "effectiveTimeoutMs": 120000,
+          "tests": {
+            "total": 1,
+            "passed": 1,
+            "failed": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          }
+        },
+        {
+          "file": "deployment/suite/installation.test.mjs",
+          "pattern": "uninstall verifies exact owner exit and restores host connections before removing persistent program entries",
+          "durationMs": 1292,
+          "effectiveTimeoutMs": 120000,
+          "tests": {
+            "total": 1,
+            "passed": 1,
+            "failed": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          }
+        },
+        {
+          "file": "deployment/suite/installation.test.mjs",
+          "pattern": "a restoration conflict retains all program entries and resumes the previous running application",
+          "durationMs": 1206,
+          "effectiveTimeoutMs": 120000,
+          "tests": {
+            "total": 1,
+            "passed": 1,
+            "failed": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          }
+        },
+        {
+          "file": "deployment/suite/installation.test.mjs",
+          "pattern": "a second registered instance blocks uninstall without stopping either owner",
+          "durationMs": 1211,
+          "effectiveTimeoutMs": 120000,
+          "tests": {
+            "total": 1,
+            "passed": 1,
+            "failed": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          }
+        },
+        {
+          "file": "deployment/suite/installation.test.mjs",
+          "pattern": "unconfirmed owner exit leaves a durable removal journal and blocks restoration until recovery",
+          "durationMs": 1212,
+          "effectiveTimeoutMs": 120000,
+          "tests": {
+            "total": 1,
+            "passed": 1,
+            "failed": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          }
+        },
+        {
+          "file": "deployment/suite/installation.test.mjs",
+          "pattern": "a failed uninstall write restores the owned program and keeps restart recovery durable",
+          "durationMs": 1234,
+          "effectiveTimeoutMs": 120000,
+          "tests": {
+            "total": 1,
+            "passed": 1,
+            "failed": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          }
+        },
+        {
+          "file": "deployment/suite/installation.test.mjs",
+          "pattern": "a dated verified recovery entry restores an interrupted uninstall even after the main loader was removed",
+          "durationMs": 1548,
+          "effectiveTimeoutMs": 120000,
+          "tests": {
+            "total": 1,
+            "passed": 1,
+            "failed": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          }
+        },
+        {
+          "file": "deployment/suite/installation.test.mjs",
+          "pattern": "an explicit no-start update stops the previous generation without restarting the new one",
+          "durationMs": 1615,
+          "effectiveTimeoutMs": 120000,
+          "tests": {
+            "total": 1,
+            "passed": 1,
+            "failed": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          }
+        },
+        {
+          "file": "deployment/suite/installation.test.mjs",
+          "pattern": "the stable installed loader verifies and addresses the actual application across update and rollback",
+          "durationMs": 3967,
+          "effectiveTimeoutMs": 120000,
+          "tests": {
+            "total": 1,
+            "passed": 1,
+            "failed": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          }
+        },
+        {
+          "file": "deployment/suite/installation.test.mjs",
+          "pattern": "pre-promotion owner loss recovers only verified staging copies and exact incomplete source prefixes",
+          "durationMs": 1433,
+          "effectiveTimeoutMs": 120000,
+          "tests": {
+            "total": 1,
+            "passed": 1,
+            "failed": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          }
+        },
+        {
+          "file": "deployment/suite/installation.test.mjs",
+          "pattern": "interrupted installation recovery accepts the full release file ceiling plus its manifest and preserves unrelated edits",
+          "durationMs": 1643,
+          "effectiveTimeoutMs": 120000,
+          "tests": {
+            "total": 1,
+            "passed": 1,
+            "failed": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          }
+        }
+      ],
+      "duplicateReceiptRemoved": true
+    }
+  ],
+  "red": {
+    "test": "authenticated automatic history preparation derives immutable versions and absent paths without source disclosure",
+    "passed": 0,
+    "failed": 1,
+    "reason": "historyPathDiscovery was absent before implementation"
+  },
+  "typecheck": {
+    "command": "node node_modules/typescript/bin/tsc --noEmit -p tsconfig.json",
+    "exitCode": 0
+  },
+  "scope": [
+    "Bounded names absent from selected HEAD and outside selected historical paths, derived from existing verified raw commit/tree witnesses.",
+    "At most 64 portable regular-file names displayed; omitted and unsupported counts retained.",
+    "No added Git queries, unselected blob read, source text, scan input, task permission or complete security coverage.",
+    "Original historical witness digest and native request formats unchanged.",
+    "Real Linux guardian/HTTP/preparation and scan boundaries exercised; Windows guest effects explicitly doubled; no live provider task, hardware or account operation.",
+    "Frontend formatter and browser-surface interaction tested; actual visual review and normal installed update remain pending."
+  ],
+  "audit": {
+    "originalManifestCommandsBoundsSkips": true,
+    "serialOrder": true,
+    "outputBounds": true,
+    "originalChildTreeCleanup": true,
+    "privateReceiptCopiesVerified": true
+  },
+  "sourceFiles": {
+    "tools/layout-studio/git-history-inputs.mjs": "fe51857c114b463ecc60c22dea9da5a55a8e3a4b48b007662cf28eeac491dcab",
+    "tools/layout-studio/git-history-inputs.test.mjs": "3e3eff087df761767c8adc8cca6cd3069286520539cda31a6318e67634de07bb",
+    "tools/layout-studio/repository-inspection.mjs": "77e5da4e50fad338efdcd29722a81b5659a54e77f558ee7109deaddb1c902055",
+    "tools/layout-studio/task-authority.mjs": "dd8e7cd4db955d36889deaf3043af3d019bd2b2d59c5607acea664fb67f3d712",
+    "tools/layout-studio/task-history-inputs.test.mjs": "156066cc5ac9d755207d8410bdd79702fdd0afbc350702f02e42a61db019714b",
+    "tools/layout-studio/scanner-history-review.test.mjs": "1d5a2cebbedccc1fe3086bec30ce25dc8f8aa299286ec5c8c09404c43c0f284e",
+    "tools/layout-studio/scanner-ui.mjs": "cf3b97166dc31bd50ffd79073a21b9286d43212c85398f57693ef9dc5abcf0f0",
+    "tools/layout-studio/scanner-ui.test.mjs": "8a029193d861ae4a14c438a8f2080288250224d18bdc7d3404d664283123a4ab"
+  }
+}

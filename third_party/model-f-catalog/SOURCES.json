@@ -1,0 +1,1445 @@
+{
+  "schema": "switchyard-catalog-sources/v1",
+  "checkedAt": "2026-10-29",
+  "commits": {
+    "ploxiln": "c832c9b0edfa554c6e8344cb732f14620e63b210",
+    "mymakercorner": "761cb1c1b71ed91c48185f3e03465702b21e49f4"
+  },
+  "files": [
+    {
+      "file": "mymakercorner/LICENSE",
+      "url": "https://raw.githubusercontent.com/mymakercorner/vial-qmk/761cb1c1b71ed91c48185f3e03465702b21e49f4/LICENSE",
+      "sha256": "8177f97513213526df2cf6184d8ff986c675afb514d4e68a404010521b880643"
+    },
+    {
+      "file": "mymakercorner/keyboards/leyden_jar/b104/keyboard.json",
+      "url": "https://raw.githubusercontent.com/mymakercorner/vial-qmk/761cb1c1b71ed91c48185f3e03465702b21e49f4/keyboards/leyden_jar/b104/keyboard.json",
+      "sha256": "3a2480accd0f51f4feadf98279acdac1d47c2bff85c32d3a702c25beb17961ed"
+    },
+    {
+      "file": "mymakercorner/keyboards/leyden_jar/b104/keymaps/default/keymap.c",
+      "url": "https://raw.githubusercontent.com/mymakercorner/vial-qmk/761cb1c1b71ed91c48185f3e03465702b21e49f4/keyboards/leyden_jar/b104/keymaps/default/keymap.c",
+      "sha256": "d5b72113506ae8a634d7720ea8b887dea0111e5169b5e673f3364025314c2ac8"
+    },
+    {
+      "file": "mymakercorner/keyboards/leyden_jar/b104/keymaps/vial-ansi/config.h",
+      "url": "https://raw.githubusercontent.com/mymakercorner/vial-qmk/761cb1c1b71ed91c48185f3e03465702b21e49f4/keyboards/leyden_jar/b104/keymaps/vial-ansi/config.h",
+      "sha256": "b631ee17d6e03c0ae5961e3b483a278e0bcbf815e06b32ebf91621c07010ea6f"
+    },
+    {
+      "file": "mymakercorner/keyboards/leyden_jar/b104/keymaps/vial-ansi/keymap.c",
+      "url": "https://raw.githubusercontent.com/mymakercorner/vial-qmk/761cb1c1b71ed91c48185f3e03465702b21e49f4/keyboards/leyden_jar/b104/keymaps/vial-ansi/keymap.c",
+      "sha256": "8da84aa98ad1dd7920152c9456be9447224f7abcb11478e75f8a973e815a5ca9"
+    },
+    {
+      "file": "mymakercorner/keyboards/leyden_jar/b104/keymaps/vial-ansi/vial.json",
+      "url": "https://raw.githubusercontent.com/mymakercorner/vial-qmk/761cb1c1b71ed91c48185f3e03465702b21e49f4/keyboards/leyden_jar/b104/keymaps/vial-ansi/vial.json",
+      "sha256": "3afcb3a57397a2d4da62e54c84a8f9628b0a98f1ef026d330a993996908d0c61"
+    },
+    {
+      "file": "mymakercorner/keyboards/leyden_jar/b104/keymaps/vial-iso/config.h",
+      "url": "https://raw.githubusercontent.com/mymakercorner/vial-qmk/761cb1c1b71ed91c48185f3e03465702b21e49f4/keyboards/leyden_jar/b104/keymaps/vial-iso/config.h",
+      "sha256": "cc2d5c9ecf2b1ab97a03e6ca25f4e068a9db3f840e7aa343e203ed15f191f8c5"
+    },
+    {
+      "file": "mymakercorner/keyboards/leyden_jar/b104/keymaps/vial-iso/keymap.c",
+      "url": "https://raw.githubusercontent.com/mymakercorner/vial-qmk/761cb1c1b71ed91c48185f3e03465702b21e49f4/keyboards/leyden_jar/b104/keymaps/vial-iso/keymap.c",
+      "sha256": "c8167f694d1bf0235128f726a299db1084c5e156cbbba7809a553bf0a739b5ba"
+    },
+    {
+      "file": "mymakercorner/keyboards/leyden_jar/b104/keymaps/vial-iso/vial.json",
+      "url": "https://raw.githubusercontent.com/mymakercorner/vial-qmk/761cb1c1b71ed91c48185f3e03465702b21e49f4/keyboards/leyden_jar/b104/keymaps/vial-iso/vial.json",
+      "sha256": "f5ed28ad21d5c228f9f29c789f9b798e57ea4f94e631a1ab9e4d6da20c68eb05"
+    },
+    {
+      "file": "mymakercorner/keyboards/leyden_jar/b104/keymaps/vial/config.h",
+      "url": "https://raw.githubusercontent.com/mymakercorner/vial-qmk/761cb1c1b71ed91c48185f3e03465702b21e49f4/keyboards/leyden_jar/b104/keymaps/vial/config.h",
+      "sha256": "e2fb89fde6f7408d46810deb5af37caa44048463ee38c3c078aa0eeb87352eb8"
+    },
+    {
+      "file": "mymakercorner/keyboards/leyden_jar/b104/keymaps/vial/keymap.c",
+      "url": "https://raw.githubusercontent.com/mymakercorner/vial-qmk/761cb1c1b71ed91c48185f3e03465702b21e49f4/keyboards/leyden_jar/b104/keymaps/vial/keymap.c",
+      "sha256": "f1ac68f4a576f0cfce4df3eadf8e7169b64a722de0d3facc1b4470a52a56ed7b"
+    },
+    {
+      "file": "mymakercorner/keyboards/leyden_jar/b104/keymaps/vial/vial.json",
+      "url": "https://raw.githubusercontent.com/mymakercorner/vial-qmk/761cb1c1b71ed91c48185f3e03465702b21e49f4/keyboards/leyden_jar/b104/keymaps/vial/vial.json",
+      "sha256": "45a644cdceb873b3cded3d93f802389efb9d5e1c020afeea1180f92ed1d17360"
+    },
+    {
+      "file": "mymakercorner/keyboards/leyden_jar/b122/keyboard.json",
+      "url": "https://raw.githubusercontent.com/mymakercorner/vial-qmk/761cb1c1b71ed91c48185f3e03465702b21e49f4/keyboards/leyden_jar/b122/keyboard.json",
+      "sha256": "38fd1feead1ff81b4aa7a705cbddfb1855708144106a1a06bcf8377961ad41a0"
+    },
+    {
+      "file": "mymakercorner/keyboards/leyden_jar/b122/keymaps/default/keymap.c",
+      "url": "https://raw.githubusercontent.com/mymakercorner/vial-qmk/761cb1c1b71ed91c48185f3e03465702b21e49f4/keyboards/leyden_jar/b122/keymaps/default/keymap.c",
+      "sha256": "9a5c91e1214df25b4714636513381a3349a71522472d3bff260f3aa5ae25d48b"
+    },
+    {
+      "file": "mymakercorner/keyboards/leyden_jar/b122/keymaps/vial-ansi/config.h",
+      "url": "https://raw.githubusercontent.com/mymakercorner/vial-qmk/761cb1c1b71ed91c48185f3e03465702b21e49f4/keyboards/leyden_jar/b122/keymaps/vial-ansi/config.h",
+      "sha256": "196f4837349c100f132542665f6f5bd248a841230e19944ec0f11c77325974b6"
+    },
+    {
+      "file": "mymakercorner/keyboards/leyden_jar/b122/keymaps/vial-ansi/keymap.c",
+      "url": "https://raw.githubusercontent.com/mymakercorner/vial-qmk/761cb1c1b71ed91c48185f3e03465702b21e49f4/keyboards/leyden_jar/b122/keymaps/vial-ansi/keymap.c",
+      "sha256": "8d1621cae6e3eca0b0814813d00b783fe449f780c44d2fa8f8723714f4365213"
+    },
+    {
+      "file": "mymakercorner/keyboards/leyden_jar/b122/keymaps/vial-ansi/vial.json",
+      "url": "https://raw.githubusercontent.com/mymakercorner/vial-qmk/761cb1c1b71ed91c48185f3e03465702b21e49f4/keyboards/leyden_jar/b122/keymaps/vial-ansi/vial.json",
+      "sha256": "0e4d7e003cd87a4cf6fcda8851f4b559c0a5327591f53d258ec47e5ae4e1670a"
+    },
+    {
+      "file": "mymakercorner/keyboards/leyden_jar/b122/keymaps/vial-iso/config.h",
+      "url": "https://raw.githubusercontent.com/mymakercorner/vial-qmk/761cb1c1b71ed91c48185f3e03465702b21e49f4/keyboards/leyden_jar/b122/keymaps/vial-iso/config.h",
+      "sha256": "9cc4321e2768b360142e5e69af4aa38fcfaa2c1bb49325706e28ab7496d16997"
+    },
+    {
+      "file": "mymakercorner/keyboards/leyden_jar/b122/keymaps/vial-iso/keymap.c",
+      "url": "https://raw.githubusercontent.com/mymakercorner/vial-qmk/761cb1c1b71ed91c48185f3e03465702b21e49f4/keyboards/leyden_jar/b122/keymaps/vial-iso/keymap.c",
+      "sha256": "f3a51a536e18fca9c6317c9f3f04d0c70f24bd29f5ea477f41f91a4116ada9f4"
+    },
+    {
+      "file": "mymakercorner/keyboards/leyden_jar/b122/keymaps/vial-iso/vial.json",
+      "url": "https://raw.githubusercontent.com/mymakercorner/vial-qmk/761cb1c1b71ed91c48185f3e03465702b21e49f4/keyboards/leyden_jar/b122/keymaps/vial-iso/vial.json",
+      "sha256": "077a8819442e525a7fd3f06fd40aca7dc51456fec5e050038cdd32d96e43a9a0"
+    },
+    {
+      "file": "mymakercorner/keyboards/leyden_jar/b122/keymaps/vial/config.h",
+      "url": "https://raw.githubusercontent.com/mymakercorner/vial-qmk/761cb1c1b71ed91c48185f3e03465702b21e49f4/keyboards/leyden_jar/b122/keymaps/vial/config.h",
+      "sha256": "ba69d5ad2fc71216383569250e194fe2b1406820eee5806ddae3ea5fddf5a7f2"
+    },
+    {
+      "file": "mymakercorner/keyboards/leyden_jar/b122/keymaps/vial/keymap.c",
+      "url": "https://raw.githubusercontent.com/mymakercorner/vial-qmk/761cb1c1b71ed91c48185f3e03465702b21e49f4/keyboards/leyden_jar/b122/keymaps/vial/keymap.c",
+      "sha256": "8a4b5d58bb3e43bcc103e63a878274e7e3fa979cecab0eda0df147ca4cc19bf8"
+    },
+    {
+      "file": "mymakercorner/keyboards/leyden_jar/b122/keymaps/vial/vial.json",
+      "url": "https://raw.githubusercontent.com/mymakercorner/vial-qmk/761cb1c1b71ed91c48185f3e03465702b21e49f4/keyboards/leyden_jar/b122/keymaps/vial/vial.json",
+      "sha256": "9198b9825718c8bbbdf7d0eda80856a59e171344e6fe4105caf3f5e67a46092d"
+    },
+    {
+      "file": "mymakercorner/keyboards/leyden_jar/f122/keyboard.json",
+      "url": "https://raw.githubusercontent.com/mymakercorner/vial-qmk/761cb1c1b71ed91c48185f3e03465702b21e49f4/keyboards/leyden_jar/f122/keyboard.json",
+      "sha256": "3184577262c81b7e2d55e766c219a825737dac97aef4f1e08ac6cf3f61760c04"
+    },
+    {
+      "file": "mymakercorner/keyboards/leyden_jar/f122/keymaps/default/keymap.c",
+      "url": "https://raw.githubusercontent.com/mymakercorner/vial-qmk/761cb1c1b71ed91c48185f3e03465702b21e49f4/keyboards/leyden_jar/f122/keymaps/default/keymap.c",
+      "sha256": "e7031bd39918f3691304593b387288c0db840d91e0aa264421034024163f3c98"
+    },
+    {
+      "file": "mymakercorner/keyboards/leyden_jar/f122/keymaps/vial-ansi-hhkb-split-rshift-hhkb-ctrl-caps/config.h",
+      "url": "https://raw.githubusercontent.com/mymakercorner/vial-qmk/761cb1c1b71ed91c48185f3e03465702b21e49f4/keyboards/leyden_jar/f122/keymaps/vial-ansi-hhkb-split-rshift-hhkb-ctrl-caps/config.h",
+      "sha256": "50f6be45444aa0352dc15598bdb318c8cd29d986e815165d606c067b0ef3bd0a"
+    },
+    {
+      "file": "mymakercorner/keyboards/leyden_jar/f122/keymaps/vial-ansi-hhkb-split-rshift-hhkb-ctrl-caps/keymap.c",
+      "url": "https://raw.githubusercontent.com/mymakercorner/vial-qmk/761cb1c1b71ed91c48185f3e03465702b21e49f4/keyboards/leyden_jar/f122/keymaps/vial-ansi-hhkb-split-rshift-hhkb-ctrl-caps/keymap.c",
+      "sha256": "a34a6637f70c5557cf3f990fecb22184a5bf7f3213d6f0137b2e3a73f45cb4e1"
+    },
+    {
+      "file": "mymakercorner/keyboards/leyden_jar/f122/keymaps/vial-ansi-hhkb-split-rshift-hhkb-ctrl-caps/vial.json",
+      "url": "https://raw.githubusercontent.com/mymakercorner/vial-qmk/761cb1c1b71ed91c48185f3e03465702b21e49f4/keyboards/leyden_jar/f122/keymaps/vial-ansi-hhkb-split-rshift-hhkb-ctrl-caps/vial.json",
+      "sha256": "71c6f07b771d44befa2fe4edcf9abe6fe4ba623413b6b3df7a2f0ea4a8f30e62"
+    },
+    {
+      "file": "mymakercorner/keyboards/leyden_jar/f122/keymaps/vial-ansi-hhkb-split-rshift-split-backspace-hhkb-ctrl-caps/config.h",
+      "url": "https://raw.githubusercontent.com/mymakercorner/vial-qmk/761cb1c1b71ed91c48185f3e03465702b21e49f4/keyboards/leyden_jar/f122/keymaps/vial-ansi-hhkb-split-rshift-split-backspace-hhkb-ctrl-caps/config.h",
+      "sha256": "35e2db42b9a1459276b00cf7f36c364132ff6c0e4c4e7baa0feb9576b6eae77c"
+    },
+    {
+      "file": "mymakercorner/keyboards/leyden_jar/f122/keymaps/vial-ansi-hhkb-split-rshift-split-backspace-hhkb-ctrl-caps/keymap.c",
+      "url": "https://raw.githubusercontent.com/mymakercorner/vial-qmk/761cb1c1b71ed91c48185f3e03465702b21e49f4/keyboards/leyden_jar/f122/keymaps/vial-ansi-hhkb-split-rshift-split-backspace-hhkb-ctrl-caps/keymap.c",
+      "sha256": "a34a6637f70c5557cf3f990fecb22184a5bf7f3213d6f0137b2e3a73f45cb4e1"
+    },
+    {
+      "file": "mymakercorner/keyboards/leyden_jar/f122/keymaps/vial-ansi-hhkb-split-rshift-split-backspace-hhkb-ctrl-caps/vial.json",
+      "url": "https://raw.githubusercontent.com/mymakercorner/vial-qmk/761cb1c1b71ed91c48185f3e03465702b21e49f4/keyboards/leyden_jar/f122/keymaps/vial-ansi-hhkb-split-rshift-split-backspace-hhkb-ctrl-caps/vial.json",
+      "sha256": "df4edf162cdd775908633edec82cb59d11e01e0f5b76ebd796ca18c3a0ceaa1d"
+    },
+    {
+      "file": "mymakercorner/keyboards/leyden_jar/f122/keymaps/vial-ansi-hhkb-split-rshift-split-backspace/config.h",
+      "url": "https://raw.githubusercontent.com/mymakercorner/vial-qmk/761cb1c1b71ed91c48185f3e03465702b21e49f4/keyboards/leyden_jar/f122/keymaps/vial-ansi-hhkb-split-rshift-split-backspace/config.h",
+      "sha256": "bf1a7caa5c0a27cd73c3b87e17b1bd6e946c60592a100f2a03f3bedec5efa0ac"
+    },
+    {
+      "file": "mymakercorner/keyboards/leyden_jar/f122/keymaps/vial-ansi-hhkb-split-rshift-split-backspace/keymap.c",
+      "url": "https://raw.githubusercontent.com/mymakercorner/vial-qmk/761cb1c1b71ed91c48185f3e03465702b21e49f4/keyboards/leyden_jar/f122/keymaps/vial-ansi-hhkb-split-rshift-split-backspace/keymap.c",
+      "sha256": "b2cd9207d553373cbdbb99bc1c42fc9277d71277dda8315b8f442721f108da10"
+    },
+    {
+      "file": "mymakercorner/keyboards/leyden_jar/f122/keymaps/vial-ansi-hhkb-split-rshift-split-backspace/vial.json",
+      "url": "https://raw.githubusercontent.com/mymakercorner/vial-qmk/761cb1c1b71ed91c48185f3e03465702b21e49f4/keyboards/leyden_jar/f122/keymaps/vial-ansi-hhkb-split-rshift-split-backspace/vial.json",
+      "sha256": "df4edf162cdd775908633edec82cb59d11e01e0f5b76ebd796ca18c3a0ceaa1d"
+    },
+    {
+      "file": "mymakercorner/keyboards/leyden_jar/f122/keymaps/vial-ansi-hhkb-split-rshift/config.h",
+      "url": "https://raw.githubusercontent.com/mymakercorner/vial-qmk/761cb1c1b71ed91c48185f3e03465702b21e49f4/keyboards/leyden_jar/f122/keymaps/vial-ansi-hhkb-split-rshift/config.h",
+      "sha256": "d63413da5cf767a5f230ea49e8fd53cc247e5d09a60aa7e1e86ae450362ac60a"
+    },
+    {
+      "file": "mymakercorner/keyboards/leyden_jar/f122/keymaps/vial-ansi-hhkb-split-rshift/keymap.c",
+      "url": "https://raw.githubusercontent.com/mymakercorner/vial-qmk/761cb1c1b71ed91c48185f3e03465702b21e49f4/keyboards/leyden_jar/f122/keymaps/vial-ansi-hhkb-split-rshift/keymap.c",
+      "sha256": "b2cd9207d553373cbdbb99bc1c42fc9277d71277dda8315b8f442721f108da10"
+    },
+    {
+      "file": "mymakercorner/keyboards/leyden_jar/f122/keymaps/vial-ansi-hhkb-split-rshift/vial.json",
+      "url": "https://raw.githubusercontent.com/mymakercorner/vial-qmk/761cb1c1b71ed91c48185f3e03465702b21e49f4/keyboards/leyden_jar/f122/keymaps/vial-ansi-hhkb-split-rshift/vial.json",
+      "sha256": "71c6f07b771d44befa2fe4edcf9abe6fe4ba623413b6b3df7a2f0ea4a8f30e62"
+    },
+    {
+      "file": "mymakercorner/keyboards/leyden_jar/f122/keymaps/vial-ansi/config.h",
+      "url": "https://raw.githubusercontent.com/mymakercorner/vial-qmk/761cb1c1b71ed91c48185f3e03465702b21e49f4/keyboards/leyden_jar/f122/keymaps/vial-ansi/config.h",
+      "sha256": "570330a2bf86f1bfd93b83493ca281ecb5d3aef0c73dd89eccd699ab50b6621d"
+    },
+    {
+      "file": "mymakercorner/keyboards/leyden_jar/f122/keymaps/vial-ansi/keymap.c",
+      "url": "https://raw.githubusercontent.com/mymakercorner/vial-qmk/761cb1c1b71ed91c48185f3e03465702b21e49f4/keyboards/leyden_jar/f122/keymaps/vial-ansi/keymap.c",
+      "sha256": "88583e64daa260e9544256e2e640ba0f2ce48454650035c9db0678519cb3865c"
+    },
+    {
+      "file": "mymakercorner/keyboards/leyden_jar/f122/keymaps/vial-ansi/vial.json",
+      "url": "https://raw.githubusercontent.com/mymakercorner/vial-qmk/761cb1c1b71ed91c48185f3e03465702b21e49f4/keyboards/leyden_jar/f122/keymaps/vial-ansi/vial.json",
+      "sha256": "7449e42a0043fefdd1901902de0ca5f95abbd1887d10559962ab658c0d189bbb"
+    },
+    {
+      "file": "mymakercorner/keyboards/leyden_jar/f122/keymaps/vial-iso-hhkb-split-rshift-hhkb-ctrl-caps/config.h",
+      "url": "https://raw.githubusercontent.com/mymakercorner/vial-qmk/761cb1c1b71ed91c48185f3e03465702b21e49f4/keyboards/leyden_jar/f122/keymaps/vial-iso-hhkb-split-rshift-hhkb-ctrl-caps/config.h",
+      "sha256": "4b6674da667f74159296ae0e48b36c81f9cfd36945077d755e1a59d382830ebd"
+    },
+    {
+      "file": "mymakercorner/keyboards/leyden_jar/f122/keymaps/vial-iso-hhkb-split-rshift-hhkb-ctrl-caps/keymap.c",
+      "url": "https://raw.githubusercontent.com/mymakercorner/vial-qmk/761cb1c1b71ed91c48185f3e03465702b21e49f4/keyboards/leyden_jar/f122/keymaps/vial-iso-hhkb-split-rshift-hhkb-ctrl-caps/keymap.c",
+      "sha256": "a34a6637f70c5557cf3f990fecb22184a5bf7f3213d6f0137b2e3a73f45cb4e1"
+    },
+    {
+      "file": "mymakercorner/keyboards/leyden_jar/f122/keymaps/vial-iso-hhkb-split-rshift-hhkb-ctrl-caps/vial.json",
+      "url": "https://raw.githubusercontent.com/mymakercorner/vial-qmk/761cb1c1b71ed91c48185f3e03465702b21e49f4/keyboards/leyden_jar/f122/keymaps/vial-iso-hhkb-split-rshift-hhkb-ctrl-caps/vial.json",
+      "sha256": "1ad9f1df05e46525f9f09d1667ef9955c0162cfff9c112fde3d0ab4b8fdfc651"
+    },
+    {
+      "file": "mymakercorner/keyboards/leyden_jar/f122/keymaps/vial-iso-hhkb-split-rshift-split-backspace-hhkb-ctrl-caps/config.h",
+      "url": "https://raw.githubusercontent.com/mymakercorner/vial-qmk/761cb1c1b71ed91c48185f3e03465702b21e49f4/keyboards/leyden_jar/f122/keymaps/vial-iso-hhkb-split-rshift-split-backspace-hhkb-ctrl-caps/config.h",
+      "sha256": "114eaabf31ad29e7865e4a5bc7dcb5c893e9f900f7cbdf8db4f9bd6450f6bc73"
+    },
+    {
+      "file": "mymakercorner/keyboards/leyden_jar/f122/keymaps/vial-iso-hhkb-split-rshift-split-backspace-hhkb-ctrl-caps/keymap.c",
+      "url": "https://raw.githubusercontent.com/mymakercorner/vial-qmk/761cb1c1b71ed91c48185f3e03465702b21e49f4/keyboards/leyden_jar/f122/keymaps/vial-iso-hhkb-split-rshift-split-backspace-hhkb-ctrl-caps/keymap.c",
+      "sha256": "a34a6637f70c5557cf3f990fecb22184a5bf7f3213d6f0137b2e3a73f45cb4e1"
+    },
+    {
+      "file": "mymakercorner/keyboards/leyden_jar/f122/keymaps/vial-iso-hhkb-split-rshift-split-backspace-hhkb-ctrl-caps/vial.json",
+      "url": "https://raw.githubusercontent.com/mymakercorner/vial-qmk/761cb1c1b71ed91c48185f3e03465702b21e49f4/keyboards/leyden_jar/f122/keymaps/vial-iso-hhkb-split-rshift-split-backspace-hhkb-ctrl-caps/vial.json",
+      "sha256": "6d75c7056c9f739f4d678d2e7eb9f2379d83e8476dc0c70db21b8aea341ec549"
+    },
+    {
+      "file": "mymakercorner/keyboards/leyden_jar/f122/keymaps/vial-iso-hhkb-split-rshift-split-backspace/config.h",
+      "url": "https://raw.githubusercontent.com/mymakercorner/vial-qmk/761cb1c1b71ed91c48185f3e03465702b21e49f4/keyboards/leyden_jar/f122/keymaps/vial-iso-hhkb-split-rshift-split-backspace/config.h",
+      "sha256": "915e2136ce82ae4cdef375971bae2c5291d6e3305ba7a2e06a548706f9e9b397"
+    },
+    {
+      "file": "mymakercorner/keyboards/leyden_jar/f122/keymaps/vial-iso-hhkb-split-rshift-split-backspace/keymap.c",
+      "url": "https://raw.githubusercontent.com/mymakercorner/vial-qmk/761cb1c1b71ed91c48185f3e03465702b21e49f4/keyboards/leyden_jar/f122/keymaps/vial-iso-hhkb-split-rshift-split-backspace/keymap.c",
+      "sha256": "b2cd9207d553373cbdbb99bc1c42fc9277d71277dda8315b8f442721f108da10"
+    },
+    {
+      "file": "mymakercorner/keyboards/leyden_jar/f122/keymaps/vial-iso-hhkb-split-rshift-split-backspace/vial.json",
+      "url": "https://raw.githubusercontent.com/mymakercorner/vial-qmk/761cb1c1b71ed91c48185f3e03465702b21e49f4/keyboards/leyden_jar/f122/keymaps/vial-iso-hhkb-split-rshift-split-backspace/vial.json",
+      "sha256": "6d75c7056c9f739f4d678d2e7eb9f2379d83e8476dc0c70db21b8aea341ec549"
+    },
+    {
+      "file": "mymakercorner/keyboards/leyden_jar/f122/keymaps/vial-iso-hhkb-split-rshift/config.h",
+      "url": "https://raw.githubusercontent.com/mymakercorner/vial-qmk/761cb1c1b71ed91c48185f3e03465702b21e49f4/keyboards/leyden_jar/f122/keymaps/vial-iso-hhkb-split-rshift/config.h",
+      "sha256": "7966949206928f79005c191585762afffb13a91df2234407c0304ac80ea10a1d"
+    },
+    {
+      "file": "mymakercorner/keyboards/leyden_jar/f122/keymaps/vial-iso-hhkb-split-rshift/keymap.c",
+      "url": "https://raw.githubusercontent.com/mymakercorner/vial-qmk/761cb1c1b71ed91c48185f3e03465702b21e49f4/keyboards/leyden_jar/f122/keymaps/vial-iso-hhkb-split-rshift/keymap.c",
+      "sha256": "b2cd9207d553373cbdbb99bc1c42fc9277d71277dda8315b8f442721f108da10"
+    },
+    {
+      "file": "mymakercorner/keyboards/leyden_jar/f122/keymaps/vial-iso-hhkb-split-rshift/vial.json",
+      "url": "https://raw.githubusercontent.com/mymakercorner/vial-qmk/761cb1c1b71ed91c48185f3e03465702b21e49f4/keyboards/leyden_jar/f122/keymaps/vial-iso-hhkb-split-rshift/vial.json",
+      "sha256": "1ad9f1df05e46525f9f09d1667ef9955c0162cfff9c112fde3d0ab4b8fdfc651"
+    },
+    {
+      "file": "mymakercorner/keyboards/leyden_jar/f122/keymaps/vial-iso/config.h",
+      "url": "https://raw.githubusercontent.com/mymakercorner/vial-qmk/761cb1c1b71ed91c48185f3e03465702b21e49f4/keyboards/leyden_jar/f122/keymaps/vial-iso/config.h",
+      "sha256": "d9fdf06c9a1f07e130ee4db88ba9335e211472aac6b371b6471601c31bb6975f"
+    },
+    {
+      "file": "mymakercorner/keyboards/leyden_jar/f122/keymaps/vial-iso/keymap.c",
+      "url": "https://raw.githubusercontent.com/mymakercorner/vial-qmk/761cb1c1b71ed91c48185f3e03465702b21e49f4/keyboards/leyden_jar/f122/keymaps/vial-iso/keymap.c",
+      "sha256": "88583e64daa260e9544256e2e640ba0f2ce48454650035c9db0678519cb3865c"
+    },
+    {
+      "file": "mymakercorner/keyboards/leyden_jar/f122/keymaps/vial-iso/vial.json",
+      "url": "https://raw.githubusercontent.com/mymakercorner/vial-qmk/761cb1c1b71ed91c48185f3e03465702b21e49f4/keyboards/leyden_jar/f122/keymaps/vial-iso/vial.json",
+      "sha256": "99c14255ba62f8ef7fed38eee17c55e254b0d0b7c2799230f9c20ccd7a6475c8"
+    },
+    {
+      "file": "mymakercorner/keyboards/leyden_jar/f122/keymaps/vial/config.h",
+      "url": "https://raw.githubusercontent.com/mymakercorner/vial-qmk/761cb1c1b71ed91c48185f3e03465702b21e49f4/keyboards/leyden_jar/f122/keymaps/vial/config.h",
+      "sha256": "3eaf0d2e3809d2899f3bb7a425e502d906968b97f3c288ae17188b605c784dd2"
+    },
+    {
+      "file": "mymakercorner/keyboards/leyden_jar/f122/keymaps/vial/keymap.c",
+      "url": "https://raw.githubusercontent.com/mymakercorner/vial-qmk/761cb1c1b71ed91c48185f3e03465702b21e49f4/keyboards/leyden_jar/f122/keymaps/vial/keymap.c",
+      "sha256": "88583e64daa260e9544256e2e640ba0f2ce48454650035c9db0678519cb3865c"
+    },
+    {
+      "file": "mymakercorner/keyboards/leyden_jar/f122/keymaps/vial/vial.json",
+      "url": "https://raw.githubusercontent.com/mymakercorner/vial-qmk/761cb1c1b71ed91c48185f3e03465702b21e49f4/keyboards/leyden_jar/f122/keymaps/vial/vial.json",
+      "sha256": "f75a2815a283f8144bde6e04e1bf199507a3b26cd0a2cb7f6a9d9f5f7b5adc84"
+    },
+    {
+      "file": "mymakercorner/keyboards/leyden_jar/f20/keyboard.json",
+      "url": "https://raw.githubusercontent.com/mymakercorner/vial-qmk/761cb1c1b71ed91c48185f3e03465702b21e49f4/keyboards/leyden_jar/f20/keyboard.json",
+      "sha256": "418c96fc6f0e201a5d84b785ee2eb360c9fdf8d1068b0848ed666e473f4b85a4"
+    },
+    {
+      "file": "mymakercorner/keyboards/leyden_jar/f20/keymaps/vial/config.h",
+      "url": "https://raw.githubusercontent.com/mymakercorner/vial-qmk/761cb1c1b71ed91c48185f3e03465702b21e49f4/keyboards/leyden_jar/f20/keymaps/vial/config.h",
+      "sha256": "605db26dd7d524246196c105074880a69f779aa47d5cd5ce36aaf7328d44871a"
+    },
+    {
+      "file": "mymakercorner/keyboards/leyden_jar/f20/keymaps/vial/keymap.json",
+      "url": "https://raw.githubusercontent.com/mymakercorner/vial-qmk/761cb1c1b71ed91c48185f3e03465702b21e49f4/keyboards/leyden_jar/f20/keymaps/vial/keymap.json",
+      "sha256": "a8785b8e34ae04229c08703cc837c31b43c0ead3c1b5e5ab8f9ebe2024aa9751"
+    },
+    {
+      "file": "mymakercorner/keyboards/leyden_jar/f20/keymaps/vial/vial.json",
+      "url": "https://raw.githubusercontent.com/mymakercorner/vial-qmk/761cb1c1b71ed91c48185f3e03465702b21e49f4/keyboards/leyden_jar/f20/keymaps/vial/vial.json",
+      "sha256": "9361180658f55cdc448d14afd8d157f34db5ddef3b99cec1da9a3e7796a3e955"
+    },
+    {
+      "file": "mymakercorner/keyboards/leyden_jar/f4x12/keyboard.json",
+      "url": "https://raw.githubusercontent.com/mymakercorner/vial-qmk/761cb1c1b71ed91c48185f3e03465702b21e49f4/keyboards/leyden_jar/f4x12/keyboard.json",
+      "sha256": "af22373989f7e29c5ed9c4f2c55c809a34c031e2c5055dc2ee769283e4addd34"
+    },
+    {
+      "file": "mymakercorner/keyboards/leyden_jar/f4x12/keymaps/vial/config.h",
+      "url": "https://raw.githubusercontent.com/mymakercorner/vial-qmk/761cb1c1b71ed91c48185f3e03465702b21e49f4/keyboards/leyden_jar/f4x12/keymaps/vial/config.h",
+      "sha256": "bd8aa9ababa850e08c8c09d637930954ad0d48c11f992eccee1536a11b3aae2a"
+    },
+    {
+      "file": "mymakercorner/keyboards/leyden_jar/f4x12/keymaps/vial/keymap.json",
+      "url": "https://raw.githubusercontent.com/mymakercorner/vial-qmk/761cb1c1b71ed91c48185f3e03465702b21e49f4/keyboards/leyden_jar/f4x12/keymaps/vial/keymap.json",
+      "sha256": "b0c2b60f27f94acf8417e1caf6964a4e0eac6b56b69817acdfdaba53a120e767"
+    },
+    {
+      "file": "mymakercorner/keyboards/leyden_jar/f4x12/keymaps/vial/vial.json",
+      "url": "https://raw.githubusercontent.com/mymakercorner/vial-qmk/761cb1c1b71ed91c48185f3e03465702b21e49f4/keyboards/leyden_jar/f4x12/keymaps/vial/vial.json",
+      "sha256": "327934f2104ded0129ecb106dbc1aa7c45ea96607f76140418b92351fbc1af90"
+    },
+    {
+      "file": "mymakercorner/keyboards/leyden_jar/f50/keyboard.json",
+      "url": "https://raw.githubusercontent.com/mymakercorner/vial-qmk/761cb1c1b71ed91c48185f3e03465702b21e49f4/keyboards/leyden_jar/f50/keyboard.json",
+      "sha256": "03884de205fb714aceef05343bb1fff8f13c41eaf260292b4da0634d09fcf6a9"
+    },
+    {
+      "file": "mymakercorner/keyboards/leyden_jar/f50/keymaps/vial/config.h",
+      "url": "https://raw.githubusercontent.com/mymakercorner/vial-qmk/761cb1c1b71ed91c48185f3e03465702b21e49f4/keyboards/leyden_jar/f50/keymaps/vial/config.h",
+      "sha256": "1b61fc56580e5bcf59550efcf17955e809ad5d9f4ff0caccabac07c576e28980"
+    },
+    {
+      "file": "mymakercorner/keyboards/leyden_jar/f50/keymaps/vial/keymap.json",
+      "url": "https://raw.githubusercontent.com/mymakercorner/vial-qmk/761cb1c1b71ed91c48185f3e03465702b21e49f4/keyboards/leyden_jar/f50/keymaps/vial/keymap.json",
+      "sha256": "b0ec2ac4f590e35f0719b90633287120e4dee73ebd016836c0b12bcfb2819bef"
+    },
+    {
+      "file": "mymakercorner/keyboards/leyden_jar/f50/keymaps/vial/vial.json",
+      "url": "https://raw.githubusercontent.com/mymakercorner/vial-qmk/761cb1c1b71ed91c48185f3e03465702b21e49f4/keyboards/leyden_jar/f50/keymaps/vial/vial.json",
+      "sha256": "f7bc8e24ce89d6e8f26359103d3cb923e5107f1d81c5b585cab2966958830715"
+    },
+    {
+      "file": "mymakercorner/keyboards/leyden_jar/f50_rev2/keyboard.json",
+      "url": "https://raw.githubusercontent.com/mymakercorner/vial-qmk/761cb1c1b71ed91c48185f3e03465702b21e49f4/keyboards/leyden_jar/f50_rev2/keyboard.json",
+      "sha256": "fa05ffa7802e4b0f5b75216a1b7ce485ec1fea4b100ad474b299bbadfc764dd5"
+    },
+    {
+      "file": "mymakercorner/keyboards/leyden_jar/f50_rev2/keymaps/vial/config.h",
+      "url": "https://raw.githubusercontent.com/mymakercorner/vial-qmk/761cb1c1b71ed91c48185f3e03465702b21e49f4/keyboards/leyden_jar/f50_rev2/keymaps/vial/config.h",
+      "sha256": "c6be34488e892632278112dafd5973f5046c3a57482ee63cca0e3a31cd28460a"
+    },
+    {
+      "file": "mymakercorner/keyboards/leyden_jar/f50_rev2/keymaps/vial/keymap.json",
+      "url": "https://raw.githubusercontent.com/mymakercorner/vial-qmk/761cb1c1b71ed91c48185f3e03465702b21e49f4/keyboards/leyden_jar/f50_rev2/keymaps/vial/keymap.json",
+      "sha256": "7f13a332ae99ead036e4ed606b7244e5ce19d05206e19db43a60aa96b37b5ac6"
+    },
+    {
+      "file": "mymakercorner/keyboards/leyden_jar/f50_rev2/keymaps/vial/vial.json",
+      "url": "https://raw.githubusercontent.com/mymakercorner/vial-qmk/761cb1c1b71ed91c48185f3e03465702b21e49f4/keyboards/leyden_jar/f50_rev2/keymaps/vial/vial.json",
+      "sha256": "a250b4c490c8291735202d4e7e945a0bd85143240c57db70cabf1f712c31981e"
+    },
+    {
+      "file": "mymakercorner/keyboards/leyden_jar/f5x12/keyboard.json",
+      "url": "https://raw.githubusercontent.com/mymakercorner/vial-qmk/761cb1c1b71ed91c48185f3e03465702b21e49f4/keyboards/leyden_jar/f5x12/keyboard.json",
+      "sha256": "ebd786be25f6b740eebbea7e02cd0543bb204c0efcc879d4b4780bccea1537ca"
+    },
+    {
+      "file": "mymakercorner/keyboards/leyden_jar/f5x12/keymaps/vial/config.h",
+      "url": "https://raw.githubusercontent.com/mymakercorner/vial-qmk/761cb1c1b71ed91c48185f3e03465702b21e49f4/keyboards/leyden_jar/f5x12/keymaps/vial/config.h",
+      "sha256": "5f57efb6c291739cf105e45d641bbcb9204e6133f15c174f4ab85a15cb0702bf"
+    },
+    {
+      "file": "mymakercorner/keyboards/leyden_jar/f5x12/keymaps/vial/keymap.json",
+      "url": "https://raw.githubusercontent.com/mymakercorner/vial-qmk/761cb1c1b71ed91c48185f3e03465702b21e49f4/keyboards/leyden_jar/f5x12/keymaps/vial/keymap.json",
+      "sha256": "51427d4678c9fbea8d792369bf315c45aade1d00804548fc74224b025a6746dc"
+    },
+    {
+      "file": "mymakercorner/keyboards/leyden_jar/f5x12/keymaps/vial/vial.json",
+      "url": "https://raw.githubusercontent.com/mymakercorner/vial-qmk/761cb1c1b71ed91c48185f3e03465702b21e49f4/keyboards/leyden_jar/f5x12/keymaps/vial/vial.json",
+      "sha256": "d1b0dc7471cdf6d4e6a7e0cbbea47d8d0649ee2ee7ba54e56998a236e50df7e7"
+    },
+    {
+      "file": "mymakercorner/keyboards/leyden_jar/f62/keyboard.json",
+      "url": "https://raw.githubusercontent.com/mymakercorner/vial-qmk/761cb1c1b71ed91c48185f3e03465702b21e49f4/keyboards/leyden_jar/f62/keyboard.json",
+      "sha256": "cc2c7cc8217b8528e6f1d19c77cc91e4d65def8fbfcd0f60086bc5cc98c861e2"
+    },
+    {
+      "file": "mymakercorner/keyboards/leyden_jar/f62/keymaps/vial/config.h",
+      "url": "https://raw.githubusercontent.com/mymakercorner/vial-qmk/761cb1c1b71ed91c48185f3e03465702b21e49f4/keyboards/leyden_jar/f62/keymaps/vial/config.h",
+      "sha256": "5aee2a6d4794d5ba27172e14054d1bd4855ca2f3d947102e015fc4e8ceac48f8"
+    },
+    {
+      "file": "mymakercorner/keyboards/leyden_jar/f62/keymaps/vial/keymap.json",
+      "url": "https://raw.githubusercontent.com/mymakercorner/vial-qmk/761cb1c1b71ed91c48185f3e03465702b21e49f4/keyboards/leyden_jar/f62/keymaps/vial/keymap.json",
+      "sha256": "ba7af51a4d85168a7bc8a656e9e4fc64721d8f1d69a28ec110029d52192c57ff"
+    },
+    {
+      "file": "mymakercorner/keyboards/leyden_jar/f62/keymaps/vial/vial.json",
+      "url": "https://raw.githubusercontent.com/mymakercorner/vial-qmk/761cb1c1b71ed91c48185f3e03465702b21e49f4/keyboards/leyden_jar/f62/keymaps/vial/vial.json",
+      "sha256": "d92d28d93244729755800e989d4d5900fa964ff7c7fda47bcb23504815620873"
+    },
+    {
+      "file": "mymakercorner/keyboards/leyden_jar/f77/keyboard.json",
+      "url": "https://raw.githubusercontent.com/mymakercorner/vial-qmk/761cb1c1b71ed91c48185f3e03465702b21e49f4/keyboards/leyden_jar/f77/keyboard.json",
+      "sha256": "6df0a132d4163dcee74ce9a610cb527e5260db7b4672d548241e16682e09100c"
+    },
+    {
+      "file": "mymakercorner/keyboards/leyden_jar/f77/keymaps/vial/config.h",
+      "url": "https://raw.githubusercontent.com/mymakercorner/vial-qmk/761cb1c1b71ed91c48185f3e03465702b21e49f4/keyboards/leyden_jar/f77/keymaps/vial/config.h",
+      "sha256": "f6a255913d695b7ad91b54804c59dbe01d6a80ce7cb58a76d8672fd99b0b0dcb"
+    },
+    {
+      "file": "mymakercorner/keyboards/leyden_jar/f77/keymaps/vial/keymap.json",
+      "url": "https://raw.githubusercontent.com/mymakercorner/vial-qmk/761cb1c1b71ed91c48185f3e03465702b21e49f4/keyboards/leyden_jar/f77/keymaps/vial/keymap.json",
+      "sha256": "5830282e998fcb9f1b27ae6069be3c6e21e02758c38b6cca904835ed9dbb7d26"
+    },
+    {
+      "file": "mymakercorner/keyboards/leyden_jar/f77/keymaps/vial/vial.json",
+      "url": "https://raw.githubusercontent.com/mymakercorner/vial-qmk/761cb1c1b71ed91c48185f3e03465702b21e49f4/keyboards/leyden_jar/f77/keymaps/vial/vial.json",
+      "sha256": "1246e74c7ce0b271cffbc4a98616c58d4791ec9ccd458ae2b924e7acf48367a7"
+    },
+    {
+      "file": "ploxiln/LICENSE",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/LICENSE",
+      "sha256": "8177f97513213526df2cf6184d8ff986c675afb514d4e68a404010521b880643"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/beamspring_60pct/readme.md",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/beamspring_60pct/readme.md",
+      "sha256": "11dc8adbd0ba51b315b56b0628b7a8064e2742ae2e56dc2b6fd6a68212927427"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/beamspring_60pct/wcass/config.h",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/beamspring_60pct/wcass/config.h",
+      "sha256": "302516aa10058ab2c06f0fa227cbf7ed686bd67b344641514d129d0698883be0"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/beamspring_60pct/wcass/keymaps/b62-allpads.vil",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/beamspring_60pct/wcass/keymaps/b62-allpads.vil",
+      "sha256": "7b9db46a4031cf66070038fe6ecaf3bd0253da3b30bd989c9dda8a0220e9b82b"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/beamspring_60pct/wcass/keymaps/b62-ansi_hhkb.vil",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/beamspring_60pct/wcass/keymaps/b62-ansi_hhkb.vil",
+      "sha256": "dba0a441eddebe388aa31f2ddc3453aee47d9b46a434e631aa6d0379f59f483b"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/beamspring_60pct/wcass/keymaps/b62-ansi_hhshift.vil",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/beamspring_60pct/wcass/keymaps/b62-ansi_hhshift.vil",
+      "sha256": "4795211d93c1236d514ffd990cf1877d18c54fde3b01e8aa50245860b042c615"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/beamspring_60pct/wcass/readme.md",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/beamspring_60pct/wcass/readme.md",
+      "sha256": "dcf761c72bedff626ab3b4f5d53ccdba83765c6d0d1b086ea3c4478241870738"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/beamspring_60pct/wcass/vial.json",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/beamspring_60pct/wcass/vial.json",
+      "sha256": "d87299f85258c1af939848a8e751082a296132a192b716fd3dd7513a3a13ae2a"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/beamspring_full/keymaps/default/readme.md",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/beamspring_full/keymaps/default/readme.md",
+      "sha256": "7a683b9fec1cfe37b1d788567ec889d9b9156e5fb47dd4f10c5c583c4b2a6e37"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/beamspring_full/readme.md",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/beamspring_full/readme.md",
+      "sha256": "8be4288a9835b0b3f0f2aedb3f6a96099b304220074cb4ec43c23768b93547a3"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/beamspring_full/universal/readme.md",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/beamspring_full/universal/readme.md",
+      "sha256": "cf4c5362b02c27fe4180d95b1cc50a313c73720636eec3a0599774941f21fa48"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/beamspring_full/wcass/config.h",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/beamspring_full/wcass/config.h",
+      "sha256": "7c512588876094d390e4d18cfce390b7fbbe4d2255963a651a3b7c9ef46ab55c"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/beamspring_full/wcass/keymaps/b104-allpads.vil",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/beamspring_full/wcass/keymaps/b104-allpads.vil",
+      "sha256": "10289913e67cd712ea805e71aab726c9f2f871fac39dec24f512253459c37a54"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/beamspring_full/wcass/keymaps/b104-ansi.vil",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/beamspring_full/wcass/keymaps/b104-ansi.vil",
+      "sha256": "7f74e6616142d2b5e202bf20fac5f9723008e82f2e5e1a8702f877cecc5efdab"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/beamspring_full/wcass/readme.md",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/beamspring_full/wcass/readme.md",
+      "sha256": "4a78f6495055115ab667138d19d9a7742996ab812e7ec989c29ac2f6f528a691"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/beamspring_full/wcass/vial.json",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/beamspring_full/wcass/vial.json",
+      "sha256": "7ca0867e00d5d48d6b8d74a915875ee1bc9dfff069e07a11866d70c53e291ee5"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/beamspring_full/xwhatsit/readme.md",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/beamspring_full/xwhatsit/readme.md",
+      "sha256": "b63f175946476fbd1ae0125e28cb33edb129ed2fe7b684cec47b31f89c1c560f"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/beamspring_ssk/keymaps/default/readme.md",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/beamspring_ssk/keymaps/default/readme.md",
+      "sha256": "e5efb3da6e0e4952980d1fc7a8cb93caf6dc1c9b0a6360593e7fe4a1bbb72c66"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/beamspring_ssk/readme.md",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/beamspring_ssk/readme.md",
+      "sha256": "3888a3b8c0a0de4c78c965935b95bc659d7460c30f75b0044811c610d438703c"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/beamspring_ssk/universal/readme.md",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/beamspring_ssk/universal/readme.md",
+      "sha256": "75cfec1b3dd1ce1c6457af4e0a680fe20fddbedcf89e51030d4514856c71317d"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/beamspring_ssk/wcass/config.h",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/beamspring_ssk/wcass/config.h",
+      "sha256": "b2308ca10b07d059bb2f6e907ac9bae2a63765f8b918ef580b64a89df0b4594f"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/beamspring_ssk/wcass/keymaps/bssk-allpads.vil",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/beamspring_ssk/wcass/keymaps/bssk-allpads.vil",
+      "sha256": "825ff471d04e1f08b0ee5131501c1c64fcdac96d0e5a40e4ce3c95809fc9cee1"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/beamspring_ssk/wcass/keymaps/bssk-ansi.vil",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/beamspring_ssk/wcass/keymaps/bssk-ansi.vil",
+      "sha256": "0b1ed5f77815d5abea5a633a42c49fca45ad0f992c9f742d61a32bfd878adfc3"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/beamspring_ssk/wcass/readme.md",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/beamspring_ssk/wcass/readme.md",
+      "sha256": "99834c06c38b8902935e452cde9cc126ee988dbf0a9a706c9719348629f4b90c"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/beamspring_ssk/wcass/vial.json",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/beamspring_ssk/wcass/vial.json",
+      "sha256": "1763ffef8614efcfe8bc656ef9ca0f817d37e9738520c101a82e2a0cd4600282"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/beamspring_ssk/xwhatsit/readme.md",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/beamspring_ssk/xwhatsit/readme.md",
+      "sha256": "aa3204f4ed629fa8df50d6350a0d6feab6696cd57aaf48e3ae91c05e2ada1bd7"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/beamspring_ssk_r2/readme.md",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/beamspring_ssk_r2/readme.md",
+      "sha256": "d0550f26c6fb94efeebeaeeed5eb800fca8f09a9355b9864dc29ee5d208a1a33"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/beamspring_ssk_r2/wcass/config.h",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/beamspring_ssk_r2/wcass/config.h",
+      "sha256": "02250734ad51b22333be9e756064b3a40e68f5815bcefcbe0a9afa3b6508b811"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/beamspring_ssk_r2/wcass/keymaps/bssk_r2-allpads.vil",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/beamspring_ssk_r2/wcass/keymaps/bssk_r2-allpads.vil",
+      "sha256": "45136d0b7f4dc1822ff83f80cac99b2f8081c866bb0a9a544447142998379705"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/beamspring_ssk_r2/wcass/keymaps/bssk_r2-ansi.vil",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/beamspring_ssk_r2/wcass/keymaps/bssk_r2-ansi.vil",
+      "sha256": "01e9994ef0ccc4d55129209b114f4940b35abe96dc9cdf4e2020e59d10cb5f4d"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/beamspring_ssk_r2/wcass/keymaps/bssk_r2-iso.vil",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/beamspring_ssk_r2/wcass/keymaps/bssk_r2-iso.vil",
+      "sha256": "ee273c2601e08b3b8abd06ec6b556fb7acf3e1181a9fa3f42cd28d21e4be3536"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/beamspring_ssk_r2/wcass/readme.md",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/beamspring_ssk_r2/wcass/readme.md",
+      "sha256": "df5f8db5436f57d06f247561f70c922ffd60f4eb7a453c79cc4084fe1d080f09"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/beamspring_ssk_r2/wcass/vial.json",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/beamspring_ssk_r2/wcass/vial.json",
+      "sha256": "cb09441728b583baa004d82a8f84e8fc383dc9b8077461170f7194d846566d4b"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/f104_round2/keymaps/default/readme.md",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/f104_round2/keymaps/default/readme.md",
+      "sha256": "c64c95f5e71624d4287de8c4d1b09b4d6db7d82bce5dc6c8d36b0c3a57687dd6"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/f104_round2/readme.md",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/f104_round2/readme.md",
+      "sha256": "fa565e2d913d5bb55f51e9ca8f93b886d69c70056f3e7c3ed26221e94163c631"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/f104_round2/wcass/config.h",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/f104_round2/wcass/config.h",
+      "sha256": "a88571021568730505435ff401b9e96e509d148fc370e9d7f6fa8b10d9b5a6ef"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/f104_round2/wcass/keymaps/f104_r2-allpads.vil",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/f104_round2/wcass/keymaps/f104_r2-allpads.vil",
+      "sha256": "2c0e80df342530fca4de1da77750869ca10c4620ffd46363aee9158f7c82855c"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/f104_round2/wcass/keymaps/f104_r2-ansi.vil",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/f104_round2/wcass/keymaps/f104_r2-ansi.vil",
+      "sha256": "9fce08585cd4bad75c71630e2db60a5fedd4d229efb08984d9dde2e7e4743c5a"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/f104_round2/wcass/keymaps/f104_r2-ansi_fn.vil",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/f104_round2/wcass/keymaps/f104_r2-ansi_fn.vil",
+      "sha256": "965f7a94e662e12a38163c9085368e71bdc8db658b782d04d486f9a91d0fb61a"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/f104_round2/wcass/keymaps/f104_r2-ansi_hhkb.vil",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/f104_round2/wcass/keymaps/f104_r2-ansi_hhkb.vil",
+      "sha256": "8df90a2c0b12c9413fff313c8cd6b577c215dd65dbf8e994f4ff8e39553b786a"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/f104_round2/wcass/keymaps/f104_r2-ansi_hhshift.vil",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/f104_round2/wcass/keymaps/f104_r2-ansi_hhshift.vil",
+      "sha256": "abc2ecef0a8ae107e8e27c4b06b1b1c873fc561d921697e6bdc0d293513e2915"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/f104_round2/wcass/keymaps/f104_r2-iso.vil",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/f104_round2/wcass/keymaps/f104_r2-iso.vil",
+      "sha256": "e2af92f06cc28154180985011ad82744a1cff6e7dfd7840cf6b2b15c38cab01a"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/f104_round2/wcass/keymaps/f104_r2-iso_fn.vil",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/f104_round2/wcass/keymaps/f104_r2-iso_fn.vil",
+      "sha256": "3d337f10bbc56da3d34393c38ac882f8f166d4f5e073d3a3e5460d7348b62009"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/f104_round2/wcass/keymaps/f104_r2-iso_hhkb.vil",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/f104_round2/wcass/keymaps/f104_r2-iso_hhkb.vil",
+      "sha256": "14b45c2749dc3ba42793018a4eeca8a76a6b491834f761a1e134a0821eeeb3b2"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/f104_round2/wcass/keymaps/f104_r2-iso_hhshift.vil",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/f104_round2/wcass/keymaps/f104_r2-iso_hhshift.vil",
+      "sha256": "5ec9fb554f03865ddd1dc24503ae3a4c5c890e3e4b1ab42caf683f7cc5c1d400"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/f104_round2/wcass/readme.md",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/f104_round2/wcass/readme.md",
+      "sha256": "6b616b8b0faf8c1529c8dbb5693aa6ab965ba7c505cdfa4b17ee5925f7a12fdb"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/f104_round2/wcass/vial.json",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/f104_round2/wcass/vial.json",
+      "sha256": "52c23080df7a1b76ba160d91f175d0d5d02b7731a7490e2ac5fd2457a6b7da48"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/f104_round_1_nonshrunk/keymaps/default/readme.md",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/f104_round_1_nonshrunk/keymaps/default/readme.md",
+      "sha256": "11f49af9cd999a9f45f34680e03d9cd998889ffe14c6761809bb1dbc47719e22"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/f104_round_1_nonshrunk/readme.md",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/f104_round_1_nonshrunk/readme.md",
+      "sha256": "4eef239f5bb4730c5d55d167e8b47abdf02b463f846b5c6e5a8818cdea084f8f"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/f104_round_1_nonshrunk/universal/readme.md",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/f104_round_1_nonshrunk/universal/readme.md",
+      "sha256": "f6a197b483febfca8ae31d331c37871ac6f2aacafe615dac36ffe3714bf174eb"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/f104_round_1_nonshrunk/wcass/config.h",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/f104_round_1_nonshrunk/wcass/config.h",
+      "sha256": "df9ec1ff96c581476039dbbd5fa12c2bdfbee78e69b396d35c70fc2c321c07c6"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/f104_round_1_nonshrunk/wcass/readme.md",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/f104_round_1_nonshrunk/wcass/readme.md",
+      "sha256": "07740cca9f43d87701e178583e86d4504b9b66f20523839c5883e297dff28f2f"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/f104_round_1_nonshrunk/wcass/vial.json",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/f104_round_1_nonshrunk/wcass/vial.json",
+      "sha256": "2321a4916380f5c6950d9b2544fa24d35f0900fb637f928c9d5efa593b9b3950"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/f104_round_1_nonshrunk/xwhatsit/readme.md",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/f104_round_1_nonshrunk/xwhatsit/readme.md",
+      "sha256": "249bb25f43aa93007b0756d22e5d60d4877215d44ad9845328dd2338b612915e"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/f104_round_1_shrunk/keymaps/default/readme.md",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/f104_round_1_shrunk/keymaps/default/readme.md",
+      "sha256": "05d372474b61c69019a048c4e52b0064fb3be1b92b2549359ac4db63aaea2e93"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/f104_round_1_shrunk/readme.md",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/f104_round_1_shrunk/readme.md",
+      "sha256": "01956fe0339cf6e54c81dcb8debc1eaa008d0cadf532616bdf230bee921f7860"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/f104_round_1_shrunk/universal/readme.md",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/f104_round_1_shrunk/universal/readme.md",
+      "sha256": "f25d7c06723bbb4f57c7b23a42979a104e5104db90e70e37bff8424b9a87fafb"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/f104_round_1_shrunk/wcass/config.h",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/f104_round_1_shrunk/wcass/config.h",
+      "sha256": "e3104e524e0b2c416996808183bc9ef586082296cbdf5b58c76e00bb98d68aba"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/f104_round_1_shrunk/wcass/keymaps/f104-allpads.vil",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/f104_round_1_shrunk/wcass/keymaps/f104-allpads.vil",
+      "sha256": "26c1d2a6fc4e8772d3142f1e90c4f84973abe119795807723cc43f5ea53ca47b"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/f104_round_1_shrunk/wcass/keymaps/f104-ansi.vil",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/f104_round_1_shrunk/wcass/keymaps/f104-ansi.vil",
+      "sha256": "bf2cc320fd9285dce6e835c3a9d6a2fbea8d45d430127591ea4cfd6bf4dcb8f9"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/f104_round_1_shrunk/wcass/keymaps/f104-iso.vil",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/f104_round_1_shrunk/wcass/keymaps/f104-iso.vil",
+      "sha256": "0fbb6f459f7345b4e584291453557e9c6ad1df7d86218f132805fb13ea66fa2b"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/f104_round_1_shrunk/wcass/readme.md",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/f104_round_1_shrunk/wcass/readme.md",
+      "sha256": "06149c213101a51a0b6ea9f0237cce0ba6566ac7eaaab7dd14e7efdc70b98fbb"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/f104_round_1_shrunk/wcass/vial.json",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/f104_round_1_shrunk/wcass/vial.json",
+      "sha256": "9a3fbd235ec8a7f775b46bb615e6bba69aadd57915d29cbd8e0a6b2f7de14842"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/f104_round_1_shrunk/xwhatsit/readme.md",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/f104_round_1_shrunk/xwhatsit/readme.md",
+      "sha256": "257f629648b38d9514b5150547a595a212b911d7faaa6c0746dcbb4e96ffbb55"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/f15_left/readme.md",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/f15_left/readme.md",
+      "sha256": "82f792d5d13db579ca390f9f754f2b63648933342d8ab547dfa4c6d49fa702fe"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/f15_left/wcass/config.h",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/f15_left/wcass/config.h",
+      "sha256": "d57dd9e854c206012e56a717508107611615fbdaa7da0fbf2ecc3f76c6c55279"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/f15_left/wcass/keymaps/f15_l-allpads.vil",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/f15_left/wcass/keymaps/f15_l-allpads.vil",
+      "sha256": "db10459fce18a0b9f4568347acde83f4f9fb39e682ea7306e86ae0974b9e93fd"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/f15_left/wcass/keymaps/f15_l-allpads_nlock.vil",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/f15_left/wcass/keymaps/f15_l-allpads_nlock.vil",
+      "sha256": "ac841f9b67b7ec03554abf799dc5c0feaf3a42846e7ac88e26f1ac3d56099ebe"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/f15_left/wcass/keymaps/f15_l-ansi.vil",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/f15_left/wcass/keymaps/f15_l-ansi.vil",
+      "sha256": "7cdbaf171448f508c8a27272d5d048547eb958679dfa985990c6ae53740344a0"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/f15_left/wcass/keymaps/f15_l-ansi_nlock.vil",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/f15_left/wcass/keymaps/f15_l-ansi_nlock.vil",
+      "sha256": "90aa1128ad971646dc2cf6c9929a0a22cc173f6003327e2cb33e2c8a5ec9c93d"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/f15_left/wcass/readme.md",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/f15_left/wcass/readme.md",
+      "sha256": "7166a6333110e48200997347bb23d846eefa1a99fa625b018d738cc2d6c3a577"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/f15_left/wcass/vial.json",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/f15_left/wcass/vial.json",
+      "sha256": "ab70f06bffb0a3d4d8d027ee0bec22d8d4cd3c1e5c494f24b505d503d1bd34c0"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/f15_right/readme.md",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/f15_right/readme.md",
+      "sha256": "fa989d2a23ca982d75bffa368ab08bb924487348d24d484a31357f543b549975"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/f15_right/wcass/config.h",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/f15_right/wcass/config.h",
+      "sha256": "aa43202e247337191916cd93e7ef704c08fb55412c938ed74690986892a2cf0c"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/f15_right/wcass/keymaps/f15_r-allpads.vil",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/f15_right/wcass/keymaps/f15_r-allpads.vil",
+      "sha256": "a37c0a13431f1bd93e67994d617fe95786a0ea078c45808bf1da5d5362dac525"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/f15_right/wcass/keymaps/f15_r-allpads_nlock.vil",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/f15_right/wcass/keymaps/f15_r-allpads_nlock.vil",
+      "sha256": "c47d7b6efc6a1c6cb3b3294c24393bf25f510de81bec475039bbb927232da5c5"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/f15_right/wcass/keymaps/f15_r-ansi.vil",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/f15_right/wcass/keymaps/f15_r-ansi.vil",
+      "sha256": "8f9fb2494f58a905aa8815029933fffbcf7a8f4611c586353a13d571fe535ec2"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/f15_right/wcass/keymaps/f15_r-ansi_nlock.vil",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/f15_right/wcass/keymaps/f15_r-ansi_nlock.vil",
+      "sha256": "f12984cb1f5ba5cbe217b43d0b0f10ab29f31b98636ac70e3b32cb648951ed8c"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/f15_right/wcass/readme.md",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/f15_right/wcass/readme.md",
+      "sha256": "f747d8b5d927e955c72728fa81812e4919dad50e568cad35928c1c4f1ac365fd"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/f15_right/wcass/vial.json",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/f15_right/wcass/vial.json",
+      "sha256": "f6dd4570ecc07c8ee1c869a6891378ab726cb288a89524e997c7c3831a37c94f"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/f50/keymaps/default/readme.md",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/f50/keymaps/default/readme.md",
+      "sha256": "c4d668f32b9a6a2a2b4191885104f053da9d1db6f2d344bb65365d0693f7cd89"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/f50/readme.md",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/f50/readme.md",
+      "sha256": "d90b508e299577bbbad3418aaed64e4b52cae12c7ecdd6dab3ed83bfa62345c1"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/f50/wcass/config.h",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/f50/wcass/config.h",
+      "sha256": "e46fda8eb66de38bf3e51bb4e50601c267720a0840ef255c5d9f2d2e57bd2725"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/f50/wcass/keymaps/f50-alpha.vil",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/f50/wcass/keymaps/f50-alpha.vil",
+      "sha256": "201c47883f374682127fe4a5e68b7fc16911a5ddef264c5c08692f1926dce895"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/f50/wcass/readme.md",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/f50/wcass/readme.md",
+      "sha256": "15703045c3afee59bd506bd945805574db2758ba4dd6138a5b34189197c055ea"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/f50/wcass/vial.json",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/f50/wcass/vial.json",
+      "sha256": "e0e50391f5c031225ebf04778125d3f4c277486a97cfe9c30f46a7a9af534a5d"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/f62/keymaps/10t8or_spacefn/readme.md",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/f62/keymaps/10t8or_spacefn/readme.md",
+      "sha256": "b39ea17a39f228a0cb561be23b6d050ffe70a3fedaadd0526ee43aa3bdef6a8c"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/f62/keymaps/ansi_hhkb_split_shift_regular_backspace/readme.md",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/f62/keymaps/ansi_hhkb_split_shift_regular_backspace/readme.md",
+      "sha256": "81ade6c6293204ce8a75a83854a47049dd71634b0926728b30c51298f4428770"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/f62/keymaps/ansi_hhkb_split_shift_split_backspace/readme.md",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/f62/keymaps/ansi_hhkb_split_shift_split_backspace/readme.md",
+      "sha256": "81ade6c6293204ce8a75a83854a47049dd71634b0926728b30c51298f4428770"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/f62/keymaps/ansi_nonhhkb_split_shift_regular_backspace/readme.md",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/f62/keymaps/ansi_nonhhkb_split_shift_regular_backspace/readme.md",
+      "sha256": "81ade6c6293204ce8a75a83854a47049dd71634b0926728b30c51298f4428770"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/f62/keymaps/ansi_nonhhkb_split_shift_split_backspace/readme.md",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/f62/keymaps/ansi_nonhhkb_split_shift_split_backspace/readme.md",
+      "sha256": "81ade6c6293204ce8a75a83854a47049dd71634b0926728b30c51298f4428770"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/f62/keymaps/ansi_regular_shift_regular_backspace/readme.md",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/f62/keymaps/ansi_regular_shift_regular_backspace/readme.md",
+      "sha256": "81ade6c6293204ce8a75a83854a47049dd71634b0926728b30c51298f4428770"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/f62/keymaps/ansi_regular_shift_split_backspace/readme.md",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/f62/keymaps/ansi_regular_shift_split_backspace/readme.md",
+      "sha256": "81ade6c6293204ce8a75a83854a47049dd71634b0926728b30c51298f4428770"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/f62/keymaps/default/readme.md",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/f62/keymaps/default/readme.md",
+      "sha256": "bb07aa833fa210e8b10cb6c1371df2719703daa39fd5b794f92f845bd7c2e205"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/f62/keymaps/iso_hhkb_split_shift_regular_backspace/readme.md",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/f62/keymaps/iso_hhkb_split_shift_regular_backspace/readme.md",
+      "sha256": "81ade6c6293204ce8a75a83854a47049dd71634b0926728b30c51298f4428770"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/f62/keymaps/iso_hhkb_split_shift_split_backspace/readme.md",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/f62/keymaps/iso_hhkb_split_shift_split_backspace/readme.md",
+      "sha256": "81ade6c6293204ce8a75a83854a47049dd71634b0926728b30c51298f4428770"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/f62/keymaps/iso_nonhhkb_split_shift_regular_backspace/readme.md",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/f62/keymaps/iso_nonhhkb_split_shift_regular_backspace/readme.md",
+      "sha256": "81ade6c6293204ce8a75a83854a47049dd71634b0926728b30c51298f4428770"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/f62/keymaps/iso_nonhhkb_split_shift_split_backspace/readme.md",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/f62/keymaps/iso_nonhhkb_split_shift_split_backspace/readme.md",
+      "sha256": "81ade6c6293204ce8a75a83854a47049dd71634b0926728b30c51298f4428770"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/f62/keymaps/iso_regular_shift_regular_backspace/readme.md",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/f62/keymaps/iso_regular_shift_regular_backspace/readme.md",
+      "sha256": "81ade6c6293204ce8a75a83854a47049dd71634b0926728b30c51298f4428770"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/f62/keymaps/iso_regular_shift_split_backspace/readme.md",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/f62/keymaps/iso_regular_shift_split_backspace/readme.md",
+      "sha256": "81ade6c6293204ce8a75a83854a47049dd71634b0926728b30c51298f4428770"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/f62/readme.md",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/f62/readme.md",
+      "sha256": "c01383ffd5e6bf9c9d4dcf5e20427c784594b65bec22fffabdf94a3edca672cd"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/f62/universal/readme.md",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/f62/universal/readme.md",
+      "sha256": "bea8a54777100269c7776fda840c1825a0aac472790f8db28493549ffe9b1193"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/f62/wcass/config.h",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/f62/wcass/config.h",
+      "sha256": "ccb684046f7a7a704ecb57471385321edf395687f9cc6dfb0ee7d22801391c7b"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/f62/wcass/keymaps/f62-allpads.vil",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/f62/wcass/keymaps/f62-allpads.vil",
+      "sha256": "d7ffefdb6b059cfb7cb920e940d4716b8e76d99dfb6de1e18d71c68878969dbc"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/f62/wcass/keymaps/f62-ansi.vil",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/f62/wcass/keymaps/f62-ansi.vil",
+      "sha256": "da8e2f7a64081071cbec42a182c22e23e22a53cbd1bdfa0b7f8d7f76e3ce70cb"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/f62/wcass/keymaps/f62-ansi_1ubksp.vil",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/f62/wcass/keymaps/f62-ansi_1ubksp.vil",
+      "sha256": "51e6d3ff060f45c6f97d716b288dd12d270872e2e7adc473334ca32833977055"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/f62/wcass/keymaps/f62-ansi_fn.vil",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/f62/wcass/keymaps/f62-ansi_fn.vil",
+      "sha256": "cc64e7a37c547850340840fc4af6313be3576d992ae1524c61ae4bf8ded05e17"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/f62/wcass/keymaps/f62-ansi_hhkb.vil",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/f62/wcass/keymaps/f62-ansi_hhkb.vil",
+      "sha256": "6db8afa258c5125ecfbb36cdfca6c4325b4f7817e79be0a82897d853f0e961ff"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/f62/wcass/keymaps/f62-ansi_hhshift.vil",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/f62/wcass/keymaps/f62-ansi_hhshift.vil",
+      "sha256": "84420aa37c95a9caeb8d7b51936b3ff5a73a7f855b1c6e2bb49ebe218b97ca92"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/f62/wcass/keymaps/f62-iso.vil",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/f62/wcass/keymaps/f62-iso.vil",
+      "sha256": "dded1b2024257c39b2914ec910fc9786eadb0f1f32f72c6d85e94f70ea714075"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/f62/wcass/keymaps/f62-iso_fn.vil",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/f62/wcass/keymaps/f62-iso_fn.vil",
+      "sha256": "137476e8f9bab85d2cd144c6fdd430c977f01db6e46bc422fe6a5055b633622d"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/f62/wcass/readme.md",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/f62/wcass/readme.md",
+      "sha256": "3405d4bed5bd4b42778fcca5765000334ff7d53057ee3a3c5cb2bd3029a2f1d2"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/f62/wcass/vial.json",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/f62/wcass/vial.json",
+      "sha256": "5ea68f6dd08b35c0b54f3e975af7b3d9c0fe7a111757cb4c4a9d68a81c8efc2a"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/f62/xwhatsit/readme.md",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/f62/xwhatsit/readme.md",
+      "sha256": "41038d038cf0ac40d28ec04d92c3fed7c3339ca453951214042d1e46d188427b"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/f62_scumyc/keymaps/default/readme.md",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/f62_scumyc/keymaps/default/readme.md",
+      "sha256": "ebd7214342af37cfdf3e098b1bd4e53849ebb1f77a4e36965551450f9b6b9611"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/f62_scumyc/readme.md",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/f62_scumyc/readme.md",
+      "sha256": "43223371723a3361d4df66fe97883cd9a995feb2517626670f8429c1d9c62dba"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/f62_scumyc/universal/readme.md",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/f62_scumyc/universal/readme.md",
+      "sha256": "3658555f53783c647c073ad9a901e4d75fcba9a74e2d1898c74acd09aa7ca1f3"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/f62_scumyc/wcass/readme.md",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/f62_scumyc/wcass/readme.md",
+      "sha256": "44e98f24a9f36ab850bb1aeab3023c0f7d8eb1b09920dc3ed55508437d52a05b"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/f62_scumyc/xwhatsit/readme.md",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/f62_scumyc/xwhatsit/readme.md",
+      "sha256": "f8688919f6ffd0a432aca6353be74e09ce68f7d83b4e7cd5683b46945f23551f"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/f77/keymaps/ansi_hhkb_split_shift_regular_backspace_0_9_and_cursor_keys/readme.md",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/f77/keymaps/ansi_hhkb_split_shift_regular_backspace_0_9_and_cursor_keys/readme.md",
+      "sha256": "b74ad0bcf961ef2eaaedeac8924f788b8b025f90107640bf5c4755c854252150"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/f77/keymaps/ansi_hhkb_split_shift_split_backspace_0_9_and_cursor_keys/readme.md",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/f77/keymaps/ansi_hhkb_split_shift_split_backspace_0_9_and_cursor_keys/readme.md",
+      "sha256": "b74ad0bcf961ef2eaaedeac8924f788b8b025f90107640bf5c4755c854252150"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/f77/keymaps/ansi_nonhhkb_split_shift_regular_backspace_0_9_and_cursor_keys/readme.md",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/f77/keymaps/ansi_nonhhkb_split_shift_regular_backspace_0_9_and_cursor_keys/readme.md",
+      "sha256": "b74ad0bcf961ef2eaaedeac8924f788b8b025f90107640bf5c4755c854252150"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/f77/keymaps/ansi_nonhhkb_split_shift_split_backspace_0_9_and_cursor_keys/readme.md",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/f77/keymaps/ansi_nonhhkb_split_shift_split_backspace_0_9_and_cursor_keys/readme.md",
+      "sha256": "b74ad0bcf961ef2eaaedeac8924f788b8b025f90107640bf5c4755c854252150"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/f77/keymaps/ansi_regular_shift_regular_backspace_0_9_and_cursor_keys/readme.md",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/f77/keymaps/ansi_regular_shift_regular_backspace_0_9_and_cursor_keys/readme.md",
+      "sha256": "56760994fc024d57d9362186b1e92d28140854b304caf01c5dfb2538dc36df3c"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/f77/keymaps/ansi_regular_shift_regular_backspace_prscr_scrlock_etc/readme.md",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/f77/keymaps/ansi_regular_shift_regular_backspace_prscr_scrlock_etc/readme.md",
+      "sha256": "56760994fc024d57d9362186b1e92d28140854b304caf01c5dfb2538dc36df3c"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/f77/keymaps/ansi_regular_shift_split_backspace_0_9_and_cursor_keys/readme.md",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/f77/keymaps/ansi_regular_shift_split_backspace_0_9_and_cursor_keys/readme.md",
+      "sha256": "56760994fc024d57d9362186b1e92d28140854b304caf01c5dfb2538dc36df3c"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/f77/keymaps/default/readme.md",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/f77/keymaps/default/readme.md",
+      "sha256": "ff9ab4ce7247e2903bf1e1fc487cb0386b828e1cf554c341121adf52e0375442"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/f77/keymaps/iso_hhkb_split_shift_regular_backspace_0_9_and_cursor_keys/readme.md",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/f77/keymaps/iso_hhkb_split_shift_regular_backspace_0_9_and_cursor_keys/readme.md",
+      "sha256": "b74ad0bcf961ef2eaaedeac8924f788b8b025f90107640bf5c4755c854252150"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/f77/keymaps/iso_hhkb_split_shift_split_backspace_0_9_and_cursor_keys/readme.md",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/f77/keymaps/iso_hhkb_split_shift_split_backspace_0_9_and_cursor_keys/readme.md",
+      "sha256": "b74ad0bcf961ef2eaaedeac8924f788b8b025f90107640bf5c4755c854252150"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/f77/keymaps/iso_nonhhkb_split_shift_regular_backspace_0_9_and_cursor_keys/readme.md",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/f77/keymaps/iso_nonhhkb_split_shift_regular_backspace_0_9_and_cursor_keys/readme.md",
+      "sha256": "b74ad0bcf961ef2eaaedeac8924f788b8b025f90107640bf5c4755c854252150"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/f77/keymaps/iso_nonhhkb_split_shift_split_backspace_0_9_and_cursor_keys/readme.md",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/f77/keymaps/iso_nonhhkb_split_shift_split_backspace_0_9_and_cursor_keys/readme.md",
+      "sha256": "b74ad0bcf961ef2eaaedeac8924f788b8b025f90107640bf5c4755c854252150"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/f77/keymaps/iso_regular_shift_regular_backspace_0_9_and_cursor_keys/readme.md",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/f77/keymaps/iso_regular_shift_regular_backspace_0_9_and_cursor_keys/readme.md",
+      "sha256": "56760994fc024d57d9362186b1e92d28140854b304caf01c5dfb2538dc36df3c"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/f77/keymaps/iso_regular_shift_split_backspace_0_9_and_cursor_keys/readme.md",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/f77/keymaps/iso_regular_shift_split_backspace_0_9_and_cursor_keys/readme.md",
+      "sha256": "56760994fc024d57d9362186b1e92d28140854b304caf01c5dfb2538dc36df3c"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/f77/keymaps/iso_uk_nonhhkb_split_shift_regular_backspace_0_9_and_cursor_keys/readme.md",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/f77/keymaps/iso_uk_nonhhkb_split_shift_regular_backspace_0_9_and_cursor_keys/readme.md",
+      "sha256": "6a761fc360f6aeae3597a136d11ceff301795990d7a191bb0b38d1ccd9ead153"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/f77/readme.md",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/f77/readme.md",
+      "sha256": "a57d0cbc999b4cb0c03b01e586cc63a0f255c3b70d07450229f328c17f1a90e2"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/f77/universal/readme.md",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/f77/universal/readme.md",
+      "sha256": "1e38d5d34672a67fd67291481ef6b6f428a1c1d5284ceef24540e0421368b356"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/f77/wcass/config.h",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/f77/wcass/config.h",
+      "sha256": "2bfb07da3a27d01dd50b202b735a069dc71a9bd5ab96961ea6e207cf2d47f213"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/f77/wcass/keymaps/f77-allpads_opt1.vil",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/f77/wcass/keymaps/f77-allpads_opt1.vil",
+      "sha256": "29087a73d5179baf83dc274109a016b4d956e5c6ed67ca0ec35ba0cc583aee8e"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/f77/wcass/keymaps/f77-allpads_opt2.vil",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/f77/wcass/keymaps/f77-allpads_opt2.vil",
+      "sha256": "5500ab3093cd79198701a32676335e534c9b8b79ac10a6d3568bd9e1524246e9"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/f77/wcass/keymaps/f77-ansi_fn_opt1.vil",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/f77/wcass/keymaps/f77-ansi_fn_opt1.vil",
+      "sha256": "650bfb5bb284f4a59e6e3f6f6a122030eca71324bc9faf986d6a14c6d4dba47a"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/f77/wcass/keymaps/f77-ansi_fn_opt2.vil",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/f77/wcass/keymaps/f77-ansi_fn_opt2.vil",
+      "sha256": "d9f47bbe3bdcb4b538bcd2dd910db45463f3d5de4a92b15b0f0695fce416e31d"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/f77/wcass/keymaps/f77-ansi_fn_opt3.vil",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/f77/wcass/keymaps/f77-ansi_fn_opt3.vil",
+      "sha256": "8df6ab94fd5647917c6919b99ed1a87d4038fc74dd12af16d23ecf0ae11ef889"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/f77/wcass/keymaps/f77-ansi_fn_opt3_nlock.vil",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/f77/wcass/keymaps/f77-ansi_fn_opt3_nlock.vil",
+      "sha256": "c179b2b0a2a7beb81888afa1a63deeea80d434a88ab6106a6463c670232e63d4"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/f77/wcass/keymaps/f77-ansi_fn_opt3_simulock.vil",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/f77/wcass/keymaps/f77-ansi_fn_opt3_simulock.vil",
+      "sha256": "ff5c872d6aa8ff5afc3dc0e34882c9ababfa1bfa4cbca7c87172588327118472"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/f77/wcass/keymaps/f77-ansi_fn_opt4_nlock.vil",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/f77/wcass/keymaps/f77-ansi_fn_opt4_nlock.vil",
+      "sha256": "eb7380459ebc38c5e89317d332415cd0956c1525fc6a5f2758b44ddf4dd5a125"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/f77/wcass/keymaps/f77-ansi_fn_opt4_simulock.vil",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/f77/wcass/keymaps/f77-ansi_fn_opt4_simulock.vil",
+      "sha256": "5bd0134adfbb36147e2c66b4837bc8c44c0925dda87336ed489b4f0e8c86b009"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/f77/wcass/keymaps/f77-ansi_fn_opt5_nlock.vil",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/f77/wcass/keymaps/f77-ansi_fn_opt5_nlock.vil",
+      "sha256": "2d9fec17cdf6302b161c34de59c5f550ffa5ae0b80aa565c4a9d9abcfe38a423"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/f77/wcass/keymaps/f77-ansi_fn_opt5_simulock.vil",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/f77/wcass/keymaps/f77-ansi_fn_opt5_simulock.vil",
+      "sha256": "9563f523d55fcbac853a2027a14e23b420f7cb235fda89a3255dda5decf7d0a4"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/f77/wcass/keymaps/f77-ansi_hhkb_opt1.vil",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/f77/wcass/keymaps/f77-ansi_hhkb_opt1.vil",
+      "sha256": "cfd81c57bf5ad1477857e4b82372189461eb9f8a6429f4378872761cb952a7fb"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/f77/wcass/keymaps/f77-ansi_hhkb_opt2.vil",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/f77/wcass/keymaps/f77-ansi_hhkb_opt2.vil",
+      "sha256": "eb2ce836ef5a9e0682be91eb68eea9f01db2aa17af0bd1a0c53af2a292f29a31"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/f77/wcass/keymaps/f77-ansi_hhshift_opt1.vil",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/f77/wcass/keymaps/f77-ansi_hhshift_opt1.vil",
+      "sha256": "4ec6db83c8343679d4a9577def334b8082aa31347f5edffe91d8708fb9365ac8"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/f77/wcass/keymaps/f77-ansi_hhshift_opt2.vil",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/f77/wcass/keymaps/f77-ansi_hhshift_opt2.vil",
+      "sha256": "0f153c1efea80d6028c09616e5a10e448ebe8fb9c8630fefe5af625d4b487527"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/f77/wcass/keymaps/f77-ansi_opt1.vil",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/f77/wcass/keymaps/f77-ansi_opt1.vil",
+      "sha256": "a2ffc286fb50f2896cf7ba643132bf73c558fa12206d4ad9c7f791d64bd151cd"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/f77/wcass/keymaps/f77-ansi_opt2.vil",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/f77/wcass/keymaps/f77-ansi_opt2.vil",
+      "sha256": "b1b8f0bf15615bb08f6f5961cefedd44c6bb57d8b57de19fb9d36e84740267c1"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/f77/wcass/keymaps/f77-iso_opt1.vil",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/f77/wcass/keymaps/f77-iso_opt1.vil",
+      "sha256": "035c573456fc005e5ac20fad0bdb9b85c0ef1793257167fe6400d85ef8d1d421"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/f77/wcass/keymaps/f77-iso_opt2.vil",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/f77/wcass/keymaps/f77-iso_opt2.vil",
+      "sha256": "e43c1287d7f0882e7b5efd65043e737c4ea71dc0ac9b3b3b8c27cf67a0c7306f"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/f77/wcass/keymaps/f77-nathana_nlock.vil",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/f77/wcass/keymaps/f77-nathana_nlock.vil",
+      "sha256": "af26a427b0b48101c651321db30d958f3a0150f56071a8a6dbc8198acda85bf4"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/f77/wcass/keymaps/f77-nathana_simulock.vil",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/f77/wcass/keymaps/f77-nathana_simulock.vil",
+      "sha256": "9b0d19d01cd4cacf243f2359d2ab3f987464bf767acb8fe3e0bed7481494de01"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/f77/wcass/readme.md",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/f77/wcass/readme.md",
+      "sha256": "eb339c90cca51b4297bd4d1f8a71c2983f89b89827bb022248beef175212d4bf"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/f77/wcass/vial.json",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/f77/wcass/vial.json",
+      "sha256": "4b5d2010d0d24f243e70247a86fa7459f67cf5b8f212488b763f1c2dfbec9a49"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/f77/xwhatsit/readme.md",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/f77/xwhatsit/readme.md",
+      "sha256": "54712cbf1f35898b02591fc4071e40c0d206cf9e556d6dbcaf044520fa3d8b6a"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/fortho_left/readme.md",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/fortho_left/readme.md",
+      "sha256": "4281c52068cdf9d3bfb9112ef148004f01452253449348da2a98cce4812f7c5d"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/fortho_left/wcass/config.h",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/fortho_left/wcass/config.h",
+      "sha256": "26bdc2db8f00ccad9884163ffcae5a07450a8738e89fc960ec1f074909ada642"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/fortho_left/wcass/keymaps/fortho_l-allpads.vil",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/fortho_left/wcass/keymaps/fortho_l-allpads.vil",
+      "sha256": "228dc19dda7560713078a7d3c7563695ac965ad28ed30e445e0da05b985e18a2"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/fortho_left/wcass/keymaps/fortho_l-allpads_nlock.vil",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/fortho_left/wcass/keymaps/fortho_l-allpads_nlock.vil",
+      "sha256": "f744de3913eb913939f87fde1eafe0515930bd45d677ab7d2f44f7913cc33824"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/fortho_left/wcass/keymaps/fortho_l-default.vil",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/fortho_left/wcass/keymaps/fortho_l-default.vil",
+      "sha256": "3d5299dc7d9aa537136d17ac1a80a4ff8741b52b7f1048e240e4e7f850454501"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/fortho_left/wcass/keymaps/fortho_l-default_nlock.vil",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/fortho_left/wcass/keymaps/fortho_l-default_nlock.vil",
+      "sha256": "f7d6d120e2381cf7646098c0d595c2526e078a25b69bb275a5d9a18bb80861e6"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/fortho_left/wcass/readme.md",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/fortho_left/wcass/readme.md",
+      "sha256": "b899e788163d2760c25b55baae68b54d020aa7a3f031c382b0c1b967ffac218e"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/fortho_left/wcass/vial.json",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/fortho_left/wcass/vial.json",
+      "sha256": "83de2ae25d7b7fb7f8815a0c7c59fb24af9c5a54e8ebcf5a75d6b3d6ffb64476"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/fortho_right/readme.md",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/fortho_right/readme.md",
+      "sha256": "669d1208004c356a46cf943d763a2da5455517acf010e36d9bc2cbb7d78a910c"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/fortho_right/wcass/config.h",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/fortho_right/wcass/config.h",
+      "sha256": "f47afb537fd636472ee8e5bb501d0fd0026d44bf8550df0034b50628c603b6c9"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/fortho_right/wcass/keymaps/fortho_r-allpads.vil",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/fortho_right/wcass/keymaps/fortho_r-allpads.vil",
+      "sha256": "a48f59085493b922a25065b8be8b1af98532b85d1475a0e2d0cfdae383c1f7ab"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/fortho_right/wcass/keymaps/fortho_r-allpads_nlock.vil",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/fortho_right/wcass/keymaps/fortho_r-allpads_nlock.vil",
+      "sha256": "57e221f7e75fd4c8f69468efae21b472c0100ee002f384b7f9fa88fb5a8179aa"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/fortho_right/wcass/keymaps/fortho_r-default.vil",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/fortho_right/wcass/keymaps/fortho_r-default.vil",
+      "sha256": "bbbd433a764e8460deea392100dc89d5b9e8e0462ec3d015dfb64a191eb73019"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/fortho_right/wcass/keymaps/fortho_r-default_nlock.vil",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/fortho_right/wcass/keymaps/fortho_r-default_nlock.vil",
+      "sha256": "6e8617a49030520af0c65c46ba54af9dab8cca762f15b71a55accab677fc2e09"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/fortho_right/wcass/readme.md",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/fortho_right/wcass/readme.md",
+      "sha256": "a9e26226f28339cf4e925f3c6c7e13eb1c73a8ff2a4e61b584b2ee997ccda9e9"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/fortho_right/wcass/vial.json",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/fortho_right/wcass/vial.json",
+      "sha256": "e453c784e78a4a87e86eb9610f098c009f947daf97518dd7ec0d5cc822769e3a"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/fssk_round2/keymaps/default/readme.md",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/fssk_round2/keymaps/default/readme.md",
+      "sha256": "b4b72ed6a33f2897691429fb35866973a8177b0f18332054bacb54141d4e8151"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/fssk_round2/readme.md",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/fssk_round2/readme.md",
+      "sha256": "42249bbf68363921580e6e26f6cbbfd14aeea3c4a27233b3d8e0556c54502a00"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/fssk_round2/wcass/config.h",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/fssk_round2/wcass/config.h",
+      "sha256": "e6c57e8d240c57817bb92cb3bf23ebfd03912a4185af23d8a5e8ee80ee368800"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/fssk_round2/wcass/keymaps/fssk_r2-allpads.vil",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/fssk_round2/wcass/keymaps/fssk_r2-allpads.vil",
+      "sha256": "f409af35c431da73a878dcbc05eb6511b807707f731b6c50cf1e381f3a5de184"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/fssk_round2/wcass/keymaps/fssk_r2-ansi.vil",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/fssk_round2/wcass/keymaps/fssk_r2-ansi.vil",
+      "sha256": "2e1f488deabef115e0cfe9acb339f04b1b5c7fa1222322b76a36d33e965a95ca"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/fssk_round2/wcass/keymaps/fssk_r2-ansi_fn.vil",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/fssk_round2/wcass/keymaps/fssk_r2-ansi_fn.vil",
+      "sha256": "681fa3ffab02e177cf1b73eb53562899fa884707155d05f7bc786659b1b4b580"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/fssk_round2/wcass/keymaps/fssk_r2-ansi_hhkb.vil",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/fssk_round2/wcass/keymaps/fssk_r2-ansi_hhkb.vil",
+      "sha256": "ed3bd6871ee09ed4dab6255a3cb09c67e8db339e6a25e37ebfe8240edce3ca92"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/fssk_round2/wcass/keymaps/fssk_r2-ansi_hhshift.vil",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/fssk_round2/wcass/keymaps/fssk_r2-ansi_hhshift.vil",
+      "sha256": "227c454ffca2ee6646c74623387b5c84fe5223617a4b6bcabd155aab2f4d35a5"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/fssk_round2/wcass/keymaps/fssk_r2-iso.vil",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/fssk_round2/wcass/keymaps/fssk_r2-iso.vil",
+      "sha256": "bc04613d4f20d4364a46ac99c3cdb40815e16eb236acbc99ab042f7241760508"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/fssk_round2/wcass/keymaps/fssk_r2-iso_fn.vil",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/fssk_round2/wcass/keymaps/fssk_r2-iso_fn.vil",
+      "sha256": "b598ad988c40ad886593b63f117fb9fbfe7fcc147e106a0d158dd02015d385b4"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/fssk_round2/wcass/keymaps/fssk_r2-iso_hhkb.vil",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/fssk_round2/wcass/keymaps/fssk_r2-iso_hhkb.vil",
+      "sha256": "10b5df26473636c47af40d8f6d4d673b1c4454598eb475eda3085ddad1bc8b80"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/fssk_round2/wcass/keymaps/fssk_r2-iso_hhshift.vil",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/fssk_round2/wcass/keymaps/fssk_r2-iso_hhshift.vil",
+      "sha256": "aeea042f25df7656f758a53c198404cd63908006b9bf80fca60ef951ab3fa021"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/fssk_round2/wcass/readme.md",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/fssk_round2/wcass/readme.md",
+      "sha256": "f191f24c5988fa6b333f96c7d7e5aa3f46dd373ee4a583793f7e1aabfcd906aa"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/fssk_round2/wcass/vial.json",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/fssk_round2/wcass/vial.json",
+      "sha256": "05b4f6d21cea9845087427064044fa41cf16db88c74cbb6a0f585665129e06e8"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/fssk_round_1/keymaps/default/readme.md",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/fssk_round_1/keymaps/default/readme.md",
+      "sha256": "168f8185b52b159fa077041c5419aa60f3fd45f83737b685d16a22525eaa6542"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/fssk_round_1/readme.md",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/fssk_round_1/readme.md",
+      "sha256": "352c860b5acd1bb347ef6b723e1bbc3fd6fec6db0129035343221a193063bf84"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/fssk_round_1/universal/readme.md",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/fssk_round_1/universal/readme.md",
+      "sha256": "335427fd5055086a9ba66ac255c2e1ee704a1d9657f82d1beb47337ee0c770b3"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/fssk_round_1/wcass/config.h",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/fssk_round_1/wcass/config.h",
+      "sha256": "e08463f56d3fca2e3ae74641587a87bb61d3a38a02fb6819d160de2c567fca27"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/fssk_round_1/wcass/keymaps/fssk-allpads.vil",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/fssk_round_1/wcass/keymaps/fssk-allpads.vil",
+      "sha256": "3eb192d43c33ff9b0b683b0062dfbab2583a8bb70d69758d6a2708b5c6591a61"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/fssk_round_1/wcass/keymaps/fssk-ansi.vil",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/fssk_round_1/wcass/keymaps/fssk-ansi.vil",
+      "sha256": "9881187bcff81ddde3738c7af86ba686ff72a4c6a00bbb7144d59408c18926dd"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/fssk_round_1/wcass/keymaps/fssk-iso.vil",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/fssk_round_1/wcass/keymaps/fssk-iso.vil",
+      "sha256": "d16064e6de1f8093255bbf15dd3f14e31dc247838cf30ad4d3aa5c3d082b05d8"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/fssk_round_1/wcass/readme.md",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/fssk_round_1/wcass/readme.md",
+      "sha256": "d49e647f236752efa9273a6bc78cb4eff4ff8fa2de5f3cf56cb8c70620ca14cf"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/fssk_round_1/wcass/vial.json",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/fssk_round_1/wcass/vial.json",
+      "sha256": "2719882ae68a7056a6e5f02a0785bf0a0033eb19e5c17852b2570acb1b223440"
+    },
+    {
+      "file": "ploxiln/keyboards/xwhatsit/brand_new_model_f/fssk_round_1/xwhatsit/readme.md",
+      "url": "https://raw.githubusercontent.com/ploxiln/vial-qmk/c832c9b0edfa554c6e8344cb732f14620e63b210/keyboards/xwhatsit/brand_new_model_f/fssk_round_1/xwhatsit/readme.md",
+      "sha256": "638ee818f3c71b8c895708919c100bc39e1a6dc2e01a4bfd6ada1b88f8705a99"
+    }
+  ]
+}

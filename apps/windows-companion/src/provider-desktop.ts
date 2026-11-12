@@ -114,6 +114,20 @@ export function createFixedProviderDesktopCatalog(paths: FixedProviderDesktopPat
   return new FixedProviderDesktopCatalog(paths);
 }
 
+/** The Suite editor target grants focus only; it is not a B122 provider enrollment. */
+export const windowsEditorProductIdentity: Readonly<ProviderProductIdentity> = Object.freeze({
+  productId: "microsoft.visual-studio-code", displayName: "VS Code", publisher: "Microsoft Corporation", role: "desktop"
+});
+export type ExecutableIdentityTarget = Pick<ProviderCatalogEntry, "executablePath" | "signerSubject" | "signerThumbprint" | "productIdentity">;
+export function createWindowsEditorFocusTarget(configuration: FixedProviderExecutableConfiguration): ExecutableIdentityTarget {
+  return {
+    executablePath: fixedExecutablePath(configuration.path, "vscode"),
+    signerSubject: fixedSignerSubject(configuration.signerSubject, "vscode"),
+    signerThumbprint: fixedSignerThumbprint(configuration.signerThumbprint, "vscode"),
+    productIdentity: windowsEditorProductIdentity
+  };
+}
+
 export interface ProviderExecutableIdentity {
   readonly canonicalExecutablePath: string;
   readonly executableSha256: string;
@@ -151,7 +165,7 @@ export class WindowsAuthenticodeSignatureProbe implements ProviderExecutableSign
 export class NodeProviderExecutableIdentityProbe implements ProviderExecutableIdentityProbe {
   private readonly signatures: ProviderExecutableSignatureProbe;
   constructor(signatures: ProviderExecutableSignatureProbe = new WindowsAuthenticodeSignatureProbe()) { this.signatures = signatures; }
-  async inspect(entry: ProviderCatalogEntry): Promise<ProviderExecutableIdentity> {
+  async inspect(entry: ExecutableIdentityTarget): Promise<ProviderExecutableIdentity> {
     const configured = resolve(entry.executablePath);
     const linkMetadata = await lstat(configured).catch(() => { throw new Error("The fixed provider executable is unavailable."); });
     if (linkMetadata.isSymbolicLink()) throw new Error("The fixed provider executable cannot be a symbolic link or redirect.");
@@ -320,6 +334,8 @@ export class AttestedProviderDesktopRegistry {
 
 export interface ProviderDesktopProcessObservation {
   readonly processId: number;
+  /** Exact unsigned Windows FILETIME creation identity, never a floating point timestamp. */
+  readonly processStartTime: string;
   readonly windowId: string;
   /** True only when the native helper observed this exact top-level surface as the foreground window. */
   readonly isForeground: boolean;
@@ -472,6 +488,7 @@ export class InstalledProviderDesktopLifecycle {
         shell: false,
         beforeEffect: () => this.finalBarrier(provider, operationId, "focus", installation, input.control)
       }));
+      if (focused.processId !== process.processId) throw new ProviderLifecycleError("failed", "The provider focus returned a different process identity.");
       return {
         status: "completed",
         summary: foregroundIndexes.length === 1 && observations.length > 1
@@ -652,7 +669,9 @@ async function runControlled<T>(control: ProviderLifecycleControl, now: () => Da
         return;
       }
     } catch {
-      controller.abort(new ProviderLifecycleError("unavailable", "The durable provider cancellation state is unavailable."));
+      // This poll runs concurrently with the native operation. Its failure
+      // cannot prove that authorization or the desktop effect never happened.
+      controller.abort(new ProviderLifecycleError("failed", "The durable provider cancellation state became unavailable during an operation; desktop effect completion is uncertain."));
       return;
     }
     cancellationTimer = setTimeout(() => { void pollCancellation(); }, cancellationPollMs);
@@ -768,6 +787,8 @@ function approvedOperator(value: Awaited<ReturnType<WindowsUserPresenceRunner["v
 
 function safeObservation(value: ProviderDesktopProcessObservation): boolean {
   return Number.isSafeInteger(value.processId) && value.processId > 0
+    && typeof value.processStartTime === "string" && /^[1-9][0-9]{0,19}$/.test(value.processStartTime)
+    && BigInt(value.processStartTime) <= 0xffff_ffff_ffff_ffffn
     && typeof value.windowId === "string" && /^[A-Za-z0-9:._-]{1,160}$/.test(value.windowId)
     && typeof value.isForeground === "boolean";
 }
@@ -784,7 +805,7 @@ function sameIdentity(left: ProviderExecutableIdentity, right: ProviderExecutabl
     && left.inode === right.inode;
 }
 
-function fixedExecutablePath(value: string, provider: ProviderId): string {
+function fixedExecutablePath(value: string, provider: ProviderId | "vscode"): string {
   if (typeof value !== "string" || !localExecutablePath(value)) {
     throw new Error(`The fixed ${provider} executable must be a bounded local absolute host path.`);
   }
@@ -793,13 +814,13 @@ function fixedExecutablePath(value: string, provider: ProviderId): string {
   return path;
 }
 
-function fixedSignerSubject(value: string, provider: ProviderId | "provider"): string {
+function fixedSignerSubject(value: string, provider: ProviderId | "provider" | "vscode"): string {
   const subject = typeof value === "string" ? value.trim() : "";
   if (!safeSignerSubject(subject)) throw new Error(`The fixed ${provider} signer subject is invalid.`);
   return subject;
 }
 
-function fixedSignerThumbprint(value: string, provider: ProviderId | "provider"): string {
+function fixedSignerThumbprint(value: string, provider: ProviderId | "provider" | "vscode"): string {
   const thumbprint = typeof value === "string" ? value.replaceAll(" ", "").toLowerCase() : "";
   if (!/^[a-f0-9]{40,128}$/.test(thumbprint)) throw new Error(`The fixed ${provider} signer thumbprint is invalid.`);
   return thumbprint;

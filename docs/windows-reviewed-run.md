@@ -1,0 +1,298 @@
+# Reviewed Windows Run and exact stop
+
+The Windows Studio platform factory connects a selected task to an isolated
+program run. Task authority, one-use approval, checkpoints and budgets precede
+native execution. The live repository is never writable inside the guest, and
+program exit never marks the provider's coding task complete.
+
+The Personal host setup review/apply API and fixed native installer are implemented.
+The bounded-volume engine and service transport are implemented and await their
+new native restricted-client proof. Normal Run/guest-consumer integration remains
+unfinished software. See the [storage service boundary](windows-storage-broker.md).
+Actual interactive VM acceptance requires a supported Windows Sandbox host;
+filesystem CI and runner doubles do not establish that acceptance. The frontend
+remains frozen for review.
+
+The Windows .NET 8 single-file host statically links its CLR/JIT, as described in
+the [upstream implementation](https://github.com/dotnet/runtime/issues/43071).
+`IncludeNativeLibrariesForSelfExtract` additionally includes native dependencies
+when present; [Microsoft's deployment contract](https://learn.microsoft.com/en-us/dotnet/core/deploying/single-file/overview)
+describes their extraction. Calls to the
+fixed helper receive only validated current-user temporary coordinates in
+addition to their explicit environment; runtime startup overrides are refused.
+The Windows lane copies only the executable to a new empty directory, removes
+installed-runtime discovery paths, runs real metadata through its owned guardian,
+verifies the exact running image, absence of external CLR/JIT modules and
+independent exit, then removes only that proof's copy/cache. Native standalone
+acceptance passes at `cba5e2b`; local runtime/package checks pass.
+It does not establish privileged service or VM acceptance.
+
+The metadata-only broker bootstrap is now implemented behind explicit native
+CLI modes. An already elevated installer creates a new fixed per-user service,
+protected code/key/configuration and a separate System/Administrators-only CLR
+extraction cache. SCM configuration, exact image digest and the per-service
+environment are read back. The System process seals native file identities,
+sizes and hashes before accepting clients. A statically linked runtime may leave
+the cache empty; any external runtime DLL must be inside it. Restarts verify that inventory;
+removal first verifies the original SCM configuration, captures its exact native
+process handle, observes service and process exit, then deletes only the verified
+inventory. Existing or unfamiliar installation state is preserved.
+
+The pipe holds one first instance, refuses remote clients and authenticates the
+kernel caller SID before parsing its closed metadata request. Its ACL omits
+instance-creation rights for the ordinary client. Every reply is signed against
+the installed key and a fresh request nonce. The installer does not elevate the
+application, assign privileges to a user or expose any volume/shell verb. Its
+metadata continues to say `brokerImplemented: false` because bounded privileged
+storage effects remain unfinished.
+
+The client verifies each signed reply, then sends its SHA-256 digest as a bounded
+transport acknowledgement. The server retains the connection until that exact
+digest arrives within the existing five-second bound. This prevents
+[DisconnectNamedPipe from discarding unread output](https://learn.microsoft.com/en-us/windows/win32/api/namedpipeapi/nf-namedpipeapi-disconnectnamedpipe).
+The native proof deliberately delays reading a valid reply, so an early
+disconnect fails deterministically. This acknowledgement authorizes no effect.
+
+Helper and linked proof compile without warnings; the sixteen actual crypto
+checks and four package checks pass locally, and build scratch was removed.
+The disposable Windows lane now passes this metadata service lifecycle and all
+thirteen restricted-client/delayed-reader/cache/malformed-pipe boundaries at
+`f4ba916`, workflow [41934738389](https://github.com/SquirmyWormy275/strathex-switchyard/actions/runs/41934738389).
+It observes exact service/process exit and removal. The per-service
+runtime environment and extraction behavior require this actual native check;
+managed compilation cannot establish them. No broker service was installed on
+the Linux pilot.
+
+The normal-user elevation boundary is implemented as a small native x64
+installer, `apps/windows-setup/Setup.cpp`. It accepts fixed install/remove verbs,
+an exact user SID/installation UUID and source/original-broker digests. It derives
+the adjacent helper itself, pins image and parent-directory handles, and hashes
+the held source before requesting UAC. Privileged managed startup occurs only
+after a protected copy is read back under Program Files, with an explicit clean
+environment and creation-time Job Object ownership. No shell or caller-selected
+program/path enters the contract. Uncertain stages are preserved, and cleanup
+never recursively deletes unknown contents. Separate source and original broker
+hashes allow reviewed removal after the application itself changes.
+
+The build uses the Windows worker's existing C++ toolchain and static CRT; no
+SDK is downloaded onto the Linux pilot. The linker uses
+[/DEPENDENTLOADFLAG:0x800](https://learn.microsoft.com/en-us/cpp/build/reference/dependentloadflag?view=msvc-170)
+to restrict startup DLL imports to System32. Its new no-effect native proof reads
+that field from the actual PE image, observes the current native user, and checks
+unknown commands/changed helper bytes are refused before elevation. Compilation
+and all five original checks pass on native Windows at `39bc24f`. The managed bootstrap compiles and
+refuses Linux. The separate native-setup lifecycle passes six lifecycle and thirteen restricted-client checks at `d7872fb`, including protected staging, clean managed startup and exact removal. The worker was already elevated; actual UAC interaction remains unaccepted. A sixth no-effect regression now binds exit to the original creation time and Job Object across PID reuse; all six no-effect and thirty filesystem checks pass at `21038f6`. Privileged volume integration remains unfinished.
+
+The broker metadata wire contract is now implemented separately from the future
+privileged service. It accepts only a closed metadata request and binds a fresh
+256-bit nonce, installation UUID, owner-scope digest, service-image digest and
+request digest to a P-256/SHA-256 signature. The verifier requires the public key
+from a separately verified protected installation; it cannot trust a key supplied
+in a pipe reply. Duplicate/unknown fields, other curves, changed scopes/images,
+wrong keys, replayed nonces and changed privilege claims are refused. Its
+readiness statement still explicitly reports `brokerImplemented: false`.
+
+Sixteen actual compiled parser/cryptography checks pass locally and on native
+Windows. The filesystem lane retains only its small result, source digest and
+assembly digest. The wire proof itself opens no service, volume, account or
+guest. The separate bootstrap lane above tests the new service transport.
+
+The protected-file primitive is implemented and compiles without warnings. New
+broker files use an Administrators/System owner and protected exact ACLs; the
+ordinary client receives only read/execute access to code and public metadata.
+The signing-key file excludes the client. Handles reject reparse points, bound
+reads and verify the ACL/owner; creation uses the protected descriptor atomically
+and reads written bytes back. Its Windows-only CI proof disables privileges and
+makes Administrators deny-only using [CreateRestrictedToken](https://learn.microsoft.com/en-us/windows/win32/api/securitybaseapi/nf-securitybaseapi-createrestrictedtoken),
+then checks public reads and denied code/config/key/permission writes. That native
+proof passes all sixteen checks on native Windows at `366d409`, alongside the
+sixteen parser/cryptography checks and existing thirty filesystem checks,
+workflow [41924140253](https://github.com/SquirmyWormy275/strathex-switchyard/actions/runs/41924140253).
+The broker archive was digest-verified and retained locally as
+`windows-broker-protected-files-366.json`, binding the actual merge source
+`2173e868`. No service is installed by this check, and its new nonce directory
+is removed after verification.
+
+```mermaid
+flowchart LR
+  Task[Task authority and selected bytes] --> Review[One-use review]
+  Review --> Ledger[Checkpoint and budget]
+  Ledger --> Preflight[Read-only host prerequisite check]
+  Preflight --> Inputs[Read-only inputs and pinned tools]
+  Inputs --> Guest[Exact guest and bounded exchange]
+  Guest --> Exit[Independent native and VM exit]
+  Exit --> Output[Verify output or failure logs]
+  Output --> Result[Result and separate storage retirement]
+  Stop[Separately approved exact stop] --> Guest
+```
+
+## Declare the exact inputs
+
+A host manifest binds the existing guest catalog to explicit non-production
+files. It has exactly these fields:
+
+```json
+{
+  "schema": "switchyard-windows-reviewed-run/v1",
+  "version": 1,
+  "recipeId": "run_target",
+  "catalogPath": "guest.json",
+  "catalogSha256": "<SHA-256 of the exact guest.json bytes>",
+  "inputFiles": [
+    {"path":"guest.json","sha256":"<SHA-256>","size":123,"classification":"non-production"},
+    {"path":"program.mjs","sha256":"<SHA-256>","size":123,"classification":"non-production"}
+  ]
+}
+```
+
+Replace placeholder digests and sizes with the actual bytes. The manifest
+cannot approve itself: it and every input must match the separately granted
+task snapshot. The selected guest catalog contains one `run_target` recipe,
+using the exact host-pinned `C:\B122\tools\node.exe` digest. Its first argument
+names a selected `.mjs`, `.cjs` or `.js` file through `{INPUT_ROOT}`. Inline code,
+host commands, replacement runtimes and implicit repository copies are refused.
+
+Inputs retain the shared 4 MiB per-file, 64 MiB total and 4,096-file/path bounds.
+The recipe limit is nine minutes, leaving a minute inside the ten-minute guest
+bound; the encompassing policy deadline can cancel earlier. Captured output is
+at most 512 KiB. Credentials, fixed environment overrides, Node startup
+injections, unknown tokens and ambiguous paths are rejected. Python, debug,
+web and pipeline connections are separate remaining work.
+
+## Own the guest and its storage
+
+After reserving the exact operation, the runner observes the current-user
+Sandbox AppExecLink and the native helper's storage privilege before staging.
+Metadata opens the process token with `TOKEN_QUERY`, reads at most 256 privilege
+entries twice and requires unchanged bytes. It reports only assigned/enabled
+flags and whether privileged setup is required. It never enables or grants a
+privilege, installs a service, opens a volume or claims containment. This follows
+the documented [GetTokenInformation access contract](https://learn.microsoft.com/en-us/windows/win32/api/securitybaseapi/nf-securitybaseapi-gettokeninformation)
+and [TOKEN_PRIVILEGES layout](https://learn.microsoft.com/en-us/windows/win32/api/winnt/ns-winnt-token_privileges).
+
+Missing Sandbox support or an unassigned storage privilege settles the consumed
+operation as unavailable before input/tool/image staging. A new approval is
+required to try again after setup; duplicate requests preserve the original
+result. Personal-host privileged setup is still unfinished. Readiness is an
+observation, not permission to elevate the application.
+
+The host-only runner stages exactly selected bytes, hard-links the existing
+worker and Node image, creates one original fixed-capacity disk and transfers
+it once into a trusted writable lease. No runtime-copy fallback is allowed.
+Native Sandbox startup pins the original image/mount identities, footer, volume
+GUID, exact extent/capacity and three closed mappings. Inputs/tools are read-only;
+only the owned exchange is writable. Network and host redirection are denied.
+[Native storage contract](windows-bounded-exchange.md).
+
+A kernel lease spans preparation, guest execution and cleanup. Another process
+must acquire it before recovery touches the guest; a missing VM during live
+preparation is not an abandoned operation. Readiness persists exact ownership
+before acknowledgement. Unknown effects cannot replay. Scope changes and durable
+exact-operation cancellation markers stop the original owner.
+
+Run admission, eventual program result, independent exit and storage retirement
+are separate records. Only the native volume service can detach/remove its
+original disk. Generic backend cleanup cannot traverse that mount. A known
+program result survives failed storage cleanup; replacement remains blocked
+until the original ownership reconciles. General snapshots omit these records.
+
+## Stop and read results
+
+Exact stop has its own confirmation, operation, 120-second Windows budget and
+receipt. Its immutable original admission is distinct from the eventual program
+result. PIDs, guest IDs and commands are not accepted. This Windows allowance
+does not change the Linux stop budget. A lost final write can recover an already
+recorded passing receipt. Late exit without that receipt preserves an incomplete
+stop result and cannot replay cancellation or the worker.
+
+Successful output is extracted only after exact VM/native exit and manifest,
+path, size, digest, resource-field and current-scope checks. Failed v2 results
+must also match the independently observed guest exit code, including signed
+Windows bits. They may retain only `process.stdout.txt` and
+`process.stderr.txt`, within the shared output bound. `diagnosticRoot` is
+separate from successful `resultRoot`; the execution stays failed.
+
+Status reads expose redacted text only from those two verified files, inside
+the exact operation's owned result directory. Descriptor hashing and directory
+identity checks reject changed bytes or substituted roots. Missing/changed
+output becomes unavailable without rewriting the original Run result. Unknown
+exit releases no diagnostic bytes. These files are untrusted program data and
+grant no task authority.
+
+## Verify the boundaries
+
+Thirteen Studio admission/stop/output cases use real task grants, Git inspection,
+encrypted ledgers, file reads and kernel locks with an explicit Windows runner
+double. The combined policy/inventory/backend/package group passes 66 checks.
+Type checking passes. Four cases invoke the actual compiled C# result formatter;
+its warning-free build and six Linux native-only guards pass. They validate wire
+format and guards, not an actual VM or native Job enforcement.
+
+The Windows policy workflow runs complete policy, recovery, stop, output,
+task-authority and host-stop test files as separate jobs. Every file is explicitly
+present in the required inventory and retains its existing harness bound. The
+four Windows adapter files are capped at five minutes. This follows the first
+whole-file run's four-minute timeout: its first four cases completed, but the
+run remains failed in `windows-policy-63cb-failed.json`. No case or assertion was
+removed. `scripts/verify-windows-policy.mjs --synthetic --suite=policy` selects
+one complete group; omitting `--suite` runs them all. It provisions pinned Node
+and locked dependencies without a .NET or optional-runtime download, opens no
+VM/account/keyboard and retains only a small seven-day receipt.
+
+All four jobs passed at `cdd86cb` in workflow `41914612230`. Digest-verified
+`windows-policy-cdd-{policy,recovery,stop,output}.json` receipts retain the exact
+results and verified child cleanup. Prerequisite transport/session/runner checks
+pass 30/30 locally; the actual Windows token query remains a native CI check.
+
+[Current verification](verification.md) identifies exact source checkpoints,
+installed Linux demonstrations and all 30 native Windows filesystem checks.
+[The requirement ledger](switchyard-requirements.md) separates unfinished
+software from hardware/account acceptance.
+
+## Personal host setup API
+
+The authenticated local API exposes four fixed POST routes beneath
+`/api/suite/host/windows-storage/`: `inspect`, `list`, `review` and `apply`.
+Inspection accepts only `{"compartment":"personal"}`. On Linux it returns
+`setupSupported:false` without opening a native helper. Review requires Personal
+companion mode and the selected primary Personal compartment:
+
+```json
+{"compartment":"personal","requestId":"<new UUID>","action":"install-bootstrap"}
+```
+
+Removal uses the separate `remove-bootstrap` action and a new review. Apply
+accepts only the same request UUID and its returned one-use confirmation token.
+Neither endpoint accepts a path, executable, SID, installation override or caller
+assertion of approval. Work and imported task permissions cannot authorize setup.
+These are backend routes; the frozen frontend has no new setup control.
+
+Review pins current-user identity, both native image hashes, original signed
+installation state and the workspace/mode. Installation requires independently
+verified absence of the original protected root; unavailable service metadata
+alone is insufficient. Apply revalidates that scope, consumes the five-minute
+approval and atomically admits one attempt before invoking the fixed installer.
+The host limit is one concurrent attempt, six minutes per admission and four
+claims per hour. Native setup itself has a five-minute transport bound.
+
+Every helper invocation records exact Job guardian ownership before readiness
+acknowledgement and independently verifies exit. A passing setup receipt requires
+fresh signed metadata after installation or verified original-root absence after
+removal. Receipt, operation and budget settlement share a guarded encrypted-state
+transaction. General snapshots omit native ownership, reviews and journals;
+public setup views omit the raw SID and token. Uncertain elevation retains the
+original evidence and budget and blocks replacement or automatic replay. Stopping
+the unprivileged guardian cannot establish an unknown elevated worker's exit.
+
+Fifteen focused transport/controller checks and fifty-five combined suite/package/
+inventory checks pass locally, including the authenticated HTTP route, lost
+receipt-write recovery, admission failure and a scope change immediately before
+receipt commit. Native setup and service proofs are separate evidence; the full
+application review-to-UAC journey and volume effects are not accepted.
+
+The normal reviewed Run caller selects `full_sandbox` for its fixed `run_target`
+recipe, as required by the backend's closed profile contract. It remains a
+one-shot reviewed-input execution with networking/clipboard disabled and no
+persistent-volume mapping. The earlier `quarantine`/`run_target` combination was
+rejected before dispatch; the correction passes actual backend profile checks
+with an explicit guest double, not a live Windows guest acceptance.

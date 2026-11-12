@@ -14,4 +14,4 @@ Copy-Item -LiteralPath (Join-Path $firmwareRoot "protocol\b122_protocol.h") -Des
 Copy-Item -LiteralPath (Join-Path $firmwareRoot "vial\logical-b122-vial.json") -Destination (Join-Path $resolvedOutput "vial.json")
 
 Write-Output "Packaged QMK keymap overlay at $keymapOutput"
-Write-Output "Copy it into keyboards/<inspected-keyboard>/keymaps/b122, then compile with vial-qmk."
+Write-Output "This logical overlay is not a full typing keymap. Integrate and review the physical matrix before compiling or flashing."

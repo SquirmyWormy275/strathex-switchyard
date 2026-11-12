@@ -1,0 +1,269 @@
+{
+  "schema": "switchyard-native-source-failures/v1",
+  "sourceCommit": "96ac2148bf0e023878abb1ae5daf493f5677a832",
+  "mergeCommit": "b5ff8cad5b9cb5a676a622c0a0b3fad8df3923e8",
+  "sourceTree": "69bbded717e4af489c0dabf05679bf4f17512c6c",
+  "clientRunId": 42583819881,
+  "clientJobId": 129052552968,
+  "fullRunId": 42583819947,
+  "workerJobs": {
+    "7": 129051326117,
+    "8": 129051326340,
+    "11": 129051326036,
+    "19": 129051326456
+  },
+  "proofs": [
+    {
+      "shard": "client",
+      "artifact": {
+        "id": 13659421363,
+        "sha256": "bb50877a3d690c0cc975d88ba2309c34b03e063dad13abbe17084f485e90ce4d",
+        "bytes": 4942
+      },
+      "envelopeSha256": "06f0c52632bac0c4f44a8284a6519f0b2a2e4aa498cc592b471fead0b2dfdea2",
+      "scope": null,
+      "receiptId": "4ec3c0af-142b-45c0-8442-66b82104e4ec",
+      "receiptSha256": "06f0c52632bac0c4f44a8284a6519f0b2a2e4aa498cc592b471fead0b2dfdea2",
+      "totals": {
+        "required": 31,
+        "passed": 30,
+        "failed": 1,
+        "tests": 326,
+        "passedTests": 326,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "failures": [
+        {
+          "file": "tools/layout-studio/role-dispatch.test.mjs",
+          "pattern": null,
+          "timeout": true,
+          "effectiveTimeoutMs": 45000,
+          "durationMs": 45121,
+          "counts": null,
+          "diagnosticSha256": "a759962e3bb1f6dd495981fbd73a1710ca1f1b338669856cf7f1ca9d4bcfa424"
+        }
+      ],
+      "originalManifestCommandsBoundsSkipsAndCleanupVerified": true,
+      "serialScheduleVerified": true
+    },
+    {
+      "shard": "19",
+      "artifact": {
+        "id": 13659781230,
+        "sha256": "13e18b7275898038ecefca3659502951330bea1ea3ea41ba069ccc4fd7983bb3",
+        "bytes": 4732
+      },
+      "envelopeSha256": "f1c47e0e7c0588f0946b63b936a200828f9867775e9ffbf72ab3d31a0a8edc94",
+      "scope": {
+        "platform": "win32",
+        "sourceCommit": "b5ff8cad5b9cb5a676a622c0a0b3fad8df3923e8",
+        "sourceTree": "69bbded717e4af489c0dabf05679bf4f17512c6c",
+        "nodeVersion": "24.14.0",
+        "nodeExecutable": "C:\\hostedtoolcache\\windows\\node\\24.14.0\\x64\\node.exe",
+        "nodeSha256": "63c259c81e5d472b5f11c8d506070130cb04a1ecf84b80377a34ed6ec9048088",
+        "pythonVersion": "3.13.3",
+        "pythonExecutable": "C:\\hostedtoolcache\\windows\\Python\\3.13.3\\x64\\python.exe",
+        "pythonSha256": "d87063e5597f257004c731b66c59c56c91038861c6877b1a3dca6b8c4e919125",
+        "helperSha256": "4621f001e2a3bc43b9d20b2e8d916024b341c1084bad11e433e4da2ebb9d1bd5",
+        "dotnetManifestSha256": "9387431f821c8af70705752e6d8a9d16ec88e374167bd415c742db3a319c0387"
+      },
+      "receiptId": "48fb7e2a-8ad9-4ceb-99dc-6d6aee75356c",
+      "receiptSha256": "9c208edee8f4431a6493b52c107b39a8ba91528c691476c844fa02c172fe5df3",
+      "totals": {
+        "required": 22,
+        "passed": 21,
+        "failed": 1,
+        "tests": 122,
+        "passedTests": 118,
+        "failedTests": 1,
+        "skippedTests": 3,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "failures": [
+        {
+          "file": "deployment/suite/installation.test.mjs",
+          "pattern": "recovery preflights all edits before writing, and respects a committed update whose pending marker survived",
+          "timeout": false,
+          "effectiveTimeoutMs": 120000,
+          "durationMs": 17391,
+          "counts": {
+            "total": 1,
+            "passed": 0,
+            "failed": 1,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          },
+          "diagnosticSha256": "55975bd0efb3a43eec727e8218c0f283fe8c692c050a1ab2ee7cb1017ad162e3"
+        }
+      ],
+      "originalManifestCommandsBoundsSkipsAndCleanupVerified": true,
+      "serialScheduleVerified": true
+    },
+    {
+      "shard": "7",
+      "artifact": {
+        "id": 13659366414,
+        "sha256": "bbacb384bdcfff9be23e9e8feeb48d3b4aa0e119c2d276b006e076d38beee118",
+        "bytes": 4396
+      },
+      "envelopeSha256": "10f7d3a54162b1f2e2b59f81d1acc3df00d930db30bbd07631a430d736a8ad49",
+      "scope": {
+        "platform": "win32",
+        "sourceCommit": "b5ff8cad5b9cb5a676a622c0a0b3fad8df3923e8",
+        "sourceTree": "69bbded717e4af489c0dabf05679bf4f17512c6c",
+        "nodeVersion": "24.14.0",
+        "nodeExecutable": "C:\\hostedtoolcache\\windows\\node\\24.14.0\\x64\\node.exe",
+        "nodeSha256": "63c259c81e5d472b5f11c8d506070130cb04a1ecf84b80377a34ed6ec9048088",
+        "pythonVersion": "3.13.3",
+        "pythonExecutable": "C:\\hostedtoolcache\\windows\\Python\\3.13.3\\x64\\python.exe",
+        "pythonSha256": "d87063e5597f257004c731b66c59c56c91038861c6877b1a3dca6b8c4e919125",
+        "helperSha256": "4621f001e2a3bc43b9d20b2e8d916024b341c1084bad11e433e4da2ebb9d1bd5",
+        "dotnetManifestSha256": "9387431f821c8af70705752e6d8a9d16ec88e374167bd415c742db3a319c0387"
+      },
+      "receiptId": "9864a84f-0045-4e28-ac72-12dabb307d94",
+      "receiptSha256": "28176a4ecf8521bc8e4a10a32dd11585c87578cf9c6b8744fbdfac4ce87c90c5",
+      "totals": {
+        "required": 21,
+        "passed": 20,
+        "failed": 1,
+        "tests": 306,
+        "passedTests": 297,
+        "failedTests": 0,
+        "skippedTests": 9,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "failures": [
+        {
+          "file": "tools/layout-studio/scanner-ui.test.mjs",
+          "pattern": null,
+          "timeout": true,
+          "effectiveTimeoutMs": 45000,
+          "durationMs": 45129,
+          "counts": null,
+          "diagnosticSha256": "e769ad2fae1fc7aa284b36566f715ee96c146a3856feedd45bfcb7b68c6008d3"
+        }
+      ],
+      "originalManifestCommandsBoundsSkipsAndCleanupVerified": true,
+      "serialScheduleVerified": true
+    },
+    {
+      "shard": "11",
+      "artifact": {
+        "id": 13659002708,
+        "sha256": "971c21c3fcfdf4be316c6bb82a4e90043ad7f4ee37aa251f410a0f283514dbd7",
+        "bytes": 4275
+      },
+      "envelopeSha256": "55dd4e9f5c73ec9a25c523b8a058316eb7e99088822f4401f5622af5cdf945d4",
+      "scope": {
+        "platform": "win32",
+        "sourceCommit": "b5ff8cad5b9cb5a676a622c0a0b3fad8df3923e8",
+        "sourceTree": "69bbded717e4af489c0dabf05679bf4f17512c6c",
+        "nodeVersion": "24.14.0",
+        "nodeExecutable": "C:\\hostedtoolcache\\windows\\node\\24.14.0\\x64\\node.exe",
+        "nodeSha256": "63c259c81e5d472b5f11c8d506070130cb04a1ecf84b80377a34ed6ec9048088",
+        "pythonVersion": "3.13.3",
+        "pythonExecutable": "C:\\hostedtoolcache\\windows\\Python\\3.13.3\\x64\\python.exe",
+        "pythonSha256": "d87063e5597f257004c731b66c59c56c91038861c6877b1a3dca6b8c4e919125",
+        "helperSha256": "4621f001e2a3bc43b9d20b2e8d916024b341c1084bad11e433e4da2ebb9d1bd5",
+        "dotnetManifestSha256": "9387431f821c8af70705752e6d8a9d16ec88e374167bd415c742db3a319c0387"
+      },
+      "receiptId": "6a339846-bb9e-4750-873d-3d15aeff9720",
+      "receiptSha256": "6de476d200da9f8c5d9129fc19015cf4f43561ec7c39199a35947ea599ead555",
+      "totals": {
+        "required": 21,
+        "passed": 20,
+        "failed": 1,
+        "tests": 133,
+        "passedTests": 126,
+        "failedTests": 0,
+        "skippedTests": 7,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "failures": [
+        {
+          "file": "tools/layout-studio/execution-ui.test.mjs",
+          "pattern": null,
+          "timeout": true,
+          "effectiveTimeoutMs": 45000,
+          "durationMs": 45095,
+          "counts": null,
+          "diagnosticSha256": "d730eb48e7d81396177ff76ff3547a621f7838fa412c96e8d09dfbd624d9ca1c"
+        }
+      ],
+      "originalManifestCommandsBoundsSkipsAndCleanupVerified": true,
+      "serialScheduleVerified": true
+    },
+    {
+      "shard": "8",
+      "artifact": {
+        "id": 13658749607,
+        "sha256": "0bb6ebdf85284ae5d5fdf6d8f0a2983bb2bce9770f62df73c5ac29c23b497355",
+        "bytes": 5232
+      },
+      "envelopeSha256": "19365a4cb8306d9d4b03bc363daef045d2ca2fca40c2763288080d4d15633c9e",
+      "scope": {
+        "platform": "win32",
+        "sourceCommit": "b5ff8cad5b9cb5a676a622c0a0b3fad8df3923e8",
+        "sourceTree": "69bbded717e4af489c0dabf05679bf4f17512c6c",
+        "nodeVersion": "24.14.0",
+        "nodeExecutable": "C:\\hostedtoolcache\\windows\\node\\24.14.0\\x64\\node.exe",
+        "nodeSha256": "63c259c81e5d472b5f11c8d506070130cb04a1ecf84b80377a34ed6ec9048088",
+        "pythonVersion": "3.13.3",
+        "pythonExecutable": "C:\\hostedtoolcache\\windows\\Python\\3.13.3\\x64\\python.exe",
+        "pythonSha256": "d87063e5597f257004c731b66c59c56c91038861c6877b1a3dca6b8c4e919125",
+        "helperSha256": "4621f001e2a3bc43b9d20b2e8d916024b341c1084bad11e433e4da2ebb9d1bd5",
+        "dotnetManifestSha256": "9387431f821c8af70705752e6d8a9d16ec88e374167bd415c742db3a319c0387"
+      },
+      "receiptId": "b7a4588b-394c-42f0-b783-1e1d85d27627",
+      "receiptSha256": "560aebf7442cbfd11b75f6f4a99fcc5ea6307e0ce3974768d39c37d8a8d0e185",
+      "totals": {
+        "required": 22,
+        "passed": 21,
+        "failed": 1,
+        "tests": 161,
+        "passedTests": 133,
+        "failedTests": 1,
+        "skippedTests": 27,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "failures": [
+        {
+          "file": "tools/layout-studio/authority-ui.test.mjs",
+          "pattern": null,
+          "timeout": false,
+          "effectiveTimeoutMs": 45000,
+          "durationMs": 37548,
+          "counts": {
+            "total": 8,
+            "passed": 7,
+            "failed": 1,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          },
+          "diagnosticSha256": "93983eb096d8c5f96ba4626cc74fbeaf550f3dbda5c34fbef1e2bf4405ddef98"
+        }
+      ],
+      "originalManifestCommandsBoundsSkipsAndCleanupVerified": true,
+      "serialScheduleVerified": true
+    }
+  ],
+  "observations": [
+    "Role-dispatch, scanner UI and execution UI exceed their original 45-second file bounds. Partial TAP without final counts is not accepted.",
+    "Authority UI preserves native task checks but its original visible-path assertion fails: JSON scope serialization escapes Windows separators, so the literal repository path is absent. This is a presentation defect, not evidence of a missing native check.",
+    "One native installation scenario times out at the existing shortcut writer deadline after utility-loaded. The exact stage and child cleanup are retained; cause remains under investigation."
+  ],
+  "limitations": [
+    "Only the failed client lane and four failed complete-source workers are audited here. This is not a full cohort acceptance.",
+    "The later atomic startup/shutdown fix has separate source and installed evidence; native follow-up remains pending.",
+    "All five small ZIPs were hashed in memory; only JSON receipts are retained. No helper/runtime download, manual CI retry, deadline change, new skip or weakened assertion occurred."
+  ]
+}

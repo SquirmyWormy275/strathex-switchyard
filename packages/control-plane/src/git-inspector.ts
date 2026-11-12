@@ -1,9 +1,11 @@
 import { createHash } from "node:crypto";
-import { lstat, readFile, realpath, stat } from "node:fs/promises";
-import { basename, isAbsolute, relative, resolve, sep } from "node:path";
+import { lstat, open, realpath, stat, type FileHandle } from "node:fs/promises";
+import { constants, type BigIntStats } from "node:fs";
+import { basename, dirname, isAbsolute, relative, resolve, sep } from "node:path";
 import { spawn } from "node:child_process";
 
 import { trackedMissingFileDigest, type GitInspection, type GitInspector, type ManifestFile } from "./snapshot.ts";
+import { gitIndexTreeFromListing } from "./git-index-tree.ts";
 
 export interface GitCommandResult {
   readonly exitCode: number;
@@ -38,7 +40,7 @@ export interface GitCliInspectorOptions {
 /**
  * Uses `spawn` with a fixed Git executable and literal argv vectors. It never
  * invokes a shell, accepts command text from a key press, or performs a Git
- * mutation. The only write-tree query creates no ref or worktree change.
+ * mutation. Index tree identities are reconstructed without Git cache/object writes.
  */
 export class NodeGitCommandRunner implements GitCommandRunner {
   private readonly candidates: readonly string[];
@@ -55,7 +57,7 @@ export class NodeGitCommandRunner implements GitCommandRunner {
   async run(args: readonly string[], workingDirectory?: string): Promise<GitCommandResult> {
     const executable = await this.fixedExecutable();
     return new Promise((resolveResult, reject) => {
-      const child = spawn(executable, [...args], {
+      const child = spawn(executable, ["--no-pager", "-c", "core.fsmonitor=false", "-c", "core.untrackedCache=false", "-c", "protocol.allow=never", ...args], {
         cwd: workingDirectory,
         shell: false,
         windowsHide: true,
@@ -64,6 +66,7 @@ export class NodeGitCommandRunner implements GitCommandRunner {
           GIT_CONFIG_NOSYSTEM: "1",
           GIT_TERMINAL_PROMPT: "0",
           GIT_OPTIONAL_LOCKS: "0",
+          GIT_NO_REPLACE_OBJECTS: "1",
           LC_ALL: "C"
         }
       });
@@ -72,11 +75,11 @@ export class NodeGitCommandRunner implements GitCommandRunner {
       child.stdout.on("data", (chunk: Buffer) => stdout.push(chunk));
       child.stderr.on("data", (chunk: Buffer) => stderr.push(chunk));
       child.once("error", reject);
-      child.once("close", (exitCode) => resolveResult({
-        exitCode: exitCode ?? 1,
-        stdout: Buffer.concat(stdout).toString("utf8"),
-        stderr: Buffer.concat(stderr).toString("utf8")
-      }));
+      child.once("close", (exitCode) => {
+        const bytes = Buffer.concat(stdout), output = bytes.toString("utf8");
+        if (!Buffer.from(output).equals(bytes)) { reject(new Error("Git query stdout is not valid UTF-8 text.")); return; }
+        resolveResult({ exitCode: exitCode ?? 1, stdout: output, stderr: Buffer.concat(stderr).toString("utf8") });
+      });
     });
   }
 
@@ -90,37 +93,92 @@ export class NodeGitCommandRunner implements GitCommandRunner {
   }
 }
 
-/** Hashes files only beneath the resolved repository root and rejects symlink traversal. */
+interface DirectoryStamp { readonly path: string; readonly dev: bigint; readonly ino: bigint; }
+interface OpenRepositoryFile { readonly handle: FileHandle; readonly root: string; readonly path: string; readonly parents: readonly DirectoryStamp[]; readonly metadata: BigIntStats; }
+
+/** Descriptor-bound, bounded hashing. Parent links cannot escape a task's root. */
 export class NodeFileDigestReader implements FileDigestReader {
+  private readonly maxFileBytes: number;
+  private readonly openFile: typeof open;
+  constructor(options: { readonly maxFileBytes?: number; readonly openFile?: typeof open } = {}) {
+    this.maxFileBytes = options.maxFileBytes ?? 32 * 1024 * 1024;
+    if (!Number.isSafeInteger(this.maxFileBytes) || this.maxFileBytes < 1 || this.maxFileBytes > 128 * 1024 * 1024) throw new Error("Choose a bounded repository digest size.");
+    this.openFile = options.openFile ?? open;
+  }
+
   async digest(repositoryRoot: string, relativePath: string): Promise<string> {
-    const candidate = this.candidate(repositoryRoot, relativePath);
-    const metadata = await lstat(candidate);
-    if (!metadata.isFile() || metadata.isSymbolicLink()) throw new Error("Path is not a regular repository file.");
-    const contents = await readFile(candidate);
-    return `sha256:${createHash("sha256").update(contents).digest("hex")}`;
+    return (await this.consume(repositoryRoot, relativePath, false)).digest;
+  }
+
+  /** A bounded immutable-at-read payload for private broker pipes, never a path for Git to reopen. */
+  async read(repositoryRoot: string, relativePath: string): Promise<{ readonly bytes: Buffer; readonly digest: string }> {
+    const result = await this.consume(repositoryRoot, relativePath, true);
+    return { bytes: result.bytes!, digest: result.digest };
+  }
+
+  private async consume(repositoryRoot: string, relativePath: string, capture: boolean): Promise<{ readonly digest: string; readonly bytes?: Buffer }> {
+    const file = await this.openVerified(repositoryRoot, relativePath); let contents: Buffer | undefined;
+    try {
+      if (file.metadata.size > BigInt(this.maxFileBytes)) throw new Error("Repository file exceeds the bounded digest size.");
+      if (capture) contents = Buffer.alloc(Number(file.metadata.size));
+      const hash = createHash("sha256"), buffer = Buffer.alloc(65536); let position = 0;
+      while (true) {
+        const { bytesRead } = await file.handle.read(buffer, 0, buffer.length, position);
+        if (!bytesRead) break;
+        if (position + bytesRead > this.maxFileBytes) throw new Error("Repository file exceeds the bounded digest size.");
+        if (contents) {
+          if (position + bytesRead > contents.length) throw new Error("Repository file changed during hashing.");
+          contents.set(buffer.subarray(0, bytesRead), position);
+        }
+        position += bytesRead; hash.update(buffer.subarray(0, bytesRead));
+      }
+      const after = await file.handle.stat({ bigint: true });
+      if (!sameFile(file.metadata, after) || after.size !== BigInt(position)) throw new Error("Repository file changed during hashing.");
+      await this.assertCurrent(file, after);
+      return { digest: `sha256:${hash.digest("hex")}`, ...(contents ? { bytes: contents } : {}) };
+    } catch (error) { contents?.fill(0); throw error; }
+    finally { await file.handle.close(); }
   }
 
   async state(repositoryRoot: string, relativePath: string): Promise<"regular_file" | "missing"> {
-    const candidate = this.candidate(repositoryRoot, relativePath);
-    try {
-      const metadata = await lstat(candidate);
-      if (!metadata.isFile() || metadata.isSymbolicLink()) throw new Error("Path is not a regular repository file.");
-      return "regular_file";
-    } catch (error) {
-      if (typeof error === "object" && error !== null && "code" in error && error.code === "ENOENT") return "missing";
-      throw error;
-    }
+    try { const file = await this.openVerified(repositoryRoot, relativePath); await file.handle.close(); return "regular_file"; }
+    catch (error) { if (typeof error === "object" && error !== null && "code" in error && error.code === "ENOENT") return "missing"; throw error; }
   }
 
-  private candidate(repositoryRoot: string, relativePath: string): string {
-    const root = resolve(repositoryRoot);
-    const candidate = resolve(root, relativePath);
-    const relation = relative(root, candidate);
-    if (relation === "" || relation === ".." || relation.startsWith(`..${sep}`) || resolve(root, relation) !== candidate) {
-      throw new Error("Path escapes the verified repository root.");
+  private async openVerified(repositoryRoot: string, relativePath: string): Promise<OpenRepositoryFile> {
+    const root = await realpath(resolve(repositoryRoot)), path = resolve(root, relativePath), relation = relative(root, path);
+    if (!relation || relation === ".." || relation.startsWith(`..${sep}`) || isAbsolute(relation)) throw new Error("Path escapes the verified repository root.");
+    const parents: DirectoryStamp[] = [];
+    const parentParts = relative(root, dirname(path)).split(sep).filter(Boolean); let current = root;
+    for (const part of ["", ...parentParts]) {
+      if (part) current = resolve(current, part);
+      const metadata = await lstat(current, { bigint: true });
+      if (!metadata.isDirectory() || metadata.isSymbolicLink()) throw new Error("Repository parent must be a real directory without symbolic links.");
+      parents.push({ path: current, dev: metadata.dev, ino: metadata.ino });
     }
-    return candidate;
+    const named = await lstat(path, { bigint: true });
+    if (!named.isFile() || named.isSymbolicLink()) throw new Error("Path is not a regular repository file.");
+    const handle = await this.openFile(path, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0) | (constants.O_NONBLOCK ?? 0));
+    try {
+      const metadata = await handle.stat({ bigint: true }), file = { handle, root, path, parents, metadata };
+      await this.assertCurrent(file, metadata); return file;
+    } catch (error) { await handle.close(); throw error; }
   }
+
+  private async assertCurrent(file: OpenRepositoryFile, metadata: BigIntStats): Promise<void> {
+    if (!metadata.isFile()) throw new Error("Path is not a regular repository file.");
+    for (const parent of file.parents) {
+      const observed = await lstat(parent.path, { bigint: true });
+      if (!observed.isDirectory() || observed.isSymbolicLink() || observed.dev !== parent.dev || observed.ino !== parent.ino) throw new Error("Repository parent changed during file inspection.");
+    }
+    const named = await lstat(file.path, { bigint: true });
+    if (!named.isFile() || named.isSymbolicLink() || !sameFile(metadata, named)) throw new Error("Repository file changed during inspection.");
+    const relation = relative(file.root, await realpath(file.path));
+    if (!relation || relation === ".." || relation.startsWith(`..${sep}`) || isAbsolute(relation)) throw new Error("Path escapes the verified repository root.");
+  }
+}
+function sameFile(a: BigIntStats, b: BigIntStats): boolean {
+  return a.dev === b.dev && a.ino === b.ino && a.size === b.size && a.mtimeNs === b.mtimeNs && a.ctimeNs === b.ctimeNs;
 }
 
 function cleanOutput(value: string): string | undefined {
@@ -129,7 +187,7 @@ function cleanOutput(value: string): string | undefined {
 }
 
 function nulPaths(value: string): readonly string[] {
-  return value.split("\0").filter(Boolean).map((path) => path.replaceAll("\\", "/").replace(/^\.\//, ""));
+  return value.split("\0").filter(Boolean);
 }
 
 function parseSubmodules(value: string): Readonly<Record<string, string>> {
@@ -170,26 +228,40 @@ export class GitCliInspector implements GitInspector {
     const repositoryRoot = rootResult.exitCode === 0 ? cleanOutput(rootResult.stdout) : undefined;
     if (!repositoryRoot) return { ...(targetHint ? { repositoryRoot: targetHint } : {}), issues: [shortFailure("root discovery", rootResult)] };
 
-    const remote = await this.optional(["remote", "get-url", "origin"], repositoryRoot, "canonical remote", issues);
-    const branchResult = await this.runner.run(["branch", "--show-current"], repositoryRoot);
-    const branch = branchResult.exitCode === 0 ? cleanOutput(branchResult.stdout) : undefined;
-    if (branchResult.exitCode !== 0) issues.push(shortFailure("branch", branchResult));
-    const detached = branchResult.exitCode === 0 && !branch;
-    const remoteDefault = await this.optional(["symbolic-ref", "--quiet", "--short", "refs/remotes/origin/HEAD"], repositoryRoot, "default branch", issues, false);
+    // These fixed metadata reads are independent once the root is verified.
+    // Join each bounded group, including failed siblings, before another group
+    // starts or the caller can retire its owned guardians and scratch directory.
+    const [remoteResult, branchResult, remoteDefaultResult, upstreamResult, headResult, indexListing, trackedResult, deletedResult, untrackedResult, ignoredResult] = await this.metadata(repositoryRoot);
+    const remote = this.optional(remoteResult!, "canonical remote", issues);
+    const branch = branchResult!.exitCode === 0 ? cleanOutput(branchResult!.stdout) : undefined;
+    if (branchResult!.exitCode !== 0) issues.push(shortFailure("branch", branchResult!));
+    const detached = branchResult!.exitCode === 0 && !branch;
+    const remoteDefault = this.optional(remoteDefaultResult!, "default branch", issues, false);
     const defaultBranch = remoteDefault?.startsWith("origin/") ? remoteDefault.slice("origin/".length) : undefined;
     if (remoteDefault && !defaultBranch) issues.push("Git default branch reference is not bound to origin.");
-    const upstream = await this.optional(["rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{upstream}"], repositoryRoot, "upstream", issues, false);
-    const head = await this.optional(["rev-parse", "HEAD"], repositoryRoot, "HEAD", issues);
-    const indexTree = await this.optional(["write-tree"], repositoryRoot, "index tree", issues);
-    const tracked = await this.paths(["ls-files", "-z"], repositoryRoot, "tracked file list", issues);
-    const deleted = await this.paths(["ls-files", "--deleted", "-z"], repositoryRoot, "tracked deletion list", issues);
+    const upstream = this.optional(upstreamResult!, "upstream", issues, false);
+    const head = this.optional(headResult!, "HEAD", issues);
+    let indexTree: string | undefined;
+    if (indexListing!.exitCode !== 0) issues.push(shortFailure("index tree", indexListing!));
+    else { try { indexTree = gitIndexTreeFromListing(indexListing!.stdout, head ?? ""); } catch { issues.push("Git index tree metadata is unavailable, unmerged or outside supported bounds."); } }
+    const tracked = this.paths(trackedResult!, "tracked file list", issues);
+    const deleted = this.paths(deletedResult!, "tracked deletion list", issues);
     const trackedSet = new Set(tracked);
     for (const path of deleted) if (!trackedSet.has(path)) issues.push(`Git reported tracked deletion ${path} outside the tracked file list.`);
     const deletedSet = new Set(deleted.filter((path) => trackedSet.has(path)));
-    const untracked = await this.paths(["ls-files", "--others", "--exclude-standard", "-z"], repositoryRoot, "untracked file list", issues);
-    const ignored = await this.paths(["ls-files", "--others", "--ignored", "--exclude-standard", "-z"], repositoryRoot, "ignored file list", issues);
-    const submoduleResult = await this.runner.run(["submodule", "status", "--recursive"], repositoryRoot);
-    const submodules = submoduleResult.exitCode === 0 ? parseSubmodules(submoduleResult.stdout) : (issues.push(shortFailure("submodule status", submoduleResult)), {});
+    const untracked = this.paths(untrackedResult!, "untracked file list", issues);
+    const ignored = this.paths(ignoredResult!, "ignored file list", issues);
+    let submodules: Record<string, string> = {};
+    if (indexTree && !indexListing!.stdout.split("\0").some(row => row.startsWith("160000 "))) {
+      // A validated index with no gitlinks has no submodules to recurse into.
+      // Re-read the exact listing so a concurrent index edit cannot turn this
+      // optimization into an unverified assertion that submodules are absent.
+      const finalIndex = await this.runner.run(["ls-files", "--stage", "-z"], repositoryRoot);
+      if (finalIndex.exitCode !== 0 || finalIndex.stdout !== indexListing!.stdout) issues.push("Git index tree changed or became unavailable while checking submodule absence.");
+    } else {
+      const submoduleResult = await this.runner.run(["submodule", "status", "--recursive"], repositoryRoot);
+      submodules = submoduleResult.exitCode === 0 ? parseSubmodules(submoduleResult.stdout) : (issues.push(shortFailure("submodule status", submoduleResult)), {});
+    }
 
     return {
       repositoryRoot,
@@ -208,8 +280,28 @@ export class GitCliInspector implements GitInspector {
     };
   }
 
-  private async optional(args: readonly string[], cwd: string, label: string, issues: string[], required = true): Promise<string | undefined> {
-    const result = await this.runner.run(args, cwd);
+  private async metadata(cwd: string): Promise<readonly GitCommandResult[]> {
+    const queries = [
+      ["remote", "get-url", "origin"], ["branch", "--show-current"],
+      ["symbolic-ref", "--quiet", "--short", "refs/remotes/origin/HEAD"],
+      ["rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{upstream}"],
+      ["rev-parse", "HEAD"], ["ls-files", "--stage", "-z"],
+      ["ls-files", "-z"], ["ls-files", "--deleted", "-z"],
+      ["ls-files", "--others", "--exclude-standard", "-z"],
+      ["ls-files", "--others", "--ignored", "--exclude-standard", "-z"]
+    ] as const;
+    const results: GitCommandResult[] = [];
+    for (let offset = 0; offset < queries.length; offset += 4) {
+      const settled = await Promise.allSettled(queries.slice(offset, offset + 4).map(args => Promise.resolve().then(() => this.runner.run(args, cwd))));
+      for (const item of settled) {
+        if (item.status === "rejected") throw item.reason;
+        results.push(item.value);
+      }
+    }
+    return results;
+  }
+
+  private optional(result: GitCommandResult, label: string, issues: string[], required = true): string | undefined {
     if (result.exitCode !== 0) {
       if (required) issues.push(shortFailure(label, result));
       return undefined;
@@ -219,13 +311,16 @@ export class GitCliInspector implements GitInspector {
     return value;
   }
 
-  private async paths(args: readonly string[], cwd: string, label: string, issues: string[]): Promise<readonly string[]> {
-    const result = await this.runner.run(args, cwd);
+  private paths(result: GitCommandResult, label: string, issues: string[]): readonly string[] {
     if (result.exitCode !== 0) {
       issues.push(shortFailure(label, result));
       return [];
     }
-    return nulPaths(result.stdout);
+    const paths = nulPaths(result.stdout);
+    // Git's NUL format already uses '/' on Windows. A literal Linux backslash
+    // must never be reinterpreted as a different directory during hashing.
+    if (paths.some((path) => path.includes("\\"))) issues.push(`Git ${label} contains an ambiguous backslash filename; snapshot is incomplete.`);
+    return paths.filter((path) => !path.includes("\\"));
   }
 
   private async hashFiles(

@@ -1,0 +1,18 @@
+{
+  "keyboard_name": "Illustrative eight-key function row",
+  "keyboard": "illustrative/function-row",
+  "layouts": {
+    "LAYOUT_sample": {
+      "layout": [
+        { "label": "F1", "matrix": [0, 0], "x": 0, "y": 0 },
+        { "label": "F2", "matrix": [0, 1], "x": 1, "y": 0 },
+        { "label": "F3", "matrix": [0, 2], "x": 2, "y": 0 },
+        { "label": "F4", "matrix": [0, 3], "x": 3, "y": 0 },
+        { "label": "F5", "matrix": [0, 4], "x": 4, "y": 0 },
+        { "label": "F6", "matrix": [0, 5], "x": 5, "y": 0 },
+        { "label": "F7", "matrix": [0, 6], "x": 6, "y": 0 },
+        { "label": "F8", "matrix": [0, 7], "x": 7, "y": 0 }
+      ]
+    }
+  }
+}

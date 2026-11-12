@@ -1,0 +1,151 @@
+{
+  "schema": "switchyard-windows-cold-job-native/v1",
+  "sourceCommit": "ad4d5e607c56329863fc10785d3827e514c2c381",
+  "executionCommit": "1ccc227fa6fb0b1f4a1fc4a810ffd0aeaf92852e",
+  "sourceAndExecutionTree": "d7dc61d2c538966600a6ddb8a64e52b67a75f092",
+  "runId": 42236720028,
+  "jobId": 127956576941,
+  "artifactId": 13512027111,
+  "archiveBytes": 4342,
+  "archiveSha256": "2ef600dc485a94432860d564409d2897fa9252fdad7410c39385e7c65b48cc68",
+  "zipSavedLocally": false,
+  "privateReceipt": "windows-cold-job-ad-native.json",
+  "coldProbe": {
+    "schema": "switchyard-cold-restricted-random/v5",
+    "executableSha256": "71421241e5b7b24e6a423941c782537fe172ec18cd33243d078cb1f951c2fece",
+    "waitResult": 0,
+    "exitCode": 0,
+    "reportValid": true,
+    "report": {
+      "systemStatus": 0,
+      "providerOpenStatus": 0,
+      "providerStatus": 0,
+      "providerCloseStatus": 0,
+      "handlesClosedVerified": true,
+      "buffersClearedVerified": true,
+      "firstApi": "legacy-cryptoapi",
+      "legacy": {
+        "providerOpened": true,
+        "providerOpenError": 0,
+        "generated": true,
+        "generateError": 0,
+        "providerCloseError": 0,
+        "handlesClosedVerified": true,
+        "buffersClearedVerified": true
+      },
+      "enhancedProvider": {
+        "providerOpened": true,
+        "providerOpenError": 0,
+        "generated": true,
+        "generateError": 0,
+        "providerCloseError": 0,
+        "handlesClosedVerified": true,
+        "buffersClearedVerified": true
+      },
+      "providerLookups": {
+        "user": {
+          "succeeded": true,
+          "error": 0,
+          "providerClass": "strong",
+          "bufferClearedVerified": true
+        },
+        "machine": {
+          "succeeded": true,
+          "error": 0,
+          "providerClass": "strong",
+          "bufferClearedVerified": true
+        }
+      },
+      "selfTokenAccess": {
+        "query": {
+          "opened": true,
+          "error": 0,
+          "closeError": 0,
+          "handlesClosedVerified": true
+        },
+        "queryDuplicate": {
+          "opened": false,
+          "error": 5,
+          "closeError": null,
+          "handlesClosedVerified": true
+        },
+        "queryDuplicateImpersonate": {
+          "opened": false,
+          "error": 5,
+          "closeError": null,
+          "handlesClosedVerified": true
+        }
+      },
+      "emptyJobs": {
+        "anonymous": {
+          "opened": true,
+          "createError": 0,
+          "createdNew": true,
+          "querySucceeded": true,
+          "queryError": 0,
+          "activeProcesses": 0,
+          "closeError": 0,
+          "handlesClosedVerified": true
+        },
+        "local": {
+          "opened": true,
+          "createError": 0,
+          "createdNew": true,
+          "querySucceeded": true,
+          "queryError": 0,
+          "activeProcesses": 0,
+          "closeError": 0,
+          "handlesClosedVerified": true
+        },
+        "global": {
+          "opened": true,
+          "createError": 0,
+          "createdNew": true,
+          "querySucceeded": true,
+          "queryError": 0,
+          "activeProcesses": 0,
+          "closeError": 0,
+          "handlesClosedVerified": true
+        }
+      }
+    },
+    "primaryTokenVerified": true,
+    "tokenRecheckedAfterExit": true,
+    "treeExitVerified": true,
+    "processHandlesClosedVerified": true,
+    "creatorQuotaRestoredVerified": true,
+    "standardIo": {
+      "schema": "switchyard-restricted-child-stdio/v1",
+      "standardHandles": 3,
+      "inheritanceRestricted": true,
+      "stdinEof": true,
+      "stdoutBytes": 0,
+      "stderrBytes": 0,
+      "outputBounded": true,
+      "handlesClosedVerified": true,
+      "drainsCompleted": true,
+      "stderr": {
+        "category": "empty",
+        "function": null,
+        "code": null,
+        "sourceFile": null,
+        "sourceLine": null
+      }
+    },
+    "nodeStartupAccepted": false
+  },
+  "originalOwnerFailure": {
+    "waitResult": 0,
+    "exitCode": 2,
+    "resultAvailable": true,
+    "childReportedSuccess": false,
+    "ownerReportedSuccess": false,
+    "completedChecks": 0,
+    "failedPhase": "probe-identity-created-native-job-create-code5",
+    "failureCategory": "Error",
+    "stateLockFailure": null
+  },
+  "finding": "The exact restricted primary child with its existing self-token QUERY allowance creates and closes new anonymous, Local and Global empty Jobs successfully. Its original token/RNG observations and independent cleanup pass. The original setup-identity guardian still fails Job creation with error 5; this does not explain the difference in that descendant context.",
+  "restrictedOwnerAccepted": false,
+  "permissionsChanged": false
+}

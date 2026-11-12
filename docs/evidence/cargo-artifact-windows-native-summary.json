@@ -1,0 +1,31 @@
+{
+  "schema": "switchyard-cargo-artifact-windows-native/v1",
+  "sourceCommit": "c367dff7c1d4cbd4ea339d21e6b4368d466b8d86",
+  "executionCommit": "76ac35c6ba52002551db880d193269c8778383f7",
+  "sourceAndExecutionTree": "5a51ba2e7529162dda4526dab084b56512c1a5f6",
+  "runId": 42245508391,
+  "jobId": 127986970436,
+  "artifactId": 13517926422,
+  "archiveBytes": 1003,
+  "archiveSha256": "47537152b44fc531c8c8495ab5b97fba66e7afba565a909062e1456e11d6ae07",
+  "zipSavedLocally": false,
+  "privateReceipt": "windows-cargo-artifact-c367-native.json",
+  "totals": {
+    "required": 1,
+    "passed": 1,
+    "failed": 0,
+    "tests": 11,
+    "passedTests": 9,
+    "failedTests": 0,
+    "skippedTests": 2,
+    "cancelledTests": 0,
+    "todoTests": 0
+  },
+  "durationMs": 124455,
+  "timeoutMs": 300000,
+  "allChildAndTreeCleanupVerified": true,
+  "windowsHostAccepted": true,
+  "guestDoubled": true,
+  "nativeGuestAccepted": false,
+  "installedChanged": false
+}

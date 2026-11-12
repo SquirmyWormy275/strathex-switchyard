@@ -1,0 +1,106 @@
+{
+  "schema": "switchyard-linux-startup-and-windows-user-object-followup/v1",
+  "basis": "ec3afe7a7f9adce507f3026d099036f50845bacf",
+  "sourceSha256": {
+    "tools/layout-studio/codex-owned-listener.mjs": "331c6b48450ce2b203ee538a2d7d5afec644d74b7928d174ff9c2ecf3e397c5c",
+    "tools/layout-studio/codex-owned-listener.test.mjs": "c11094ea28c2e293eae00670ee313cd3fc92a30f6e2cd9755a523855f47e982d",
+    "apps/linux-companion/test/linux-process-supervisor.test.ts": "d581174568f44cb8aa2f2de43f49708e78c0b60881b8a31db148d001a76d0e0b",
+    "deployment/windows/test-support/storage-broker-protocol/PrivateDesktopSpace.cs": "354a4cd7291d1043320fac7b55997bb38f564c0554245ed0ed63ec778effbb89",
+    "scripts/windows-restricted-owner-report.mjs": "24c8e212f4bf7c7ff45996562a3246bd5e28025464da0a426e1392f97160ecc6"
+  },
+  "failedCompleteLinux": {
+    "source": "5fe6e95b7c83842898762afd2f0951df7bb2cdfb",
+    "receipt": "isolated-test-6a9c6433-1e10-428f-8a76-36c7c998f285.json",
+    "totals": {
+      "required": 241,
+      "passed": 239,
+      "failed": 2,
+      "tests": 1509,
+      "passedTests": 1495,
+      "failedTests": 4,
+      "skippedTests": 10,
+      "cancelledTests": 0,
+      "todoTests": 0
+    },
+    "success": false,
+    "failures": [
+      "Owned listener observed its socket before its requested alias existed (ENOENT).",
+      "Three supervisor cases hit EDQUOT copying the 122 MB Node executable into their owned fixture/cache."
+    ],
+    "cleanupReceipt": "linux-5fe-failed-cleanup-1793935005207.json",
+    "allChildAndOwnedCheckoutCleanupVerified": true
+  },
+  "corrections": [
+    "Wait for both exact socket and exact alias within the unchanged startup deadline; reject mismatched identity/type and preserve subsequent pinning. Deterministic delayed-alias regression.",
+    "Use an owned 47 KB sleep executable for the same supervisor reservation, cache-hash, process-group and deadline assertions, avoiding repeated Node copies."
+  ],
+  "focused": {
+    "receipt": "isolated-test-f56b0270-2888-4c3a-b028-48d5061339f1.json",
+    "totals": {
+      "required": 4,
+      "passed": 4,
+      "failed": 0,
+      "tests": 25,
+      "passedTests": 25,
+      "failedTests": 0,
+      "skippedTests": 0,
+      "cancelledTests": 0,
+      "todoTests": 0
+    },
+    "success": true,
+    "allCleanupVerified": true,
+    "typecheck": true
+  },
+  "nativeCodex": {
+    "receipt": "codex-unix-tasks-1793935046721.json",
+    "checksPassed": 3,
+    "accountOperations": 2,
+    "threadsCreated": 0,
+    "modelTurns": 0,
+    "loginChanges": 0,
+    "exactShutdownAndOwnedCleanupVerified": true
+  },
+  "windowsDiagnostic": {
+    "purpose": "Observe whether the same restricted token can open the newly owned private window station and desktop before the original child creation. No ACL/token/privilege changes.",
+    "closedPrivacyProjection": true,
+    "handlesAndOriginalNamespaceRestorationRequired": true,
+    "buildReceipt": "windows-user-object-build-1793935099232.json",
+    "managedTargets": 2,
+    "warnings": 0,
+    "errors": 0,
+    "portableChecksPassed": 1776,
+    "reusedExistingSdk": true,
+    "ownedScratchRemoved": true,
+    "nativeAcceptance": "pending",
+    "earlierBuildFailureRetained": "windows-user-object-build-1793935045684.json"
+  },
+  "nativeScannerFollowup": {
+    "source": "ec3afe7a7f9adce507f3026d099036f50845bacf",
+    "executionMerge": "21b9a64cc275e2362c2213b1c70d91849884b8e6",
+    "runId": 42154972541,
+    "artifactId": 13474471503,
+    "sha256": "b3845683be2d4dc42f67c58c25d0996d4536102cbefedafca7c8e7d656555564",
+    "receipt": "windows-fixture-registry-ec3-native.json",
+    "testsPassed": 20,
+    "allCleanupVerified": true,
+    "limit": "GetShortPathNameW may return the original long spelling when 8.3 aliases are unavailable."
+  },
+  "separateNativeShieldFailure": {
+    "runId": 42154972541,
+    "jobId": 127686834878,
+    "artifactId": 13474411649,
+    "sha256": "ff6871e3485d7b85b84744aa2fd6e9b8751c2fef3c1a3a0d637f76f3775cc239",
+    "receipt": "windows-shield-supply-chain-ec3-native.json",
+    "phase": "worker-startup",
+    "workerProgress": "not-observed",
+    "success": false,
+    "timeoutExtended": false,
+    "allCleanupVerified": true
+  },
+  "limits": [
+    "Fresh complete Linux verification remains required; focused passes do not replace the failed complete run.",
+    "Native restricted child still fails with STATUS_DLL_INIT_FAILED; this diagnostic is not its repair.",
+    "Windows worker startup timeout recurred independently; account/hardware absence is not the cause established by these failures.",
+    "Main Studio owned-transport composition and complete task/IDE attachment remain unfinished."
+  ]
+}

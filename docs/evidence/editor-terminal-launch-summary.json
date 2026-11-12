@@ -1,0 +1,52 @@
+{
+  "schema": "switchyard-editor-terminal-launch-summary/v1",
+  "basis": "eddd3f1b9a2b1b1293754df5069b1c1cc8a89ac9",
+  "sourceSha256": {
+    "apps/vscode-extension/src/studio-editor-launch.ts": "6ea83e319b4e61b4aa456d45b5082b371b7ef79aa8393343e3c899dd0d81b516",
+    "apps/vscode-extension/test/studio-editor-launch.test.ts": "cba0be31dfd1470daacba4cac2c6bb3c93465481abf201c9b60730e208b6cc08",
+    "scripts/run-isolated-tests.mjs": "3d7c02c5a25e4bda5db8a5a734a16ac1fc67e4c15d29cce1172da59f901c74df"
+  },
+  "focused": {
+    "receipt": "isolated-test-347fa5eb-7cd2-4238-aece-79764ace8534.json",
+    "groups": 5,
+    "passedTests": 54,
+    "childAndTreeCleanupVerified": true
+  },
+  "typecheck": true,
+  "extensionBuild": true,
+  "compiledCommonJs": {
+    "receipt": "editor-launch-compiled-1793948826895.json",
+    "loaded": true,
+    "closedBeforeIoVerified": true,
+    "generatedOutputRemoved": true
+  },
+  "implemented": [
+    "The signed target, review, issue and durable consume flow reaches exactly one VS Code createTerminal call per original review.",
+    "Current focused workspace, admission callback, repository and socket identities and executable identity are rechecked across asynchronous boundaries.",
+    "The reviewed executable must match the original native owner executable SHA-256; changed bytes, paths or permissions refuse.",
+    "Exact original task UUID, Unix socket, repository and read-only/on-request arguments are fixed; no terminal text or model prompt is submitted.",
+    "Concurrent requests, lost authorization replies, shutdown and partial creation cannot reuse the original review.",
+    "The original returned Terminal object survives failed focus/context checks. It is never inferred from a name, disposed, replaced or promoted to native acknowledgement."
+  ],
+  "limits": [
+    "Actual signed HTTP, encrypted state, Linux leases and filesystem fixtures compose; provider metadata and VS Code terminal creation are controlled doubles.",
+    "The compiled class loads, but it is not yet wired to a user-facing extension command or installed as an active extension.",
+    "Native terminal process/task/account acknowledgement remains unfinished; nativeTaskLoaded and ideAttached remain false even after exact object focus.",
+    "No live provider, terminal, model, account, microphone or keyboard operation occurred.",
+    "This focused acceptance is separate from the earlier complete 244-group Linux run."
+  ],
+  "earlierChecks": [
+    {
+      "receipt": "isolated-test-c6ad425a-7ea3-4c12-b0c4-04b05b28f525.json",
+      "groups": 3,
+      "passedTests": 21,
+      "harnessSuccess": true,
+      "wrapperExit": 1,
+      "cause": "The ad-hoc wrapper read success from the outer return object instead of receipt.success. The final wrapper and receipt both succeed."
+    },
+    {
+      "typecheckPassed": false,
+      "cause": "A test supplied undefined to the three-argument assert.rejects overload. The corrected test uses a predicate; final typecheck passes."
+    }
+  ]
+}

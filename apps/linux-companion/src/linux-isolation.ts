@@ -37,7 +37,7 @@ export class LinuxBubblewrapIsolationRuntime implements IsolationRuntime {
     const args = [
       "--unshare-user", "--unshare-pid", "--unshare-ipc", "--unshare-uts", "--unshare-cgroup-try", "--unshare-net",
       "--die-with-parent", "--new-session", "--clearenv", "--proc", "/proc", "--dev", "/dev", "--tmpfs", "/tmp",
-      "--ro-bind", "/usr", "/usr", "--ro-bind", "/bin", "/bin", "--ro-bind", "/lib", "/lib",
+      "--ro-bind", "/usr", "/usr", "--ro-bind", "/bin", "/bin", "--ro-bind", "/lib", "/lib", "--ro-bind", "/lib64", "/lib64",
       "--ro-bind", "/etc", "/etc", "--ro-bind", first, "/workspace", "--chdir", "/workspace",
       "/usr/bin/printf", successMarker
     ] as const;

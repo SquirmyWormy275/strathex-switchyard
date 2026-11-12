@@ -1,0 +1,134 @@
+{
+  "schema": "switchyard-editor-command-source-evidence/v1",
+  "scope": "Saved project/task command activation, explicit terminal review and owned terminal return",
+  "runs": [
+    {
+      "receiptId": "33a3d857-4ddf-4315-9980-571d8a3d3687",
+      "sha256": "2c1139bffce58fde0de29db44b368b388ca4d1f970516dfb323ca9894bd40162",
+      "totals": {
+        "required": 10,
+        "passed": 10,
+        "failed": 0,
+        "tests": 108,
+        "passedTests": 107,
+        "failedTests": 0,
+        "skippedTests": 1,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "files": [
+        "scripts/windows-complete-shards.test.mjs",
+        "scripts/run-isolated-tests.test.mjs",
+        "apps/vscode-extension/test/commands.test.ts",
+        "apps/vscode-extension/test/studio-editor-commands.test.ts",
+        "apps/vscode-extension/test/studio-windows-task-client.test.ts",
+        "apps/vscode-extension/test/studio-windows-native.test.ts",
+        "apps/vscode-extension/test/studio-windows-editor-launch.test.ts",
+        "apps/vscode-extension/test/studio-windows-editor-files.test.ts",
+        "apps/vscode-extension/test/studio-task-client.test.ts",
+        "apps/vscode-extension/test/studio-editor-launch.test.ts"
+      ],
+      "originalBoundsPreserved": true,
+      "ownedCleanupComplete": true
+    },
+    {
+      "receiptId": "b5e38316-7d56-4b7b-aa6e-3b0046dcd474",
+      "sha256": "3ddd578dc9800860b2da98858bbfd4fa513670eb9c765dd3c4e0e7771107bea6",
+      "totals": {
+        "required": 3,
+        "passed": 3,
+        "failed": 0,
+        "tests": 36,
+        "passedTests": 36,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "files": [
+        "scripts/run-isolated-tests.test.mjs",
+        "apps/vscode-extension/test/commands.test.ts",
+        "apps/vscode-extension/test/studio-editor-commands.test.ts"
+      ],
+      "originalBoundsPreserved": true,
+      "ownedCleanupComplete": true
+    }
+  ],
+  "overlap": "The final three groups overlap the first run and add executable-picker cancellation. Do not sum totals as distinct cases.",
+  "sourceFiles": [
+    {
+      "file": "apps/vscode-extension/package.json",
+      "sha256": "ac9db1dae941c0b828c57d1f25de2faef83d43bd2245ba44a0d3c84f2529fc3d"
+    },
+    {
+      "file": "apps/vscode-extension/src/extension.ts",
+      "sha256": "df7f90ae3533bb33bc572fccd4675593bc4b451855d5e601c165c756f5a52329"
+    },
+    {
+      "file": "apps/vscode-extension/src/studio-editor-commands.ts",
+      "sha256": "28bdf5a57d33ebf6218b97cdb6991758941a30ef28e6da07ef21bd08d11ad7e8"
+    },
+    {
+      "file": "apps/vscode-extension/src/studio-editor-command-session.ts",
+      "sha256": "c6859f7faa27f7dea5990a811db5982f2148d7ee7b6ce4276c9c4d11196f6d22"
+    },
+    {
+      "file": "apps/vscode-extension/test/studio-editor-commands.test.ts",
+      "sha256": "2ab5859fc581bd36082b9b101cdb79b8eec257da6c212af933dad086c0cda379"
+    },
+    {
+      "file": "scripts/run-isolated-tests.mjs",
+      "sha256": "03c4e1a8c8e02a61a009b62c61500503bdbbddf5dd046534a56600cb042c64db"
+    }
+  ],
+  "typecheck": {
+    "command": "node node_modules/typescript/bin/tsc --noEmit",
+    "exitCode": 0
+  },
+  "compiled": {
+    "schema": "switchyard-editor-compiled-source/v1",
+    "compiled": true,
+    "commonJsLoad": true,
+    "activationCommands": [
+      "switchyard.showSavedTasks",
+      "switchyard.connectSavedTask",
+      "switchyard.returnToConnectedTask"
+    ],
+    "activationIO": 0,
+    "runtimeFiles": 6,
+    "generatedFiles": 51,
+    "generatedBytes": 1110340,
+    "hardwareOperations": 0,
+    "realAccountOperations": 0,
+    "ownedStagingRemoved": true
+  },
+  "earlierCompiled": {
+    "schema": "switchyard-editor-compiled-source/v1",
+    "compiled": true,
+    "commonJsLoad": true,
+    "activationCommands": [
+      "switchyard.showSavedTasks",
+      "switchyard.connectSavedTask",
+      "switchyard.returnToConnectedTask"
+    ],
+    "activationIO": 0,
+    "runtimeFiles": 6,
+    "generatedFiles": 51,
+    "generatedBytes": 1110563,
+    "hardwareOperations": 0,
+    "realAccountOperations": 0,
+    "ownedStagingRemoved": true
+  },
+  "interactionCases": 7,
+  "activationPerformsIO": false,
+  "windowsPermissionsUnchanged": {
+    "process": 1052672,
+    "token": 8
+  },
+  "limitations": [
+    "Command UI uses a VS Code surface/session double; existing client/launcher groups retain their stated native/fixture boundaries.",
+    "No installed extension update, live task/account operation or interactive VS Code acceptance.",
+    "Terminal focus and protocol acknowledgement do not establish native task attachment or completion.",
+    "Windows executable selection and native command activation remain to be exercised on an approved Windows host."
+  ]
+}

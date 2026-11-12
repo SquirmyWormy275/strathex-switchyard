@@ -1,0 +1,61 @@
+{
+  "schema": "switchyard-execution-shutdown-source/v1",
+  "basis": "7a75189cf897d9067b31333c96e0b36a85c940f3",
+  "sourceSha256": {
+    "packages/control-plane/src/runtime.ts": "54e89a400fd149f8d6d756d4aacc7f7939ba85dbf5463b8efad9587e32fc71d5",
+    "apps/windows-companion/src/repository-runtime.ts": "c8be7dd96c0ac0f1835a3d2c6537b7df825327886f26ddd73879b1f622a816fe",
+    "tools/layout-studio/repository-execution.mjs": "6bdb839d770257268af85f12b49375f8542f19fd944c3d4ae656c88e07808fc9",
+    "scripts/windows-scenario-groups.test.mjs": "b6cb81f1d59de6c7486cfde2a56718ae8e6e0711c218c83da0fc0688f2ec1f4e"
+  },
+  "priorCompleteLinux": {
+    "source": "efbaa52216d4336d0eab53f19c29a2742cc4d6b7",
+    "receipt": "isolated-test-91c15f8c-1c54-4c3e-9261-9f098f7aec82.json",
+    "totals": {
+      "required": 241,
+      "passed": 240,
+      "failed": 1,
+      "tests": 1516,
+      "passedTests": 1504,
+      "failedTests": 1,
+      "skippedTests": 11,
+      "cancelledTests": 0,
+      "todoTests": 0
+    },
+    "accepted": false,
+    "failure": "The concurrency guard rejected any CI needs entry, including the new shared exact-source helper. It now requires only that helper dependency in both independent lane families.",
+    "cleanupReceipt": "linux-efbaa-failed-cleanup-1793939120744.json",
+    "allChildAndTreeCleanupVerified": true,
+    "exactOwnedCheckoutAliasesBuildsMarkerRemoved": true
+  },
+  "githubLinuxFailure": {
+    "source": "efbaa52216d4336d0eab53f19c29a2742cc4d6b7",
+    "runId": 42161182653,
+    "jobId": 127706968318,
+    "errorCode": "ENOTEMPTY",
+    "test": "actual Linux host broker connects reviewed task inputs, namespace and owned guardian without a live repository write",
+    "accepted": false,
+    "exactNativeCauseConfirmed": false
+  },
+  "change": [
+    "Observation shutdown now fences new callbacks and joins already-running reconciliation and original/recovered deadline callbacks. A completed callback cannot recreate timers after shutdown.",
+    "Managed-process exit observers are joined after independent supervisor exit, before staging/state removal. Unconfirmed staging cleanup refuses shutdown acceptance.",
+    "No blind directory-removal retry or broader process ownership is introduced."
+  ],
+  "focused": {
+    "receipt": "isolated-test-4c375792-46ce-4e58-b357-48384678c69b.json",
+    "groups": 7,
+    "testsPassed": 66,
+    "allChildAndTreeCleanupVerified": true,
+    "typecheck": true
+  },
+  "deterministicChecks": [
+    "Hold an active reconciliation callback across shutdown; require shutdown to wait, preserve unknown work and refuse post-stop timers/recovery.",
+    "Hold original and recovered deadline cancellation callbacks across shutdown; require both to settle before retirement.",
+    "Hold input lease release after managed process exit; require observer retirement to wait."
+  ],
+  "limits": [
+    "Full followup source acceptance is pending. The previous Linux and Windows failures remain failed.",
+    "The controlled lifecycle tests establish the shutdown gap and correction; they do not reconstruct the exact interleaving of the prior GitHub teardown.",
+    "No frontend, live account, model request, keyboard or desktop configuration was changed."
+  ]
+}

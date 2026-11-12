@@ -1,0 +1,146 @@
+{
+  "schema": "switchyard-editor-project-choices-source/v1",
+  "sourceParent": "45c34e555a16c8946e07176df30c2a0ea4971767",
+  "files": [
+    {
+      "path": "tools/layout-studio/coding-task-owners.mjs",
+      "sha256": "b541a9dadd7831c15f399e4ba076bab86b08009d36a62e2896f4b6a6a87389d8"
+    },
+    {
+      "path": "tools/layout-studio/coding-task-owners.test.mjs",
+      "sha256": "ab2a07a2dbb3ebf6fcd558f7e30ed1ccc080ad2bffa8f0cfe64f2a2328bd3aee"
+    },
+    {
+      "path": "tools/layout-studio/suite.mjs",
+      "sha256": "0d0e1998ca52c2721153425ce65d9c383f623c3639266d04e884b235958cf6e3"
+    },
+    {
+      "path": "tools/layout-studio/instance.mjs",
+      "sha256": "4f487adefbbaf7182f9b8f26b1052183c235e60b3b11ac37df6220cabf98e5bb"
+    },
+    {
+      "path": "tools/layout-studio/serve.mjs",
+      "sha256": "ee7143933ee924f96d4b09382ee790b27a242b43b6a87b9c22f145755ba1b162"
+    },
+    {
+      "path": "apps/vscode-extension/src/studio-editor-choices.ts",
+      "sha256": "013f4cfb45981a98f690be92cb50bf68ee1bc89d623eaf703e7d6e8d0e47f4a3"
+    },
+    {
+      "path": "apps/vscode-extension/src/studio-task-client.ts",
+      "sha256": "138d2d6fbca1cbb7788151d7d0fd4c5d77e2aebfa8af37d123c87c772e44f4c2"
+    },
+    {
+      "path": "apps/vscode-extension/src/studio-windows-task-client.ts",
+      "sha256": "bbb507a3141904c448ea38c10ba12efe499c60c1f9a458aeeed5264e75380cb5"
+    },
+    {
+      "path": "apps/vscode-extension/src/studio-instance-transport.ts",
+      "sha256": "16ed723d1d2e282bfedcbe59a414d2acc32ccf629dd361f1a7188f20dfd51ea8"
+    },
+    {
+      "path": "apps/vscode-extension/test/studio-task-client.test.ts",
+      "sha256": "b6b0cbce8ccc6e40dba66a0704b17f07cba206bc707427c0a2f8b54ce31c59e9"
+    },
+    {
+      "path": "apps/vscode-extension/test/studio-windows-task-client.test.ts",
+      "sha256": "b907312bfaf0249435de62f038729526f18b6c0ac098a73c4e10aac6b1bc1002"
+    },
+    {
+      "path": "scripts/windows-scenario-groups.mjs",
+      "sha256": "797b9cc879d9bd94b27405f28573cb556446e63670e9f21a79bb65cb3894cd3d"
+    },
+    {
+      "path": "scripts/windows-scenario-groups.test.mjs",
+      "sha256": "47d756f6756956c4311c3e8016db8c7b57de0446c953e50c64e87f090bc69fef"
+    },
+    {
+      "path": "scripts/windows-backend-shards.test.mjs",
+      "sha256": "690f82845537457c577a666e02c7493488661cdf36191fad2a29634fd1b0f34e"
+    }
+  ],
+  "receipts": [
+    {
+      "id": "c87e2d38-f3cd-4071-a609-1f482cb17570",
+      "sha256": "fca55677a5cdcb15f14dc578f31d047dd53056f7d20a8830385d191b2bece236",
+      "success": true,
+      "totals": {
+        "required": 32,
+        "passed": 32,
+        "failed": 0,
+        "tests": 98,
+        "passedTests": 98,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "id": "c42520f0-9bb4-4f60-9051-4c19b330a0ca",
+      "sha256": "e6e34c7048bf782b1c2abe4a02381d9df0ef28096788fbf767f23f36e7002729",
+      "success": true,
+      "totals": {
+        "required": 32,
+        "passed": 32,
+        "failed": 0,
+        "tests": 98,
+        "passedTests": 98,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "id": "5b434382-fd81-4d6e-a0f5-87c7c30965b6",
+      "sha256": "c4682ec7f2ac8287c9d7ac3aecdf623456da86f64a95dfd9edd47f4d04b95a7b",
+      "success": false,
+      "totals": {
+        "required": 35,
+        "passed": 34,
+        "failed": 1,
+        "tests": 109,
+        "passedTests": 108,
+        "failedTests": 1,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "id": "53629092-1d8c-493e-bc7f-4357348eec7d",
+      "sha256": "802207340db4b251b65f4d88faa909b38c60900b3bb19f8fd8599e45972e1c13",
+      "success": true,
+      "totals": {
+        "required": 37,
+        "passed": 37,
+        "failed": 0,
+        "tests": 117,
+        "passedTests": 117,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    }
+  ],
+  "acceptance": {
+    "completeFocusedGroups": 37,
+    "passingTests": 117,
+    "skippedTests": 0,
+    "repositoryTypecheck": true,
+    "editorTypecheck": true,
+    "originalCommandsBoundsSkipsAndCleanupVerified": true,
+    "all29TaskOwnerScenariosScheduledExactlyOnce": true,
+    "signedEncryptedStoreToLinuxClientDemonstration": true,
+    "windowsClientUsesSignedServerWithNativeEndpointReaderDouble": true,
+    "distinctTaskCountsAcrossSavedProjects": true,
+    "stalePolicyWorkspaceEndpointAndDuplicateRefusals": true,
+    "inventoryPerformsNoNativeObservationOrWrite": true
+  },
+  "retainedCorrection": "The two new task-owner cases were added to the fixed scenario manifest; coverage checks then rejected stale literal 27-case expectations. Expectations now require all 29 original/new cases exactly once without changing any child deadline. Earlier 98-test batches did not include the new task-owner scenarios and are not final feature acceptance.",
+  "nativeWindowsAcceptance": false,
+  "installedAcceptance": false,
+  "remaining": "Picker/command activation is frozen. Actual native task/account/IDE and physical-key acceptance remain separate. Existing exact target/review/issue/consume is still required after a choice."
+}

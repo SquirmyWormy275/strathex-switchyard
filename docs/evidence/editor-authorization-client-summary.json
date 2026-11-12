@@ -1,0 +1,63 @@
+{
+  "schema": "switchyard-editor-authorization-client-summary/v1",
+  "basis": "637a27f79d44803fd54ea2cf95ec186d1db64175",
+  "sourceSha256": {
+    "apps/vscode-extension/src/studio-task-client.ts": "994583dbb16249f050a48e6c2cfbf683ce96a835c1362964d3607c97db6fa8e0",
+    "apps/vscode-extension/test/studio-task-client.test.ts": "f3ebbfd9eff6a8e30365acdb53ad8c2a248cd25518541bf56a1d63b575954e10",
+    "scripts/run-isolated-tests.mjs": "07eb11d5c8ec33d9d4102a9e777e9e7186182e26a52c4547421cdfc371f7c304",
+    "scripts/verify-task-owner-host.mjs": "8aa9e7966ee26a95f58d92c5b195d14e764a01e6acee9349c81c15481e254624",
+    "tools/layout-studio/coding-task-owners.test.mjs": "e8911d6fbc728d31e18b53928d1896c0b20fc4b7a0ec3a093bd0d26c5f946d66",
+    "tools/layout-studio/instance.mjs": "0a754c9ca146f921a2e4c1853a8dee2bacebe474f6ac7fc77e863e9e1c902c57",
+    "tools/layout-studio/instance.test.mjs": "4a413aa5fb6004723c4b8721192b6c041a830707a71f16bbf65f3c41f72de422",
+    "tools/layout-studio/serve.mjs": "ae4c6fced009686015468705dbac9143c40f73eee134220d1049cf3446891920"
+  },
+  "focusedRuns": [
+    {
+      "receipt": "isolated-test-1fb93d99-c782-472c-b77a-f012dc831152.json",
+      "groups": 3,
+      "passedTests": 39,
+      "childAndTreeCleanupVerified": true
+    },
+    {
+      "receipt": "isolated-test-2f4bf6f3-6c51-4b93-acd5-637b112323b5.json",
+      "groups": 4,
+      "passedTests": 38,
+      "childAndTreeCleanupVerified": true
+    },
+    {
+      "receipt": "isolated-test-ab09fa30-b567-4b14-ac16-5ffcfb452f1d.json",
+      "groups": 1,
+      "passedTests": 25,
+      "childAndTreeCleanupVerified": true
+    },
+    {
+      "receipt": "isolated-test-93ddb301-41d6-4c31-a61d-f284fea0a7cb.json",
+      "groups": 1,
+      "passedTests": 2,
+      "childAndTreeCleanupVerified": true
+    }
+  ],
+  "testCountsOverlap": true,
+  "typecheck": true,
+  "extensionBuild": true,
+  "compiledCommonJsReceipt": "editor-authorization-compiled-1793947681909.json",
+  "compiledMethodsVerified": [
+    "reviewEditor",
+    "issueEditor",
+    "consumeEditor"
+  ],
+  "generatedExtensionOutputRemoved": true,
+  "implemented": [
+    "Fixed signed review/issue/consume requests and responses bind the original listener, build, nonce and exact editor selection.",
+    "Strict response schemas reject foreign selection, wrong confirmation scope, expired permits and unsupported effect claims.",
+    "The actual protected owner and HTTP gateway compose with the extension client, encrypted state and controlled provider metadata.",
+    "Cancellation after durable consumption rejects delivery; a fresh client sees a spent permit without launch authorization.",
+    "Installed metadata verifier adds three unknown-owner authorization refusals without creating confirmations, permits, tasks or terminals."
+  ],
+  "limits": [
+    "Focused cohorts overlap and are not a new complete Linux acceptance.",
+    "The repository client and compiled CommonJS module are exercised; command registration and actual terminal creation remain unfinished.",
+    "Native account/task attachment acknowledgement remains unfinished. No live provider, model, keyboard or account operation was performed.",
+    "Installed source is still e768d18 until the separate normal application update is accepted."
+  ]
+}

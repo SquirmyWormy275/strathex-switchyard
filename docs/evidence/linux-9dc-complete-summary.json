@@ -1,0 +1,22 @@
+{
+  "schema": "switchyard-linux-complete-summary/v1",
+  "sourceCommit": "9dc0a944f7ecbbf39d7936b89ccc9297d69f9f80",
+  "sourceTree": "955e4012bf23a20300ac52abc0222e1dc236b7bc",
+  "receipt": "isolated-test-110e9e17-a41f-4b05-baf7-8e8dd7781d97.json",
+  "receiptSha256": "d1538ad91624ad79847d3327933eb8496144d98ad1ecdb9456afee7e9d41ec08",
+  "groups": 235,
+  "reportedTests": 1455,
+  "passedTests": 1445,
+  "declaredSkips": 10,
+  "failedGroups": 0,
+  "failedTests": 0,
+  "allChildCleanup": true,
+  "allOwnedProcessTreeTerminationComplete": true,
+  "ownedImmutableCheckoutFixturesAndAliasesRemoved": true,
+  "fixtureFilesystem": "btrfs",
+  "newSdkInstalled": false,
+  "originalBoundShieldAndPipelineIncluded": true,
+  "earlierFailedRunsRemainFailed": true,
+  "hardwareOrAccountAcceptanceInferred": false,
+  "wholeRev2SuiteClaimedComplete": false
+}

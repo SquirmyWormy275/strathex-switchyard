@@ -1,0 +1,144 @@
+{
+  "schema": "switchyard-readable-scanner-review/v1",
+  "at": "2026-11-09T12:12:59.694Z",
+  "baseCommit": "9cc29a5b523358026c95a966dec7cf02b9feea1f",
+  "sourceFiles": {
+    "tools/layout-studio/scanner-ui.mjs": "c595db0f0cc0fe99826f14be1ec6aad0fcf7905858428764a4800601cd2f3ae7",
+    "tools/layout-studio/scanner-ui.test.mjs": "bab36eda056ab6ee2d0086fad640146605af677423ce51db021becd3a91da5ce",
+    "tools/layout-studio/index.html": "cdacfee5152e82f23107baa0cab6cf7f5655a927cb8c57cc29241bd8a8b1d366"
+  },
+  "runs": [
+    {
+      "receiptId": "6f3e4f5c-2720-474e-a2c6-95cb42cbe3ad",
+      "receiptSha256": "a869514219c5c6984aae0d4ab8be7393135c97e6772f407c256f4a45b42d9c8f",
+      "totals": {
+        "required": 5,
+        "passed": 5,
+        "failed": 0,
+        "tests": 58,
+        "passedTests": 58,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "children": [
+        {
+          "file": "tools/layout-studio/scanner-recipe-draft.test.mjs",
+          "pattern": null,
+          "durationMs": 16270,
+          "effectiveTimeoutMs": 120000,
+          "tests": {
+            "total": 12,
+            "passed": 12,
+            "failed": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          }
+        },
+        {
+          "file": "tools/layout-studio/scanner-recipe-save.test.mjs",
+          "pattern": null,
+          "durationMs": 31276,
+          "effectiveTimeoutMs": 120000,
+          "tests": {
+            "total": 23,
+            "passed": 23,
+            "failed": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          }
+        },
+        {
+          "file": "tools/layout-studio/execution-ui.test.mjs",
+          "pattern": null,
+          "durationMs": 12254,
+          "effectiveTimeoutMs": 45000,
+          "tests": {
+            "total": 7,
+            "passed": 7,
+            "failed": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          }
+        },
+        {
+          "file": "tools/layout-studio/authority-ui.test.mjs",
+          "pattern": null,
+          "durationMs": 3310,
+          "effectiveTimeoutMs": 45000,
+          "tests": {
+            "total": 9,
+            "passed": 9,
+            "failed": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          }
+        },
+        {
+          "file": "tools/layout-studio/scanner-ui.test.mjs",
+          "pattern": null,
+          "durationMs": 11320,
+          "effectiveTimeoutMs": 45000,
+          "tests": {
+            "total": 7,
+            "passed": 7,
+            "failed": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          }
+        }
+      ],
+      "duplicateReceiptRemoved": true
+    }
+  ],
+  "red": {
+    "receiptId": "1bd0a205-0be2-4314-ba5c-6ec0b6fd5b6d",
+    "receiptSha256": "0ed78de34b98e1d01baf97dd8ffe5c360ede6e8b5b1730d90897c585cf7a1f2f",
+    "totals": {
+      "required": 2,
+      "passed": 0,
+      "failed": 2,
+      "tests": 2,
+      "passedTests": 0,
+      "failedTests": 2,
+      "skippedTests": 0,
+      "cancelledTests": 0,
+      "todoTests": 0
+    },
+    "reason": "The hidden review retained repository and scope metadata after cancellation and workspace change.",
+    "originalChildTreeCleanupVerified": true,
+    "duplicateReceiptRemoved": true
+  },
+  "typecheck": {
+    "command": "node node_modules/typescript/bin/tsc --noEmit -p tsconfig.json",
+    "exitCode": 0
+  },
+  "page": {
+    "uniqueIds": 488,
+    "technicalDetailsInitiallyCollapsed": true
+  },
+  "scope": [
+    "Human-readable project, new output directory, current/staged/historical paths, exclusions, feed names and coverage limits appear first.",
+    "Full preparation metadata, permission proposal, feed identities and manifest hashes remain in a collapsed technical disclosure. Every generated file retains its exact text and hash preview.",
+    "Cancellation, form changes and workspace invalidation clear all review text and reset technical disclosure state.",
+    "Five original integration groups retain commands, limits, skip inventory, serial ordering and all original assertions; two added red regressions reproduce stale metadata before the fix.",
+    "Explicit filesystem/provider/UI doubles remain; no browser visual, installed application, live provider, hardware or account acceptance is claimed."
+  ],
+  "audit": {
+    "originalManifestCommandsBoundsSkips": true,
+    "serialOrder": true,
+    "outputBounds": true,
+    "originalChildTreeCleanup": true,
+    "privateReceiptCopiesVerified": true
+  },
+  "status": {
+    "installed": false,
+    "immutableFrontendPinPending": true
+  }
+}

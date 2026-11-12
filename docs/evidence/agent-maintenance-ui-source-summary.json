@@ -1,0 +1,100 @@
+{
+  "schema": "switchyard-agent-maintenance-ui-source-evidence/v1",
+  "scope": "Saved custom-agent inventory, exact reviewed revocation, uncertain retired-command acknowledgement and owned bundled-example retirement",
+  "runs": [
+    {
+      "receiptId": "0b7c5a60-810c-4eee-81cb-9e1a8f958795",
+      "sha256": "a9a583e23f14f8f4ef8005141a59953bffa900634238ab65641788cae492f38f",
+      "success": true,
+      "totals": {
+        "required": 8,
+        "passed": 8,
+        "failed": 0,
+        "tests": 115,
+        "passedTests": 115,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "files": [
+        "scripts/windows-backend-shards.test.mjs",
+        "scripts/run-isolated-tests.test.mjs",
+        "deployment/suite/release.test.mjs",
+        "tools/layout-studio/agent-revocation.test.mjs",
+        "tools/layout-studio/suite.test.mjs",
+        "tools/layout-studio/integrations.test.mjs",
+        "tools/layout-studio/role-ui.test.mjs",
+        "tools/layout-studio/agent-maintenance-ui.test.mjs"
+      ],
+      "originalBoundsPreserved": true,
+      "ownedCleanupComplete": true
+    },
+    {
+      "receiptId": "3a83af04-8f5d-4ad5-a6eb-3d218330ec44",
+      "sha256": "b363a22394ee488b14e1aa875bb4ba06428230a1a10413cfc71b06231e083231",
+      "success": true,
+      "totals": {
+        "required": 4,
+        "passed": 4,
+        "failed": 0,
+        "tests": 33,
+        "passedTests": 33,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "files": [
+        "tools/layout-studio/agent-maintenance-ui.test.mjs",
+        "tools/layout-studio/conversation-ui.test.mjs",
+        "tools/layout-studio/copilot-ui.test.mjs",
+        "tools/layout-studio/observation-ui.test.mjs"
+      ],
+      "originalBoundsPreserved": true,
+      "ownedCleanupComplete": true
+    }
+  ],
+  "interactionCases": 8,
+  "sourceFiles": {
+    "tools/layout-studio/role-ui.mjs": "e8e1359f0b30c15ae19b40eb37bf0b9dcb5142a432bb61b921678d21f8b582a2",
+    "tools/layout-studio/agent-maintenance-ui.test.mjs": "1323a97c3066b07e4d6875f6348e1c45e777a33fa328031c177349bddfd5684d",
+    "tools/layout-studio/index.html": "90a58cd8694ab0755b462104c6d6100183541345bfb774ec7ece1fd717a06843",
+    "tools/layout-studio/suite-ui.mjs": "d86c80a0c31fbf67e6f6238a77e89d1595462531d652edd0238f66658aae43bc",
+    "tools/layout-studio/suite.mjs": "75738ddd2059c6e46c7ed42230dace3ebc56073554d6ac120ad7ebe1c4e10e6d",
+    "tools/layout-studio/custom-agents.mjs": "3a4b75addef2845cdc79ba96cd6669fe2a179ca81d00edc5959ad65f28ee2a8e",
+    "tools/layout-studio/serve.mjs": "2ef1817c076ddaaf4ed843e31c1b00a3f48d0cf29da6dd195200f86eb33902c8",
+    "deployment/suite/release.mjs": "3c0f52e5571d34cf549f7ecb5fd6483683a87eb3acaf0b8abc6c65c157036f61",
+    "scripts/demo-switchyard-ui.mjs": "af6e1ff77e7917b86f913ae220f9365fd97ed1b9f3b634a45535e85677d1bf64"
+  },
+  "livePreview": {
+    "checks": [
+      "exact served role-ui.mjs",
+      "exact served suite-ui.mjs",
+      "exact served index.html",
+      "two synthetic saved adapters in keyboard-only mode",
+      "signed SDK claim and stopped report retain uncertain synthetic handoff without execution",
+      "unauthenticated revocation review refused",
+      "keyboard-only refuses agents/revoke/review",
+      "keyboard-only refuses agents/revoke",
+      "keyboard-only refuses agents/outcome/review",
+      "keyboard-only refuses agents/outcome/resolve",
+      "interactive demo refuses agents/enroll",
+      "interactive demo refuses agents/example",
+      "complete saved state and Personal selection unchanged"
+    ],
+    "synthetic": true,
+    "modelRequests": 0,
+    "hardwareOpened": false
+  },
+  "boundaries": [
+    "Authenticated HTTP, encrypted state and one-use review ledger are real. Agent credentials, sessions and signed SDK reports are isolated synthetic fixtures.",
+    "Revocation cancels queued commands locally and keeps claimed work uncertain. Late original adapter acknowledgement invalidates stale operator review; it remains self-reported.",
+    "Uncertainty review sends no command and explicitly explains bounded-history retention. Lost replies refresh saved state without replay.",
+    "Owned example retirement is available in Personal keyboard-only mode; a missing owner is not evidence of external process exit or task completion.",
+    "No live installed agent enrollment, revocation or command, account, native task, model, HID or microphone action occurred.",
+    "Browser visual acceptance, normal installation and current complete Linux/Windows acceptance remain separate.",
+    "Custom agent enrollment remains an existing developer SDK flow; this UI does not add credential issuance."
+  ],
+  "counting": "Run totals overlap; do not add them as unique assertions."
+}

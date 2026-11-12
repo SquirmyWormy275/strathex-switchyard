@@ -1,0 +1,37 @@
+{
+  "schema": "switchyard-windows-client-passed-summary/v1",
+  "runId": 42336421474,
+  "jobId": 128294801271,
+  "sourceCommit": "4f56477e49651a14514f3b6a2f8555ab3d094abd",
+  "mergeCommit": "a4a5a6ec871d66f6466d1af590a618a6e29f15e9",
+  "artifactId": 13560350476,
+  "artifactSha256": "98fb7e33bfe3d1bf243457a19553746058cd0f4198798f3d2c8926decceb978f",
+  "artifactBytes": 1702,
+  "receiptSha256": "50109905b1e2918ae62217d18adb3959b430f4d17079362a0ca0a820694519a3",
+  "archiveExtracted": false,
+  "archiveStoredLocally": false,
+  "sourceAndMergeTree": "0e233a1b47a25675c21d83708ce617a8667a5bf6",
+  "sourceAndMergeTreesVerifiedEqual": true,
+  "originalCommandsBoundsAndSkipsVerified": true,
+  "childAndTreeCleanupVerified": true,
+  "nativeReceipt": "067da2b6-df8e-4bcd-952b-9aaa9f679dbb",
+  "totals": {
+    "required": 7,
+    "passed": 7,
+    "failed": 0,
+    "tests": 94,
+    "passedTests": 94,
+    "failedTests": 0,
+    "skippedTests": 0,
+    "cancelledTests": 0,
+    "todoTests": 0
+  },
+  "success": true,
+  "previousFailure": "windows-client-02cc6ba-failed-summary.json",
+  "interpretation": "Native Windows client contracts pass, including both explicit policy paths. This does not establish interactive focus, account/task attachment or complete Windows acceptance.",
+  "privateReceipt": {
+    "name": "windows-client-4f56477-native.json",
+    "sha256": "4f87b587f6a8fe0797e72044ac72bc73ba6c0537ece3eafc6731695155d24f68"
+  },
+  "workflowUrl": "https://github.com/SquirmyWormy275/strathex-switchyard/actions/runs/42336421474"
+}

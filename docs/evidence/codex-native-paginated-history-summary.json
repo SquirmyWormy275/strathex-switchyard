@@ -1,0 +1,420 @@
+{
+  "schema": "switchyard-native-codex-paginated-history/v1",
+  "baseCommit": "a7c3d94038a79f60c50dc8069a53ac0065f5a975",
+  "sourceFiles": {
+    "tools/layout-studio/codex-editor-history.mjs": "ac66868ae8ee8611dc929d038dd3ffde788ed74ce7ee85fd0a8f68f0618310b6",
+    "tools/layout-studio/codex-editor-relay.mjs": "22ae4f0e811d71408b22b33107bf4347abb50ed9e173d76064cde758533b28d8",
+    "tools/layout-studio/codex-editor-relay.test.mjs": "08931a2d91a43b44d093a377d3c4c37c3e1a51745ccfc56359fd95de3171d4d5",
+    "tools/layout-studio/codex-retained-editor-client.mjs": "7947a1306fdea46195abc4cde6ce8839a1bff417daaf0344fa419f8a626b6f0e",
+    "tools/layout-studio/codex-retained-editor-client.test.mjs": "f301e55325574f8b30bd9259c4061111e5d7bd5365caabd0b25df9dc2fa9ab92"
+  },
+  "runs": [
+    {
+      "receiptId": "59d1ce5c-53c5-481b-8aef-9fcb5feacf23",
+      "sha256": "288b53bb3c792f7e2c8877c85d65011916e209fbd8c03246beeace532e31d37e",
+      "success": false,
+      "totals": {
+        "required": 2,
+        "passed": 1,
+        "failed": 1,
+        "tests": 28,
+        "passedTests": 27,
+        "failedTests": 1,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "groups": [
+        {
+          "file": "tools/layout-studio/codex-editor-relay.test.mjs",
+          "durationMs": 158,
+          "originalBoundMs": 45000
+        },
+        {
+          "file": "tools/layout-studio/codex-retained-editor-client.test.mjs",
+          "durationMs": 140,
+          "originalBoundMs": 45000
+        }
+      ],
+      "originalCommandsBoundsSkipsAndCleanupVerified": true,
+      "failures": [
+        {
+          "file": "tools/layout-studio/codex-editor-relay.test.mjs",
+          "diagnosticSha256": "9cef0051833a9efef64f344572fc6435410fc3a2b239b55d76b31669a77a5174"
+        }
+      ]
+    },
+    {
+      "receiptId": "42b2246f-d010-4160-b470-2ba7b32a3cc6",
+      "sha256": "38cfeb26fa40b91b1e7d6a46575a45651635d48fff58b5bbc473625b3b63dd6e",
+      "success": true,
+      "totals": {
+        "required": 2,
+        "passed": 2,
+        "failed": 0,
+        "tests": 34,
+        "passedTests": 34,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "groups": [
+        {
+          "file": "tools/layout-studio/codex-editor-relay.test.mjs",
+          "durationMs": 174,
+          "originalBoundMs": 45000
+        },
+        {
+          "file": "tools/layout-studio/codex-retained-editor-client.test.mjs",
+          "durationMs": 150,
+          "originalBoundMs": 45000
+        }
+      ],
+      "originalCommandsBoundsSkipsAndCleanupVerified": true,
+      "failures": []
+    },
+    {
+      "receiptId": "02267b1a-276e-4651-9916-b19fffd0dcc8",
+      "sha256": "1801f90dabdce0a647ee77fff767dd88488d7e36a423a9f3fd3c5186e933da99",
+      "success": true,
+      "totals": {
+        "required": 13,
+        "passed": 13,
+        "failed": 0,
+        "tests": 137,
+        "passedTests": 136,
+        "failedTests": 0,
+        "skippedTests": 1,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "groups": [
+        {
+          "file": "tools/layout-studio/windows-codex-editor-connection.test.mjs",
+          "durationMs": 663,
+          "originalBoundMs": 45000
+        },
+        {
+          "file": "tools/layout-studio/coding-editor-connections.test.mjs",
+          "durationMs": 14929,
+          "originalBoundMs": 45000
+        },
+        {
+          "file": "tools/layout-studio/codex-editor-protocol.test.mjs",
+          "durationMs": 138,
+          "originalBoundMs": 45000
+        },
+        {
+          "file": "tools/layout-studio/codex-editor-relay.test.mjs",
+          "durationMs": 181,
+          "originalBoundMs": 45000
+        },
+        {
+          "file": "tools/layout-studio/codex-retained-editor-client.test.mjs",
+          "durationMs": 156,
+          "originalBoundMs": 45000
+        },
+        {
+          "file": "tools/layout-studio/windows-coding-editor-connections.test.mjs",
+          "durationMs": 6903,
+          "originalBoundMs": 45000
+        },
+        {
+          "file": "tools/layout-studio/codex-editor-ingress.test.mjs",
+          "durationMs": 11708,
+          "originalBoundMs": 45000
+        },
+        {
+          "file": "tools/layout-studio/codex-editor-ingress-owner.test.mjs",
+          "durationMs": 1600,
+          "originalBoundMs": 45000
+        },
+        {
+          "file": "apps/vscode-extension/test/codex-terminal.test.ts",
+          "durationMs": 98,
+          "originalBoundMs": 45000
+        },
+        {
+          "file": "apps/vscode-extension/test/codex-windows-terminal.test.ts",
+          "durationMs": 107,
+          "originalBoundMs": 45000
+        },
+        {
+          "file": "apps/vscode-extension/test/studio-windows-editor-launch.test.ts",
+          "durationMs": 1226,
+          "originalBoundMs": 45000
+        },
+        {
+          "file": "apps/vscode-extension/test/studio-editor-launch.test.ts",
+          "durationMs": 3872,
+          "originalBoundMs": 45000
+        },
+        {
+          "file": "apps/vscode-extension/test/studio-editor-session.test.ts",
+          "durationMs": 4256,
+          "originalBoundMs": 45000
+        }
+      ],
+      "originalCommandsBoundsSkipsAndCleanupVerified": true,
+      "failures": []
+    },
+    {
+      "receiptId": "d4086e22-1f88-4008-a61d-a195914c1513",
+      "sha256": "df8073fa50d4c7002018152444969a4d2da9ca3ebcd9125aabb99a88a7c99dd9",
+      "success": true,
+      "totals": {
+        "required": 3,
+        "passed": 3,
+        "failed": 0,
+        "tests": 39,
+        "passedTests": 39,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "groups": [
+        {
+          "file": "deployment/suite/release.test.mjs",
+          "durationMs": 2411,
+          "originalBoundMs": 45000
+        },
+        {
+          "file": "tools/layout-studio/codex-editor-relay.test.mjs",
+          "durationMs": 185,
+          "originalBoundMs": 45000
+        },
+        {
+          "file": "tools/layout-studio/codex-retained-editor-client.test.mjs",
+          "durationMs": 150,
+          "originalBoundMs": 45000
+        }
+      ],
+      "originalCommandsBoundsSkipsAndCleanupVerified": true,
+      "failures": []
+    }
+  ],
+  "native": [
+    {
+      "attempt": 1,
+      "resultSha256": "46447f9847900186c386d78b7240ece509bd195ce1fe98c749e997f8fa7f8bd0",
+      "reason": "production-relay-refused-next-request",
+      "syntheticTaskRendered": false,
+      "syntheticTranscriptRendered": false,
+      "unexpectedReconnect": false,
+      "historyRequests": [
+        {
+          "id": 9,
+          "method": "thread/turns/list",
+          "params": {
+            "threadId": "11111111-1111-4111-8111-111111111111",
+            "cursor": null,
+            "limit": 5,
+            "sortDirection": "desc",
+            "itemsView": "notLoaded"
+          }
+        }
+      ],
+      "finalObservation": {
+        "schema": "switchyard-editor-relay/v1",
+        "phase": "closed",
+        "protocolAcknowledged": false,
+        "connectionClosed": true,
+        "failed": true,
+        "ideAttached": false,
+        "authorityGranted": false,
+        "completionVerified": false
+      },
+      "acknowledgements": 1,
+      "originalGuardianAndTreeExitVerified": true,
+      "kernelPeerPidVerified": true,
+      "networkNamespaceIsolated": true
+    },
+    {
+      "attempt": 2,
+      "resultSha256": "c928b34b58d0b271aa302cfd6779d55060e6b57d682668a11e3e4e595b8eb657",
+      "reason": "production-relay-refused-next-request",
+      "syntheticTaskRendered": false,
+      "syntheticTranscriptRendered": false,
+      "unexpectedReconnect": false,
+      "historyRequests": [
+        {
+          "id": 9,
+          "method": "thread/turns/list",
+          "params": {
+            "threadId": "11111111-1111-4111-8111-111111111111",
+            "cursor": null,
+            "limit": 5,
+            "sortDirection": "desc",
+            "itemsView": "notLoaded"
+          }
+        },
+        {
+          "id": 10,
+          "method": "thread/items/list",
+          "params": {
+            "threadId": "11111111-1111-4111-8111-111111111111",
+            "turnId": null,
+            "cursor": null,
+            "limit": 100,
+            "sortDirection": "desc"
+          }
+        }
+      ],
+      "finalObservation": {
+        "schema": "switchyard-editor-relay/v1",
+        "phase": "closed",
+        "protocolAcknowledged": false,
+        "connectionClosed": true,
+        "failed": true,
+        "ideAttached": false,
+        "authorityGranted": false,
+        "completionVerified": false
+      },
+      "acknowledgements": 1,
+      "originalGuardianAndTreeExitVerified": true,
+      "kernelPeerPidVerified": true,
+      "networkNamespaceIsolated": true
+    },
+    {
+      "attempt": 3,
+      "resultSha256": "1cfecc775a4deb3151688cfd772144b850c4f927d752805e05ffff0b79013eb9",
+      "reason": "synthetic-task-rendered-and-stable",
+      "syntheticTaskRendered": true,
+      "syntheticTranscriptRendered": true,
+      "unexpectedReconnect": false,
+      "historyRequests": [
+        {
+          "id": 9,
+          "method": "thread/turns/list",
+          "params": {
+            "threadId": "11111111-1111-4111-8111-111111111111",
+            "cursor": null,
+            "limit": 5,
+            "sortDirection": "desc",
+            "itemsView": "notLoaded"
+          }
+        },
+        {
+          "id": 10,
+          "method": "thread/items/list",
+          "params": {
+            "threadId": "11111111-1111-4111-8111-111111111111",
+            "turnId": null,
+            "cursor": null,
+            "limit": 100,
+            "sortDirection": "desc"
+          }
+        }
+      ],
+      "finalObservation": {
+        "schema": "switchyard-editor-relay/v1",
+        "phase": "acknowledged",
+        "protocolAcknowledged": true,
+        "connectionClosed": false,
+        "failed": false,
+        "ideAttached": false,
+        "authorityGranted": false,
+        "completionVerified": false
+      },
+      "acknowledgements": 1,
+      "originalGuardianAndTreeExitVerified": true,
+      "kernelPeerPidVerified": true,
+      "networkNamespaceIsolated": true
+    },
+    {
+      "attempt": 4,
+      "resultSha256": "e447002b03ac7a10c9c09aae7bab810077db7ab22f0ab9395421bf9cdefc29f0",
+      "reason": "synthetic-task-rendered-and-stable",
+      "syntheticTaskRendered": true,
+      "syntheticTranscriptRendered": true,
+      "unexpectedReconnect": false,
+      "historyRequests": [
+        {
+          "id": 9,
+          "method": "thread/turns/list",
+          "params": {
+            "threadId": "11111111-1111-4111-8111-111111111111",
+            "cursor": null,
+            "limit": 5,
+            "sortDirection": "desc",
+            "itemsView": "notLoaded"
+          }
+        },
+        {
+          "id": 10,
+          "method": "thread/items/list",
+          "params": {
+            "threadId": "11111111-1111-4111-8111-111111111111",
+            "turnId": null,
+            "cursor": null,
+            "limit": 100,
+            "sortDirection": "desc"
+          }
+        },
+        {
+          "id": 11,
+          "method": "thread/items/list",
+          "params": {
+            "threadId": "11111111-1111-4111-8111-111111111111",
+            "turnId": null,
+            "cursor": "synthetic-item-cursor",
+            "limit": 100,
+            "sortDirection": "desc"
+          }
+        },
+        {
+          "id": 12,
+          "method": "thread/turns/list",
+          "params": {
+            "threadId": "11111111-1111-4111-8111-111111111111",
+            "cursor": "synthetic-turn-cursor",
+            "limit": 1,
+            "sortDirection": "desc",
+            "itemsView": "notLoaded"
+          }
+        }
+      ],
+      "finalObservation": {
+        "schema": "switchyard-editor-relay/v1",
+        "phase": "acknowledged",
+        "protocolAcknowledged": true,
+        "connectionClosed": false,
+        "failed": false,
+        "ideAttached": false,
+        "authorityGranted": false,
+        "completionVerified": false
+      },
+      "acknowledgements": 1,
+      "originalGuardianAndTreeExitVerified": true,
+      "kernelPeerPidVerified": true,
+      "networkNamespaceIsolated": true
+    }
+  ],
+  "cleanup": {
+    "sha256": "e9ffe571942881a550538fdb566eb2b4b69242bf473d5518670f2bed89e5c275",
+    "roots": 4,
+    "files": 20,
+    "bytes": 93752,
+    "removed": true
+  },
+  "typecheck": {
+    "command": "node node_modules/typescript/bin/tsc --noEmit -p tsconfig.json",
+    "exitCode": 0
+  },
+  "contract": [
+    "Only the acknowledged selected paginated 0.167 task can request turn or item pages.",
+    "Page sizes are integers 1 through 100, descending only; turns request notLoaded items and item pages remain whole-thread reads.",
+    "Opaque continuation cursors come only from that selected task and the same page family. Responses remain at most one MiB, 100 entries, and bounded retained cursor/turn inventories.",
+    "Original account is checked before and after every page; malformed replies, workspace/account changes, cancellation and unknown operations refuse without delivery.",
+    "Retained Windows channels use the same history validation and do not reinitialize or retire their native owner."
+  ],
+  "limitations": [
+    "The demonstration uses the actual installed 0.167 CLI, production launch arguments, Python WebSocket handshake and relay with a synthetic provider; it is not live-account or actual IDE GUI acceptance.",
+    "Native per-turn editing, anchor cursors, ascending requests and experimental methods remain refused. No prompt or provider tool effect is admitted by history support.",
+    "Thirteen integration groups pass 136 tests with one existing skip. Final history and release-package groups pass 39 with zero skips after reviewing variable native page sizes. Counts overlap.",
+    "The two earlier native missing-method refusals and original regression failure remain retained.",
+    "Source changes are not yet installed. Complete Windows verification remains unsuccessful and separate."
+  ]
+}

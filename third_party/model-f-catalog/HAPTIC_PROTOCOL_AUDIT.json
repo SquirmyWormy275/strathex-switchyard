@@ -1,0 +1,217 @@
+{
+  "schema": "switchyard-haptic-host-protocol-audit/v1",
+  "scope": "direct-via-vial-haptic-state-and-control",
+  "provenance": "pinned-source-review",
+  "liveFirmwareAuthenticated": false,
+  "hidTransactions": 0,
+  "builds": [
+    {
+      "definitionId": "wcass:f77",
+      "repository": "ploxiln/vial-qmk",
+      "commit": "c832c9b0edfa554c6e8344cb732f14620e63b210",
+      "viaProtocol": 9,
+      "vialProtocol": 4,
+      "stateQuery": "not-exposed-in-audited-source",
+      "control": "not-exposed-in-audited-source",
+      "sourceSettingIdRange": {
+        "first": 1,
+        "last": 19
+      },
+      "keyboardExtension": "util-comm-2.0.5",
+      "findings": [
+        "VIA delegates extended messages only to the audited Vial handler or keyboard utility handler.",
+        "Vial QMK settings resolve through a closed non-haptic setting table.",
+        "The keyboard utility handles calibration, matrix, keyboard enable, EEPROM and bootloader commands; none is a haptic state/control operation.",
+        "Internal haptic functions and physical keycodes are distinct from a host configuration command."
+      ],
+      "files": [
+        {
+          "path": "quantum/via.c",
+          "gitBlobSha": "ff93a81f8a40b995499ef13ddfd5673245acf305",
+          "size": 20187,
+          "sha256": "a8f5eaf4ab58dc113e26f9995cb373193c5dc42b77aba625ad98d37e80698447"
+        },
+        {
+          "path": "quantum/via.h",
+          "gitBlobSha": "8b753787a753a0a03b20e3e63dd0ca17f1bdb70d",
+          "size": 5649,
+          "sha256": "7b990c8b30397fcfedd465e641780c12adf5e0f8470aabbb2bd390843225a04d"
+        },
+        {
+          "path": "quantum/vial.c",
+          "gitBlobSha": "8a43c014233243eb189d3c6ec8e1f9378fc47bbe",
+          "size": 16370,
+          "sha256": "c6dd2ac41c65a381b59bb3f2ae6f4b69afad7aed42b5184c97bd93e1ac9cc206"
+        },
+        {
+          "path": "quantum/qmk_settings.c",
+          "gitBlobSha": "55373ec31bc622432a01470123004a6260cd5d10",
+          "size": 6036,
+          "sha256": "54f28dcb56262e713c0d509705043ee40e33923d3b061440d76f14ed1d961c88"
+        },
+        {
+          "path": "quantum/qmk_settings.h",
+          "gitBlobSha": "4ce67103c3d06a7bd32099d70b16e5671c76eeb0",
+          "size": 6463,
+          "sha256": "a7d04d47faef5e80d7eabb605b6ac28526b2064b2362d845fcb36fc105d7aeb7"
+        },
+        {
+          "path": "keyboards/xwhatsit/util_comm.c",
+          "gitBlobSha": "59e897183c0d85a46deed8cbc93d2d9383e7c6ee",
+          "size": 9246,
+          "sha256": "7a757c2779538a645be06ab60337a9086babca28022429249afd385c54e77a4e"
+        },
+        {
+          "path": "keyboards/xwhatsit/util_comm.h",
+          "gitBlobSha": "d41cf45ff3e3be71771705f44a1473eafee4b449",
+          "size": 1412,
+          "sha256": "3494d6988917bf78b3bd0980d076efa09cdc3cb793360482d78635a8da757847"
+        },
+        {
+          "path": "keyboards/xwhatsit/brand_new_model_f/f77/wcass/wcass.c",
+          "gitBlobSha": "944c858953674ca3dbfaea480cde8acdf49fdc57",
+          "size": 1793,
+          "sha256": "427c65849e58e25da3def23d011faeef69d0a06734efab47bccc860e1467401c"
+        },
+        {
+          "path": "keyboards/xwhatsit/brand_new_model_f/f77/wcass/rules.mk",
+          "gitBlobSha": "c88b66ca835dba82ae0b8815ba38340bd8be4cfd",
+          "size": 2232,
+          "sha256": "836a228e4f4b30cca87bf2b3786ae38823f957de74802d4607e685fbc5abb5a4"
+        },
+        {
+          "path": "drivers/haptic/haptic.c",
+          "gitBlobSha": "fde5e94c4d651b8ffdeee18e46548c73ffce24c9",
+          "size": 11128,
+          "sha256": "38d67a2c77418962eece96b4c9e6fedb5a42ac64e33ac962d84c40bda83647d7"
+        }
+      ]
+    },
+    {
+      "definitionId": "leyden:f77:vial",
+      "repository": "mymakercorner/vial-qmk",
+      "commit": "761cb1c1b71ed91c48185f3e03465702b21e49f4",
+      "viaProtocol": 9,
+      "vialProtocol": 6,
+      "stateQuery": "not-exposed-in-audited-source",
+      "control": "not-exposed-in-audited-source",
+      "sourceSettingIdRange": {
+        "first": 1,
+        "last": 21
+      },
+      "keyboardExtension": "leyden-jar-utility",
+      "findings": [
+        "VIA delegates extended messages to the audited Vial or keyboard utility handler.",
+        "Vial QMK settings resolve through a closed non-haptic setting table.",
+        "The keyboard utility handles calibration, matrix, keyboard enable, EEPROM and bootloader commands; none is a haptic state/control operation.",
+        "Compiled keyboard support files do not override VIA layout-option handling to expose haptics.",
+        "PS/2 startup owns a mutually exclusive connector mode and can disable haptics internally; that is not a VIA/Vial haptic state/control API."
+      ],
+      "files": [
+        {
+          "path": "quantum/via.c",
+          "gitBlobSha": "30915ae9ce403608810c163633fc4722fd99dd5e",
+          "size": 23110,
+          "sha256": "7f658e1c188bae121da83bdb07e07c668da62b02d6e91560751be0a3bb4a0e77"
+        },
+        {
+          "path": "quantum/via.h",
+          "gitBlobSha": "d74f0be88d9fec6ab09115b5ec3b863baeab5c08",
+          "size": 7765,
+          "sha256": "907ddad6bdfa2f99246a2a40a9a9152765c36ad2e0e2ad67db3bee9acc8eabed"
+        },
+        {
+          "path": "quantum/vial.c",
+          "gitBlobSha": "f5019bb5bf4179de679cecfe913689ec36ce8c02",
+          "size": 20989,
+          "sha256": "6127e5de2a25b58b4936dd4041bde33f2f23d0fab82dbd3ccbb4c916013a5aa1"
+        },
+        {
+          "path": "quantum/qmk_settings.c",
+          "gitBlobSha": "ce5e2ac1f56f77d03e479072889167c14796c39d",
+          "size": 10542,
+          "sha256": "af35425e57bdf977dc339887e2d81225aa6bdd9f4765b45af969f6bfba710d0b"
+        },
+        {
+          "path": "quantum/qmk_settings.h",
+          "gitBlobSha": "0a43bb7072b31b78d12d1c940cbe6c216fb2f638",
+          "size": 7085,
+          "sha256": "336c1efe088f15905ebd316b9edea481ed760c70c13289b309e8625f37ee3bc1"
+        },
+        {
+          "path": "keyboards/leyden_jar/util_protocol.c",
+          "gitBlobSha": "505aa2ffe2b9b08826756ced9d7b376bce815e2f",
+          "size": 8150,
+          "sha256": "063684cf35a082e40f706b06ada7ab870d9b7bc5edaee371c7f39975bdcb3fac"
+        },
+        {
+          "path": "keyboards/leyden_jar/util_protocol.h",
+          "gitBlobSha": "5f5e46b83011298cad2af4346c9429ecac3c17ce",
+          "size": 1754,
+          "sha256": "6d3a88ae02df396a20357d113707fe16c155c7fbef9ea6b34055e94a28d9a194"
+        },
+        {
+          "path": "keyboards/leyden_jar/common.c",
+          "gitBlobSha": "91f4c91bdc7c8a62a60a629ba00c2638498fe472",
+          "size": 22856,
+          "sha256": "80130e0b69aa697cc12b35368001b90813780a40ddbd1e861a04a63c39e6f678"
+        },
+        {
+          "path": "keyboards/leyden_jar/f77/rules.mk",
+          "gitBlobSha": "f4ebc214c509a06df1202acc0468911d709f143b",
+          "size": 1045,
+          "sha256": "d27327cb0f0456eb6574a58de7bac6ff1d92bba05cc4f0d139a10861984177a0"
+        },
+        {
+          "path": "quantum/haptic.c",
+          "gitBlobSha": "81bad469b37f231d132d544876a0b16b7c688ae1",
+          "size": 10263,
+          "sha256": "e51e8c575f9961505eda86f97015ca85bed248af159c180d8f63b90cdb972ebc"
+        },
+        {
+          "path": "keyboards/leyden_jar/ps2/ps2_glue.c",
+          "gitBlobSha": "3cd3e3a926535efc895f1c71259492776c4a0c36",
+          "size": 56717,
+          "sha256": "e06a848afbace0553ab3d5dee38e58f365661dc1ebca64786a55b95709f32890"
+        },
+        {
+          "path": "keyboards/leyden_jar/matrix.c",
+          "gitBlobSha": "e456205a3b1617407ff9857ae23d6b35c55b24c7",
+          "size": 5085,
+          "sha256": "d4739e84d86fd223a028c22688c60be57329f67f97f8196ee22de8b295f16bc2"
+        },
+        {
+          "path": "keyboards/leyden_jar/dac.c",
+          "gitBlobSha": "cac2684fb765f6d4868b5cd7269052f0ce2805e3",
+          "size": 1857,
+          "sha256": "926866cce90c8a23f0bc91dd9332cd287dd345a8543382f190093f97bf9739d2"
+        },
+        {
+          "path": "keyboards/leyden_jar/pio_matrix_scan.c",
+          "gitBlobSha": "65e9a6abb2320cf1e5d4ec34016741f63b12b0a0",
+          "size": 5097,
+          "sha256": "da762e6a34dd26f54b7119d423737b8943edc7ac296df0b20bfa33fcc79ccbe1"
+        },
+        {
+          "path": "keyboards/leyden_jar/io_expander.c",
+          "gitBlobSha": "d976a7f718211656b9bbf866a557f212c713565e",
+          "size": 5450,
+          "sha256": "0cd75710d8b5aba0608e22dcc4c4e010be87a9617a33fdd7451f8e71d4ca4a69"
+        },
+        {
+          "path": "keyboards/leyden_jar/leds.c",
+          "gitBlobSha": "c53fd7da9e2fdbc9d49ca2d33bd458faa8560799",
+          "size": 1242,
+          "sha256": "112f4c287083519269d449786db300472f4c7d682ea61de945f3479a38fda016"
+        }
+      ]
+    }
+  ],
+  "limits": [
+    "Only these exact source revisions and direct VIA/Vial routes were reviewed.",
+    "Source identity is not authentication of installed firmware, a fitted solenoid, live state or electrical limits.",
+    "Physical haptic keycodes and internal driver APIs are not authorized host controls.",
+    "Other firmware, transport extensions and newly implemented firmware protocols require separate review.",
+    "No device was opened, unlocked, written, reset, flashed, placed in a bootloader or energized."
+  ]
+}

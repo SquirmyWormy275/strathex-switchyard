@@ -1,0 +1,41 @@
+{
+  "schema": "switchyard-codex-isolated-config-summary/v1",
+  "sourceCommit": "37d87f3b725c9d7fe8659fb1b68609fcd25bb97a",
+  "executableSha256": "cdcb45aaa01d0f14e298985e09465aebccd47f64ecd298aea44814af7b62bbda",
+  "observation": {
+    "schema": "switchyard-isolated-codex-config/v1",
+    "version": "0.167.0",
+    "featuresVerified": 42,
+    "methods": [
+      "initialize",
+      "initialized",
+      "config/read"
+    ],
+    "providerExited": true,
+    "networkNamespaceIsolated": true,
+    "accountRequests": 0,
+    "threadRequests": 0,
+    "modelPrompts": 0
+  },
+  "restrictions": [
+    "Existing 34 design feature exclusions plus all seven new 0.167 flags and deferred_tool_world_state are explicitly false.",
+    "Empty owned HOME and CODEX_HOME, hidden host homes/configuration, no network namespace access, no account or thread request."
+  ],
+  "cleanup": {
+    "originalGuardianAndTreeExitVerified": true,
+    "ownedFilesRemoved": 66,
+    "ownedBytesRemoved": 3053441,
+    "ownedRootAndMarkerRemoved": true
+  },
+  "runtimeAdmissionChanged": false,
+  "limitations": [
+    "Effective configuration readback is accepted only in the isolated account-free environment.",
+    "Live account/task/model and native TUI protocol acceptance remain separate.",
+    "Three diagnostic attempts precede the accepted probe: mount destination missing, early native exit with hidden stderr, then a missing empty CODEX_HOME. Their original runtime trees exited."
+  ],
+  "receipt": {
+    "name": "codex-167-isolated-probe-result-4.json",
+    "sha256": "70c942a1036454c259b86ed1faefadd6bd9d9be37060ea9341f3c69cfa06f65e"
+  },
+  "documentation": "https://learn.chatgpt.com/docs/app-server"
+}

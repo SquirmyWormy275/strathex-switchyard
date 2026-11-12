@@ -1,0 +1,215 @@
+{
+  "schema": "switchyard-batched-inspection-source/v1",
+  "sourceFiles": {
+    "packages/control-plane/src/git-inspector.ts": "6220b5ebfedbdb13332d146c06f5a28938e712042242a726a53d52596fa43ff8",
+    "packages/control-plane/test/git-inspector.test.ts": "bc0876824fa4fdcb396e36aa697cd418aa20605ea66d81606bd94c7910cf7cf1",
+    "tools/layout-studio/task-authority.test.mjs": "818b9a5dd14064345ead94e85a62062b36054bdeb68c2ba26f9d6251809621c0",
+    "tools/layout-studio/repository-inspection.mjs": "2c2e24d0e41ad4a18bdcd81736a964ac59be6ffa49b95773a166250f7d691ebd",
+    "tools/layout-studio/owned-native-command.mjs": "111ae7ad96adf1a461e3aaa8d73c0c7c698de95e9348ea6b0abc596c1d77261a"
+  },
+  "runs": [
+    {
+      "receiptId": "b5f2675c-58b7-4cb2-b992-19949529fbc3",
+      "sha256": "0c26acee6671317a5c1c80cf6c4f5f1f0e019079c48c21b19d85850e1033028f",
+      "success": false,
+      "totals": {
+        "required": 1,
+        "passed": 0,
+        "failed": 1,
+        "tests": 19,
+        "passedTests": 17,
+        "failedTests": 2,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "groups": [
+        {
+          "file": "packages/control-plane/test/git-inspector.test.ts",
+          "durationMs": 386,
+          "originalBoundMs": 45000
+        }
+      ],
+      "originalCommandsBoundsSkipsAndCleanupVerified": true,
+      "failures": [
+        {
+          "file": "packages/control-plane/test/git-inspector.test.ts",
+          "diagnosticSha256": "453cc08e4db530301103f9f118118b49f67265e32a30aaa675e323e9fbbe30f1"
+        }
+      ]
+    },
+    {
+      "receiptId": "aad219fd-5049-40a6-ade1-e7e9cd81f8e5",
+      "sha256": "22cd695f25ab9a4900120fa0e49a4fae1c618dd15be180ac221e5b836fdf0f9a",
+      "success": true,
+      "totals": {
+        "required": 1,
+        "passed": 1,
+        "failed": 0,
+        "tests": 19,
+        "passedTests": 19,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "groups": [
+        {
+          "file": "packages/control-plane/test/git-inspector.test.ts",
+          "durationMs": 370,
+          "originalBoundMs": 45000
+        }
+      ],
+      "originalCommandsBoundsSkipsAndCleanupVerified": true,
+      "failures": []
+    },
+    {
+      "receiptId": "d8643b15-6452-4edc-8c9b-7a47a82f9008",
+      "sha256": "1f9e37d6fdecd4a197f914d741a9e981bb1997334afb2981151eddb16b28b0aa",
+      "success": true,
+      "totals": {
+        "required": 7,
+        "passed": 7,
+        "failed": 0,
+        "tests": 58,
+        "passedTests": 58,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "groups": [
+        {
+          "file": "tools/layout-studio/task-authority-ignored-trees.test.mjs",
+          "durationMs": 1446,
+          "originalBoundMs": 120000
+        },
+        {
+          "file": "tools/layout-studio/task-authority-ignored-inputs.test.mjs",
+          "durationMs": 1397,
+          "originalBoundMs": 45000
+        },
+        {
+          "file": "tools/layout-studio/task-authority.test.mjs",
+          "durationMs": 3721,
+          "originalBoundMs": 45000
+        },
+        {
+          "file": "tools/layout-studio/execution-ui.test.mjs",
+          "durationMs": 12091,
+          "originalBoundMs": 45000
+        },
+        {
+          "file": "tools/layout-studio/authority-ui.test.mjs",
+          "durationMs": 3189,
+          "originalBoundMs": 45000
+        },
+        {
+          "file": "tools/layout-studio/scanner-ui.test.mjs",
+          "durationMs": 10522,
+          "originalBoundMs": 45000
+        },
+        {
+          "file": "packages/control-plane/test/git-inspector.test.ts",
+          "durationMs": 364,
+          "originalBoundMs": 45000
+        }
+      ],
+      "originalCommandsBoundsSkipsAndCleanupVerified": true,
+      "failures": []
+    },
+    {
+      "receiptId": "520f3e9e-4634-4086-9a59-ff6cb1462852",
+      "sha256": "4bf24cc5fa38d7f9a4d2021ae4b1a8eeb8b6994783eb906866ea6afd5860da5e",
+      "success": true,
+      "totals": {
+        "required": 4,
+        "passed": 4,
+        "failed": 0,
+        "tests": 24,
+        "passedTests": 24,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "groups": [
+        {
+          "file": "tools/layout-studio/repository-effects.test.mjs",
+          "durationMs": 8277,
+          "originalBoundMs": 45000
+        },
+        {
+          "file": "apps/windows-companion/test/bootstrap.test.ts",
+          "durationMs": 1044,
+          "originalBoundMs": 45000
+        },
+        {
+          "file": "apps/windows-companion/test/installed-automation-e2e.test.ts",
+          "durationMs": 1520,
+          "originalBoundMs": 240000
+        },
+        {
+          "file": "apps/windows-companion/test/git-review.test.ts",
+          "durationMs": 144,
+          "originalBoundMs": 45000
+        }
+      ],
+      "originalCommandsBoundsSkipsAndCleanupVerified": true,
+      "failures": []
+    }
+  ],
+  "typecheckPassed": true,
+  "nativeDemo": {
+    "sha256": "f54048e8d7c77b82ad2b9dc4ae0d426ac75a0f7f273206010bf98562c768d086",
+    "schema": "switchyard-batched-inspection-native-demo/v1",
+    "checks": [
+      "complete exact-root snapshot through production native guardians",
+      "native query overlap remains bounded to four and all commands settle",
+      "all twelve original guardian identities independently verify exit and owned scratch removal",
+      "original repository HEAD index and worktree bytes remain unchanged"
+    ],
+    "nativeCommands": 12,
+    "peakConcurrentNativeQueries": 4,
+    "independentGuardianExits": 12,
+    "commandDurationsMs": [
+      102,
+      124,
+      127,
+      131,
+      135,
+      123,
+      125,
+      126,
+      135,
+      109,
+      109,
+      97
+    ],
+    "syntheticProvider": true,
+    "actualNativeGit": true,
+    "hardwareOpened": false,
+    "userWorkspacesUsed": false,
+    "modelRequests": 0,
+    "sourceFiles": {
+      "packages/control-plane/src/git-inspector.ts": "6220b5ebfedbdb13332d146c06f5a28938e712042242a726a53d52596fa43ff8",
+      "tools/layout-studio/repository-inspection.mjs": "2c2e24d0e41ad4a18bdcd81736a964ac59be6ffa49b95773a166250f7d691ebd",
+      "tools/layout-studio/owned-native-command.mjs": "111ae7ad96adf1a461e3aaa8d73c0c7c698de95e9348ea6b0abc596c1d77261a"
+    },
+    "ownedStagingRemoved": true
+  },
+  "implementation": [
+    "After verified root discovery, the same ten fixed independent metadata queries run in bounded groups of four. Each group settles every started sibling before ordered failure reporting or another group. Synchronous runner throws also enter the settled group.",
+    "The final exact index witness and recursive submodule fallback remain after metadata. Original query allowlist, 45-second inspection bound, 10-second native command bound, 16-owner quota, original guardian persistence/exit checks, protected state and scratch cleanup are unchanged.",
+    "A four-guardian suspension regression proves every acknowledged owner retires before scratch removal, with no later group or accepted snapshot. Native Linux demonstration verifies twelve actual owned Git commands and four-query maximum, unchanged repository and complete removal."
+  ],
+  "regressions": [
+    "The two original scheduling tests failed before implementation; seventeen existing cases remained passing. The focused nineteen and seven integration groups/fifty-eight tests pass after implementation, with overlap and zero skips.",
+    "The first integration wrapper requested an absent owned-native-command group and refused before starting tests. The corrected selection uses seven existing required groups with their original contracts."
+  ],
+  "limitations": [
+    "Native Windows scanner/execution deadline acceptance remains pending; Linux timings do not prove that failure resolved.",
+    "No installed workspace, real provider/account/task, microphone or hardware operation occurred. Native task identity is synthetic; Git commands and guardians in the separate Linux demonstration are actual.",
+    "The installed checkpoint remains 85f1ec4; this backend source is not yet installed."
+  ]
+}

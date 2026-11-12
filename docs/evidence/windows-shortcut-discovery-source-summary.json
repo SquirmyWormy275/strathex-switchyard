@@ -1,0 +1,34 @@
+{
+  "schema": "switchyard-windows-shortcut-discovery-source/v1",
+  "problem": "Default host discovery returned shortcuts=false on Windows, hiding the implemented shortcut bridge from the frontend.",
+  "result": "Windows advertises bridge availability without claiming keyboard, host layout, application, signature, window or registration observation. Native checks still run at exact review and registration boundaries.",
+  "receiptId": "c1967ea3-489d-4716-a1f6-0247e75cd8a1",
+  "sha256": "b8c1d14da8cf9120f63eae28c5ab46e6c2fd394f882a90d5dbb155422a5d1fb1",
+  "totals": {
+    "required": 5,
+    "passed": 5,
+    "failed": 0,
+    "tests": 78,
+    "passedTests": 78,
+    "failedTests": 0,
+    "skippedTests": 0,
+    "cancelledTests": 0,
+    "todoTests": 0
+  },
+  "files": [
+    "deployment/suite/release.test.mjs",
+    "tools/layout-studio/configuration.test.mjs",
+    "tools/layout-studio/physical-intent.test.mjs",
+    "tools/layout-studio/native-focus-gateway.test.mjs",
+    "tools/layout-studio/windows-native-focus.test.mjs"
+  ],
+  "sourceFiles": {
+    "tools/layout-studio/host.mjs": "31568957cf8a8db6c7fa146d0a154785e542b2542461cc24c1bdcd00873f6f32",
+    "tools/layout-studio/serve.mjs": "2afaaac18780362e07233e220ea266deaa43d3817c2060dd2e6e31a9b18ce989",
+    "tools/layout-studio/configuration.test.mjs": "720d4cc57811e1277eb7c1a78f297d9a5b880dd289e6a0ae6110fe6298424d14",
+    "tools/layout-studio/windows-native-focus.test.mjs": "28a9f0225f80287ecb57fdf98fc85bba6c40536f49dbe887ae7f3f6bf79b0c9c"
+  },
+  "originalBoundsPreserved": true,
+  "ownedCleanupComplete": true,
+  "liveWindowsDesktopAccepted": false
+}

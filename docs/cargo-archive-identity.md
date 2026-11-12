@@ -1,0 +1,147 @@
+# Check the identity inside a selected Rust package
+
+Supply Chain and Release Shield inspect the manifest inside a reviewed Cargo
+archive alongside its declared SHA-256 checksum. If the file matches the checksum
+but declares a different package name or version, the scan fails with an
+`artifact.identity-mismatch` finding. This closes a separate gap from byte
+integrity: matching a declaration does not prove the declaration describes the
+expected package.
+
+Selected Cargo archives now expose bounded package license declarations and
+apply the reviewed SPDX policy only after both byte integrity and manifest
+identity match. Disallowed obligations fail; permitted alternatives remain
+unselected. Missing, unsupported and file-only declarations preserve coverage
+gaps without exporting raw text or file paths. Fifteen focused groups pass 124
+tests, including eight actual Linux scans and eight Windows guest doubles.
+Typecheck, original package bounds and child/tree cleanup pass; staging is removed.
+License text inspection, dependency resolution and publisher verification remain
+unfinished. [Contract](cargo-license-declarations.md),
+[source evidence](evidence/cargo-license-source-summary.json).
+
+Cargo archive inspection now accepts bounded inline dependency tables such as
+`serde = { version = "1", features = ["derive"] }`, nested metadata and array
+tables. All 112 independent Python reference cases and ten focused groups / 96
+tests pass, including six actual Linux scanner journeys and six Windows guest
+doubles. Duplicate aliases, invalid delimiters, table reopening and nesting beyond
+sixteen inline tables refuse admission. Original package bounds, typecheck and
+child/tree cleanup verify; owned staging is removed. Dependency resolution and
+broader manifest/license coverage remain unfinished.
+[Contract](cargo-archive-identity.md),
+[source evidence](evidence/cargo-inline-manifest-source-summary.json).
+
+Installed `6fdc6bd` passes **71 metadata/in-memory checks** and verifies 22 exact
+module hashes, including all 112 Cargo manifest reference cases and eight Cargo
+archive/license policy reports. All 54 semantic
+workspaces, selection, pending keyboard-only conversation and frozen frontend
+are preserved; 53 sealed files are byte-identical and one changes only audit
+metadata. All four profiles and 57 workflows remain compatible. Dated backup
+and launcher readback verify; current plus one rollback remain. The exact
+531-file, 5,183,244-byte prepared bundle is removed. No live scanner, provider,
+account, model, keyboard or native Windows focus action was performed.
+[Installed evidence](evidence/installed-cargo-license-summary.json).
+
+Previous installed `9eec9cd` passes 58 reference cases in ten Cargo metadata
+checks inside its 71-check update, preserving all 54 semantic workspaces and the
+frozen frontend. [Previous installed receipt](evidence/installed-cargo-quoted-manifest-summary.json).
+
+Use the existing [Cargo artifact selection](cargo-artifact-integrity.md). No new
+authority or selection format is required. Both the lockfile and archive must be
+explicitly reviewed inputs. The scanner never invokes Cargo, resolves dependencies,
+extracts files, runs build scripts or contacts a registry.
+
+## Supported archive and manifest
+
+Cargo produces compressed `.crate` archives and normalizes the packaged
+`Cargo.toml`. Embedded VCS metadata does not establish verified provenance.
+[Cargo packaging reference](https://doc.rust-lang.org/cargo/commands/cargo-package.html).
+
+The inspector accepts gzip-compressed USTAR with one exact `NAME-VERSION` root
+matching the manifest. It requires exactly one correctly cased `Cargo.toml` at
+that root. Ordinary files and empty directory entries are supported. Links,
+extension records, duplicate or case-colliding paths, traversal, file/directory
+conflicts, damaged headers and ambiguous manifests remain unsupported.
+
+The entire manifest must fit a closed TOML subset:
+
+- Ordinary tables with bare or single-line quoted keys, including nested tables
+  and quoted platform conditions such as `target.'cfg(unix)'.dependencies`.
+- Array tables such as `[[bin]]` and `[[example]]`, with nested ordinary/array
+  tables attached to the most recent element. Each element has its own fields.
+- Single-line inline tables with bare/quoted fields, nested inline tables up to
+  sixteen levels, and the same bounded scalar and string-array values.
+- Single-line basic/literal strings, string arrays, booleans and signed 64-bit
+  decimal integers, with comments and LF or CRLF line endings.
+- One explicit `[package]` with string `name` and `version`, validated by the
+  existing bounded Cargo identity rules. Prerelease and build spelling remain
+  literal; `+build.7` cannot stand in for `+build.8`.
+
+The parser rejects duplicate definitions and scalar/table conflicts anywhere in
+the document. It does not ignore unsupported fields after reading the identity.
+Quoted field keys, empty strings and repeated string-array values are accepted.
+Quoted and bare spellings of the same key are aliases; a dot inside a quoted key
+is literal. A Map tree preserves those distinctions and rejects duplicate or
+scalar/table collisions without treating keys as JavaScript object properties.
+Multiline strings, arrays of inline tables, mixed arrays, floats, dotted field keys, inherited
+identity, eight-digit Unicode escapes and other TOML forms retain an explicit
+coverage gap. This is not a general TOML implementation or a promise to inspect
+every crate produced by Cargo. Cargo's [manifest reference](https://doc.rust-lang.org/cargo/reference/manifest.html)
+describes the broader format.
+
+Arrays cannot replace ordinary tables or append to static arrays; duplicate
+subtables within one element remain invalid. An array named `package` cannot
+supply the required ordinary package identity. This follows the
+[TOML 1.0 array-of-tables rules](https://toml.io/en/v1.0.0#array-of-tables).
+
+Inline tables are self-contained: trailing commas, duplicate decoded keys and
+reopening their fields through later table headers are refused. An inline root
+`package` does not replace the required explicit `[package]` identity. The syntax
+follows the [TOML 1.0 inline-table rules](https://toml.io/en/v1.0.0#inline-table)
+within the closed subset described above.
+
+The quoted-key behavior follows [TOML 1.0 key and table rules](https://toml.io/en/v1.0.0#keys).
+Parsing a platform condition preserves its syntax as a key; it does not evaluate
+that condition or establish which dependencies apply to the host. Cargo.lock
+retains its separate, narrower grammar.
+
+The existing limits remain: 2 MiB per selected file, 4 MiB expanded per archive,
+32 MiB shared expanded budget across selected package formats, 1,024 entries and
+32 path segments. A manifest is at most 64 KiB, 2,048 lines and 8,192 characters
+per line; individual strings retain the existing 2,048-character bound. Failed
+decompression consumes its reserved allowance.
+
+## What the result establishes
+
+| Observation | Result |
+| --- | --- |
+| Supported manifest agrees with the lock identity | Archive identity `matched`; scan remains incomplete. |
+| Supported manifest differs in name or literal version | Archive identity `mismatched`, high provenance finding and failed scan. |
+| Unsupported, malformed, ambiguous or excessive input | Archive identity `unsupported` and a bounded reason. |
+
+Unmatched observations retain `cargo_archive_identity_not_verified`. The strict
+host validator binds identity, manifest hash, reviewed bytes, finding fingerprint
+and CycloneDX properties. The fingerprint includes the registry-source digest so
+private and public identities cannot borrow each other's failure evidence.
+Deleting or changing those claims refuses admission.
+
+Name, version, manifest SHA-256, entry count and expanded size are retained for
+supported archives. Raw metadata, source text, private registry URLs and build
+scripts are not returned. License inspection, dependency/feature/target
+resolution, publisher verification and code safety remain unfinished. Existing
+coverage gaps and the 512-finding ceiling continue to apply.
+
+## Earlier verification
+
+The reference generator uses the existing Python standard library's `tomllib`,
+`tarfile` and `gzip` to produce 26 synthetic cases. It runs no Cargo command,
+build, package install or network request. Thirteen focused groups pass 132 distinct tests, including six actual Linux
+scans and six Windows guest doubles. Original package bounds, typecheck,
+replay, unchanged Git/files and exact cleanup verify. The first composed run
+failed one test-harness inventory assertion; the corrected inventory and
+follow-up pass without extending existing deadlines.
+[Source receipts](evidence/cargo-archive-source-summary.json).
+Normal installed 12b3c87 passes ten Cargo metadata/in-memory checks inside its
+56-check update, including all 26 reference cases and six new archive reports.
+All 54 semantic workspaces and frozen frontend are preserved; the prepared
+bundle is removed. [Installed receipt](evidence/installed-cargo-archive-summary.json).
+This starts no installed scanner process. Live installed scanner and native
+Windows archive acceptance remain unperformed.

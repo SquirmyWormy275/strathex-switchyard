@@ -501,6 +501,21 @@ def render_demo_svg(demo: dict[str, Any]) -> str:
     )
 
 
+def preserve_demo_png_encoding(rendered: bytes, existing: bytes | None) -> bytes:
+    # Zlib wheels can encode identical pixels differently. Keep the source
+    # artifact only after an exact bounded pixel comparison; the manifest
+    # continues to hash every original byte, including PNG metadata.
+    if existing is None or len(existing) > 1048576:
+        return rendered
+    try:
+        with Image.open(io.BytesIO(existing)) as old, Image.open(io.BytesIO(rendered)) as new:
+            if old.format == new.format == "PNG" and old.mode == new.mode == "RGB" and old.size == new.size == (1600, 900) and old.tobytes() == new.tobytes():
+                return existing
+    except (OSError, ValueError, Image.DecompressionBombError):
+        pass
+    return rendered
+
+
 def render_demo_png(demo: dict[str, Any]) -> bytes:
     image = Image.new("RGB", (1600, 900), "#f2f4f7")
     draw = ImageDraw.Draw(image)
@@ -710,7 +725,8 @@ def build_outputs(
             )
     demo_json = canonical_json(demo)
     demo_svg = render_demo_svg(demo)
-    demo_png = render_demo_png(demo)
+    png_path = repository_root / OUTPUT_PATHS["demo_png"]
+    demo_png = preserve_demo_png_encoding(render_demo_png(demo), png_path.read_bytes() if png_path.is_file() and png_path.stat().st_size <= 1048576 else None)
     demo_html = render_demo_html(demo)
     demo_readme = render_demo_readme()
     template = template_path.read_text(encoding="utf-8")

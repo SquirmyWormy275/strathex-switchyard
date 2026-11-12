@@ -1,0 +1,69 @@
+{
+  "schema": "switchyard-cargo-semver-summary/v1",
+  "basis": "1fc9d7fa891c941e432aae67d3e4cdea041464c3",
+  "sourceSha256": {
+    "tools/layout-studio/shield-scanner-engine.mjs": "2524b6899c77321638e5dd5123901fada8dd9088c14906fc83e39aede3b79f5d",
+    "tools/layout-studio/osv-advisory-source.mjs": "ba89dba1f60195b82dc9450c76e7721fd45672d389f212967ab50e76f774b0af",
+    "tools/layout-studio/cargo-lock-inventory.test.mjs": "c0d1b4e40723344e60bd102fd6e146e5ca9df26452e8c6bbf1fa452a36d53d89",
+    "tools/layout-studio/osv-advisory-source.test.mjs": "e5c159f7a7e0cac4f1c7dc0c15908dd89615897e0bb3160a83ce53d328f1da77",
+    "tools/layout-studio/test-support/shield-scanner-fixture.mjs": "313da46139d62ee22a4e535c6a0ff7d1a77449aa27689096813ae0a1999bee4b",
+    "tools/layout-studio/test-support/assert-cargo-shield.mjs": "2ca9267ff5669134ae5af755b26677271618799adfaff11a6fb32e62a527872f",
+    "tools/layout-studio/test-support/repository-shield-fixture.mjs": "5fed6c4b4d38843eb5ef6550dc6d16ea0a70a275d1ca8e3772f4dd8d957f777d",
+    "tools/layout-studio/test-support/windows-execution-fixture.mjs": "b5d0213677708dde208084b408b8c882c73d5fc5d9ce1e7b43910e85b623badc",
+    "tools/layout-studio/repository-shield-cargo.test.mjs": "7173a94937079baec95bebdc40339a4563b929c9858f0c3c56b87d855814c781",
+    "tools/layout-studio/repository-windows-shield-cargo.test.mjs": "eb94173fa8f2b37812a61aa106e6fa8f4d70a94bf7755ae0f5a7bfbfc0fd4b1c",
+    "scripts/collect-osv-advisories.mjs": "515f96e54e22e99499c8b7f9e6f27d93698c525743a0d00e6fe0f445d7c4cadd",
+    "scripts/run-isolated-tests.mjs": "2632e842690c4cf3334c6de8013222f1ceef8f2c2bf82c075a2a6802af831d76",
+    "scripts/verify-windows-storage-contracts.mjs": "5fafaf4b19df57fc08c367d3e89c59c9b75c03f9adae8c010cf890e869cf6551",
+    "scripts/windows-scenario-groups.test.mjs": "01e8d67e348f6d7ab1c6bcc72e0bc3333e7dc8ef75e4387343cda579ced77062",
+    ".github/workflows/switchyard-windows-filesystem.yml": "b2b2dcc9cc33e0f8d0f02526d8ba17aab3690302edfa2300d30222a9efc70efd"
+  },
+  "receipt": "isolated-test-f68c35e0-dc2c-4f6b-93f8-a68fdb3e1913.json",
+  "totals": {
+    "required": 9,
+    "passed": 9,
+    "failed": 0,
+    "tests": 94,
+    "passedTests": 94,
+    "failedTests": 0,
+    "skippedTests": 0,
+    "cancelledTests": 0,
+    "todoTests": 0
+  },
+  "allChildAndTreeCleanupVerified": true,
+  "ownedEmptyTestParentRemoved": true,
+  "typecheckPassed": true,
+  "independentReference": {
+    "receipt": "cargo-semver-reference-1793968755574.json",
+    "schema": "switchyard-cargo-semver-reference/v1",
+    "reference": "https://crates.io/crates/semver/1.0.28",
+    "version": "1.0.28",
+    "archiveSha256": "8a7852d02fc848982e0c167ef163aaff9cd91dc640ba85e263cb1ce46fae51cd",
+    "sourceOnlyDownload": true,
+    "newSdkOrRuntimeDownloaded": false,
+    "compiler": "rustc 1.94.1 (e408947bf 2026-03-25)",
+    "acceptanceChecks": 402,
+    "precedenceChecks": 145924,
+    "caseSha256": "b4c1e48f242ba7dd8ce9061dd9167c100bbf96c2811abdfcd9899247e5e3b9b4",
+    "allMatched": true,
+    "scannerSha256": "2524b6899c77321638e5dd5123901fada8dd9088c14906fc83e39aede3b79f5d",
+    "success": true,
+    "ownedCleanup": {
+      "files": 28,
+      "bytes": 4777045,
+      "removed": true
+    }
+  },
+  "collectorVersion": "switchyard-osv-collector/7",
+  "demonstration": "Supply Chain and Release each authenticate stable and prerelease/build Cargo reports with actual Linux namespaces and Windows guest doubles. Original lockfile/index/HEAD and exact cleanup verify.",
+  "coverage": [
+    "256-character SemVer syntax with u64 core numbers, arbitrary bounded numeric prerelease identifiers and literal build metadata.",
+    "Precedence ignores build metadata; exact query/inventory/advisory identities retain it. Explicit affected-version lists do not borrow another build identity.",
+    "Cargo scanner has an independent Windows CI matrix lane; four Linux integration cases have exact non-Linux declared skips."
+  ],
+  "limits": [
+    "No Cargo dependency resolution, install, project discovery or live OSV query ran. Reference download was a 33,064-byte public source archive, verified against the registry checksum; existing rustc compiled it and all owned source/build output was removed.",
+    "Broader lockfile syntax, features/targets/graph, licenses, artifacts and publisher provenance remain unfinished.",
+    "Installed and native Windows guest acceptance remain unperformed; npm collector scope is unchanged."
+  ]
+}

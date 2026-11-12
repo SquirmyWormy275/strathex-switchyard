@@ -1,0 +1,32 @@
+{
+  "schema": "switchyard-editor-protocol-summary/v1",
+  "basis": "d900499bdeb3d0bf61a8ef46f098abb0e93a9e06",
+  "sourceSha256": {
+    "tools/layout-studio/codex-editor-protocol.mjs": "b54e1a58e33b94c3da86c772a8e1a5631c693fb9cfc7d8aa92dfab9ab39ab5cd",
+    "tools/layout-studio/codex-editor-protocol.test.mjs": "f49ab6aaa94aabbe0a11b8883834d80318302d43079879bf814fb640d8d7a695",
+    "scripts/run-isolated-tests.mjs": "73a606dbc0e38de9e3916c2876448d4b3fb42aa875ac3353f9326b5683eb1cb4",
+    "deployment/suite/release.test.mjs": "6b579da8020c2fea070702c271cd09e7b21397d6d8530e6cc457e472bc9eedcb"
+  },
+  "focused": [
+    {
+      "receipt": "isolated-test-4291cbe6-fa4e-4ff7-bc4b-d379de3f6bef.json",
+      "groups": 2,
+      "tests": 28
+    },
+    {
+      "receipt": "isolated-test-67d26f24-999f-4399-820d-685ef204a5df.json",
+      "groups": 1,
+      "tests": 5
+    }
+  ],
+  "childTreeAndTemporaryCleanupVerified": true,
+  "typecheck": true,
+  "limits": [
+    "Pure synchronous protocol witness with synthetic frames; no transport, provider, terminal or live account is connected.",
+    "Requires exact request/reply IDs, first-party account fingerprints before and after the acknowledged resume, original thread/root, read-only/on-request reply and first-party model provider.",
+    "Only the declared minimal resume parameter contract is supported. TUI parameter compatibility and actual stream composition are unverified.",
+    "Account boundaries, changed accounts, replay, invalid/oversized frames and request limits invalidate; new pending account reads withdraw acknowledgement. Raw replies, accounts, paths, task IDs and text never enter the public evidence.",
+    "protocolAcknowledged does not assert kernel peer, terminal process, IDE attachment, permission or completion. A peer-bound relay and final launcher composition remain unfinished.",
+    "The boolean frame result is an observation, not permission to forward or execute arbitrary methods. No native effect is performed by this module."
+  ]
+}

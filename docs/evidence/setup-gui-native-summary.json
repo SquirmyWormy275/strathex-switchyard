@@ -1,0 +1,53 @@
+{
+  "schema": "switchyard-setup-gui-acceptance/v1",
+  "observations": [
+    {
+      "schema": "switchyard-setup-gui-native/v1",
+      "sourceCommit": "c9a858a68e074ff8ebc83eb7cadc8a77e8ae7bef",
+      "executionCommit": "cc15528448936ec977b6b8df327b6c309e14aa39",
+      "sourceAndExecutionTree": "4bbc8caaa8151d2b41e4090d04b3c0f97fbea522",
+      "runId": 42270291147,
+      "jobId": 128073154767,
+      "artifactId": 13529097160,
+      "archiveBytes": 5725,
+      "archiveSha256": "e1a12e0d9f8ea9d1e9de344892e664b1cd2bf71d81fd34a6c556a00d0c3d4980",
+      "zipSavedLocally": false,
+      "privateReceipt": "windows-setup-owner-c9a-native.json",
+      "success": false,
+      "originalOwnerCompletedChecks": 7,
+      "originalOwnerRequiredChecks": 8,
+      "failedPhase": "native-exit-and-fixture-retirement",
+      "verifiedQueryRegistrations": 64,
+      "registrationRoles": {
+        "guardian": 17,
+        "worker": 17,
+        "status": 30
+      },
+      "fixtureRetirementAccepted": false
+    },
+    {
+      "schema": "switchyard-setup-gui-native/v1",
+      "sourceCommit": "c9a858a68e074ff8ebc83eb7cadc8a77e8ae7bef",
+      "executionCommit": "cc15528448936ec977b6b8df327b6c309e14aa39",
+      "sourceAndExecutionTree": "4bbc8caaa8151d2b41e4090d04b3c0f97fbea522",
+      "runId": 42270291147,
+      "jobId": 128073154596,
+      "artifactId": 13529187101,
+      "archiveBytes": 1066,
+      "archiveSha256": "834d7a9e89d998eea5f06c3a9fb0499d630e828eaab1cab9b4df47c97b4bd497",
+      "zipSavedLocally": false,
+      "privateReceipt": "windows-setup-setup-c9a-native.json",
+      "success": true,
+      "checks": 6,
+      "image": {
+        "imageSubsystem": "windows-gui",
+        "dependentLoadFlags": 2048,
+        "deferredUiImportsVerified": true,
+        "runtimeModuleIsolationVerified": false
+      },
+      "nativeExitVerified": true
+    }
+  ],
+  "restrictedOwnerAccepted": false,
+  "installedChanged": false
+}

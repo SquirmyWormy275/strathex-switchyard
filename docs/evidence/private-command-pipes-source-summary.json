@@ -1,0 +1,68 @@
+{
+  "schema": "switchyard-private-command-pipes-source/v1",
+  "basis": "cd996bca01a209611d1c72f48e335c9f0fca947b",
+  "sourceSha256": {
+    ".github/workflows/switchyard-windows-filesystem.yml": "3b31a6c5c44344b3c92eff4744969a867334d19c3985bbc23b30c7c7439bdb7b",
+    "apps/desktop-hotkeys/RuntimeCommandRunner.cs": "d272ba2b57d81a3954d3abdecd5cb1373648fce3c1cc8fed23c8fde68941123b",
+    "apps/desktop-hotkeys/RuntimePrivatePipeSecurity.cs": "16e0f3cb7aeb5e1db912200f84b0860f602bd056e8af9ed136a9acfd9e44709b",
+    "deployment/windows/test-support/storage-broker-protocol/Program.cs": "cb9e86da7de1cece78729b5df3f8e20169a1fdeb57196effe9416c0c080490c1",
+    "deployment/windows/test-support/storage-broker-protocol/RuntimePrivatePipeProof.cs": "7b32bb2ff1ea68551691e6d7f7e61b7021fe092dd815e8206e1bf8e897be707e",
+    "deployment/windows/test-support/storage-broker-protocol/StorageBrokerProtocol.Proof.csproj": "bec50602b7abd7959af1a9fb86ca489480e7ed76d49b4db2cd4b89b615c514dd",
+    "tools/layout-studio/runtime-command.mjs": "d4dd534b5ae23651554fac74e98d6847054b65c6fc7454fb4d7c47a47e3b4745",
+    "tools/layout-studio/runtime-command-suspended.test.mjs": "2b0e28e8e6f6f6805c30b940db68e46e8eccdf9e4018e0c42e5a12cc4009ac05"
+  },
+  "focused": {
+    "receipt": "isolated-test-1d846b5a-8c98-47c4-aa35-64fe520593ad.json",
+    "totals": {
+      "required": 7,
+      "passed": 7,
+      "failed": 0,
+      "tests": 74,
+      "passedTests": 69,
+      "failedTests": 0,
+      "skippedTests": 5,
+      "cancelledTests": 0,
+      "todoTests": 0
+    },
+    "allChildAndTreeCleanupVerified": true
+  },
+  "managed": {
+    "receipt": "private-pipe-security-managed-1793985843954.json",
+    "builds": [
+      {
+        "name": "helper",
+        "warnings": 0,
+        "errors": 0,
+        "managedAssemblySha256": "8cb5dd006cba443868b003b2ac197f6cda960fc7addb6a0a8927c9c115ac9327",
+        "managedPeSubsystem": 2
+      },
+      {
+        "name": "proof",
+        "warnings": 0,
+        "errors": 0,
+        "managedAssemblySha256": "e618516c70ca1fb36094cf4a7f8aa64715f4602e87777e20a33735b0180dcdf3",
+        "managedPeSubsystem": 3
+      }
+    ],
+    "portableChecks": 2101,
+    "cleanup": {
+      "files": 149,
+      "bytes": 3351760,
+      "removed": true
+    },
+    "earlierWarningRejectedAttempt": "private-pipe-security-managed-1793985625721.json"
+  },
+  "typecheckPassed": true,
+  "newAnonymousPipes": 3,
+  "verifiedPipeHandles": 6,
+  "pipeDaclMask": 1180063,
+  "tokenOpenMask": 8,
+  "tokenDefaultDaclChanged": false,
+  "existingObjectSecurityChanged": false,
+  "requiredNativePipeChecks": 36,
+  "nativePipeChecksRunLocally": false,
+  "nativeAcceptance": false,
+  "originalOwnerAcceptedChecks": 0,
+  "installedChanged": false,
+  "newRuntimeOrSdkDownloads": false
+}

@@ -1,0 +1,129 @@
+{
+  "schema": "switchyard-editor-project-choices-native/v1",
+  "sourceCommit": "cf3bb4c5c456802d232d9250e7de1032687febab",
+  "mergeCommit": "94010f1cc8922ac1288419d7ed3dd59eb0110a4c",
+  "sourceTree": "80ce528f780a7f13919ba61c1dfa0c088e2c9659",
+  "runId": 42395492107,
+  "artifacts": [
+    {
+      "artifactId": 13584105602,
+      "shard": "16",
+      "zipBytes": 4508,
+      "zipSha256": "37cf2fce4d4a33e34cf22df6bbb08cce2e417b4b019cda342f9ad3e686314695",
+      "envelopeSha256": "f91da4be0970ff037bae4cd7d1f93ea2a2dc68d973856e646885554366dd27fe",
+      "receiptSha256": "58273af7028bae4a4851838fadbb65e80be79767875aed525670c61c15f1a354",
+      "receiptId": "9e013552-9462-4899-a7a7-cbc80036f0c3",
+      "totals": {
+        "required": 25,
+        "passed": 25,
+        "failed": 0,
+        "tests": 149,
+        "passedTests": 144,
+        "failedTests": 0,
+        "skippedTests": 5,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "artifactId": 13583636802,
+      "shard": "10",
+      "zipBytes": 4253,
+      "zipSha256": "05abf809f3f68847450b4755aa974ef8d746cc92f623fd92f5b35a4ff75f2a4e",
+      "envelopeSha256": "81a0841e6c7e5f6bfed9d6c820025b50ac9583170dc69a825ef58eb79fa4b1a8",
+      "receiptSha256": "998e1f9cf86d3f975e2b33e00c9bd159a0e9d767c9c1c65efba12890dafc50f6",
+      "receiptId": "cdb0b6a0-03ed-448c-b401-6c93e31468c0",
+      "totals": {
+        "required": 23,
+        "passed": 23,
+        "failed": 0,
+        "tests": 183,
+        "passedTests": 181,
+        "failedTests": 0,
+        "skippedTests": 2,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "artifactId": 13583592024,
+      "shard": "20",
+      "zipBytes": 4582,
+      "zipSha256": "ed7991f53783b189fbb5f81aa3ef58a74b0fa3ed6a3eae11f58a1472d48ac7ac",
+      "envelopeSha256": "18bebf24f16f1d97f7e42458f21d6f0977a70c9a82cc6ce8018de4a2733716a8",
+      "receiptSha256": "056dd9a1aafdda41d71a70e2f3c057fdc4f6995411eacd651e67236c10e720e7",
+      "receiptId": "554d7d26-f264-42f9-bcba-acf2bab47ebd",
+      "totals": {
+        "required": 24,
+        "passed": 24,
+        "failed": 0,
+        "tests": 317,
+        "passedTests": 300,
+        "failedTests": 0,
+        "skippedTests": 17,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    }
+  ],
+  "acceptedGroups": [
+    {
+      "file": "apps/vscode-extension/test/studio-windows-task-client.test.ts",
+      "pattern": null,
+      "durationMs": 758,
+      "effectiveTimeoutMs": 45000,
+      "testCounts": {
+        "total": 15,
+        "passed": 15,
+        "failed": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "receiptId": "9e013552-9462-4899-a7a7-cbc80036f0c3",
+      "receiptSha256": "58273af7028bae4a4851838fadbb65e80be79767875aed525670c61c15f1a354",
+      "shard": "16"
+    },
+    {
+      "file": "tools/layout-studio/coding-task-owners.test.mjs",
+      "pattern": "saved project inventory uses the selected protected owners without native inspection or authority",
+      "durationMs": 3825,
+      "effectiveTimeoutMs": 45000,
+      "testCounts": {
+        "total": 1,
+        "passed": 1,
+        "failed": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "receiptId": "cdb0b6a0-03ed-448c-b401-6c93e31468c0",
+      "receiptSha256": "998e1f9cf86d3f975e2b33e00c9bd159a0e9d767c9c1c65efba12890dafc50f6",
+      "shard": "10"
+    },
+    {
+      "file": "tools/layout-studio/coding-task-owners.test.mjs",
+      "pattern": "project inventory groups distinct acknowledged tasks and refuses ambiguous saved loads",
+      "durationMs": 5086,
+      "effectiveTimeoutMs": 45000,
+      "testCounts": {
+        "total": 1,
+        "passed": 1,
+        "failed": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "receiptId": "554d7d26-f264-42f9-bcba-acf2bab47ebd",
+      "receiptSha256": "056dd9a1aafdda41d71a70e2f3c057fdc4f6995411eacd651e67236c10e720e7",
+      "shard": "20"
+    }
+  ],
+  "passedTests": 17,
+  "skippedTests": 0,
+  "originalManifestCommandsBoundsAndCleanupVerified": true,
+  "scope": "Native Windows protected owner/project inventories and signed Windows client contract. Provider and endpoint-reader doubles are explicit. Only these three named groups are promoted from their worker receipts.",
+  "completeSourceAcceptance": false,
+  "packageAcceptance": false,
+  "remaining": "The full source cohort has an unrelated host-action settlement failure. No live provider/account/task, interactive IDE, physical keyboard, frontend activation or installed-runtime acceptance is claimed."
+}

@@ -81,7 +81,11 @@ class RecordingEffects implements WindowsHostActionEffectPort {
 
 async function fixture(context: TestContext) {
   const directory = await mkdtemp(join(tmpdir(), "b122-windows-host-action-consumer-"));
-  context.after(async () => rm(directory, { recursive: true, force: true, maxRetries: 5, retryDelay: 20 }));
+  const consumers: CompanionWindowsHostActionConsumer[] = [];
+  context.after(async () => {
+    for (const consumer of [...consumers].reverse()) await consumer.stop();
+    await rm(directory, { recursive: true, force: true, maxRetries: 5, retryDelay: 20 });
+  });
   let clock = fixedNow;
   let token = 0;
   const store = new ProtectedJsonStore({ filePath: join(directory, "protected.jsonl"), authenticator, clock: () => clock });
@@ -95,7 +99,7 @@ async function fixture(context: TestContext) {
   });
   const executor = new RecordingExecutor();
   const effects = new RecordingEffects();
-  const create = (queuePort: WindowsHostActionQueuePort = queue, completionExecutor: RecordingExecutor = executor, applications: Readonly<Partial<Record<"vscode" | "terminal", FixedWindowsHostApplicationIdentity>>> = { vscode: identity("vscode"), terminal: identity("terminal") }) => new CompanionWindowsHostActionConsumer(
+  const create = (queuePort: WindowsHostActionQueuePort = queue, completionExecutor: RecordingExecutor = executor, applications: Readonly<Partial<Record<"vscode" | "terminal", FixedWindowsHostApplicationIdentity>>> = { vscode: identity("vscode"), terminal: identity("terminal") }) => { const consumer = new CompanionWindowsHostActionConsumer(
     store,
     queuePort,
     completionExecutor,
@@ -107,7 +111,7 @@ async function fixture(context: TestContext) {
       now: () => clock,
       claimTokenFactory: () => `isolated-windows-host-claim-${String(++token).padStart(4, "0")}`
     }
-  );
+  ); consumers.push(consumer); return consumer; };
   return { directory, store, queue, executor, effects, create, setClock(value: string) { clock = value; } };
 }
 
@@ -172,8 +176,21 @@ test("an unavailable reviewed host application settles not-started without invok
   await queueAction(setup.queue, "focus_vscode", "operation-unavailable-vscode");
   const consumer = setup.create(setup.queue, setup.executor, { terminal: identity("terminal") });
   await consumer.start();
-  await waitFor(() => setup.executor.records.length === 1, "unavailable VS Code settlement");
-  await consumer.stop();
+  try { await waitFor(() => setup.executor.records.length === 1, "unavailable VS Code settlement"); }
+  catch (error) {
+    await consumer.stop();
+    const entries = await setup.store.readEntries();
+    // Report fixed journal kinds and closed outcome tags only, never identities,
+    // authorization tokens, executable paths or the protected record itself.
+    const kinds = [...new Set(entries.map(entry => entry.kind))].sort();
+    const outcomes = entries.flatMap(entry => {
+      const payload = entry.payload;
+      if (!payload || typeof payload !== "object" || Array.isArray(payload)) return [];
+      const outcome = (payload as Record<string, unknown>).outcome;
+      return ["settled", "yielded", "reconciled"].includes(String(outcome)) ? [String(outcome)] : [];
+    });
+    throw new Error("Unavailable application settlement evidence: " + JSON.stringify({ completionCount: setup.executor.records.length, effectRequests: setup.effects.requests.length, kinds, outcomes }), { cause: error });
+  } finally { await consumer.stop(); }
   assert.equal(setup.effects.requests.length, 0);
   assert.equal(setup.executor.records[0]!.status, "failed");
   assert.match(setup.executor.records[0]!.summary, /vscode.*unavailable/i);
@@ -351,16 +368,15 @@ test("restart retries only durable external completion after its queue settlemen
 test("stop aborts a non-settling post-barrier native effect and records ambiguity without hanging", async (context) => {
   const setup = await fixture(context);
   await queueAction(setup.queue, "focus_vscode", "operation-stop-post-barrier");
-  let crossed!: () => void;
-  const started = new Promise<void>((resolve) => { crossed = resolve; });
+  let crossed = false;
   setup.effects.implementation = async (request) => {
     await request.beforeEffect();
-    crossed();
+    crossed = true;
     return new Promise<WindowsHostActionEffectResult>(() => undefined);
   };
   const consumer = setup.create();
   await consumer.start();
-  await started;
+  await waitFor(() => crossed, "post-barrier stop fixture entering its native effect");
   const before = Date.now();
   await consumer.stop();
   assert.ok(Date.now() - before < 500, "stop waited on a non-settling native port");
@@ -371,17 +387,16 @@ test("stop aborts a non-settling post-barrier native effect and records ambiguit
 test("stop before the native barrier admits no effect and settles failed", async (context) => {
   const setup = await fixture(context);
   await queueAction(setup.queue, "focus_terminal", "operation-stop-pre-barrier");
-  let entered!: () => void;
-  const ready = new Promise<void>((resolve) => { entered = resolve; });
+  let entered = false;
   setup.effects.implementation = async (request) => {
-    entered();
+    entered = true;
     await new Promise<void>((resolve) => request.signal.addEventListener("abort", () => resolve(), { once: true }));
     await request.beforeEffect();
     return { disposition: "committed", summary: "must not commit" };
   };
   const consumer = setup.create();
   await consumer.start();
-  await ready;
+  await waitFor(() => entered, "pre-barrier stop fixture entering its native effect");
   await consumer.stop();
   assert.equal(setup.executor.records.length, 1);
   assert.equal(setup.executor.records[0]?.status, "failed");

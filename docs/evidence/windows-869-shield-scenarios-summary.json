@@ -1,0 +1,61 @@
+{
+  "schema": "switchyard-native-windows-shield-scenarios/v1",
+  "pullRequestHead": "869aa9e1be4c1ec665c7e1c693d6d339b7e60f2c",
+  "artifactRevision": "d365e150fffe2e3e15fc1dc3349e0da3a4de9c5e",
+  "workflowRun": 42023436468,
+  "success": true,
+  "scope": "five independently scheduled native Windows software scenarios with guest and native staging doubles",
+  "artifacts": [
+    {
+      "id": 13413340386,
+      "name": "switchyard-storage-contract-shield-clean-d365e150fffe2e3e15fc1dc3349e0da3a4de9c5e",
+      "archiveSha256": "a984435b4dc0be6e7c9ce57dc3def4b422dfd074b10f98d9c62755bcb0d1781c",
+      "localReceipt": "windows-869-shield-clean.json",
+      "receiptSha256": "c3f5bdae5c1402d58e47845ab670a14e423bd90a20528ee6765cd429cf8d560b",
+      "pattern": "Windows clean Shield input cannot establish complete coverage",
+      "effectiveTimeoutMs": 300000
+    },
+    {
+      "id": 13412633634,
+      "name": "switchyard-storage-contract-shield-change-d365e150fffe2e3e15fc1dc3349e0da3a4de9c5e",
+      "archiveSha256": "176cff17b6def5c4811c94ad8d763bba26b5b16f9e7d552a69f2ac072ce567e6",
+      "localReceipt": "windows-869-shield-change.json",
+      "receiptSha256": "00c6488f3fbc46ef3f6a1398f4218564175bf29696747f723e61d21ab3f1286d",
+      "pattern": "Windows shield_change_scan retains pinned scanner observations and incomplete failed receipts",
+      "effectiveTimeoutMs": 300000
+    },
+    {
+      "id": 13412603351,
+      "name": "switchyard-storage-contract-shield-codebase-d365e150fffe2e3e15fc1dc3349e0da3a4de9c5e",
+      "archiveSha256": "ec23d4d0861f23663ef6372a6482db03dfa4d6a456114ef54f63ecd163975e3b",
+      "localReceipt": "windows-869-shield-codebase.json",
+      "receiptSha256": "68ca2a94c8be8cf15b931ad066f72663a3eedfe33cc360ac7e7c04821a016600",
+      "pattern": "Windows shield_codebase_audit retains pinned scanner observations and incomplete failed receipts",
+      "effectiveTimeoutMs": 300000
+    },
+    {
+      "id": 13412214320,
+      "name": "switchyard-storage-contract-shield-supply-chain-d365e150fffe2e3e15fc1dc3349e0da3a4de9c5e",
+      "archiveSha256": "b92891f3a6e7a4f1818e576f1ec32c2a87d4f2950b87556129d10d0a658b0b7a",
+      "localReceipt": "windows-869-shield-supply-chain.json",
+      "receiptSha256": "f014dc24e1767a14a586dc7e3bbc0cceca830cf662ca9472b5a53735c33a8aa7",
+      "pattern": "Windows shield_supply_chain retains pinned scanner observations and incomplete failed receipts",
+      "effectiveTimeoutMs": 300000
+    },
+    {
+      "id": 13412119324,
+      "name": "switchyard-storage-contract-shield-release-d365e150fffe2e3e15fc1dc3349e0da3a4de9c5e",
+      "archiveSha256": "5a04d50ff90e34ab0c811c8ec300196a504303c1f7dc3330e63d852396632a05",
+      "localReceipt": "windows-869-shield-release.json",
+      "receiptSha256": "033a1478a08d76d591ae9dbf960ea8f8e8364b263a3d910e2057b452026bd0f2",
+      "pattern": "Windows release_shield retains pinned scanner observations and incomplete failed receipts",
+      "effectiveTimeoutMs": 300000
+    }
+  ],
+  "passingScenarios": 5,
+  "allChildCleanupVerified": true,
+  "originalChildTimeoutMs": 300000,
+  "nativeGuestAccepted": false,
+  "overallWorkflowAccepted": false,
+  "archivesRetainedLocally": false
+}

@@ -1,0 +1,16 @@
+{
+  "schema": "switchyard-client-native-prerequisite-failure/v1",
+  "sourceCommit": "531587b75ba7aac212072f6b2601fb3a3c5de105",
+  "mergeCommit": "1a4354fc41a5e517b2b02b235850c859afad472b",
+  "exactSourceAndMergeTree": "b2f2a225ffcb98c09da22f7c9da087667d1d7272",
+  "runId": 42579643586,
+  "jobId": 129037534807,
+  "result": "failed-before-tests",
+  "stage": "Pinned Python 3.13.3 download",
+  "diagnostic": "Unexpected HTTP response: 504",
+  "testReceiptAvailable": false,
+  "logSha256": "2a36c395546d2356ab520056aae975983657e27475eb5bd474d90921c7cdc0f1",
+  "manualWorkflowOperations": false,
+  "limitsChanged": false,
+  "localRuntimeDownloads": false
+}

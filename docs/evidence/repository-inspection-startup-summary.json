@@ -1,0 +1,217 @@
+{
+  "schema": "switchyard-repository-inspection-startup/v1",
+  "scope": "Avoid recursive submodule startup only after a validated, unchanged index proves that no gitlinks exist; join the actual execution-review reply before testing UI render readiness.",
+  "runs": [
+    {
+      "receiptId": "92a41a96-3408-422e-a23b-4ed92940353a",
+      "sha256": "e04a70fd48a72fda260b9606d8aa40cd9c902caa1a833bbbb8d7a8b7e549a704",
+      "success": true,
+      "totals": {
+        "required": 2,
+        "passed": 2,
+        "failed": 0,
+        "tests": 14,
+        "passedTests": 14,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "groups": [
+        {
+          "file": "tools/layout-studio/execution-ui.test.mjs",
+          "durationMs": 14118,
+          "effectiveTimeoutMs": 45000
+        },
+        {
+          "file": "tools/layout-studio/scanner-ui.test.mjs",
+          "durationMs": 12559,
+          "effectiveTimeoutMs": 45000
+        }
+      ],
+      "originalCommandsBoundsSkipsAndCleanupVerified": true,
+      "failures": []
+    },
+    {
+      "receiptId": "b608e122-8ffb-4999-bfbf-6dd8d36dffe7",
+      "sha256": "f144e4fca0763d95f6157fd09a3fd8b64023864941ab05cf7a62663c410c537e",
+      "success": false,
+      "totals": {
+        "required": 1,
+        "passed": 0,
+        "failed": 1,
+        "tests": 17,
+        "passedTests": 15,
+        "failedTests": 2,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "groups": [
+        {
+          "file": "packages/control-plane/test/git-inspector.test.ts",
+          "durationMs": 414,
+          "effectiveTimeoutMs": 45000
+        }
+      ],
+      "originalCommandsBoundsSkipsAndCleanupVerified": true,
+      "failures": [
+        {
+          "file": "packages/control-plane/test/git-inspector.test.ts",
+          "counts": {
+            "total": 17,
+            "passed": 15,
+            "failed": 2,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          },
+          "diagnosticSha256": "eb94d3b16d85a31455e0aa44d6659e06f57247c09fd4ccd0849a3fd939dc22d1"
+        }
+      ]
+    },
+    {
+      "receiptId": "a4db0832-3502-4166-a8ed-a4222c4b28bd",
+      "sha256": "4cd5453c9e992cf7de4436fb7b8e830bf993c61e68c96115f54c83b9494fecbe",
+      "success": true,
+      "totals": {
+        "required": 3,
+        "passed": 3,
+        "failed": 0,
+        "tests": 31,
+        "passedTests": 31,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "groups": [
+        {
+          "file": "tools/layout-studio/execution-ui.test.mjs",
+          "durationMs": 14001,
+          "effectiveTimeoutMs": 45000
+        },
+        {
+          "file": "tools/layout-studio/scanner-ui.test.mjs",
+          "durationMs": 12458,
+          "effectiveTimeoutMs": 45000
+        },
+        {
+          "file": "packages/control-plane/test/git-inspector.test.ts",
+          "durationMs": 390,
+          "effectiveTimeoutMs": 45000
+        }
+      ],
+      "originalCommandsBoundsSkipsAndCleanupVerified": true,
+      "failures": []
+    },
+    {
+      "receiptId": "f0a1f745-889c-4552-b036-977cfa409e9e",
+      "sha256": "1a9947b8a7694aae9826bcaa0a6f79daa71b0287a8dc0625c16361030e43ec45",
+      "success": true,
+      "totals": {
+        "required": 8,
+        "passed": 8,
+        "failed": 0,
+        "tests": 80,
+        "passedTests": 80,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "groups": [
+        {
+          "file": "tools/layout-studio/repository-execution-stop.test.mjs",
+          "durationMs": 516,
+          "effectiveTimeoutMs": 45000
+        },
+        {
+          "file": "tools/layout-studio/scanner-recipe-draft.test.mjs",
+          "durationMs": 16573,
+          "effectiveTimeoutMs": 120000
+        },
+        {
+          "file": "tools/layout-studio/scanner-recipe-save.test.mjs",
+          "durationMs": 36183,
+          "effectiveTimeoutMs": 120000
+        },
+        {
+          "file": "tools/layout-studio/task-authority-ignored-trees.test.mjs",
+          "durationMs": 1644,
+          "effectiveTimeoutMs": 120000
+        },
+        {
+          "file": "tools/layout-studio/task-authority-ignored-inputs.test.mjs",
+          "durationMs": 1697,
+          "effectiveTimeoutMs": 45000
+        },
+        {
+          "file": "tools/layout-studio/task-authority.test.mjs",
+          "durationMs": 4360,
+          "effectiveTimeoutMs": 45000
+        },
+        {
+          "file": "packages/control-plane/test/git-inspector.test.ts",
+          "durationMs": 385,
+          "effectiveTimeoutMs": 45000
+        },
+        {
+          "file": "packages/control-plane/test/snapshot-operations.test.ts",
+          "durationMs": 186,
+          "effectiveTimeoutMs": 45000
+        }
+      ],
+      "originalCommandsBoundsSkipsAndCleanupVerified": true,
+      "failures": []
+    },
+    {
+      "receiptId": "2baef381-e96f-4067-a1d3-49360bdea329",
+      "sha256": "e526b0f37e3ebcb0ddff81b2758f1a5f89ba3477a60eef8ec3abbd4c3ffd88bc",
+      "success": true,
+      "totals": {
+        "required": 1,
+        "passed": 1,
+        "failed": 0,
+        "tests": 17,
+        "passedTests": 17,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "groups": [
+        {
+          "file": "packages/control-plane/test/git-inspector.test.ts",
+          "durationMs": 389,
+          "effectiveTimeoutMs": 45000
+        }
+      ],
+      "originalCommandsBoundsSkipsAndCleanupVerified": true,
+      "failures": []
+    }
+  ],
+  "sourceFiles": {
+    "packages/control-plane/src/git-inspector.ts": "9a9203945322a469977fa05643160f33b75b93567435a3e834186f223efece1b",
+    "packages/control-plane/test/git-inspector.test.ts": "f42c3d3eefa2b31609e4923c89d3251fbfde0459fc7434e8b08ae8e47a34039c",
+    "tools/layout-studio/execution-ui.test.mjs": "2989c7e5e327249dac47d7d8abb27b5c0e438b9bf66be39d68cbd6256a72575d"
+  },
+  "typecheck": {
+    "command": "node node_modules/typescript/bin/tsc --noEmit -p tsconfig.json",
+    "exitCode": 0
+  },
+  "originalWindowsFailures": "full-native-58ecd54-ui-failures-summary.json",
+  "corrections": [
+    "Execution UI tests join the original HTTP review response, then retain the same two-second rendering assertion and 45-second complete-file budget.",
+    "Only a successfully parsed logical index without mode-160000 entries takes the fast path. A second exact read must match or the snapshot is incomplete.",
+    "Gitlinks, unmerged, malformed or unavailable index metadata retain the original recursive query and refusal behavior.",
+    "Real Git SHA-1 and SHA-256 repositories verify populated gitlinks, an empty index, unchanged index bytes and unchanged object databases; synthetic cases exercise concurrent index change and unavailable readback."
+  ],
+  "limitations": [
+    "The two new failing checks specify the optimization and its final-index guard; they do not represent an observed production safety exploit.",
+    "Linux focused UI time changes from 14,118/12,559 ms to 14,001/12,458 ms. This is not a reliable Windows performance estimate.",
+    "Full Windows scanner/execution file timeouts remain unresolved until exact native follow-up; no deadline change, new skip, split budget or replacement of real Git with a mock.",
+    "Overlapping receipts are not added into one total. No native app/account/model/HID operations."
+  ],
+  "reference": "https://git-scm.com/docs/gitsubmodules"
+}

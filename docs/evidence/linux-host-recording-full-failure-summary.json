@@ -1,0 +1,57 @@
+{
+  "schema": "switchyard-linux-host-recording-full-failure-summary/v1",
+  "sourceCommit": "7c44f05f183acd1027e5375cc06c16e458adcb30",
+  "receipt": "isolated-test-2c20a702-0a2a-438c-b52c-a53beb6605f2.json",
+  "success": false,
+  "accepted": false,
+  "totals": {
+    "required": 236,
+    "passed": 235,
+    "failed": 1,
+    "tests": 1463,
+    "passedTests": 1452,
+    "failedTests": 1,
+    "skippedTests": 10,
+    "cancelledTests": 0,
+    "todoTests": 0
+  },
+  "allChildCleanup": true,
+  "allProcessTreeTerminationComplete": true,
+  "failure": {
+    "file": "tools/layout-studio/task-history-inputs.test.mjs",
+    "kind": "hookFailed",
+    "code": "ENOTEMPTY",
+    "phase": "fixture teardown",
+    "underlyingFixture": "Server cleanup invoked suite.close asynchronously while a second direct suite.close ran; teardown did not await the server-owned cleanup promise."
+  },
+  "correction": "Fixture closes ingress, awaits server.cleanup exactly once, then allows its shared store root to retire. Assertions and deadlines unchanged.",
+  "correctedFocusedReceipt": "isolated-test-975eeef4-3999-438e-96e8-9d7bd678b277.json",
+  "correctedFocusedGroups": 9,
+  "correctedFocusedChecks": 85,
+  "ownedStagingCleanupReceipt": "failed-full-host-action-cleanup-1793920319057.json",
+  "ownedWorktreeAliasesAndEmptyFixturesRemoved": true,
+  "newCompleteRunAccepted": false,
+  "priorCompleteCheckpoint": {
+    "sourceCommit": "9dc0a944f7ecbbf39d7936b89ccc9297d69f9f80",
+    "groups": 235,
+    "passedTests": 1445,
+    "declaredSkips": 10
+  },
+  "acceptedFollowup": {
+    "sourceCommit": "35a64a982f63105f55ad55671d89b26ca0972c9c",
+    "receipt": "isolated-test-88ae253d-4c7d-4676-95c7-d0ac531dc3c6.json",
+    "success": true,
+    "totals": {
+      "required": 237,
+      "passed": 237,
+      "failed": 0,
+      "tests": 1474,
+      "passedTests": 1464,
+      "failedTests": 0,
+      "skippedTests": 10,
+      "cancelledTests": 0,
+      "todoTests": 0
+    },
+    "allCleanup": true
+  }
+}

@@ -1,0 +1,64 @@
+{
+  "schema": "switchyard-descendant-retirement-source/v1",
+  "basis": "c9a858a68e074ff8ebc83eb7cadc8a77e8ae7bef",
+  "sourceSha256": {
+    "scripts/windows-descendant-query.mjs": "58cbb9483045e9f703c9b192f5c94f63b600825835fc58ffa117b5914c8b7455",
+    "scripts/windows-descendant-query.test.mjs": "bbefcc621aa332ab7e14af3fa36956e0ad820edb70a609702c6d99bb2d4938c8",
+    "scripts/windows-restricted-owner-report.mjs": "0be8a99fc6f6ef3a546ae84e799c8ad230e5d8512c52ea6d7d77c50d0befaa8f",
+    "scripts/windows-restricted-owner-report.test.mjs": "a5391993e0eef8b4960c9368187eb1dc61608ed045e1ec8edcefe28ab4ea8743",
+    "deployment/windows/test-support/storage-broker-protocol/DescendantQueryProtocol.cs": "8692ebc3b2ba732cbbb0b856762465522d823ea5bbe2930158e3417ed8976879",
+    "deployment/windows/test-support/storage-broker-protocol/DescendantQueryProtocolProof.cs": "929db6bceefc19835e4cb19273d39e79d29b6884432864de4bd8e3f40a6bb9e9",
+    "deployment/windows/test-support/storage-broker-protocol/NativeRestrictedHostProof.cs": "f05facdbc3c313980cf490be1efec8d2e22ad5a0306badd6f4a29685091309a2"
+  },
+  "focused": {
+    "receipt": "isolated-test-311ef0f9-d216-40f1-a80d-ba69b098e64a.json",
+    "totals": {
+      "required": 4,
+      "passed": 4,
+      "failed": 0,
+      "tests": 50,
+      "passedTests": 50,
+      "failedTests": 0,
+      "skippedTests": 0,
+      "cancelledTests": 0,
+      "todoTests": 0
+    },
+    "allChildAndTreeCleanupVerified": true
+  },
+  "installedChanged": false,
+  "additionalStatusOnlySlots": [
+    65,
+    66,
+    67,
+    68
+  ],
+  "maximumSequence": 68,
+  "grantedMask": 8,
+  "nativeAccepted": false,
+  "deadlineMs": 90000,
+  "managed": {
+    "receipt": "descendant-retirement-managed-1793989730972.json",
+    "builds": [
+      {
+        "name": "helper",
+        "warnings": 0,
+        "errors": 0,
+        "managedAssemblySha256": "a6b3700dba19f6a24b166ee3a1b3d9ba4b401e7a80f9229378bbae3df94b79ae",
+        "managedPeSubsystem": 2
+      },
+      {
+        "name": "proof",
+        "warnings": 0,
+        "errors": 0,
+        "managedAssemblySha256": "903a17b30768847e5abda9abfdf9796af58c786d2722273095ed23b315603a92",
+        "managedPeSubsystem": 3
+      }
+    ],
+    "portableChecks": 2114,
+    "ownedCleanup": {
+      "files": 149,
+      "bytes": 3387035,
+      "removed": true
+    }
+  }
+}

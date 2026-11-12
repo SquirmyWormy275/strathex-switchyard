@@ -1,0 +1,62 @@
+{
+  "schema": "switchyard-restricted-random-native/v1",
+  "source": "a9cefaf2e8d763839ef54f9b684b9f9138e6bf12",
+  "executionMerge": "d3a3103304351eb45fd975153486e99eb90e917f",
+  "runId": 42165008093,
+  "jobId": 127719564071,
+  "artifactId": 13478727109,
+  "archiveSha256": "477d90a04a61039f5b5cb3037601e0022d77387cbe11a31f9d00fcf0df4fe12d",
+  "receipt": "windows-restricted-random-a9c-native.json",
+  "accepted": false,
+  "randomAccess": {
+    "schema": "switchyard-restricted-random-access/v1",
+    "handlesClosedVerified": true,
+    "buffersClearedVerified": true,
+    "entries": [
+      {
+        "token": "restricted",
+        "systemStatus": 0,
+        "providerOpenStatus": 0,
+        "providerStatus": 0,
+        "providerCloseStatus": 0
+      },
+      {
+        "token": "creator",
+        "systemStatus": 0,
+        "providerOpenStatus": 0,
+        "providerStatus": 0,
+        "providerCloseStatus": 0
+      }
+    ]
+  },
+  "childExit": {
+    "waitResult": 0,
+    "exitCode": 134,
+    "resultAvailable": false
+  },
+  "standardIo": {
+    "schema": "switchyard-restricted-child-stdio/v1",
+    "standardHandles": 3,
+    "inheritanceRestricted": true,
+    "stdinEof": true,
+    "stdoutBytes": 0,
+    "stderrBytes": 663,
+    "outputBounded": true,
+    "handlesClosedVerified": true,
+    "drainsCompleted": true,
+    "stderr": {
+      "category": "assertion",
+      "function": "ncrypto::CSPRNG",
+      "code": null,
+      "sourceFile": "node.cc",
+      "sourceLine": 1221
+    }
+  },
+  "failedFixturePreserved": true,
+  "finding": "Both system-preferred and freshly opened explicit RNG provider calls succeed under restricted and creator impersonation in the already running parent. The cold restricted Node child still aborts at ncrypto::CSPRNG; these observations do not identify or repair its startup failure.",
+  "limits": [
+    "No entropy leaves the probe; buffers and provider handles verify cleanup.",
+    "No cryptographic fallback, token relaxation, privilege change or account fallback.",
+    "Complete failed-fixture retirement and restricted owner journey remain unaccepted."
+  ]
+}

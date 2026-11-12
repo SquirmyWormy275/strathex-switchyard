@@ -1,0 +1,167 @@
+{
+  "schema": "switchyard-provider-helper-retirement-source/v1",
+  "at": "2026-11-07T02:00:21.888628+00:00",
+  "baseSource": "7f0e0c17542265020c54f679f72f8dbb95a32082",
+  "sourceFiles": {
+    "apps/windows-companion/src/windows-provider-process.ts": "4ed667b3737ca7ab7b0dca16a05a8aea11ea931c65555da3a0dee506ac6f22f8",
+    "apps/windows-companion/src/provider-desktop.ts": "acbb3add74a8a44513e98a26b2cdcb2757858e5db199f8643da00525d1e8ba11",
+    "apps/windows-companion/src/provider-desktop-effects.ts": "cda7b1cc0cf5f8e56367b3cead31374ec4df97f317de30cb89759c5611713d2d",
+    "apps/windows-companion/src/provider-desktop-adapter.ts": "276f7f16c61f7e677f63dfedf9909bb211e0256edd1b3d18dabb7153581d7e68",
+    "apps/windows-companion/test/windows-provider-process.test.ts": "f8269a2a55a329696e09cce46230ada924a9f5b873acc1ba24c1c7df51b844e0",
+    "apps/windows-companion/test/provider-desktop.test.ts": "b4c643048a8c3e98a74278618fc17953f8a7200bbee36fed59597712fc54283c",
+    "apps/windows-companion/test/provider-desktop-effects.test.ts": "d6f332000ff95452272462974a9862089806e19c8483a9688be298b874dc69e9",
+    "apps/windows-companion/test/provider-desktop-adapter.test.ts": "13ed08c99b4f187132cc989f83add6e0f85bce69b67c42dd79b73cc7681adeaa",
+    "apps/windows-companion/provider-desktop-helper/Program.cs": "090a2b0450a3bb9dcc7f7ed1c904dfe264f765bf4dd63015acd3a436a75be939"
+  },
+  "receipts": [
+    {
+      "name": "isolated-test-5a6cd3e5-24a1-4f42-b758-991434e3980a.json",
+      "sha256": "1d22036e7fd781e0e2e6465ecab9f3666fefe86b92703532bc1f3b96d1b65109",
+      "success": false,
+      "totals": {
+        "required": 1,
+        "passed": 0,
+        "failed": 1,
+        "tests": 16,
+        "passedTests": 11,
+        "failedTests": 5,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "name": "isolated-test-081dc275-923f-4a56-b72d-f93eb820c74d.json",
+      "sha256": "334eb93bf69804fb66e68d275a7d504e323a7e5d753a8e5a675ec4c48e677a99",
+      "success": true,
+      "totals": {
+        "required": 1,
+        "passed": 1,
+        "failed": 0,
+        "tests": 16,
+        "passedTests": 16,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "name": "isolated-test-6db778c0-041e-4f61-8cf9-7e0f0f9e472f.json",
+      "sha256": "2f240749243653a832f09ba071d39abbe54bab3c1bfce523d7cbd07dc31ff8ad",
+      "success": true,
+      "totals": {
+        "required": 1,
+        "passed": 1,
+        "failed": 0,
+        "tests": 17,
+        "passedTests": 17,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "name": "isolated-test-d817edce-38bb-4d1c-9474-1fb2e6066902.json",
+      "sha256": "1e59f95ddd16421a1ae821fe3791934c28d0affbfcc591a7936a7608538bf7ba",
+      "success": true,
+      "totals": {
+        "required": 6,
+        "passed": 6,
+        "failed": 0,
+        "tests": 63,
+        "passedTests": 63,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "name": "isolated-test-7e93586f-2566-42ba-89cd-988e38c7cc90.json",
+      "sha256": "5e22fa3f649d5960212e954be766f8e1d8eae172aec09e51ef70acd0617d5118",
+      "success": false,
+      "totals": {
+        "required": 1,
+        "passed": 0,
+        "failed": 1,
+        "tests": 13,
+        "passedTests": 12,
+        "failedTests": 1,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "name": "isolated-test-c93fd05a-74e7-499c-9d43-6df38118ef54.json",
+      "sha256": "f485261edbcc8d4a0f045ee9e36bf45528d45ef5394d6892893d5998fda5122f",
+      "success": true,
+      "totals": {
+        "required": 1,
+        "passed": 1,
+        "failed": 0,
+        "tests": 13,
+        "passedTests": 13,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "name": "isolated-test-2cd945df-35ea-4747-8197-d5ce364824df.json",
+      "sha256": "0b4bdea4792cba80b10634e87703bca21ec60192b256ffeed50b379c04d91067",
+      "success": true,
+      "totals": {
+        "required": 6,
+        "passed": 6,
+        "failed": 0,
+        "tests": 64,
+        "passedTests": 64,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    }
+  ],
+  "distinctFocusedGroups": 6,
+  "distinctFocusedPasses": 64,
+  "reproducedRegressionFailures": 6,
+  "newRegressionCases": 8,
+  "ownedNodeChildCases": 2,
+  "postAuthorizationJournalCases": 2,
+  "typecheck": "passed",
+  "helperNativeSourceUnchanged": true,
+  "cleanup": {
+    "everyChildVerified": true,
+    "everyTreeVerified": true,
+    "emptyOwnedRootRemoved": true
+  },
+  "effects": {
+    "providerLaunches": 0,
+    "nativeWindowFocus": 0,
+    "accountChanges": 0,
+    "modelRequests": 0,
+    "hardwareOperations": 0,
+    "newDependencyDownloads": 0
+  },
+  "behavior": [
+    "Helper ownership is reserved before asynchronous startup; concurrent operations refuse.",
+    "Owned-session results and errors wait for exact helper close within two seconds. An unconfirmed original session stays owned and blocks replacement until a later exact exit observation; concurrent admission itself refuses immediately.",
+    "Protocol errors clear queued output; final protocol failure or unread responses cannot promote an earlier result.",
+    "A cancellation-state read failure during an operation remains failed/ambiguous in the durable effect ledger and cannot be replayed as a refusal before effect."
+  ],
+  "limitations": [
+    "These are source checks with isolated provider/signature/session doubles and two owned Node child cases; they do not accept native Windows provider windows.",
+    "The unchanged native helper still uses TOKEN_QUERY 8 and its existing process birth, image, owner/session and foreground checks.",
+    "Suite Windows focus wiring and ordinary-user native Windows acceptance remain unfinished.",
+    "The commissioned Windows companion source does not alter the installed Linux Suite payload."
+  ],
+  "privateReceipt": {
+    "name": "provider-helper-retirement-source.json",
+    "sha256": "05df41b434bea8bb831563fe9a86a1733e6d844110c03e2e6d43e778aed19142"
+  }
+}

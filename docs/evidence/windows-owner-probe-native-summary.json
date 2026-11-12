@@ -1,0 +1,30 @@
+{
+  "sourceCommit": "6f2097b5a70c64620ff347a67082a858d52a23df",
+  "executionCommit": "0bf08df2a8e7fedb4d608b2e55e5c4580c581aeb",
+  "sourceAndExecutionTree": "cd159c6d7d310ece2601484a1b51999b6726adef",
+  "artifactId": 13507198266,
+  "archiveBytes": 4260,
+  "runId": 42229695432,
+  "archiveSha256": "aa686e36367ded6780cb68cc5cadf6f1c66ad5bed8814278b685153b3b811194",
+  "zipSavedLocally": false,
+  "schema": "switchyard-windows-owner-probe-native/v1",
+  "jobId": 127932630694,
+  "privateReceipt": "windows-probe-6f-native.json",
+  "helperSha256": "80943054ed9ac1c6c1b27f3b467d0566fcf6ad241b5a781365458f55a6fe5887",
+  "failure": {
+    "waitResult": 0,
+    "exitCode": 2,
+    "resultAvailable": true,
+    "childReportedSuccess": false,
+    "ownerReportedSuccess": false,
+    "completedChecks": 0,
+    "failedPhase": "probe-identity-created-worker-exit",
+    "failureCategory": "Error",
+    "stateLockFailure": null
+  },
+  "ordinaryOwnerChecks": 8,
+  "restrictedMetadataChecks": 13,
+  "restrictedNativeExchangeChecks": 31,
+  "finding": "Setup identity enters its actual native command; the guardian child is created but exits without a verified readiness frame. Protected state and mode update already completed. The exact managed startup operation is not yet identified.",
+  "restrictedOwnerAccepted": false
+}

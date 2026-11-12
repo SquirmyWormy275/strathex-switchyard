@@ -1,0 +1,86 @@
+{
+  "schema": "switchyard-physical-workspace-lifecycle-source-summary/v1",
+  "baseCommit": "997584540ed40129ee035d9d743782638891df05",
+  "sourceFiles": {
+    "tools/layout-studio/suite.mjs": "f54703e0b8a01188d49171140ac1785c86a42566216bf6efb47ff689f6dae465",
+    "tools/layout-studio/custom-agents.mjs": "f0f48685ed4413824224a28dcbc5c8b86ff5e76d2ac5fe79acda63769b1cac66",
+    "tools/layout-studio/role-dispatch.test.mjs": "eb7ad8971ee072774cdcb0e45df6d056427fa6828fb234e1032ac38e7ed487c2",
+    "tools/layout-studio/native-focus-gateway.test.mjs": "610c15d3e7ba0ae2b80193029dc22989372c98bf637162064f362fccaa1811b7"
+  },
+  "receipts": [
+    {
+      "id": "c2efc5ed-024a-47b2-9c50-9b4a16732b0e",
+      "sha256": "68fecb64db4832d8bf5ae69b80f1569c609deb26b4f9e183ba634011e03dd96d",
+      "success": false,
+      "totals": {
+        "required": 1,
+        "passed": 0,
+        "failed": 1,
+        "tests": 13,
+        "passedTests": 8,
+        "failedTests": 5,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "originalManifestCommandsBoundsSkipsAndCleanupVerified": true
+    },
+    {
+      "id": "0cb980ab-bded-4db4-9a5b-132582c9f813",
+      "sha256": "7a07d5cbde2f872f32e36e58f28fdb019cd7b3beb3328d43c42c067a78b53354",
+      "success": true,
+      "totals": {
+        "required": 1,
+        "passed": 1,
+        "failed": 0,
+        "tests": 13,
+        "passedTests": 13,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "originalManifestCommandsBoundsSkipsAndCleanupVerified": true
+    },
+    {
+      "id": "d6dea3d1-bf98-4fac-aa0b-0338e818e94e",
+      "sha256": "98849a6cee391c967da60f3d10d45537a5f0e4ec839cc8011a569371a3613425",
+      "success": true,
+      "totals": {
+        "required": 7,
+        "passed": 7,
+        "failed": 0,
+        "tests": 107,
+        "passedTests": 106,
+        "failedTests": 0,
+        "skippedTests": 1,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "originalManifestCommandsBoundsSkipsAndCleanupVerified": true
+    }
+  ],
+  "typechecks": [
+    "tsconfig.json",
+    "apps/vscode-extension/tsconfig.build.json"
+  ],
+  "scope": {
+    "workspaceSelectionGenerationCaptured": true,
+    "departureAttemptInvalidatesPriorIntents": true,
+    "roundTripCannotReviveIntent": true,
+    "persistedSelectionCheckedBeforeCustomEnqueue": true,
+    "shutdownRefusesPendingCustomEnqueue": true,
+    "failedDepartureDoesNotReviveRequest": true,
+    "nativeFocusUsesSameGenerationGuard": true,
+    "clientLaunchReceivesSameWorkspaceGuard": true,
+    "alreadyQueuedCommandsPreserved": true,
+    "staleResultAttributionRefused": true,
+    "freshRequestAfterReturnAccepted": true
+  },
+  "limitations": [
+    "The new effect-boundary enforcement covers custom-agent enqueue and existing native-focus/client-launch guard callbacks. Other provider adapters still need equivalent checks at their native-effect boundaries.",
+    "Generation belongs to the active Suite process. A different process rewriting persisted selection away and back entirely between reads is not represented by this in-memory generation.",
+    "Native focus calls are explicit doubles, exercised through real authenticated HTTP; no actual window, account, task, keyboard or frontend effect occurred.",
+    "Source-level only; installed application remains 738c1f7; complete-suite acceptance remains separate."
+  ]
+}

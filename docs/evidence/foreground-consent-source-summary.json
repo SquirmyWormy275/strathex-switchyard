@@ -1,0 +1,58 @@
+{
+  "schema": "switchyard-foreground-consent-source-summary/v1",
+  "baseCommit": "4d517711a2b86b2943cc6eb0f237eaaf04930dca",
+  "sourceFiles": {
+    "tools/layout-studio/suite.mjs": "d3c64fdc9326b5880e53ee146e10ec15496e38b0b4c0ad3bfd354c1598fb1802",
+    "tools/layout-studio/foreground.test.mjs": "cbd7f83dd73303cdd656eac17ad3d4cd77b6dc53f7b5e56d03aba2d972c2e8ec"
+  },
+  "receipts": [
+    {
+      "id": "9ac25426-39ab-4466-9c40-71be90459d4d",
+      "kind": "original-regressions",
+      "sha256": "c4afc7d35917ce0af7c541d8b757449fb21758da77cececb0b53b73b718e23bf",
+      "totals": {
+        "required": 1,
+        "passed": 0,
+        "failed": 1,
+        "tests": 14,
+        "passedTests": 11,
+        "failedTests": 3,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "originalManifestCommandsBoundsSkipsAndCleanupVerified": true
+    },
+    {
+      "id": "d29477d2-f7ff-416c-808a-845d550afd59",
+      "kind": "accepted",
+      "sha256": "180f6d84ae0a032c98591c5a51f9f7e8b3aa86d3f0b855af486e4742fc4adb7c",
+      "totals": {
+        "required": 8,
+        "passed": 8,
+        "failed": 0,
+        "tests": 123,
+        "passedTests": 123,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "originalManifestCommandsBoundsSkipsAndCleanupVerified": true
+    }
+  ],
+  "accepted": {
+    "groups": 8,
+    "passedTests": 123,
+    "skippedTests": 0
+  },
+  "scope": [
+    "Foreground sampling checks the exact persisted recording generation and source consent before native reads, after replies and inside encrypted persistence.",
+    "A pause committed by an independent store stops the old sampler before another read. A late old reply or error cannot append to or pause renewed consent.",
+    "An old sampler retires its own source without resetting the new recording. Existing bounded unavailable-source retries and deliberate resume remain intact."
+  ],
+  "limitations": [
+    "Fixtures use two independent stores sharing encrypted files and controlled foreground replies; they do not read the user's actual foreground window, register hotkeys or open hardware.",
+    "Installed 57af859 and complete Linux 0c025df predate this correction. Native platform, live account and frozen frontend acceptance remain separate."
+  ]
+}

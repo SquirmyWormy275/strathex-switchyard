@@ -120,6 +120,7 @@ export interface DurableOperationClaim {
 }
 
 export interface DurableOperationResult {
+  readonly evidenceCompleteness?: "complete" | "incomplete";
   readonly action: string;
   readonly targetSnapshotId?: string;
   readonly authorityId?: string;
@@ -432,10 +433,18 @@ export class OperationSagaStore {
    * manufactures a completed result or receipt; it merely releases the active
    * dispatch scope so a fresh explicit generation can re-observe provider state.
    */
-  async settleRecoveredParents(): Promise<readonly ReconciliationResult[]> {
+  async settleRecoveredParents(options: Readonly<{ rootOperationId?: string }> = {}): Promise<readonly ReconciliationResult[]> {
+    if (options.rootOperationId !== undefined) nonEmpty(options.rootOperationId, "root operation id");
     const results: ReconciliationResult[] = [];
     for (;;) {
-      const operations = new Map((await this.list()).map((operation) => [operation.id, operation]));
+      const all = new Map((await this.list()).map((operation) => [operation.id, operation]));
+      const belongs = (operation: OperationRecord): boolean => {
+        if (!options.rootOperationId) return true;
+        let current = operation; const seen = new Set<string>();
+        while (current.parentId) { if (seen.has(current.id)) return false; seen.add(current.id); const parent = all.get(current.parentId); if (!parent) return false; current = parent; }
+        return current.id === options.rootOperationId;
+      };
+      const operations = new Map([...all].filter(([, operation]) => belongs(operation)));
       let candidate: OperationRecord | undefined;
       let evidence: readonly OperationRecord[] = [];
 
@@ -904,21 +913,24 @@ function isFinalCommandStatus(status: CommandStatus): boolean {
 export class DurableOperationCoordinator {
   private readonly operations: OperationSagaStore;
   private readonly receipts: ReceiptLedger;
+  private readonly scopeDigest?: string;
 
-  constructor(operations: OperationSagaStore, receipts: ReceiptLedger) {
+  constructor(operations: OperationSagaStore, receipts: ReceiptLedger, options: { readonly scopeDigest?: string } = {}) {
+    if (options.scopeDigest !== undefined && !/^[a-f0-9]{64}$/.test(options.scopeDigest)) throw new Error("A host operation scope must be one exact reviewed SHA-256 digest.");
     this.operations = operations;
     this.receipts = receipts;
+    this.scopeDigest = options.scopeDigest;
   }
 
   async claim(input: DurableOperationClaim): Promise<DurableCommandOperationLease> {
     const action = nonEmpty(input.action, "dispatch action");
     const targetSnapshotId = input.targetSnapshotId ?? `<no-target:${input.sessionId ?? "host"}>`;
-    const scope = deriveIdempotencyKey({ action, targetSnapshotId, sessionId: input.sessionId ?? "none", authorityId: input.authorityId ?? "none" });
+    const scope = deriveIdempotencyKey({ action, targetSnapshotId, sessionId: input.sessionId ?? "none", authorityId: input.authorityId ?? "none", ...(this.scopeDigest ? { hostReviewScopeDigest: this.scopeDigest } : {}) });
     const claimed = await this.operations.claimScope({
       scope,
       action,
       targetSnapshotId,
-      details: { ...(input.sessionId ? { sessionId: input.sessionId } : {}), ...(input.authorityId ? { authorityId: input.authorityId } : {}), targetBound: input.targetSnapshotId ? "true" : "false" }
+      details: { ...(input.sessionId ? { sessionId: input.sessionId } : {}), ...(input.authorityId ? { authorityId: input.authorityId } : {}), ...(this.scopeDigest ? { hostReviewScopeDigest: this.scopeDigest } : {}), targetBound: input.targetSnapshotId ? "true" : "false" }
     });
     return {
       operationId: claimed.operation.id,
@@ -970,6 +982,7 @@ export class DurableOperationCoordinator {
    * produces a green receipt; it still produces a sanitized audit event.
    */
   async recordResult(lease: DurableCommandOperationLease, result: DurableOperationResult): Promise<{ readonly receiptId?: string }> {
+    if (result.evidenceCompleteness !== undefined && !["complete", "incomplete"].includes(result.evidenceCompleteness) || result.evidenceCompleteness === "incomplete" && result.status === "completed") throw new OperationSagaError("Incomplete evidence cannot establish a completed gate.");
     let operation = await this.requireOperation(lease.operationId);
     if (operation.action !== result.action) throw new OperationSagaError("A dispatch result cannot be recorded against a different operation action.");
     if (result.targetSnapshotId && operation.targetSnapshotId !== result.targetSnapshotId) {
@@ -1025,7 +1038,7 @@ export class DurableOperationCoordinator {
           targetSnapshotId: result.targetSnapshotId,
           ...(result.authorityId ? { authorityId: result.authorityId } : {}),
           result: receiptResultFor(result.status),
-          completeness: result.status === "incomplete" ? "incomplete" : "complete",
+          completeness: result.status === "incomplete" || result.evidenceCompleteness === "incomplete" ? "incomplete" : "complete",
           evidenceDigest: result.evidenceDigest,
           policyVersion: result.policyVersion,
           toolVersions: result.toolVersions,

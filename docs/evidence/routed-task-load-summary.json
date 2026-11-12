@@ -1,0 +1,45 @@
+{
+  "schema": "switchyard-routed-owned-task-load/v1",
+  "basis": "74d0d040695238b9380bf67036f5de6762a305ea",
+  "sourceSha256": {
+    "tools/layout-studio/suite.mjs": "4c016964f5e7feb50a119809fb2e9f85b91969336187b21f0f00100b4b843eec",
+    "tools/layout-studio/coding-task-owners.mjs": "d71170359443aab9ce0072c7a9938d2bba6adf764ffdeb86bc641e71ed2deaf3",
+    "tools/layout-studio/coding-task-owners.test.mjs": "56ed3a806514dd315d3f0219a1ec67990dad14974d65c63888836430d197b329"
+  },
+  "cohort": {
+    "receipt": "isolated-test-5702f21a-4ae5-4948-9f22-7a204b461ba1.json",
+    "groups": 6,
+    "passedTests": 91
+  },
+  "finalPrivacy": {
+    "receipt": "isolated-test-4e26598b-1351-4c8b-90ab-a955ca1398a8.json",
+    "groups": 2,
+    "passedTests": 40
+  },
+  "allChildAndTreeCleanupVerified": true,
+  "typecheck": true,
+  "httpDemonstration": {
+    "authenticatedLocalServer": true,
+    "realProtectedStateAndConfirmationLedger": true,
+    "provider": "controlled-double",
+    "syntheticResumeCount": 1,
+    "realProviderTasks": 0,
+    "modelTurns": 0,
+    "unauthenticatedAndUnexpectedPromptFieldsRefused": true,
+    "privateOwnerAndLoadRecordsOmittedFromGenericSnapshot": true
+  },
+  "checks": [
+    "Normal Studio routes open, observe, review, load, list safe outcomes, stop and retire an exact owner.",
+    "Workspace selection refuses an unconfirmed owner exit and preserves the original selection.",
+    "Keyboard-only mode persists its fence, refuses new effects and reports unconfirmed shutdown.",
+    "Externally changed selection refuses before a delayed native effect.",
+    "Individual stop and app close join owned operations and preserve failed retirement.",
+    "HTTP test server, Suite services and owned fixtures close in that order before state removal."
+  ],
+  "limits": [
+    "Existing task creation/text APIs retain their stdio behavior.",
+    "Frontend and exact authenticated IDE/terminal handoff are unfinished; no UI bytes changed.",
+    "Actual provider loading and the newer installed app journey remain unaccepted.",
+    "The complete 74d0d04 Linux run is independent and still active at publication."
+  ]
+}

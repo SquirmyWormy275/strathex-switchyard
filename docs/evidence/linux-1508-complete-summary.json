@@ -1,0 +1,40 @@
+{
+  "schema": "switchyard-linux-complete-summary/v1",
+  "sourceCommit": "1508ea97ff128586f75c03258654042454072400",
+  "receipt": "isolated-test-b96b71ab-bb11-40d3-b5e4-1616596fadf6.json",
+  "totals": {
+    "required": 246,
+    "passed": 246,
+    "failed": 0,
+    "tests": 1586,
+    "passedTests": 1575,
+    "failedTests": 0,
+    "skippedTests": 11,
+    "cancelledTests": 0,
+    "todoTests": 0
+  },
+  "allChildAndTreeCleanupVerified": true,
+  "ownedCleanupReceipt": "linux-1508ea9-cleanup-1793949817699.json",
+  "ownedCleanup": {
+    "schema": "switchyard-owned-linux-checkout-cleanup/v1",
+    "source": "1508ea97ff128586f75c03258654042454072400",
+    "runReceipt": "isolated-test-b96b71ab-bb11-40d3-b5e4-1616596fadf6.json",
+    "runAccepted": true,
+    "allChildAndTreeCleanupVerified": true,
+    "exactRootIdentityVerified": true,
+    "dependencyAliasesVerifiedRemoved": true,
+    "ownedBuildsRemoved": true,
+    "emptyArtifactsDirectoryRemoved": true,
+    "checkoutRemoved": true,
+    "rootRemoved": true,
+    "markerRemoved": true,
+    "ownedTestParentRemoved": true
+  },
+  "scope": "Complete required Linux manifest from an immutable published source checkout, including signed editor authorization and one exact Terminal creation with provider/editor doubles.",
+  "limits": [
+    "Eleven declared Windows-only skips; this is not native Windows acceptance.",
+    "Editor/native account/task attachment, frontend, physical hardware and approved work-tenant acceptance remain separate.",
+    "The installed application remains source 2c87c03; the extension launcher is not activated by this source run.",
+    "Later Windows import-observation source has separate focused and native followup evidence."
+  ]
+}

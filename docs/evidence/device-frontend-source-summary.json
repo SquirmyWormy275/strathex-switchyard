@@ -1,0 +1,221 @@
+{
+  "schema": "switchyard-device-frontend-source-evidence/v1",
+  "scope": "Advertised firmware setting forms and explicitly consented manual matrix diagnostics through the existing authenticated API and real device codecs with a synthetic transport",
+  "runs": [
+    {
+      "receiptId": "5bf7c56a-8682-4088-a993-b0ebc4790314",
+      "sha256": "13d1c238354fb0747978455836cffe0035b341ef3da91a83b421eae29f8d99ab",
+      "totals": {
+        "required": 13,
+        "passed": 13,
+        "failed": 0,
+        "tests": 109,
+        "passedTests": 109,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "files": [
+        "scripts/windows-complete-shards.test.mjs",
+        "scripts/run-isolated-tests.test.mjs",
+        "deployment/suite/release.test.mjs",
+        "tools/layout-studio/devices.test.mjs",
+        "tools/layout-studio/vial-dynamic.test.mjs",
+        "tools/layout-studio/vial-encoders.test.mjs",
+        "tools/layout-studio/vial-rules.test.mjs",
+        "tools/layout-studio/role-ui.test.mjs",
+        "tools/layout-studio/device-ui.test.mjs",
+        "tools/layout-studio/device-settings-ui.test.mjs",
+        "tools/layout-studio/connection-ui.test.mjs",
+        "tools/layout-studio/portable-ui.test.mjs",
+        "tools/layout-studio/observation-ui.test.mjs"
+      ],
+      "originalBoundsPreserved": true,
+      "ownedCleanupComplete": true
+    },
+    {
+      "receiptId": "7d249cac-3dc8-4304-a4fb-65608fd3e8f9",
+      "sha256": "4857d9edee5b71541891e7597bdb0057e9ac9fcd4df09676b783fceea5f2576c",
+      "totals": {
+        "required": 15,
+        "passed": 15,
+        "failed": 0,
+        "tests": 127,
+        "passedTests": 127,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "files": [
+        "scripts/windows-complete-shards.test.mjs",
+        "scripts/run-isolated-tests.test.mjs",
+        "deployment/suite/release.test.mjs",
+        "tools/layout-studio/devices.test.mjs",
+        "tools/layout-studio/vial-dynamic.test.mjs",
+        "tools/layout-studio/vial-encoders.test.mjs",
+        "tools/layout-studio/vial-rules.test.mjs",
+        "tools/layout-studio/role-ui.test.mjs",
+        "tools/layout-studio/device-ui.test.mjs",
+        "tools/layout-studio/device-settings-ui.test.mjs",
+        "tools/layout-studio/device-diagnostic-ui.test.mjs",
+        "tools/layout-studio/connection-ui.test.mjs",
+        "tools/layout-studio/portable-ui.test.mjs",
+        "tools/layout-studio/observation-ui.test.mjs",
+        "tools/layout-studio/matrix-diagnostics.test.mjs"
+      ],
+      "originalBoundsPreserved": true,
+      "ownedCleanupComplete": true
+    },
+    {
+      "receiptId": "22726d81-ca48-4208-9de4-6f9e11fe2d2c",
+      "sha256": "5ea74e1854e315eb6f16a91b78f83300f9099648357a60c861e12902c71f8f10",
+      "totals": {
+        "required": 15,
+        "passed": 15,
+        "failed": 0,
+        "tests": 128,
+        "passedTests": 128,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "files": [
+        "scripts/windows-complete-shards.test.mjs",
+        "scripts/run-isolated-tests.test.mjs",
+        "deployment/suite/release.test.mjs",
+        "tools/layout-studio/devices.test.mjs",
+        "tools/layout-studio/vial-dynamic.test.mjs",
+        "tools/layout-studio/vial-encoders.test.mjs",
+        "tools/layout-studio/vial-rules.test.mjs",
+        "tools/layout-studio/role-ui.test.mjs",
+        "tools/layout-studio/device-ui.test.mjs",
+        "tools/layout-studio/device-settings-ui.test.mjs",
+        "tools/layout-studio/device-diagnostic-ui.test.mjs",
+        "tools/layout-studio/connection-ui.test.mjs",
+        "tools/layout-studio/portable-ui.test.mjs",
+        "tools/layout-studio/observation-ui.test.mjs",
+        "tools/layout-studio/matrix-diagnostics.test.mjs"
+      ],
+      "originalBoundsPreserved": true,
+      "ownedCleanupComplete": true
+    }
+  ],
+  "overlap": "Runs overlap. The final 15 groups have 128 passing tests, including 11 firmware UI cases, four diagnostic UI cases and the expired-consent reload regression. Do not add these counts.",
+  "sourceFiles": [
+    {
+      "path": "tools/layout-studio/device-ui.mjs",
+      "sha256": "b499aafdccf6e53ab2fcb3380d1b8b3bf7f27827bbc1b15eb34929f57da55073"
+    },
+    {
+      "path": "tools/layout-studio/device-settings-ui.mjs",
+      "sha256": "79139f7982041772cdb864057c9199d4fc5672feb77e17b426dc9ac580d78d8e"
+    },
+    {
+      "path": "tools/layout-studio/device-diagnostic-ui.mjs",
+      "sha256": "232307a070a066f67c514b994463faf73755ff41af71afcc5517a835cc8ad903"
+    },
+    {
+      "path": "tools/layout-studio/device-settings-ui.test.mjs",
+      "sha256": "ad3181f9628ee55100cc5b1e808b9157e9635c66f4193939443f88823e60253b"
+    },
+    {
+      "path": "tools/layout-studio/device-diagnostic-ui.test.mjs",
+      "sha256": "c7d592d15b4ae5317bbd536436cd5f6d46e930050e3ca7778e7d062b1b78f3f9"
+    },
+    {
+      "path": "tools/layout-studio/matrix-diagnostics.mjs",
+      "sha256": "d39b420382569ea84fcecf1fb1b99570c8fdd74ded185a94f8463dcd962c186b"
+    },
+    {
+      "path": "tools/layout-studio/matrix-diagnostics.test.mjs",
+      "sha256": "0b8485ab5024bf2d5bf54b9a4cda79346c9b989916b62dfaf179fb4a07d2323d"
+    },
+    {
+      "path": "tools/layout-studio/index.html",
+      "sha256": "c74e2a7dc24066cd3e7161d1a85d212bee6c7396c4b5fd3c22862f07b5c7719e"
+    },
+    {
+      "path": "tools/layout-studio/style.css",
+      "sha256": "64cc60fdce28e0ea61a327efcf0a6cae8f7f16d4aa9655d60b6122e8bae573cd"
+    },
+    {
+      "path": "tools/layout-studio/serve.mjs",
+      "sha256": "ee1bf5e258b5bfddfbb64cfc68c4ad01a4a28921af921403ff65793203590b29"
+    },
+    {
+      "path": "tools/layout-studio/test-support/vial-fixture.mjs",
+      "sha256": "e7008a4d81341fc3842f3c24e509628c28406fb763e9a37695b0af0c2cd764f6"
+    }
+  ],
+  "interactionBoundary": "Browser-event fixtures call actual authenticated HTTP, encrypted workspace storage and Vial codecs through an explicit synthetic transport. This is not a rendered browser or physical keyboard.",
+  "liveDemonstration": {
+    "schema": "switchyard-device-settings-live-demo/v1",
+    "origin": "http://127.0.0.1:43335",
+    "checks": [
+      {
+        "name": "device-ui.mjs",
+        "sha256": "b499aafdccf6e53ab2fcb3380d1b8b3bf7f27827bbc1b15eb34929f57da55073"
+      },
+      {
+        "name": "device-settings-ui.mjs",
+        "sha256": "79139f7982041772cdb864057c9199d4fc5672feb77e17b426dc9ac580d78d8e"
+      },
+      {
+        "name": "device-diagnostic-ui.mjs",
+        "sha256": "232307a070a066f67c514b994463faf73755ff41af71afcc5517a835cc8ad903"
+      },
+      {
+        "name": "vial-settings.mjs",
+        "sha256": "8483d4580ad3c85aa2cbfe7dd99036d71a2f363ccae687e0ca50dce1d42e557c"
+      },
+      {
+        "name": "vial-keycodes.mjs",
+        "sha256": "ff1d6625e0f988be244a2588128394a21a714884d9b9df9fab1746945936781f"
+      },
+      {
+        "name": "vial-rules.mjs",
+        "sha256": "59f838c7ac1273ad137c34c5695a7858cd69a612007d4ea7cf7f9cae77d81ed1"
+      },
+      {
+        "name": "served diagnostic and settings controls"
+      },
+      {
+        "name": "hardware routes refused; saved synthetic readout preserved"
+      }
+    ],
+    "hardwareOpened": false,
+    "visualAcceptance": false,
+    "previousOwnedSyntheticStateRemoved": true
+  },
+  "preliminaryFindings": [
+    {
+      "stage": "first diagnostic UI test",
+      "result": "Four cases refused their first review because the UI looked for recording on state.policy instead of state.policyRules.",
+      "correction": "Use the existing policyRules.recording projection; all four original cases pass. No backend policy changed."
+    },
+    {
+      "stage": "first live HTTP demo",
+      "result": "The refusal assertion expected HTTP 400; the server correctly returned HTTP 409 for a rejected action.",
+      "correction": "The existing serve.mjs action-refusal contract was inspected; the assertion now checks exact 409 plus the synthetic refusal message. No server response changed."
+    }
+  ],
+  "limits": [
+    "No real keyboard was opened, unlocked, written, sampled or relocked. Firmware Dvorak and US host layout are unchanged.",
+    "No native account/task, installed-agent or model request occurred.",
+    "Browser control again failed before navigation with the existing timeoutMs error. Visual, responsive, interactive IDE, printer and physical keyboard acceptance are separate.",
+    "The new frontend is not installed; the existing installed release and all 54 workspaces are unchanged.",
+    "Original-xwhatsit optional firmware features and solenoid state/control remain outside the verified capability contract."
+  ],
+  "reviewBundle": {
+    "sourceCommit": "029ca57050f84b05dbdd580d05df9dbdbe438d11",
+    "digest": "a8e1b15fe918e9c4a4637d0ddb61b3040c47aa19f2d53c6d557cb5d09dde8ce1",
+    "assets": 27,
+    "allBytesVerified": true,
+    "priorPointerDatedBackupVerified": true,
+    "installed": false,
+    "visuallyAccepted": false
+  }
+}

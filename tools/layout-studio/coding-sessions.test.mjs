@@ -1,0 +1,263 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import { mkdtemp, mkdir, rm, readFile, readdir, writeFile, realpath, rename } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { randomUUID } from "node:crypto";
+import { createSuiteStore } from "./suite-store.mjs";
+import { createCodingSessions } from "./coding-sessions.mjs";
+import { createSuite } from "./suite.mjs";
+
+async function fixture(fn) {
+  const temporary = await mkdtemp(join(tmpdir(), "switchyard-coding-")), root = await realpath(temporary), stateRoot = join(root, "state"), repositoryRoot = join(root, "repository"), keys = new Map(), calls = [];
+  await mkdir(join(repositoryRoot, ".git"), { recursive: true });
+  const store = createSuiteStore({ root: stateRoot, secrets: { get: async (id, purpose) => keys.get(`${id}:${purpose}`), set: async (id, purpose, value) => { keys.set(`${id}:${purpose}`, value); } } });
+  await store.initialize("personal"); await store.initialize("other-client"); await store.initialize("company", "work");
+  for (const id of ["personal", "other-client"]) await store.update(id, "mode-select", (s) => { s.mode = "personal-companion"; });
+  let accountId = "a".repeat(64), providerRoot = repositoryRoot, failStart = false, failedIdentity = false, failRead = false, badResume = false, observation = "active", clock = Date.now();
+  const daemon = { account: async () => { calls.push("account"); return { type: "chatgpt", fingerprint: accountId, organizationVerified: false }; }, list: async () => { calls.push("list"); return [{ id: "synthetic-thread", observation }]; }, read: async (id) => { calls.push("read"); if (failRead) throw new Error("Synthetic unavailable thread"); return { id, repositoryRoot: providerRoot, observation }; }, resume: async (id) => { calls.push("resume"); await new Promise((r) => setTimeout(r, 20)); return { id, repositoryRoot: providerRoot, observation: "idle", permissions: badResume ? "danger-full-access" : "read-only/on-request", modelPromptSubmitted: false }; }, start: async () => { calls.push("start"); if (failStart) throw Object.assign(new Error("Synthetic uncertain create"), { createdThreadId: failedIdentity ? "synthetic-created-thread" : undefined }); return { threadId: "synthetic-created-thread" }; } };
+  const options = { store, daemon, platform: "linux", resolveCli: async () => "/synthetic/codex", now: () => clock }, service = createCodingSessions(options);
+  try { await fn({ root, stateRoot, repositoryRoot, store, calls, service, options, account: (v) => { accountId = v; }, wrongRoot: () => { providerRoot = join(root, "wrong-root"); }, badResume: () => { badResume = true; }, failStart: (identity = false) => { failStart = true; failedIdentity = identity; }, failRead: (v) => { failRead = v; }, idle: () => { observation = "idle"; }, stale: () => { clock += 31000; } }); }
+  finally { await rm(root, { recursive: true, force: true }); }
+}
+const existing = (repositoryRoot) => ({ sessionId: "synthetic-thread", repositoryRoot, label: "Local task label" });
+
+test("queued Codex status cannot inherit renewed, newly started or replaced observation consent", async () => {
+  for (const change of ["renewed", "new", "started", "paused", "excluded"]) await fixture(async ({ store, service, repositoryRoot, options }) => {
+    const task = await service.bind("personal", existing(repositoryRoot)), at = options.now();
+    const recording = { id: "observed", status: change === "started" ? "paused" : "recording", sources: ["agent-events"], exclusions: [], events: [], createdAt: at - 2, recordingSince: at - 1, recordingGeneration: "original", updatedAt: at - 1 };
+    await store.update("personal", "synthetic-observation", s => { s.observations = [recording]; });
+    const update = store.update.bind(store);
+    store.update = async (c, operation, mutate, request) => {
+      if (operation === "coding-session-status") await update(c, "synthetic-consent-change", s => {
+        if (change === "renewed") s.observations[0].recordingGeneration = "resumed-with-the-same-clock";
+        if (change === "new") s.observations = [{ ...recording, id: "new-recording" }];
+        if (change === "started") s.observations[0].status = "recording";
+        if (change === "paused") s.observations[0].status = "paused";
+        if (change === "excluded") s.observations[0].exclusions = ["codex"];
+      });
+      return update(c, operation, mutate, request);
+    };
+    try {
+      await service.status("personal", task.id);
+      assert.equal((await store.snapshot("personal")).observations[0].events.length, 0, change);
+    } finally { store.update = update; }
+  });
+});
+
+test("delayed Codex status retains its actual observation time and becomes stale while waiting for storage", () => fixture(async ({ store, service, repositoryRoot, options, stale }) => {
+  const task = await service.bind("personal", existing(repositoryRoot)), at = options.now();
+  await store.update("personal", "synthetic-observation", s => { s.observations = [{ id: "observed", status: "recording", sources: ["agent-events"], exclusions: [], events: [], createdAt: at - 2, recordingSince: at - 1, recordingGeneration: "original", updatedAt: at - 1 }]; });
+  const update = store.update.bind(store);
+  store.update = async (c, operation, mutate, request) => { if (operation === "coding-session-status") stale(); return update(c, operation, mutate, request); };
+  try {
+    const result = await service.status("personal", task.id), saved = await store.snapshot("personal");
+    assert.equal(result.observation.status, "stale"); assert.equal(result.observation.observedAt, at);
+    assert.equal(saved.codingSessions.find(t => t.id === task.id).observation.observedAt, at);
+    assert.equal(saved.observations[0].events.length, 1); assert.equal(saved.observations[0].events[0].at, at);
+    assert.equal(saved.observations[0].events[0].provenance, "native-provider-status-observation");
+  } finally { store.update = update; }
+}));
+
+test("opt-in Codex lifecycle metadata records local reservation and exact status transitions without prompt, label or repository content", () => fixture(async ({ store, service, repositoryRoot, stateRoot, idle }) => {
+  await store.update("personal", "synthetic-observation", s => { s.observations = [{ id: "observed", status: "recording", sources: ["agent-events"], exclusions: [], events: [], updatedAt: Date.now() }]; });
+  const request = { requestId: randomUUID(), repositoryRoot, label: "PRIVATE_LABEL_NOT_IN_OBSERVATIONS" }, task = await service.create("personal", request);
+  let events = (await store.snapshot("personal")).observations[0].events; assert.deepEqual(events.map(e => e.phase), ["request-reserved", "identity-bound"]);
+  await service.status("personal", task.id); await service.status("personal", task.id); events = (await store.snapshot("personal")).observations[0].events; assert.equal(events.length, 3);
+  idle(); await service.status("personal", task.id); events = (await store.snapshot("personal")).observations[0].events; assert.equal(events.length, 4); assert.equal(events.at(-1).status, "idle"); assert.equal(events.at(-1).provenance, "native-provider-status-observation");
+  for (const value of [request.label, repositoryRoot, task.id, task.sessionId, task.accountFingerprint]) assert.equal(JSON.stringify(events).includes(value), false);
+  assert.ok(events.every(e => e.taskCompletionVerified === false && e.timeSavingMeasured === false)); assert.equal((await store.snapshot("other-client")).observations.length, 0);
+  assert.equal((await readFile(join(stateRoot, "personal.sealed.json"), "utf8")).includes("subjectDigest"), false);
+  await store.update("personal", "synthetic-pause", s => { s.observations[0].status = "paused"; }); await service.status("personal", task.id); assert.equal((await store.snapshot("personal")).observations[0].events.length, 4);
+}));
+test("uncertain Codex creation contributes only local uncertainty metadata without inventing a verified native identity", () => fixture(async ({ store, service, repositoryRoot, failStart }) => {
+  await store.update("personal", "synthetic-observation", s => { s.observations = [{ id: "observed", status: "recording", sources: ["agent-events"], exclusions: [], events: [], updatedAt: Date.now() }]; }); failStart();
+  await assert.rejects(service.create("personal", { requestId: randomUUID(), repositoryRoot, label: "Uncertain" }), /Creation is uncertain/);
+  const events = (await store.snapshot("personal")).observations[0].events; assert.deepEqual(events.map(e => e.phase), ["request-reserved", "outcome-unconfirmed"]); assert.ok(events.every(e => e.provenance === "switchyard-local-lifecycle" && !e.taskCompletionVerified));
+}));
+
+test("dedicated native task creators release the writer before registration and never resume an attached client implicitly", () => fixture(async ({ service, options, repositoryRoot, calls }) => {
+  let writer = false, closed = 0;
+  const owned = createCodingSessions({ ...options, taskDriverFactory: () => ({ account: options.daemon.account, start: async () => { writer = true; return { threadId: "synthetic-created-thread" }; }, close: async () => { writer = false; closed++; return [{ stopped: true }]; } }) });
+  try {
+    const task = await owned.create("personal", { requestId: randomUUID(), repositoryRoot, label: "Dedicated task" });
+    assert.equal(task.nativeTransport, "owned-stdio"); assert.equal(writer, false); assert.equal(closed, 1); assert.equal(task.capabilities.resumable, false); assert.equal(task.capabilities.textReviewAvailable, true);
+    calls.length = 0; await assert.rejects(owned.resume("personal", task.id), /reviewed text continuation/); assert.equal(calls.includes("resume"), false);
+  } finally { await owned.close(); }
+}));
+
+test("an unconfirmed creator exit preserves its returned identity and blocks another native creator", () => fixture(async ({ options, store, repositoryRoot }) => {
+  let stopped = false, starts = 0, factories = 0;
+  const owned = createCodingSessions({ ...options, taskDriverFactory: () => { factories++; return { account: options.daemon.account, start: async () => { starts++; return { threadId: "synthetic-created-thread" }; }, close: async () => [{ stopped }] }; } });
+  try {
+    await assert.rejects(owned.create("personal", { requestId: randomUUID(), repositoryRoot, label: "Uncertain owner" }), /creator did not verify exit/);
+    const task = (await store.snapshot("personal")).codingSessions[0]; assert.equal(task.sessionId, "synthetic-created-thread"); assert.equal(task.status, "creation-uncertain");
+    await assert.rejects(owned.create("personal", { requestId: randomUUID(), repositoryRoot, label: "No replacement" }), /previous owned task creator/); assert.equal(factories, 1); assert.equal(starts, 1);
+  } finally { stopped = true; await owned.close(); }
+}));
+
+test("stopping a pending dedicated creator retains a late native identity without registering or relaunching it", () => fixture(async ({ options, store, repositoryRoot }) => {
+  let entered, release, starts = 0; const ready = new Promise((r) => { entered = r; });
+  const owned = createCodingSessions({ ...options, taskDriverFactory: () => ({ account: options.daemon.account, start: async () => { starts++; entered(); await new Promise((r) => { release = r; }); return { threadId: "synthetic-created-thread" }; }, close: async () => [{ stopped: true }] }) });
+  try {
+    const input = { requestId: randomUUID(), repositoryRoot, label: "Pending creator" }, pending = owned.create("personal", input), rejected = assert.rejects(pending, /stopped after.*acknowledgement/); await ready;
+    await owned.stopCompartment("personal"); release(); await rejected;
+    const saved = (await store.snapshot("personal")).codingSessions[0]; assert.equal(saved.sessionId, "synthetic-created-thread"); assert.equal(saved.status, "creation-uncertain"); assert.equal((await owned.create("personal", input)).duplicatePrevented, true); assert.equal(starts, 1);
+  } finally { release?.(); await owned.close(); }
+}));
+
+test("replacing a directory at the same path cannot redirect a saved native task", () => fixture(async ({ root, repositoryRoot, service, calls, idle }) => {
+  const task = await service.create("personal", { requestId: randomUUID(), repositoryRoot, label: "Synthetic owned task" });
+  assert.match(task.repositoryIdentity.inode, /^[1-9]\d*$/); assert.match(task.repositoryIdentity.device, /^\d+$/);
+  await rename(repositoryRoot, join(root, "preserved-original")); await mkdir(join(repositoryRoot, ".git"), { recursive: true }); calls.length = 0; idle();
+  await assert.rejects(service.status("personal", task.id), /directory was replaced/); assert.equal(calls.includes("read"), false);
+  await assert.rejects(service.resume("personal", task.id), /directory was replaced/); assert.equal(calls.includes("resume"), false);
+  await assert.rejects(service.bind("personal", { ...existing(repositoryRoot), sessionId: task.sessionId }), /changed its working directory/);
+}));
+
+test("coding discovery distinguishes live inventory, exact bindings, staleness and task completion", () => fixture(async ({ service, repositoryRoot, store, stale, idle }) => {
+  assert.equal((await service.discovery("personal")).recentThreads, 1);
+  const task = await service.bind("personal", existing(repositoryRoot));
+  assert.equal(task.observation.status, "active"); assert.equal(task.accountScope.organizationVerified, false); assert.equal(task.capabilities.mediated, false); assert.equal(task.capabilities.resumable, false);
+  assert.equal((await service.bind("personal", existing(repositoryRoot))).duplicatePrevented, true);
+  assert.equal((await store.snapshot("personal")).codingSessions.length, 1);
+  stale(); assert.equal((await service.list("personal"))[0].observation.status, "stale");
+  idle(); const updated = await service.status("personal", task.id); assert.equal(updated.observation.status, "idle"); assert.equal(updated.observation.completionVerified, false);
+}));
+test("coding bindings reject a different directory, a changed/unidentified login and prohibited Work providers before provider access", () => fixture(async ({ service, repositoryRoot, wrongRoot, account, calls }) => {
+  const task = await service.bind("personal", existing(repositoryRoot)); calls.length = 0;
+  await assert.rejects(service.bind("company", existing(repositoryRoot)), /prohibited/); assert.equal(calls.length, 0);
+  account("b".repeat(64)); await assert.rejects(service.status("personal", task.id), /login changed/); assert.equal(calls.includes("read"), false);
+  account(null); await assert.rejects(service.bind("personal", existing(repositoryRoot)), /did not identify/);
+  account("a".repeat(64)); wrongRoot(); await assert.rejects(service.status("personal", task.id), /exact thread and working directory/);
+}));
+test("one durable request prevents duplicate empty-thread creation, including after restart and an uncertain provider response", () => fixture(async ({ service, options, repositoryRoot, calls, failStart }) => {
+  const input = { requestId: randomUUID(), repositoryRoot, label: "Private label stays local" };
+  const result = await Promise.all([service.create("personal", input), service.create("personal", input)]);
+  assert.equal(calls.filter((c) => c === "start").length, 1); assert.ok(result.some((r) => r.duplicatePrevented)); assert.ok(result.some((r) => r.modelPromptSubmitted === false));
+  const restarted = createCodingSessions(options); assert.equal((await restarted.create("personal", input)).duplicatePrevented, true);
+  failStart(); const uncertain = { ...input, requestId: randomUUID() }; await assert.rejects(service.create("personal", uncertain), /Creation is uncertain/);
+  const before = calls.filter((c) => c === "start").length, repeated = await restarted.create("personal", uncertain);
+  assert.equal(repeated.status, "creation-uncertain"); assert.equal(calls.filter((c) => c === "start").length, before);
+}));
+test("a retained new thread ID can be reconciled after observation fails without creating another thread", () => fixture(async ({ service, repositoryRoot, failRead, calls }) => {
+  const input = { requestId: randomUUID(), repositoryRoot, label: "Recover identity" }; failRead(true);
+  await assert.rejects(service.create("personal", input), /Creation is uncertain/);
+  const saved = (await service.list("personal"))[0]; assert.equal(saved.sessionId, "synthetic-created-thread");
+  failRead(false); assert.equal((await service.status("personal", input.requestId)).status, "registered"); assert.equal(calls.filter((c) => c === "start").length, 1);
+}));
+test("a failed provider follow-up retains the already-created thread identity for exact reconciliation", () => fixture(async ({ service, repositoryRoot, failStart, calls }) => {
+  const requestId = randomUUID(); failStart(true);
+  await assert.rejects(service.create("personal", { requestId, repositoryRoot, label: "Partial create" }), /Creation is uncertain/);
+  assert.equal((await service.list("personal"))[0].sessionId, "synthetic-created-thread");
+  assert.equal((await service.status("personal", requestId)).status, "registered"); assert.equal(calls.filter((c) => c === "start").length, 1);
+}));
+test("only owned read-only tasks can resume; active turns are preserved, parallel requests share an acknowledgement and bad permission readback stays uncertain", () => fixture(async ({ service, repositoryRoot, store, calls, idle, badResume }) => {
+  const bound = await service.bind("personal", existing(repositoryRoot));
+  await assert.rejects(service.resume("personal", bound.id), /only for exact read-only/);
+  const task = await service.create("personal", { requestId: randomUUID(), repositoryRoot, label: "Owned runtime" }); assert.equal(task.capabilities.resumable, true);
+  await assert.rejects(service.resume("personal", task.id), /already active/); assert.equal(calls.includes("resume"), false);
+  idle(); const result = await Promise.all([service.resume("personal", task.id), service.resume("personal", task.id)]);
+  assert.equal(calls.filter((c) => c === "resume").length, 1); assert.ok(result.every((r) => r.effect === "runtime-resumed" && !r.modelPromptSubmitted && !r.windowFocusVerified && !r.observation.completionVerified));
+  badResume(); await assert.rejects(service.resume("personal", task.id), /did not verify/);
+  assert.equal((await store.snapshot("personal")).codingSessions.find((t) => t.id === task.id).lastResume.status, "uncertain");
+}));
+test("external session ownership is compartment-scoped, authenticated and retained through restart without plaintext session IDs", () => fixture(async ({ service, repositoryRoot, store, stateRoot }) => {
+  await service.bind("personal", existing(repositoryRoot));
+  await assert.rejects(service.bind("other-client", existing(repositoryRoot)), /outside this compartment/);
+  const directory = join(stateRoot, "external-sessions"), files = await readdir(directory), path = join(directory, files[0]), raw = await readFile(path, "utf8");
+  assert.equal(raw.includes("synthetic-thread"), false); assert.equal(raw.includes("personal"), false);
+  await store.claimSession("personal", { provider: "codex", sessionId: "synthetic-thread" });
+  const changed = JSON.parse(raw); changed.tag = "0".repeat(64); await writeFile(path, JSON.stringify(changed));
+  await assert.rejects(store.claimSession("personal", { provider: "codex", sessionId: "synthetic-thread" }), /failed authentication/);
+}));
+
+test("pending Codex resume acknowledgements cannot be shared with a replacement authorization", () => fixture(async ({ service, options, repositoryRoot, idle, calls }) => {
+  const task = await service.create("personal", { requestId: randomUUID(), repositoryRoot, label: "Synthetic shared resume" }); idle();
+  let entered, release;
+  const ready = new Promise(resolve => { entered = resolve; }), held = new Promise(resolve => { release = resolve; });
+  const resume = options.daemon.resume;
+  options.daemon.resume = async (...args) => { assert.equal(typeof args[3].beforeCommand, "function"); await args[3].beforeCommand(); entered(); await held; return resume(...args); };
+  const original = service.resume("personal", task.id, { authorizationKey: "original-binding" });
+  try {
+    await ready;
+    await assert.rejects(service.resume("personal", task.id, { authorizationKey: "replacement-binding" }), /different authorization/);
+    assert.equal(calls.includes("resume"), false);
+  } finally { release(); await original; }
+  assert.equal(calls.filter(call => call === "resume").length, 1);
+}));
+
+for (const boundary of ["same-role-rebind", "workspace-round-trip"]) {
+  test(`Codex runtime resume refuses ${boundary} after its exact status read`, () => fixture(async ({ service, repositoryRoot, store, options, idle, calls }) => {
+    const task = await service.create("personal", { requestId: randomUUID(), repositoryRoot, label: "Synthetic owned runtime" }); idle();
+    const suite = createSuite({ store, coding: service, agents: { discovery: async () => [], close() {} }, voice: { discovery: async () => ({ available: false }) } });
+    const binding = { roleId: "builder", intent: "resume", provider: "codex", targetKind: "coding-task", targetId: task.id };
+    try {
+      await suite.handle("/api/suite/bootstrap");
+      await store.saveWorkflow("personal", { name: "Synthetic resume", roles: [{ id: "builder", label: "Builder" }], steps: [] });
+      await suite.handle("/api/suite/roles/bind", binding);
+      const read = options.daemon.read;
+      options.daemon.read = async (...args) => {
+        const result = await read(...args); options.daemon.read = read;
+        if (boundary === "same-role-rebind") await suite.handle("/api/suite/roles/bind", binding);
+        else {
+          await suite.handle("/api/suite/compartment/select", { compartment: "other-client" });
+          await suite.handle("/api/suite/compartment/select", { compartment: "personal" });
+        }
+        return result;
+      };
+      await assert.rejects(suite.handle("/api/suite/intent", { implementation: "switchyard.role/v1", roleId: "builder", intent: "resume" }), /role binding changed|workspace changed/);
+      assert.equal(calls.includes("resume"), false);
+      assert.equal((await store.snapshot("personal")).intentResults?.length ?? 0, 0);
+    } finally { await suite.close(); }
+  }));
+}
+
+test("the authenticated suite routes an exact coding role to runtime status and cannot reinterpret it as a configuration conversation", () => fixture(async ({ service, repositoryRoot, store }) => {
+  const task = await service.bind("personal", existing(repositoryRoot));
+  await store.saveWorkflow("personal", { name: "Coding loop", roles: [{ id: "builder", label: "Builder" }], steps: [] });
+  const suite = createSuite({ store, coding: service, agents: { discovery: async () => [], design: () => { throw new Error("Wrong configuration route"); }, close() {} }, voice: { discovery: async () => ({ available: false }) } });
+  try {
+    await suite.handle("/api/suite/roles/bind", { compartment: "personal", roleId: "builder", provider: "codex", targetKind: "coding-task", targetId: task.id, intent: "status" });
+    const response = await suite.handle("/api/suite/intent", { implementation: "switchyard.role/v1", roleId: "builder", intent: "status" });
+    assert.equal(response.id, task.id); assert.equal(response.observation.completionVerified, false);
+    assert.equal((await store.snapshot("personal")).activeConversationId, undefined);
+    await assert.rejects(suite.handle("/api/suite/roles/bind", { compartment: "personal", roleId: "builder", provider: "codex", targetKind: "coding-task", targetId: task.id, intent: "resume" }), /runtime status only/);
+  } finally { await suite.close(); }
+}));
+
+test("a dedicated creator with another native login cannot create a reserved task or replay the request", () => fixture(async ({ options, store, repositoryRoot }) => {
+  let starts = 0, closes = 0;
+  const owned = createCodingSessions({ ...options, taskDriverFactory: () => ({
+    account: async () => ({ type: "chatgpt", fingerprint: "b".repeat(64) }),
+    start: async () => { starts++; return { threadId: "wrong-account-thread" }; },
+    close: async () => { closes++; return [{ stopped: true }]; }
+  }) });
+  try {
+    const request = { requestId: randomUUID(), repositoryRoot, label: "Exact account" };
+    await assert.rejects(owned.create("personal", request), /creator's native login differs/);
+    assert.equal(starts, 0); assert.equal(closes, 1);
+    const saved = (await store.snapshot("personal")).codingSessions[0]; assert.equal(saved.status, "creation-uncertain"); assert.equal(saved.sessionId, null);
+    assert.equal((await owned.create("personal", request)).duplicatePrevented, true); assert.equal(starts, 0);
+  } finally { await owned.close(); }
+}));
+
+test("creator effects recheck account, original repository and durable reservation after asynchronous setup", async () => {
+  for (const boundary of ["account", "repository", "reservation"]) await fixture(async ({ root, options, store, repositoryRoot }) => {
+    let login = "a".repeat(64), effects = 0, closes = 0;
+    const owned = createCodingSessions({ ...options, taskDriverFactory: () => ({
+      account: async () => ({ type: "chatgpt", fingerprint: login }),
+      start: async (_root, _id, compartment, { beforeEffect }) => {
+        if (boundary === "account") login = "b".repeat(64);
+        if (boundary === "repository") { await rename(repositoryRoot, join(root, "preserved-original")); await mkdir(join(repositoryRoot, ".git"), { recursive: true }); }
+        if (boundary === "reservation") await store.update(compartment, "synthetic-reservation-change", state => { state.codingSessions[0].status = "registered"; });
+        await beforeEffect(); effects++; return { threadId: "must-not-exist" };
+      },
+      close: async () => { closes++; return [{ stopped: true }]; }
+    }) });
+    try {
+      await assert.rejects(owned.create("personal", { requestId: randomUUID(), repositoryRoot, label: "Late boundary" }), /login differs|directory was replaced|reservation changed/);
+      assert.equal(effects, 0); assert.equal(closes, 1); assert.equal((await store.snapshot("personal")).codingSessions[0].sessionId, null);
+    } finally { await owned.close(); }
+  });
+});

@@ -1,0 +1,23 @@
+{
+  "schema": "switchyard-native-restricted-host-failure/v1",
+  "pullRequestHead": "869aa9e1be4c1ec665c7e1c693d6d339b7e60f2c",
+  "artifactRevision": "d365e150fffe2e3e15fc1dc3349e0da3a4de9c5e",
+  "workflowRun": 42023436468,
+  "nativeJob": 127231697479,
+  "artifactId": 13412623086,
+  "archiveSha256": "a47a153fb37072498e626682c311e04cb4ffbca64ea6168e8e17b9ada88e366d",
+  "localReceipt": "windows-restricted-owner-869-failed.json",
+  "receiptSha256": "f27421d1143ab84a07f8b468aa19f640319904616ec4bbd322e166234c62506d",
+  "success": false,
+  "restrictedClientChecksBeforeFailure": 13,
+  "restrictedExchangeChecksBeforeFailure": 31,
+  "workerTokenHostOwnerChecksBeforeFailure": 8,
+  "failedPhase": "create-restricted-child",
+  "nativeCode": 1314,
+  "restrictedChildStarted": false,
+  "ownedContextRetained": true,
+  "originalServicePreserved": true,
+  "guestAccepted": false,
+  "ordinaryUserAccountAccepted": false,
+  "archiveRetainedLocally": false
+}

@@ -1,0 +1,17 @@
+{
+  "schema": "switchyard-haptic-protocol-packaging-failed-summary/v1",
+  "baseCommit": "514bf685d5f103911fab6702613fe422d5bdc6a3",
+  "uncommittedSource": true,
+  "success": false,
+  "failedReceipt": "isolated-test-4ffaaa70-4d6a-4ea4-bd96-fa307ab4ede7.json",
+  "groups": 4,
+  "passedGroups": 3,
+  "tests": 30,
+  "passedTests": 29,
+  "failedTests": 1,
+  "allChildCleanupVerified": true,
+  "failure": "The new source audit exceeded the existing 5 MiB package test budget.",
+  "correctiveChange": "Omit duplicate backend index.html/style.css while preserving their exact verified frozen-frontend copies.",
+  "budgetUnchanged": true,
+  "correctedAcceptanceRecordedSeparately": true
+}

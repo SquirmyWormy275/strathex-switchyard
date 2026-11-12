@@ -127,9 +127,42 @@ test("receipts and audits share the protected chain and invalidation is append-o
     assert.equal(audit.previousHash, receipt.hash);
     assert.equal(await ledger.isFresh(receipt, "snapshot-1", "2026-08-23T10:30:00.000Z"), true);
     await ledger.invalidate(receipt.id, "snapshot-changed");
+    assert.equal(await ledger.isFresh(receipt, "snapshot-1", "2026-08-23T10:30:00.000Z"), false, "A retained pre-invalidation object cannot establish freshness.");
     const invalidated = await ledger.get(receipt.id);
     assert.equal(invalidated?.invalidatedBy, "snapshot-changed");
     assert.equal(await ledger.isFresh(invalidated!, "snapshot-1", "2026-08-23T10:30:00.000Z"), false);
     assert.equal(await ledger.verify(), true);
+  });
+});
+
+test("an action-set policy change atomically invalidates matching receipts with idempotent first lineage", async () => {
+  await withStore(async store => {
+    const ledger = new ReceiptLedger(store);
+    const issue = (action: string) => ledger.issue({ operationId: `operation-${action}`, action, targetSnapshotId: "snapshot", result: "passed", completeness: "complete", evidenceDigest: "digest", policyVersion: "v1", toolVersions: {} });
+    const first = await issue("pipeline_local_gate"), second = await issue("shield_supply_chain"), run = await issue("run_target");
+    assert.deepEqual(await ledger.invalidateActions([second.action, first.action, first.action], "review:one"), [first.id, second.id]);
+    const entries = await store.readEntries();
+    assert.deepEqual(await ledger.invalidateActions([first.action, second.action], "review:one"), [first.id, second.id]);
+    assert.deepEqual(await store.readEntries(), entries);
+    await assert.rejects(ledger.invalidateActions([first.action], "review:one"), /different action set/);
+    await ledger.invalidateActions([first.action], "review:two");
+    assert.equal((await ledger.get(first.id))?.invalidatedBy, "review:one");
+    assert.equal((await ledger.get(run.id))?.invalidatedBy, undefined);
+    assert.equal(await ledger.isFresh(first, "snapshot"), false);
+    assert.equal(await ledger.isFresh({ ...run, hash: "forged" }, "snapshot"), false);
+    assert.equal(await ledger.isFresh(run, "snapshot"), true);
+    assert.equal(await ledger.verify(), true);
+  });
+});
+
+test("a failed batched invalidation cannot commit only some receipt retirements", async () => {
+  await withStore(async store => {
+    const ledger = new ReceiptLedger(store);
+    for (const action of ["pipeline_local_gate", "shield_supply_chain"]) await ledger.issue({ operationId: action, action, targetSnapshotId: "snapshot", result: "passed", completeness: "complete", evidenceDigest: "digest", policyVersion: "v1", toolVersions: {} });
+    const before = await store.readEntries();
+    const failing = new ReceiptLedger({ transaction: fn => store.transaction(transaction => fn({ ...transaction, append: async (kind, payload) => { if (kind === "receipt.actions-invalidated") throw Error("Synthetic policy barrier failure"); return transaction.append(kind, payload); } })) } as ProtectedJsonStore);
+    await assert.rejects(failing.invalidateActions(["pipeline_local_gate", "shield_supply_chain"], "review:failed"), /barrier failure/);
+    assert.deepEqual(await store.readEntries(), before);
+    assert.equal((await ledger.list()).some(receipt => receipt.invalidatedBy), false);
   });
 });

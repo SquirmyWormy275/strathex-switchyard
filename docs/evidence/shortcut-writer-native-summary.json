@@ -1,0 +1,38 @@
+{
+  "sourceCommit": "9f35961ca18087b2406e7e2ad716b5fe97ebc2bb",
+  "executedCommit": "c87caa487b44ea851f0174101f8fbdc757927227",
+  "sourceTree": "ce90296ad34d0ea3fb7445a3b120cafb579f0dfd",
+  "equalSourceAndMergeTree": true,
+  "workflowRun": 42281533550,
+  "artifact": {
+    "id": 13536107725,
+    "name": "switchyard-storage-contract-suite-installation-c87caa487b44ea851f0174101f8fbdc757927227",
+    "size_in_bytes": 3210,
+    "digest": "sha256:c259613a2e2f01393d1ae01842a17c48847ddb2cf7f619007bdb7755faabdd0c"
+  },
+  "schema": "switchyard-shortcut-writer-native-summary/v1",
+  "jobId": 128112278919,
+  "privateReceipt": "windows-boundary-9f35961-13536107725.json",
+  "success": true,
+  "totals": {
+    "required": 17,
+    "passed": 17,
+    "failed": 0,
+    "tests": 25,
+    "passedTests": 25,
+    "failedTests": 0,
+    "skippedTests": 0,
+    "cancelledTests": 0,
+    "todoTests": 0
+  },
+  "originalInstallationScenarios": 16,
+  "shortcutWriterChecks": 9,
+  "originalShortcutExecutionTimeoutMs": 10000,
+  "allChildAndTreeCleanupVerified": true,
+  "guestLaunched": false,
+  "accountOpened": false,
+  "keyboardOpened": false,
+  "installedWindowsChanged": false,
+  "interactiveUserAcceptance": false,
+  "originalTimeoutCauseEstablished": false
+}

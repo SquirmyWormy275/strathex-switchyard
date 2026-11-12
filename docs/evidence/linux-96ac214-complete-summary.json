@@ -1,0 +1,181 @@
+{
+  "schema": "switchyard-linux-complete-source-summary/v1",
+  "sourceCommit": "96ac2148bf0e023878abb1ae5daf493f5677a832",
+  "tree": "69bbded717e4af489c0dabf05679bf4f17512c6c",
+  "receipt": {
+    "id": "cfd737eb-5968-4777-ae1e-51a1f2c0f573",
+    "sha256": "697f60572a2a69b79e64896f261c01a61e7092e3067df612a56b8d697dca0f04"
+  },
+  "startedAt": "2026-11-09T08:09:34.045Z",
+  "endedAt": "2026-11-09T08:31:18.575Z",
+  "success": true,
+  "totals": {
+    "required": 376,
+    "passed": 376,
+    "failed": 0,
+    "tests": 2581,
+    "passedTests": 2549,
+    "failedTests": 0,
+    "skippedTests": 32,
+    "cancelledTests": 0,
+    "todoTests": 0
+  },
+  "declaredSkips": [
+    {
+      "file": "tools/layout-studio/windows-scanner-recipe-files.test.mjs",
+      "pattern": null,
+      "count": 4
+    },
+    {
+      "file": "tools/layout-studio/windows-history-staging.test.mjs",
+      "pattern": null,
+      "count": 1
+    },
+    {
+      "file": "tools/layout-studio/client-launch.test.mjs",
+      "pattern": null,
+      "count": 1
+    },
+    {
+      "file": "tools/layout-studio/windows-terminal-process.test.mjs",
+      "pattern": null,
+      "count": 1
+    },
+    {
+      "file": "tools/layout-studio/windows-editor-endpoint.test.mjs",
+      "pattern": null,
+      "count": 1
+    },
+    {
+      "file": "tools/layout-studio/windows-terminal-peer.test.mjs",
+      "pattern": null,
+      "count": 1
+    },
+    {
+      "file": "tools/layout-studio/windows-editor-ingress.test.mjs",
+      "pattern": null,
+      "count": 1
+    },
+    {
+      "file": "tools/layout-studio/windows-owned-stdio.test.mjs",
+      "pattern": null,
+      "count": 3
+    },
+    {
+      "file": "tools/layout-studio/codex-windows-tasks.test.mjs",
+      "pattern": null,
+      "count": 1
+    },
+    {
+      "file": "tools/layout-studio/state-lock.test.mjs",
+      "pattern": null,
+      "count": 1
+    },
+    {
+      "file": "tools/layout-studio/runtime-command-suspended.test.mjs",
+      "pattern": null,
+      "count": 5
+    },
+    {
+      "file": "tools/layout-studio/windows-editor-recovery.test.mjs",
+      "pattern": null,
+      "count": 1
+    },
+    {
+      "file": "tools/layout-studio/windows-coding-editor-connections.test.mjs",
+      "pattern": null,
+      "count": 1
+    },
+    {
+      "file": "apps/vscode-extension/test/named-pipe-transport.test.ts",
+      "pattern": null,
+      "count": 7
+    },
+    {
+      "file": "apps/vscode-extension/test/studio-windows-editor-files.test.ts",
+      "pattern": null,
+      "count": 1
+    },
+    {
+      "file": "apps/provider-adapter-host/test/tls-network-e2e.test.ts",
+      "pattern": "provider secret generation validates and Initialize emits its exact ready-to-provision receipt",
+      "count": 1
+    },
+    {
+      "file": "apps/provider-adapter-host/test/tls-network-e2e.test.ts",
+      "pattern": "packaged provider host lifecycle and the production pinned network broker interoperate over exact loopback TLS",
+      "count": 1
+    }
+  ],
+  "builds": [
+    {
+      "index": 276,
+      "file": "build:companion",
+      "command": [
+        "/home/kingoftheeast/.local/share/mise/installs/node/24.14.0/bin/node",
+        "/home/kingoftheeast/.local/share/mise/installs/node/24.14.0/lib/node_modules/npm/bin/npm-cli.js",
+        "run",
+        "build:companion"
+      ]
+    },
+    {
+      "index": 277,
+      "file": "build:linux-companion",
+      "command": [
+        "/home/kingoftheeast/.local/share/mise/installs/node/24.14.0/bin/node",
+        "/home/kingoftheeast/.local/share/mise/installs/node/24.14.0/lib/node_modules/npm/bin/npm-cli.js",
+        "run",
+        "build:linux-companion"
+      ]
+    },
+    {
+      "index": 278,
+      "file": "build:provider-host",
+      "command": [
+        "/home/kingoftheeast/.local/share/mise/installs/node/24.14.0/bin/node",
+        "/home/kingoftheeast/.local/share/mise/installs/node/24.14.0/lib/node_modules/npm/bin/npm-cli.js",
+        "run",
+        "build:provider-host"
+      ]
+    },
+    {
+      "index": 279,
+      "file": "build:vscode",
+      "command": [
+        "/home/kingoftheeast/.local/share/mise/installs/node/24.14.0/bin/node",
+        "/home/kingoftheeast/.local/share/mise/installs/node/24.14.0/lib/node_modules/npm/bin/npm-cli.js",
+        "run",
+        "build:vscode"
+      ]
+    }
+  ],
+  "originalManifestCommandsBoundsSkipsAndChildCleanupVerified": true,
+  "serialScheduleVerified": true,
+  "unitExit": {
+    "ActiveState": "inactive",
+    "SubState": "dead",
+    "MainPID": "0",
+    "Result": "success",
+    "ExecMainStatus": "0"
+  },
+  "cleanupPending": false,
+  "cleanup": {
+    "schema": "switchyard-owned-full-linux-cleanup/v1",
+    "sourceCommit": "96ac2148bf0e023878abb1ae5daf493f5677a832",
+    "completed": true,
+    "generatedFilesRemoved": 805,
+    "generatedBytesRemoved": 11931780,
+    "dependencyAliasesRemoved": 9,
+    "noNewDependencies": true,
+    "originalUnitExitVerified": true,
+    "originalCheckoutRemoved": true,
+    "emptyTestParentRemoved": true,
+    "otherWorktreesPreserved": true,
+    "markerRemoved": true
+  },
+  "limitations": [
+    "Complete software verification at exact source 96ac214. The later atomic startup/shutdown correction has separate focused evidence; this run does not accept it.",
+    "Native Windows, interactive browser/editor, actual keyboard, microphone, provider and account acceptance remain separate.",
+    "No new SDK, runtime, model or dependency downloads. Existing dependency aliases and exact generated build products were removed after audit."
+  ]
+}

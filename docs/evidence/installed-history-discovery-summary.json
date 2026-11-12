@@ -1,0 +1,155 @@
+{
+  "schema": "switchyard-installed-history-discovery-summary/v1",
+  "at": "2026-11-09T11:57:51.197727+00:00",
+  "readback": {
+    "schema": "switchyard-history-discovery-installed-readback/v1",
+    "at": "2026-11-09T11:56:17.724Z",
+    "sourceCommit": "a7958c4b7cd22efdaa532d91ad4a3dc28150093b",
+    "release": "3714ac7e4798230b85eee7dbe94ea67e28665303d0b0ce392faf236f8f6bf970",
+    "previous": "2ee8827dd022ba676bff48f3b0639ef5d0d0f47c683cef12d806a7db6defc2ea",
+    "frontend": "00140e1b02bcacc4077219d67b2a796fa798e7ccdc04b95e6d16b9e6f6f4219a",
+    "assets": 36,
+    "files": 575,
+    "bytes": 5082369,
+    "checks": [
+      "current and one verified rollback; no additional installed version",
+      "new immutable frontend has its own authenticated local access; no stale credential reused",
+      "served index.html",
+      "served app.mjs",
+      "served model.mjs",
+      "served workspace.mjs",
+      "served connection.mjs",
+      "served vial-snapshot.mjs",
+      "served voice-ui.mjs",
+      "served observation-ui.mjs",
+      "served portable-ui.mjs",
+      "served scanner-ui.mjs",
+      "served feed-ui.mjs",
+      "served conversation-ui.mjs",
+      "served copilot-ui.mjs",
+      "served task-ui.mjs",
+      "served authority-ui.mjs",
+      "served execution-ui.mjs",
+      "served client-ui.mjs",
+      "served role-ui.mjs",
+      "served suite-ui.mjs",
+      "served workflow.mjs",
+      "served device-diagnostic-ui.mjs",
+      "served device-settings-ui.mjs",
+      "served vial-settings.mjs",
+      "served vial-keycodes.mjs",
+      "served vial-rules.mjs",
+      "served device-ui.mjs",
+      "served shell.mjs",
+      "served home.mjs",
+      "served catalog.mjs",
+      "served geometry.mjs",
+      "served keyboard-view.mjs",
+      "served model-f-catalog.json",
+      "served style.css",
+      "served sample-info.json",
+      "served sample-keymap.json",
+      "served sample-study-report.json",
+      "complete authenticated workspace inventory; no provider observation or authority",
+      "invalid history request refused before native queries",
+      "all 54 semantic workspaces, modes, conversations and pending keyboard-only record preserved",
+      "dated exact launcher/record backups and persistent entry readback verified"
+    ],
+    "workspaces": 54,
+    "semanticSnapshotsPreserved": true,
+    "sealedByteIdentical": 53,
+    "selectionPreserved": true,
+    "modesPreserved": true,
+    "conversations": 3,
+    "pendingKeyboardOnly": 1,
+    "backup": "2026-11-09T11-52-52.170Z-a2928885-4a5a-45d5-8445-92ab6d6014f2",
+    "metadataReceipts": [
+      {
+        "name": "installed-agent-security-metadata-1794225269769.json",
+        "sha256": "90f2247a5d04780da7967b1f8cd7a96af18666f39ec1d318dd08cdb430dfee6d",
+        "checks": 38
+      },
+      {
+        "name": "installed-npm-archive-metadata-1794225194614.json",
+        "sha256": "cc9a05951746634c3715b5663050bb7a58e3ffed7368462b454915a8929a66bc",
+        "checks": 3
+      },
+      {
+        "name": "installed-python-inventory-metadata-1794225194632.json",
+        "sha256": "79774a00ad7841bce2480472c1218f1505f2bb2b0fbdd07237da6f00aba74e91",
+        "checks": 14
+      },
+      {
+        "name": "installed-cargo-inventory-metadata-1794225194630.json",
+        "sha256": "04079f831c56e81e9dc222660cd7b9c39a7f8a00c4603bb06807e723dc0a34db",
+        "checks": 10
+      },
+      {
+        "name": "installed-workflow-identity-metadata-1794225270516.json",
+        "sha256": "3c13bd3d7e048ca1161c2451097316fd0944b8ea9eec3d428fc5c580e6eb25eb",
+        "checks": 10
+      },
+      {
+        "name": "installed-task-owner-metadata-1794225271095.json",
+        "sha256": "f83d22a10d0fc9a4d61dceb083b6863907d8bf3624247ebf1da38191be111095",
+        "checks": 18
+      },
+      {
+        "name": "installed-copilot-journal-metadata-1794225271276.json",
+        "sha256": "1c776c57af64491e38143f7b74d2eb9b76ce1ac646579033bd64a039333e8de4",
+        "checks": 7
+      },
+      {
+        "name": "installed-signed-intent-metadata-1794225271464.json",
+        "sha256": "4a680617c505d3be9368956e56807c06632d3cdc08e43d918c20da92367d3de0",
+        "checks": 9
+      },
+      {
+        "name": "installed-codex-editor-metadata-1794225271662.json",
+        "sha256": "43f190d9ebafb8e25f1453b943af468849d5bd165064baed744934b2aef742b1",
+        "checks": 14
+      }
+    ],
+    "metadataChecks": 123,
+    "exactModuleHashes": 65,
+    "initialVerifierFailures": [
+      {
+        "stage": "old evidence pin",
+        "effect": false,
+        "expected": "33865705014bb6b08fbb1e60f4113d6b23cb28e681c4197b56a0c6bdc7412e79",
+        "actual": "fe51857c114b463ecc60c22dea9da5a55a8e3a4b48b007662cf28eeac491dcab"
+      },
+      {
+        "stage": "synthetic verifier fixture used literal escape sequences",
+        "effect": false
+      }
+    ],
+    "hardwareOpened": false,
+    "nativeProviderRequests": 0,
+    "microphoneOpened": false,
+    "visualAcceptance": false
+  },
+  "cleanup": {
+    "schema": "switchyard-history-discovery-prepared-cleanup/v1",
+    "at": "2026-11-09T11:57:51.197727+00:00",
+    "release": "3714ac7e4798230b85eee7dbe94ea67e28665303d0b0ce392faf236f8f6bf970",
+    "removedFiles": 576,
+    "removedBytes": 5186299,
+    "rootIdentityVerified": true,
+    "exactPathsIdentitiesHashesVerified": true,
+    "installedCopyIndependentlyVerified": true,
+    "preparedCopyRemoved": true,
+    "initialCleanupRefusal": "Installed manifest is differently formatted JSON; exact semantic equality and all 575 payload hashes verified before cleanup",
+    "sourceAndRuntimeCopiesPreserved": true
+  },
+  "additionalValidation": {
+    "freshFrontendReleaseApplicationCases": 10,
+    "metadataVerifierFlagRefusalCases": 8
+  },
+  "limitations": [
+    "Actual browser task/visual review remains blocked by the browser control tool before page access.",
+    "No installed native provider/task, scanner, hardware, microphone or guest action was started.",
+    "A new frontend digest intentionally rotates local access; the normal launcher obtains the new private link.",
+    "Full Windows source f4dcc79 acceptance predates this historical-name discovery; normal-push native follow-up remains separate."
+  ]
+}

@@ -1,0 +1,86 @@
+{
+  "schema": "switchyard-windows-native-checkpoint-summary/v1",
+  "sourceHead": "fdb055946c7cbbfbaa7cc2bd81d955d00de2f08c",
+  "executionMerge": "1fca6daee97a652ba723d7e1f2ebb958d3c87a4c",
+  "runId": 42141522247,
+  "workflowAccepted": false,
+  "jobs": {
+    "total": 56,
+    "success": 55,
+    "failure": 1
+  },
+  "filesystem": {
+    "jobId": 127642702843,
+    "success": true,
+    "checks": 30,
+    "ownedVirtualDiskAttached": true,
+    "ownedVirtualDiskDetached": true,
+    "guestLaunched": false,
+    "keyboardOpened": false,
+    "accountOpened": false
+  },
+  "serviceLifecycle": {
+    "success": true,
+    "checks": 6,
+    "restrictedMetadataChecks": 13,
+    "nativeExitVerified": true,
+    "normalUserSetupAccepted": false
+  },
+  "nativeSetupLifecycle": {
+    "jobId": 127642702552,
+    "success": true,
+    "checks": 6,
+    "restrictedMetadataChecks": 13,
+    "nativeExitVerified": true,
+    "normalUserSetupAccepted": false
+  },
+  "originalAndDeletionHeaderGuardCases": 1541,
+  "restrictedOwner": {
+    "jobId": 127642703032,
+    "success": false,
+    "priorRestrictedMetadataChecks": 13,
+    "priorRestrictedExchangeChecks": 31,
+    "priorJavascriptOwnerChecks": 8,
+    "childExitCode": 3221225794,
+    "childExitName": "STATUS_DLL_INIT_FAILED",
+    "resultAvailable": false,
+    "originalProtectedInstallationPreserved": true
+  },
+  "artifacts": [
+    {
+      "id": 13468268552,
+      "archiveSha256": "a901ced491ddea32564b5585a058d2492426394b1f10155f3692fa6c5ed6a646",
+      "receipt": "windows-broker-bootstrap-fdb-native.json",
+      "receiptSha256": "1f6d9d49029b3ce651ed9252735c5fdd250a2c61093a2378991b1c8659f6bf41"
+    },
+    {
+      "id": 13467803934,
+      "archiveSha256": "34507b234d79cf298cc35b55c8630bf8a7cc9fed6c685632035bd8e21b770d76",
+      "receipt": "windows-filesystem-fdb-native.json",
+      "receiptSha256": "0d2d64a2ddd5e817ff99cf9671cf9825bb7c3efea0370d029e8467984ccfebf7"
+    },
+    {
+      "id": 13467389281,
+      "archiveSha256": "a5219c66859b445c8015364c482be0f65a5cc4eaf7eec13c72366a53cb069b64",
+      "receipt": "windows-native-setup-fdb-lifecycle.json",
+      "receiptSha256": "924dac1a692d1d4366a32a2ab56efcfe79900bccd7b4e08f8f0c7253cf7b597e"
+    },
+    {
+      "id": 13467049629,
+      "archiveSha256": "17f796ca243fbe04de2d77d1cc3661f9b0cfe83def158f5496918ec946524ea5",
+      "receipt": "windows-protocol-fdb-native.json",
+      "receiptSha256": "71a8d837ad78206ed497bdbbfbbbf05a2723471e3fbbb341444ff95c42db2a0f"
+    },
+    {
+      "id": 13466818723,
+      "archiveSha256": "f1920131372d6e2e470c15afd0193859b36181af7b4882222ddbae755bce92df",
+      "receipt": "windows-restricted-owner-fdb-native.json",
+      "receiptSha256": "1ceb815815ff4d86d93b6066f37117637fd70f03b52ad235b0c7bb68cef7618c"
+    }
+  ],
+  "limits": [
+    "Native service/setup lifecycle followup passes at the corrected exact source; the disabled post-delete branch is not separately forced.",
+    "The restricted primary-child DLL initialization failure keeps the whole workflow unaccepted.",
+    "Actual guest, interactive UAC, ordinary account and physical acceptance remain separate."
+  ]
+}

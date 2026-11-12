@@ -1,0 +1,73 @@
+{
+  "schema": "switchyard-native-state-lease-source/v1",
+  "basis": "78978355152a341c600611f41731704b9fd97479",
+  "sourceSha256": {
+    "apps/desktop-hotkeys/StateLeaseWorker.cs": "46c9eb654470a8a3c43b8c8851d0e7fd44be8f0938039a16b49b5b1c080a412a",
+    "deployment/windows/test-support/storage-broker-protocol/StateLeaseProtocolProof.cs": "29566a74ab8b7cb6f4a6a377e233ac3c498f9e12d7e1b15940e4e374dd58428f",
+    "tools/layout-studio/state-lock.mjs": "2030b5d03116231b62dd031de637bbf2d9466858ef097037371efb03e11edd7c",
+    "tools/layout-studio/state-lock.test.mjs": "0bfa20f7bf4fe3bf2aab70e64e9eb1ebd1603a743eb8c7392a50693ce3854a1e",
+    ".github/workflows/switchyard-windows-state-helper.yml": "d6deda4c3c4a4d224616792041ac89738e686e4b6b1dc5b40d8ffda59bf23b22",
+    ".github/actions/install-state-helper/action.yml": "1fbf2cbce0077d3158bca213b0d311bae99936bdc2891467eb8ba0f5e52715a4"
+  },
+  "behavior": [
+    "Fixed existing shipped helper mode; no shell, PowerShell startup, arbitrary executable override or fallback.",
+    "Original bounded ASCII protocol, sequence numbers, exclusive kernel handles, nonblocking sharing refusal and unchanged deadlines.",
+    "Only pre-existing local ordinary single-link lock files; exact volume/index/creation identity is rechecked for every lease.",
+    "Pinned parent process handle, joined watcher disposal, EOF/parent-loss release and closed diagnostics. No keys or protected state enter the worker."
+  ],
+  "managedBuild": {
+    "receipt": "managed-source-build-1793936348673.json",
+    "targets": 2,
+    "warnings": 0,
+    "errors": 0,
+    "portableChecksPassed": 1816,
+    "newParserChecks": 40,
+    "existingSdkReused": true,
+    "ownedScratchRemoved": true
+  },
+  "focused": {
+    "receipt": "isolated-test-d9104510-f046-4a73-b9f9-c48a56d6edd5.json",
+    "groups": 4,
+    "passedTests": 43,
+    "declaredWindowsOnlySkips": 1,
+    "allChildCleanupVerified": true,
+    "typecheck": true
+  },
+  "nativeRegression": "Default state-lock journeys plus replacement, hard-link and malformed-release refusal; actual native execution pending.",
+  "ci": "Four Windows workflows build the exact source helper once per run using the existing digest-pinned toolchain; dependent jobs verify source/size/SHA256 before fixed-path staging. Existing child/test bounds remain unchanged.",
+  "nativeAcceptance": "pending",
+  "separateRestrictedUserObjectDiagnostic": {
+    "source": "78978355152a341c600611f41731704b9fd97479",
+    "executionMerge": "b83787875f5cadb3688df7878624daac9f000f27",
+    "runId": 42156588468,
+    "jobId": 127692082361,
+    "artifactId": 13474767010,
+    "archiveSha256": "3871c98c96493497aceb3e0a99353b315bbb47f94f37a6ed752a67537d697672",
+    "receipt": "windows-restricted-user-objects-789-native.json",
+    "stationOpened": true,
+    "stationError": 0,
+    "desktopOpened": true,
+    "desktopError": 0,
+    "diagnosticHandlesClosedVerified": true,
+    "originalNamespaceRestoredVerified": true,
+    "childExitCode": 3221225794,
+    "overallSuccess": false,
+    "failedFixturePreserved": true,
+    "limit": "Successful impersonated access does not establish successful child DLL initialization or full native acceptance."
+  },
+  "limits": [
+    "The two prior Windows worker-startup failures remain failed until exact-source native followup verifies the replacement.",
+    "The independent restricted child still fails STATUS_DLL_INIT_FAILED; its retained fixture is not reported as cleaned.",
+    "No UI, account, physical keyboard, service or desktop changes were made on this workstation."
+  ],
+  "references": [
+    "https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-createfilew",
+    "https://github.com/actions/download-artifact/releases/tag/v8.0.2"
+  ],
+  "stagedReleaseFollowup": {
+    "receipt": "isolated-test-70c23fa2-d339-4e17-8d42-b299b1ef08ee.json",
+    "testsPassed": 5,
+    "allCleanupVerified": true,
+    "includesNewTrackedNativeSource": true
+  }
+}

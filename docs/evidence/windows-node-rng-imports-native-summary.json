@@ -1,0 +1,66 @@
+{
+  "schema": "switchyard-windows-node-rng-imports-native/v1",
+  "sourceCommit": "78b640d07f380e3df3a0e158244854f2398ee032",
+  "executionCommit": "7d19ee23b722feb9830c6b09ae1fde9a0daeeec0",
+  "sourceAndExecutionTree": "7afb4bf01ed52d2cb3e47f7e84671ac96b9fcabb",
+  "sourceTreeAndMergeParentsVerified": true,
+  "runId": 42180496339,
+  "restrictedJobId": 127769041632,
+  "importArtifact": {
+    "id": 13484983648,
+    "sha256": "4c896df66a9b7fd593d41c365f43f88d3ac9e7b1b40a208045eb45954d3372d8",
+    "privateReceipt": "windows-node-rng-imports-78b-native.json"
+  },
+  "exchangeArtifact": {
+    "id": 13485108332,
+    "sha256": "e72b4f0c0043e65dec528061ca0b0b0124176506888d47ef7886048144c7ad93",
+    "privateReceipt": "windows-restricted-owner-78b-native.json"
+  },
+  "archiveDigestsVerified": true,
+  "archivesRetainedOnDisk": false,
+  "nodeRngImports": {
+    "schema": "switchyard-node-rng-imports/v1",
+    "nodeSha256": "63c259c81e5d472b5f11c8d506070130cb04a1ecf84b80377a34ed6ec9048088",
+    "tool": "dumpbin-imports",
+    "imports": {
+      "BCryptGenRandom": false,
+      "CryptAcquireContextW": true,
+      "CryptGenRandom": true,
+      "CryptReleaseContext": true
+    },
+    "runtimeBranchVerified": false,
+    "nodeStartupAccepted": false
+  },
+  "nodeExit": {
+    "waitResult": 0,
+    "exitCode": 134,
+    "resultAvailable": false
+  },
+  "nodeStderr": {
+    "category": "assertion",
+    "function": "ncrypto::CSPRNG",
+    "code": null,
+    "sourceFile": "node.cc",
+    "sourceLine": 1221
+  },
+  "nodePipesClosedAndDrained": true,
+  "coldCngReport": {
+    "systemStatus": 0,
+    "providerOpenStatus": 0,
+    "providerStatus": 0,
+    "providerCloseStatus": 0,
+    "handlesClosedVerified": true,
+    "buffersClearedVerified": true
+  },
+  "coldCngProcessAndTokenVerified": true,
+  "failedFixtureRemoved": false,
+  "independentJobConclusions": {
+    "filesystem": "success",
+    "nativeSetup": "success"
+  },
+  "limits": [
+    "The exact Node image imports the three legacy CryptoAPI functions; BCryptGenRandom is not observed in its import dump. Static imports do not prove the runtime OpenSSL branch.",
+    "The build followup succeeds after resolving the running process executable. The earlier generic failure did not retain enough detail to confirm its exact cause.",
+    "Node still aborts at CSPRNG before JavaScript. No weaker entropy, privilege, token, account or desktop fallback; failed fixture preserved."
+  ]
+}

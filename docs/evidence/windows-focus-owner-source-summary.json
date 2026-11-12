@@ -1,0 +1,150 @@
+{
+  "schema": "switchyard-windows-focus-owner-source/v1",
+  "at": "2026-11-07T02:23:20.506463+00:00",
+  "baseSource": "556ad1314aa8335a7675e283a448d780b14bddce",
+  "sourceFiles": {
+    "apps/desktop-hotkeys/BoundedExchangeImage.cs": "5cca580973f3688e8aef5e9c6ef3c5f504d8b3d327997db37bec70eb44e2ca80",
+    "apps/desktop-hotkeys/BoundedExchangeVolume.cs": "590f7e05811f0549e8657a76719cfbc024e9643ae0c44d6e980e696c676ec769",
+    "apps/desktop-hotkeys/BrokerExchangeImage.cs": "c8a1b87a74f161561f1d0cabe5f6a4a5ac21aeb7335f9f3c13c5d759b45aa5fb",
+    "apps/desktop-hotkeys/PipeTextProtocol.cs": "98c1cdb43f0c5993bfa7fad548178d5a469849c8d4b19b26e5ad5c29b655278d",
+    "apps/desktop-hotkeys/Program.cs": "3eebe872f6f3de9526b9e78ffbd1bcbfd6bfc060ecb9bc06d3ef673adca31bea",
+    "apps/desktop-hotkeys/ReviewedHistoryInputs.cs": "28c802f099f22feda73b206ddde2f5927ef69871ded84a0dd82e22d185ecc6a7",
+    "apps/desktop-hotkeys/ReviewedIndexInputs.cs": "372602863793a270b86b9abb74c34a861254dbd281a5f2f3dabb0b395ac763c2",
+    "apps/desktop-hotkeys/ReviewedInputStager.cs": "6645c1aaded54ae0e6c70f684f070c6a8c625f36e7525cc8f776335a7c6b7e24",
+    "apps/desktop-hotkeys/RuntimeCommandRunner.cs": "d272ba2b57d81a3954d3abdecd5cb1373648fce3c1cc8fed23c8fde68941123b",
+    "apps/desktop-hotkeys/RuntimePackageMetadata.cs": "df6f0d2e011471a8a3f65967f630ec8f2d94c388a4d5758d4e9a9e1d4bc9297c",
+    "apps/desktop-hotkeys/RuntimePrivatePipeSecurity.cs": "19b8bb02b7c41b7879223648e3f6edf54652e2b9e13ec5ed8618436390b771e4",
+    "apps/desktop-hotkeys/StateLeaseWorker.cs": "617c6b404179a9289bb9992117807ecbe7beaf77a9da6b8028c621ad7873626a",
+    "apps/desktop-hotkeys/Switchyard.Hotkeys.csproj": "92d0835c7155b02d43d58f99aef4bf79b2013c383df39942162b01ba2ab11f0f",
+    "apps/desktop-hotkeys/WindowsSandboxCli.cs": "8a8d428e0a4eadf56631b154edce9e95c0ea813e45d8bb8cf0522149046f1030",
+    "apps/desktop-hotkeys/WindowsStorageBroker.cs": "508e30ac285b1c029b39c8c2947aec7625d52e6fce8103c8e6a6f19381a386e4",
+    "apps/desktop-hotkeys/WindowsStorageBrokerBootstrap.cs": "6c2d612447084928a907cf7e3b3fc2837de141f5c21fc82ae0e068676a5866f2",
+    "apps/desktop-hotkeys/WindowsStorageBrokerControl.cs": "148afe8cdbf5ad96841d683e72be7273fcd27ebf730582a8cbe3bbf776148fd9",
+    "apps/desktop-hotkeys/WindowsStorageBrokerDiagnostic.cs": "56545d478055bccc73277ea83a94f3e9904230d38e8bf320ba4c402b6aef4d0d",
+    "apps/desktop-hotkeys/WindowsStorageBrokerExchangeEngine.cs": "e69c8911975ea1fb4e9b32ba999928078099699e3eac0e96afe231c7f21d4aeb",
+    "apps/desktop-hotkeys/WindowsStorageBrokerExchangeFacts.cs": "8dc35f2980e748c8ec08eda60f0e0fc0a764650cdaefe80b243efba5e903ef27",
+    "apps/desktop-hotkeys/WindowsStorageBrokerExchangeFiles.cs": "b0d27292d5cedf07a4e68093d1a67483e53305bee085eb321294f2c5cf04b902",
+    "apps/desktop-hotkeys/WindowsStorageBrokerExchangeJournal.cs": "7603a59e27a8ff6c009c2b0b0b9aab5d8e89f165feaacc15692c50c08aba2908",
+    "apps/desktop-hotkeys/WindowsStorageBrokerExchangeMapping.cs": "9c76c0cd5c41b9ec2525781e11ef7d2f327aa8d76401055c36a0acd2cafa5030",
+    "apps/desktop-hotkeys/WindowsStorageBrokerExchangeProtocol.cs": "e7787821ac2c36acc25ca4ef53ecadcd7c2c32d02e76339a5b7c0c1117e5ae15",
+    "apps/desktop-hotkeys/WindowsStorageBrokerFiles.cs": "05c38bb34ee8aef8a03b4e80b949dfdd2ed5764b7ea99e82baf9e02b6c28938d",
+    "apps/desktop-hotkeys/WindowsStorageBrokerInstallation.cs": "58525c47574e2dcd2d16db9037ebc748d837caae9ca8b38323347aeb1d9a668d",
+    "apps/desktop-hotkeys/WindowsStorageBrokerPipe.cs": "5bf0b6700e4169c6e4547be61a052b835fbd231bbdbfff4033586635d2112023",
+    "apps/desktop-hotkeys/WindowsStorageBrokerProtocol.cs": "cc58058bbb0e108ad7283dc4b37eb467dcf9874b89ef666fd0b956f9fa6dcb3a",
+    "apps/desktop-hotkeys/WindowsStorageBrokerRuntime.cs": "193d5711b021e2dbda39af47fb417eed5f742e6aaafbdb41441f24f8383279a7",
+    "apps/desktop-hotkeys/WindowsStorageBrokerService.cs": "8abc195a6416ef637e77fd37c0aff234ff1d646088ea728dcf7fdebb49e6bd2f",
+    "apps/desktop-hotkeys/WindowsStorageBrokerServiceHeader.cs": "b2ce888b17bdf5f960eef00c89f46fd355fb3368b56c2067fb422b8b9fb72ebf",
+    "apps/desktop-hotkeys/WindowsStoragePrerequisites.cs": "06fea31a24ae5c2dd05df0b8b1eb6c1220f8ca375dc3c19489d6a13c01ac83d3",
+    "apps/windows-companion/sandbox-helper/Program.cs": "445428afc42357c69a16e15679945cdb1a79b336dc0976c4e51d59a0520c4cbe",
+    "apps/windows-companion/provider-desktop-helper/Program.cs": "1b198da9c09569aa38b3edc406a31e3f46d71c61c21da0db0fb0cf61f11b44ff",
+    "apps/windows-companion/provider-desktop-helper/Sxsy.B122.ProviderDesktopHelper.csproj": "e4fd869cda71b91f706fed5061abdf57b578ed68faa7636190f9d590fca3f840",
+    "apps/windows-companion/src/windows-provider-process.ts": "670d33f4e0141a73dd45fa04cbeb83d18b1960ba289073b0e6da9c9dd3de0b5d",
+    "apps/windows-companion/test/windows-provider-process.test.ts": "07e775cee34f903ddf02b5c934c2cd0ca5ed999d7a321a65b78f92bbd7f049bd",
+    "deployment/windows/Test-B122PortableBundle.ps1": "9193c364f9f7024deac6d7b54a2b058cdfd1d72cc0c43f8bf6007c99ef29423f",
+    "scripts/verify-windows-standalone-helper.mjs": "fe67d22fb483b8be812a433e436f56f012d84c456ee922c317e635cb8cedbf6a"
+  },
+  "receipts": [
+    {
+      "name": "isolated-test-2aee4dd8-f15d-4cc5-b595-0cc0dda0cfcd.json",
+      "sha256": "df77e1fc9b8a0e898b3d5153e451ace73f7b9af834196f2f13dfcbc9f86d00b2",
+      "success": false,
+      "totals": {
+        "required": 1,
+        "passed": 0,
+        "failed": 1,
+        "tests": 1,
+        "passedTests": 0,
+        "failedTests": 1,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "name": "isolated-test-d5161ca9-eba3-40d5-ab85-431123f1621b.json",
+      "sha256": "d7bbd86a93552bda1ec6769050003fa56943d8045ee4d73b248466351d39805a",
+      "success": true,
+      "totals": {
+        "required": 1,
+        "passed": 1,
+        "failed": 0,
+        "tests": 22,
+        "passedTests": 22,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "name": "isolated-test-7bd6c510-8ca4-4fdf-a971-237ed2c7b125.json",
+      "sha256": "b2950e748124c8522de32668b570499c189ebd00e3c03da143937c6f42447bc5",
+      "success": true,
+      "totals": {
+        "required": 6,
+        "passed": 6,
+        "failed": 0,
+        "tests": 69,
+        "passedTests": 69,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    }
+  ],
+  "distinctFocusedGroups": 6,
+  "distinctFocusedPasses": 69,
+  "managedBuild": {
+    "status": "passed",
+    "warnings": 0,
+    "errors": 0,
+    "existingSdk": "8.0.424",
+    "clearedPackageSources": true,
+    "sourceFiles": 35
+  },
+  "managedChecks": {
+    "focusOnlyPolicyVerified": true,
+    "currentProcessVerified": null,
+    "ownerQueryVerified": null,
+    "tokenAccessMask": 8,
+    "windowFocused": false,
+    "olderFocusModeRefused": true,
+    "nonWindowsOwnerQueryRefused": true
+  },
+  "typecheck": "passed",
+  "windowsVerifierSyntax": "passed",
+  "cleanup": {
+    "everyChildVerified": true,
+    "everyTreeVerified": true,
+    "ownedBuildProcessesAbsent": true,
+    "files": 66,
+    "bytes": 1869485,
+    "removed": true
+  },
+  "effects": {
+    "providerLaunches": 0,
+    "nativeWindowFocus": 0,
+    "accountChanges": 0,
+    "modelRequests": 0,
+    "hardwareOperations": 0,
+    "newDependencyDownloads": 0
+  },
+  "behavior": [
+    "Focus-only mode v3 emits its own exact PID/creation-time witness before reading a provider request; the process port binds it to the started child and requires persistence callbacks.",
+    "Owner persistence must complete before any request. Exact child closure and retirement persistence must complete before replacement.",
+    "Cancellation joins pending owner recording; failed or timed-out retirement persistence cannot permit a replacement helper.",
+    "A separate read-only owner query checks the original PID/birth with the existing limited process access and TOKEN_QUERY 8; denied queries remain unknown and never fall back."
+  ],
+  "limitations": [
+    "Suite configuration/dispatch and durable owner journal wiring remain unfinished; callback protocol tests use isolated persistence doubles.",
+    "VS Code-specific Windows focus remains unfinished.",
+    "The local managed self-test checks portable policy only; native current-user, owner query and window acceptance remain unperformed.",
+    "Windows copied-helper automation now requires native owner self-query, launch refusal and independent read-only exit proof; that Windows verification is pending.",
+    "The installed Linux Suite payload is unchanged by this Windows source work."
+  ],
+  "privateReceipt": {
+    "name": "windows-focus-owner-source.json",
+    "sha256": "355ea09465b41f5c6ad225bc068451ca428ccd321cb2a4ff6162d29d95c5a891"
+  }
+}

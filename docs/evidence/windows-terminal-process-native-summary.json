@@ -1,0 +1,43 @@
+{
+  "schema": "switchyard-windows-terminal-process-native-summary/v1",
+  "sourceCommit": "dec4dd55510cd20e46128f0d1e75f68421647f18",
+  "mergeCommit": "6fe4734827ccf03e268a1dddb09f4b1d96d7e341",
+  "equalSourceAndMergeTree": "f56e59fd1f4618ff3f9068fa426a946108a4f8d4",
+  "workflowRun": 42350391512,
+  "clientJob": 128337214474,
+  "helperBuildJob": 128337066805,
+  "overallClientWorkflowPassed": true,
+  "sourceFiles": {
+    "apps/desktop-hotkeys/Program.cs": "4909de4c2d04289ed9aebd4a2f64ab2a31e21345fc3da7c28164a92fd42a09e1",
+    "apps/windows-companion/provider-desktop-helper/Program.cs": "5199becd2a3d4c0fb43c72625acf9e777b1950a560b201e71e4edbf3e8fda205",
+    "tools/layout-studio/windows-terminal-process.mjs": "068cd0dcf2f3ffec11329a06218948055e83cf29318a991c4ccc2c54402f4003",
+    "tools/layout-studio/windows-terminal-process.test.mjs": "54b8f6ab058d59848a4607aaaf7ce487c7c6b4cd62d15091005b5597b382d176",
+    "scripts/verify-client-platform.mjs": "2eb48bd4d621377361d4274ce40dc1a6ff7b700bfc74dd04b4052f857a10a90f",
+    ".github/workflows/client-platform.yml": "b435b6ebdd8a178531a8c6f692e85286129c8704a4b2100f275f50104b762abf"
+  },
+  "manifestSha256": "436f466028801018f196b0ca92c53f96306f6d9e8e82c44125faa3bc0d5340c8",
+  "receipt": "isolated-test-5db6f0de-60e5-4ea1-b891-e4f34559826a.json",
+  "receiptSha256": "90af6777dc7b791ccc25d21a2483f8f80cef00ef43d2570d8c28b978a881a0b2",
+  "artifact": {
+    "id": 13565636569,
+    "bytes": 1833,
+    "sha256": "bdf3d92122e469f449a4bcb91c3bbbaf40c474c16d1f8bdeba847edb7e394ff1",
+    "archiveReadInMemoryOnly": true
+  },
+  "groups": 8,
+  "passedTests": 100,
+  "skippedTests": 0,
+  "originalCommandsBoundsSkipsAndCleanupVerified": true,
+  "actualNativeProcessQueryAccepted": true,
+  "scope": [
+    "Exact owned Node fixture PID, birth, held executable file identity and SHA-256, current user and session.",
+    "Repeated birth observation and refusal of changed birth, digest or exited process.",
+    "Original supervised helper exit and QUERY mask 8."
+  ],
+  "limitations": [
+    "The later TCP peer-query extension is outside this source.",
+    "This does not establish Windows task attachment, Suite/editor routing, live provider/account interaction or interactive native focus.",
+    "Full Windows release and physical device acceptance remain separate."
+  ],
+  "success": true
+}

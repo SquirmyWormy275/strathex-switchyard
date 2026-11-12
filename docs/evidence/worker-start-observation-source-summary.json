@@ -1,0 +1,61 @@
+{
+  "schema": "switchyard-worker-start-observation-source/v1",
+  "basis": "a9ed2159c74a4528bc6b4f6a4a2bf91d7aa1adda",
+  "sourceSha256": {
+    ".github/workflows/switchyard-windows-filesystem.yml": "e22d6387a8e59db40e485fada2d0028827fe99dc1505c8a54fd416f2144902d6",
+    "apps/desktop-hotkeys/RuntimeCommandRunner.cs": "aca0cc96a801f23ba6e730682040805d5dd04f6094241d895d2c1b521e6ac6de",
+    "scripts/run-isolated-tests.mjs": "011a71db2a3dafe38c12c21ae4a1b22491da551d9ce9aae95183420b4577273e",
+    "scripts/windows-owner-probe-observation.mjs": "5b7da50490a88301c14891cb1c34e732d449aa020a4487edab96a8718b478a49",
+    "scripts/windows-restricted-owner-report.test.mjs": "ef804f2744aa1b8d5d59f74cb293d6d64c8602e850a1e0dd794e7544fb4f3de2",
+    "tools/layout-studio/runtime-command-suspended.test.mjs": "a1c96ce75d9873e83998005b1e3fd5c0b4b49e57fb3e1111e4b6f6ec6cf3c490",
+    "tools/layout-studio/runtime-command.mjs": "af1162c29df2bebdaa08780ee32332ac8953719c4473f62d79eb007ed08566ad"
+  },
+  "focused": {
+    "receipt": "isolated-test-31ebb51c-1c12-4816-83ec-76948c866916.json",
+    "totals": {
+      "required": 7,
+      "passed": 7,
+      "failed": 0,
+      "tests": 74,
+      "passedTests": 69,
+      "failedTests": 0,
+      "skippedTests": 5,
+      "cancelledTests": 0,
+      "todoTests": 0
+    },
+    "allChildAndTreeCleanupVerified": true
+  },
+  "managed": {
+    "receipt": "worker-start-observation-managed-1793984793197.json",
+    "builds": [
+      {
+        "name": "helper",
+        "warnings": 0,
+        "errors": 0,
+        "managedAssemblySha256": "160ec7737abc128872df74cd043617b3a1805d0a101a5bb85cc3624ccc6f0290",
+        "managedPeSubsystem": 2
+      },
+      {
+        "name": "proof",
+        "warnings": 0,
+        "errors": 0,
+        "managedAssemblySha256": "3fa989be99d7348190c8dd3cd9264d24278609eb0da06d29632b927d1fb1ec4b",
+        "managedPeSubsystem": 3
+      }
+    ],
+    "portableChecks": 2101,
+    "cleanup": {
+      "files": 147,
+      "bytes": 3313658,
+      "removed": true
+    }
+  },
+  "typecheckPassed": true,
+  "nativeAcceptance": false,
+  "originalOwnerAcceptedChecks": 0,
+  "permissionChanges": false,
+  "diagnosticContainsPathsArgumentsOrOutput": false,
+  "diagnosticEstablishesReadinessOrExecutionOrCleanup": false,
+  "installedChanged": false,
+  "newRuntimeOrSdkDownloads": false
+}

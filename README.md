@@ -1,199 +1,145 @@
-# STRATHEX SWITCHYARD — SXSY-B122
+# Switchyard
 
-> Route attention. Direct agents. Keep the operator in command.
+**Keep your place when work moves between tools.**
 
-SXSY-B122 is a software-only safety control plane for a proposed 22-control
-operator keyboard for agentic software development. Its host platforms are
-Windows and systemd-based desktop Linux. Its physical target is a
-Model F Labs B122 with a programmable Leyden Jar/Vial/QMK lineage, but the
-physical keyboard and its integration are not validated by this repository.
+Switchyard turns a Model F keyboard into a set of consistent controls: return to
+a task, check progress, review work and leave a handoff. Start with a recommended
+layout, keep your normal typing keys, then connect the tools you actually use.
+Direct configuration works without an assistant account.
 
-**Current status:** the repository contains the hardware-independent B122
-implementation: the canonical protocol and firmware/Raw-HID host source; the
-mutually authenticated Windows and Linux companions; the VS Code
-operator and provisioning surfaces; durable mediation, receipts, recovery,
-containment, and Council; host-attested repository recipes; DPAPI or Linux
-Secret Service credential references; exact-route HTTPS; configured
-provider, GitHub/Git/CI and scanner adapters; Windows Sandbox and Linux
-Bubblewrap isolation boundaries; an exhaustive
-hardware-independent 176-chord Raw-HID product simulator; and content-verified,
-transactional per-user release tooling. Source availability is **not** production, hardware, provider,
-or acceptance evidence. Every one of the 27 gates remains **NOT ACCEPTED**.
+The project brings Alex's workflow requirements and Model F setup into a reusable
+application. The F77 is the current pilot; the B122 is a separate future physical
+showcase. [See Alex's F77 setup](examples/alex-f77/README.md) and the
+[product decisions](docs/switchyard-requirements.md).
 
-The accepted design has 10 left-bank agent-control keys, 12 upper-row workspace
-keys, 65 settled chord behaviors, and 111 intentionally unassigned chord slots.
-The complete behavior contract and adversarial review live in
-[docs/SXSY-B122-complete-key-specification-and-audit.md](docs/SXSY-B122-complete-key-specification-and-audit.md).
+**Development status:** the application runs on the pilot's Omarchy Linux
+workstation. Windows software and packaging have independent test evidence.
+The full suite is unfinished, and there is no approved public release.
 
-## What this project is
+## Try it without accounts or hardware
 
-Agentic development spreads work across editors, terminals, repositories,
-worktrees, browser sessions, and multiple coding agents. SWITCHYARD explores a
-stable physical vocabulary for supervisory actions—route attention, inspect
-work, hand off context, interrupt, review, and approve only within a known
-boundary—rather than a macro layer that grants ambient authority.
+From a source checkout with the pinned Node **24.14.0** environment:
 
-A keyboard chord is an intent signal, never authority to change a repository,
-start a process, use a credential, or submit a prompt. The physical device
-conveys a bounded signal; a reviewed host decides whether a concrete action is
-safe and available in the current context.
-
-## What is implemented here
-
-- `firmware/qmk/` — QMK-compatible reference firmware that emits bounded,
-  versioned Raw HID signals only. It does not run Git, a terminal, a browser,
-  or desktop automation.
-- `packages/protocol/` — the canonical 22-control / 65-behavior manifest,
-  packet validation, and a closed command map. Unknown, forged, and
-  intentionally unassigned chords have no fallback action.
-- `packages/control-plane/` — the TypeScript mediation model: managed-session
-  lifecycle, exact target snapshots, authority and policy checks, durable
-  one-time confirmations, operation/child-operation sagas, receipts,
-  no-replay recovery, containment, budget claims, deadline/cancellation
-  control, and typed broker interfaces.
-- `apps/windows-companion/` — a local named-pipe companion and bootstrap seam.
-  On Windows it uses a DPAPI CurrentUser-protected journal and endpoint token,
-  mutual challenge/response authentication, and strict single-instance state.
-  It hydrates durable state and runs no-replay startup recovery without opening
-  TCP. Host-attested registries connect reviewed repository recipes, Windows
-  Sandbox, credential references, exact-route HTTPS, provider handshakes,
-  GitHub/Git, CI, scanner, and Council adapters when their required local
-  configuration and authorization are present. Its separate Raw-HID simulator
-  exercises all 65 assigned and 111 deliberately unassigned chord combinations,
-  replay/epoch recovery, and corrupt framing without opening hardware or the
-  network.
-- `apps/linux-companion/` — the Linux entry point for the same durable control
-  plane. It uses Secret Service-backed authenticated state, a private Unix
-  socket below `XDG_RUNTIME_DIR`, exact `/proc` process identity, and a
-  fail-closed Bubblewrap namespace adapter. No TCP or plaintext fallback is
-  present.
-- `apps/provider-adapter-host/` — an authenticated, TLS-pinned loopback host for
-  the closed Claude/Codex command, observation, cancellation, Council, and
-  reconciliation ports. It packages deterministic fixture backends for isolated
-  verification; it does not bundle, infer, or claim live vendor authorization.
-- `apps/vscode-extension/` — a VS Code bridge and lifecycle registry. It reads
-  only the companion-created sealed endpoint record, may identify/focus
-  approved local surfaces and route a canonical request, and does not use
-  direct Run/Debug APIs as a bypass around mediation.
-- `deployment/windows/` — content-verified per-user build, install, update,
-  rollback, start, health, and uninstall tooling with exact-root ownership,
-  crash-recovery receipts, and authenticated companion/provider shutdown.
-- `deployment/linux/` — a manifest-verified portable Node bundle, reversible
-  per-user systemd installation/update/rollback, hardened service unit, VS Code
-  package, and narrow physical-device udev template.
-- `docs/` — the accepted specification, reconstructed interview history,
-  adversarial review, project charter, attribution records, operational safety
-  model, and source-linked software-only completion audit.
-
-## The safety boundary
-
-`Managed` means the companion can identify or route a session. It does **not**
-mean the session is trusted or mediated. A filesystem, Git, credential, process,
-network, test-data, or containment claim can only be enforced through a
-reviewed, concrete mediated adapter or broker.
-
-```text
-B122 signal / extension request
-  -> canonical assignment and selected registered session
-  -> protected target snapshot and scoped authority
-  -> durable exact-scope confirmation (when required)
-  -> operation ID, policy permit, checkpoint/artifact verification
-  -> budget claim, deadline/cancellation control, containment check
-  -> explicitly registered typed broker or safe unavailable result
+```sh
+npm ci --ignore-scripts
+node scripts/demo-switchyard-ui.mjs --synthetic
 ```
 
-The in-memory brokers and adapters are test harnesses and never contact a real
-system. The installed composition also contains concrete, fail-closed adapters.
-Those adapters can act only after the operator installs the exact repository
-manifest, platform isolation runtime, OS-protected credential reference, network policy,
-provider handshake, external account, or scanner feed required by that route.
-Absent configuration or authorization is reported as unavailable; it is never
-replaced by an unreviewed fallback.
+Open the private local link printed by the command. Choose **Home → F77 Classic →
+Use this setup**, then follow the [guided walkthrough](docs/guided-setup.md).
+The demo includes a synthetic keyboard readout, saved conversations and a signed
+example agent. It refuses real hardware, account and desktop operations.
+Ctrl+C removes its temporary state.
 
-The following capabilities remain disabled by default, even though their
-software policy/saga paths are represented: Council automatic mode, Repair
-Mission, `lfg`, broker-enforced Merge and Direct Main, containment release,
-Full Sandbox, rebuild Full Sandbox, and Quarantine. No control silently commits,
-pushes, merges, force-pushes, approves a permission, or submits a prompt.
+Home gives you a useful starting arrangement. **Customize** contains the keyboard
+workbench. A reference preset is a preview: applying a real change requires
+evidence of the actual keyboard and a separate review.
 
-## Local development
+| Your next step | Start here |
+| --- | --- |
+| Use Switchyard | [Guided setup](docs/guided-setup.md), then [installation and rollback](docs/suite-installation.md) |
+| See Alex's setup | [F77 pilot](examples/alex-f77/README.md) and [B122 reference](examples/alex-b122/README.md) |
+| Choose your keyboard | [Model F catalog](docs/model-f-standard-configurations.md): 19 listed model/case/round combinations and 104 named references |
+| Understand the evidence | [Current status](docs/switchyard-status.md) and [requirement ledger](docs/switchyard-requirements.md) |
+| Develop or extend | [Documentation guide](docs/README.md), [integration contracts](integrations/README.md) and [contributing](CONTRIBUTING.md) |
 
-Use a current Node.js runtime that supports TypeScript transformation (the test
-scripts use `node --experimental-transform-types`). Tests use temporary files,
-fakes, and in-memory brokers; they must never use a production database,
-credentials, data, or endpoint.
+## What you can do
 
-```powershell
-npm ci
+- **Build a layout that fits your work.** Preview keys, name tool roles, discuss
+  structured proposals or edit directly. Normal typing stays part of the design.
+- **Connect an exact target.** Supported task, conversation, app and custom-agent
+  connections have distinct capabilities. An app homepage is not a resumed task.
+- **Review before acting.** Shortcuts, task permissions, repository execution and
+  device changes have their own scope and confirmation. Uncertain replies remain
+  visible and are not automatically repeated.
+- **Keep work separate.** Personal and Work use separate protected state and
+  provider policy. Work can remain Copilot-only or keyboard-only.
+- **Take your preferences with you.** Portable profiles carry layout and control
+  meanings; accounts, credentials and local task connections stay on the computer.
+- **Refine from observation.** Opt in to supported event sources, review aggregate
+  observations or voice transcripts, and use them in a design proposal.
+
+Follow the [connected backend demonstration](docs/backend-demonstration.md) for
+preset → named role → signed command → observation → revised portable profile.
+It uses disposable encrypted state and needs no external account.
+
+## Evidence and remaining work
+
+Results belong to the specific source tested; an older passing suite does not
+accept later changes.
+
+| Scope | Verified result |
+| --- | --- |
+| Installed Linux application, `fd13fd0` | 48 served/state/presentation and 129 metadata checks. App, task, device, profile and role reviews clear cancelled context. All 54 workspace definitions are preserved; Personal retains its expected shutdown revocation increment. [Receipt](docs/evidence/installed-removed-history-summary.json) |
+| Running synthetic demonstration, `dfa40fb` | Nine checks: named connection, signed acknowledgement and stale-workspace refusal. [Receipt](docs/evidence/batched-inspection-running-demo-summary.json) |
+| Native Codex terminal, synthetic provider | Real 0.167 CLI renders legacy and paginated saved transcripts through the production relay; one narrowed resume, zero model prompts. [Receipt](docs/evidence/codex-native-paginated-history-summary.json) |
+| Native Linux repository inspection | Twelve real Git guardians, at most four concurrent reads, independent exit and unchanged repository bytes. [Receipt](docs/evidence/batched-inspection-source-summary.json) |
+| Complete Linux suite, `a7958c4` | 376 groups, 2,578 passing tests, 32 declared skips; original commands, limits and cleanup audited. Predates the later frontend. [Receipt](docs/evidence/linux-a7958c4-complete-summary.json) |
+| Windows client lane, `3222727` | 31 groups, 362 passing tests, zero skips; later lease correction and full-suite acceptance remain separate. [Receipt](docs/evidence/native-client-3222727-summary.json) |
+| Complete Windows source, `a7958c4` | 482 groups, 3,158 passing tests, 246 declared skips; all 23 workers and native collector pass with original limits and audited cleanup. Predates the readable-review frontend. [Receipt](docs/evidence/complete-windows-a7958c4-summary.json) |
+| Earlier Windows package, `7529718` | 462 groups, 2,910 passing tests, 246 declared skips; bundle construction and smoke checks pass. [Receipt](docs/evidence/windows-package-7529718-summary.json) |
+
+**Unfinished software:** Linux Claude Desktop focus/launch and the broader
+observation and scanner capabilities tracked in the ledger. The Windows UI files
+now pass their original limits, though execution retains a narrow timing margin.
+Earlier repeated-focus and other intermittent native failures remain recorded.
+[Retained Windows failures](docs/evidence/native-48bf450-results-summary.json).
+A later PowerShell bootstrap fixture hit counter-file contention; its bounded
+wait correction awaits native acceptance. [Current failure](docs/evidence/windows-bootstrap-contention-summary.json).
+
+**Separate acceptance checks:** browser task/visual review, physical F77/B122
+changes, approved Microsoft tenant access, live native accounts/tasks, interactive
+Windows/IDE behavior, microphone capture and printed legend fit. The browser
+control connection currently fails before page loading. Synthetic checks do not
+establish these results.
+
+## How it is built
+
+A keyboard signals intent. The host checks the selected workspace, exact target,
+current policy and any required one-use review before an adapter acts.
+
+| Area | Responsibility |
+| --- | --- |
+| [Layout Studio](tools/layout-studio/README.md) | Local application, keyboard workspace, guided setup and configuration |
+| `packages/protocol/` | Versioned hardware signals and the canonical control vocabulary |
+| `packages/control-plane/` | Target snapshots, scoped authority, durable operations and recovery |
+| `apps/linux-companion/` and `apps/windows-companion/` | Platform identity, authenticated local channels and supervised execution |
+| `apps/vscode-extension/` | Saved-project/task controls and exact owned-terminal selection |
+| `integrations/` and `apps/provider-adapter-host/` | Explicit provider capabilities, signed custom-agent SDK and adapter contracts |
+| `deployment/suite/` | Verified application bundle, installation, update, rollback and removal |
+| [QMK reference](firmware/qmk/README.md) | Signal-only firmware; physical target commissioning is separate |
+
+Lost replies cannot grant a new action. Imported profiles cannot import
+credentials or approvals. Unsupported targets stay unavailable instead of typing
+into an unrelated foreground window. Read the
+[operational model](docs/operational-safety-model.md) for the enforcement boundary
+and its limitations.
+
+## Development
+
+Use the pinned runtime in [.node-version](.node-version). With dependencies
+installed, start the normal local application or run the supported host checks:
+
+```sh
+npm run layout:studio
 npm test
 npm run typecheck
-npm run build:vscode
-npm run build:companion
-npm run build:linux-companion
-npm run build:provider-host
 ```
 
-`npm run start:companion` starts the reviewed per-user companion, not a Windows
-service or service-account boundary. The standalone entry point supplies the
-reviewed Git-mutation queue and the configured adapter registries described
-above. It still does not establish independent named-pipe ACL acceptance,
-same-user adversary resistance, or production authorization. Uninstalled or
-unauthorized integrations fail closed. See
-[the local companion guide](docs/local-companion.md).
+The normal application uses persistent local state; the synthetic demo above is
+the disposable starting point. Windows source checks also require the reviewed
+native helper described in [private state locking](docs/private-state-locking.md).
+[Build and package instructions](docs/suite-installation.md) cover both platforms.
+No firmware flashing is part of these commands.
 
-QMK compilation is not part of the default suite because it needs the selected
-physical B122-compatible target and toolchain. See
-[firmware/qmk/README.md](firmware/qmk/README.md) before adapting the matrix.
-After `npm run build:companion`, run
-`node apps/windows-companion/dist/apps/windows-companion/src/raw-hid-simulator.js --self-test`
-for the hardware-independent exhaustive protocol receipt. That receipt is not
-physical-device, hot-plug, Vial, LED, or ergonomic acceptance evidence.
+Read [CONTRIBUTING.md](CONTRIBUTING.md) before changing behavior and
+[the continuation record](docs/switchyard-continuation.md) before resuming the
+current implementation. The [B122 specification and acceptance gates](docs/acceptance-gates.md)
+remain separate from the F77 pilot.
 
-## Contributing
+## Attribution and publication
 
-Read [CONTRIBUTING.md](CONTRIBUTING.md) before opening a contribution. In
-particular:
-
-- Treat [the complete specification](docs/SXSY-B122-complete-key-specification-and-audit.md)
-  as authoritative; the historical ledger and reconstructed interview notes are
-  traceability material.
-- Keep the signal-only firmware boundary and the distinction between Registered,
-  Observable, Controllable, and Mediated sessions intact.
-- Add isolated automated coverage with every behavior change, and update
-  [the software-only audit](docs/software-only-completion-audit.md) when a
-  mechanism or its evidence boundary changes.
-- Do not enable a high-consequence path on the strength of a mock, a local
-  receipt, or a keyboard event. It needs the applicable real acceptance evidence
-  first.
-- Never put secrets, production credentials, production test data, or a
-  production database in the repository or test harness.
-
-## Documentation, attribution, and governance
-
-- [Complete specification and 27 acceptance gates](docs/SXSY-B122-complete-key-specification-and-audit.md)
-- [Software-only completion audit](docs/software-only-completion-audit.md)
-- [Local companion and VS Code guide](docs/local-companion.md)
-- [Windows release, installation, recovery, and uninstall guide](docs/windows-release-and-installation.md)
-- [Linux release, installation, recovery, and uninstall guide](docs/linux-release-and-installation.md)
-- [Operational safety model](docs/operational-safety-model.md)
-- [Acceptance-gate ledger](docs/acceptance-gates.md)
-- [Project charter](docs/01-project-charter.md)
-- [Hardware and software architecture](docs/02-system-architecture.md)
-- [Workflow study protocol](docs/03-workflow-study.md)
-- [Control taxonomy requirements](docs/04-control-taxonomy.md)
-- [Publication roadmap](docs/05-roadmap.md) and [publication gate](docs/06-publication-gate.md)
-- [Documentation provenance](docs/README.md)
-- [Attribution register](ATTRIBUTION.md), [source bibliography](docs/references/bibliography.md),
-  [licensing status](LICENSING.md), [security policy](SECURITY.md), and
-  [third-party material policy](third-party/README.md)
-
-STRATHEX SWITCHYARD is an independent community project and is not affiliated
-with, sponsored by, or endorsed by Model F Labs, IBM, Vial, QMK, Microsoft,
-OpenAI, Anthropic, or any other referenced project or company.
-
-The audit is the current evidence boundary: it documents source-controlled
-mechanisms and isolated tests, including the configured provider/GitHub,
-credential-reference, Raw-HID helper/simulator, Windows Sandbox guest-worker,
-Linux Bubblewrap/process-group, and host-lifecycle implementations. It
-does not claim physical hardware, live external authorization, pipe-ACL or
-same-user adversarial acceptance, a signed release, or production readiness.
+See [licensing status](LICENSING.md), [attribution](ATTRIBUTION.md),
+[security policy](SECURITY.md) and [publication gates](docs/06-publication-gate.md).
+This is an independent project, not an official product of Model F Labs, IBM,
+Vial, QMK, Microsoft, OpenAI, Anthropic or other referenced vendors.

@@ -1,0 +1,24 @@
+{
+  "schema": "switchyard-editor-retired-stop/v1",
+  "basis": "97a7727514d0dfa3f12480c26b5326ef7aa9fd7b",
+  "sourceSha256": {
+    "tools/layout-studio/coding-editor-journal.mjs": "69b6d5beb1fae2f3fb9eab19715a0995bcd8daddeda65240b36c0d41cd020bcf",
+    "tools/layout-studio/coding-editor-connections.mjs": "04c794f673b068ed4cf56b53c74aed9c9df801e20ceed595a39f7fab2ab112ea",
+    "tools/layout-studio/coding-editor-connections.test.mjs": "94ef007c22ed97d09bd23dc2c0bdaab46b5ff81ac9b9c535bd46ad91bbe64cdd",
+    "apps/vscode-extension/test/studio-editor-session.test.ts": "5e8d18b068bb40ea73ebeb848c08ac41a4ed835b3a4281cf1fc05d730fcd7d55"
+  },
+  "receipt": "isolated-test-2add4fef-3623-4ffc-8f74-94c08e5b8202.json",
+  "groups": 5,
+  "passed": 39,
+  "allChildAndTreeCleanupVerified": true,
+  "typecheckPassed": true,
+  "implemented": [
+    "After automatic disconnect cleanup removes the live handle, a later exact stop now returns the already-verified protected retirement record. Unknown, uncertain or differently bound requests still refuse.",
+    "This path performs no provider/account request and changes no retained state. It cannot create another endpoint or adopt a process."
+  ],
+  "demonstration": "The full signed Terminal demonstration now terminates the original owned synthetic terminal process, waits independently for actual carrier retirement, then closes the launcher successfully. Repeated exact stop is immutable; a substituted editor identity refuses.",
+  "limits": [
+    "The 0ad510e complete run predates this correction; this five-group cohort verifies the later source.",
+    "Production command activation and native TUI/0.167.0 compatibility remain unfinished/unaccepted. No actual account, task, model or hardware action ran."
+  ]
+}

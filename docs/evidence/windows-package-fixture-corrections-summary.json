@@ -1,0 +1,134 @@
+{
+  "schema": "switchyard-windows-package-fixture-corrections/v1",
+  "baseCommit": "a384acc7ad92e100cf7484373c275dd1a3706a20",
+  "sourceFiles": [
+    {
+      "file": "tools/layout-studio/codex-windows-tasks.test.mjs",
+      "sha256": "0c1ad8de55d6a1b17554181f1a97e794ff7d1177432176f027201d7dd3cc1357"
+    },
+    {
+      "file": "tools/layout-studio/test-support/codex-windows-stdio-fixture.cjs",
+      "sha256": "f32bee9516ae954c14158b1edc46ad48732f4a28ddabd1182e5987bd96083d09"
+    },
+    {
+      "file": "tools/layout-studio/windows-editor-recovery.test.mjs",
+      "sha256": "a683d96a62fc161036323ffc6c4dacfde9ad9e20e86345683499f918db6724ad"
+    }
+  ],
+  "originalPackageEvidence": "windows-package-90fa879-failure-summary.json",
+  "originalModuleReproduction": {
+    "schema": "switchyard-original-fixture-module-reproduction/v1",
+    "source": "a384acc7ad92e100cf7484373c275dd1a3706a20",
+    "fixtureSha256": "06709fe0f6de17b4e77ad720a7fd9b1e8ca98c2fe750d03923f5516f227d2d9f",
+    "nodeVersion": "24.14.0",
+    "results": [
+      {
+        "type": "commonjs",
+        "initialized": true,
+        "error": null,
+        "ownedDirectChildExitVerified": true
+      },
+      {
+        "type": "module",
+        "initialized": false,
+        "error": "Codex disconnected. Your saved draft is preserved.",
+        "ownedDirectChildExitVerified": true
+      }
+    ],
+    "temporaryStateRemoved": true,
+    "liveProviderUsed": false
+  },
+  "receipts": [
+    {
+      "receiptId": "fa241a9e-a5e3-4347-915f-3439bb92bf4a",
+      "sha256": "d3ff043f88b8bac9df5d851c0d3b3633623d3e7f2000b35ae2ff18bf6615c1f6",
+      "totals": {
+        "required": 1,
+        "passed": 0,
+        "failed": 1,
+        "tests": 14,
+        "passedTests": 12,
+        "failedTests": 1,
+        "skippedTests": 1,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "success": false,
+      "originalCommandsBoundsSkipsAndCleanupVerified": true,
+      "failure": "not ok 13 - the synthetic native provider answers restricted RPC under CommonJS and module package parents\n  ---\n  duration_ms: 44.391222\n  type: 'test'\n  location: '[redacted].test.mjs:177:1'\n  failureType: 'testCodeFailure'\n  error: 'Codex disconnected. Your saved draft is preserved.'\n  code: 'ERR_TEST_FAILURE'\n  stack: |-\n    CodexClient.close (file:[redacted].mjs:181:186)\n    ChildProcess.<anonymous> (file:[redacted].mjs:147:83)\n    ChildProcess.emit (node:events:508:28)\n    maybeClose (node:internal/child_process:1100:16)\n    ChildProcess._handle.onexit (node:internal/child_process:305:5)\n  ...\n# Subtest: actual Windows Jobs carry restricted task RPC and recover original retirement with a synthetic provider\nok 14 - actual Windows Jobs carry restricted task RPC and recover original retirement with a synthetic provider # SKIP\n  ---\n  duration_ms: 0.842861\n  type: 'test'\n  ...\n1..14\n# tests 14\n# suites 0\n# pass 12\n# fail 1\n# cancelled 0\n# skipped 1\n# todo 0\n# duration_ms 2257.852628\n\n[bounded final output]\n-studio/agents.mjs:181:186)\n    ChildProcess.<anonymous> (file:[redacted].mjs:147:83)\n    ChildProcess.emit (node:events:508:28)\n    maybeClose (node:internal/child_process:1100:16)\n    ChildProcess._handle.onexit (node:internal/child_process:305:5)\n  ...\n# Subtest: actual Windows Jobs carry restricted task RPC and recover original retirement with a synthetic provider\nok 14 - actual Windows Jobs carry restricted task RPC and recover original retirement with a synthetic provider # SKIP\n  ---\n  duration_ms: 0.842861\n  type: 'test'\n  ...\n1..14\n# tests 14\n# suites 0\n# pass 12\n# fail 1\n# cancelled 0\n# skipped 1\n# todo 0\n# duration_ms 2257.852628\n"
+    },
+    {
+      "receiptId": "fb6f056c-40e4-4639-86d3-827493fff32b",
+      "sha256": "75e5f8448510f6c0b5b170cb3ecdff9e37352d5f8b3034f2d0f027e2ade35824",
+      "totals": {
+        "required": 3,
+        "passed": 3,
+        "failed": 0,
+        "tests": 34,
+        "passedTests": 29,
+        "failedTests": 0,
+        "skippedTests": 5,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "success": true,
+      "originalCommandsBoundsSkipsAndCleanupVerified": true
+    }
+  ],
+  "corrections": [
+    "The extensionless synthetic Codex provider uses dynamic imports so it runs under either CommonJS or module package parents without changing its RPC contract.",
+    "The native recovery fixture captures the canonical helper path before creating ownership evidence; the production saved-helper canonical identity and digest guards are unchanged."
+  ],
+  "unchangedProductionAndVerificationPaths": [
+    "tools/layout-studio/agents.mjs",
+    "tools/layout-studio/codex-windows-owner.mjs",
+    "tools/layout-studio/codex-windows-tasks.mjs",
+    "tools/layout-studio/windows-owned-stdio.mjs",
+    "tools/layout-studio/windows-editor-recovery.mjs",
+    "scripts/run-isolated-tests.mjs",
+    "deployment/windows/Build-B122Release.ps1",
+    ".github/workflows/b122-windows.yml"
+  ],
+  "nativeWindowsFollowup": {
+    "sourceCommit": "4db5948e63df68501b56ac4d6690f3a86cf001e4",
+    "targetTestsPassed": 22,
+    "targetSkips": 0,
+    "evidence": "windows-fixture-native-4db5948-summary.json",
+    "packageAcceptance": false,
+    "laterAliasAssertionsAccepted": true
+  },
+  "nativePackageAcceptance": false,
+  "limitations": [
+    "Local tests prove the provider module-context correction and preserve the original failing regression. Five declared platform cases still require native Windows.",
+    "The SUBST helper-path correction is supported by the package context and canonical-path failure guard; its causal native confirmation remains pending.",
+    "No installed runtime, frontend, provider account, real task, hardware, process/token access, ACL, timeout or CI retry policy changed."
+  ],
+  "aliasGuardFollowup": {
+    "baseCommit": "4db5948e63df68501b56ac4d6690f3a86cf001e4",
+    "file": "tools/layout-studio/windows-editor-recovery.test.mjs",
+    "sha256": "23f4d72eefa0ab3f1dfebc1d33b5a2b4aa434fcf314e84ae801f5240ad4d9f6e",
+    "receiptId": "7601f4e9-bffa-4fc7-b019-7b4dd07a9b11",
+    "receiptSha256": "31013a9a0ae002959cb6775db002a37a3a58702651ce3bb5f8b6d3badb3abd54",
+    "totals": {
+      "required": 3,
+      "passed": 3,
+      "failed": 0,
+      "tests": 34,
+      "passedTests": 29,
+      "failedTests": 0,
+      "skippedTests": 5,
+      "cancelledTests": 0,
+      "todoTests": 0
+    },
+    "originalCommandsBoundsSkipsAndCleanupVerified": true,
+    "nativeWindowsAcceptance": {
+      "sourceCommit": "db2463431cff362ce3ef0ab47ffe3c74080b4745",
+      "workflowRunId": 42462775807,
+      "receiptId": "55b07028-1f80-40f7-8bf8-4b1c2a94cf0a",
+      "evidence": "windows-package-db24634-tests-summary.json",
+      "originalBoundsAndCleanupVerified": true
+    },
+    "behavior": "The existing native case creates an owned directory junction, checks identical helper bytes and regular-file status, refuses that alias as saved identity, and accepts the untouched original canonical ownership row. It neither rewrites an original saved helper identity nor grants recovery through an alias.",
+    "limitation": "The native alias assertions pass in the original full package test group; complete release acceptance remains blocked by the later standalone provider-helper build."
+  }
+}

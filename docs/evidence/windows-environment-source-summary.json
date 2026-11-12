@@ -1,0 +1,35 @@
+{
+  "schema": "switchyard-restricted-environment-source/v1",
+  "basis": "359a825a743790ef399d24a2f867527381d1c944",
+  "sourceSha256": {
+    "deployment/windows/test-support/storage-broker-protocol/NativeRestrictedHostProof.cs": "7912c3a0754b9ec988f31d17d81b120df94039a08373fdea598c6db76bb5847a",
+    "deployment/windows/test-support/storage-broker-protocol/Program.cs": "f2987e926454dcc88d7b33ad6c7022c929209796fb86a683403d753777d26ca8",
+    "scripts/windows-restricted-owner-report.mjs": "781170559f7c9b138645162888eb3e1b1c4d387215ec81620409e71eafc1a06d"
+  },
+  "purpose": "Observe exact cold-child environment entry count and fixed SystemRoot/WINDIR presence and comparison with GetSystemWindowsDirectoryW, plus presence of OpenSSL and Node startup overrides. No values or paths are exported; the child environment is unchanged.",
+  "managedBuild": {
+    "receipt": "managed-source-build-1793942599812.json",
+    "targets": 2,
+    "portableChecksPassed": 1856,
+    "warnings": 0,
+    "errors": 0,
+    "existingSdkReused": true,
+    "ownedScratchRemoved": true
+  },
+  "projectionTests": {
+    "receipt": "isolated-test-577ddd64-9018-4482-a26d-e3a769bffb5d.json",
+    "passedTests": 12,
+    "allChildAndTreeCleanupVerified": true,
+    "typecheck": true
+  },
+  "nativeAcceptance": "pending",
+  "limits": [
+    "A reported upstream missing-SystemRoot failure motivated this observation; it is not evidence of this fixture cause.",
+    "Cold Node startup still fails at the latest accepted failure artifact.",
+    "No environment, RNG, token, privilege, desktop, account, Job or deadline change."
+  ],
+  "references": [
+    "https://learn.microsoft.com/en-us/windows/win32/api/sysinfoapi/nf-sysinfoapi-getsystemwindowsdirectoryw",
+    "https://github.com/openai/codex/issues/43881"
+  ]
+}

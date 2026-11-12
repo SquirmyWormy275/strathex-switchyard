@@ -41,7 +41,11 @@ disposable work root are collected. Successful output is placed under
 `C:\B122\exchange\output`, hashed, and bound to the request in an atomically
 renamed exact-v2 `result-manifest.json` consumed by `WindowsSandboxBackend`.
 The exact host-selected profile and resource-policy digest are bound into that
-manifest. The helper requests shutdown of the disposable guest on every exit;
+manifest. Legacy requests ask the disposable guest to shut down on every exit;
+reviewed host-owned sessions set the optional exact boolean
+`hostOwnsGuestShutdown: true` so the worker result returns before the host stops
+and independently observes its exact VM. Unknown/malformed lifecycle fields fail
+closed. A newly pinned helper is required for this request extension;
 the host deadline remains the fail-closed fallback.
 
 ## Reproducible build

@@ -1,0 +1,117 @@
+{
+  "schema": "switchyard-role-refusal-refresh-source-evidence/v1",
+  "scope": "After a refused role confirmation, refresh saved state and labels before offering another review; retain a failed refresh without enabling stale connections.",
+  "runs": [
+    {
+      "receiptId": "01178d4f-bf4f-4f09-b517-8cf382d7bb42",
+      "sha256": "e36776049daa560ddb64868d4ba13face83fa3fff5c1868af09104b9aa1dfc8c",
+      "success": false,
+      "totals": {
+        "required": 1,
+        "passed": 0,
+        "failed": 1,
+        "tests": 13,
+        "passedTests": 11,
+        "failedTests": 2,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "files": [
+        "tools/layout-studio/role-ui.test.mjs"
+      ],
+      "originalBoundsAndSkipsPreserved": true,
+      "ownedCleanupComplete": true,
+      "failures": [
+        {
+          "file": "tools/layout-studio/role-ui.test.mjs",
+          "counts": {
+            "total": 13,
+            "passed": 11,
+            "failed": 2,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          },
+          "diagnosticSha256": "1f8c245763a42f44c1d89586479aaf11bc8e7c64fccc5b0c6d901d2091bdef38"
+        }
+      ]
+    },
+    {
+      "receiptId": "27cc23d6-261a-4b54-bba7-b87e4766d742",
+      "sha256": "fef25bde12190d44f4408224554c4d4db8d091ec36fcd2153ad3b2d2422047e9",
+      "success": true,
+      "totals": {
+        "required": 7,
+        "passed": 7,
+        "failed": 0,
+        "tests": 88,
+        "passedTests": 88,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "files": [
+        "deployment/suite/release.test.mjs",
+        "tools/layout-studio/catalog.test.mjs",
+        "tools/layout-studio/role-dispatch.test.mjs",
+        "tools/layout-studio/guided-role-choices.test.mjs",
+        "tools/layout-studio/role-ui.test.mjs",
+        "tools/layout-studio/agent-maintenance-ui.test.mjs",
+        "tools/layout-studio/voice-ui.test.mjs"
+      ],
+      "originalBoundsAndSkipsPreserved": true,
+      "ownedCleanupComplete": true,
+      "failures": []
+    },
+    {
+      "receiptId": "4bfeff8d-6f3f-447c-94da-1386b1df4561",
+      "sha256": "9a47b7b82f3959764fdbf084bab0a91d190da3f0d52a3b1f8b0d92d4236551f3",
+      "success": true,
+      "totals": {
+        "required": 7,
+        "passed": 7,
+        "failed": 0,
+        "tests": 88,
+        "passedTests": 88,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "files": [
+        "deployment/suite/release.test.mjs",
+        "tools/layout-studio/catalog.test.mjs",
+        "tools/layout-studio/role-dispatch.test.mjs",
+        "tools/layout-studio/guided-role-choices.test.mjs",
+        "tools/layout-studio/role-ui.test.mjs",
+        "tools/layout-studio/agent-maintenance-ui.test.mjs",
+        "tools/layout-studio/voice-ui.test.mjs"
+      ],
+      "originalBoundsAndSkipsPreserved": true,
+      "ownedCleanupComplete": true,
+      "failures": []
+    }
+  ],
+  "sourceFiles": {
+    "tools/layout-studio/role-ui.mjs": "4d13ba438148ac88f23da104cc926a3a562847e185682e209083067e7128782d",
+    "tools/layout-studio/role-ui.test.mjs": "6e96e548e85746cdfb1b587e1fb42545ee482fd90544c176c8c5efd91902f470"
+  },
+  "originalFailures": [
+    "The refused review correctly queued no command, but still showed the old target after an independent rebind.",
+    "An independently changed role label remained stale after refusal."
+  ],
+  "nativeFailure": "client-native-51ce508-failure-summary.json",
+  "nativeFollowup": "Not yet accepted. The original Windows run remains failed: its UI fixture restored the global document before asynchronous post-refusal refresh completed.",
+  "corrections": [
+    "Refresh reads the current protected workspace after refusal, retaining the original error and never retrying the command.",
+    "Failed saved-state refresh clears choices and requires reconnection; its exception is handled.",
+    "UI assertions join closed-dialog and enabled-control readiness before returning their borrowed document. The original two-second UI deadline and all original group bounds remain."
+  ],
+  "boundaries": [
+    "Real authenticated HTTP, temporary encrypted storage and explicit DOM fixture. No actual browser rendering or keyboard acceptance.",
+    "No provider/account/model/native application or installed agent effects.",
+    "The final seven groups include earlier cases; overlapping totals are not added together."
+  ]
+}

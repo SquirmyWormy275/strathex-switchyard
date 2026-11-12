@@ -1,10 +1,11 @@
 import { createHash, randomUUID } from "node:crypto";
 import { spawn } from "node:child_process";
 import { existsSync, readdirSync } from "node:fs";
-import { mkdir, mkdtemp, rename, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, realpath, rename, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 import { dirname, isAbsolute, join, resolve } from "node:path";
+import { windowsScenarioGroups, windowsTaskOwnerLinuxScenarios } from "./windows-scenario-groups.mjs";
 import { terminateOwnedProcessTree } from "./test-support/process-tree.mjs";
 
 export const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -28,7 +29,7 @@ const controlPlaneTests = [
   "host-path", "policy", "reanchor", "recipes", "redaction", "runtime", "session-authority",
   "snapshot-ledger", "snapshot-operations", "snapshot-resolver", "store-receipts",
   "voice", "workflow-artifacts"
-].map((name) => ({ file: `packages/control-plane/test/${name}.test.ts` }));
+].map((name) => ({ file: `packages/control-plane/test/${name}.test.ts`, ...(name === "git-inspector" && process.platform !== "linux" ? { expectedSkipped: 1 } : {}) }));
 const companionTests = [
   "acceptance-administration", "atomic-python-venv", "authenticated-pipe", "automation-child-effects", "automation-effect-executor", "automation-high-consequence", "automation-installed-runtime", "automation-manifest-coordinator", "automation-manifest-review", "automation-proposal-source", "automation-refresh-git", "bootstrap", "companion-lifecycle-helper", "configured-network", "configured-voice-provider", "containment-assessment", "containment-history-remediation", "containment-release", "containment-remote-evidence", "containment-remote-evaluator", "containment-remote-host", "control-plane",
   "configured-provider-host", "council-epoch-lifecycle", "council-resource-broker", "council-runtime", "council-workspace-isolation", "default-composition-handoff", "durable-credentials", "installed-automation-e2e", "main-shutdown",
@@ -57,11 +58,34 @@ const mediatedGitTests = [
   "mediated local commit uses an exact task-owned private index and reconciles the shared index to its committed tree",
   "default-branch review creates a hook-disabled feature branch and requires a fresh target before committing",
   "detached-HEAD review creates an exact feature branch before any commit and requires a fresh target",
-  "mediated local commit rejects unowned paths, a dirty shared index, containment, and a final target change"
+  "mediated local commit rejects unowned paths, a dirty shared index, containment, and a final target change",
+  "raw commit mediation bypasses repository clean/process/diff/textconv/fsmonitor commands and hooks",
+  "new binary files cross the private blob pipe unchanged and remain non-executable",
+  "a file changed between its manifest witness and private byte read cannot be committed",
+  "a competing branch update wins its own CAS and is never overwritten by a reviewed local commit",
+  "feature-branch creation uses an expected-HEAD transaction without checkout filters",
+  "an unconfirmed native Git exit retains its exact indices and shared lock for recovery",
+  "a readback failure after a verified reference update retains exact transaction recovery files",
+  "exact preserved index and private leases can be reopened for separately reviewed reconciliation without another commit",
+  "reopening a preserved lease refuses in-place lock changes and changed original index bytes",
+  "the Windows replacement sequence closes its destination and preserves a competing replacement after that close",
+  "reviewed private index bytes and artifact identity must still match before replacement or cleanup",
+  "a replacement shared index lock is preserved after the exact reviewed commit advances HEAD",
+  "a replacement original index is never overwritten during shared-index reconciliation",
+  "the previous worktree owner cannot delete a replacement private lock during cleanup",
+  "host preservation records exact index and lock identities before any reference update",
+  "shared lock content changed in place is preserved rather than overwritten",
+  "private lock content changed in place remains untouched during cleanup"
 ].map((pattern) => ({ file: "apps/windows-companion/test/mediated-git.test.ts", pattern }));
-const extensionTests = ["commands", "companion-bridge", "controller", "named-pipe-transport"]
+const extensionTests = ["commands", "studio-editor-commands", "companion-bridge", "controller", "named-pipe-transport", "operator-status", "terminal-focus", "codex-terminal", "codex-windows-terminal", "studio-windows-task-client", "studio-windows-native", "studio-windows-editor-launch", "studio-windows-editor-files", "studio-task-client", "studio-editor-launch", "studio-terminal-process", "studio-editor-session"]
   .map((name) => ({
     file: `apps/vscode-extension/test/${name}.test.ts`,
+    ...(name === "controller" && process.platform !== "linux" ? { expectedSkipped: 3 } : {}),
+    ...(name === "studio-windows-editor-files" && process.platform !== "win32" ? { expectedSkipped: 1 } : {}),
+    ...(name === "studio-task-client" && process.platform !== "linux" ? { expectedSkipped: 12 } : {}),
+    ...(name === "studio-editor-session" && process.platform !== "linux" ? { expectedSkipped: 2 } : {}),
+    ...(name === "studio-editor-launch" && process.platform !== "linux" ? { expectedSkipped: 22 } : {}),
+    ...(name === "studio-terminal-process" && process.platform !== "linux" ? { expectedSkipped: 5 } : {}),
     ...(name === "named-pipe-transport" ? { timeoutMs: 120_000, expectedSkipped: process.platform === "win32" ? 1 : 7 } : {})
   }));
 const providerHostTests = ["backends", "config", "council-resources", "dispatch-lease", "linux-path-security", "main", "reanchor", "redaction", "release", "server", "service", "workflow-context"]
@@ -85,15 +109,276 @@ const linuxSkippedOnNonLinux = new Map([
   ["linux-lifecycle", 2],
   ["linux-user-presence", 2],
   ["linux-process-supervisor", 3],
-  ["linux-repository-runtime", 3]
+  ["linux-repository-runtime", 6]
 ]);
 const linuxCompanionTests = ["linux-secret", "linux-isolation", "linux-lifecycle", "linux-user-presence", "linux-pipewire-audio", "linux-hidraw", "linux-process-supervisor", "linux-repository-runtime", "omarchy-capabilities", "omarchy-identity", "omarchy-host-action", "omarchy-host-action-consumer"]
   .map((name) => ({
     file: `apps/linux-companion/test/${name}.test.ts`,
     ...(process.platform !== "linux" && linuxSkippedOnNonLinux.has(name) ? { expectedSkipped: linuxSkippedOnNonLinux.get(name) } : {})
   }));
+export function nativeTestOverrides(file, platform = process.platform) {
+  if (platform === "win32" && ["tools/layout-studio/copilot-account-binding.test.mjs", "tools/layout-studio/copilot-lifecycle.test.mjs", "tools/layout-studio/copilot-requests.test.mjs"].includes(file)) return { timeoutMs: 120_000 };
+  if (file === "deployment/suite/inspect.test.mjs") return { timeoutMs: platform === "win32" ? 300_000 : 120_000 };
+  if (file === "tools/layout-studio/task-history-inputs.test.mjs") return { timeoutMs: platform === "win32" ? 300_000 : 120_000 };
+  if (file === "tools/layout-studio/repository-windows-shield-history.test.mjs") return { timeoutMs: platform === "win32" ? 300_000 : 120_000 };
+  if (file === "tools/layout-studio/repository-windows-shield-index.test.mjs") return { timeoutMs: platform === "win32" ? 300_000 : 120_000 };
+  if (file === "tools/layout-studio/task-index-inputs.test.mjs") return { timeoutMs: platform === "win32" ? 300_000 : 120_000 };
+  if (["tools/layout-studio/repository-shield-cargo.test.mjs", "tools/layout-studio/repository-windows-shield-cargo.test.mjs", "tools/layout-studio/repository-shield-pypi.test.mjs", "tools/layout-studio/repository-windows-shield-pypi.test.mjs", "tools/layout-studio/repository-shield-licenses.test.mjs", "tools/layout-studio/repository-windows-shield-licenses.test.mjs"].includes(file)) return { timeoutMs: platform === "win32" ? 300_000 : 120_000 };
+  if (["tools/layout-studio/repository-shield-python-wheels.test.mjs", "tools/layout-studio/repository-windows-shield-python-wheels.test.mjs", "tools/layout-studio/repository-shield-python-records.test.mjs", "tools/layout-studio/repository-windows-shield-python-records.test.mjs", "tools/layout-studio/repository-shield-cargo-archives.test.mjs", "tools/layout-studio/repository-windows-shield-cargo-archives.test.mjs"].includes(file)) return { timeoutMs: platform === "win32" ? 300_000 : 120_000 };
+  if (file === "tools/layout-studio/repository-shield-osv-source.test.mjs") return { timeoutMs: platform === "win32" ? 300_000 : 120_000 };
+  if (file === "tools/layout-studio/repository-shield-ignored-trees.test.mjs") return { timeoutMs: platform === "win32" ? 300_000 : 120_000 };
+  if (file === "tools/layout-studio/task-authority-ignored-trees.test.mjs") return { timeoutMs: platform === "win32" ? 300_000 : 120_000 };
+  if (["tools/layout-studio/repository-shield-pypi-artifacts.test.mjs", "tools/layout-studio/repository-shield-cargo-artifacts.test.mjs", "tools/layout-studio/repository-shield-artifacts.test.mjs", "tools/layout-studio/repository-shield-npm-archives.test.mjs", "tools/layout-studio/repository-shield-workspaces.test.mjs"].includes(file)) return { timeoutMs: platform === "win32" ? 300_000 : 120_000 };
+  if (file === "tools/layout-studio/repository-receipt-authority.test.mjs") return { timeoutMs: platform === "win32" ? 300_000 : 120_000 };
+  if (file === "tools/layout-studio/receipt-authority-state.test.mjs" && platform === "win32") return { timeoutMs: 240_000 };
+  if (file === "tools/layout-studio/repository-windows-shield-exceptions.test.mjs") return { timeoutMs: platform === "win32" ? 300_000 : 120_000 };
+  if (file === "tools/layout-studio/repository-ignored-scanner-inputs.test.mjs") return { timeoutMs: platform === "win32" ? 300_000 : 120_000 };
+  if (file === "tools/layout-studio/task-authority-ignored-inputs.test.mjs" && platform === "win32") return { timeoutMs: 240_000 };
+  if (file === "tools/layout-studio/repository-validation-policy.test.mjs") return { timeoutMs: platform === "win32" ? 300_000 : 120_000 };
+  if (platform === "win32" && file === "tools/layout-studio/suite.test.mjs") return { timeoutMs: 120_000 };
+  if (platform === "win32" && file === "tools/layout-studio/repository-execution.test.mjs") return { timeoutMs: 480_000 };
+  if (platform === "win32" && file === "tools/layout-studio/task-authority.test.mjs") return { timeoutMs: 240_000 };
+  if (platform === "win32" && ["repository-windows-shield", "repository-windows-shield-recovery", "repository-windows-pipeline", "repository-windows-pipeline-recovery", "repository-windows-execution", "repository-windows-execution-recovery", "repository-windows-execution-stop", "repository-windows-execution-output"].some(name => file === `tools/layout-studio/${name}.test.mjs`)) return { timeoutMs: 300_000 };
+  if (file === "tools/layout-studio/windows-exchange-images.test.mjs") return { timeoutMs: platform === "win32" ? 240_000 : 120_000 };
+  if (file === "tools/layout-studio/repository-recovery.test.mjs") return { timeoutMs: 120_000 };
+  const protectedNativeGroups = ["claude-coding", "agents-claude", "conversation-bindings", "codex-submissions", "claude-submissions", "windows-reviewed-inputs", "windows-index-staging", "windows-history-staging", "windows-sandbox-native", "windows-sandbox-sessions", "windows-guest-tools", "windows-exchange-images", "windows-broker-exchanges", "scanner-fixtures", "scanner-fixture-removal", "scanner-fixture-invalidation", "windows-reviewed-runner", "repository-windows-execution"].map((name) => `tools/layout-studio/${name}.test.mjs`);
+  return platform === "win32" && protectedNativeGroups.includes(file) ? { timeoutMs: 120_000 } : {};
+}
 export const requiredGroups = [
+  { file: "scripts/demo-switchyard-backend.test.mjs" },
+  { file: "scripts/windows-complete-shards.test.mjs" },
+  { file: "scripts/windows-backend-shards.test.mjs" },
+  { file: "scripts/windows-descendant-query.test.mjs" },
   { file: "scripts/run-isolated-tests.test.mjs" },
+  { file: "scripts/vscode-windows-runtime.test.mjs" },
+  { file: "scripts/windows-scenario-groups.test.mjs" },
+  { file: "scripts/windows-restricted-owner-report.test.mjs" },
+  { file: "scripts/verify-shield-license-host.test.mjs" },
+  { file: "scripts/verify-copilot-journal-host.test.mjs" },
+  { file: "tools/layout-studio/copilot-account-binding.test.mjs", ...nativeTestOverrides("tools/layout-studio/copilot-account-binding.test.mjs") },
+  { file: "tools/layout-studio/copilot-lifecycle.test.mjs", ...nativeTestOverrides("tools/layout-studio/copilot-lifecycle.test.mjs") },
+  { file: "tools/layout-studio/copilot-requests.test.mjs", ...nativeTestOverrides("tools/layout-studio/copilot-requests.test.mjs") },
+  { file: "scripts/verify-runtime-platform.test.mjs" },
+  { file: "deployment/suite/release.test.mjs" },
+  { file: "deployment/suite/inspect.test.mjs", ...nativeTestOverrides("deployment/suite/inspect.test.mjs") },
+  { file: "deployment/suite/application.test.mjs" },
+  { file: "deployment/suite/shortcut-process.test.mjs" },
+  { file: "tools/layout-studio/credential-process.test.mjs" },
+  { file: "tools/layout-studio/agent-revocation.test.mjs" },
+  { file: "deployment/suite/runtime-maintenance.test.mjs" },
+  { file: "deployment/suite/connection-restoration.test.mjs" },
+  ...windowsScenarioGroups("deployment/suite/installation.test.mjs").map(group => ({ ...group, timeoutMs: 120_000 })),
+  { file: "scripts/install-workflow-shortcut.test.mjs", ...(process.platform !== "linux" ? { expectedSkipped: 2 } : {}) },
+  { file: "scripts/workflow-capture.test.mjs" },
+  { file: "scripts/codex-thread-status.test.mjs" },
+  { file: "scripts/codex-daemon-status.test.mjs", ...(process.platform === "win32" ? { expectedSkipped: 2 } : {}) },
+  { file: "scripts/verify-tmux-focus-host.test.mjs" },
+  { file: "tools/layout-studio/model.test.mjs" },
+  { file: "tools/layout-studio/catalog.test.mjs" },
+  { file: "tools/layout-studio/catalog-identity.test.mjs" },
+  { file: "tools/layout-studio/haptic-capabilities.test.mjs" },
+  { file: "tools/layout-studio/agent-observation.test.mjs" },
+  { file: "tools/layout-studio/host-action-observation.test.mjs" },
+  { file: "tools/layout-studio/editor-observation.test.mjs" },
+  { file: "tools/layout-studio/keyless-lease-pool.test.mjs" },
+  { file: "tools/layout-studio/readout-profiles.test.mjs" },
+  { file: "tools/layout-studio/configuration.test.mjs", ...(process.platform !== "linux" ? { expectedSkipped: 1 } : {}) },
+  { file: "tools/layout-studio/suite.test.mjs", ...nativeTestOverrides("tools/layout-studio/suite.test.mjs") },
+  { file: "tools/layout-studio/repository-effects.test.mjs", ...(process.platform !== "linux" ? { expectedSkipped: 1 } : {}) },
+  { file: "tools/layout-studio/repository-recovery.test.mjs", ...nativeTestOverrides("tools/layout-studio/repository-recovery.test.mjs"), ...(process.platform !== "linux" ? { expectedSkipped: 1 } : {}) },
+  { file: "tools/layout-studio/repository-commits.test.mjs", ...(process.platform !== "linux" ? { expectedSkipped: 1 } : {}) },
+  { file: "tools/layout-studio/repository-execution-supervisor.test.mjs", ...(process.platform !== "linux" ? { expectedSkipped: 1 } : {}) },
+  { file: "tools/layout-studio/repository-execution-staging.test.mjs" },
+  { file: "tools/layout-studio/repository-execution-stop.test.mjs" },
+  { file: "tools/layout-studio/windows-reviewed-inputs.test.mjs", ...nativeTestOverrides("tools/layout-studio/windows-reviewed-inputs.test.mjs") },
+  { file: "tools/layout-studio/windows-storage-native.test.mjs" },
+  { file: "tools/layout-studio/shield-exception-ledger.test.mjs" },
+  { file: "tools/layout-studio/shield-exceptions.test.mjs" },
+  { file: "tools/layout-studio/repository-shield-exceptions.test.mjs", timeoutMs: 120_000, expectedSkipped: process.platform === "linux" ? 0 : 1 },
+  { file: "tools/layout-studio/repository-windows-shield-exceptions.test.mjs", ...nativeTestOverrides("tools/layout-studio/repository-windows-shield-exceptions.test.mjs") },
+  { file: "tools/layout-studio/scanner-fixtures.test.mjs", ...nativeTestOverrides("tools/layout-studio/scanner-fixtures.test.mjs") },
+  { file: "tools/layout-studio/scanner-fixture-invalidation.test.mjs", ...nativeTestOverrides("tools/layout-studio/scanner-fixture-invalidation.test.mjs") },
+  { file: "tools/layout-studio/receipt-authority-state.test.mjs", ...nativeTestOverrides("tools/layout-studio/receipt-authority-state.test.mjs") },
+  { file: "tools/layout-studio/repository-receipt-authority.test.mjs", ...nativeTestOverrides("tools/layout-studio/repository-receipt-authority.test.mjs"), expectedSkipped: process.platform === "linux" ? 0 : 1 },
+  { file: "tools/layout-studio/repository-validation-policy.test.mjs", timeoutMs: 120_000, ...nativeTestOverrides("tools/layout-studio/repository-validation-policy.test.mjs"), expectedSkipped: process.platform === "linux" ? 0 : 1 },
+  { file: "tools/layout-studio/scanner-fixture-removal.test.mjs", ...nativeTestOverrides("tools/layout-studio/scanner-fixture-removal.test.mjs") },
+  { file: "tools/layout-studio/windows-broker-exchanges.test.mjs", ...nativeTestOverrides("tools/layout-studio/windows-broker-exchanges.test.mjs") },
+  { file: "tools/layout-studio/windows-storage-setup.test.mjs" },
+  { file: "tools/layout-studio/windows-sandbox-native.test.mjs", ...nativeTestOverrides("tools/layout-studio/windows-sandbox-native.test.mjs") },
+  { file: "tools/layout-studio/windows-sandbox-sessions.test.mjs", ...nativeTestOverrides("tools/layout-studio/windows-sandbox-sessions.test.mjs") },
+  { file: "tools/layout-studio/windows-guest-tools.test.mjs", ...nativeTestOverrides("tools/layout-studio/windows-guest-tools.test.mjs") },
+  { file: "tools/layout-studio/windows-exchange-images.test.mjs", ...nativeTestOverrides("tools/layout-studio/windows-exchange-images.test.mjs") },
+  { file: "tools/layout-studio/windows-reviewed-run.test.mjs" },
+  { file: "tools/layout-studio/windows-reviewed-runner.test.mjs", ...nativeTestOverrides("tools/layout-studio/windows-reviewed-runner.test.mjs") },
+  { file: "tools/layout-studio/repository-windows-execution.test.mjs", ...nativeTestOverrides("tools/layout-studio/repository-windows-execution.test.mjs") },
+  { file: "tools/layout-studio/repository-windows-pipeline.test.mjs", ...nativeTestOverrides("tools/layout-studio/repository-windows-pipeline.test.mjs") },
+  { file: "tools/layout-studio/repository-windows-pipeline-recovery.test.mjs", ...nativeTestOverrides("tools/layout-studio/repository-windows-pipeline-recovery.test.mjs") },
+  ...windowsScenarioGroups("tools/layout-studio/repository-windows-shield.test.mjs").map(group => ({ ...group, timeoutMs: 120_000, ...nativeTestOverrides(group.file) })),
+  { file: "tools/layout-studio/repository-windows-shield-recovery.test.mjs", timeoutMs: 120_000, ...nativeTestOverrides("tools/layout-studio/repository-windows-shield-recovery.test.mjs") },
+  { file: "tools/layout-studio/windows-pipeline-evidence.test.mjs" },
+  { file: "tools/layout-studio/windows-shield-evidence.test.mjs" },
+  { file: "tools/layout-studio/linux-namespace-budget.test.mjs", expectedSkipped: process.platform === "linux" ? 0 : 1 },
+  { file: "tools/layout-studio/linux-temporary-workspace.test.mjs", expectedSkipped: process.platform === "linux" ? 0 : 1 },
+  { file: "tools/layout-studio/repository-temporary-build.test.mjs", timeoutMs: 120_000, expectedSkipped: process.platform === "linux" ? 0 : 2 },
+  { file: "tools/layout-studio/repository-windows-execution-recovery.test.mjs", ...nativeTestOverrides("tools/layout-studio/repository-windows-execution-recovery.test.mjs") },
+  ...windowsScenarioGroups("tools/layout-studio/repository-windows-execution-stop.test.mjs").map(group => ({ ...group, ...nativeTestOverrides(group.file) })),
+  { file: "tools/layout-studio/repository-windows-execution-output.test.mjs", ...nativeTestOverrides("tools/layout-studio/repository-windows-execution-output.test.mjs") },
+  { file: "tools/layout-studio/repository-execution.test.mjs", timeoutMs: 240_000, ...nativeTestOverrides("tools/layout-studio/repository-execution.test.mjs"), ...(process.platform !== "linux" ? { expectedSkipped: 1 } : {}) },
+  { file: "tools/layout-studio/cargo-lock-inventory.test.mjs" },
+  { file: "tools/layout-studio/cargo-archive.test.mjs" },
+  { file: "tools/layout-studio/npm-archive-license.test.mjs" },
+  { file: "tools/layout-studio/pypi-wheel-license.test.mjs" },
+  { file: "tools/layout-studio/repository-shield-cargo-archives.test.mjs", ...nativeTestOverrides("tools/layout-studio/repository-shield-cargo-archives.test.mjs"), expectedSkipped: process.platform === "linux" ? 0 : 2 },
+  { file: "tools/layout-studio/repository-windows-shield-cargo-archives.test.mjs", ...nativeTestOverrides("tools/layout-studio/repository-windows-shield-cargo-archives.test.mjs") },
+  { file: "tools/layout-studio/repository-shield-cargo.test.mjs", ...nativeTestOverrides("tools/layout-studio/repository-shield-cargo.test.mjs"), expectedSkipped: process.platform === "linux" ? 0 : 4 },
+  { file: "tools/layout-studio/repository-windows-shield-cargo.test.mjs", ...nativeTestOverrides("tools/layout-studio/repository-windows-shield-cargo.test.mjs") },
+  { file: "tools/layout-studio/shield-scanner-engine.test.mjs" },
+  { file: "tools/layout-studio/pypi-wheel-identity.test.mjs" },
+  { file: "tools/layout-studio/pypi-wheel-record.test.mjs" },
+  { file: "tools/layout-studio/repository-shield-python-records.test.mjs", ...nativeTestOverrides("tools/layout-studio/repository-shield-python-records.test.mjs"), expectedSkipped: process.platform === "linux" ? 0 : 2 },
+  { file: "tools/layout-studio/repository-windows-shield-python-records.test.mjs", ...nativeTestOverrides("tools/layout-studio/repository-windows-shield-python-records.test.mjs") },
+  { file: "tools/layout-studio/repository-shield-python-wheels.test.mjs", ...nativeTestOverrides("tools/layout-studio/repository-shield-python-wheels.test.mjs"), expectedSkipped: process.platform === "linux" ? 0 : 2 },
+  { file: "tools/layout-studio/repository-windows-shield-python-wheels.test.mjs", ...nativeTestOverrides("tools/layout-studio/repository-windows-shield-python-wheels.test.mjs") },
+  { file: "tools/layout-studio/repository-shield-index.test.mjs", timeoutMs: 120_000, expectedSkipped: process.platform === "linux" ? 0 : 3 },
+  { file: "tools/layout-studio/repository-shield-history.test.mjs", timeoutMs: 120_000, expectedSkipped: process.platform === "linux" ? 0 : 3 },
+  { file: "tools/layout-studio/cvss-v2-metrics.test.mjs" },
+  { file: "tools/layout-studio/cvss-v3-base.test.mjs" },
+  { file: "tools/layout-studio/cvss-v3-metrics.test.mjs" },
+  { file: "tools/layout-studio/cvss-v4-metrics.test.mjs" },
+  { file: "tools/layout-studio/osv-advisory-source.test.mjs" },
+  { file: "tools/layout-studio/repository-shield-osv-source.test.mjs", ...nativeTestOverrides("tools/layout-studio/repository-shield-osv-source.test.mjs"), expectedSkipped: process.platform === "linux" ? 0 : 8 },
+  { file: "tools/layout-studio/repository-shield-pypi.test.mjs", ...nativeTestOverrides("tools/layout-studio/repository-shield-pypi.test.mjs"), expectedSkipped: process.platform === "linux" ? 0 : 6 },
+  { file: "tools/layout-studio/repository-windows-shield-pypi.test.mjs", ...nativeTestOverrides("tools/layout-studio/repository-windows-shield-pypi.test.mjs") },
+  { file: "tools/layout-studio/repository-shield-licenses.test.mjs", ...nativeTestOverrides("tools/layout-studio/repository-shield-licenses.test.mjs"), expectedSkipped: process.platform === "linux" ? 0 : 2 },
+  { file: "tools/layout-studio/repository-windows-shield-licenses.test.mjs", ...nativeTestOverrides("tools/layout-studio/repository-windows-shield-licenses.test.mjs") },
+  { file: "tools/layout-studio/shield-input-inventory.test.mjs" },
+  { file: "tools/layout-studio/scanner-review.test.mjs", timeoutMs: process.platform === "win32" ? 240_000 : 120_000, expectedSkipped: process.platform === "linux" ? 0 : 1 },
+  { file: "tools/layout-studio/scanner-index-review.test.mjs", timeoutMs: process.platform === "win32" ? 240_000 : 120_000, expectedSkipped: process.platform === "linux" ? 0 : 1 },
+  { file: "tools/layout-studio/scanner-history-review.test.mjs", timeoutMs: process.platform === "win32" ? 300_000 : 120_000, expectedSkipped: process.platform === "linux" ? 0 : 1 },
+  { file: "tools/layout-studio/scanner-mixed-review.test.mjs", timeoutMs: process.platform === "win32" ? 300_000 : 120_000, expectedSkipped: process.platform === "linux" ? 0 : 1 },
+  { file: "tools/layout-studio/scanner-recipe-draft.test.mjs", timeoutMs: process.platform === "win32" ? 300_000 : 120_000, expectedSkipped: process.platform === "linux" ? 0 : 1 },
+  { file: "tools/layout-studio/windows-scanner-draft.test.mjs" },
+  { file: "tools/layout-studio/windows-scanner-runtime.test.mjs" },
+  { file: "tools/layout-studio/windows-scanner-draft-execution.test.mjs", timeoutMs: process.platform === "win32" ? 300_000 : 120_000 },
+  { file: "tools/layout-studio/scanner-recipe-save.test.mjs", timeoutMs: process.platform === "win32" ? 300_000 : 120_000, expectedSkipped: process.platform === "linux" ? 0 : 22 },
+  { file: "tools/layout-studio/windows-scanner-recipe-files.test.mjs", timeoutMs: process.platform === "win32" ? 300_000 : 120_000, expectedSkipped: process.platform === "win32" ? 0 : 4 },
+  { file: "tools/layout-studio/git-index-inputs.test.mjs" },
+  { file: "tools/layout-studio/git-history-inputs.test.mjs" },
+  { file: "tools/layout-studio/task-history-scope.test.mjs" },
+  { file: "tools/layout-studio/task-history-inputs.test.mjs", ...nativeTestOverrides("tools/layout-studio/task-history-inputs.test.mjs"), expectedSkipped: process.platform === "linux" ? 0 : 1 },
+  { file: "tools/layout-studio/windows-index-inputs.test.mjs" },
+  { file: "tools/layout-studio/windows-history-inputs.test.mjs" },
+  { file: "tools/layout-studio/windows-history-staging.test.mjs", ...nativeTestOverrides("tools/layout-studio/windows-history-staging.test.mjs"), expectedSkipped: process.platform === "win32" ? 0 : 1 },
+  { file: "tools/layout-studio/windows-index-staging.test.mjs", ...nativeTestOverrides("tools/layout-studio/windows-index-staging.test.mjs") },
+  { file: "tools/layout-studio/repository-windows-shield-index.test.mjs", ...nativeTestOverrides("tools/layout-studio/repository-windows-shield-index.test.mjs") },
+  { file: "tools/layout-studio/repository-windows-shield-history.test.mjs", ...nativeTestOverrides("tools/layout-studio/repository-windows-shield-history.test.mjs") },
+  { file: "tools/layout-studio/task-index-inputs.test.mjs", ...nativeTestOverrides("tools/layout-studio/task-index-inputs.test.mjs"), expectedSkipped: process.platform === "linux" ? 0 : 1 },
+  { file: "tools/layout-studio/ignored-tree-policy.test.mjs" },
+  { file: "tools/layout-studio/repository-shield-ignored-trees.test.mjs", ...nativeTestOverrides("tools/layout-studio/repository-shield-ignored-trees.test.mjs"), expectedSkipped: process.platform === "linux" ? 0 : 1 },
+  { file: "tools/layout-studio/task-authority-ignored-trees.test.mjs", ...nativeTestOverrides("tools/layout-studio/task-authority-ignored-trees.test.mjs") },
+  { file: "tools/layout-studio/repository-shield-artifacts.test.mjs", ...nativeTestOverrides("tools/layout-studio/repository-shield-artifacts.test.mjs"), expectedSkipped: process.platform === "linux" ? 0 : 2 },
+  { file: "tools/layout-studio/repository-shield-npm-archives.test.mjs", ...nativeTestOverrides("tools/layout-studio/repository-shield-npm-archives.test.mjs"), expectedSkipped: process.platform === "linux" ? 0 : 2 },
+  { file: "tools/layout-studio/repository-shield-cargo-artifacts.test.mjs", ...nativeTestOverrides("tools/layout-studio/repository-shield-cargo-artifacts.test.mjs"), expectedSkipped: process.platform === "linux" ? 0 : 2 },
+  { file: "tools/layout-studio/repository-shield-pypi-artifacts.test.mjs", ...nativeTestOverrides("tools/layout-studio/repository-shield-pypi-artifacts.test.mjs"), expectedSkipped: process.platform === "linux" ? 0 : 2 },
+  { file: "tools/layout-studio/repository-shield-workspaces.test.mjs", ...nativeTestOverrides("tools/layout-studio/repository-shield-workspaces.test.mjs"), expectedSkipped: process.platform === "linux" ? 0 : 1 },
+  { file: "tools/layout-studio/repository-shield.test.mjs", timeoutMs: 120_000, expectedSkipped: process.platform === "linux" ? 0 : 2 },
+  { file: "tools/layout-studio/repository-pipeline.test.mjs", timeoutMs: 120_000, ...(process.platform !== "linux" ? { expectedSkipped: 5 } : {}) },
+  { file: "tools/layout-studio/repository-pipeline-fixtures.test.mjs", timeoutMs: 120_000, ...(process.platform !== "linux" ? { expectedSkipped: 2 } : {}) },
+  { file: "tools/layout-studio/task-authority-ignored-inputs.test.mjs", ...nativeTestOverrides("tools/layout-studio/task-authority-ignored-inputs.test.mjs") },
+  { file: "tools/layout-studio/repository-ignored-scanner-inputs.test.mjs", ...nativeTestOverrides("tools/layout-studio/repository-ignored-scanner-inputs.test.mjs"), expectedSkipped: process.platform === "linux" ? 0 : 1 },
+  { file: "tools/layout-studio/task-authority.test.mjs", ...nativeTestOverrides("tools/layout-studio/task-authority.test.mjs") },
+  { file: "tools/layout-studio/devices.test.mjs" },
+  { file: "tools/layout-studio/xwhatsit-expansion.test.mjs" },
+  { file: "tools/layout-studio/vial-dynamic.test.mjs" },
+  { file: "tools/layout-studio/vial-encoders.test.mjs" },
+  { file: "tools/layout-studio/vial-rules.test.mjs" },
+  { file: "tools/layout-studio/integrations.test.mjs" },
+  { file: "tools/layout-studio/claude-hook-observation.test.mjs" },
+  { file: "tools/layout-studio/role-dispatch.test.mjs" },
+  { file: "tools/layout-studio/guided-role-choices.test.mjs" },
+  { file: "tools/layout-studio/role-ui.test.mjs" },
+  { file: "tools/layout-studio/client-ui.test.mjs" },
+  { file: "tools/layout-studio/native-focus-ui.test.mjs" },
+  { file: "tools/layout-studio/agent-maintenance-ui.test.mjs" },
+  ...windowsScenarioGroups("tools/layout-studio/execution-ui.test.mjs"),
+  { file: "tools/layout-studio/authority-ui.test.mjs" },
+  ...windowsScenarioGroups("tools/layout-studio/scanner-ui.test.mjs"),
+  { file: "tools/layout-studio/history-scope-ui.test.mjs" },
+  { file: "tools/layout-studio/feed-ui.test.mjs" },
+  { file: "tools/layout-studio/conversation-ui.test.mjs" },
+  { file: "tools/layout-studio/task-ui.test.mjs" },
+  { file: "tools/layout-studio/copilot-ui.test.mjs" },
+  { file: "tools/layout-studio/device-ui.test.mjs" },
+  { file: "tools/layout-studio/device-settings-ui.test.mjs" },
+  { file: "tools/layout-studio/device-diagnostic-ui.test.mjs" },
+  { file: "tools/layout-studio/connection-ui.test.mjs" },
+  { file: "tools/layout-studio/portable-ui.test.mjs" },
+  { file: "tools/layout-studio/observation-ui.test.mjs" },
+  { file: "tools/layout-studio/voice-ui.test.mjs" },
+  { file: "tools/layout-studio/conversation-role-boundaries.test.mjs" },
+  { file: "tools/layout-studio/client-launch.test.mjs", ...(process.platform !== "win32" ? { expectedSkipped: 1 } : {}) },
+  { file: "tools/layout-studio/physical-intent.test.mjs" },
+  { file: "tools/layout-studio/native-focus-gateway.test.mjs" },
+  { file: "tools/layout-studio/windows-native-focus.test.mjs" },
+  { file: "tools/layout-studio/windows-terminal-process.test.mjs", timeoutMs: process.platform === "win32" ? 120_000 : 45_000, expectedSkipped: process.platform === "win32" ? 0 : 1 },
+  { file: "tools/layout-studio/windows-editor-endpoint.test.mjs", timeoutMs: process.platform === "win32" ? 120_000 : 45_000, expectedSkipped: process.platform === "win32" ? 0 : 1 },
+  { file: "tools/layout-studio/windows-terminal-peer.test.mjs", timeoutMs: process.platform === "win32" ? 120_000 : 45_000, expectedSkipped: process.platform === "win32" ? 0 : 1 },
+  { file: "tools/layout-studio/editor-websocket-frames.test.mjs" },
+  { file: "tools/layout-studio/windows-editor-ingress.test.mjs", timeoutMs: process.platform === "win32" ? 120_000 : 45_000, expectedSkipped: process.platform === "win32" ? 0 : 1 },
+  { file: "tools/layout-studio/windows-codex-editor-connection.test.mjs" },
+  { file: "tools/layout-studio/windows-owned-stdio.test.mjs", timeoutMs: process.platform === "win32" ? 120_000 : 45_000, expectedSkipped: process.platform === "win32" ? 0 : 3 },
+  { file: "tools/layout-studio/codex-windows-tasks.test.mjs", timeoutMs: process.platform === "win32" ? 120_000 : 45_000, expectedSkipped: process.platform === "win32" ? 0 : 1 },
+  { file: "tools/layout-studio/instance.test.mjs" },
+  { file: "tools/layout-studio/foreground.test.mjs" },
+  { file: "tools/layout-studio/keyboard-indicators.test.mjs" },
+  { file: "tools/layout-studio/matrix-diagnostics.test.mjs" },
+  { file: "tools/layout-studio/portable-package.test.mjs" },
+  { file: "tools/layout-studio/legend-export.test.mjs" },
+  { file: "tools/layout-studio/windows-host.test.mjs" },
+  { file: "tools/layout-studio/state-lock.test.mjs", expectedSkipped: ["linux", "win32"].includes(process.platform) ? 1 : 2 },
+  { file: "tools/layout-studio/runtime.test.mjs", ...(process.platform === "win32" ? { expectedSkipped: 1 } : {}) },
+  // The separate native CI helper step executes all fourteen boundary cases.
+  // Source-only Windows groups have no built helper and must skip exactly these.
+  { file: "tools/layout-studio/runtime-command.test.mjs", ...(process.platform === "win32" ? { expectedSkipped: 15 } : {}) },
+  { file: "tools/layout-studio/runtime-command-suspended.test.mjs", expectedSkipped: 5 },
+  { file: "tools/layout-studio/runtime-lifecycle.test.mjs" },
+  { file: "tools/layout-studio/runtime-consumers.test.mjs" },
+  { file: "tools/layout-studio/private-fs.test.mjs" },
+  { file: "tools/layout-studio/coding-sessions.test.mjs" },
+  { file: "tools/layout-studio/coding-editor-authorizations.test.mjs" },
+  { file: "tools/layout-studio/coding-editor-journal.test.mjs" },
+  { file: "tools/layout-studio/coding-editor-connections.test.mjs", ...(process.platform !== "linux" ? { expectedSkipped: 10 } : {}) },
+  { file: "tools/layout-studio/codex-editor-recovery.test.mjs", ...(process.platform !== "linux" ? { expectedSkipped: 3 } : {}) },
+  ...windowsScenarioGroups("tools/layout-studio/coding-task-owners.test.mjs").map(group => ({ ...group, ...(process.platform !== "linux" && windowsTaskOwnerLinuxScenarios.includes(group.pattern) ? { expectedSkipped: 1 } : {}) })),
+  { file: "tools/layout-studio/codex-stdio-tasks.test.mjs" },
+  { file: "tools/layout-studio/codex-unix-tasks.test.mjs", ...(process.platform !== "linux" ? { expectedSkipped: 6 } : {}) },
+  { file: "tools/layout-studio/codex-editor-protocol.test.mjs" },
+  { file: "tools/layout-studio/codex-editor-relay.test.mjs" },
+  { file: "tools/layout-studio/codex-retained-editor-client.test.mjs" },
+  { file: "tools/layout-studio/windows-editor-journal.test.mjs" },
+  { file: "tools/layout-studio/windows-editor-recovery.test.mjs", timeoutMs: process.platform === "win32" ? 120_000 : 45_000, expectedSkipped: process.platform === "win32" ? 0 : 1 },
+  { file: "tools/layout-studio/windows-coding-editor-connections.test.mjs", timeoutMs: process.platform === "win32" ? 120_000 : 45_000, expectedSkipped: process.platform === "win32" ? 0 : 1 },
+  { file: "tools/layout-studio/codex-editor-ingress.test.mjs", ...(process.platform !== "linux" ? { expectedSkipped: 13 } : {}) },
+  { file: "tools/layout-studio/codex-editor-ingress-owner.test.mjs", ...(process.platform !== "linux" ? { expectedSkipped: 9 } : {}) },
+  { file: "tools/layout-studio/codex-unix-transport.test.mjs", ...(process.platform !== "linux" ? { expectedSkipped: 6 } : {}) },
+  { file: "tools/layout-studio/codex-owned-listener.test.mjs", ...(process.platform !== "linux" ? { expectedSkipped: 13 } : {}) },
+  { file: "tools/layout-studio/codex-turn.test.mjs" },
+  { file: "tools/layout-studio/design-observations.test.mjs" },
+  // Protected Windows fault matrices each start many short native lock helpers.
+  // Keep their cold-process allowance bounded without relaxing assertions/skips.
+  { file: "tools/layout-studio/agents-claude.test.mjs", ...nativeTestOverrides("tools/layout-studio/agents-claude.test.mjs") },
+  { file: "tools/layout-studio/claude-account.test.mjs" },
+  { file: "tools/layout-studio/conversation-bindings.test.mjs", ...nativeTestOverrides("tools/layout-studio/conversation-bindings.test.mjs") },
+  { file: "tools/layout-studio/codex-submissions.test.mjs", ...nativeTestOverrides("tools/layout-studio/codex-submissions.test.mjs") },
+  { file: "tools/layout-studio/claude-submissions.test.mjs", ...nativeTestOverrides("tools/layout-studio/claude-submissions.test.mjs") },
+  // Native Windows kernel leases start the system PowerShell helper per state
+  // transaction. Nine exact-task scenarios passed in 44.99 s on a cold runner;
+  // allow bounded process/pipe cleanup without relaxing any assertion or skip.
+  { file: "tools/layout-studio/claude-coding.test.mjs", ...nativeTestOverrides("tools/layout-studio/claude-coding.test.mjs") },
+  { file: "tools/layout-studio/task-window.test.mjs" },
+  { file: "tools/layout-studio/tmux-task-window.test.mjs" },
+  { file: "tools/layout-studio/voice-queue.test.mjs" },
+  { file: "tools/layout-studio/owned-process.test.mjs", ...(process.platform !== "linux" ? { expectedSkipped: 1 } : {}) },
   { file: "scripts/b122-commissioning.test.mjs" },
   { file: "scripts/run-b122-prehardware-drill.test.mjs" },
   { file: "scripts/b122-acceptance-evidence.test.mjs" },
@@ -140,10 +425,23 @@ export const requiredGroups = [
   ...providerHostTests,
   ...providerTlsNetworkTests
 ];
+/** Linux omits Windows-only runtime contracts and includes the portable native Git transactions. */
+export const linuxGroups = requiredGroups
+  .filter((group) => (group.file === "apps/windows-companion/test/mediated-git.test.ts" || !group.file.startsWith("apps/windows-companion/")) && !group.file.startsWith("deployment/windows/"));
+const compiledOutputConsumers = new Set([
+  "apps/windows-companion/test/packaged-runtime.test.ts",
+  "apps/windows-companion/test/main-shutdown.test.ts",
+  "apps/provider-adapter-host/test/tls-network-e2e.test.ts"
+]);
+export const requiresVerificationBuild = group => Boolean(group.args) || compiledOutputConsumers.has(group.file);
 const limit = 64 * 1024;
 const diagnosticLimit = 4096;
 function failureDiagnostic(chunks) {
-  return Buffer.concat(chunks).toString("utf8").slice(-diagnosticLimit)
+  const output = Buffer.concat(chunks).toString("utf8"), firstFailure = output.search(/^\s*not ok [0-9]+ -/m);
+  // A later passing plan must not displace the original error from the bounded
+  // receipt. Preserve its failing block and the final totals under the same cap.
+  const excerpt = firstFailure < 0 || output.length <= diagnosticLimit ? output.slice(-diagnosticLimit) : output.slice(firstFailure, firstFailure + diagnosticLimit - 768) + "\n[bounded final output]\n" + output.slice(-720);
+  return excerpt.slice(0, diagnosticLimit)
     .replace(/[A-Za-z0-9+\/_=-]{32,}/g, "[redacted]")
     .replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g, "?");
 }
@@ -165,7 +463,7 @@ function testCounts(output, isTestRun) {
 
 const manifestRoots = [
   "packages/control-plane/test", "packages/protocol/test", "apps/windows-companion/test",
-  "apps/vscode-extension/test", "apps/provider-adapter-host/test", "apps/linux-companion/test", "scripts", "firmware"
+  "apps/vscode-extension/test", "apps/provider-adapter-host/test", "apps/linux-companion/test", "tools/layout-studio", "scripts", "firmware", "deployment/suite"
 ];
 const portable = (value) => value.replaceAll("\\", "/");
 export function discoverRequiredTestFiles(cwd = root) {
@@ -242,9 +540,14 @@ export function createStrictTestEnvironment(testRoot, source = process.env, { cu
 }
 
 /** A result is recorded only after close proves this owned child has exited. */
+export function effectiveGroupTimeout(group, fallback = 45_000) {
+  const value = group.timeoutMs ?? fallback;
+  const reviewedLongGroup = group.file === "tools/layout-studio/repository-execution.test.mjs" && !group.args && group.timeoutMs === 480_000;
+  if (!Number.isSafeInteger(value) || value < 1 || value > 300_000 && !reviewedLongGroup) throw new Error("An isolated test timeout must be 1–300000 milliseconds, except the explicitly reviewed 480000-millisecond execution group.");
+  return value;
+}
 export async function runChild(group, { cwd = root, executable = process.execPath, timeoutMs = 45_000, cleanup = rm, sourceEnvironment = process.env } = {}) {
-  const effectiveTimeoutMs = group.timeoutMs ?? timeoutMs;
-  if (!Number.isSafeInteger(effectiveTimeoutMs) || effectiveTimeoutMs < 1 || effectiveTimeoutMs > 300_000) throw new Error("An isolated test timeout must be an integer between 1 and 300000 milliseconds.");
+  const effectiveTimeoutMs = effectiveGroupTimeout(group, timeoutMs);
   const expectedSkipped = group.expectedSkipped ?? 0;
   if (!Number.isSafeInteger(expectedSkipped) || expectedSkipped < 0) throw new Error("An isolated test expectedSkipped value must be a non-negative integer.");
   const childExecutable = group.executable ?? executable;
@@ -253,8 +556,12 @@ export async function runChild(group, { cwd = root, executable = process.execPat
   const startedAt = new Date().toISOString(); const started = Date.now();
   const configuredTestParent = inheritedValue(sourceEnvironment, "SXSY_B122_TEST_TEMP_ROOT");
   if (configuredTestParent !== undefined && (!isAbsolute(configuredTestParent) || /[\0\r\n"]/u.test(configuredTestParent))) throw new Error("The isolated test parent is invalid.");
-  const testParent = configuredTestParent ?? tmpdir();
-  await mkdir(testParent, { recursive: true });
+  const requestedParent = configuredTestParent ?? tmpdir();
+  await mkdir(requestedParent, { recursive: true });
+  // Release builds use a short SUBST drive on Windows. Keep private test state
+  // on the actual local drive; private storage deliberately rejects drive
+  // redirection rather than treating that temporary build alias as authority.
+  const testParent = await realpath(requestedParent);
   const testRoot = await mkdtemp(join(testParent, "i-"));
   const environment = createStrictTestEnvironment(testRoot, sourceEnvironment, { currentUserProfile: group.currentUserProfile === true });
   if (group.safeTrace === true) environment.SXSY_PROVIDER_E2E_TRACE = "1";
@@ -296,9 +603,9 @@ export async function runChild(group, { cwd = root, executable = process.execPat
         const zeroTestPlan = isTestRun && /^1\.\.0$/m.test(tapTail);
         const testSuccess = !isTestRun || !!counts && !zeroTestPlan && counts.total >= 1 && counts.passed + counts.skipped === counts.total && counts.failed === 0 && counts.cancelled === 0 && counts.skipped === expectedSkipped && counts.todo === 0;
         const success = !timedOut && !spawnError && processTreeTermination.completed && exitCode === 0 && testSuccess;
-        result = { file: group.file, pattern: group.pattern ?? null, command: [childExecutable, ...args], startedAt, endedAt: new Date().toISOString(), durationMs: Date.now() - started, effectiveTimeoutMs, exitCode, signal: signal ?? null, timeout: timedOut, outputDigest: outputHasher.digest("hex"), outputBytes, totalOutputBytes, outputLimitBytes: limit, outputTruncated: totalOutputBytes > outputBytes, zeroTestPlan, environmentPolicy: "strict-test-v2", safeTrace, processTreeTermination, testCounts: counts, failureDiagnostic: success ? null : failureDiagnostic(chunks), spawnError, cleanupCompleted: false, cleanupError: null, success };
+        result = { file: group.file, pattern: group.pattern ?? null, command: [childExecutable, ...args], startedAt, endedAt: new Date().toISOString(), durationMs: Date.now() - started, effectiveTimeoutMs, exitCode, signal: signal ?? null, timeout: timedOut, outputDigest: outputHasher.digest("hex"), outputBytes, totalOutputBytes, outputLimitBytes: limit, outputTruncated: totalOutputBytes > outputBytes, zeroTestPlan, environmentPolicy: "strict-test-v3", safeTrace, processTreeTermination, testCounts: counts, failureDiagnostic: success ? null : failureDiagnostic(chunks), spawnError, cleanupCompleted: false, cleanupError: null, success };
       } catch {
-        result = { file: group.file, pattern: group.pattern ?? null, command: [childExecutable, ...args], startedAt, endedAt: new Date().toISOString(), durationMs: Date.now() - started, effectiveTimeoutMs, exitCode, signal: signal ?? null, timeout: timedOut, outputDigest: "unavailable", outputBytes, totalOutputBytes, outputLimitBytes: limit, outputTruncated: totalOutputBytes > outputBytes, zeroTestPlan: false, environmentPolicy: "strict-test-v2", safeTrace: [], processTreeTermination: { strategy: "receipt-error", completed: false, supervisorExitCode: null, supervisorError: "child-receipt-failed" }, testCounts: undefined, spawnError, cleanupCompleted: false, cleanupError: null, success: false };
+        result = { file: group.file, pattern: group.pattern ?? null, command: [childExecutable, ...args], startedAt, endedAt: new Date().toISOString(), durationMs: Date.now() - started, effectiveTimeoutMs, exitCode, signal: signal ?? null, timeout: timedOut, outputDigest: "unavailable", outputBytes, totalOutputBytes, outputLimitBytes: limit, outputTruncated: totalOutputBytes > outputBytes, zeroTestPlan: false, environmentPolicy: "strict-test-v3", safeTrace: [], processTreeTermination: { strategy: "receipt-error", completed: false, supervisorExitCode: null, supervisorError: "child-receipt-failed" }, testCounts: undefined, spawnError, cleanupCompleted: false, cleanupError: null, success: false };
       } finally {
         try {
           await cleanupIsolatedRoot(cleanup, testRoot, testParent);
@@ -329,9 +636,43 @@ async function cleanupIsolatedRoot(cleanup, testRoot, testParent) {
 }
 
 async function writeReceipt(directory, receipt) { await mkdir(directory, { recursive: true }); const finalPath = join(directory, `isolated-test-${receipt.runId}.json`); const temporaryPath = `${finalPath}.${randomUUID()}.tmp`; try { await writeFile(temporaryPath, JSON.stringify(receipt, null, 2), { encoding: "utf8", mode: 0o600 }); await rename(temporaryPath, finalPath); return finalPath; } finally { await rm(temporaryPath, { force: true }).catch(() => {}); } }
-export async function runVerification({ groups = requiredGroups, cwd = root, outputDirectory = receiptDirectory, executable = process.execPath, timeoutMs, cleanup, sourceEnvironment, receiptWriter = writeReceipt } = {}) {
+export async function runVerification({ groups = requiredGroups, cwd = root, outputDirectory = receiptDirectory, executable = process.execPath, timeoutMs, cleanup, sourceEnvironment, receiptWriter = writeReceipt, onProgress, scheduling = "serial" } = {}) {
   if (groups === requiredGroups) assertRequiredTestManifest(groups);
-  const runId = randomUUID(); const startedAt = new Date().toISOString(); const children = []; for (const group of groups) children.push(await runChild(group, { cwd, executable, timeoutMs, cleanup, sourceEnvironment }));
+  if (onProgress !== undefined && typeof onProgress !== "function") throw Error("Verification progress requires a reporter function.");
+  if (!["serial", "windows-pairs"].includes(scheduling)) throw Error("Choose the serial or bounded windows-pairs verification schedule.");
+  if (scheduling === "windows-pairs" && new Set(groups.map(g => JSON.stringify([g.file, g.pattern ?? null]))).size !== groups.length) throw Error("Parallel verification requires each exact group once.");
+  // Reject a bad later allowance before launching any earlier test processes.
+  for (const group of groups) effectiveGroupTimeout(group, timeoutMs);
+  const runId = randomUUID(); const startedAt = new Date().toISOString(); const children = []; let progressFailed = false;
+  const report = async (phase, group, index, child) => {
+    if (!onProgress) return;
+    const progress = Object.freeze({ schema: "switchyard-test-progress/v1", runId, verificationComplete: false, phase, group: index + 1, requiredGroups: groups.length,
+      file: group.file, pattern: group.pattern ?? null, ...(child ? { groupAccepted: child.success, durationMs: child.durationMs } : {}) });
+    try { await onProgress(progress); } catch { progressFailed = true; }
+  };
+  const execute = async index => {
+    const group = groups[index];
+    await report("started", group, index);
+    const child = await runChild(group, { cwd, executable, timeoutMs, cleanup, sourceEnvironment }); children[index] = child;
+    await report("exited", group, index, child);
+  };
+  if (scheduling === "serial") {
+    for (let index = 0; index < groups.length; index++) await execute(index);
+  } else {
+    // Shared compiled outputs are prepared/consumed in original dependency
+    // order. Other children retain their own strict environment and temp root;
+    // at most two run concurrently. The final receipt stays in manifest order.
+    const independent = [];
+    for (let index = 0; index < groups.length; index++) {
+      if (requiresVerificationBuild(groups[index])) await execute(index);
+      else independent.push(index);
+    }
+    let next = 0;
+    const worker = async () => { while (next < independent.length) { const index = independent[next++]; await execute(index); } };
+    const results = await Promise.allSettled([worker(), worker()]);
+    const failures = results.filter(result => result.status === "rejected");
+    if (failures.length) throw new AggregateError(failures.map(result => result.reason), "Independent verification startup failed after joining both workers.");
+  }
   const passed = children.filter((item) => item.success).length;
   const tests = children.reduce((total, child) => total + (child.testCounts?.total ?? 0), 0);
   const passedTests = children.reduce((total, child) => total + (child.testCounts?.passed ?? 0), 0);
@@ -340,7 +681,31 @@ export async function runVerification({ groups = requiredGroups, cwd = root, out
   const cancelledTests = children.reduce((total, child) => total + (child.testCounts?.cancelled ?? 0), 0);
   const todoTests = children.reduce((total, child) => total + (child.testCounts?.todo ?? 0), 0);
   const receipt = { version: 1, runId, startedAt, endedAt: new Date().toISOString(), requiredGroups: groups, children, totals: { required: groups.length, passed, failed: groups.length - passed, tests, passedTests, failedTests, skippedTests, cancelledTests, todoTests }, receiptWrite: { completed: true, error: null }, success: passed === groups.length };
+  if (scheduling === "windows-pairs") receipt.execution = { scheduling, maxConcurrentChildren: 2, buildDependenciesOrdered: true };
+  if (onProgress) receipt.progressWrite = { completed: !progressFailed, error: progressFailed ? "progress-reporter-failed" : null };
+  if (progressFailed) receipt.success = false;
   try { return { receipt, receiptPath: await receiptWriter(outputDirectory, receipt) }; }
   catch { receipt.receiptWrite = { completed: false, error: "atomic-receipt-write-failed" }; receipt.success = false; return { receipt, receiptPath: null }; }
 }
-if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) { const { receipt, receiptPath } = await runVerification(); for (const child of receipt.children) { process.stdout.write(`${child.success ? "PASS" : "FAIL"} ${child.file}${child.pattern ? ` :: ${child.pattern}` : ""}\n`); if (!child.success) process.stdout.write(`FAIL_DETAIL ${JSON.stringify({ file: child.file, pattern: child.pattern, exitCode: child.exitCode, signal: child.signal, timeout: child.timeout, spawnError: child.spawnError, cleanupCompleted: child.cleanupCompleted, cleanupError: child.cleanupError, processTreeTermination: child.processTreeTermination, testCounts: child.testCounts ?? null, safeTrace: child.safeTrace, diagnostic: child.failureDiagnostic })}\n`); } process.stdout.write(`${receiptPath ? "RECEIPT" : "RECEIPT_WRITE_FAILED"} ${receipt.runId}${receiptPath ? ` ${receiptPath}` : ""}\n`); process.exitCode = receipt.success ? 0 : 1; }
+export function verificationCommandOptions(arguments_, platform = process.platform) {
+  if (arguments_.length === 0) return { scheduling: "serial", help: false };
+  if (arguments_.length === 1 && arguments_[0] === "--help") return { scheduling: "serial", help: true };
+  if (arguments_.length === 1 && arguments_[0] === "--windows-pairs" && platform === "win32") return { scheduling: "windows-pairs", help: false };
+  throw Error("Use no arguments, --help, or --windows-pairs on native Windows only.");
+}
+export const verificationUsage = "Usage: node scripts/run-platform-tests.mjs [--help | --windows-pairs]\nRun the complete platform manifest with no arguments; --windows-pairs is native Windows only and retains ordered builds and at most two independent children. For selected groups, use the exported runVerification API.\n";
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  let options;
+  try { options = verificationCommandOptions(process.argv.slice(2)); }
+  catch { process.stderr.write(verificationUsage); process.exitCode = 2; }
+  if (options?.help) process.stdout.write(verificationUsage);
+  else if (options) {
+    const { receipt, receiptPath } = await runVerification({ scheduling: options.scheduling, onProgress: event => console.log("SXSY-TEST-PROGRESS " + JSON.stringify(event)) });
+    for (const child of receipt.children) {
+      process.stdout.write(`${child.success ? "PASS" : "FAIL"} ${child.file}${child.pattern ? ` :: ${child.pattern}` : ""}\n`);
+      if (!child.success) process.stdout.write(`FAIL_DETAIL ${JSON.stringify({ file: child.file, pattern: child.pattern, exitCode: child.exitCode, signal: child.signal, timeout: child.timeout, spawnError: child.spawnError, cleanupCompleted: child.cleanupCompleted, cleanupError: child.cleanupError, processTreeTermination: child.processTreeTermination, testCounts: child.testCounts ?? null, safeTrace: child.safeTrace, diagnostic: child.failureDiagnostic })}\n`);
+    }
+    process.stdout.write(`${receiptPath ? "RECEIPT" : "RECEIPT_WRITE_FAILED"} ${receipt.runId}${receiptPath ? ` ${receiptPath}` : ""}\n`);
+    process.exitCode = receipt.success ? 0 : 1;
+  }
+}

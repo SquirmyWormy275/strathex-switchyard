@@ -1,0 +1,224 @@
+{
+  "schema": "switchyard-conversation-ui-source-evidence/v1",
+  "scope": "Saved designer context selection, reviewed legacy account binding, exact native status, scoped drafts and lost-reply handling",
+  "runs": [
+    {
+      "receiptId": "b3a4c9ae-a3a5-41f5-93b3-30d1972c3688",
+      "sha256": "50bbabddba8946a95ce7b82c1beeba58be804fe6af85f76cc0190c91db50f7bd",
+      "success": false,
+      "totals": {
+        "required": 8,
+        "passed": 7,
+        "failed": 1,
+        "tests": 72,
+        "passedTests": 71,
+        "failedTests": 1,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "files": [
+        "scripts/windows-complete-shards.test.mjs",
+        "scripts/windows-backend-shards.test.mjs",
+        "scripts/run-isolated-tests.test.mjs",
+        "deployment/suite/release.test.mjs",
+        "tools/layout-studio/conversation-ui.test.mjs",
+        "tools/layout-studio/observation-ui.test.mjs",
+        "tools/layout-studio/agents-claude.test.mjs",
+        "tools/layout-studio/conversation-bindings.test.mjs"
+      ],
+      "originalBoundsPreserved": true,
+      "ownedCleanupComplete": true
+    },
+    {
+      "receiptId": "5e715662-22a5-4dfa-9f80-a42a024cced8",
+      "sha256": "a9d6e89e22b6b92fb972def09954a1064df34aa73065f150de91be0ddfd85ea5",
+      "success": true,
+      "totals": {
+        "required": 8,
+        "passed": 8,
+        "failed": 0,
+        "tests": 73,
+        "passedTests": 73,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "files": [
+        "scripts/windows-complete-shards.test.mjs",
+        "scripts/windows-backend-shards.test.mjs",
+        "scripts/run-isolated-tests.test.mjs",
+        "deployment/suite/release.test.mjs",
+        "tools/layout-studio/conversation-ui.test.mjs",
+        "tools/layout-studio/observation-ui.test.mjs",
+        "tools/layout-studio/agents-claude.test.mjs",
+        "tools/layout-studio/conversation-bindings.test.mjs"
+      ],
+      "originalBoundsPreserved": true,
+      "ownedCleanupComplete": true
+    },
+    {
+      "receiptId": "b4714124-7c92-4416-940f-912dc34219e9",
+      "sha256": "11d783dfe70fa2dcdda394624027345d247c03bb28d1139bcfe185f04ee67819",
+      "success": true,
+      "totals": {
+        "required": 3,
+        "passed": 3,
+        "failed": 0,
+        "tests": 23,
+        "passedTests": 23,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "files": [
+        "tools/layout-studio/authority-ui.test.mjs",
+        "tools/layout-studio/conversation-ui.test.mjs",
+        "tools/layout-studio/observation-ui.test.mjs"
+      ],
+      "originalBoundsPreserved": true,
+      "ownedCleanupComplete": true
+    }
+  ],
+  "interactionCases": 9,
+  "overlap": "Eight original groups pass 73 tests; the final three interaction groups pass 23 with overlap. Neither sum is a distinct total.",
+  "sourceFiles": {
+    "tools/layout-studio/conversation-ui.mjs": "21eb30e870948c43cff6a73aa251beb4878512d5bc5e72ed4c7df4a4b55a2e46",
+    "tools/layout-studio/conversation-ui.test.mjs": "dad32e8be5c179088b55b7d461913d058ddbd097296142a5657b45a9a9a9e4bf",
+    "tools/layout-studio/suite-ui.mjs": "f3bc6402ac837b7f1f70ffff3f634aa2681a218ea810e1144563a16af1acbd03",
+    "tools/layout-studio/index.html": "664863b3fd59f4e653cd20d376c5d9ff5e056db90d82259f2854209142754f96",
+    "tools/layout-studio/serve.mjs": "c18d738e44bafe9266efd42fbe2c5f9a0b9893010272434745e919f48a76780c",
+    "deployment/suite/release.mjs": "f3bb26bca78a9ab21c3be1e063f844929db3a09ff66fe27a9fcf230f1304d179",
+    "scripts/run-isolated-tests.mjs": "2dd2a243b6bbb6f62d2c02063bd110a72afdc892bb69af4c98c28b47e0877be5",
+    "scripts/demo-switchyard-ui.mjs": "4f67972bd6dd6fd40addc42b0cff4c47413b5318b756db6a4e54a8211d5dcad1",
+    "scripts/windows-complete-shards.mjs": "06bb2769913e04efaed494a7c1834257fac6ccbc0eb16edbfc0f56a76abc10dc",
+    "scripts/windows-complete-shards.test.mjs": "5b83b51fcfdaf152ab7c56eea2d175bf1b37e640d03316f309823e464408f6cd",
+    ".github/workflows/switchyard-windows-complete.yml": "22b7c6591ee8c1eb900190cb127ef63175da0a66c7fdfbc65fe66fdf0a18e9ac"
+  },
+  "livePreview": {
+    "checks": [
+      "exact served conversation-ui.mjs",
+      "exact served suite-ui.mjs",
+      "exact served index.html",
+      "two distinct synthetic saved conversations browse in keyboard-only mode",
+      "preview refuses conversation/binding/review",
+      "preview refuses conversation/binding/bind",
+      "preview refuses design/status",
+      "preview refuses design"
+    ],
+    "synthetic": true,
+    "modelRequests": 0,
+    "hardwareOpened": false
+  },
+  "originalFailures": {
+    "scheduling": "The first eight-group run passes 71 tests and fails the original complete-Windows workload assertion: twenty estimates were 951408\u2013951567 ms against the unchanged 950000 ms allowance. All original cases, commands, historical estimates, fallback costs and child bounds remain. Twenty-two software workers plus ordered assembly restore headroom without increasing the 20-minute worker limit.",
+    "preview": "The initial read-only HTTP asset audit requested /index.html, which is deliberately not routed (404). Corrected only the audit to request the served Home path /; no application allowlist was expanded."
+  },
+  "completeWorkerLoads": [
+    {
+      "shard": "1",
+      "estimatedMs": 864916
+    },
+    {
+      "shard": "2",
+      "estimatedMs": 865012
+    },
+    {
+      "shard": "3",
+      "estimatedMs": 865049
+    },
+    {
+      "shard": "4",
+      "estimatedMs": 865051
+    },
+    {
+      "shard": "5",
+      "estimatedMs": 865053
+    },
+    {
+      "shard": "6",
+      "estimatedMs": 864928
+    },
+    {
+      "shard": "7",
+      "estimatedMs": 864920
+    },
+    {
+      "shard": "8",
+      "estimatedMs": 864935
+    },
+    {
+      "shard": "9",
+      "estimatedMs": 865053
+    },
+    {
+      "shard": "10",
+      "estimatedMs": 864933
+    },
+    {
+      "shard": "11",
+      "estimatedMs": 864926
+    },
+    {
+      "shard": "12",
+      "estimatedMs": 864924
+    },
+    {
+      "shard": "13",
+      "estimatedMs": 865050
+    },
+    {
+      "shard": "14",
+      "estimatedMs": 865059
+    },
+    {
+      "shard": "15",
+      "estimatedMs": 864910
+    },
+    {
+      "shard": "16",
+      "estimatedMs": 865010
+    },
+    {
+      "shard": "17",
+      "estimatedMs": 864930
+    },
+    {
+      "shard": "18",
+      "estimatedMs": 864935
+    },
+    {
+      "shard": "19",
+      "estimatedMs": 864917
+    },
+    {
+      "shard": "20",
+      "estimatedMs": 864919
+    },
+    {
+      "shard": "21",
+      "estimatedMs": 864917
+    },
+    {
+      "shard": "22",
+      "estimatedMs": 864913
+    }
+  ],
+  "limitations": [
+    "Provider/account identities are explicit doubles; HTTP, encrypted storage, confirmation and account-drift guards are real.",
+    "No actual native login, model request, task resume, hardware, microphone or live IDE operation.",
+    "Browser control fails before inspection; visual/responsive acceptance remains unverified.",
+    "The new frontend source is not the installed 32-asset release until separately updated.",
+    "Current complete Windows/Linux acceptance and the retained native host-action failure remain separate."
+  ],
+  "frontend": {
+    "digest": "9e54d5d38129a4c75b47a3f0b1b0a6e03487004059d7170bd971a1b67677b8fd",
+    "assets": 33,
+    "sourceCommit": "9bb9fffc35fe083912f9fdd09f5a995b52c45848",
+    "immutableBytesVerified": true,
+    "installed": false,
+    "visualAcceptance": false
+  }
+}

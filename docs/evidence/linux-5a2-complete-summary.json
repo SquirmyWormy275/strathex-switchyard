@@ -1,0 +1,41 @@
+{
+  "schema": "switchyard-linux-complete-summary/v1",
+  "sourceCommit": "5a2c3243b223c657d81b190745ad43440b4e013c",
+  "receipt": "isolated-test-2568a7cb-863c-443b-97bb-3db1c7ec0d2b.json",
+  "totals": {
+    "required": 247,
+    "passed": 247,
+    "failed": 0,
+    "tests": 1602,
+    "passedTests": 1591,
+    "failedTests": 0,
+    "skippedTests": 11,
+    "cancelledTests": 0,
+    "todoTests": 0
+  },
+  "allChildAndTreeCleanupVerified": true,
+  "ownedCleanupReceipt": "linux-5a2c324-cleanup-1793954014001.json",
+  "ownedCleanup": {
+    "schema": "switchyard-owned-linux-checkout-cleanup/v1",
+    "source": "5a2c3243b223c657d81b190745ad43440b4e013c",
+    "runReceipt": "isolated-test-2568a7cb-863c-443b-97bb-3db1c7ec0d2b.json",
+    "runAccepted": true,
+    "allChildAndTreeCleanupVerified": true,
+    "exactRootIdentityVerified": true,
+    "dependencyAliasesVerifiedRemoved": true,
+    "ownedBuildsRemoved": true,
+    "emptyArtifactsDirectoryRemoved": true,
+    "checkoutRemoved": true,
+    "rootRemoved": true,
+    "markerRemoved": true,
+    "ownedTestParentRemoved": true
+  },
+  "scope": "Complete required Linux manifest from immutable published source, including active-task editor return and CVSS 4 scoring/collector support.",
+  "limits": [
+    "Eleven declared Windows-only skips; native Windows acceptance is separate.",
+    "Provider/editor doubles establish software behavior, not actual terminal/native account/task acknowledgement or live account acceptance.",
+    "Installed source 5a2c324 has separate normal-update/offline/metadata evidence; no extension is activated by this test run.",
+    "The later Windows V4 self-token diagnostic has separate focused source evidence; it is not included in this complete run.",
+    "Frontend review, physical F77/B122 checks and approved Microsoft work-tenant acceptance remain separate."
+  ]
+}

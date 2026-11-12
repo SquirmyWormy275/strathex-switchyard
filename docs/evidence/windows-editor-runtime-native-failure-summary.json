@@ -1,0 +1,45 @@
+{
+  "schema": "switchyard-windows-editor-runtime-native-failure/v1",
+  "sourceCommit": "74412894737c36830cd7a444a3c4b93a3ece0d21",
+  "mergeCommit": "0766128c65cf051b5be68642a4c2740aeefd3e33",
+  "equalSourceAndMergeTree": "0cc4872704bfc930a58f52b14bff5a8292ca7e62",
+  "workflowRun": 42362618055,
+  "clientJob": 128374126928,
+  "helperBuildJob": 128373971681,
+  "artifact": {
+    "source": "74412894737c36830cd7a444a3c4b93a3ece0d21",
+    "merge": "0766128c65cf051b5be68642a4c2740aeefd3e33",
+    "tree": "0cc4872704bfc930a58f52b14bff5a8292ca7e62",
+    "artifact": 13570575938,
+    "bytes": 4364,
+    "sha256": "2817f82f31febd44288d394dd8fd76cf2fca397a0a86ecf812cdf702da51bedb"
+  },
+  "receipt": "isolated-test-5196ed0a-4ffb-4238-9fac-143d068906cc.json",
+  "receiptSha256": "4f9c02ffe7226f94d2a52b67b3e4805ec50f65f76b97b00fe51ac5f3bfc567f1",
+  "totals": {
+    "required": 23,
+    "passed": 22,
+    "failed": 1,
+    "tests": 223,
+    "passedTests": 222,
+    "failedTests": 1,
+    "skippedTests": 0,
+    "cancelledTests": 0,
+    "todoTests": 0
+  },
+  "failure": {
+    "file": "tools/layout-studio/windows-editor-endpoint.test.mjs",
+    "stage": "owned PowerShell synthetic fixture setup",
+    "nativeCommandTimeoutMs": 10000,
+    "groupTimeoutMs": 120000,
+    "nativeEndpointQueryReached": false,
+    "diagnosis": "Original fixture setup returned timed-out without any fixed setup-stage marker being returned.",
+    "resolved": false
+  },
+  "ownedChildAndTreeCleanupVerified": true,
+  "correctiveWork": "Replaced only synthetic fixture creation with a fixed native helper role creating fresh UUID-scoped files under the original held temporary parent; no existing ACL/file mutation. Same 10000 ms setup and 120000 ms group bounds, native reader policy, assertions and skips retained. Next native run must verify actual ACL/path cases.",
+  "limitations": [
+    "Native ACL/path acceptance remains unfinished; compiled helper is not proof of runtime acceptance.",
+    "The separate restricted-storage guardian-retirement failure remains unresolved."
+  ]
+}

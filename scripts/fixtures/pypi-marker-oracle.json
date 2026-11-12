@@ -1,0 +1,1857 @@
+{
+  "schema": "switchyard-pypi-marker-oracle/v1",
+  "pipVersion": "26.2.2",
+  "packagingVersion": "26.2",
+  "markersEvaluated": false,
+  "sources": [
+    {
+      "module": "pip._internal.req.req_file",
+      "sha256": "7661814b167d763d5e3aad8d5eff786e8af4bb59fc3f8f80be624bfaf63322c1"
+    },
+    {
+      "module": "pip._vendor.packaging.requirements",
+      "sha256": "43e05d107556e4aefce46057b7b45c3f8504b1d20a5a8585aa5ac78d1e16579d"
+    },
+    {
+      "module": "pip._vendor.packaging.markers",
+      "sha256": "422c4155c6fd0f61e3c04622ba1a4d91baa4f739cf45b53cccd5f4911d5122b5"
+    },
+    {
+      "module": "pip._vendor.packaging.utils",
+      "sha256": "33bf8930a89cdac3f562d57ff1a5bb795181fb1dc00ee282892aec55e09dd94a"
+    }
+  ],
+  "references": [
+    "https://pip.pypa.io/en/stable/reference/requirements-file-format/",
+    "https://packaging.python.org/en/latest/specifications/dependency-specifiers/"
+  ],
+  "cases": [
+    {
+      "input": "Demo[TLS,foo_bar]==1.2.3; python_version == \"synthetic\"",
+      "components": [
+        {
+          "ecosystem": "PyPI",
+          "name": "demo",
+          "version": "1.2.3",
+          "declaredSha256": [],
+          "extras": [
+            "foo-bar",
+            "tls"
+          ],
+          "marker": {
+            "sha256": "7dc1be5b2f81aa034c643ba7588df7106cc22a495f39b6ca2da96cebd687d55e",
+            "variables": [
+              "python_version"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "input": "Demo[TLS,foo_bar]==1.2.3; \"synthetic\" == python_version",
+      "components": [
+        {
+          "ecosystem": "PyPI",
+          "name": "demo",
+          "version": "1.2.3",
+          "declaredSha256": [],
+          "extras": [
+            "foo-bar",
+            "tls"
+          ],
+          "marker": {
+            "sha256": "ef89000e53865de7e7c5d7024465bcd54e214680c0f4093b2399f509191c2707",
+            "variables": [
+              "python_version"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "input": "Demo[TLS,foo_bar]==1.2.3; python_version != \"synthetic\"",
+      "components": [
+        {
+          "ecosystem": "PyPI",
+          "name": "demo",
+          "version": "1.2.3",
+          "declaredSha256": [],
+          "extras": [
+            "foo-bar",
+            "tls"
+          ],
+          "marker": {
+            "sha256": "45c2c1ee07b21e4d1c20dc3d395d100ebb06586575446eea62249e979f065a53",
+            "variables": [
+              "python_version"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "input": "Demo[TLS,foo_bar]==1.2.3; \"synthetic\" != python_version",
+      "components": [
+        {
+          "ecosystem": "PyPI",
+          "name": "demo",
+          "version": "1.2.3",
+          "declaredSha256": [],
+          "extras": [
+            "foo-bar",
+            "tls"
+          ],
+          "marker": {
+            "sha256": "45d5072b032efcf8f7fc33103946c3954ab77489a05268738b20f03ba896da28",
+            "variables": [
+              "python_version"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "input": "Demo[TLS,foo_bar]==1.2.3; python_version in \"synthetic\"",
+      "components": [
+        {
+          "ecosystem": "PyPI",
+          "name": "demo",
+          "version": "1.2.3",
+          "declaredSha256": [],
+          "extras": [
+            "foo-bar",
+            "tls"
+          ],
+          "marker": {
+            "sha256": "3a249c4d85369f4175d54e7bd92ed8316cbb494366f473a24101b8a0e07f9a5a",
+            "variables": [
+              "python_version"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "input": "Demo[TLS,foo_bar]==1.2.3; \"synthetic\" in python_version",
+      "components": [
+        {
+          "ecosystem": "PyPI",
+          "name": "demo",
+          "version": "1.2.3",
+          "declaredSha256": [],
+          "extras": [
+            "foo-bar",
+            "tls"
+          ],
+          "marker": {
+            "sha256": "fb29f6937b18229423f946a90b3dd2429839614b56e572a0f5249f22f3681d2f",
+            "variables": [
+              "python_version"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "input": "Demo[TLS,foo_bar]==1.2.3; python_full_version == \"synthetic\"",
+      "components": [
+        {
+          "ecosystem": "PyPI",
+          "name": "demo",
+          "version": "1.2.3",
+          "declaredSha256": [],
+          "extras": [
+            "foo-bar",
+            "tls"
+          ],
+          "marker": {
+            "sha256": "f16755e149de569f141cdac64f1f8d971aed872c335cb499fe596cf107c8d4de",
+            "variables": [
+              "python_full_version"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "input": "Demo[TLS,foo_bar]==1.2.3; \"synthetic\" == python_full_version",
+      "components": [
+        {
+          "ecosystem": "PyPI",
+          "name": "demo",
+          "version": "1.2.3",
+          "declaredSha256": [],
+          "extras": [
+            "foo-bar",
+            "tls"
+          ],
+          "marker": {
+            "sha256": "be89c38204ed2a630544e064c561e1805a598e9b7e7e69ca3a1d91d719cf05f7",
+            "variables": [
+              "python_full_version"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "input": "Demo[TLS,foo_bar]==1.2.3; python_full_version != \"synthetic\"",
+      "components": [
+        {
+          "ecosystem": "PyPI",
+          "name": "demo",
+          "version": "1.2.3",
+          "declaredSha256": [],
+          "extras": [
+            "foo-bar",
+            "tls"
+          ],
+          "marker": {
+            "sha256": "f606a96711aebe5bf2611ccaee5fd855ecfb7c44afbf50b79b3713ac3606ac0b",
+            "variables": [
+              "python_full_version"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "input": "Demo[TLS,foo_bar]==1.2.3; \"synthetic\" != python_full_version",
+      "components": [
+        {
+          "ecosystem": "PyPI",
+          "name": "demo",
+          "version": "1.2.3",
+          "declaredSha256": [],
+          "extras": [
+            "foo-bar",
+            "tls"
+          ],
+          "marker": {
+            "sha256": "d169b893f46614a6dbc5e80fbd37823842fb569700a3302b11281e7c119696b3",
+            "variables": [
+              "python_full_version"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "input": "Demo[TLS,foo_bar]==1.2.3; python_full_version in \"synthetic\"",
+      "components": [
+        {
+          "ecosystem": "PyPI",
+          "name": "demo",
+          "version": "1.2.3",
+          "declaredSha256": [],
+          "extras": [
+            "foo-bar",
+            "tls"
+          ],
+          "marker": {
+            "sha256": "239c51bc1d7f93028602a95d2da386c3030c497162b28fefb5e866b116c0043b",
+            "variables": [
+              "python_full_version"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "input": "Demo[TLS,foo_bar]==1.2.3; \"synthetic\" in python_full_version",
+      "components": [
+        {
+          "ecosystem": "PyPI",
+          "name": "demo",
+          "version": "1.2.3",
+          "declaredSha256": [],
+          "extras": [
+            "foo-bar",
+            "tls"
+          ],
+          "marker": {
+            "sha256": "b0453691d22b845610562845ad6711480d2b5a556a39115c8489dfdf17e4e926",
+            "variables": [
+              "python_full_version"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "input": "Demo[TLS,foo_bar]==1.2.3; os_name == \"synthetic\"",
+      "components": [
+        {
+          "ecosystem": "PyPI",
+          "name": "demo",
+          "version": "1.2.3",
+          "declaredSha256": [],
+          "extras": [
+            "foo-bar",
+            "tls"
+          ],
+          "marker": {
+            "sha256": "3e327cbf40a0054ffdfa171af6ae0d58ed7112f5dc84660a3b2c372dfec31d69",
+            "variables": [
+              "os_name"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "input": "Demo[TLS,foo_bar]==1.2.3; \"synthetic\" == os_name",
+      "components": [
+        {
+          "ecosystem": "PyPI",
+          "name": "demo",
+          "version": "1.2.3",
+          "declaredSha256": [],
+          "extras": [
+            "foo-bar",
+            "tls"
+          ],
+          "marker": {
+            "sha256": "f78dca276b89ee00c469dbee5ce6eee745f8d70e6d913252f6fb25357d82e644",
+            "variables": [
+              "os_name"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "input": "Demo[TLS,foo_bar]==1.2.3; os_name != \"synthetic\"",
+      "components": [
+        {
+          "ecosystem": "PyPI",
+          "name": "demo",
+          "version": "1.2.3",
+          "declaredSha256": [],
+          "extras": [
+            "foo-bar",
+            "tls"
+          ],
+          "marker": {
+            "sha256": "8f3f5c291e84df01a0a6bc66dc33a3b4c463de6c035f1d01b3a145d632dcf420",
+            "variables": [
+              "os_name"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "input": "Demo[TLS,foo_bar]==1.2.3; \"synthetic\" != os_name",
+      "components": [
+        {
+          "ecosystem": "PyPI",
+          "name": "demo",
+          "version": "1.2.3",
+          "declaredSha256": [],
+          "extras": [
+            "foo-bar",
+            "tls"
+          ],
+          "marker": {
+            "sha256": "e18bee8284f054b2e2fa421e9f3767794be1d4426a9cac2c4002b1be10eb462f",
+            "variables": [
+              "os_name"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "input": "Demo[TLS,foo_bar]==1.2.3; os_name in \"synthetic\"",
+      "components": [
+        {
+          "ecosystem": "PyPI",
+          "name": "demo",
+          "version": "1.2.3",
+          "declaredSha256": [],
+          "extras": [
+            "foo-bar",
+            "tls"
+          ],
+          "marker": {
+            "sha256": "a1fc29d3bd0b1ca8693980051434536ff727cc140320d31111078a846e81a7dc",
+            "variables": [
+              "os_name"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "input": "Demo[TLS,foo_bar]==1.2.3; \"synthetic\" in os_name",
+      "components": [
+        {
+          "ecosystem": "PyPI",
+          "name": "demo",
+          "version": "1.2.3",
+          "declaredSha256": [],
+          "extras": [
+            "foo-bar",
+            "tls"
+          ],
+          "marker": {
+            "sha256": "286e133d5a037f458a8b0f19588f18b510f107d1bcafc335bd983b1bc7fb0622",
+            "variables": [
+              "os_name"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "input": "Demo[TLS,foo_bar]==1.2.3; sys_platform == \"synthetic\"",
+      "components": [
+        {
+          "ecosystem": "PyPI",
+          "name": "demo",
+          "version": "1.2.3",
+          "declaredSha256": [],
+          "extras": [
+            "foo-bar",
+            "tls"
+          ],
+          "marker": {
+            "sha256": "c4e6b3bacf76d69db1a2266d0570c6d6287225aadffae4fc872c0e1b24ea2487",
+            "variables": [
+              "sys_platform"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "input": "Demo[TLS,foo_bar]==1.2.3; \"synthetic\" == sys_platform",
+      "components": [
+        {
+          "ecosystem": "PyPI",
+          "name": "demo",
+          "version": "1.2.3",
+          "declaredSha256": [],
+          "extras": [
+            "foo-bar",
+            "tls"
+          ],
+          "marker": {
+            "sha256": "911b07f9a7c74b333e804c35abbf0135382118941830d1dc391f1028791912f1",
+            "variables": [
+              "sys_platform"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "input": "Demo[TLS,foo_bar]==1.2.3; sys_platform != \"synthetic\"",
+      "components": [
+        {
+          "ecosystem": "PyPI",
+          "name": "demo",
+          "version": "1.2.3",
+          "declaredSha256": [],
+          "extras": [
+            "foo-bar",
+            "tls"
+          ],
+          "marker": {
+            "sha256": "be850cf9edc050e93747e025555b086c80adaaddc039c2381e822cd1e154f099",
+            "variables": [
+              "sys_platform"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "input": "Demo[TLS,foo_bar]==1.2.3; \"synthetic\" != sys_platform",
+      "components": [
+        {
+          "ecosystem": "PyPI",
+          "name": "demo",
+          "version": "1.2.3",
+          "declaredSha256": [],
+          "extras": [
+            "foo-bar",
+            "tls"
+          ],
+          "marker": {
+            "sha256": "2e7ddecf78f291d0ddb477af0d7a6ebcd156dc668dc0c309ce660db5c75272b9",
+            "variables": [
+              "sys_platform"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "input": "Demo[TLS,foo_bar]==1.2.3; sys_platform in \"synthetic\"",
+      "components": [
+        {
+          "ecosystem": "PyPI",
+          "name": "demo",
+          "version": "1.2.3",
+          "declaredSha256": [],
+          "extras": [
+            "foo-bar",
+            "tls"
+          ],
+          "marker": {
+            "sha256": "5923d9d9f590d7dc8c906c24bb1a50a38da605b1c78e15212ba149286fcd40a3",
+            "variables": [
+              "sys_platform"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "input": "Demo[TLS,foo_bar]==1.2.3; \"synthetic\" in sys_platform",
+      "components": [
+        {
+          "ecosystem": "PyPI",
+          "name": "demo",
+          "version": "1.2.3",
+          "declaredSha256": [],
+          "extras": [
+            "foo-bar",
+            "tls"
+          ],
+          "marker": {
+            "sha256": "948ade7f6492578b10e6bb5b0803bb85ecdace0f5e5e08cdd47f36a56d500c35",
+            "variables": [
+              "sys_platform"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "input": "Demo[TLS,foo_bar]==1.2.3; platform_release == \"synthetic\"",
+      "components": [
+        {
+          "ecosystem": "PyPI",
+          "name": "demo",
+          "version": "1.2.3",
+          "declaredSha256": [],
+          "extras": [
+            "foo-bar",
+            "tls"
+          ],
+          "marker": {
+            "sha256": "ee84055f4585737feecf634c82a81904ee1656cc4c4ec2e73af2a3b55958e34d",
+            "variables": [
+              "platform_release"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "input": "Demo[TLS,foo_bar]==1.2.3; \"synthetic\" == platform_release",
+      "components": [
+        {
+          "ecosystem": "PyPI",
+          "name": "demo",
+          "version": "1.2.3",
+          "declaredSha256": [],
+          "extras": [
+            "foo-bar",
+            "tls"
+          ],
+          "marker": {
+            "sha256": "a96256e25f8e38feabb05a1228ff5ba51029e3123315fdab72693ed67df9dfcb",
+            "variables": [
+              "platform_release"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "input": "Demo[TLS,foo_bar]==1.2.3; platform_release != \"synthetic\"",
+      "components": [
+        {
+          "ecosystem": "PyPI",
+          "name": "demo",
+          "version": "1.2.3",
+          "declaredSha256": [],
+          "extras": [
+            "foo-bar",
+            "tls"
+          ],
+          "marker": {
+            "sha256": "4990fc96c61e3384a5d05998951ca08aea844f6efd11e194add4610029f8b887",
+            "variables": [
+              "platform_release"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "input": "Demo[TLS,foo_bar]==1.2.3; \"synthetic\" != platform_release",
+      "components": [
+        {
+          "ecosystem": "PyPI",
+          "name": "demo",
+          "version": "1.2.3",
+          "declaredSha256": [],
+          "extras": [
+            "foo-bar",
+            "tls"
+          ],
+          "marker": {
+            "sha256": "28ad536405919d0109ff895369486f087b0df847152cd7f1f2afdfbf99919915",
+            "variables": [
+              "platform_release"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "input": "Demo[TLS,foo_bar]==1.2.3; platform_release in \"synthetic\"",
+      "components": [
+        {
+          "ecosystem": "PyPI",
+          "name": "demo",
+          "version": "1.2.3",
+          "declaredSha256": [],
+          "extras": [
+            "foo-bar",
+            "tls"
+          ],
+          "marker": {
+            "sha256": "29b98bc7aaffb17b4961f2532ea350ab43bd2264993ecaab969cf8994846da85",
+            "variables": [
+              "platform_release"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "input": "Demo[TLS,foo_bar]==1.2.3; \"synthetic\" in platform_release",
+      "components": [
+        {
+          "ecosystem": "PyPI",
+          "name": "demo",
+          "version": "1.2.3",
+          "declaredSha256": [],
+          "extras": [
+            "foo-bar",
+            "tls"
+          ],
+          "marker": {
+            "sha256": "c963db653130f6e1bb4850c9c6e85a331f27df51fb57ade6f325cce9f6c9a335",
+            "variables": [
+              "platform_release"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "input": "Demo[TLS,foo_bar]==1.2.3; platform_system == \"synthetic\"",
+      "components": [
+        {
+          "ecosystem": "PyPI",
+          "name": "demo",
+          "version": "1.2.3",
+          "declaredSha256": [],
+          "extras": [
+            "foo-bar",
+            "tls"
+          ],
+          "marker": {
+            "sha256": "21e8e55bdf7e971e6ca97c93b75ac9e328c6cff0f2ac3649a4ee42307b388436",
+            "variables": [
+              "platform_system"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "input": "Demo[TLS,foo_bar]==1.2.3; \"synthetic\" == platform_system",
+      "components": [
+        {
+          "ecosystem": "PyPI",
+          "name": "demo",
+          "version": "1.2.3",
+          "declaredSha256": [],
+          "extras": [
+            "foo-bar",
+            "tls"
+          ],
+          "marker": {
+            "sha256": "dea7d5ad20f50988e990ce23dee3b2a471b0d6a1747b641285f0b140e75bd240",
+            "variables": [
+              "platform_system"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "input": "Demo[TLS,foo_bar]==1.2.3; platform_system != \"synthetic\"",
+      "components": [
+        {
+          "ecosystem": "PyPI",
+          "name": "demo",
+          "version": "1.2.3",
+          "declaredSha256": [],
+          "extras": [
+            "foo-bar",
+            "tls"
+          ],
+          "marker": {
+            "sha256": "bbcb4c1efe28107754768905124a9c38847592f1ed572655f0a51418b373c417",
+            "variables": [
+              "platform_system"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "input": "Demo[TLS,foo_bar]==1.2.3; \"synthetic\" != platform_system",
+      "components": [
+        {
+          "ecosystem": "PyPI",
+          "name": "demo",
+          "version": "1.2.3",
+          "declaredSha256": [],
+          "extras": [
+            "foo-bar",
+            "tls"
+          ],
+          "marker": {
+            "sha256": "07ead77df75d6982c00cb9550d4f18ba0198ed75f6615754ebf32128a6235c41",
+            "variables": [
+              "platform_system"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "input": "Demo[TLS,foo_bar]==1.2.3; platform_system in \"synthetic\"",
+      "components": [
+        {
+          "ecosystem": "PyPI",
+          "name": "demo",
+          "version": "1.2.3",
+          "declaredSha256": [],
+          "extras": [
+            "foo-bar",
+            "tls"
+          ],
+          "marker": {
+            "sha256": "e41c12ee5dfe4a6dd80b0696e58a8b5d09242b7f6f0bafee26518fc1789460ac",
+            "variables": [
+              "platform_system"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "input": "Demo[TLS,foo_bar]==1.2.3; \"synthetic\" in platform_system",
+      "components": [
+        {
+          "ecosystem": "PyPI",
+          "name": "demo",
+          "version": "1.2.3",
+          "declaredSha256": [],
+          "extras": [
+            "foo-bar",
+            "tls"
+          ],
+          "marker": {
+            "sha256": "b97d4b0b7b1e762b6127ed46eb19aff0696c09a8fa22094711d751441fb2be51",
+            "variables": [
+              "platform_system"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "input": "Demo[TLS,foo_bar]==1.2.3; platform_version == \"synthetic\"",
+      "components": [
+        {
+          "ecosystem": "PyPI",
+          "name": "demo",
+          "version": "1.2.3",
+          "declaredSha256": [],
+          "extras": [
+            "foo-bar",
+            "tls"
+          ],
+          "marker": {
+            "sha256": "a9bb9077acf8c808feccd3d51be8ee236cb5200fce022626738d59e05191b94a",
+            "variables": [
+              "platform_version"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "input": "Demo[TLS,foo_bar]==1.2.3; \"synthetic\" == platform_version",
+      "components": [
+        {
+          "ecosystem": "PyPI",
+          "name": "demo",
+          "version": "1.2.3",
+          "declaredSha256": [],
+          "extras": [
+            "foo-bar",
+            "tls"
+          ],
+          "marker": {
+            "sha256": "721f78f52e1a4941b10d10104bbfa5026f0b6a1a2641f3e732f11537e96241f9",
+            "variables": [
+              "platform_version"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "input": "Demo[TLS,foo_bar]==1.2.3; platform_version != \"synthetic\"",
+      "components": [
+        {
+          "ecosystem": "PyPI",
+          "name": "demo",
+          "version": "1.2.3",
+          "declaredSha256": [],
+          "extras": [
+            "foo-bar",
+            "tls"
+          ],
+          "marker": {
+            "sha256": "c7bb04eed277fc9ab5881d7fddc1a5827a2602a8cec40dc78aa4b4160be5cd00",
+            "variables": [
+              "platform_version"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "input": "Demo[TLS,foo_bar]==1.2.3; \"synthetic\" != platform_version",
+      "components": [
+        {
+          "ecosystem": "PyPI",
+          "name": "demo",
+          "version": "1.2.3",
+          "declaredSha256": [],
+          "extras": [
+            "foo-bar",
+            "tls"
+          ],
+          "marker": {
+            "sha256": "ef997220234a5be108e72289053203edede0ae673ecec6d104eedac345471a7c",
+            "variables": [
+              "platform_version"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "input": "Demo[TLS,foo_bar]==1.2.3; platform_version in \"synthetic\"",
+      "components": [
+        {
+          "ecosystem": "PyPI",
+          "name": "demo",
+          "version": "1.2.3",
+          "declaredSha256": [],
+          "extras": [
+            "foo-bar",
+            "tls"
+          ],
+          "marker": {
+            "sha256": "1032136d81f99548e6ec6792fdd0aebf209a36145416dfdd2eaa66d61e0547a6",
+            "variables": [
+              "platform_version"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "input": "Demo[TLS,foo_bar]==1.2.3; \"synthetic\" in platform_version",
+      "components": [
+        {
+          "ecosystem": "PyPI",
+          "name": "demo",
+          "version": "1.2.3",
+          "declaredSha256": [],
+          "extras": [
+            "foo-bar",
+            "tls"
+          ],
+          "marker": {
+            "sha256": "03138bd3877c7544327dab4d480e93a371f9bb4d1cc02075c0bb7d7c416fea37",
+            "variables": [
+              "platform_version"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "input": "Demo[TLS,foo_bar]==1.2.3; platform_machine == \"synthetic\"",
+      "components": [
+        {
+          "ecosystem": "PyPI",
+          "name": "demo",
+          "version": "1.2.3",
+          "declaredSha256": [],
+          "extras": [
+            "foo-bar",
+            "tls"
+          ],
+          "marker": {
+            "sha256": "81c17f2a35dc254a409005b0eb323d1431c83df487913011d0dc21dcfd373e6a",
+            "variables": [
+              "platform_machine"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "input": "Demo[TLS,foo_bar]==1.2.3; \"synthetic\" == platform_machine",
+      "components": [
+        {
+          "ecosystem": "PyPI",
+          "name": "demo",
+          "version": "1.2.3",
+          "declaredSha256": [],
+          "extras": [
+            "foo-bar",
+            "tls"
+          ],
+          "marker": {
+            "sha256": "c1a86ac0637087e215fd9ea35dea5e2ddb8a6afadd567431a7af4bf6c5612ab7",
+            "variables": [
+              "platform_machine"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "input": "Demo[TLS,foo_bar]==1.2.3; platform_machine != \"synthetic\"",
+      "components": [
+        {
+          "ecosystem": "PyPI",
+          "name": "demo",
+          "version": "1.2.3",
+          "declaredSha256": [],
+          "extras": [
+            "foo-bar",
+            "tls"
+          ],
+          "marker": {
+            "sha256": "4fcf38a86d494a76789fbfb31b6f75a719ee3342cf2acd3e989198e72f460727",
+            "variables": [
+              "platform_machine"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "input": "Demo[TLS,foo_bar]==1.2.3; \"synthetic\" != platform_machine",
+      "components": [
+        {
+          "ecosystem": "PyPI",
+          "name": "demo",
+          "version": "1.2.3",
+          "declaredSha256": [],
+          "extras": [
+            "foo-bar",
+            "tls"
+          ],
+          "marker": {
+            "sha256": "c692efb203e75cb798e981d7011d471d4b20cb31c7984b8d85d32a90b5d4f905",
+            "variables": [
+              "platform_machine"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "input": "Demo[TLS,foo_bar]==1.2.3; platform_machine in \"synthetic\"",
+      "components": [
+        {
+          "ecosystem": "PyPI",
+          "name": "demo",
+          "version": "1.2.3",
+          "declaredSha256": [],
+          "extras": [
+            "foo-bar",
+            "tls"
+          ],
+          "marker": {
+            "sha256": "eae7a422839473d5beba6b690952d496085b1d80050f0069bea1d9da14600d2b",
+            "variables": [
+              "platform_machine"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "input": "Demo[TLS,foo_bar]==1.2.3; \"synthetic\" in platform_machine",
+      "components": [
+        {
+          "ecosystem": "PyPI",
+          "name": "demo",
+          "version": "1.2.3",
+          "declaredSha256": [],
+          "extras": [
+            "foo-bar",
+            "tls"
+          ],
+          "marker": {
+            "sha256": "e551215957b2f193160aeca19412d082de5cb2f5b1fe52d1ecc0c96f34cecd5a",
+            "variables": [
+              "platform_machine"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "input": "Demo[TLS,foo_bar]==1.2.3; platform_python_implementation == \"synthetic\"",
+      "components": [
+        {
+          "ecosystem": "PyPI",
+          "name": "demo",
+          "version": "1.2.3",
+          "declaredSha256": [],
+          "extras": [
+            "foo-bar",
+            "tls"
+          ],
+          "marker": {
+            "sha256": "991bfb6f823b8740eaa3381d0f75c0ef0c2c4764f2dc142e41ffc8c7253f6766",
+            "variables": [
+              "platform_python_implementation"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "input": "Demo[TLS,foo_bar]==1.2.3; \"synthetic\" == platform_python_implementation",
+      "components": [
+        {
+          "ecosystem": "PyPI",
+          "name": "demo",
+          "version": "1.2.3",
+          "declaredSha256": [],
+          "extras": [
+            "foo-bar",
+            "tls"
+          ],
+          "marker": {
+            "sha256": "290812152a9a3c43868642642e5cdb4f1835de4760521d917b889bc44b1a1227",
+            "variables": [
+              "platform_python_implementation"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "input": "Demo[TLS,foo_bar]==1.2.3; platform_python_implementation != \"synthetic\"",
+      "components": [
+        {
+          "ecosystem": "PyPI",
+          "name": "demo",
+          "version": "1.2.3",
+          "declaredSha256": [],
+          "extras": [
+            "foo-bar",
+            "tls"
+          ],
+          "marker": {
+            "sha256": "dcd7503189389f7cf9e00feb4516921db7ceae37ddbaf1d60d750176037be35f",
+            "variables": [
+              "platform_python_implementation"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "input": "Demo[TLS,foo_bar]==1.2.3; \"synthetic\" != platform_python_implementation",
+      "components": [
+        {
+          "ecosystem": "PyPI",
+          "name": "demo",
+          "version": "1.2.3",
+          "declaredSha256": [],
+          "extras": [
+            "foo-bar",
+            "tls"
+          ],
+          "marker": {
+            "sha256": "57179ea8fc0bc33c478af4b8de70b3f1cb77464a982ee7c4d708002f953ecd11",
+            "variables": [
+              "platform_python_implementation"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "input": "Demo[TLS,foo_bar]==1.2.3; platform_python_implementation in \"synthetic\"",
+      "components": [
+        {
+          "ecosystem": "PyPI",
+          "name": "demo",
+          "version": "1.2.3",
+          "declaredSha256": [],
+          "extras": [
+            "foo-bar",
+            "tls"
+          ],
+          "marker": {
+            "sha256": "b569ed1c4589ccaa318e4d24c2fb7849ae3d86a5f13b494f46837ea1b0ed46bb",
+            "variables": [
+              "platform_python_implementation"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "input": "Demo[TLS,foo_bar]==1.2.3; \"synthetic\" in platform_python_implementation",
+      "components": [
+        {
+          "ecosystem": "PyPI",
+          "name": "demo",
+          "version": "1.2.3",
+          "declaredSha256": [],
+          "extras": [
+            "foo-bar",
+            "tls"
+          ],
+          "marker": {
+            "sha256": "bcaa5d7c3673bff818fb6f237aecc733284add074e5b051b71ea28f6615e4f89",
+            "variables": [
+              "platform_python_implementation"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "input": "Demo[TLS,foo_bar]==1.2.3; implementation_name == \"synthetic\"",
+      "components": [
+        {
+          "ecosystem": "PyPI",
+          "name": "demo",
+          "version": "1.2.3",
+          "declaredSha256": [],
+          "extras": [
+            "foo-bar",
+            "tls"
+          ],
+          "marker": {
+            "sha256": "761bb41aa47c9ffeb392a97b0cbcf2ea45e452a73f2a96f88e5aa6efd44e0f77",
+            "variables": [
+              "implementation_name"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "input": "Demo[TLS,foo_bar]==1.2.3; \"synthetic\" == implementation_name",
+      "components": [
+        {
+          "ecosystem": "PyPI",
+          "name": "demo",
+          "version": "1.2.3",
+          "declaredSha256": [],
+          "extras": [
+            "foo-bar",
+            "tls"
+          ],
+          "marker": {
+            "sha256": "1af2727c2e8ded38418c0b137cb5517cbb5f5642bcd7e8bc58c0d18652ada982",
+            "variables": [
+              "implementation_name"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "input": "Demo[TLS,foo_bar]==1.2.3; implementation_name != \"synthetic\"",
+      "components": [
+        {
+          "ecosystem": "PyPI",
+          "name": "demo",
+          "version": "1.2.3",
+          "declaredSha256": [],
+          "extras": [
+            "foo-bar",
+            "tls"
+          ],
+          "marker": {
+            "sha256": "750702d56393a46a3835adf456066ebb09af4ff6ac29e86bd5a7347ce5c31667",
+            "variables": [
+              "implementation_name"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "input": "Demo[TLS,foo_bar]==1.2.3; \"synthetic\" != implementation_name",
+      "components": [
+        {
+          "ecosystem": "PyPI",
+          "name": "demo",
+          "version": "1.2.3",
+          "declaredSha256": [],
+          "extras": [
+            "foo-bar",
+            "tls"
+          ],
+          "marker": {
+            "sha256": "5fd29de1ba5377d675f40f8196ea2927fe068b2dc13703491b35d246023eef82",
+            "variables": [
+              "implementation_name"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "input": "Demo[TLS,foo_bar]==1.2.3; implementation_name in \"synthetic\"",
+      "components": [
+        {
+          "ecosystem": "PyPI",
+          "name": "demo",
+          "version": "1.2.3",
+          "declaredSha256": [],
+          "extras": [
+            "foo-bar",
+            "tls"
+          ],
+          "marker": {
+            "sha256": "fa1fd56b0156b452c50863b80e849baad91ee0d4bd6994735372a734172fb78d",
+            "variables": [
+              "implementation_name"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "input": "Demo[TLS,foo_bar]==1.2.3; \"synthetic\" in implementation_name",
+      "components": [
+        {
+          "ecosystem": "PyPI",
+          "name": "demo",
+          "version": "1.2.3",
+          "declaredSha256": [],
+          "extras": [
+            "foo-bar",
+            "tls"
+          ],
+          "marker": {
+            "sha256": "e30093c4288949ac847bda6b27006085a0dab91319d0ff712b70bc02a4813fa2",
+            "variables": [
+              "implementation_name"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "input": "Demo[TLS,foo_bar]==1.2.3; implementation_version == \"synthetic\"",
+      "components": [
+        {
+          "ecosystem": "PyPI",
+          "name": "demo",
+          "version": "1.2.3",
+          "declaredSha256": [],
+          "extras": [
+            "foo-bar",
+            "tls"
+          ],
+          "marker": {
+            "sha256": "243f2b5003995bf743cd16970da17d4200ba53580db6ac5003d475afcaca9731",
+            "variables": [
+              "implementation_version"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "input": "Demo[TLS,foo_bar]==1.2.3; \"synthetic\" == implementation_version",
+      "components": [
+        {
+          "ecosystem": "PyPI",
+          "name": "demo",
+          "version": "1.2.3",
+          "declaredSha256": [],
+          "extras": [
+            "foo-bar",
+            "tls"
+          ],
+          "marker": {
+            "sha256": "463ad2c5df8e14d557dbca8ee66452a3581a33803a29f1957647dbc09b96bd8a",
+            "variables": [
+              "implementation_version"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "input": "Demo[TLS,foo_bar]==1.2.3; implementation_version != \"synthetic\"",
+      "components": [
+        {
+          "ecosystem": "PyPI",
+          "name": "demo",
+          "version": "1.2.3",
+          "declaredSha256": [],
+          "extras": [
+            "foo-bar",
+            "tls"
+          ],
+          "marker": {
+            "sha256": "86b92b37fd36c5ef43502cb56d717e8534fd9fa7ab317181a34c0176f9e2a6e1",
+            "variables": [
+              "implementation_version"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "input": "Demo[TLS,foo_bar]==1.2.3; \"synthetic\" != implementation_version",
+      "components": [
+        {
+          "ecosystem": "PyPI",
+          "name": "demo",
+          "version": "1.2.3",
+          "declaredSha256": [],
+          "extras": [
+            "foo-bar",
+            "tls"
+          ],
+          "marker": {
+            "sha256": "99c106d7ccbb06b09ecf1ddb385d2615209668a3e03d22d8740a0648e54ea381",
+            "variables": [
+              "implementation_version"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "input": "Demo[TLS,foo_bar]==1.2.3; implementation_version in \"synthetic\"",
+      "components": [
+        {
+          "ecosystem": "PyPI",
+          "name": "demo",
+          "version": "1.2.3",
+          "declaredSha256": [],
+          "extras": [
+            "foo-bar",
+            "tls"
+          ],
+          "marker": {
+            "sha256": "3c1456fb49dc1ee37cc2ea4436bd54f4a66e28aab034a43db84b9990236efced",
+            "variables": [
+              "implementation_version"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "input": "Demo[TLS,foo_bar]==1.2.3; \"synthetic\" in implementation_version",
+      "components": [
+        {
+          "ecosystem": "PyPI",
+          "name": "demo",
+          "version": "1.2.3",
+          "declaredSha256": [],
+          "extras": [
+            "foo-bar",
+            "tls"
+          ],
+          "marker": {
+            "sha256": "3ee1b166428556cdc71506eb58d5f1f930c5974963357e2622e9c8de688760f0",
+            "variables": [
+              "implementation_version"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "input": "Demo[TLS,foo_bar]==1.2.3; python_version < \"3.12\"",
+      "components": [
+        {
+          "ecosystem": "PyPI",
+          "name": "demo",
+          "version": "1.2.3",
+          "declaredSha256": [],
+          "extras": [
+            "foo-bar",
+            "tls"
+          ],
+          "marker": {
+            "sha256": "c2856e00fbc3348a72a88f74b391eb8fd0a906deb1d5e2f343466f9d58549bf1",
+            "variables": [
+              "python_version"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "input": "Demo[TLS,foo_bar]==1.2.3; python_version <= \"3.12\"",
+      "components": [
+        {
+          "ecosystem": "PyPI",
+          "name": "demo",
+          "version": "1.2.3",
+          "declaredSha256": [],
+          "extras": [
+            "foo-bar",
+            "tls"
+          ],
+          "marker": {
+            "sha256": "a3221856f7d3f7fec099327cb637dee169ce28429cb8489a1a98469dc28c799d",
+            "variables": [
+              "python_version"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "input": "Demo[TLS,foo_bar]==1.2.3; python_version > \"3.12\"",
+      "components": [
+        {
+          "ecosystem": "PyPI",
+          "name": "demo",
+          "version": "1.2.3",
+          "declaredSha256": [],
+          "extras": [
+            "foo-bar",
+            "tls"
+          ],
+          "marker": {
+            "sha256": "470a08d5f9de2ea129d2ce5754d5ed76d6a5a70189a9597bc2bf25088e803592",
+            "variables": [
+              "python_version"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "input": "Demo[TLS,foo_bar]==1.2.3; python_version >= \"3.12\"",
+      "components": [
+        {
+          "ecosystem": "PyPI",
+          "name": "demo",
+          "version": "1.2.3",
+          "declaredSha256": [],
+          "extras": [
+            "foo-bar",
+            "tls"
+          ],
+          "marker": {
+            "sha256": "2eb584d3cb074dd5a3d74d2dddf9ec80b5b1e9649c0ba38f704a2944b5a43ea6",
+            "variables": [
+              "python_version"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "input": "Demo[TLS,foo_bar]==1.2.3; python_version ~= \"3.12\"",
+      "components": [
+        {
+          "ecosystem": "PyPI",
+          "name": "demo",
+          "version": "1.2.3",
+          "declaredSha256": [],
+          "extras": [
+            "foo-bar",
+            "tls"
+          ],
+          "marker": {
+            "sha256": "82c716b70a4991a3839c297b8f698b65d57e98bf65a9e17c940f6d5634945c27",
+            "variables": [
+              "python_version"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "input": "Demo[TLS,foo_bar]==1.2.3; python_version === \"3.12\"",
+      "components": [
+        {
+          "ecosystem": "PyPI",
+          "name": "demo",
+          "version": "1.2.3",
+          "declaredSha256": [],
+          "extras": [
+            "foo-bar",
+            "tls"
+          ],
+          "marker": {
+            "sha256": "5fcb6f10155f3bb839b809d185e4deb4e2591554ff1948f8a70d10c95dc97299",
+            "variables": [
+              "python_version"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "input": "Demo[TLS,foo_bar]==1.2.3; python_version not in \"3.12\"",
+      "components": [
+        {
+          "ecosystem": "PyPI",
+          "name": "demo",
+          "version": "1.2.3",
+          "declaredSha256": [],
+          "extras": [
+            "foo-bar",
+            "tls"
+          ],
+          "marker": {
+            "sha256": "a066dd31de95486be041ea7de49330356cec74ac71cd15140ca11d089cfcb56c",
+            "variables": [
+              "python_version"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "input": "Demo[TLS,foo_bar]==1.2.3; python_version<\"3.12\"and(sys_platform==\"win32\"or os_name==\"posix\")",
+      "components": [
+        {
+          "ecosystem": "PyPI",
+          "name": "demo",
+          "version": "1.2.3",
+          "declaredSha256": [],
+          "extras": [
+            "foo-bar",
+            "tls"
+          ],
+          "marker": {
+            "sha256": "4cc64d6a69dd5bd9168cca47cb4163d9ba0f5a2a35ca0e8fd9e2f2a617e21617",
+            "variables": [
+              "os_name",
+              "python_version",
+              "sys_platform"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "input": "Demo[TLS,foo_bar]==1.2.3; (python_version >= \"3.9\" and python_version < \"4\") or implementation_name == \"pypy\"",
+      "components": [
+        {
+          "ecosystem": "PyPI",
+          "name": "demo",
+          "version": "1.2.3",
+          "declaredSha256": [],
+          "extras": [
+            "foo-bar",
+            "tls"
+          ],
+          "marker": {
+            "sha256": "6ebc6d4d5587be414ef7739424f57d4255b1e2a05cbf9e44cc8f6593a1656887",
+            "variables": [
+              "implementation_name",
+              "python_version"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "input": "Demo[TLS,foo_bar]==1.2.3; \"a\" == \"a\"",
+      "components": [
+        {
+          "ecosystem": "PyPI",
+          "name": "demo",
+          "version": "1.2.3",
+          "declaredSha256": [],
+          "extras": [
+            "foo-bar",
+            "tls"
+          ],
+          "marker": {
+            "sha256": "eeaf503c0cdc8ce5af083d7cc279ae4100fb4aceabb856d574fc568f3cade313",
+            "variables": []
+          }
+        }
+      ]
+    },
+    {
+      "input": "Demo[TLS,foo_bar]==1.2.3; python_version < python_full_version",
+      "components": [
+        {
+          "ecosystem": "PyPI",
+          "name": "demo",
+          "version": "1.2.3",
+          "declaredSha256": [],
+          "extras": [
+            "foo-bar",
+            "tls"
+          ],
+          "marker": {
+            "sha256": "210178acb14b1d7d4c0cf5ec60553fd4b962d3099905c629acb2fad8e161c11b",
+            "variables": [
+              "python_full_version",
+              "python_version"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "input": "Demo[TLS,foo_bar]==1.2.3; platform_version == \"NEVER_COPY_LITERAL;#&${PRIVATE}\"",
+      "components": [
+        {
+          "ecosystem": "PyPI",
+          "name": "demo",
+          "version": "1.2.3",
+          "declaredSha256": [],
+          "extras": [
+            "foo-bar",
+            "tls"
+          ],
+          "marker": {
+            "sha256": "b68e333a377a2fd788e39987ab85b01c6d68f5d8dc62c9c95f5838d51de9ae73",
+            "variables": [
+              "platform_version"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "input": "Demo[TLS,foo_bar]==1.2.3; platform_version == 'double\"quote'",
+      "components": [
+        {
+          "ecosystem": "PyPI",
+          "name": "demo",
+          "version": "1.2.3",
+          "declaredSha256": [],
+          "extras": [
+            "foo-bar",
+            "tls"
+          ],
+          "marker": {
+            "sha256": "9ab47869d345cd5e34a2b73bd5d49a0d1aeabb9b75a729f88f5d15f979620394",
+            "variables": [
+              "platform_version"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "input": "Demo[TLS,foo_bar]==1.2.3; platform_version == \"single'quote\"",
+      "components": [
+        {
+          "ecosystem": "PyPI",
+          "name": "demo",
+          "version": "1.2.3",
+          "declaredSha256": [],
+          "extras": [
+            "foo-bar",
+            "tls"
+          ],
+          "marker": {
+            "sha256": "0ce0c0515194a398ffaa8f88857e8b1352690afea096bcd2d3059322a74c6886",
+            "variables": [
+              "platform_version"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "input": "Demo[TLS,foo_bar]==1.2.3; platform_system\t not\tin\t\"\"",
+      "components": [
+        {
+          "ecosystem": "PyPI",
+          "name": "demo",
+          "version": "1.2.3",
+          "declaredSha256": [],
+          "extras": [
+            "foo-bar",
+            "tls"
+          ],
+          "marker": {
+            "sha256": "c5aea85b38ab3ae34a693641998e28f4b7363ca48c552de70f1cc7b900d94e42",
+            "variables": [
+              "platform_system"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "input": "Demo[TLS,foo_bar]==1.2.3; ((((((((((((((((os_name == \"posix\"))))))))))))))))",
+      "components": [
+        {
+          "ecosystem": "PyPI",
+          "name": "demo",
+          "version": "1.2.3",
+          "declaredSha256": [],
+          "extras": [
+            "foo-bar",
+            "tls"
+          ],
+          "marker": {
+            "sha256": "d066700e3e6f57fb219c364356ad3d74b87c598254a744a2bdf8cdbbce21b9ea",
+            "variables": [
+              "os_name"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "input": "one==1; python_version < \"4\" --hash=sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "components": [
+        {
+          "ecosystem": "PyPI",
+          "name": "one",
+          "version": "1",
+          "declaredSha256": [
+            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          ],
+          "marker": {
+            "sha256": "54d60fbf4e0ba896644978f54b9a24ad0e8bc595710af7fa4e0e92164859ec72",
+            "variables": [
+              "python_version"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "input": "one==1; python_version < \"4\" \\\n --hash=sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb --hash=sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "components": [
+        {
+          "ecosystem": "PyPI",
+          "name": "one",
+          "version": "1",
+          "declaredSha256": [
+            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          ],
+          "marker": {
+            "sha256": "54d60fbf4e0ba896644978f54b9a24ad0e8bc595710af7fa4e0e92164859ec72",
+            "variables": [
+              "python_version"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "input": "one==1; (python_version < \"4\" and \\\n os_name == \"posix\") # metadata\nsecond==2",
+      "components": [
+        {
+          "ecosystem": "PyPI",
+          "name": "one",
+          "version": "1",
+          "declaredSha256": [],
+          "marker": {
+            "sha256": "5cce00e83cf1905162a4669f3a85e09616266e58c4462d5cd2f7d067e0554641",
+            "variables": [
+              "os_name",
+              "python_version"
+            ]
+          }
+        },
+        {
+          "ecosystem": "PyPI",
+          "name": "second",
+          "version": "2",
+          "declaredSha256": []
+        }
+      ]
+    },
+    {
+      "input": "one==1; os_name == \"posix\" # continued comment \\\nconcealed==2\nlast==3",
+      "components": [
+        {
+          "ecosystem": "PyPI",
+          "name": "one",
+          "version": "1",
+          "declaredSha256": [],
+          "marker": {
+            "sha256": "1f3a15e159bbb7e1b251d78732017a5e2e7c290d752f927583c4f2121758eb18",
+            "variables": [
+              "os_name"
+            ]
+          }
+        },
+        {
+          "ecosystem": "PyPI",
+          "name": "last",
+          "version": "3",
+          "declaredSha256": []
+        }
+      ]
+    },
+    {
+      "input": "one==1;\tpython_version==\"3.12\"\t\r\n",
+      "components": [
+        {
+          "ecosystem": "PyPI",
+          "name": "one",
+          "version": "1",
+          "declaredSha256": [],
+          "marker": {
+            "sha256": "5927b54cad823efd2367ba542418e218a533922a4e70f4ba6baef18e1d08ac6d",
+            "variables": [
+              "python_version"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,65 @@
+{
+  "schema": "switchyard-five-native-backend-shards-source/v1",
+  "baseCommit": "1415d48cee7ffc8f91d7e68a57d167dc380e212d",
+  "sourceFiles": {
+    "scripts/windows-backend-shards.mjs": "a58e2f465a396e783906b98db10bb3f0e839cdb484546a10049793951c057428",
+    "scripts/windows-backend-shards.test.mjs": "2025ce872294426df0bab0c3b5fa367c9d2a18471568a3a4043109f55eae6234",
+    ".github/workflows/b122-windows.yml": "502abed45e518656e6cae33c23356b0c2e94efe9bb7aea2a84cfadf0a026f351"
+  },
+  "motivatingFailure": "linux-39db1fe-scheduling-failed-summary.json",
+  "receipt": {
+    "name": "isolated-test-8b5cfa65-ffa1-4faf-9b6c-e633557d06f7.json",
+    "sha256": "ddf271561067acda31cd492c9b65d0ba9fbdd1de400ec8a6f18b554715cb833a",
+    "success": true,
+    "totals": {
+      "required": 3,
+      "passed": 3,
+      "failed": 0,
+      "tests": 35,
+      "passedTests": 35,
+      "failedTests": 0,
+      "skippedTests": 0,
+      "cancelledTests": 0,
+      "todoTests": 0
+    }
+  },
+  "currentGroups": 207,
+  "historicalMeasuredGroups": 198,
+  "fallbackEstimatedGroups": 9,
+  "unchangedFallbackCostMs": 60000,
+  "shards": [
+    {
+      "id": 1,
+      "groups": 42,
+      "costMs": 799287
+    },
+    {
+      "id": 2,
+      "groups": 41,
+      "costMs": 799288
+    },
+    {
+      "id": 3,
+      "groups": 41,
+      "costMs": 799277
+    },
+    {
+      "id": 4,
+      "groups": 41,
+      "costMs": 799301
+    },
+    {
+      "id": 5,
+      "groups": 42,
+      "costMs": 799236
+    }
+  ],
+  "unchangedMaximumHistoricalLoadMs": 950000,
+  "unchangedJobMinutes": 20,
+  "originalGroupObjectsAndChildDeadlinesPreserved": true,
+  "everyGroupExactlyOnce": true,
+  "typecheckPassed": true,
+  "allChildAndTreeCleanupVerified": true,
+  "exactSharedOwnedRootRemoved": true,
+  "nativeAcceptancePending": true
+}

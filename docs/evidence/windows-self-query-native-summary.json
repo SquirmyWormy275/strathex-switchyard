@@ -1,0 +1,271 @@
+{
+  "schema": "switchyard-self-query-native-summary/v1",
+  "sourceCommit": "a061be089ec42c1ee8301c8327491d3e82528879",
+  "executionCommit": "3242ca281f0ffa9a96b49d06f37096ea3cfd2564",
+  "sourceAndExecutionTree": "c6965399aced5df6b130e71939b4242be0ef367d",
+  "mergeParents": [
+    "d8af73553de1b61402520aad1fe0c9fbad2e8c5a",
+    "a061be089ec42c1ee8301c8327491d3e82528879"
+  ],
+  "runId": 42193969109,
+  "restrictedJobId": 127812870579,
+  "artifact": {
+    "id": 13490089759,
+    "bytes": 3991,
+    "sha256": "d663927336a9e30a937e012ced6a797db8c0303e1bc2ece5765a13b33c7f6e75",
+    "privateReceipt": "windows-self-query-a061-native.json",
+    "zipSavedLocally": false
+  },
+  "selfTokenQueryAcl": [
+    {
+      "schema": "switchyard-child-self-query-acl/v1",
+      "scope": "cold-probe",
+      "status": "verified",
+      "grantedMask": 8,
+      "changeRequested": true,
+      "beforeAclSha256": "f8ae23ed1da311ea05a9d6fbad0f390c26372a2763427cc5ac8d922ea91873ed",
+      "afterAclSha256": "834f277a24d1cb4d5fe7a6b56a7ee3477d4635227241de32aa2ded4643ae055f",
+      "originalAcesPreserved": true,
+      "exactQueryEntryVerified": true,
+      "tokenRestrictionsRechecked": true,
+      "handlesClosedVerified": true,
+      "buffersClearedVerified": true
+    },
+    {
+      "schema": "switchyard-child-self-query-acl/v1",
+      "scope": "node-owner",
+      "status": "verified",
+      "grantedMask": 8,
+      "changeRequested": true,
+      "beforeAclSha256": "f8ae23ed1da311ea05a9d6fbad0f390c26372a2763427cc5ac8d922ea91873ed",
+      "afterAclSha256": "834f277a24d1cb4d5fe7a6b56a7ee3477d4635227241de32aa2ded4643ae055f",
+      "originalAcesPreserved": true,
+      "exactQueryEntryVerified": true,
+      "tokenRestrictionsRechecked": true,
+      "handlesClosedVerified": true,
+      "buffersClearedVerified": true
+    }
+  ],
+  "tokenSecurity": [
+    {
+      "schema": "switchyard-child-token-security/v1",
+      "scope": "cold-probe",
+      "stage": "complete",
+      "error": 0,
+      "ownerClass": "current-user",
+      "daclPresent": true,
+      "nullDacl": false,
+      "daclProtected": false,
+      "entries": [
+        {
+          "kind": "allow",
+          "flags": 0,
+          "mask": 983551,
+          "principal": "administrators"
+        },
+        {
+          "kind": "allow",
+          "flags": 0,
+          "mask": 983551,
+          "principal": "system"
+        },
+        {
+          "kind": "allow",
+          "flags": 0,
+          "mask": 131103,
+          "principal": "logon"
+        },
+        {
+          "kind": "allow",
+          "flags": 0,
+          "mask": 8,
+          "principal": "current-user"
+        }
+      ],
+      "handlesClosedVerified": true,
+      "buffersClearedVerified": true
+    },
+    {
+      "schema": "switchyard-child-token-security/v1",
+      "scope": "node-owner",
+      "stage": "complete",
+      "error": 0,
+      "ownerClass": "current-user",
+      "daclPresent": true,
+      "nullDacl": false,
+      "daclProtected": false,
+      "entries": [
+        {
+          "kind": "allow",
+          "flags": 0,
+          "mask": 983551,
+          "principal": "administrators"
+        },
+        {
+          "kind": "allow",
+          "flags": 0,
+          "mask": 983551,
+          "principal": "system"
+        },
+        {
+          "kind": "allow",
+          "flags": 0,
+          "mask": 131103,
+          "principal": "logon"
+        },
+        {
+          "kind": "allow",
+          "flags": 0,
+          "mask": 8,
+          "principal": "current-user"
+        }
+      ],
+      "handlesClosedVerified": true,
+      "buffersClearedVerified": true
+    }
+  ],
+  "coldRandom": {
+    "schema": "switchyard-cold-restricted-random/v4",
+    "executableSha256": "c5ff54fd010505a1c52fa42d7e5b17eab8c8df6db31f670a347d937379786367",
+    "waitResult": 0,
+    "exitCode": 0,
+    "reportValid": true,
+    "report": {
+      "systemStatus": 0,
+      "providerOpenStatus": 0,
+      "providerStatus": 0,
+      "providerCloseStatus": 0,
+      "handlesClosedVerified": true,
+      "buffersClearedVerified": true,
+      "firstApi": "legacy-cryptoapi",
+      "legacy": {
+        "providerOpened": true,
+        "providerOpenError": 0,
+        "generated": true,
+        "generateError": 0,
+        "providerCloseError": 0,
+        "handlesClosedVerified": true,
+        "buffersClearedVerified": true
+      },
+      "enhancedProvider": {
+        "providerOpened": true,
+        "providerOpenError": 0,
+        "generated": true,
+        "generateError": 0,
+        "providerCloseError": 0,
+        "handlesClosedVerified": true,
+        "buffersClearedVerified": true
+      },
+      "providerLookups": {
+        "user": {
+          "succeeded": true,
+          "error": 0,
+          "providerClass": "strong",
+          "bufferClearedVerified": true
+        },
+        "machine": {
+          "succeeded": true,
+          "error": 0,
+          "providerClass": "strong",
+          "bufferClearedVerified": true
+        }
+      },
+      "selfTokenAccess": {
+        "query": {
+          "opened": true,
+          "error": 0,
+          "closeError": 0,
+          "handlesClosedVerified": true
+        },
+        "queryDuplicate": {
+          "opened": false,
+          "error": 5,
+          "closeError": null,
+          "handlesClosedVerified": true
+        },
+        "queryDuplicateImpersonate": {
+          "opened": false,
+          "error": 5,
+          "closeError": null,
+          "handlesClosedVerified": true
+        }
+      }
+    },
+    "primaryTokenVerified": true,
+    "tokenRecheckedAfterExit": true,
+    "treeExitVerified": true,
+    "processHandlesClosedVerified": true,
+    "creatorQuotaRestoredVerified": true,
+    "standardIo": {
+      "schema": "switchyard-restricted-child-stdio/v1",
+      "standardHandles": 3,
+      "inheritanceRestricted": true,
+      "stdinEof": true,
+      "stdoutBytes": 0,
+      "stderrBytes": 0,
+      "outputBounded": true,
+      "handlesClosedVerified": true,
+      "drainsCompleted": true,
+      "stderr": {
+        "category": "empty",
+        "function": null,
+        "code": null,
+        "sourceFile": null,
+        "sourceLine": null
+      }
+    },
+    "nodeStartupAccepted": false
+  },
+  "node": {
+    "waitResult": 0,
+    "exitCode": 2,
+    "resultAvailable": true,
+    "childReportedSuccess": false,
+    "ownerReportedSuccess": false,
+    "completedChecks": 0,
+    "failedPhase": "private-state-initialize",
+    "failureCategory": "Error",
+    "standardIo": {
+      "schema": "switchyard-restricted-child-stdio/v1",
+      "standardHandles": 3,
+      "inheritanceRestricted": true,
+      "stdinEof": true,
+      "stdoutBytes": 0,
+      "stderrBytes": 0,
+      "outputBounded": true,
+      "handlesClosedVerified": true,
+      "drainsCompleted": true,
+      "stderr": {
+        "category": "empty",
+        "function": null,
+        "code": null,
+        "sourceFile": null,
+        "sourceLine": null
+      }
+    },
+    "randomStartupFailureReproduced": false,
+    "completeOwnerJourneyAccepted": false
+  },
+  "separateChecks": {
+    "restrictedMetadata": 13,
+    "nativeExchange": 31,
+    "ordinaryJsOwner": 8
+  },
+  "separateJobs": {
+    "filesystem": {
+      "id": 127812870378,
+      "conclusion": "success"
+    },
+    "nativeSetup": {
+      "id": 127812870446,
+      "conclusion": "success"
+    }
+  },
+  "originalFailedFixturePreserved": true,
+  "limits": [
+    "The actual owned suspended child token receives only TOKEN_QUERY for the existing user; all three original ACEs and token restrictions verify. Duplicate and impersonation handle requests remain denied.",
+    "The original pinned Node now reaches JavaScript and writes an exact nonce-bound failure result. Its eight-check owner journey still fails before the first check, during private-state-initialize. This is failed software validation, not unavailable hardware.",
+    "The earlier CSPRNG abort is no longer reproduced by this run. No broader rights, source-account/default-DACL changes, privilege/SID change, registry, provider-default or runtime fallback is used.",
+    "Cold probe cleanup and original Node pipe completion are explicit. The parent enforces Job retirement in finally; this failed receipt does not carry the successful complete-owner proof. No guest/UAC/ordinary-user acceptance is inferred."
+  ]
+}

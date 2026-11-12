@@ -1,0 +1,182 @@
+{
+  "schema": "switchyard-native-app-ui-source-evidence/v1",
+  "scope": "Reviewed return to exact native ChatGPT/VS Code main window, Windows executable setup and original-helper retirement; no app launch or task attachment",
+  "runs": [
+    {
+      "receiptId": "4e875d08-9c8f-492c-bebc-fee94a602525",
+      "sha256": "efc0102965288b9b42558a21a63bef8064bc0d70256b6a3d2ff219bd11463f8b",
+      "success": true,
+      "totals": {
+        "required": 6,
+        "passed": 6,
+        "failed": 0,
+        "tests": 80,
+        "passedTests": 80,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "files": [
+        "scripts/run-isolated-tests.test.mjs",
+        "tools/layout-studio/client-ui.test.mjs",
+        "tools/layout-studio/native-focus-ui.test.mjs",
+        "tools/layout-studio/physical-intent.test.mjs",
+        "tools/layout-studio/native-focus-gateway.test.mjs",
+        "tools/layout-studio/windows-native-focus.test.mjs"
+      ],
+      "originalBoundsPreserved": true,
+      "ownedCleanupComplete": true
+    },
+    {
+      "receiptId": "5a2de747-c692-4863-8f81-e74c7a80ec7f",
+      "sha256": "f4b0bf31fdf72e2eba6064d4f9ae2ebcf060fa24d728ede4979e2082e8b25143",
+      "success": true,
+      "totals": {
+        "required": 5,
+        "passed": 5,
+        "failed": 0,
+        "tests": 68,
+        "passedTests": 68,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "files": [
+        "scripts/windows-backend-shards.test.mjs",
+        "deployment/suite/release.test.mjs",
+        "tools/layout-studio/suite.test.mjs",
+        "tools/layout-studio/integrations.test.mjs",
+        "tools/layout-studio/native-focus-ui.test.mjs"
+      ],
+      "originalBoundsPreserved": true,
+      "ownedCleanupComplete": true
+    }
+  ],
+  "originalFailures": [
+    {
+      "receiptId": "a997d1d2-d4da-4ed0-998f-ec562a43aa2b",
+      "sha256": "6f174483fb2198912b7e86b5eb969cff1ceeb35d6958c5c06602c65074d47a1f",
+      "success": false,
+      "totals": {
+        "required": 6,
+        "passed": 5,
+        "failed": 1,
+        "tests": 79,
+        "passedTests": 77,
+        "failedTests": 2,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "files": [
+        "scripts/run-isolated-tests.test.mjs",
+        "tools/layout-studio/client-ui.test.mjs",
+        "tools/layout-studio/native-focus-ui.test.mjs",
+        "tools/layout-studio/physical-intent.test.mjs",
+        "tools/layout-studio/native-focus-gateway.test.mjs",
+        "tools/layout-studio/windows-native-focus.test.mjs"
+      ],
+      "originalBoundsPreserved": true,
+      "ownedCleanupComplete": true
+    },
+    {
+      "receiptId": "eea30561-5b24-4743-8458-d3fdb278f441",
+      "sha256": "17984b80f6d81b0f6d1bc99b57d101d929482e845965a52df662f13c664acf0c",
+      "success": false,
+      "totals": {
+        "required": 6,
+        "passed": 5,
+        "failed": 1,
+        "tests": 79,
+        "passedTests": 78,
+        "failedTests": 1,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "files": [
+        "scripts/run-isolated-tests.test.mjs",
+        "tools/layout-studio/client-ui.test.mjs",
+        "tools/layout-studio/native-focus-ui.test.mjs",
+        "tools/layout-studio/physical-intent.test.mjs",
+        "tools/layout-studio/native-focus-gateway.test.mjs",
+        "tools/layout-studio/windows-native-focus.test.mjs"
+      ],
+      "originalBoundsPreserved": true,
+      "ownedCleanupComplete": true
+    }
+  ],
+  "failureCorrections": [
+    "The original fixture did not create Work; initialization now precedes both workspace-transition cases. Its teardown error is retained.",
+    "An old queued dialog close cleared a reopened review; the handler now clears only a closed dialog. The original transition assertion is retained."
+  ],
+  "interactionCases": 9,
+  "sourceFiles": {
+    "tools/layout-studio/client-ui.mjs": "4d71bbda9a5deeb08aed3ca4a86e788724528c9b11ed6454861304dc1e6c11d1",
+    "tools/layout-studio/native-focus-ui.test.mjs": "9bde144a6e368c2387d367c03e6cef50de9f43a3c39a23d7f62e4d21abbe28a7",
+    "tools/layout-studio/client-integrations.mjs": "f3c1786ca999de2472c99f1b8d2f80942caa5e95478e5b846c18d4d92ad699bf",
+    "tools/layout-studio/index.html": "d7145f79ae4f76123c7912da1fd58892d562026f20654cc46a44fdb9ebcaa927",
+    "tools/layout-studio/suite-ui.mjs": "b18e2a1dfb42052702286c1dfb6893739f7fd0128cabe57c3818dbf7373e940b",
+    "tools/layout-studio/suite.mjs": "75738ddd2059c6e46c7ed42230dace3ebc56073554d6ac120ad7ebe1c4e10e6d",
+    "tools/layout-studio/serve.mjs": "2ef1817c076ddaaf4ed843e31c1b00a3f48d0cf29da6dd195200f86eb33902c8",
+    "deployment/suite/release.mjs": "3c0f52e5571d34cf549f7ecb5fd6483683a87eb3acaf0b8abc6c65c157036f61",
+    "scripts/demo-switchyard-ui.mjs": "2d735135ffcd0c3ec512d615cb1dc06ac2334c9a24ebff8a12168d78507c35fe",
+    "scripts/verify-client-platform.mjs": "4871f8f8476701a506236d2d6d2a064b9ae889520684f0b1e96b3a37ca230c48"
+  },
+  "livePreview": {
+    "checks": [
+      "exact served client-ui.mjs",
+      "exact served suite-ui.mjs",
+      "exact served index.html",
+      "unauthenticated native metadata refused",
+      "two passive native app choices; keyboard-only navigation unavailable",
+      "closed metadata route refuses effect fields",
+      "synthetic preview refuses native-focus/review",
+      "synthetic preview refuses native-focus/configure",
+      "synthetic preview refuses native-focus/focus",
+      "synthetic preview refuses native-focus/recover",
+      "Personal selection and complete saved state unchanged"
+    ],
+    "synthetic": true,
+    "modelRequests": 0,
+    "hardwareOpened": false
+  },
+  "boundaries": [
+    "The UI focus route requires its reviewed workspace to remain selected; two permitted Personal workspaces cannot substitute. Physical dispatch keeps its separate active-workspace contract.",
+    "Encrypted store, authenticated HTTP, exact executable-file identity, review/configuration lifecycle and existing native focus service are real; signatures, process/window and helper transports are explicit doubles. Original service and gateway groups run separately.",
+    "No live desktop, account, provider, task, model, HID or microphone action occurred.",
+    "Windows helper recovery remains available in keyboard-only mode and preserves uncertain original outcomes.",
+    "Browser visual acceptance, normal installation and current full Linux/Windows acceptance remain separate.",
+    "Claude desktop launch and exact interactive coding-task attachment remain unfinished implementation."
+  ],
+  "counting": "Run totals overlap; do not add them as unique assertions.",
+  "immutableFrontend": {
+    "sourceCommit": "a993aa3f9f3e5cebb6f241e41fcc7d054b8c32eb",
+    "digest": "5ee9bf6f9398531d5d4d3bf337391e1e910ca113432099756648c4f7fac9604b",
+    "assets": 35,
+    "gitBytesVerified": true,
+    "priorPointerBackup": "native-app-20261109T042456Z",
+    "installed": true,
+    "visuallyAccepted": false
+  },
+  "installationRegression": {
+    "receiptId": "e87d033d-480e-4203-ab51-a3f0c66436ce",
+    "sha256": "248b9cd6f5d5a4c6ac5d525928e540ffc7c0232dd14867ba5b4b19c03fd8cd8d",
+    "totals": {
+      "required": 18,
+      "passed": 18,
+      "failed": 0,
+      "tests": 29,
+      "passedTests": 29,
+      "failedTests": 0,
+      "skippedTests": 0,
+      "cancelledTests": 0,
+      "todoTests": 0
+    },
+    "originalBoundsPreserved": true,
+    "ownedCleanupComplete": true
+  },
+  "installedEvidence": "installed-native-app-controls-summary.json"
+}

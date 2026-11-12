@@ -1,0 +1,133 @@
+{
+  "schema": "switchyard-windows-editor-ingress-source-summary/v1",
+  "at": "2026-11-07T07:35:14.004Z",
+  "baseCommit": "89db483c5c735b2c0817b5710b68c05fc3fd1852",
+  "sourceFiles": {
+    ".github/workflows/client-platform.yml": "b435b6ebdd8a178531a8c6f692e85286129c8704a4b2100f275f50104b762abf",
+    "apps/desktop-hotkeys/Program.cs": "bb93aace81a0b40651a489f950ce89dfba0beda1d276c63f4315b41d131afcc0",
+    "apps/windows-companion/provider-desktop-helper/Program.cs": "04f0c5fd546aed1099aeca89377db623c79ac08124fb985009417100c2fec6dc",
+    "deployment/suite/application.test.mjs": "bfff39c8699b6d578edd54a80e1e26fd9d346c708b1707ac27e332e934d4b83b",
+    "deployment/suite/release.test.mjs": "bfdce3a7644ef2be90619ee410e4941e3deacff5cf387ed6c8697d8f8f5863ef",
+    "scripts/run-isolated-tests.mjs": "fa83a0c187542eb403092b0df33fc295a0ae71cd7501214c30e0971b5cc2dafd",
+    "scripts/run-isolated-tests.test.mjs": "8b1779d0ca8d87e527731bf3c5b4bc263ab6328366b9327beab68d97c29817c9",
+    "scripts/verify-client-platform.mjs": "bfe691c10ef5d24001735a81626303130b56b9377f3c382a0092a218212753f2",
+    "scripts/windows-backend-shards.test.mjs": "efaaa961fd4fd3f64dd5e7019a841b9da86b385b7ad7b9cd4593468aef04e1c3",
+    "tools/layout-studio/codex-editor-ingress.test.mjs": "7a1de575fd6b72c62e23ef72003176aea26d48d6864e8a0c0170edf2c041eed0",
+    "tools/layout-studio/codex-editor-protocol.test.mjs": "f49ab6aaa94aabbe0a11b8883834d80318302d43079879bf814fb640d8d7a695",
+    "tools/layout-studio/codex-editor-relay.test.mjs": "7a3ac25a8c82df7edaaabc1cfc3a36d788ca2c061fa4c3f6d7f9138c96f5bc61",
+    "tools/layout-studio/coding-editor-connections.test.mjs": "134fd8ecb7ed502d7644d09c70bd2bc4e84a70511f4f2d7ae676b60b68c4eecf",
+    "tools/layout-studio/editor-websocket-frames.mjs": "56ba5da76b9e7b3e0473e17b6408d6dd3baf5e4727e4f2aeeea58e345e1f9637",
+    "tools/layout-studio/editor-websocket-frames.test.mjs": "4a7bdcb0d0e48697c95b935cf53a0d41fa91b427f426373bcb418126236d7d74",
+    "tools/layout-studio/owned-native-command.mjs": "111ae7ad96adf1a461e3aaa8d73c0c7c698de95e9348ea6b0abc596c1d77261a",
+    "tools/layout-studio/runtime-command.test.mjs": "284608a2595cb4b823a44afce2d45a244023a1f62ad36f3f4e85e3dfadea01d1",
+    "tools/layout-studio/windows-editor-ingress.mjs": "7c49607d024205f3c05c725a96a4043e75e8164d696e5382f7856851dfff5571",
+    "tools/layout-studio/windows-editor-ingress.test.mjs": "dcf381d0487754f65077487b84570114d28c918218f03c361754369e7bb83681",
+    "tools/layout-studio/windows-terminal-peer.test.mjs": "e83f37af27b9a47094fdb23ff81fd9d65c0c48ad02c7fafb8fab6fa16b72b9a2",
+    "tools/layout-studio/windows-terminal-process.mjs": "fe0ed2b7e4d635130c6e734440dd23daf838aad3213837734d9d75f96ae6da7f",
+    "tools/layout-studio/windows-terminal-process.test.mjs": "6c79e27b8f9737fdd38a0923ce933ce02a58fed9fdec7f1db78c00762a71bb1b"
+  },
+  "receipts": [
+    {
+      "name": "isolated-test-0b8fb1c9-c4c6-4712-9ff1-e4e56aca7943.json",
+      "sha256": "90c68b699ee971ce244803e38e4e96b84d2c0281b985c4631bfa17486802f592",
+      "totals": {
+        "required": 6,
+        "passed": 6,
+        "failed": 0,
+        "tests": 49,
+        "passedTests": 46,
+        "failedTests": 0,
+        "skippedTests": 3,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "name": "isolated-test-a0f0a7f6-cb68-4a3a-b7b0-84472459c897.json",
+      "sha256": "5ab08c8a72e1233c813ba2ce07801567a785be5467bb85d3494d4b15317495fc",
+      "totals": {
+        "required": 13,
+        "passed": 13,
+        "failed": 0,
+        "tests": 120,
+        "passedTests": 117,
+        "failedTests": 0,
+        "skippedTests": 3,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "name": "isolated-test-987de5e6-c9e4-4528-ac71-77e24b46cc1e.json",
+      "sha256": "5649e0a2c2009e37739eb44d4a8444cc8170d0ba704bfd2aa0c94c4a956b31d6",
+      "totals": {
+        "required": 1,
+        "passed": 1,
+        "failed": 0,
+        "tests": 7,
+        "passedTests": 6,
+        "failedTests": 0,
+        "skippedTests": 1,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    }
+  ],
+  "groups": 13,
+  "passedTests": 118,
+  "skippedTests": 3,
+  "originalCommandsBoundsSkipsAndCleanupVerified": true,
+  "typecheck": {
+    "command": "npm run typecheck",
+    "node": "24.14.0",
+    "passed": true
+  },
+  "scope": {
+    "actualLoopbackJsonRoundTrip": true,
+    "nativePeerExplicitlyDoubledOnLinux": true,
+    "oneAcceptedSocketOnly": true,
+    "ephemeralLoopbackOnly": true,
+    "bearerCapabilityAndExactPeerBothRequired": true,
+    "capabilityAbsentFromOwnershipMetadata": true,
+    "peerRecheckedBeforeBothMessageDirections": true,
+    "wrongAuthOriginHostExtensionsRefused": true,
+    "malformedFramesRefusedBeforeForwarding": true,
+    "closeJoinsPendingConsumers": true,
+    "unknownHelperExitCannotAcceptRetirement": true,
+    "taskAccountProtocolOrIdeAuthorityGranted": false
+  },
+  "bounds": {
+    "startupMs": 8000,
+    "headersBytes": 16384,
+    "messageBytes": 1048576,
+    "incomingBufferBytes": 1114112,
+    "queuedOutgoingBytes": 2097152,
+    "pendingOperations": 64,
+    "jsonDepth": 32,
+    "fragmentCount": 1024,
+    "nativeCiGroupMs": 120000
+  },
+  "nativePeerEvidence": "windows-terminal-peer-native-summary.json",
+  "effects": {
+    "modelPrompts": 0,
+    "liveProviderTasks": 0,
+    "accountChanges": 0,
+    "hardwareOpened": false,
+    "frontendChanged": false,
+    "installedApplicationChanged": false,
+    "newDependencies": false,
+    "newNativeCompilation": false
+  },
+  "limitations": [
+    "Actual Windows carrier test is registered in client CI but is skipped on Linux.",
+    "This carrier provides authenticated transport, not the Codex protocol acknowledgement or task/account binding.",
+    "Windows persistent task ownership, durable editor lifecycle, Suite routes and VS Code launcher integration remain unfinished.",
+    "The frozen frontend and editor activation remain unchanged."
+  ],
+  "cleanup": {
+    "originalChildAndTreeRetirementVerified": true,
+    "noCompilerOrBundleStagingCreated": true,
+    "ownedSocketsAndListenersClosed": true
+  },
+  "success": true
+}

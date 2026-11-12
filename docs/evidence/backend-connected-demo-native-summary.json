@@ -1,0 +1,40 @@
+{
+  "schema": "switchyard-connected-demo-native-summary/v1",
+  "sourceCommit": "864fe0d381493582023fcb95a7e63448ebf0e2b6",
+  "sourceTree": "b3a1f3cf5c27f683d211515ca0919a74efdac71f",
+  "mergeCommit": "a009e8617d93d736457d4b1daa8517267aa38fb9",
+  "mergeTree": "b3a1f3cf5c27f683d211515ca0919a74efdac71f",
+  "runId": 42391637320,
+  "jobId": 128460708595,
+  "artifactId": 13581822219,
+  "zipSha256": "47137f1431a778b87f561053d1ef18525d1fa78b87e674ebd8fa28ae57c292c8",
+  "envelopeSha256": "da143a79ff94c53e8e1b4ab8d96613523fc3468bb27c91e73f1d34d39a5f0705",
+  "receipt": {
+    "id": "4ddd1289-f265-47d2-9ed3-d8d1f9ce1eb8",
+    "sha256": "ef0af1e66c0e19e2ae07cb643e3896d9d8709d053b184b1377a3a0c92160a39a"
+  },
+  "files": [
+    {
+      "path": "scripts/demo-switchyard-backend.mjs",
+      "sha256": "04e53ae0decca5a4bab0f1e03ec9c24116630068cc8954e57ed5adb128fe977f"
+    },
+    {
+      "path": "scripts/demo-switchyard-backend.test.mjs",
+      "sha256": "6cdbfd242d309809ea33883d2dc2eda8db70345cf761b2f25319734fd4480f59"
+    }
+  ],
+  "acceptedGroup": {
+    "file": "scripts/demo-switchyard-backend.test.mjs",
+    "passedTests": 2,
+    "skippedTests": 0,
+    "durationMs": 7002,
+    "timeoutMs": 45000
+  },
+  "originalCommandBoundAndCleanupVerified": true,
+  "sevenConnectedStagesVerifiedByPublicCli": true,
+  "fullCohortAcceptance": false,
+  "limitations": [
+    "This accepts only the named demonstration test group from the passing shard; the complete Windows workflow has separate cancellation and compiled-dependency results.",
+    "The agent and second host are explicit fixtures. No live account/provider task, interactive IDE, physical keyboard or installed application is accepted."
+  ]
+}

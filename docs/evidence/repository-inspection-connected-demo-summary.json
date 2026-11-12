@@ -1,0 +1,66 @@
+{
+  "schema": "switchyard-repository-inspection-connected-demo/v1",
+  "sourceCommit": "531587b75ba7aac212072f6b2601fb3a3c5de105",
+  "receiptId": "4af7f141-97ef-4fad-849a-1846f1f09f88",
+  "receiptSha256": "9da61bf95f0479cd609de0994c60669666306bf74d32bd7f0e8d52f872957c82",
+  "success": true,
+  "sourceFiles": {
+    "scripts/demo-switchyard-backend.test.mjs": "6cdbfd242d309809ea33883d2dc2eda8db70345cf761b2f25319734fd4480f59",
+    "scripts/demo-switchyard-backend.mjs": "04e53ae0decca5a4bab0f1e03ec9c24116630068cc8954e57ed5adb128fe977f",
+    "scripts/demo-switchyard-execution.mjs": "75cfff4fc5a8b85bc8fef4ffe03482c76c73cdf7c472df1e12f17cf9b7103660",
+    "tools/layout-studio/test-support/task-authority-fixture.mjs": "6e951c3aa0da586268f4f3086dff752e15d1b7b9961f560f02cad0f2c0e35d23",
+    "tools/layout-studio/test-support/execution-fixture.mjs": "857485b257c566c05e3040b00508035ad8f9bd115c7c961bd969448cdd96c42f",
+    "packages/control-plane/src/git-inspector.ts": "9a9203945322a469977fa05643160f33b75b93567435a3e834186f223efece1b"
+  },
+  "commands": [
+    {
+      "command": [
+        "/home/kingoftheeast/.local/share/mise/installs/node/24.14.0/bin/node",
+        "--experimental-transform-types",
+        "--test",
+        "--test-reporter=tap",
+        "scripts/demo-switchyard-backend.test.mjs"
+      ],
+      "effectiveTimeoutMs": 45000,
+      "durationMs": 1301,
+      "outputSha256": "0a167a1b97db1cf87b01232fc03c165379248feca36646acc5c30ad44f402055",
+      "ownedCleanupComplete": true
+    },
+    {
+      "command": [
+        "/home/kingoftheeast/.local/share/mise/installs/node/24.14.0/bin/node",
+        "--experimental-transform-types",
+        "scripts/demo-switchyard-execution.mjs",
+        "--synthetic"
+      ],
+      "effectiveTimeoutMs": 45000,
+      "durationMs": 3436,
+      "outputSha256": "bdd7b088ea912e24329d2ea4c78df61b70c40c8f4dec325f33b20d6764475d22",
+      "ownedCleanupComplete": true
+    }
+  ],
+  "backendJourney": {
+    "stages": 7,
+    "originalTestGroup": "scripts/demo-switchyard-backend.test.mjs",
+    "tests": 2,
+    "syntheticAgent": true
+  },
+  "executionJourney": {
+    "checks": 6,
+    "actualLinuxProgram": true,
+    "syntheticProvider": true,
+    "authenticatedApi": true,
+    "networkDenied": true,
+    "originalAdmissionRetained": true,
+    "independentProcessExitVerified": true,
+    "duplicateExecutionRefused": true,
+    "originalFilesIndexAndHeadUnchanged": true,
+    "ownedStagingRemoved": true
+  },
+  "limitations": [
+    "The standalone execution CLI is an additional explicitly bounded demonstration, not a new required manifest group or a replacement for the original Windows UI groups.",
+    "No existing account/model/HID/IDE/microphone or installed-user workspace effects. Actual provider task completion is not inferred.",
+    "The existing browser preview at 35019 retains its earlier source/backend and the same frontend; this receipt does not relabel that process as the new source.",
+    "Browser visual and full Windows timeout acceptance remain separate."
+  ]
+}

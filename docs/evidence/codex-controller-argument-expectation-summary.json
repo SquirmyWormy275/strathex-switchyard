@@ -1,0 +1,63 @@
+{
+  "schema": "switchyard-source-evidence/v1",
+  "sourceBefore": "42655aa0667dfbf06c88c560a1098ae65543ecf2",
+  "scope": "Exact controller launch argument expectation only; production behavior unchanged",
+  "originalCI": {
+    "runId": 42599935484,
+    "jobId": 129104495761,
+    "url": "https://github.com/SquirmyWormy275/strathex-switchyard/actions/runs/42599935484",
+    "result": "failure",
+    "cause": "Controller expectation retained remote-resume CLI permission flags rejected by native Codex 0.167"
+  },
+  "correction": "Keep exact shell argument equality; omit unsupported CLI permission overrides. Relay permission narrowing remains tested separately.",
+  "runs": [
+    {
+      "label": "original-failure",
+      "runId": "83640333-1d25-44f0-8b57-daaac91534d5",
+      "receiptSha256": "5b6300b8f15058f16c2e67bae6e89bb8785c50c4737331d358db44b9a4e94020",
+      "success": false,
+      "counts": {
+        "total": 126,
+        "passed": 125,
+        "failed": 1,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "durationMs": 690,
+      "timeoutMs": 45000,
+      "outputDigest": "0197269d91fdbc762cd0d4ee36d8ead6d0fae88f939d939c4e149d34744e7bd1",
+      "cleanupCompleted": true
+    },
+    {
+      "label": "corrected-expectation",
+      "runId": "b7242266-4025-4434-b39d-f379d840a30c",
+      "receiptSha256": "63b3ca93dd9b0c2c463480221987a617c050562b71aea508fbc97832b5dfa333",
+      "success": true,
+      "counts": {
+        "total": 126,
+        "passed": 126,
+        "failed": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "durationMs": 689,
+      "timeoutMs": 45000,
+      "outputDigest": "3098b8f9ff45585ae7285af1e05280ac20f874744af340d9088ebdea3c623871",
+      "cleanupCompleted": true
+    }
+  ],
+  "unchanged": [
+    "Original controller group and all 126 cases",
+    "45-second group deadline",
+    "Deep equality and all other assertions",
+    "No added skips",
+    "Production CLI arguments and relay read-only/on-request enforcement"
+  ],
+  "notAccepted": [
+    "Current complete Linux suite",
+    "Current complete Windows suite",
+    "Live account/native task or graphical editor acceptance"
+  ]
+}

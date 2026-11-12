@@ -28,6 +28,7 @@ test("Linux isolation proves a deny-network Bubblewrap namespace bound to the ex
   assert.equal(calls.length, 1);
   assert.ok(calls[0]!.args.includes("--unshare-net"));
   assert.ok(calls[0]!.args.includes("--die-with-parent"));
+  assert.ok(calls[0]!.args.includes("/lib64"));
   assert.ok(calls[0]!.args.includes(await realpath(root)));
 });
 

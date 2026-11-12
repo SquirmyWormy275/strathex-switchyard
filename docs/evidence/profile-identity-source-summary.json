@@ -1,0 +1,99 @@
+{
+  "schema": "switchyard-profile-identity-validation/v1",
+  "at": "2026-11-07T00:43:14.291034+00:00",
+  "baseSource": "a97a835a537473d21993c5b10a9516d74f5e77b7",
+  "sourceFiles": {
+    "tools/layout-studio/workspace.mjs": "378e913d36fff330d3f2f63ffa1aa1f2228c124527d5c2a68f24c77d90b797ac",
+    "tools/layout-studio/configuration.test.mjs": "38dac0e4361dd60b33719aed2400d65608676398f0b68a99c8d93aa73697d318",
+    "tools/layout-studio/suite.test.mjs": "18d65cf5a39999ae18be36a9eb2662f29823e9710aef941e2f31f6ab76972521",
+    "scripts/verify-workflow-host.mjs": "3c04705d81d86fff796765bdd68425ebd17d3840312f0202c65f8e1a7a619522",
+    "scripts/verify-copilot-journal-host.test.mjs": "d3542f3f6dbec0538a32de9dd32c98b772e548f0f4e093768eaea034347f03b8"
+  },
+  "receipts": [
+    {
+      "name": "isolated-test-f96beea2-1fad-494d-a627-f6b50f9ecbfe.json",
+      "sha256": "69e183ddb8bf0b58859c9cc1de69ea3e7e5b0909cf52409b19d9bfe630a59427",
+      "success": false,
+      "totals": {
+        "required": 2,
+        "passed": 0,
+        "failed": 2,
+        "tests": 2,
+        "passedTests": 0,
+        "failedTests": 2,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "name": "isolated-test-6ed0301b-1d42-447b-a72d-00b89a0b155e.json",
+      "sha256": "2532f0961a8c3d204a7e0af56dcea1a11f68e80ee714c9b906d543ac148852f4",
+      "success": true,
+      "totals": {
+        "required": 2,
+        "passed": 2,
+        "failed": 0,
+        "tests": 2,
+        "passedTests": 2,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "name": "isolated-test-97d1d59a-6b7a-46bb-8ba0-729623d8560d.json",
+      "sha256": "9eac7d8e71dc4d9bedfd36d856a91534891a179f64580b825ef0b69abfc679c2",
+      "success": true,
+      "totals": {
+        "required": 5,
+        "passed": 5,
+        "failed": 0,
+        "tests": 81,
+        "passedTests": 81,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "name": "isolated-test-381e0517-252f-4a8e-bd5a-0bb31f07ea1c.json",
+      "sha256": "0d2f3480c9782aba8ae7a1ec56b3f8fe36918e57700a45f4e3b48b3390f51110",
+      "success": true,
+      "totals": {
+        "required": 1,
+        "passed": 1,
+        "failed": 0,
+        "tests": 6,
+        "passedTests": 6,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    }
+  ],
+  "reproducedRegressions": 2,
+  "acceptedDistinctGroups": 6,
+  "acceptedDistinctTests": 87,
+  "encryptedLibraryAndCurrentArrangementPreservedOnRefusal": true,
+  "intentionalHelperDefaultsAndLegacyPlanImportPreserved": true,
+  "compatibility": {
+    "receipt": "profile-identity-compatibility-1794011932239.json",
+    "sha256": "00dd4dcd7332d2068e5c99aae9bbbb711f28fd1d3d14b76fad7501cb4737d5bb",
+    "workspaces": 54,
+    "profiles": 4,
+    "unchangedSealedFiles": 54,
+    "metadataOnly": true
+  },
+  "typecheck": true,
+  "originalPackageBudgetPassed": true,
+  "allChildAndTreeCleanupVerified": true,
+  "exactOwnedRootRemoved": true,
+  "liveTaskOrAccountAction": false,
+  "frontendChanged": false,
+  "installedCorrectionAcceptance": false,
+  "nativeWindowsCorrectionAcceptance": false
+}

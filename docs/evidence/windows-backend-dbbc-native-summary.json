@@ -1,0 +1,139 @@
+{
+  "schema": "switchyard-windows-backend-shards-native/v1",
+  "shards": [
+    {
+      "sourceCommit": "dbbcce84ad397e90a10b7ea3e1f5a9884f6b2ffe",
+      "executionCommit": "b07c0340e6134f0bd0722de86571aeac53b092b7",
+      "sourceAndExecutionTree": "3aedd953c2d473b1eb0b605fffcc95ffbcd33bf6",
+      "runId": 42253093548,
+      "artifactId": 13521794595,
+      "shard": 1,
+      "archiveBytes": 5991,
+      "archiveSha256": "f2d8eeb31c6fd19547a057cb75e092b3fecacbb1f05796efabb0072120e5564f",
+      "zipSavedLocally": false,
+      "privateReceipt": "windows-backend-dbbc-shard1.json",
+      "totals": {
+        "required": 43,
+        "passed": 43,
+        "failed": 0,
+        "tests": 275,
+        "passedTests": 242,
+        "failedTests": 0,
+        "skippedTests": 33,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "success": true,
+      "allChildAndTreeCleanupVerified": true,
+      "failedGroups": []
+    },
+    {
+      "sourceCommit": "dbbcce84ad397e90a10b7ea3e1f5a9884f6b2ffe",
+      "executionCommit": "b07c0340e6134f0bd0722de86571aeac53b092b7",
+      "sourceAndExecutionTree": "3aedd953c2d473b1eb0b605fffcc95ffbcd33bf6",
+      "runId": 42253093548,
+      "artifactId": 13523645793,
+      "shard": 2,
+      "archiveBytes": 5852,
+      "archiveSha256": "e19316770c9a0409b7f5a9308274740bc15e27c64fe9737f6ab6f5929f88fe4b",
+      "zipSavedLocally": false,
+      "privateReceipt": "windows-backend-dbbc-shard2.json",
+      "totals": {
+        "required": 43,
+        "passed": 43,
+        "failed": 0,
+        "tests": 334,
+        "passedTests": 271,
+        "failedTests": 0,
+        "skippedTests": 63,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "success": true,
+      "allChildAndTreeCleanupVerified": true,
+      "failedGroups": []
+    },
+    {
+      "sourceCommit": "dbbcce84ad397e90a10b7ea3e1f5a9884f6b2ffe",
+      "executionCommit": "b07c0340e6134f0bd0722de86571aeac53b092b7",
+      "sourceAndExecutionTree": "3aedd953c2d473b1eb0b605fffcc95ffbcd33bf6",
+      "runId": 42253093548,
+      "artifactId": 13522548222,
+      "shard": 3,
+      "archiveBytes": 6112,
+      "archiveSha256": "04b0466d9a1c74717efada6a0477ee0951ab3c23d1d202f68d42d5a2d7d4d42d",
+      "zipSavedLocally": false,
+      "privateReceipt": "windows-backend-dbbc-shard3.json",
+      "totals": {
+        "required": 43,
+        "passed": 43,
+        "failed": 0,
+        "tests": 256,
+        "passedTests": 234,
+        "failedTests": 0,
+        "skippedTests": 22,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "success": true,
+      "allChildAndTreeCleanupVerified": true,
+      "failedGroups": []
+    },
+    {
+      "sourceCommit": "dbbcce84ad397e90a10b7ea3e1f5a9884f6b2ffe",
+      "executionCommit": "b07c0340e6134f0bd0722de86571aeac53b092b7",
+      "sourceAndExecutionTree": "3aedd953c2d473b1eb0b605fffcc95ffbcd33bf6",
+      "runId": 42253093548,
+      "artifactId": 13523196501,
+      "shard": 4,
+      "archiveBytes": 6997,
+      "archiveSha256": "91ce91c0ac22fe2506b414b8885f21dac1ec83d0149d05bdd9b7a0fd10076762",
+      "zipSavedLocally": false,
+      "privateReceipt": "windows-backend-dbbc-shard4.json",
+      "totals": {
+        "required": 42,
+        "passed": 41,
+        "failed": 1,
+        "tests": 241,
+        "passedTests": 224,
+        "failedTests": 0,
+        "skippedTests": 17,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "success": false,
+      "allChildAndTreeCleanupVerified": true,
+      "failedGroups": [
+        {
+          "file": "tools/layout-studio/coding-task-owners.test.mjs",
+          "timeout": true,
+          "effectiveTimeoutMs": 45000,
+          "completeTestPlan": false,
+          "acceptedCases": 0,
+          "reportedPartialPasses": 22
+        }
+      ]
+    }
+  ],
+  "allGroupsAccepted": false,
+  "groupTotals": {
+    "required": 171,
+    "passed": 170,
+    "failed": 1
+  },
+  "acceptedCompletedPlanTotals": {
+    "passedTests": 971,
+    "skippedTests": 135,
+    "failedTests": 0
+  },
+  "failedGroupCasesExcludedFromTotals": true,
+  "stateLock": {
+    "file": "tools/layout-studio/state-lock.test.mjs",
+    "success": true,
+    "passedTests": 10,
+    "declaredSkippedTests": 1,
+    "nativeReplacementHardLinkMalformedReleasePassed": true
+  },
+  "completeReleaseAccepted": false,
+  "installedChanged": false
+}

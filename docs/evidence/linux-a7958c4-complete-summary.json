@@ -1,0 +1,58 @@
+{
+  "schema": "switchyard-full-linux-summary/v1",
+  "sourceCommit": "a7958c4b7cd22efdaa532d91ad4a3dc28150093b",
+  "sourceTree": "c5667192c79fbfa824c61639ed7012d13e390adc",
+  "runId": "853cc5ea-8dfa-43bd-89d8-84a8a8215e62",
+  "receiptSha256": "6b92b050b9dddbd0c80cf6646fb53b6f0aab1f4b1709ca6c41c25592cddd3931",
+  "startedAt": "2026-11-09T12:05:22.327Z",
+  "endedAt": "2026-11-09T12:29:01.535Z",
+  "totals": {
+    "required": 376,
+    "passed": 376,
+    "failed": 0,
+    "tests": 2610,
+    "passedTests": 2578,
+    "failedTests": 0,
+    "skippedTests": 32,
+    "cancelledTests": 0,
+    "todoTests": 0
+  },
+  "success": true,
+  "originalManifestVerified": true,
+  "originalCommandsAndBoundsVerified": true,
+  "originalSkipInventoryVerified": true,
+  "serialOrderVerified": true,
+  "allChildTreeCleanupVerified": true,
+  "unitExit": {
+    "SubState": "exited",
+    "MainPID": "0",
+    "Result": "success",
+    "ExecMainStatus": "0",
+    "ControlGroup": ""
+  },
+  "temporaryParentEmpty": true,
+  "sourceTrackedFilesUnchanged": true,
+  "auditSha256": "a777c4a0e8812043be46c77c427d8a208cc00abbc5139e89e976ba572d3e9ece",
+  "cleanupSha256": "2fdf261b4a8da4e1338756ef2fbb42cfcfb01dc6b7702c4d4b88e469af2a4bc0",
+  "cleanup": {
+    "schema": "switchyard-owned-full-linux-cleanup/v1",
+    "sourceCommit": "a7958c4b7cd22efdaa532d91ad4a3dc28150093b",
+    "receiptSha256": "6b92b050b9dddbd0c80cf6646fb53b6f0aab1f4b1709ca6c41c25592cddd3931",
+    "generatedFiles": 806,
+    "generatedBytes": 12507506,
+    "aliasesRemoved": 9,
+    "checkoutRemoved": true,
+    "ownerRemoved": true,
+    "temporaryParentRemoved": true,
+    "runnerRemoved": true,
+    "originalWorktreesPreserved": true,
+    "unitStopped": true
+  },
+  "noNewDependencies": true,
+  "auditNote": "The first local audit expected test counts for build-only groups and stopped before writing evidence. Build-only groups are now separately checked against original commands and exits; all test groups retain original count checks.",
+  "limitations": [
+    "This complete source predates the later readable scanner and review-context frontend changes.",
+    "Linux platform skips do not establish native Windows acceptance.",
+    "Synthetic provider/device tests do not establish live accounts, browser/editor UI, microphone or physical keyboard acceptance."
+  ]
+}

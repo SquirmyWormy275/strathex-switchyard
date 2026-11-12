@@ -1,0 +1,29 @@
+{
+  "schema": "switchyard-reviewed-owned-task-load/v1",
+  "basis": "a9cefaf2e8d763839ef54f9b684b9f9138e6bf12",
+  "sourceSha256": {
+    "tools/layout-studio/coding-task-owners.mjs": "12cb3a24903b438ff2866d232fc19ebc7a8ab716b5d08639b7188f42340d1b50",
+    "tools/layout-studio/codex-stdio-tasks.mjs": "557ad018e6b67a18dd8a00aff10114c537c2d92d16720413642161e0601cdd90",
+    "packages/control-plane/src/confirmations.ts": "52a948529ac49373d32a0106c4297b545be91ab4aba1f3ca806d408074408c9f"
+  },
+  "receipt": "isolated-test-bd575eb6-ff50-4871-873e-777819076829.json",
+  "groups": 5,
+  "passedTests": 62,
+  "registryCases": 15,
+  "allChildAndTreeCleanupVerified": true,
+  "typecheck": true,
+  "checks": [
+    "Exact one-use review binds original task/account/repository/owner and current policy.",
+    "Protected load reservation blocks competing requests and replay across service restart.",
+    "Idle metadata precedes resume; changed bindings refuse before and after asynchronous setup.",
+    "An exact late native acknowledgement remains retained without a successful load claim.",
+    "Shutdown joins in-flight loading and prevents late effects.",
+    "Actual Unix listener/bridge composes with a controlled provider double; exactly one synthetic resume and no thread creation, injection or model turn."
+  ],
+  "limits": [
+    "Explicit backend service; production Studio routing and authenticated IDE handoff remain unfinished.",
+    "No actual provider task was resumed; live loading is not accepted.",
+    "Acknowledgement does not verify task completion or grant repository effects.",
+    "Installed application remains on the earlier verified c5d2d28 source."
+  ]
+}

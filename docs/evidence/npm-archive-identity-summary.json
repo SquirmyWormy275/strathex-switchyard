@@ -1,0 +1,98 @@
+{
+  "schema": "switchyard-npm-archive-identity-source/v1",
+  "baselineCommit": "6b4089cab2a741e64e964829aab3a6f19df1438e",
+  "sourceFiles": {
+    "tools/layout-studio/shield-scanner-engine.mjs": "406e7cc31b3102364ac3d774216ffd5842d0b5ee7f65db1e47ae772f4ed66102",
+    "tools/layout-studio/repository-shield.mjs": "93f497d86ffaf0ca7cd8155b1d5247b5f92a0d0820611ad1980e6467dc065c5b",
+    "tools/layout-studio/repository-shield-artifacts.test.mjs": "30b4ab2db73c99cca3130485c445ab2cd9bd68c9b4ced6972e5a2ccd1e1a4fc4",
+    "tools/layout-studio/test-support/npm-archive-fixture.mjs": "dbc8aa1f1cec3d022e5489778c929c86a017af6c4575844c3da93372ee7c76f5",
+    "tools/layout-studio/test-support/shield-scanner-fixture.mjs": "a68026f42bbb443f08ca4487f0b77eceb1baea2ccfc9c319b85db20683ee190b",
+    "tools/layout-studio/test-support/repository-shield-fixture.mjs": "c26b879b18551063a5971a0e66b873084fb2dd79a822c65596a17c76e022a4c1",
+    "tools/layout-studio/test-support/windows-execution-fixture.mjs": "f03426341e09e9f1f6afe29631c0702e01482a9832da57b593a9d993ab99560b"
+  },
+  "verification": [
+    {
+      "receipt": "isolated-test-775cab34-6693-4c06-bc5f-13563c5c530b.json",
+      "sha256": "bd39bec6f4351fb103f850b02c76d8b5dc784bba5a5c4c604ab39be27110f1e2",
+      "totals": {
+        "required": 6,
+        "passed": 6,
+        "failed": 0,
+        "tests": 78,
+        "passedTests": 78,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "allChildAndTreeCleanupVerified": true
+    },
+    {
+      "receipt": "isolated-test-2270732f-b2f5-4257-9b96-52c150a88d9c.json",
+      "sha256": "1c45169a2133abdd30b53864fa517cb4cfc243ca3c16cf0a9f2503234b9b7d83",
+      "totals": {
+        "required": 1,
+        "passed": 1,
+        "failed": 0,
+        "tests": 1,
+        "passedTests": 1,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "allChildAndTreeCleanupVerified": true
+    }
+  ],
+  "acceptedPassingTests": 79,
+  "initialFailedReceipt": "isolated-test-ee77eba8-50e9-40c0-8153-37dd99e99bb7.json",
+  "initialFailureCauses": [
+    "npm validator initially inserted into Python branch",
+    "source edited during initial scanner execution; exact pinned-byte guard refused drift"
+  ],
+  "zeroPlanReceipt": "isolated-test-b26a66c3-8245-41f4-8699-9c82fdc8884c.json",
+  "zeroPlanAccepted": false,
+  "npmLinuxScans": 12,
+  "npmWindowsGuestDoubleScans": 12,
+  "originalFilesIndexHeadPreserved": true,
+  "originalReceiptReplayVerified": true,
+  "actualNpmPack": {
+    "initialObservation": {
+      "status": "unsupported",
+      "reason": "headers",
+      "cause": "npm portable writer omits unused uid/gid"
+    },
+    "schema": "switchyard-actual-npm-archive/v1",
+    "at": "2026-11-06T19:01:44.525Z",
+    "baseline": "6b4089cab2a741e64e964829aab3a6f19df1438e",
+    "workingTreeChange": true,
+    "archiveSha256": "61864bdfbcce06a18f4b87542e6f6dd83031e8e03a13a82f079d7e5f2ac336a5",
+    "archiveBytes": 368,
+    "observation": {
+      "status": "inspected",
+      "name": "@switchyard-fixture/archive-identity",
+      "version": "1.2.3-beta.1+build",
+      "manifestSha256": "c2f3e8bb194405c4a2ab1028795b7c3aea9b110256fb9863d234c3ed886c48da",
+      "entries": 3,
+      "expandedBytes": 4096
+    },
+    "lifecycleScriptsExecuted": false,
+    "network": "offline",
+    "dependenciesInstalled": false,
+    "childExit": 0,
+    "ownedFilesRemoved": 10,
+    "ownedBytesRemoved": 2930,
+    "ownedRootRemoved": true
+  },
+  "typecheck": true,
+  "applicationAndReleasePackaging": true,
+  "originalPackageBudgetPreserved": true,
+  "installedChanged": false,
+  "nativeWindowsAccepted": false,
+  "actualGuestAccepted": false,
+  "publisherVerified": false,
+  "archiveExtracted": false,
+  "packageScriptsExecuted": false,
+  "frontendChanged": false,
+  "hidOpened": false
+}

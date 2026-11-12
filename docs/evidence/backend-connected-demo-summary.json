@@ -1,0 +1,76 @@
+{
+  "schema": "switchyard-connected-demo-source-summary/v1",
+  "baseCommit": "754660e0c97bd115eb229b536240671a9dbfd863",
+  "files": [
+    {
+      "path": "scripts/demo-switchyard-backend.mjs",
+      "sha256": "04e53ae0decca5a4bab0f1e03ec9c24116630068cc8954e57ed5adb128fe977f"
+    },
+    {
+      "path": "scripts/demo-switchyard-backend.test.mjs",
+      "sha256": "6cdbfd242d309809ea33883d2dc2eda8db70345cf761b2f25319734fd4480f59"
+    },
+    {
+      "path": "scripts/run-isolated-tests.mjs",
+      "sha256": "4bb23c848ac28776a083c05438bf024290a55bb9d6ed0f1640dd55c4d5ec0b5a"
+    }
+  ],
+  "receipt": {
+    "id": "012b0464-1c83-4a1e-826f-6eefb65ca908",
+    "sha256": "701d9c970c21dd0aecd4ba76550b3101a440a3f30cdbc41c8f1c4d4be5c780d2",
+    "totals": {
+      "required": 4,
+      "passed": 4,
+      "failed": 0,
+      "tests": 21,
+      "passedTests": 21,
+      "failedTests": 0,
+      "skippedTests": 0,
+      "cancelledTests": 0,
+      "todoTests": 0
+    },
+    "startedAt": "2026-11-07T16:29:16.716Z",
+    "endedAt": "2026-11-07T16:29:21.252Z"
+  },
+  "earlierReceipt": {
+    "id": "1276168e-5612-47e6-90e1-95fd8b3d5554",
+    "sha256": "a4a428905e68f7849ef5852b613ba6aeb631663f568353da5f6bd1f740f3134f",
+    "totals": {
+      "required": 4,
+      "passed": 4,
+      "failed": 0,
+      "tests": 21,
+      "passedTests": 21,
+      "failedTests": 0,
+      "skippedTests": 0,
+      "cancelledTests": 0,
+      "todoTests": 0
+    },
+    "startedAt": "2026-11-07T16:27:50.689Z",
+    "endedAt": "2026-11-07T16:27:55.219Z"
+  },
+  "originalManifestCommandsBoundsSkipsAndCleanupVerified": true,
+  "demonstration": {
+    "command": "node scripts/demo-switchyard-backend.mjs --synthetic",
+    "success": true,
+    "passedStages": 7,
+    "stages": [
+      "F77 Dvorak reference in keyboard-only mode",
+      "Readable connection choice and stale binding refusal",
+      "Authenticated stable intent with signed SDK claim/acknowledgement and consented observations",
+      "Pause/resume, stop and saved workflow refinement",
+      "Private portable export, persisted observation deletion and reopened encrypted state",
+      "Reviewed second-store import with no transferred local connections",
+      "Work policy refusal of personal agents, recording and export"
+    ],
+    "secondHostSimulated": true,
+    "agentIsSynthetic": true,
+    "temporaryServersAndEncryptedStateRemoved": true
+  },
+  "nativeWindowsAcceptance": false,
+  "limitations": [
+    "Source demonstration uses the normal encrypted Suite and authenticated HTTP, with a deliberate local synthetic agent.",
+    "No physical keyboard, native model/task/account, interactive IDE, installed application or live microphone is accepted by this walkthrough.",
+    "The full-suite implementation and latest complete Windows package acceptance remain separate."
+  ]
+}

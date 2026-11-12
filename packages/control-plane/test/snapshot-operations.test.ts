@@ -146,6 +146,18 @@ test("resource leases serialize conflicting work and expire rather than silently
   });
 });
 
+test("partial failed findings retain incomplete receipts and cannot establish a completed gate", async () => {
+  await withStore(async store => {
+    const operations = new OperationSagaStore(store), receipts = new ReceiptLedger(store), coordinator = new DurableOperationCoordinator(operations, receipts);
+    const lease = await coordinator.claim({ action: "shield_change_scan", targetSnapshotId: "snapshot-partial", sessionId: "session-partial", authorityId: "grant-partial" });
+    const result = { action: "shield_change_scan", targetSnapshotId: "snapshot-partial", summary: "Baseline finding with incomplete repository scope", policyVersion: "policy-v1", evidenceDigest: "a".repeat(64), toolVersions: { scanner: "baseline-v1" }, evidenceCompleteness: "incomplete" as const };
+    await assert.rejects(coordinator.recordResult(lease, { ...result, status: "completed" }), /Incomplete evidence/);
+    assert.equal((await operations.get(lease.operationId))?.state, "prepared");
+    const recorded = await coordinator.recordResult(lease, { ...result, status: "failed", effectDisposition: "committed" });
+    const receipt = await receipts.get(recorded.receiptId!); assert.equal(receipt?.result, "failed"); assert.equal(receipt?.completeness, "incomplete"); assert.equal(receipt?.evidenceDigest, result.evidenceDigest);
+  });
+});
+
 test("durable dispatch coordination focuses active work and records a result before completion", async () => {
   await withStore(async (store) => {
     const operations = new OperationSagaStore(store, {
@@ -199,5 +211,25 @@ test("durable dispatch coordination focuses active work and records a result bef
     await coordinator.settle(blocked, "blocked");
     assert.equal((await operations.get(blocked.operationId))?.state, "failed");
     assert.equal((await receipts.audits()).some((audit) => audit.operationId === blocked.operationId && audit.status === "blocked"), true);
+  });
+});
+
+test("host-reviewed invocation scopes retain no-replay within one approval while a distinct approval has its own operation", async () => {
+  await withStore(async store => {
+    const operations = new OperationSagaStore(store), receipts = new ReceiptLedger(store);
+    const first = new DurableOperationCoordinator(operations, receipts, { scopeDigest: "a".repeat(64) });
+    const input = { action: "run_target" as const, targetSnapshotId: "snapshot", sessionId: "task", authorityId: "grant" };
+    const started = await first.claim(input);
+    await first.markExecuting(started);
+    await first.recordResult(started, { action: "run_target", targetSnapshotId: "snapshot", status: "cancelled", effectDisposition: "committed", summary: "Exact native process stopped; prior program effects remain." });
+    const duplicate = await new DurableOperationCoordinator(operations, receipts, { scopeDigest: "a".repeat(64) }).claim(input);
+    assert.equal(duplicate.existing, true);
+    assert.equal(duplicate.operationId, started.operationId);
+    const next = await new DurableOperationCoordinator(operations, receipts, { scopeDigest: "b".repeat(64) }).claim(input);
+    assert.equal(next.existing, false);
+    assert.notEqual(next.operationId, started.operationId);
+    assert.equal((await operations.get(next.operationId))?.details.hostReviewScopeDigest, "b".repeat(64));
+    assert.equal((await operations.get(started.operationId))?.details.noReplay, "true");
+    assert.throws(() => new DurableOperationCoordinator(operations, receipts, { scopeDigest: "untrusted command" }), /exact reviewed/);
   });
 });

@@ -1,0 +1,151 @@
+{
+  "schema": "switchyard-front-end-review/v1",
+  "digest": "0d52f396a8e8e07a4e03b29a13a099aab4936190b6779ee81fccbc379011ec0e",
+  "files": [
+    {
+      "file": "index.html",
+      "sha256": "1c53590272b17c6ded95681fc92c3d1be5b08c3357fd84348fa06409057ade91"
+    },
+    {
+      "file": "app.mjs",
+      "sha256": "bd6b2d7d353eac5345176095af431f41f04cbd3e1583fae8232a69fe8935b8c6"
+    },
+    {
+      "file": "model.mjs",
+      "sha256": "82b1d84d83fb94b454f374bc79acd0ae268286c26e2f0504a8d486dd1faa01cf"
+    },
+    {
+      "file": "workspace.mjs",
+      "sha256": "3fd97d0a29bfae72f1a81cc0656b787158f600d194452fa57af80c6a2a767c71"
+    },
+    {
+      "file": "connection.mjs",
+      "sha256": "4c8261e89e76da6c7b611c3ffe01303ec33b14e3cec110c210980cfae9f6f7bf"
+    },
+    {
+      "file": "vial-snapshot.mjs",
+      "sha256": "9ae120fb23bb5786e64d7188d3e14970a537827604903a88549f19f56aecc7ee"
+    },
+    {
+      "file": "voice-ui.mjs",
+      "sha256": "70405deed9bf332fa95f87164905946972e178c7571d00d642d3de209833d1df"
+    },
+    {
+      "file": "observation-ui.mjs",
+      "sha256": "c096ff225b5464cd94efa1b7f0f51911a9339262c0ef38c54bebc172b0be8996"
+    },
+    {
+      "file": "portable-ui.mjs",
+      "sha256": "9a6b6d699ae38fd1f9613a987edb15b1c611b6c43bab6f79d9f34fd12ed7cb2e"
+    },
+    {
+      "file": "scanner-ui.mjs",
+      "sha256": "92f47a2b692a4f1bb9bbee631c990b7d6b11aadb850a57811501968b104bfd93"
+    },
+    {
+      "file": "feed-ui.mjs",
+      "sha256": "a31fe97e55665605028a74a494853957dfa6f25f427671eccdd792ab87596c5c"
+    },
+    {
+      "file": "conversation-ui.mjs",
+      "sha256": "8d85ddfbfcde69e4fd7b3839e8e610058f52ed6cb5d165b2548100b452da5e98"
+    },
+    {
+      "file": "copilot-ui.mjs",
+      "sha256": "66ce8f85ee756e147611a13bdd0bdb9e32e8384a47f41dbb89a36ad3900bb090"
+    },
+    {
+      "file": "task-ui.mjs",
+      "sha256": "9831e15bc422302cd1fba9da29d5b642a494126da954d6a5377ca07e5365a176"
+    },
+    {
+      "file": "authority-ui.mjs",
+      "sha256": "e4c65421f7e746aafdcc68ba83ae6b6bc38bb1ac9245fc7cfd7d41c01c217806"
+    },
+    {
+      "file": "execution-ui.mjs",
+      "sha256": "493de6690c767fdf62ecb4576dae8af975db13f2d7d693c9d10c54e283ab1cbc"
+    },
+    {
+      "file": "client-ui.mjs",
+      "sha256": "7852a2fb748412afa3b847665c8e70c957cd7be87fe5408cb5362064c66ba782"
+    },
+    {
+      "file": "role-ui.mjs",
+      "sha256": "1b956e5660461cf9246d4e5fe9f7e27db11fabc3eada733c1a44e253aeda0de3"
+    },
+    {
+      "file": "suite-ui.mjs",
+      "sha256": "59d4be49e488316aa5859d15199f4482b203913288a11f1ad96f2c8db80a9d7d"
+    },
+    {
+      "file": "workflow.mjs",
+      "sha256": "21305677d67b99e401050c705c40535f059cc15cb7ccf7de696b65ef4be9c7b4"
+    },
+    {
+      "file": "device-diagnostic-ui.mjs",
+      "sha256": "232307a070a066f67c514b994463faf73755ff41af71afcc5517a835cc8ad903"
+    },
+    {
+      "file": "device-settings-ui.mjs",
+      "sha256": "79139f7982041772cdb864057c9199d4fc5672feb77e17b426dc9ac580d78d8e"
+    },
+    {
+      "file": "vial-settings.mjs",
+      "sha256": "8483d4580ad3c85aa2cbfe7dd99036d71a2f363ccae687e0ca50dce1d42e557c"
+    },
+    {
+      "file": "vial-keycodes.mjs",
+      "sha256": "ff1d6625e0f988be244a2588128394a21a714884d9b9df9fab1746945936781f"
+    },
+    {
+      "file": "vial-rules.mjs",
+      "sha256": "59f838c7ac1273ad137c34c5695a7858cd69a612007d4ea7cf7f9cae77d81ed1"
+    },
+    {
+      "file": "device-ui.mjs",
+      "sha256": "66ab0d1cf4af321a530508de022858734ec6afbb29f0f676552ac7e19ef29f10"
+    },
+    {
+      "file": "shell.mjs",
+      "sha256": "4716eea0bda29d56d197cd66e3a55d6a1c7a043eaa032b68c7ef0ebc5bd56859"
+    },
+    {
+      "file": "home.mjs",
+      "sha256": "81c0106a4145c79612ed2f1f74a84c834c258301b07a775ffb9d407636b05ccf"
+    },
+    {
+      "file": "catalog.mjs",
+      "sha256": "90212520a9a616c09b1bfea37ea92fe924eb067182f3416f545316572ca82df2"
+    },
+    {
+      "file": "geometry.mjs",
+      "sha256": "84d2689f3e046402defa125feb721a61856a46d3b9b9443d242b4742f0d73a89"
+    },
+    {
+      "file": "keyboard-view.mjs",
+      "sha256": "757325b40f0bf6567300be62c38753f11a88b7930b476e6fbf66cc3371374f31"
+    },
+    {
+      "file": "model-f-catalog.json",
+      "sha256": "572e0192b3324b39619de6b5b8fc44d43ae72a088c2d9aa49e34ccd71efd03e5"
+    },
+    {
+      "file": "style.css",
+      "sha256": "0fec2b2082d0ebd65ef17d93e25acb83ea8a29123866de85fce73f7a0f36e46e"
+    },
+    {
+      "file": "sample-info.json",
+      "sha256": "5bedbd514820db420b105ab0cc4f05d8292ec9df2785dbd32280edd320c57a33"
+    },
+    {
+      "file": "sample-keymap.json",
+      "sha256": "e33cb872996f605f64f77178f7b6af2af1fe2e68082ea76900d171137b2abebf"
+    },
+    {
+      "file": "sample-study-report.json",
+      "sha256": "3992ae079403cf41f6d99f9513b6d20ccbd96b976a658866b3915f15f43d4f13"
+    }
+  ],
+  "sourceCommit": "b0f67bc22e379aee65d479ef8e5cc6650ce9b1a6"
+}

@@ -1,0 +1,12 @@
+{
+  "sessionsStarted": 3,
+  "sessionsCompleted": 3,
+  "events": 5,
+  "focusIntervals": 19,
+  "focusDurationMs": { "vscode": 1300000, "terminal": 320000 },
+  "byKind": {
+    "resume": { "count": 2, "retriesOrBlocked": 1, "totalDurationMs": 145000, "averageFriction": 3.5 },
+    "review": { "count": 2, "retriesOrBlocked": 0, "totalDurationMs": 90000, "averageFriction": 2.5 },
+    "failure": { "count": 1, "retriesOrBlocked": 1, "totalDurationMs": 60000, "averageFriction": 4.0 }
+  }
+}

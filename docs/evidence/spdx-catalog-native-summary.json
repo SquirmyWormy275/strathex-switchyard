@@ -1,0 +1,30 @@
+{
+  "schema": "switchyard-spdx-catalog-native/v1",
+  "sourceCommit": "a5520be3bf4a38d8ee3c04938cfedabf8ca3fc03",
+  "executionCommit": "3aeddc45784c19d97f9c1a3dfda10f171952ac0e",
+  "sourceAndExecutionTree": "f007ed685454541b1e403ea5f5037d82a733c7f9",
+  "runId": 42266420634,
+  "jobId": 128059884994,
+  "artifactId": 13526729274,
+  "archiveBytes": 982,
+  "archiveSha256": "b3cbd440aed8841244ecd69baccba374f770e89bb563cf0f8897f776fd48cd4d",
+  "zipSavedLocally": false,
+  "privateReceipt": "windows-spdx-a552-native.json",
+  "success": true,
+  "totals": {
+    "required": 1,
+    "passed": 1,
+    "failed": 0,
+    "tests": 2,
+    "passedTests": 2,
+    "failedTests": 0,
+    "skippedTests": 0,
+    "cancelledTests": 0,
+    "todoTests": 0
+  },
+  "allChildAndTreeCleanupVerified": true,
+  "actualWindowsHost": true,
+  "guestExecutionDoubled": true,
+  "actualGuestAccepted": false,
+  "installedChanged": false
+}

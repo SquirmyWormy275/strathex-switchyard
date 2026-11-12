@@ -1,0 +1,50 @@
+{
+  "schema": "switchyard-native-vscode-terminal-summary/v1",
+  "sourceParentCommit": "7d9310a0d00de650bf63f2bff6ef12cdfe0f0f97",
+  "receipt": "native-vscode-terminal-1793904289700.json",
+  "receiptSha256": "43bb394b9859a4ea2c143e37b54c2065f21b806f975ba244170a752ac0c45bd1",
+  "sourceSha256": {
+    "apps/vscode-extension/src/terminal-focus.ts": "763040dc6635ae954f3eee231f2a569c1d1c446db9d36332518a3948224806ad",
+    "apps/vscode-extension/src/controller.ts": "613b58ba2e8e01c02fdb44cb6bbecd51556b3bce3ad777522dd595af0e32fe70",
+    "scripts/verify-vscode-terminal-host.mjs": "1115c4d3b2292097ba3a01a46a936a8b3a111aab1cdd462e0cf1d3f439da3583",
+    "scripts/fixtures/vscode-terminal-selection.cjs": "66f9eae508c2fd785990a096a0b66874263c06f7a7e67ae2b1e4e15be8dab6be"
+  },
+  "compiledHelperSha256": "ac716a643ec31f17b7d7253a63bd7b9602524b4004d2b027c42be235b34eea51",
+  "softwareReceipt": "isolated-test-324d15d0-cf04-4a10-b806-487c4129f777.json",
+  "softwareGroups": 3,
+  "softwareChecks": 147,
+  "allSoftwareChildCleanup": true,
+  "typecheckPassed": true,
+  "extensionBuildPassed": true,
+  "nativeChecks": 2,
+  "realApiChecks": 3,
+  "nativeTerminalProcesses": 2,
+  "sameTitleExactObjectsSelectedRepeatedly": true,
+  "closedExactObjectRefusedWithoutReplacement": true,
+  "nativeProcessExitsVerified": 9,
+  "originalFocusRestored": true,
+  "ownedProfileRemoved": true,
+  "modelPromptsSubmitted": 0,
+  "terminalTextSubmitted": false,
+  "userEditorProfileChanged": false,
+  "workspaceTrustBypassed": false,
+  "frontendChanged": false,
+  "installedProductionExtensionAcceptance": false,
+  "exactCodingTaskIdeAttachmentImplemented": false,
+  "failedHarnessAttemptsRetained": [
+    "native-vscode-terminal-1793903761201.json",
+    "native-vscode-terminal-1793903810891.json",
+    "native-vscode-terminal-1793903867126.json",
+    "native-vscode-terminal-1793903989808.json",
+    "native-vscode-terminal-1793904065777.json",
+    "native-vscode-terminal-1793904115274.json",
+    "native-vscode-terminal-1793904179552.json"
+  ],
+  "harnessCorrections": [
+    "launch the native executable instead of the short-lived CLI wrapper",
+    "pin protected fixture API process IDs with native executable, unique directory and birth identities; do not claim ownership or stop shared app scopes",
+    "bound newly mapped editor readiness and require independent protected extension focus plus native PID/birth readbacks"
+  ],
+  "failedProfilesCleanupReceipt": "native-vscode-failed-profiles-cleanup-1793904391436.json",
+  "allFailedProfilesRemovedAfterVerifiedExit": true
+}

@@ -1,0 +1,65 @@
+name: Switchyard Windows policy admission
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: switchyard-windows-policy-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build-state-helper:
+    uses: ./.github/workflows/switchyard-windows-state-helper.yml
+
+  verify-policy-admission:
+    needs: build-state-helper
+    runs-on: windows-2022
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        suite: [policy, recovery, stop, output, authority, host-stop]
+    env:
+      npm_config_audit: "false"
+      npm_config_fund: "false"
+      npm_config_update_notifier: "false"
+    steps:
+      - name: Check out the exact source revision
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+
+      - name: Install pinned Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 24.14.0
+          cache: npm
+
+      - name: Install locked source dependencies
+        shell: pwsh
+        run: npm.cmd ci --ignore-scripts
+
+      - name: Install the exact-source native state helper
+        uses: ./.github/actions/install-state-helper
+
+      - name: Verify isolated task admission and separate stop receipts without a VM
+        shell: pwsh
+        timeout-minutes: 12
+        run: |
+          $ErrorActionPreference = 'Stop'
+          & node scripts/verify-windows-policy.mjs --synthetic "--suite=${{ matrix.suite }}"
+          if ($LASTEXITCODE -ne 0) { throw 'A Windows task/approval/checkpoint/budget/stop receipt boundary failed.' }
+
+      - name: Retain only the bounded policy verification receipt
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: switchyard-windows-policy-${{ matrix.suite }}-${{ github.sha }}
+          path: ${{ runner.temp }}/switchyard-policy-verification/isolated-test-*.json
+          if-no-files-found: error
+          retention-days: 7

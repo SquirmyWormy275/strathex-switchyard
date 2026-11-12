@@ -1,0 +1,40 @@
+{
+  "schema": "switchyard-frontend-host-provenance-source/v1",
+  "sourceCommit": "d32c60dec9157cab64a40f436ddb5e19bdcdc57d",
+  "sourceFiles": {
+    "deployment/suite/release.mjs": "34e538ab7a162d9faa2611b0a19b05c599eed4bf98585b24a66cd26df4feac3b",
+    "tools/layout-studio/serve.mjs": "2341c0e2e9d355d534f0a6a3147bf1b1abf1d69f768522914ba25973ba21cbf0",
+    "tools/layout-studio/index.html": "d26aa748154d5470f0a68449012eb37263ed49d6afd9b0c4cc391b20e119a052"
+  },
+  "receipt": {
+    "id": "31177d18-ba14-424e-b132-09c7abf34dba",
+    "sha256": "ee9de63745dd97614a4920f50807f9a8c7719d46b89f735129636f3b41a12a15",
+    "totals": {
+      "required": 12,
+      "passed": 12,
+      "failed": 0,
+      "tests": 132,
+      "passedTests": 131,
+      "failedTests": 0,
+      "skippedTests": 1,
+      "cancelledTests": 0,
+      "todoTests": 0
+    },
+    "groups": [
+      "scripts/windows-complete-shards.test.mjs",
+      "scripts/run-isolated-tests.test.mjs",
+      "deployment/suite/release.test.mjs",
+      "tools/layout-studio/suite.test.mjs",
+      "tools/layout-studio/integrations.test.mjs",
+      "tools/layout-studio/role-ui.test.mjs",
+      "tools/layout-studio/client-ui.test.mjs",
+      "tools/layout-studio/device-settings-ui.test.mjs",
+      "tools/layout-studio/connection-ui.test.mjs",
+      "tools/layout-studio/portable-ui.test.mjs",
+      "tools/layout-studio/observation-ui.test.mjs",
+      "tools/layout-studio/client-launch.test.mjs"
+    ]
+  },
+  "frontendDigest": "8114b09fc9d33c6e79b65a58ba58b719629b29bf6e8cd3290b91c09d90ebe35f",
+  "scope": "Additional exact hashes for the tested client frontend, served asset allowlist and release closure. Original historical evidence remains unchanged. These are software checks, not browser or live hardware/account acceptance."
+}

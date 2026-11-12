@@ -1,0 +1,167 @@
+{
+  "schema": "switchyard-client-ui-source-evidence/v1",
+  "scope": "Distinct documented client choices, authority-free recipe download, explicit fixed-destination launch review and retained launch history",
+  "runs": [
+    {
+      "receiptId": "bcd4c82c-ed45-4506-9275-f14d5e2d8865",
+      "sha256": "631ec3e3c3efcc8e0e760da39a01c74497b2380971363e1bf89e13b8199f14a1",
+      "totals": {
+        "required": 12,
+        "passed": 12,
+        "failed": 0,
+        "tests": 132,
+        "passedTests": 131,
+        "failedTests": 0,
+        "skippedTests": 1,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "files": [
+        "scripts/windows-complete-shards.test.mjs",
+        "scripts/run-isolated-tests.test.mjs",
+        "deployment/suite/release.test.mjs",
+        "tools/layout-studio/suite.test.mjs",
+        "tools/layout-studio/integrations.test.mjs",
+        "tools/layout-studio/role-ui.test.mjs",
+        "tools/layout-studio/client-ui.test.mjs",
+        "tools/layout-studio/device-settings-ui.test.mjs",
+        "tools/layout-studio/connection-ui.test.mjs",
+        "tools/layout-studio/portable-ui.test.mjs",
+        "tools/layout-studio/observation-ui.test.mjs",
+        "tools/layout-studio/client-launch.test.mjs"
+      ],
+      "originalBoundsPreserved": true,
+      "ownedCleanupComplete": true
+    },
+    {
+      "receiptId": "31177d18-ba14-424e-b132-09c7abf34dba",
+      "sha256": "ee9de63745dd97614a4920f50807f9a8c7719d46b89f735129636f3b41a12a15",
+      "totals": {
+        "required": 12,
+        "passed": 12,
+        "failed": 0,
+        "tests": 132,
+        "passedTests": 131,
+        "failedTests": 0,
+        "skippedTests": 1,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "files": [
+        "scripts/windows-complete-shards.test.mjs",
+        "scripts/run-isolated-tests.test.mjs",
+        "deployment/suite/release.test.mjs",
+        "tools/layout-studio/suite.test.mjs",
+        "tools/layout-studio/integrations.test.mjs",
+        "tools/layout-studio/role-ui.test.mjs",
+        "tools/layout-studio/client-ui.test.mjs",
+        "tools/layout-studio/device-settings-ui.test.mjs",
+        "tools/layout-studio/connection-ui.test.mjs",
+        "tools/layout-studio/portable-ui.test.mjs",
+        "tools/layout-studio/observation-ui.test.mjs",
+        "tools/layout-studio/client-launch.test.mjs"
+      ],
+      "originalBoundsPreserved": true,
+      "ownedCleanupComplete": true
+    }
+  ],
+  "overlap": "The two 12-group runs overlap. The latter includes the retained Microsoft 365 Personal-policy regression; 131 tests pass and one original native Windows metadata test is skipped on Linux. Do not sum totals.",
+  "interactionCases": 5,
+  "interactionBoundary": "Browser-event fixture, actual authenticated HTTP, real encrypted store and launch service, explicit synthetic portal command and guardian. No external app, native account or task was opened.",
+  "sourceFiles": [
+    {
+      "path": "tools/layout-studio/client-ui.mjs",
+      "sha256": "7f9c8e504e717264120b035bc147f51ada2c896811361afdc5dcf8e37649513d"
+    },
+    {
+      "path": "tools/layout-studio/client-ui.test.mjs",
+      "sha256": "b7c0f0a4628934fef4b31ed020d9928ed8ffc59b8e27c54d6a640ee4c56a9dca"
+    },
+    {
+      "path": "tools/layout-studio/client-integrations.mjs",
+      "sha256": "87a4f78b73e310f8d305b94dad6db2e87d626f6ae7497366b6dc7c0c7919c3e6"
+    },
+    {
+      "path": "tools/layout-studio/integrations.test.mjs",
+      "sha256": "ed07ab8705f97babafae55802f130be3077d2a70130a11bb0abe4286ed2402a7"
+    },
+    {
+      "path": "tools/layout-studio/suite-ui.mjs",
+      "sha256": "d1c0d8e4d83d2d665f0b8449abe5514b7825ddbf1c57ad55e2dbcbd1e4e31dc3"
+    },
+    {
+      "path": "tools/layout-studio/index.html",
+      "sha256": "d26aa748154d5470f0a68449012eb37263ed49d6afd9b0c4cc391b20e119a052"
+    },
+    {
+      "path": "tools/layout-studio/style.css",
+      "sha256": "cbd22a024f0510f7c5b69ef3ca3c42e2e6063ee09227fa4cc5a0ecae36ccefc9"
+    },
+    {
+      "path": "integrations/client-recipes.mjs",
+      "sha256": "9bfbad28105fb8de8005b75cb62fdc8e9d2d1a2be47765f9f290a5ccea48aeb1"
+    },
+    {
+      "path": "scripts/demo-switchyard-ui.mjs",
+      "sha256": "c7b3fb0786e0f8ee8b6788034587ab51ae2aeb2b5841a6879a1ec518e10fd41a"
+    }
+  ],
+  "liveDemonstration": {
+    "schema": "switchyard-client-ui-live-demo/v1",
+    "origin": "http://127.0.0.1:41611",
+    "checks": [
+      {
+        "name": "client UI exact served bytes",
+        "sha256": "7f9c8e504e717264120b035bc147f51ada2c896811361afdc5dcf8e37649513d"
+      },
+      {
+        "name": "client controls served"
+      },
+      {
+        "name": "distinct Personal catalog policy"
+      },
+      {
+        "name": "declarative recipe carries no approval"
+      },
+      {
+        "name": "Personal Microsoft 365 refusal"
+      },
+      {
+        "name": "Work allows Microsoft 365 only"
+      },
+      {
+        "name": "Work personal-provider refusal"
+      },
+      {
+        "name": "demo refuses real launches and retains empty history"
+      }
+    ],
+    "realLaunches": 0,
+    "visualAcceptance": false,
+    "previousOwnedSyntheticStateRemoved": true
+  },
+  "retainedRegression": {
+    "schema": "switchyard-client-catalog-policy-regression/v1",
+    "originalFailure": "The added actual-HTTP client UI assertion found Microsoft 365 launch/recipe buttons enabled in Personal (false !== true for the disabled flag), while the existing provider policy already rejected its launch.",
+    "correction": "Catalog and recipe policy now reserve Microsoft 365 for Work. The authority policy itself is unchanged.",
+    "assertionPreserved": true,
+    "deadlinesChanged": false,
+    "realLaunches": 0
+  },
+  "reviewBundle": {
+    "sourceCommit": "d32c60dec9157cab64a40f436ddb5e19bdcdc57d",
+    "digest": "8114b09fc9d33c6e79b65a58ba58b719629b29bf6e8cd3290b91c09d90ebe35f",
+    "assets": 28,
+    "allBytesVerified": true,
+    "priorPointerDatedBackupVerified": true,
+    "installed": false,
+    "visuallyAccepted": false
+  },
+  "limits": [
+    "Browser visual/responsive acceptance remains blocked before navigation by the existing browser-tool error.",
+    "Claude desktop native launch remains unfinished; its card exposes this limitation and offers no browser fallback.",
+    "Opening an app does not verify its account, repository, file, conversation or exact task.",
+    "Installed frontend and all 54 normal workspace identities remain unchanged.",
+    "The Windows 7529718 package acceptance predates these frontend changes."
+  ]
+}

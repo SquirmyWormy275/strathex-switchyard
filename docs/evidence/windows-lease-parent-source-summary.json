@@ -1,0 +1,61 @@
+{
+  "schema": "switchyard-lease-parent-source/v1",
+  "basis": "30357edca2dc6d19bfa5a88e6c67825a5ef7c54f",
+  "sourceSha256": {
+    "apps/desktop-hotkeys/StateLeaseWorker.cs": "3e0a383cdfd79ad5956fca7f67c60f47b05d56077746f69e16107d01a71d8b16"
+  },
+  "correction": "Replace PID-only Process.SafeHandle all-access open with one non-inherited process handle requesting PROCESS_QUERY_LIMITED_INFORMATION | SYNCHRONIZE (0x00101000). Pin creation time and observe exit on that same handle.",
+  "unchangedBoundarySha256": {
+    "tools/layout-studio/state-lock.mjs": "2030b5d03116231b62dd031de637bbf2d9466858ef097037371efb03e11edd7c",
+    "tools/layout-studio/keyless-lease-pool.mjs": "9a324867eec0c3568a5f2c57a2cdc73693ead6df7316bdfbb7fbee0ebf8aa153",
+    "deployment/windows/test-support/storage-broker-protocol/NativeRestrictedHostProof.cs": "3a64e18d82e0af11db1d1c4851f6a9a47a21a44384a2e2fad6569bc62afeb5b2",
+    "deployment/windows/test-support/storage-broker-protocol/RestrictedSelfTokenQuery.cs": "2f93772b6c6e762dfaf0727f89a679f4a87d425cc06b5095e799c939b58c9266"
+  },
+  "managed": {
+    "receipt": "lease-parent-managed-1793969056829.json",
+    "builds": [
+      {
+        "name": "helper",
+        "warnings": 0,
+        "errors": 0,
+        "managedAssemblySha256": "d5edebebb095416a38ab407cb96cd60a2c51f1655a1fb2677cdfcec222bc7fa9",
+        "managedPeSubsystem": 2
+      },
+      {
+        "name": "proof",
+        "warnings": 0,
+        "errors": 0,
+        "managedAssemblySha256": "a11697e7eb42c8e210c68c6f13a8a280cc882b5f823b824ba66f6d2be136d2b4",
+        "managedPeSubsystem": 3
+      }
+    ],
+    "portableChecks": 1985,
+    "ownedCleanup": {
+      "files": 124,
+      "bytes": 3186802,
+      "removed": true
+    }
+  },
+  "isolated": {
+    "receipt": "isolated-test-ba1afe54-f4ee-4253-9341-892157e45a29.json",
+    "totals": {
+      "required": 5,
+      "passed": 5,
+      "failed": 0,
+      "tests": 50,
+      "passedTests": 49,
+      "failedTests": 0,
+      "skippedTests": 1,
+      "cancelledTests": 0,
+      "todoTests": 0
+    },
+    "allChildAndTreeCleanupVerified": true,
+    "skip": "The actual native Windows lease-file test is unavailable on Linux."
+  },
+  "nativeAcceptance": false,
+  "limits": [
+    "The previous receipt does not identify which post-input operation threw. Requesting full process access is a source-proven unnecessary dependency, not an accepted native root cause.",
+    "No token or process ACL, privilege, desktop, SID, default DACL or production spawn mode changes. The watcher still joins before closing its pinned handle.",
+    "Original owner, lock substitution and parent-loss checks must pass on Windows before accepting the correction."
+  ]
+}

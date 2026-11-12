@@ -1,0 +1,441 @@
+{
+  "schema": "switchyard-windows-package-failure/v1",
+  "sourceCommit": "90fa879d776c0b7756f66d37180fb8c3049b3fc4",
+  "mergeCommit": "1ef2f3659805b45d7f6959cac669c5d0036fd1c9",
+  "sourceTree": "8ff16a293e3de4e702d69d361d43b1a38378f089",
+  "workflowRunId": 42397684952,
+  "jobId": 128483375265,
+  "workflowConclusion": "failure",
+  "artifact": {
+    "id": 13587345844,
+    "archiveBytes": 54874,
+    "archiveSha256": "ac9b6260909811aa10b37011062e6a91525385b1c3660bf5cf11e9a1eb35431a"
+  },
+  "receiptId": "687384a5-244a-456d-95a8-ae2590e77c42",
+  "receiptSha256": "5728b12011bbfc7c36fb3e585a944bf5a549b23d2b1eb276b7a533936fb7b663",
+  "receiptBytes": 715042,
+  "startedAt": "2026-11-07T18:09:02.692Z",
+  "endedAt": "2026-11-07T19:10:00.646Z",
+  "elapsedMs": 3657954,
+  "execution": {
+    "scheduling": "windows-pairs",
+    "maxConcurrentChildren": 2,
+    "buildDependenciesOrdered": true,
+    "observedMaxConcurrentChildren": 2,
+    "buildOrderingVerified": true
+  },
+  "totals": {
+    "required": 462,
+    "passed": 460,
+    "failed": 2,
+    "tests": 3148,
+    "passedTests": 2900,
+    "failedTests": 2,
+    "skippedTests": 246,
+    "cancelledTests": 0,
+    "todoTests": 0
+  },
+  "originalManifestCommandsBoundsSkipsAndCleanupVerified": true,
+  "manifestSha256": "816705b539568c61f30db61b9ce9e6eabd181197b59523483ee2558bf286d8f5",
+  "failures": [
+    {
+      "file": "tools/layout-studio/codex-windows-tasks.test.mjs",
+      "pattern": null,
+      "testCounts": {
+        "total": 13,
+        "passed": 12,
+        "failed": 1,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "effectiveTimeoutMs": 120000,
+      "durationMs": 10417,
+      "timeout": false,
+      "cleanupCompleted": true,
+      "processTreeTermination": {
+        "strategy": "natural-exit",
+        "completed": true,
+        "supervisorExitCode": null,
+        "supervisorError": null
+      },
+      "failureDiagnostic": "not ok 13 - actual Windows Jobs carry restricted task RPC and recover original retirement with a synthetic provider\n  ---\n  duration_ms: 803.9078\n  type: 'test'\n  location: 'B:\\\\artifacts\\\\b122-windows\\\\.source-tree\\\\tools\\\\layout-studio\\\\codex-windows-tasks.test.mjs:176:1'\n  failureType: 'testCodeFailure'\n  error: 'Codex disconnected. Your saved draft is preserved.'\n  code: 'ERR_TEST_FAILURE'\n  stack: |-\n    CodexClient.close (file:///B:/artifacts/b122-windows/.[redacted].mjs:181:186)\n    EventEmitter.<anonymous> (file:///B:/artifacts/b122-windows/.[redacted].mjs:147:83)\n    EventEmitter.emit (node:events:508:28)\n    ChildProcess.<anonymous> (file:///B:/artifacts/b122-windows/.[redacted].mjs:150:160)\n    Object.onceWrapper (node:events:623:26)\n    ChildProcess.emit (node:events:508:28)\n    maybeClose (node:internal/child_process:1100:16)\n    ChildProcess._handle.onexit (node:internal/child_process:305:5)\n  ...\n1..13\n# tests 13\n# suites 0\n# pass 12\n# fail 1\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 10346.7021\n\n[bounded final output]\n    CodexClient.close (file:///B:/artifacts/b122-windows/.[redacted].mjs:181:186)\n    EventEmitter.<anonymous> (file:///B:/artifacts/b122-windows/.[redacted].mjs:147:83)\n    EventEmitter.emit (node:events:508:28)\n    ChildProcess.<anonymous> (file:///B:/artifacts/b122-windows/.[redacted].mjs:150:160)\n    Object.onceWrapper (node:events:623:26)\n    ChildProcess.emit (node:events:508:28)\n    maybeClose (node:internal/child_process:1100:16)\n    ChildProcess._handle.onexit (node:internal/child_process:305:5)\n  ...\n1..13\n# tests 13\n# suites 0\n# pass 12\n# fail 1\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 10346.7021\n"
+    },
+    {
+      "file": "tools/layout-studio/windows-editor-recovery.test.mjs",
+      "pattern": null,
+      "testCounts": {
+        "total": 8,
+        "passed": 7,
+        "failed": 1,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "effectiveTimeoutMs": 120000,
+      "durationMs": 2367,
+      "timeout": false,
+      "cleanupCompleted": true,
+      "processTreeTermination": {
+        "strategy": "natural-exit",
+        "completed": true,
+        "supervisorExitCode": null,
+        "supervisorError": null
+      },
+      "failureDiagnostic": "TAP version 13\n# Subtest: recovery observes only the original host and saved query Job and independently retires its observers\nok 1 - recovery observes only the original host and saved query Job and independently retires its observers\n  ---\n  duration_ms: 8.0678\n  type: 'test'\n  ...\n# Subtest: unknown startup, legacy checkpoints and unrelated retired queries cannot prove helper retirement\nok 2 - unknown startup, legacy checkpoints and unrelated retired queries cannot prove helper retirement\n  ---\n  duration_ms: 3.4085\n  type: 'test'\n  ...\n# Subtest: durable no-start and original retirement are sufficient but malformed sequences refuse before native access\nok 3 - durable no-start and original retirement are sufficient but malformed sequences refuse before native access\n  ---\n  duration_ms: 3.0939\n  type: 'test'\n  ...\n# Subtest: substituted native proof and changed saved helper bytes cannot authorize recovery\nok 4 - substituted native proof and changed saved helper bytes cannot authorize recovery\n  ---\n  duration_ms: 4.384\n  type: 'test'\n  ...\n# Subtest: input is copied and current-record checks remain joined through cancellation\nok 5 - input is copied and current-record checks remain joined through cancellation\n  ---\n  duration_ms: 6.4653\n  type: 'test'\n  ...\n# Subtest: unknown observer retirement blocks reuse and cannot become successful recovery\nok 6 - unknown observer retirement blocks reuse and cannot become successful recovery\n  ---\n  duration_ms: 2.6982\n  type: 'test'\n  ...\n# Subtest: unsupported platform and stale protected record refuse without spawning an observer\nok 7 - unsupported platform and stale protected record refuse without spawning an observer\n  ---\n  duration_ms: 0.825\n  type: 'test'\n  ...\n# Subtest: actual Windows recovery distinguishes an owned live host from its exit and observes the original completed query Job\nnot ok 8 - actual Windows recovery distinguishes an owned live host from its exit and observes the original completed query Job\n  ---\n  duration_ms: 2164.0836\n  type: 'test'\n  location: 'B:\\\\artifacts\\\\b122-windows\\\\.source-tree\\\\tools\\\\layout-studio\\\\windows-editor-recovery.test.mjs:94:1'\n  failureType: 'testCodeFailure'\n  error: 'The original Windows editor recovery evidence did not verify.'\n  code: 'ERR_TEST_FAILURE'\n  stack: |-\n    require (file:///B:/artifacts/b122-windows/.[redacted].mjs:19:31)\n    inspectSavedHelper (file:///B:/artifacts/b122-windows/.[redacted].mjs:30:3)\n    async file:///B:/artifacts/b122-windows/.[redacted].mjs:91:84\n  ...\n1..8\n# tests 8\n# suites 0\n# pass 7\n# fail 1\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 2292.0326\n"
+    }
+  ],
+  "declaredSkips": [
+    {
+      "file": "scripts/install-workflow-shortcut.test.mjs",
+      "pattern": null,
+      "count": 2
+    },
+    {
+      "file": "scripts/codex-daemon-status.test.mjs",
+      "pattern": null,
+      "count": 2
+    },
+    {
+      "file": "tools/layout-studio/configuration.test.mjs",
+      "pattern": null,
+      "count": 1
+    },
+    {
+      "file": "tools/layout-studio/repository-effects.test.mjs",
+      "pattern": null,
+      "count": 1
+    },
+    {
+      "file": "tools/layout-studio/repository-recovery.test.mjs",
+      "pattern": null,
+      "count": 1
+    },
+    {
+      "file": "tools/layout-studio/repository-commits.test.mjs",
+      "pattern": null,
+      "count": 1
+    },
+    {
+      "file": "tools/layout-studio/repository-execution-supervisor.test.mjs",
+      "pattern": null,
+      "count": 1
+    },
+    {
+      "file": "tools/layout-studio/repository-shield-exceptions.test.mjs",
+      "pattern": null,
+      "count": 1
+    },
+    {
+      "file": "tools/layout-studio/repository-receipt-authority.test.mjs",
+      "pattern": null,
+      "count": 1
+    },
+    {
+      "file": "tools/layout-studio/repository-validation-policy.test.mjs",
+      "pattern": null,
+      "count": 1
+    },
+    {
+      "file": "tools/layout-studio/linux-namespace-budget.test.mjs",
+      "pattern": null,
+      "count": 1
+    },
+    {
+      "file": "tools/layout-studio/linux-temporary-workspace.test.mjs",
+      "pattern": null,
+      "count": 1
+    },
+    {
+      "file": "tools/layout-studio/repository-temporary-build.test.mjs",
+      "pattern": null,
+      "count": 2
+    },
+    {
+      "file": "tools/layout-studio/repository-execution.test.mjs",
+      "pattern": null,
+      "count": 1
+    },
+    {
+      "file": "tools/layout-studio/repository-shield-cargo-archives.test.mjs",
+      "pattern": null,
+      "count": 2
+    },
+    {
+      "file": "tools/layout-studio/repository-shield-cargo.test.mjs",
+      "pattern": null,
+      "count": 4
+    },
+    {
+      "file": "tools/layout-studio/repository-shield-python-records.test.mjs",
+      "pattern": null,
+      "count": 2
+    },
+    {
+      "file": "tools/layout-studio/repository-shield-python-wheels.test.mjs",
+      "pattern": null,
+      "count": 2
+    },
+    {
+      "file": "tools/layout-studio/repository-shield-index.test.mjs",
+      "pattern": null,
+      "count": 3
+    },
+    {
+      "file": "tools/layout-studio/repository-shield-history.test.mjs",
+      "pattern": null,
+      "count": 3
+    },
+    {
+      "file": "tools/layout-studio/repository-shield-osv-source.test.mjs",
+      "pattern": null,
+      "count": 8
+    },
+    {
+      "file": "tools/layout-studio/repository-shield-pypi.test.mjs",
+      "pattern": null,
+      "count": 6
+    },
+    {
+      "file": "tools/layout-studio/repository-shield-licenses.test.mjs",
+      "pattern": null,
+      "count": 2
+    },
+    {
+      "file": "tools/layout-studio/scanner-review.test.mjs",
+      "pattern": null,
+      "count": 1
+    },
+    {
+      "file": "tools/layout-studio/scanner-index-review.test.mjs",
+      "pattern": null,
+      "count": 1
+    },
+    {
+      "file": "tools/layout-studio/scanner-history-review.test.mjs",
+      "pattern": null,
+      "count": 1
+    },
+    {
+      "file": "tools/layout-studio/scanner-mixed-review.test.mjs",
+      "pattern": null,
+      "count": 1
+    },
+    {
+      "file": "tools/layout-studio/scanner-recipe-draft.test.mjs",
+      "pattern": null,
+      "count": 1
+    },
+    {
+      "file": "tools/layout-studio/scanner-recipe-save.test.mjs",
+      "pattern": null,
+      "count": 22
+    },
+    {
+      "file": "tools/layout-studio/task-history-inputs.test.mjs",
+      "pattern": null,
+      "count": 1
+    },
+    {
+      "file": "tools/layout-studio/task-index-inputs.test.mjs",
+      "pattern": null,
+      "count": 1
+    },
+    {
+      "file": "tools/layout-studio/repository-shield-ignored-trees.test.mjs",
+      "pattern": null,
+      "count": 1
+    },
+    {
+      "file": "tools/layout-studio/repository-shield-artifacts.test.mjs",
+      "pattern": null,
+      "count": 2
+    },
+    {
+      "file": "tools/layout-studio/repository-shield-npm-archives.test.mjs",
+      "pattern": null,
+      "count": 2
+    },
+    {
+      "file": "tools/layout-studio/repository-shield-cargo-artifacts.test.mjs",
+      "pattern": null,
+      "count": 2
+    },
+    {
+      "file": "tools/layout-studio/repository-shield-pypi-artifacts.test.mjs",
+      "pattern": null,
+      "count": 2
+    },
+    {
+      "file": "tools/layout-studio/repository-shield-workspaces.test.mjs",
+      "pattern": null,
+      "count": 1
+    },
+    {
+      "file": "tools/layout-studio/repository-shield.test.mjs",
+      "pattern": null,
+      "count": 2
+    },
+    {
+      "file": "tools/layout-studio/repository-pipeline.test.mjs",
+      "pattern": null,
+      "count": 5
+    },
+    {
+      "file": "tools/layout-studio/repository-pipeline-fixtures.test.mjs",
+      "pattern": null,
+      "count": 2
+    },
+    {
+      "file": "tools/layout-studio/repository-ignored-scanner-inputs.test.mjs",
+      "pattern": null,
+      "count": 1
+    },
+    {
+      "file": "tools/layout-studio/state-lock.test.mjs",
+      "pattern": null,
+      "count": 1
+    },
+    {
+      "file": "tools/layout-studio/runtime.test.mjs",
+      "pattern": null,
+      "count": 1
+    },
+    {
+      "file": "tools/layout-studio/runtime-command.test.mjs",
+      "pattern": null,
+      "count": 15
+    },
+    {
+      "file": "tools/layout-studio/runtime-command-suspended.test.mjs",
+      "pattern": null,
+      "count": 5
+    },
+    {
+      "file": "tools/layout-studio/coding-editor-connections.test.mjs",
+      "pattern": null,
+      "count": 10
+    },
+    {
+      "file": "tools/layout-studio/codex-editor-recovery.test.mjs",
+      "pattern": null,
+      "count": 3
+    },
+    {
+      "file": "tools/layout-studio/coding-task-owners.test.mjs",
+      "pattern": "protected task registry composes the actual owned Unix listener and bridge while the provider is a controlled double",
+      "count": 1
+    },
+    {
+      "file": "tools/layout-studio/coding-task-owners.test.mjs",
+      "pattern": "the editor client authenticates the real Studio route and reads original protected target metadata without another native effect",
+      "count": 1
+    },
+    {
+      "file": "tools/layout-studio/codex-unix-tasks.test.mjs",
+      "pattern": null,
+      "count": 6
+    },
+    {
+      "file": "tools/layout-studio/codex-editor-ingress.test.mjs",
+      "pattern": null,
+      "count": 13
+    },
+    {
+      "file": "tools/layout-studio/codex-editor-ingress-owner.test.mjs",
+      "pattern": null,
+      "count": 9
+    },
+    {
+      "file": "tools/layout-studio/codex-unix-transport.test.mjs",
+      "pattern": null,
+      "count": 6
+    },
+    {
+      "file": "tools/layout-studio/codex-owned-listener.test.mjs",
+      "pattern": null,
+      "count": 13
+    },
+    {
+      "file": "tools/layout-studio/owned-process.test.mjs",
+      "pattern": null,
+      "count": 1
+    },
+    {
+      "file": "packages/control-plane/test/git-inspector.test.ts",
+      "pattern": null,
+      "count": 1
+    },
+    {
+      "file": "apps/windows-companion/test/authenticated-pipe.test.ts",
+      "pattern": null,
+      "count": 2
+    },
+    {
+      "file": "apps/vscode-extension/test/controller.test.ts",
+      "pattern": null,
+      "count": 3
+    },
+    {
+      "file": "apps/vscode-extension/test/named-pipe-transport.test.ts",
+      "pattern": null,
+      "count": 1
+    },
+    {
+      "file": "apps/vscode-extension/test/studio-task-client.test.ts",
+      "pattern": null,
+      "count": 12
+    },
+    {
+      "file": "apps/vscode-extension/test/studio-editor-launch.test.ts",
+      "pattern": null,
+      "count": 22
+    },
+    {
+      "file": "apps/vscode-extension/test/studio-terminal-process.test.ts",
+      "pattern": null,
+      "count": 5
+    },
+    {
+      "file": "apps/vscode-extension/test/studio-editor-session.test.ts",
+      "pattern": null,
+      "count": 2
+    },
+    {
+      "file": "apps/linux-companion/test/linux-isolation.test.ts",
+      "pattern": null,
+      "count": 1
+    },
+    {
+      "file": "apps/linux-companion/test/linux-lifecycle.test.ts",
+      "pattern": null,
+      "count": 2
+    },
+    {
+      "file": "apps/linux-companion/test/linux-user-presence.test.ts",
+      "pattern": null,
+      "count": 2
+    },
+    {
+      "file": "apps/linux-companion/test/linux-process-supervisor.test.ts",
+      "pattern": null,
+      "count": 3
+    },
+    {
+      "file": "apps/linux-companion/test/linux-repository-runtime.test.ts",
+      "pattern": null,
+      "count": 6
+    },
+    {
+      "file": "apps/provider-adapter-host/test/linux-path-security.test.ts",
+      "pattern": null,
+      "count": 1
+    }
+  ],
+  "packageAcceptance": false,
+  "limitations": [
+    "All 462 groups completed within the existing package-job deadline, but two native fixture tests failed; this is not package acceptance.",
+    "The separately passing complete source run does not erase these original failures.",
+    "Follow-up fixture corrections require native package verification; interactive Windows, provider/account and hardware acceptance remain separate."
+  ]
+}

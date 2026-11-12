@@ -1,0 +1,41 @@
+{
+  "schema": "switchyard-observation-window-summary/v1",
+  "basis": "fea2ca47b34ff466c06313e2f28f523a24d430af",
+  "sourceSha256": {
+    "tools/layout-studio/workflow.mjs": "102cedad9186b10cc0e6adcca7310a2bc055f2e525c72fa47b5b92e74c1acaaa",
+    "tools/layout-studio/suite.mjs": "8f8e0c52d672eb555d45ceaed483d2cf98e78b80afc1cb0e7fc97f5be2d230fb",
+    "tools/layout-studio/agent-observation.mjs": "2df4380cb57d9e6d29367ce90ef48256f68a2c452ab86a1da8bf41f979a32fbe",
+    "tools/layout-studio/host-action-observation.mjs": "93e027ce07df0b79c6b5f06c8683e6d981229a0f4c10e70c9296a16bd2714304",
+    "tools/layout-studio/editor-observation.mjs": "d12f07a474f2f3a5668adb68f4ccfea5837c19f31c2ed68f097823f0baa1a15d",
+    "tools/layout-studio/agent-observation.test.mjs": "e1ade5c24c192267789fb1856236687f4f641660b330808c924b3ee96c7e15c9",
+    "tools/layout-studio/host-action-observation.test.mjs": "a91bbeaaf49ce5dd4dd7c8a882e54110d143047de0baa81bdbe83aff401079cf",
+    "tools/layout-studio/editor-observation.test.mjs": "335e4d1904cbc0b45fa8f05aa429d3b73fffe35746457ace514d3518709e157c"
+  },
+  "isolated": {
+    "receipt": "isolated-test-ef51f4dd-8aba-43bf-80e3-e6f19a097fe3.json",
+    "totals": {
+      "required": 9,
+      "passed": 9,
+      "failed": 0,
+      "tests": 105,
+      "passedTests": 105,
+      "failedTests": 0,
+      "skippedTests": 0,
+      "cancelledTests": 0,
+      "todoTests": 0
+    },
+    "allChildAndTreeCleanupVerified": true
+  },
+  "typecheckPassed": true,
+  "behavior": [
+    "Agent, host-action and editor journal event timestamps must fall within the latest explicitly started or resumed recording interval.",
+    "The interval is stored in the same protected observation state; duplicate resume and backward clock movement cannot lower its boundary.",
+    "Existing sessions use creation time until their next resume. Old metadata is omitted without deleting existing events or changing execution results.",
+    "Encrypted API, provider/editor doubles, original transaction rollback, pause/exclusions and exact child/tree cleanup verify."
+  ],
+  "limits": [
+    "Metadata timestamps do not establish user intent, live attachment, task completion or measured savings.",
+    "No frontend, installed runtime, hardware, account, model or native task operation was performed.",
+    "The accepted complete Linux 701f915 run predates this correction; this checkpoint has focused evidence."
+  ]
+}

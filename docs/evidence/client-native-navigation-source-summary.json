@@ -1,0 +1,45 @@
+{
+  "schema": "switchyard-client-native-navigation-evidence/v1",
+  "scope": "Passive documented-client navigation to exact saved Windows Claude Desktop setup",
+  "runs": [
+    {
+      "receiptId": "96da9a33-cf43-4dbb-94bd-6bf2fb585649",
+      "sha256": "b3814997913e9730d887ec2e318a41bc4fa1c2f345fdb62f4eddc6919ede1b24",
+      "totals": {
+        "required": 5,
+        "passed": 5,
+        "failed": 0,
+        "tests": 59,
+        "passedTests": 59,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "files": [
+        "tools/layout-studio/integrations.test.mjs",
+        "tools/layout-studio/client-ui.test.mjs",
+        "tools/layout-studio/native-focus-ui.test.mjs",
+        "tools/layout-studio/connection-ui.test.mjs",
+        "tools/layout-studio/voice-ui.test.mjs"
+      ],
+      "originalBoundsPreserved": true,
+      "ownedCleanupComplete": true
+    }
+  ],
+  "sourceFiles": {
+    "tools/layout-studio/client-integrations.mjs": "f3f72a3b6130283753950f3897c8827997f94ebefe57c3445a3cccabb92863e7",
+    "tools/layout-studio/client-ui.mjs": "5937f5247b697c8bcd1fdd33cb1ab1daa6b08a05272b14557fef6503a1243458",
+    "tools/layout-studio/index.html": "b2bfad8f825fa5239bec1993031e31dd35703d80ad19f3e05171a4bf9427cb3c",
+    "tools/layout-studio/native-focus-ui.test.mjs": "64056c542bfec8c7d587494233284cea935c9adacb109071ee7d1965005f3c01",
+    "tools/layout-studio/test-support/browser-ui.mjs": "6e5755b0b0e23e62ae629f59ca613e06a4103faef054743c9d07a95ad709498a"
+  },
+  "boundaries": [
+    "Authenticated HTTP and encrypted storage are real; native executable signatures, processes, windows and browser DOM are explicit fixtures.",
+    "Catalog setup navigation never probes or focuses an application, launches a client, exports a recipe or grants task authority.",
+    "Saved setup and actual observed windows remain distinct. Launch remains unfinished; no Linux fallback is offered.",
+    "Delayed responses cannot populate a replacement workspace or revive a discarded review.",
+    "The unchanged five original groups pass 59 tests with zero skips and verified child cleanup.",
+    "Interactive browser, real Windows image/window and account acceptance remain separate."
+  ]
+}

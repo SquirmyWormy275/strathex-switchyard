@@ -1,0 +1,172 @@
+{
+  "schema": "switchyard-provider-process-birth-source/v1",
+  "at": "2026-11-07T01:21:23.788272+00:00",
+  "baseSource": "a6a6618ab22bb51d6d19d40d3676208c7fa75092",
+  "sourceFiles": {
+    "apps/windows-companion/provider-desktop-helper/Program.cs": "090a2b0450a3bb9dcc7f7ed1c904dfe264f765bf4dd63015acd3a436a75be939",
+    "apps/windows-companion/provider-desktop-helper/Sxsy.B122.ProviderDesktopHelper.csproj": "e4fd869cda71b91f706fed5061abdf57b578ed68faa7636190f9d590fca3f840",
+    "apps/windows-companion/src/provider-desktop.ts": "f5bde37621080e94662cd1015fd30086862b544ea82c1b49f9471201a4ee0779",
+    "apps/windows-companion/src/windows-provider-process.ts": "27cb9b4a00a6d8e74a1997fa0490495ee87fd1e7edf44efb843f2bc9f4de2d2b",
+    "apps/windows-companion/test/provider-desktop.test.ts": "4c9b7fd7bd793d7e01143a692e17a60e6b74671872cf37d4ad9a8d713ae9c9ef",
+    "apps/windows-companion/test/provider-desktop-adapter.test.ts": "13ed08c99b4f187132cc989f83add6e0f85bce69b67c42dd79b73cc7681adeaa",
+    "apps/windows-companion/test/windows-provider-process.test.ts": "4b653a072d67d89456425c7ab3964c905eaa7d9bdd1170e807ff04f0528c6de3",
+    "deployment/windows/Test-B122PortableBundle.ps1": "52f00099ed66b022c889690cdf854e56e38ab5a669a62c786a934554277b45a3"
+  },
+  "receipts": [
+    {
+      "name": "isolated-test-bd61f752-d7ec-400d-83f7-459f4e315308.json",
+      "sha256": "bcafbe4edc30ce46970b84f00d061d12332a27ec47375a0ed1217768b9211c19",
+      "success": false,
+      "totals": {
+        "required": 1,
+        "passed": 0,
+        "failed": 1,
+        "tests": 0,
+        "passedTests": 0,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "name": "isolated-test-16caf6d0-6359-44bc-967e-9fb07b0d3136.json",
+      "sha256": "02de70d63d7fbdde4b0607fea396386c15595d5e5482b4abb2767d2d98367e6c",
+      "success": false,
+      "totals": {
+        "required": 1,
+        "passed": 0,
+        "failed": 1,
+        "tests": 1,
+        "passedTests": 1,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "name": "isolated-test-9541f75e-7f71-4c65-8b39-2b495c89d3f4.json",
+      "sha256": "0e8bda3c0d00e645b74dcbfd4eb93894cf16f8a9bc4dd321eac1a02eec83b6c5",
+      "success": false,
+      "totals": {
+        "required": 1,
+        "passed": 0,
+        "failed": 1,
+        "tests": 9,
+        "passedTests": 6,
+        "failedTests": 3,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "name": "isolated-test-66c8f1a9-a0cc-433c-9aba-92a5866b71c3.json",
+      "sha256": "c2ec4ff094c919297c6528a0e2c6fa8a18d9762677d9ff721af5fa12c9942622",
+      "success": true,
+      "totals": {
+        "required": 1,
+        "passed": 1,
+        "failed": 0,
+        "tests": 9,
+        "passedTests": 9,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "name": "isolated-test-a2006bbc-b936-4063-bc7f-fdd9a157e4dc.json",
+      "sha256": "a380cbac146dcb18dd069aeeb32ab1497e7512278611ccb3c4b8f549ebc4b819",
+      "success": false,
+      "totals": {
+        "required": 6,
+        "passed": 5,
+        "failed": 1,
+        "tests": 56,
+        "passedTests": 53,
+        "failedTests": 3,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "name": "isolated-test-e410a16f-2c3c-4439-ae06-3e15cdc8c5cc.json",
+      "sha256": "f492de215b33d5ca8dd4258870a3cd5b71e12e66383a169db049f8ff6dc12e50",
+      "success": false,
+      "totals": {
+        "required": 6,
+        "passed": 5,
+        "failed": 1,
+        "tests": 56,
+        "passedTests": 55,
+        "failedTests": 1,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "name": "isolated-test-0deee20a-0d6c-4b1a-87fe-19cf752bc30f.json",
+      "sha256": "edfc78795b7de87c6f157039a62aa72687b9823237b2a02d9400dc8759d39981",
+      "success": true,
+      "totals": {
+        "required": 6,
+        "passed": 6,
+        "failed": 0,
+        "tests": 56,
+        "passedTests": 56,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    }
+  ],
+  "finalFocusedGroups": 6,
+  "finalFocusedPasses": 56,
+  "managed": {
+    "sdk": "8.0.424",
+    "buildExitCode": 0,
+    "warnings": 0,
+    "errors": 0,
+    "downloads": false,
+    "sourcesCleared": true,
+    "finalBuildServersDisabled": true,
+    "selfTest": {
+      "schema": "sxsy-b122.provider-desktop-self-test",
+      "version": 1,
+      "status": "ok",
+      "desktopProtocolVersion": 2,
+      "processBirthGrammarVerified": true,
+      "currentProcessVerified": null,
+      "tokenAccessMask": 8,
+      "windowFocused": false
+    }
+  },
+  "typecheck": "passed",
+  "cleanup": {
+    "files": 25,
+    "bytes": 417149,
+    "ownedRootRemoved": true
+  },
+  "limitations": [
+    "Windows native owner/session readback is unperformed locally.",
+    "Real Windows provider windows, accounts, foreground policy and ordinary-user interactive acceptance remain unperformed.",
+    "Windows Suite focus wiring remains unfinished; this corrects the commissioned companion adapter.",
+    "No model prompts, task creation, account action, keyboard transaction or desktop focus was performed."
+  ],
+  "failureNotes": [
+    "First harness attempt selected a Windows companion file from the Linux-only list and executed no tests; retained as failed.",
+    "Second harness attempt used a regex where the runner expects a literal full test name; zero-test plan remains failed.",
+    "The original valid file run reproduced three regressions: PID birth reuse, post-authorization birth/readback and absent/lossy birth identity.",
+    "Surrounding Linux run exposed Windows-absolute fake terminal paths; fixture paths now use native absolute temporary paths. First three and then one related fixture failures remain retained. No production path rule or deadline was loosened."
+  ],
+  "privateReceipt": {
+    "name": "provider-process-birth-source.json",
+    "sha256": "f8bc5d9b5497d8f8bdcf37cbf4a9ee2b5a9c457493b7f06df8fb1cba118a7a39"
+  }
+}

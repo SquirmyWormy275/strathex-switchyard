@@ -1,0 +1,61 @@
+{
+  "schema": "switchyard-full-linux-source-summary/v1",
+  "sourceCommit": "97ef7d69f92ed94eecc1895a13de046c4b587ea0",
+  "sourceTree": "2e56352c390e7dfe5bce738782a1d850e7059893",
+  "verificationReceipt": "isolated-test-54a63098-1e37-4f28-99e6-463aa6592bec.json",
+  "verificationReceiptSha256": "5f7ae462497699c16c1fa418aad051978b7a6ad3812535b5e5a5498f2339cc3a",
+  "success": true,
+  "totals": {
+    "required": 322,
+    "passed": 322,
+    "failed": 0,
+    "tests": 1981,
+    "passedTests": 1965,
+    "failedTests": 0,
+    "skippedTests": 16,
+    "cancelledTests": 0,
+    "todoTests": 0
+  },
+  "allChildAndTreeCleanupVerified": true,
+  "cleanupReceipt": "linux-97ef7d6-cleanup-1794021620570.json",
+  "cleanup": {
+    "schema": "switchyard-owned-full-linux-cleanup/v1",
+    "sourceCommit": "97ef7d69f92ed94eecc1895a13de046c4b587ea0",
+    "verificationReceipt": "isolated-test-54a63098-1e37-4f28-99e6-463aa6592bec.json",
+    "generatedFiles": 782,
+    "generatedBytes": 11785816,
+    "generatedDirectories": [
+      "apps/linux-companion/dist",
+      "apps/provider-adapter-host/dist",
+      "apps/vscode-extension/dist",
+      "apps/windows-companion/dist",
+      "packages/protocol/dist"
+    ],
+    "dependencyAliasCount": 9,
+    "trackedTreeClean": true,
+    "testChildrenExited": true,
+    "testParentEmpty": true,
+    "rootIdentityVerified": true,
+    "testParentIdentityVerified": true,
+    "worktreeRemoved": true,
+    "rootRemoved": true,
+    "testParentRemoved": true,
+    "markerRemoved": true,
+    "otherWorktreesPreserved": true,
+    "dependencyAliasIdentityAndTargetVerified": true,
+    "cleanupPlanSha256": "e50791e6cd0551405ce443995c862ef7e5f743509c2f818bbce0cea98e8baaac"
+  },
+  "providersAndWindowsGuestsDoubledWhereDeclared": true,
+  "installedChanged": false,
+  "originalManifestCommandsBoundsAndSkipsVerified": true,
+  "failedPreflight": {
+    "accepted": false,
+    "beforeTests": true,
+    "reason": "Temporary wrapper placeholder replacement corrupted an environment key; syntax failure occurred before any test started. Original failed wrapper retained until exact cleanup.",
+    "runnerSha256": "e29eef6aeed9c14c8b056cb30ea5281782c7a281395e3406b147fe5afcc3c5c2"
+  },
+  "limitations": [
+    "VS Code focus and Cargo inline-table changes made after this source have separate focused evidence.",
+    "Interactive Windows, provider account and physical hardware acceptance remain separate."
+  ]
+}

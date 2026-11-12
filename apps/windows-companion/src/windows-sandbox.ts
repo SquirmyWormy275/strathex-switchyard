@@ -32,6 +32,7 @@ import type {
 } from "../../../packages/control-plane/src/brokers.ts";
 import { redactText, untrustedSummary } from "../../../packages/control-plane/src/redaction.ts";
 import { createDurableAbortControl } from "./execution-cancellation.ts";
+import { validateRepositoryInputs, type RepositoryInputFile } from "./repository-inputs.ts";
 
 export const WINDOWS_SANDBOX_EXECUTABLE = "C:\\Windows\\System32\\WindowsSandbox.exe" as const;
 export const WINDOWS_SANDBOX_FEATURE_TOOL = "C:\\Windows\\System32\\dism.exe" as const;
@@ -95,6 +96,16 @@ export interface WindowsSandboxRunSpec {
   readonly shell: false;
   readonly timeoutMs: number;
   readonly maxOutputBytes: number;
+  readonly reviewedGuest?: Readonly<{ operationId: string; configurationSha256: string }>;
+  readonly reviewedExchangeBinding?: WindowsSandboxBoundedExchangeBinding;
+  readonly reviewedCatalogRelativePath?: string;
+}
+
+export interface WindowsSandboxGuestIdentity {
+  readonly schema: "switchyard-windows-sandbox-guest/v1";
+  readonly sandboxId: string;
+  readonly operationId: string;
+  readonly configurationSha256: string;
 }
 
 export interface WindowsSandboxProcessResult {
@@ -107,16 +118,22 @@ export interface WindowsSandboxProcessResult {
   readonly outputTruncated: boolean;
   /** True only once the WindowsSandbox.exe process handle has closed. */
   readonly hostProcessContained: boolean;
+  /** Independent guest-session stop proof; viewer/process exit is insufficient. */
+  readonly guestSessionExit?: WindowsSandboxGuestIdentity & Readonly<{ stopped: true }>;
 }
 
 export interface WindowsSandboxProcessRunner {
   run(
     spec: WindowsSandboxRunSpec,
     signal: AbortSignal,
-    onStarted: (pid: number) => Promise<void>
+    onStarted: (pid: number) => Promise<void>,
+    /** Persist the exact newly owned VM before its recipe receives permission. */
+    onGuestReady?: (identity: WindowsSandboxGuestIdentity) => Promise<void>
   ): Promise<WindowsSandboxProcessResult>;
   /** Unknown or reused process identities must conservatively report active. */
   isProcessActive?(pid: number): Promise<boolean>;
+  /** Observe only the protected original VM operation; never replay its worker. */
+  reconcileReviewedOperation?(input: Readonly<{ operationId: string; configurationSha256: string; knownSandboxId?: string }>): Promise<(WindowsSandboxGuestIdentity & Readonly<{ stopped: true }>) | undefined>;
 }
 
 /** Exact native identity for one non-reusable WindowsSandbox.exe process. */
@@ -177,6 +194,17 @@ export interface WindowsSandboxReceipt {
   readonly profile: WindowsSandboxProfile;
   readonly state: WindowsSandboxReceiptState;
   readonly targetRoot: string;
+  /** Present only for exact selected-input mapping; never the live target. */
+  readonly reviewedInputRoot?: string;
+  readonly reviewedInputManifestSha256?: string;
+  readonly reviewedInputOperationId?: string;
+  /** Mounted-volume admission facts; its host service owns detach/removal. */
+  readonly reviewedExchangeRoot?: string;
+  readonly reviewedExchangeBindingSha256?: string;
+  readonly exchangeQuotaEnforced?: true;
+  readonly guestStartAttempted?: boolean;
+  readonly guestExitVerified?: boolean;
+  readonly guestSessionId?: string;
   readonly destinationRoot: string;
   readonly createdAt: string;
   readonly updatedAt: string;
@@ -198,6 +226,7 @@ export interface WindowsSandboxReceipt {
   readonly reconciledAt?: string;
   readonly resultManifestDigest?: string;
   readonly resultRoot?: string;
+  readonly diagnosticRoot?: string;
   readonly summary: string;
 }
 
@@ -209,12 +238,15 @@ export interface WindowsSandboxExecutionResult {
   readonly processId?: string;
   readonly receiptPath?: string;
   readonly resultRoot?: string;
+  readonly diagnosticRoot?: string;
+  readonly programExitCode?: number;
   /** Host-memory bindings from the already validated result manifest. */
   readonly resultManifestSha256?: string;
   readonly recipeCatalogSha256?: string;
   readonly sandboxHelperSha256?: string;
   readonly validatedOutputs?: readonly Readonly<{ path: string; size: number; sha256: string }>[];
   readonly lifecycleEffect?: "created" | "entered" | "rebuilt";
+  readonly replayed?: true;
 }
 
 export interface WindowsSandboxExecutionRequest {
@@ -226,8 +258,58 @@ export interface WindowsSandboxExecutionRequest {
   /** Host-attested digests; repository bytes cannot authorize themselves. */
   readonly expectedRecipeCatalogSha256: string;
   readonly expectedHelperSha256: string;
+  readonly operationId?: string;
+  /** A host capability, never deserialized from an untrusted request body. */
+  readonly reviewedInputs?: WindowsSandboxReviewedInputLease;
+  readonly reviewedExchange?: WindowsSandboxReviewedExchangeLease;
   readonly signal?: AbortSignal;
   readonly effectGuard?: WindowsSandboxEffectGuard;
+}
+
+/** Produced by the native reviewed-input port; this is not a VM-exit fence. */
+export interface WindowsSandboxReviewedInputLease {
+  readonly operationId: string;
+  readonly sourceRoot: string;
+  readonly root: string;
+  readonly inputManifestSha256: string;
+  readonly inputFiles: readonly RepositoryInputFile[];
+  readonly privateAclReadbackVerified: true;
+  readonly sandboxEnforced: false;
+  assertCurrent(): Promise<void>;
+  /** Holds a cross-process kernel lease through preparation and the guest result. */
+  withConsumer<T>(effect: () => Promise<T>): Promise<T>;
+}
+
+export interface WindowsSandboxBoundedExchangeBinding {
+  readonly schema: "switchyard-windows-bounded-volume/v1";
+  readonly operationId: string;
+  readonly stagingRoot: string;
+  readonly stagingIdentity: Readonly<{ device: string; inode: string }>;
+  readonly imageIdentity: Readonly<{ device: string; inode: string }>;
+  readonly mountIdentity: Readonly<{ device: string; inode: string }>;
+  readonly footerSha256: string;
+  readonly volumeGuid: string;
+  readonly broker?: Readonly<{
+    installationId: string;
+    ownerScope: string;
+    serviceImageSha256: string;
+    taskScopeSha256: string;
+    inputManifestSha256: string;
+  }>;
+}
+
+/** Supplied by the trusted native volume service, never request JSON. */
+export interface WindowsSandboxReviewedExchangeLease {
+  readonly schema: "switchyard-windows-bounded-volume/v1";
+  readonly operationId: string;
+  readonly root: string;
+  readonly maximumBytes: 67108864;
+  readonly privateAclReadbackVerified: true;
+  readonly exchangeQuotaEnforced: true;
+  readonly sandboxEnforced: false;
+  readonly nativeBinding: WindowsSandboxBoundedExchangeBinding;
+  assertCurrent(): Promise<void>;
+  withConsumer<T>(effect: () => Promise<T>): Promise<T>;
 }
 
 export interface WindowsSandboxBackendOptions {
@@ -238,6 +320,9 @@ export interface WindowsSandboxBackendOptions {
   readonly jobManifestRelativePath: string;
   readonly defaultDestinationRoot?: string;
   readonly effectGuard: WindowsSandboxEffectGuard;
+  /** New connected executions require this; legacy host pins remain explicit. */
+  readonly requireReviewedInputs?: boolean;
+  readonly requireBoundedExchange?: boolean;
   readonly featureProbe?: WindowsSandboxFeatureProbe;
   readonly runner?: WindowsSandboxProcessRunner;
   readonly lifecycleController?: WindowsSandboxLifecycleController;
@@ -572,6 +657,7 @@ export class WindowsSandboxBackend {
   private readonly maxExtractedBytes: number;
   private readonly idFactory: () => string;
   private readonly now: () => Date;
+  private executionPending = false;
 
   constructor(options: WindowsSandboxBackendOptions) {
     if (!options.allowedTaskRoots.length) throw new Error("Windows Sandbox requires at least one task-owned root.");
@@ -599,6 +685,42 @@ export class WindowsSandboxBackend {
   run(request: WindowsSandboxExecutionRequest): Promise<WindowsSandboxExecutionResult> { return this.execute(request); }
 
   async execute(request: WindowsSandboxExecutionRequest): Promise<WindowsSandboxExecutionResult> {
+    if (this.executionPending) return { status: "unavailable", summary: "Wait for this Windows Sandbox boundary's current preparation or result; no concurrent launch was attempted." };
+    this.executionPending = true;
+    try {
+      if (request.reviewedInputs) {
+        if (typeof request.reviewedInputs.withConsumer !== "function") return { status: "blocked", summary: "The reviewed input mapping has no host-owned cross-process consumer lease." };
+        if (request.reviewedExchange) {
+          if (typeof request.reviewedExchange.withConsumer !== "function") return { status: "blocked", summary: "The bounded exchange has no host-owned cross-process consumer lease." };
+          return await request.reviewedInputs.withConsumer(() => request.reviewedExchange!.withConsumer(() => this.executeOwned(request)));
+        }
+        return await request.reviewedInputs.withConsumer(() => this.executeOwned(request));
+      }
+      return await this.executeOwned(request);
+    }
+    catch { return { status: "unavailable", summary: "The exact reviewed input consumer lease or source could not be verified; no replacement was selected." }; }
+    finally { this.executionPending = false; }
+  }
+
+  private async executeOwned(request: WindowsSandboxExecutionRequest): Promise<WindowsSandboxExecutionResult> {
+    let reviewed: WindowsSandboxReviewedInputLease | undefined;
+    const exchange = request.reviewedExchange;
+    try {
+      if (request.reviewedInputs) reviewed = { ...request.reviewedInputs, inputFiles: validateRepositoryInputs(request.reviewedInputs.inputFiles) };
+    } catch { return { status: "blocked", summary: "Windows Sandbox rejected a malformed exact reviewed-input capability." }; }
+    if (this.options.requireReviewedInputs && !reviewed) return { status: "blocked", summary: "Windows Sandbox requires its native exact reviewed-input lease; the live repository is not a fallback." };
+    if (this.options.requireBoundedExchange && !exchange) return { status: "blocked", summary: "Windows Sandbox requires its exact native bounded-volume lease; an ordinary writable directory is not a fallback." };
+    if (exchange && (!reviewed || exchange.schema !== "switchyard-windows-bounded-volume/v1" || exchange.operationId !== request.operationId
+      || exchange.nativeBinding?.operationId !== request.operationId || exchange.nativeBinding.schema !== exchange.schema
+      || exchange.maximumBytes !== 67108864 || exchange.exchangeQuotaEnforced !== true || exchange.privateAclReadbackVerified !== true
+      || exchange.sandboxEnforced !== false || typeof exchange.assertCurrent !== "function" || typeof exchange.withConsumer !== "function"
+      || !isAbsolute(exchange.root) || !isAbsolute(exchange.nativeBinding.stagingRoot) || !samePath(exchange.root, join(exchange.nativeBinding.stagingRoot, "mount"))
+      || !validDigest(exchange.nativeBinding.footerSha256))) return { status: "blocked", summary: "Windows Sandbox rejected an unbound native bounded-volume capability." };
+    if (reviewed && (!safeUuid.test(request.operationId ?? "") || reviewed.operationId !== request.operationId || typeof reviewed.assertCurrent !== "function" || reviewed.privateAclReadbackVerified !== true || reviewed.sandboxEnforced !== false || !validDigest(reviewed.inputManifestSha256))) return { status: "blocked", summary: "Windows Sandbox rejected an unbound reviewed-input capability." };
+    const broker = exchange?.nativeBinding.broker;
+    if (exchange && Object.hasOwn(exchange.nativeBinding, "broker") && (!broker || typeof broker !== "object" || Array.isArray(broker) || Object.keys(broker).sort().join() !== "inputManifestSha256,installationId,ownerScope,serviceImageSha256,taskScopeSha256"
+      || !safeUuid.test(broker.installationId) || ![broker.ownerScope, broker.serviceImageSha256, broker.taskScopeSha256, broker.inputManifestSha256].every(validDigest)
+      || broker.inputManifestSha256 !== reviewed?.inputManifestSha256)) return { status: "blocked", summary: "Windows Sandbox rejected a broker exchange bound to different reviewed inputs or an unknown installation scope." };
     const recipeId = request.recipeId ?? "full_sandbox";
     if (!safeIdentifier.test(recipeId)) return { status: "blocked", summary: "Windows Sandbox rejected an invalid repository recipe identifier." };
     const profile = resolveProfile(request.profile, recipeId);
@@ -617,10 +739,22 @@ export class WindowsSandboxBackend {
       const summary = untrustedSummary((error as Error).message || "Windows Sandbox could not reconcile its durable lease state.");
       return { status: error instanceof SandboxBlockedError ? "blocked" : "unavailable", summary };
     }
+    if (reviewed) {
+      const prior = reconciled.filter(receipt => receipt.reviewedInputOperationId === reviewed.operationId);
+      if (prior.length) {
+        const receipt = prior[0]!;
+        if (prior.length !== 1 || !samePath(receipt.targetRoot, reviewed.sourceRoot) || !samePath(receipt.reviewedInputRoot!, reviewed.root)
+          || receipt.reviewedInputManifestSha256 !== reviewed.inputManifestSha256 || receipt.recipeId !== recipeId || receipt.profile !== profile
+          || receipt.reviewedExchangeRoot !== exchange?.root || receipt.reviewedExchangeBindingSha256 !== (exchange ? sha256(JSON.stringify(exchange.nativeBinding)) : undefined)
+          || !sameDigest(receipt.recipeCatalogDigest, request.expectedRecipeCatalogSha256) || !sameDigest(receipt.helperDigest, request.expectedHelperSha256)) return { status: "blocked", summary: "The reviewed operation already belongs to a different exact guest mapping; no replay is available." };
+        return { status: receipt.state === "prepared" || receipt.state === "running" ? "unavailable" : terminalStatus(receipt.state), summary: receipt.summary, leaseId: receipt.leaseId, processId: receipt.processId, receiptPath: this.receiptPath(receipt), ...(receipt.resultRoot ? { resultRoot: receipt.resultRoot } : {}), ...(receipt.diagnosticRoot ? { diagnosticRoot: receipt.diagnosticRoot } : {}), ...(receipt.reviewedInputRoot && receipt.resultManifestDigest && receipt.guestExitVerified && Number.isInteger(receipt.exitCode) ? { programExitCode: receipt.exitCode! >>> 0 } : {}), replayed: true };
+      }
+    }
     const live = reconciled.filter((entry) => entry.state === "prepared" || entry.state === "running");
-    const interactiveLifecycle = recipeId === "full_sandbox" || recipeId === "rebuild_full_sandbox" ? this.lifecycle : undefined;
+    const interactiveLifecycle = !reviewed && (recipeId === "full_sandbox" || recipeId === "rebuild_full_sandbox") ? this.lifecycle : undefined;
     let lifecycleEffect: "created" | "rebuilt" = recipeId === "rebuild_full_sandbox" ? "rebuilt" : "created";
     if (live.length) {
+      if (reviewed || this.options.requireReviewedInputs) return { status: "unavailable", summary: "An exact reviewed-input execution cannot adopt or rebuild a prior guest. Preserve its input and guest ownership." };
       if (!interactiveLifecycle || live.length !== 1) {
         return { status: "unavailable", summary: "Windows Sandbox has an unreconciled live lease; no concurrent launch was attempted." };
       }
@@ -662,23 +796,40 @@ export class WindowsSandboxBackend {
       const destinationRoot = await this.canonicalOwnedDirectory(destinationAddress, allowedRoots, "destination");
       const helperDirectory = await this.canonicalOwnedDirectory(this.options.helperDirectory, allowedRoots, "helper");
       const stateRoot = await this.ensureOwnedDirectory(this.options.stateRoot, allowedRoots, "state");
+      let inputRoot = targetRoot;
+      if (reviewed) {
+        if (!samePath(reviewed.sourceRoot, targetRoot)) throw new SandboxBlockedError("The reviewed input lease belongs to a different source repository.");
+        const files = validateRepositoryInputs(reviewed.inputFiles);
+        if (sha256(JSON.stringify(files)) !== reviewed.inputManifestSha256) throw new SandboxBlockedError("The exact reviewed input manifest digest changed.");
+        const catalog = files.find(file => file.path === this.options.jobManifestRelativePath);
+        if (!catalog || !sameDigest(catalog.sha256, request.expectedRecipeCatalogSha256)) throw new SandboxBlockedError("The exact reviewed input set must include the pinned guest recipe catalog.");
+        await reviewed.assertCurrent();
+        inputRoot = await this.canonicalOwnedDirectory(reviewed.root, allowedRoots, "reviewed input");
+        if ([targetRoot, destinationRoot, helperDirectory].some(root => overlaps(root, inputRoot))) throw new SandboxBlockedError("The reviewed input copy must be disjoint from the live repository, tools and output destination.");
+      }
       const persistentVolumes = await this.resolvePersistentVolumes(profile, recipeId, allowedRoots, [targetRoot, destinationRoot, helperDirectory, stateRoot]);
+      if (reviewed && (persistentVolumes.length || this.options.helperFilename !== "b122-sandbox-worker.exe")) throw new SandboxBlockedError("Reviewed guest execution requires only its three fixed mappings and the pinned fixed worker filename.");
       const helperPath = join(helperDirectory, this.options.helperFilename);
       const helper = await this.filesystem.lstat(helperPath);
       if (!helper.isFile || helper.isSymbolicLink) throw new SandboxBlockedError("Windows Sandbox fixed guest helper is absent or is a symbolic link.");
       const helperDigest = sha256(await this.filesystem.readBytes(helperPath));
       if (!sameDigest(helperDigest, request.expectedHelperSha256)) throw new SandboxBlockedError("Windows Sandbox fixed guest helper changed after host attestation.");
-      const manifestPath = join(targetRoot, this.options.jobManifestRelativePath);
+      const manifestPath = join(inputRoot, this.options.jobManifestRelativePath);
       const manifest = await this.filesystem.lstat(manifestPath);
       if (!manifest.isFile || manifest.isSymbolicLink || manifest.size <= 0 || manifest.size > maximumManifestBytes) throw new SandboxBlockedError("Windows Sandbox repository recipe catalog is absent, linked, empty, or oversized.");
       const recipeCatalogDigest = sha256(await this.filesystem.readBytes(manifestPath));
       if (!sameDigest(recipeCatalogDigest, request.expectedRecipeCatalogSha256)) throw new SandboxBlockedError("Windows Sandbox recipe catalog changed after host attestation.");
 
       leaseRoot = join(stateRoot, "leases", rawId);
-      const exchangeRoot = join(leaseRoot, "exchange");
-      await this.filesystem.mkdir(exchangeRoot);
+      const exchangeRoot = exchange?.root ?? join(leaseRoot, "exchange");
+      await this.filesystem.mkdir(exchange ? leaseRoot : exchangeRoot);
       const canonicalLeaseRoot = await this.canonicalOwnedDirectory(leaseRoot, allowedRoots, "lease");
-      const canonicalExchangeRoot = await this.canonicalOwnedDirectory(exchangeRoot, allowedRoots, "exchange");
+      if (exchange) {
+        await this.canonicalOwnedDirectory(exchange.nativeBinding.stagingRoot, allowedRoots, "bounded exchange owner");
+        if ([targetRoot, destinationRoot, helperDirectory, inputRoot, canonicalLeaseRoot].some(root => overlaps(root, exchangeRoot))) throw new SandboxBlockedError("The bounded exchange must be disjoint from inputs, tools, outputs and control records.");
+        await exchange.assertCurrent();
+      }
+      const canonicalExchangeRoot = exchange ? exchangeRoot : await this.canonicalOwnedDirectory(exchangeRoot, allowedRoots, "exchange");
       const configurationPath = join(canonicalLeaseRoot, "sandbox.wsb");
       const requestPath = join(canonicalExchangeRoot, "request.json");
       const requestDocument = JSON.stringify({
@@ -691,11 +842,12 @@ export class WindowsSandboxBackend {
         recipeCatalogDigest,
         helperDigest,
         resourcePolicy,
-        resourcePolicyDigest
+        resourcePolicyDigest,
+        ...(reviewed ? { hostOwnsGuestShutdown: true } : {})
       });
       await this.filesystem.writeText(requestPath, requestDocument);
       const configurationDocument = createConfiguration({
-        targetRoot,
+        targetRoot: inputRoot,
         helperDirectory,
         exchangeRoot: canonicalExchangeRoot,
         helperFilename: this.options.helperFilename,
@@ -703,7 +855,8 @@ export class WindowsSandboxBackend {
         profile,
         resourcePolicy,
         persistentVolumes,
-        interactive: Boolean(interactiveLifecycle)
+        interactive: Boolean(interactiveLifecycle),
+        delayedRecipe: Boolean(reviewed)
       });
       await this.filesystem.writeText(configurationPath, configurationDocument);
       const requestDigest = sha256(requestDocument);
@@ -722,6 +875,8 @@ export class WindowsSandboxBackend {
         profile,
         state: "prepared",
         targetRoot,
+        ...(reviewed ? { reviewedInputRoot: inputRoot, reviewedInputManifestSha256: reviewed.inputManifestSha256, reviewedInputOperationId: reviewed.operationId } : {}),
+        ...(exchange ? { reviewedExchangeRoot: exchange.root, reviewedExchangeBindingSha256: sha256(JSON.stringify(exchange.nativeBinding)), exchangeQuotaEnforced: true as const } : {}),
         destinationRoot,
         createdAt,
         updatedAt: createdAt,
@@ -742,8 +897,9 @@ export class WindowsSandboxBackend {
       await this.writeReceipt(receiptPath, receipt);
 
       await this.assertCanonicalUnchanged(targetRoot, "target");
+      if (reviewed) { await reviewed.assertCurrent(); await this.assertCanonicalUnchanged(inputRoot, "reviewed input"); }
       await this.assertCanonicalUnchanged(helperDirectory, "helper");
-      await this.assertCanonicalUnchanged(canonicalExchangeRoot, "exchange");
+      if (exchange) await exchange.assertCurrent(); else await this.assertCanonicalUnchanged(canonicalExchangeRoot, "exchange");
       for (const volume of persistentVolumes) await this.assertCanonicalUnchanged(volume.hostRoot, `persistent volume ${volume.id}`);
       if (sha256(await this.filesystem.readBytes(helperPath)) !== helperDigest) throw new SandboxBlockedError("Windows Sandbox fixed guest helper changed after validation.");
       if (sha256(await this.filesystem.readBytes(manifestPath)) !== recipeCatalogDigest) throw new SandboxBlockedError("Windows Sandbox repository recipe catalog changed after validation.");
@@ -753,6 +909,8 @@ export class WindowsSandboxBackend {
       if (!sandboxExecutable?.isFile || sandboxExecutable.isSymbolicLink) throw new SandboxBlockedError("The fixed inbox Windows Sandbox executable is unavailable at final launch.");
       const guard = request.effectGuard ?? this.options.effectGuard;
       await this.assertEffect(guard, { phase: "launch", leaseId, recipeId, targetRoot, destinationRoot });
+      if (reviewed) await reviewed.assertCurrent();
+      if (exchange) await exchange.assertCurrent();
       if (request.signal?.aborted) throw new SandboxCancelledError("Windows Sandbox cancellation arrived before launch.");
 
       const controller = request.signal ? undefined : new AbortController();
@@ -764,7 +922,9 @@ export class WindowsSandboxBackend {
         environment: { SystemRoot: "C:\\Windows", WINDIR: "C:\\Windows" },
         shell: false,
         timeoutMs: this.timeoutMs,
-        maxOutputBytes: this.maxProcessOutputBytes
+        maxOutputBytes: this.maxProcessOutputBytes,
+        ...(reviewed ? { reviewedGuest: { operationId: reviewed.operationId, configurationSha256: configurationDigest }, reviewedCatalogRelativePath: this.options.jobManifestRelativePath } : {}),
+        ...(exchange ? { reviewedExchangeBinding: structuredClone(exchange.nativeBinding) } : {})
       };
       if (interactiveLifecycle) {
         const identity = assertProcessIdentity(await interactiveLifecycle.launch(runSpec, configurationDigest, signal));
@@ -788,40 +948,63 @@ export class WindowsSandboxBackend {
           lifecycleEffect
         };
       }
+      if (reviewed) {
+        receipt = this.updateReceipt(receipt, { guestStartAttempted: true, guestExitVerified: false });
+        await this.writeReceipt(receiptPath, receipt);
+        await reviewed.assertCurrent();
+        if (signal.aborted) throw new SandboxCancelledError("The reviewed guest was cancelled before native launch.");
+      }
       const processResult = await this.runner.run(runSpec, signal, async (pid) => {
         if (!Number.isSafeInteger(pid) || pid <= 0) throw new Error("Windows Sandbox did not expose a valid owned child process identity.");
         receipt = this.updateReceipt(receipt!, { state: "running", hostPid: pid, summary: "Windows Sandbox owned process is running." });
         await this.writeReceipt(receiptPath!, receipt);
-      });
+      }, reviewed ? async identity => {
+        if (!validGuestIdentity(identity, reviewed.operationId, configurationDigest, false) || receipt!.guestSessionId) throw new SandboxBlockedError("The exact newly owned guest identity did not verify or was already acknowledged.");
+        receipt = this.updateReceipt(receipt!, { guestSessionId: identity.sandboxId });
+        await this.writeReceipt(receiptPath!, receipt);
+        await reviewed.assertCurrent();
+        if (exchange) await exchange.assertCurrent();
+        if (signal.aborted) throw new SandboxCancelledError("The reviewed guest recipe was cancelled before its ownership acknowledgement.");
+      } : undefined);
 
       const combined = boundedRedactedOutput(`${processResult.stdout}\n${processResult.stderr}`, this.maxProcessOutputBytes);
+      const guestExitVerified = Boolean(reviewed && receipt.guestSessionId && validGuestIdentity(processResult.guestSessionExit, reviewed.operationId, configurationDigest, true) && processResult.guestSessionExit!.sandboxId === receipt.guestSessionId);
       receipt = this.updateReceipt(receipt, {
         hostPid: processResult.pid ?? receipt.hostPid,
         exitCode: processResult.exitCode,
         timedOut: processResult.timedOut,
         cancelled: processResult.cancelled,
         processOutput: combined.output,
-        processOutputTruncated: processResult.outputTruncated || combined.truncated
+        processOutputTruncated: processResult.outputTruncated || combined.truncated,
+        ...(reviewed ? { guestExitVerified } : {})
       });
+      if (reviewed && !guestExitVerified) return await this.finish(receiptPath, receipt, "failed", "The reviewed guest session has no independent stop proof. Preserve its mapping, exchange and input ownership; viewer exit is insufficient.");
       if (!processResult.hostProcessContained) return await this.finish(receiptPath, receipt, "failed", "Windows Sandbox could not prove host-process containment or the absence of survivors.");
       if (processResult.timedOut) return await this.finish(receiptPath, receipt, "timed_out", "Windows Sandbox exceeded its bounded deadline and its owned process was terminated.");
       if (processResult.cancelled || signal.aborted) return await this.finish(receiptPath, receipt, "cancelled", "Windows Sandbox was cancelled and its owned process was terminated.");
-      if (processResult.exitCode !== 0) return await this.finish(receiptPath, receipt, "failed", `Windows Sandbox exited without a successful receipt (${processResult.exitCode ?? "no exit code"}).`);
-
-      const validated = await this.validateResultManifest(canonicalExchangeRoot, { requestId, leaseId, recipeId, profile, recipeCatalogDigest, resourcePolicyDigest });
+      const failedProgram = processResult.exitCode !== 0;
+      if (failedProgram && (!reviewed || !Number.isInteger(processResult.exitCode) || processResult.exitCode! < -2147483648 || processResult.exitCode! > 4294967295)) return await this.finish(receiptPath, receipt, "failed", `Windows Sandbox exited without a successful receipt (${processResult.exitCode ?? "no exit code"}).`);
+      if (exchange) await exchange.assertCurrent();
+      let validated: ValidatedResultManifest;
+      try { validated = await this.validateResultManifest(canonicalExchangeRoot, { requestId, leaseId, recipeId, profile, recipeCatalogDigest, resourcePolicyDigest }, exchange, failedProgram ? processResult.exitCode! : undefined); }
+      catch (error) { if (!failedProgram) throw error; return await this.finish(receiptPath, receipt, "failed", `Windows Sandbox exited without a successful receipt (${processResult.exitCode}); bounded failure diagnostics did not verify.`); }
       await this.assertCanonicalUnchanged(targetRoot, "target");
       await this.assertCanonicalUnchanged(destinationRoot, "destination");
-      await this.assertCanonicalUnchanged(canonicalExchangeRoot, "exchange");
+      if (exchange) await exchange.assertCurrent(); else await this.assertCanonicalUnchanged(canonicalExchangeRoot, "exchange");
       await this.assertEffect(guard, { phase: "extract", leaseId, recipeId, targetRoot, destinationRoot });
       if (signal.aborted) return await this.finish(receiptPath, receipt, "cancelled", "Windows Sandbox extraction was cancelled before any output left quarantine.");
       const resultRoot = await this.extractValidated(rawId, destinationRoot, validated.outputs);
       receipt = this.updateReceipt(receipt, {
         resultManifestDigest: validated.digest,
-        resultRoot
+        ...(failedProgram ? { diagnosticRoot: resultRoot } : { resultRoot })
       });
-      const finished = await this.finish(receiptPath, receipt, "completed", `Windows Sandbox completed the verified ${recipeId} recipe and extracted validated output: ${validated.summary}`);
+      const finished = await this.finish(receiptPath, receipt, failedProgram ? "failed" : "completed", failedProgram
+        ? `Windows Sandbox program exited unsuccessfully (${processResult.exitCode}); only verified bounded stdout/stderr diagnostics were retained.`
+        : `Windows Sandbox completed the verified ${recipeId} recipe and extracted validated output: ${validated.summary}`);
       return {
         ...finished,
+        ...(failedProgram ? { diagnosticRoot: resultRoot } : {}),
+        ...(reviewed ? { programExitCode: processResult.exitCode! >>> 0 } : {}),
         resultManifestSha256: validated.digest,
         recipeCatalogSha256: recipeCatalogDigest,
         sandboxHelperSha256: helperDigest,
@@ -933,6 +1116,12 @@ export class WindowsSandboxBackend {
         receipts.push(receipt);
         continue;
       }
+      if (receipt.reviewedInputRoot && receipt.guestStartAttempted && receipt.guestExitVerified !== true) {
+        const observed = await this.runner.reconcileReviewedOperation?.({ operationId: receipt.reviewedInputOperationId!, configurationSha256: receipt.configurationDigest, ...(receipt.guestSessionId ? { knownSandboxId: receipt.guestSessionId } : {}) }).catch(() => undefined);
+        if (!validGuestIdentity(observed, receipt.reviewedInputOperationId!, receipt.configurationDigest, true) || receipt.guestSessionId && observed.sandboxId !== receipt.guestSessionId) throw new SandboxBlockedError("A reviewed guest session still needs independent stop proof; its mapped inputs and exchange were preserved.");
+        receipt = this.updateReceipt(receipt, { guestSessionId: observed.sandboxId, guestExitVerified: true, ...(receipt.state === "prepared" || receipt.state === "running" ? { state: "failed", summary: "Independent guest exit was recovered. The interrupted program outcome remains unconfirmed; no worker was replayed." } : {}), reconciledAt: this.now().toISOString() });
+        await this.writeReceipt(receiptPath, receipt);
+      }
       if (receipt.state === "prepared" || receipt.state === "running") {
         if (receipt.hostProcessIdentity) {
           if (!this.lifecycle) throw new SandboxBlockedError("Windows Sandbox found an exact interactive lease but no native identity controller is available.");
@@ -1037,6 +1226,24 @@ export class WindowsSandboxBackend {
     if (!samePath(path, current)) throw new SandboxBlockedError(`Windows Sandbox ${label} root changed after validation.`);
   }
 
+  private async boundedExchangePath(exchange: WindowsSandboxReviewedExchangeLease, path: string, directory: boolean): Promise<string> {
+    if (!inside(exchange.root, path) || samePath(exchange.root, path)) throw new SandboxValidationError("Windows Sandbox output escaped its exact bounded volume.");
+    const parts = relative(exchange.root, path).split(sep);
+    if (parts.length > 64 || parts.some(part => !validRelativePath(part))) throw new SandboxValidationError("Windows Sandbox bounded output path is invalid.");
+    // The trusted native lease verifies the one allowed mount point and its
+    // FAT volume. Descendants must remain plain directories/files. Resolving
+    // the mount through realpath would produce a volume GUID outside the
+    // ordinary task-root contract; generic directory checks remain unchanged.
+    let current = exchange.root;
+    for (let index = 0; index < parts.length; index++) {
+      current = join(current, parts[index]!);
+      const metadata = await this.filesystem.lstat(current);
+      const requireDirectory = directory || index < parts.length - 1;
+      if (metadata.isSymbolicLink || (requireDirectory ? !metadata.isDirectory : !metadata.isFile)) throw new SandboxValidationError("Windows Sandbox bounded output contains a link or a changed file kind.");
+    }
+    return current;
+  }
+
   private async assertEffect(guard: WindowsSandboxEffectGuard, input: Parameters<WindowsSandboxEffectGuard["check"]>[0]): Promise<void> {
     const result = await guard.check(input);
     if (!result.allowed) throw new SandboxBlockedError(untrustedSummary(result.reason));
@@ -1051,7 +1258,9 @@ export class WindowsSandboxBackend {
       profile: WindowsSandboxProfile;
       recipeCatalogDigest: string;
       resourcePolicyDigest: string;
-    }>
+    }>,
+    exchange?: WindowsSandboxReviewedExchangeLease,
+    failureExitCode?: number
   ): Promise<ValidatedResultManifest> {
     const manifestPath = join(exchangeRoot, "result-manifest.json");
     const metadata = await this.filesystem.lstat(manifestPath).catch(() => undefined);
@@ -1060,8 +1269,10 @@ export class WindowsSandboxBackend {
     let unknown: unknown;
     try { unknown = JSON.parse(Buffer.from(bytes).toString("utf8")); }
     catch { throw new SandboxValidationError("Windows Sandbox result manifest is not valid JSON."); }
-    if (!isRecord(unknown) || !exactKeys(unknown, ["schema", "version", "requestId", "leaseId", "recipeId", "profile", "recipeCatalogDigest", "resourcePolicyDigest", "outcome", "summary", "resourceEnforcement", "outputs"])) throw new SandboxValidationError("Windows Sandbox result manifest does not use the exact v2 schema.");
-    if (unknown.schema !== windowsSandboxResultSchema || unknown.version !== 2 || unknown.outcome !== "completed") throw new SandboxValidationError("Windows Sandbox helper did not provide a successful exact-schema result.");
+    const failed = failureExitCode !== undefined;
+    if (!isRecord(unknown) || !exactKeys(unknown, ["schema", "version", "requestId", "leaseId", "recipeId", "profile", "recipeCatalogDigest", "resourcePolicyDigest", "outcome", "summary", "resourceEnforcement", "outputs", ...(failed ? ["processExitCode"] : [])])) throw new SandboxValidationError("Windows Sandbox result manifest does not use the exact v2 schema.");
+    if (unknown.schema !== windowsSandboxResultSchema || unknown.version !== 2 || unknown.outcome !== (failed ? "failed" : "completed")) throw new SandboxValidationError("Windows Sandbox helper did not provide the exact expected program outcome.");
+    if (failed && (!Number.isInteger(unknown.processExitCode) || (unknown.processExitCode as number) < -2147483648 || (unknown.processExitCode as number) > 4294967295 || ((unknown.processExitCode as number) >>> 0) === 0 || ((unknown.processExitCode as number) >>> 0) !== (failureExitCode >>> 0))) throw new SandboxValidationError("Windows Sandbox failure diagnostics do not match the independently observed guest exit code.");
     if (unknown.requestId !== binding.requestId || unknown.leaseId !== binding.leaseId || unknown.recipeId !== binding.recipeId || unknown.profile !== binding.profile || unknown.recipeCatalogDigest !== binding.recipeCatalogDigest || unknown.resourcePolicyDigest !== binding.resourcePolicyDigest) throw new SandboxValidationError("Windows Sandbox result manifest is stale or is not bound to this exact request, profile, resource policy, and recipe catalog.");
     if (!isRecord(unknown.resourceEnforcement) || !exactKeys(unknown.resourceEnforcement, ["jobObject", "cpuHardCap", "memoryLimit", "processLimit", "noSurvivors", "activeProcessesAfterCleanup"])
       || unknown.resourceEnforcement.jobObject !== true || unknown.resourceEnforcement.cpuHardCap !== true
@@ -1071,8 +1282,10 @@ export class WindowsSandboxBackend {
     }
     if (typeof unknown.summary !== "string" || Buffer.byteLength(unknown.summary, "utf8") > 1_024) throw new SandboxValidationError("Windows Sandbox result summary is invalid or oversized.");
     if (!Array.isArray(unknown.outputs) || unknown.outputs.length > maximumOutputs) throw new SandboxValidationError("Windows Sandbox output manifest exceeds its file-count bound.");
+    if (failed && (unknown.outputs.length !== 2 || unknown.outputs.map(item => isRecord(item) ? item.path : null).sort().join() !== "process.stderr.txt,process.stdout.txt")) throw new SandboxValidationError("Failed Windows programs may retain only the two fixed captured diagnostic streams.");
     const outputRoot = join(exchangeRoot, "output");
-    await this.canonicalOwnedDirectory(outputRoot, [exchangeRoot], "quarantine output");
+    if (exchange) await this.boundedExchangePath(exchange, outputRoot, true);
+    else await this.canonicalOwnedDirectory(outputRoot, [exchangeRoot], "quarantine output");
     const validated: ValidatedOutput[] = [];
     let total = 0;
     const seen = new Set<string>();
@@ -1082,12 +1295,13 @@ export class WindowsSandboxBackend {
       if (!Number.isSafeInteger(item.size) || (item.size as number) < 0 || (item.size as number) > maximumSingleOutputBytes) throw new SandboxValidationError("Windows Sandbox output size is invalid or oversized.");
       if (typeof item.sha256 !== "string" || !/^[a-f0-9]{64}$/i.test(item.sha256)) throw new SandboxValidationError("Windows Sandbox output digest is invalid.");
       total += item.size as number;
+      if (failed && total > this.maxProcessOutputBytes) throw new SandboxValidationError("Windows Sandbox failure diagnostics exceed the reviewed shared output bound.");
       if (total > this.maxExtractedBytes) throw new SandboxValidationError("Windows Sandbox total extracted output exceeds its configured bound.");
       const sourcePath = resolve(outputRoot, item.path);
       if (!inside(outputRoot, sourcePath)) throw new SandboxValidationError("Windows Sandbox output escapes quarantine.");
       const sourceMetadata = await this.filesystem.lstat(sourcePath).catch(() => undefined);
       if (!sourceMetadata?.isFile || sourceMetadata.isSymbolicLink || sourceMetadata.size !== item.size) throw new SandboxValidationError("Windows Sandbox output is missing, linked, or has the wrong size.");
-      const canonicalSource = await this.filesystem.realpath(sourcePath);
+      const canonicalSource = exchange ? await this.boundedExchangePath(exchange, sourcePath, false) : await this.filesystem.realpath(sourcePath);
       if (!inside(outputRoot, canonicalSource)) throw new SandboxValidationError("Windows Sandbox output resolves outside quarantine.");
       const contents = await this.filesystem.readBytes(canonicalSource);
       if (contents.byteLength !== item.size || sha256(contents) !== item.sha256.toLowerCase()) throw new SandboxValidationError("Windows Sandbox output digest does not match its quarantine manifest.");
@@ -1162,15 +1376,19 @@ export class WindowsSandboxBackend {
       leaseId: next.leaseId,
       processId: next.processId,
       receiptPath,
-      ...(next.resultRoot ? { resultRoot: next.resultRoot } : {})
+      ...(next.resultRoot ? { resultRoot: next.resultRoot } : {}),
+      ...(next.diagnosticRoot ? { diagnosticRoot: next.diagnosticRoot } : {})
     };
   }
 
   private async cleanupLease(receiptPath: string, receipt: WindowsSandboxReceipt): Promise<void> {
+    if (receipt.reviewedInputRoot && receipt.guestStartAttempted && receipt.guestExitVerified !== true) throw new Error("Reviewed guest exit remains unconfirmed; preserve its exchange and input mapping.");
     const leaseRoot = dirname(receiptPath);
     const rawId = basename(leaseRoot);
     if (!safeUuid.test(rawId)) throw new Error("Windows Sandbox refused an invalid durable lease cleanup identity.");
-    await this.filesystem.remove(join(leaseRoot, "exchange"));
+    // The native volume service owns external exchange retirement. Recursive
+    // generic cleanup must never traverse or remove its mounted volume.
+    if (!receipt.reviewedExchangeRoot) await this.filesystem.remove(join(leaseRoot, "exchange"));
     await this.filesystem.remove(join(leaseRoot, "sandbox.wsb"));
     const destinationRoot = await this.filesystem.realpath(receipt.destinationRoot);
     const allowedRoots = await Promise.all(this.options.allowedTaskRoots.map((path) => this.filesystem.realpath(path)));
@@ -1192,6 +1410,9 @@ export interface WindowsSandboxIsolationRuntimeOptions {
   readonly permitVerifier: PermitVerifier;
   readonly recipeCatalogDigest: string;
   readonly helperDigest: string;
+  /** Exact dispatch-bound native input provider, supplied by the trusted host. */
+  readonly reviewedInputs?: Readonly<{ prepare(request: IsolationRequest): Promise<WindowsSandboxReviewedInputLease> }>;
+  readonly reviewedExchange?: Readonly<{ prepare(request: IsolationRequest): Promise<WindowsSandboxReviewedExchangeLease> }>;
 }
 
 /** Control-plane wrapper; success is reported only for a concrete completed backend receipt. */
@@ -1236,6 +1457,8 @@ export class WindowsSandboxIsolationRuntime implements IsolationRuntime {
       }
     };
     try {
+      const reviewedInputs = await this.options.reviewedInputs?.prepare(request);
+      const reviewedExchange = await this.options.reviewedExchange?.prepare(request);
       const result = await this.backend.execute({
         targetRoot: request.target.repositoryRoot,
         destinationRoot: this.options.destinationRoot,
@@ -1243,6 +1466,8 @@ export class WindowsSandboxIsolationRuntime implements IsolationRuntime {
         profile: request.profile === "rebuild_full_sandbox" ? "fresh_full_sandbox" : request.profile,
         expectedRecipeCatalogSha256: this.options.recipeCatalogDigest,
         expectedHelperSha256: this.options.helperDigest,
+        ...(reviewedInputs ? { reviewedInputs, operationId: request.operationId } : {}),
+        ...(reviewedExchange ? { reviewedExchange, operationId: request.operationId } : {}),
         signal: control.signal,
         effectGuard: controlPlaneGuard
       });
@@ -1279,6 +1504,7 @@ function createConfiguration(input: Readonly<{
   resourcePolicy: WindowsSandboxResourcePolicy;
   persistentVolumes: readonly PersistentVolumeMapping[];
   interactive: boolean;
+  delayedRecipe?: boolean;
 }>): string {
   const command = `&quot;C:\\B122\\tools\\${input.helperFilename}&quot; --catalog &quot;C:\\B122\\input\\${input.manifestRelativePath.replace(/\//g, "\\")}&quot; --request &quot;C:\\B122\\exchange\\request.json&quot; --output &quot;C:\\B122\\exchange&quot;`;
   return [
@@ -1297,7 +1523,7 @@ function createConfiguration(input: Readonly<{
     mappedFolder(input.exchangeRoot, "C:\\B122\\exchange", false),
     ...input.persistentVolumes.map((volume) => mappedFolder(volume.hostRoot, volume.sandboxRoot, volume.readOnly)),
     "  </MappedFolders>",
-    ...(input.interactive ? [] : [`  <LogonCommand><Command>${command}</Command></LogonCommand>`]),
+    ...(input.interactive || input.delayedRecipe ? [] : [`  <LogonCommand><Command>${command}</Command></LogonCommand>`]),
     "</Configuration>",
     ""
   ].join("\n");
@@ -1349,6 +1575,22 @@ function parseReceipt(contents: string, rawId: string): WindowsSandboxReceipt {
   let value: unknown;
   try { value = JSON.parse(contents); }
   catch { throw new Error("Windows Sandbox receipt is not valid JSON."); }
+  if (isRecord(value)) {
+    const reviewed = [value.reviewedInputRoot, value.reviewedInputManifestSha256, value.reviewedInputOperationId].some(field => field !== undefined);
+    if (reviewed && (typeof value.reviewedInputRoot !== "string" || !isAbsolute(value.reviewedInputRoot)
+      || typeof value.reviewedInputManifestSha256 !== "string" || !validDigest(value.reviewedInputManifestSha256)
+      || typeof value.reviewedInputOperationId !== "string" || !safeUuid.test(value.reviewedInputOperationId))) throw new Error("Windows Sandbox reviewed-input receipt binding is malformed.");
+    const bounded = [value.reviewedExchangeRoot, value.reviewedExchangeBindingSha256, value.exchangeQuotaEnforced].some(field => field !== undefined);
+    if (bounded && (!reviewed || typeof value.reviewedExchangeRoot !== "string" || !isAbsolute(value.reviewedExchangeRoot)
+      || typeof value.reviewedExchangeBindingSha256 !== "string" || !validDigest(value.reviewedExchangeBindingSha256)
+      || value.exchangeQuotaEnforced !== true)) throw new Error("Windows Sandbox bounded-volume receipt binding is malformed.");
+    if (value.diagnosticRoot !== undefined && (typeof value.diagnosticRoot !== "string" || !isAbsolute(value.diagnosticRoot) || typeof value.destinationRoot !== "string" || !inside(value.destinationRoot, value.diagnosticRoot) || basename(value.diagnosticRoot) !== `sandbox-${rawId}` || value.resultRoot !== undefined || value.state !== "failed")) throw new Error("Windows Sandbox diagnostic receipt ownership is malformed.");
+    if ((value.guestStartAttempted !== undefined && (!reviewed || typeof value.guestStartAttempted !== "boolean"))
+      || (value.guestExitVerified !== undefined && (!reviewed || typeof value.guestExitVerified !== "boolean"))
+      || (value.guestSessionId !== undefined && (!reviewed || typeof value.guestSessionId !== "string" || !safeUuid.test(value.guestSessionId)))
+      || (value.guestExitVerified === true && value.guestSessionId === undefined)
+      || (value.guestExitVerified === true && value.guestStartAttempted !== true)) throw new Error("Windows Sandbox guest ownership evidence is malformed.");
+  }
   if (!isRecord(value) || value.schema !== windowsSandboxReceiptSchema || value.version !== 2
     || value.leaseId !== `sandbox:${rawId}` || value.processId !== `sandbox-process:${rawId}` || value.requestId !== `sandbox-request:${rawId}`
     || typeof value.recipeId !== "string" || !safeIdentifier.test(value.recipeId)
@@ -1375,6 +1617,11 @@ function parseReceipt(contents: string, rawId: string): WindowsSandboxReceipt {
     throw new Error("Windows Sandbox receipt is malformed or not bound to its lease path.");
   }
   return value as unknown as WindowsSandboxReceipt;
+}
+
+function validGuestIdentity(value: unknown, operationId: string, configurationSha256: string, stopped: boolean): value is WindowsSandboxGuestIdentity & Readonly<{ stopped?: true }> {
+  if (!isRecord(value) || Object.keys(value).sort().join() !== (stopped ? "configurationSha256,operationId,sandboxId,schema,stopped" : "configurationSha256,operationId,sandboxId,schema")) return false;
+  return value.schema === "switchyard-windows-sandbox-guest/v1" && value.operationId === operationId && value.configurationSha256 === configurationSha256 && typeof value.sandboxId === "string" && safeUuid.test(value.sandboxId) && (!stopped || value.stopped === true);
 }
 
 function xml(value: string): string {

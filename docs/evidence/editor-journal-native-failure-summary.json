@@ -1,0 +1,57 @@
+{
+  "schema": "switchyard-editor-journal-native-failure-summary/v1",
+  "sourceCommit": "ecbb8cbdde16cf7b45ad9d4847bf65ae04a451a8",
+  "mergeCommit": "314fecac9d339afbdb2431177be2c2fc3b2e8c12",
+  "tree": "9fc199e0afaabbf39c3f5fb4df1b2dafd3c5eb8f",
+  "workflowRun": 42365035074,
+  "job": 128381426239,
+  "artifact": {
+    "id": 13571094491,
+    "bytes": 4592,
+    "sha256": "88b9b3be737ccbe530dcf22d3c8195323929b86ca84085abe39f49a2c44f065e"
+  },
+  "receipt": {
+    "id": "7349ef8a-4e8b-4069-93ef-d17425483853",
+    "sha256": "77af2ab03de9a4af6c39df49d56b9719cd9f97b20bff238beba0fe7e28e2ef90"
+  },
+  "success": false,
+  "totals": {
+    "required": 25,
+    "passed": 24,
+    "failed": 1,
+    "tests": 233,
+    "passedTests": 229,
+    "failedTests": 4,
+    "skippedTests": 0,
+    "cancelledTests": 0,
+    "todoTests": 0
+  },
+  "failure": {
+    "file": "tools/layout-studio/windows-coding-editor-connections.test.mjs",
+    "counts": {
+      "total": 9,
+      "passed": 5,
+      "failed": 4,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    "durationMs": 107260,
+    "timeoutMs": 120000,
+    "timeout": false,
+    "reason": "Four composed lifecycle assertions fail while awaiting original bounded acknowledgements; the complete TAP summary and natural cleanup now finish.",
+    "processTreeTermination": {
+      "strategy": "natural-exit",
+      "completed": true,
+      "supervisorExitCode": null,
+      "supervisorError": null
+    },
+    "cleanupCompleted": true
+  },
+  "originalCommandsBoundsAndCleanupVerified": true,
+  "limits": [
+    "The extra read-side journal kernel lease is removed in a subsequent source correction; native causality and corrected acceptance remain pending.",
+    "The whole client lane is not accepted.",
+    "No live provider/account/task, interactive editor or hardware acceptance is inferred."
+  ]
+}

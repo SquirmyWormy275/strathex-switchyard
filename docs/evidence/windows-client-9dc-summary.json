@@ -1,0 +1,18 @@
+{
+  "schema": "switchyard-native-windows-client-summary/v1",
+  "pullRequestHeadCommit": "9dc0a944f7ecbbf39d7936b89ccc9297d69f9f80",
+  "executionMergeLabel": "f699687502bbf2d3cb49b7aff4e30f4f9dd62a84",
+  "runId": 42114157201,
+  "jobId": 127549208472,
+  "artifactId": 13453844967,
+  "artifactSha256": "4d85376628e21137b0af51e090abef0c1d79b9f4ea566ac8c794099decc89bf2",
+  "archiveDigestVerified": true,
+  "receipt": "windows-client-platform-9dc-native.json",
+  "receiptSha256": "8554d65ecfbc09b15e59af6af68cef2115cb6d5e2f1a41f090730e9450784092",
+  "groups": 7,
+  "checks": 73,
+  "allChildCleanup": true,
+  "actualWindowsHost": true,
+  "interactiveWindowOrAccountAcceptance": false,
+  "guestAndPhysicalAcceptance": false
+}

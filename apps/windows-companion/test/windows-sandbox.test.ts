@@ -12,6 +12,7 @@ import {
   rename,
   rm,
   stat,
+  symlink,
   writeFile
 } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -28,6 +29,7 @@ import {
   type WindowsSandboxLifecycleController,
   type WindowsSandboxProcessIdentity,
   type WindowsSandboxProcessRunner,
+  type WindowsSandboxReviewedExchangeLease,
   type WindowsSandboxRunSpec
 } from "../src/windows-sandbox.ts";
 
@@ -101,7 +103,7 @@ function successfulRunner(assertSpec?: (spec: WindowsSandboxRunSpec) => Promise<
       assert.equal(signal.aborted, false);
       await assertSpec?.(spec);
       await onStarted(4242);
-      const exchangeRoot = join(dirname(spec.args[0]!), "exchange");
+      const exchangeRoot = spec.reviewedExchangeBinding ? join(spec.reviewedExchangeBinding.stagingRoot, "mount") : join(dirname(spec.args[0]!), "exchange");
       const request = JSON.parse(await readFile(join(exchangeRoot, "request.json"), "utf8")) as Record<string, unknown>;
       const outputRoot = join(exchangeRoot, "output");
       const contents = Buffer.from("validated sandbox result", "utf8");
@@ -386,7 +388,7 @@ test("invalid quarantine content fails closed without copying any output", async
   const runner: WindowsSandboxProcessRunner = {
     async run(spec, _signal, onStarted) {
       await onStarted(9);
-      const exchangeRoot = join(dirname(spec.args[0]!), "exchange");
+      const exchangeRoot = spec.reviewedExchangeBinding ? join(spec.reviewedExchangeBinding.stagingRoot, "mount") : join(dirname(spec.args[0]!), "exchange");
       const request = JSON.parse(await readFile(join(exchangeRoot, "request.json"), "utf8")) as Record<string, unknown>;
       await mkdir(join(exchangeRoot, "output"), { recursive: true });
       await writeFile(join(exchangeRoot, "output", "report.txt"), "tampered", "utf8");
@@ -792,4 +794,189 @@ test("target and effect guards run again immediately before exact focus and term
   assert.equal(deniedTerminate.status, "blocked");
   assert.match(deniedTerminate.summary, /terminate authority changed/i);
   assert.equal(lifecycleCalls.includes("terminate"), false);
+});
+
+// These mapping capabilities and guest-exit observations are explicit doubles.
+// Actual NTFS staging has its own native journey; no VM is launched here.
+async function reviewedInputFixture(setup: Awaited<ReturnType<typeof fixture>>) {
+  const root=join(setup.base,"reviewed-inputs");await mkdir(root);
+  const catalog=await readFile(join(setup.targetRoot,"sandbox-job.json"));await writeFile(join(root,"sandbox-job.json"),catalog);
+  await writeFile(join(setup.targetRoot,"unselected.env"),"synthetic private bytes");
+  const inputFiles=[{path:"sandbox-job.json",sha256:sha256(catalog),size:catalog.length,classification:"non-production" as const}];
+  let checks=0;
+  const lease={operationId:"aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee",sourceRoot:setup.targetRoot,root,inputFiles,inputManifestSha256:sha256(JSON.stringify(inputFiles)),privateAclReadbackVerified:true as const,sandboxEnforced:false as const,withConsumer:async<T>(effect:()=>Promise<T>)=>effect(),assertCurrent:async()=>{checks++;assert.equal(sha256(await readFile(join(root,"sandbox-job.json"))),sha256(catalog));}};
+  return {lease,checks:()=>checks};
+}
+
+test("reviewed guest mapping contains only its exact staged inputs and retains a separate operation binding",async context=>{
+  const setup=await fixture(context),inputs=await reviewedInputFixture(setup);
+  const inner=successfulRunner(async spec=>{const xml=await readFile(spec.args[0]!,"utf8");assert.ok(xml.includes(`<HostFolder>${inputs.lease.root}</HostFolder>`));assert.ok(!xml.includes(`<HostFolder>${setup.targetRoot}</HostFolder>`));assert.ok(!xml.includes("<LogonCommand>"),"The guest cannot start its recipe before native identity acknowledgement");const request=JSON.parse(await readFile(join(dirname(spec.args[0]!),"exchange/request.json"),"utf8"));assert.equal(request.hostOwnsGuestShutdown,true);await assert.rejects(access(join(inputs.lease.root,"unselected.env")),{code:"ENOENT"});});
+  let launches=0;
+  const runner:WindowsSandboxProcessRunner={run:async(...args)=>{launches++;const identity={schema:"switchyard-windows-sandbox-guest/v1" as const,sandboxId:"12345678-1234-4567-8123-123456789abc",...args[0].reviewedGuest!};await args[3]!(identity);return {...await inner.run(...args),guestSessionExit:{...identity,stopped:true}};}};
+  const backend=createBackend(setup,runner,[],{requireReviewedInputs:true});
+  const result=await backend.run({...await sandboxRequest(setup),operationId:inputs.lease.operationId,reviewedInputs:inputs.lease});assert.equal(result.status,"completed",result.summary);assert.ok(inputs.checks()>=4);
+  const receipt=JSON.parse(await readFile(result.receiptPath!,"utf8"));assert.equal(receipt.reviewedInputRoot,inputs.lease.root);assert.equal(receipt.reviewedInputManifestSha256,inputs.lease.inputManifestSha256);assert.equal(receipt.reviewedInputOperationId,inputs.lease.operationId);assert.equal(receipt.guestExitVerified,true);
+  const duplicate=await backend.run({...await sandboxRequest(setup),operationId:inputs.lease.operationId,reviewedInputs:inputs.lease});assert.equal(duplicate.replayed,true);assert.equal(duplicate.resultRoot,result.resultRoot);assert.equal(launches,1);
+  await access(inputs.lease.root);assert.equal(await readFile(join(setup.targetRoot,"unselected.env"),"utf8"),"synthetic private bytes");
+});
+
+test("a viewer exit cannot authorize reviewed guest extraction, exchange cleanup or restart replacement",async context=>{
+  const setup=await fixture(context),inputs=await reviewedInputFixture(setup),backend=createBackend(setup,successfulRunner(),[],{requireReviewedInputs:true});
+  const result=await backend.run({...await sandboxRequest(setup),operationId:inputs.lease.operationId,reviewedInputs:inputs.lease});assert.equal(result.status,"failed");assert.match(result.summary,/guest exit remains unconfirmed/i);
+  const receipt=JSON.parse(await readFile(result.receiptPath!,"utf8"));assert.equal(receipt.guestStartAttempted,true);assert.equal(receipt.guestExitVerified,false);assert.equal(receipt.cleanupVerified,false);await access(join(dirname(result.receiptPath!),"exchange/request.json"));await access(inputs.lease.root);assert.deepEqual(await readdir(setup.destinationRoot),[]);
+  await assert.rejects(backend.reconcile(),/independent stop proof/);
+  const again=await backend.run({...await sandboxRequest(setup),operationId:inputs.lease.operationId,reviewedInputs:inputs.lease});assert.equal(again.status,"blocked");
+});
+
+test("reviewed mapping refuses absent, deserialized, wrong-operation and changed input capabilities before launch",async context=>{
+  for(const invalid of ["missing","serialized","operation","catalog","digest","late"]){
+    const setup=await fixture(context),inputs=await reviewedInputFixture(setup);let launches=0;
+    const backend=createBackend(setup,{run:async()=>{launches++;throw Error("unexpected guest launch");}},[],{requireReviewedInputs:true});
+    let lease=inputs.lease;
+    if(invalid==="serialized")lease=JSON.parse(JSON.stringify(lease));
+    if(invalid==="operation")lease={...lease,operationId:"ffffffff-bbbb-4ccc-8ddd-eeeeeeeeeeee"};
+    if(invalid==="catalog")lease={...lease,inputFiles:[{...lease.inputFiles[0]!,path:"different.json"}]};
+    if(invalid==="digest")lease={...lease,inputManifestSha256:"f".repeat(64)};
+    if(invalid==="late")lease={...lease,assertCurrent:async()=>{await inputs.lease.assertCurrent();if(inputs.checks()>=3)throw Error("Synthetic input revocation before launch");}};
+    const result=await backend.run({...await sandboxRequest(setup),operationId:inputs.lease.operationId,...(invalid!=="missing"?{reviewedInputs:lease}:{})});
+    assert.notEqual(result.status,"completed",invalid);assert.equal(launches,0,invalid);await access(inputs.lease.root);
+  }
+});
+
+test("guest acknowledgement and exit evidence cannot cross an operation, configuration or VM identity",async context=>{
+  for(const fault of ["ready-operation","ready-write","exit-id","exit-config"]){
+    const setup=await fixture(context),inputs=await reviewedInputFixture(setup),inner=successfulRunner();let recipes=0;
+    const fs=new InjectedFileSystem(),write=fs.writeText.bind(fs);let failedWrite=false;
+    fs.writeText=async(path,text)=>{if(fault==="ready-write"&&!failedWrite&&path.includes("receipt.json.")&&JSON.parse(text).guestSessionId){failedWrite=true;throw Error("Synthetic lost VM identity write");}return write(path,text);};
+    const runner:WindowsSandboxProcessRunner={run:async(...args)=>{
+      const identity={schema:"switchyard-windows-sandbox-guest/v1" as const,sandboxId:"12345678-1234-4567-8123-123456789abc",...args[0].reviewedGuest!};
+      await args[3]!({...identity,...(fault==="ready-operation"?{operationId:"ffffffff-bbbb-4ccc-8ddd-eeeeeeeeeeee"}:{})});
+      recipes++;const result=await inner.run(...args);
+      return {...result,guestSessionExit:{...identity,stopped:true,...(fault==="exit-id"?{sandboxId:"ffffffff-bbbb-4ccc-8ddd-eeeeeeeeeeee"}:{}),...(fault==="exit-config"?{configurationSha256:"f".repeat(64)}:{})}};
+    }};
+    const backend=createBackend(setup,runner,[],{requireReviewedInputs:true,filesystem:fs});
+    const result=await backend.run({...await sandboxRequest(setup),operationId:inputs.lease.operationId,reviewedInputs:inputs.lease});
+    assert.equal(result.status,"failed",fault);assert.equal(recipes,fault.startsWith("ready")?0:1,fault);assert.deepEqual(await readdir(setup.destinationRoot),[],fault);await access(inputs.lease.root);await access(join(dirname(result.receiptPath!),"exchange/request.json"));await assert.rejects(backend.reconcile(),/independent stop proof/);
+  }
+});
+
+test("restart observes exact guest exit without upgrading an unconfirmed program or extracting its output",async context=>{
+  const setup=await fixture(context),inputs=await reviewedInputFixture(setup),inner=successfulRunner();let executions=0,available=false,wrong=false;
+  const identity={schema:"switchyard-windows-sandbox-guest/v1" as const,sandboxId:"12345678-1234-4567-8123-123456789abc",operationId:inputs.lease.operationId,configurationSha256:""};
+  const runner:WindowsSandboxProcessRunner={run:async(...args)=>{executions++;identity.configurationSha256=args[0].reviewedGuest!.configurationSha256;await args[3]!(identity);return inner.run(...args);},reconcileReviewedOperation:async input=>{assert.equal(input.operationId,identity.operationId);assert.equal(input.knownSandboxId,identity.sandboxId);return available?{...identity,stopped:true,...(wrong?{configurationSha256:"f".repeat(64)}:{})}:undefined;}};
+  const backend=createBackend(setup,runner,[],{requireReviewedInputs:true});
+  const failed=await backend.run({...await sandboxRequest(setup),operationId:inputs.lease.operationId,reviewedInputs:inputs.lease});assert.equal(failed.status,"failed");
+  available=true;wrong=true;await assert.rejects(backend.reconcile(),/independent stop proof/);await access(join(dirname(failed.receiptPath!),"exchange/request.json"));
+  wrong=false;const [receipt]=await backend.reconcile();assert.equal(receipt!.state,"failed");assert.equal(receipt!.guestExitVerified,true);assert.equal(receipt!.cleanupVerified,true);assert.deepEqual(await readdir(setup.destinationRoot),[]);await assert.rejects(access(join(dirname(failed.receiptPath!),"exchange")),{code:"ENOENT"});await access(inputs.lease.root);assert.equal(executions,1);
+});
+
+
+// These volume capabilities deliberately use ordinary temporary test folders.
+// Native Windows mount/extent/ACL admission is accepted in its separate CI lane.
+async function reviewedExchangeFixture(setup: Awaited<ReturnType<typeof fixture>>, operationId: string) {
+  const stagingRoot=join(setup.base,`disk-${operationId}`),root=join(stagingRoot,"mount");await mkdir(root,{recursive:true});
+  await writeFile(join(stagingRoot,"exchange.vhd"),"synthetic original volume owner");
+  let held=0,checks=0,current=true;
+  const lease:WindowsSandboxReviewedExchangeLease={schema:"switchyard-windows-bounded-volume/v1",operationId,root,maximumBytes:67108864,privateAclReadbackVerified:true,exchangeQuotaEnforced:true,sandboxEnforced:false,
+    nativeBinding:{schema:"switchyard-windows-bounded-volume/v1",operationId,stagingRoot,stagingIdentity:{device:"1",inode:"2"},imageIdentity:{device:"1",inode:"3"},mountIdentity:{device:"1",inode:"4"},footerSha256:"a".repeat(64),volumeGuid:"\\\\?\\Volume{11111111-2222-4333-8444-555555555555}\\"},
+    async assertCurrent(){assert.equal(current,true,"Synthetic volume identity changed");assert.ok(held>0);checks++;},
+    async withConsumer<T>(effect:()=>Promise<T>){held++;try{return await effect();}finally{held--;}}
+  };
+  return{lease,held:()=>held,checks:()=>checks,revoke:()=>{current=false;}};
+}
+function exactGuestRunner(inner:WindowsSandboxProcessRunner):WindowsSandboxProcessRunner {
+  return{async run(...args){const identity={schema:"switchyard-windows-sandbox-guest/v1" as const,sandboxId:"12345678-1234-4567-8123-123456789abc",...args[0].reviewedGuest!};await args[3]!(identity);return{...await inner.run(...args),guestSessionExit:{...identity,stopped:true}};}};
+}
+test("bounded guest mapping holds its native consumer lease, validates output without resolving the mount and leaves retirement to its original owner",async context=>{
+ const setup=await fixture(context),inputs=await reviewedInputFixture(setup),exchange=await reviewedExchangeFixture(setup,inputs.lease.operationId);let launches=0;
+ const filesystem=new InjectedFileSystem(),originalRealpath=filesystem.realpath.bind(filesystem);filesystem.realpath=async path=>{assert.ok(path!==exchange.lease.root&&!path.startsWith(exchange.lease.root+"/"),"Generic realpath must not resolve the trusted volume mount");return originalRealpath(path);};
+ const inner=successfulRunner(async spec=>{launches++;assert.equal(exchange.held(),1);assert.deepEqual(spec.reviewedExchangeBinding,exchange.lease.nativeBinding);const xml=await readFile(spec.args[0],"utf8");assert.ok(xml.includes(`<HostFolder>${exchange.lease.root}</HostFolder>`));});
+ const backend=createBackend(setup,exactGuestRunner(inner),[],{requireReviewedInputs:true,requireBoundedExchange:true,filesystem}),request={...await sandboxRequest(setup),operationId:inputs.lease.operationId,reviewedInputs:inputs.lease,reviewedExchange:exchange.lease};
+ const result=await backend.run(request);assert.equal(result.status,"completed",result.summary);assert.equal(exchange.held(),0);assert.ok(exchange.checks()>=4);assert.equal(await readFile(join(result.resultRoot!,"report.txt"),"utf8"),"validated sandbox result");
+ const receipt=JSON.parse(await readFile(result.receiptPath!,"utf8"));assert.equal(receipt.reviewedExchangeRoot,exchange.lease.root);assert.equal(receipt.reviewedExchangeBindingSha256,sha256(JSON.stringify(exchange.lease.nativeBinding)));assert.equal(receipt.exchangeQuotaEnforced,true);assert.equal(receipt.cleanupVerified,true);
+ await access(join(exchange.lease.root,"request.json"));assert.equal(await readFile(join(exchange.lease.nativeBinding.stagingRoot,"exchange.vhd"),"utf8"),"synthetic original volume owner");
+ assert.equal((await backend.run(request)).replayed,true);assert.equal(launches,1);
+ const altered={...exchange.lease,nativeBinding:{...exchange.lease.nativeBinding,footerSha256:"f".repeat(64)}};assert.equal((await backend.run({...request,reviewedExchange:altered})).status,"blocked");assert.equal(launches,1);
+});
+test("bounded backend refuses missing, serialized, wrong-scope, unbounded and overlapping exchange capabilities without guest effects",async context=>{
+ for(const invalid of ["missing","serialized","operation","binding","quota","path","overlap"]){
+  const setup=await fixture(context),inputs=await reviewedInputFixture(setup),exchange=await reviewedExchangeFixture(setup,inputs.lease.operationId);let launches=0;
+  const lease:any={...exchange.lease,nativeBinding:{...exchange.lease.nativeBinding}};
+  if(invalid==="serialized"){delete lease.assertCurrent;delete lease.withConsumer;}
+  if(invalid==="operation")lease.operationId="bbbbbbbb-bbbb-4ccc-8ddd-eeeeeeeeeeee";
+  if(invalid==="binding")lease.nativeBinding.operationId="bbbbbbbb-bbbb-4ccc-8ddd-eeeeeeeeeeee";
+  if(invalid==="quota")lease.exchangeQuotaEnforced=false;
+  if(invalid==="path")lease.root=setup.targetRoot;
+  if(invalid==="overlap"){lease.nativeBinding.stagingRoot=setup.targetRoot;lease.root=join(setup.targetRoot,"mount");}
+  const backend=createBackend(setup,exactGuestRunner(successfulRunner(()=>{launches++;})),[],{requireReviewedInputs:true,requireBoundedExchange:true});
+  const result=await backend.run({...await sandboxRequest(setup),operationId:inputs.lease.operationId,reviewedInputs:inputs.lease,...(invalid==="missing"?{}:{reviewedExchange:lease})});assert.ok(["blocked","unavailable"].includes(result.status),`${invalid}: ${result.summary}`);assert.equal(launches,0);assert.equal(exchange.held(),0);await access(join(exchange.lease.nativeBinding.stagingRoot,"exchange.vhd"));
+ }
+});
+test("bounded exchange survives an unknown guest exit and cannot be extracted or replayed on restart",async context=>{
+ const setup=await fixture(context),inputs=await reviewedInputFixture(setup),exchange=await reviewedExchangeFixture(setup,inputs.lease.operationId);let launches=0;
+ const backend=createBackend(setup,successfulRunner(()=>{launches++;}),[],{requireReviewedInputs:true,requireBoundedExchange:true}),request={...await sandboxRequest(setup),operationId:inputs.lease.operationId,reviewedInputs:inputs.lease,reviewedExchange:exchange.lease};
+ const result=await backend.run(request);assert.equal(result.status,"failed");assert.match(result.summary,/guest exit remains unconfirmed/i);await access(join(exchange.lease.root,"result-manifest.json"));assert.equal((await readdir(setup.destinationRoot)).length,0);assert.equal((await backend.run(request)).status,"blocked");assert.equal(launches,1);assert.equal(exchange.held(),0);
+});
+test("a protected broker exchange must bind the same exact reviewed input manifest before any guest or output effect",async context=>{
+ for(const variant of ["matching","other-inputs","invalid-scope","unknown-field","null-scope","false-scope"]){
+  const setup=await fixture(context),inputs=await reviewedInputFixture(setup),exchange=await reviewedExchangeFixture(setup,inputs.lease.operationId);let launches=0;
+  let broker:any={installationId:"12345678-1234-4567-8123-123456789abc",ownerScope:"a".repeat(64),serviceImageSha256:"b".repeat(64),taskScopeSha256:"c".repeat(64),inputManifestSha256:inputs.lease.inputManifestSha256};
+  if(variant==="other-inputs")broker.inputManifestSha256="f".repeat(64);if(variant==="invalid-scope")broker.taskScopeSha256="unreviewed";if(variant==="unknown-field")broker.approved=true;if(variant==="null-scope")broker=null;if(variant==="false-scope")broker=false;
+  const lease={...exchange.lease,nativeBinding:{...exchange.lease.nativeBinding,broker}},backend=createBackend(setup,exactGuestRunner(successfulRunner(()=>{launches++;})),[],{requireReviewedInputs:true,requireBoundedExchange:true});
+  const result=await backend.run({...await sandboxRequest(setup),operationId:inputs.lease.operationId,reviewedInputs:inputs.lease,reviewedExchange:lease});
+  assert.equal(result.status,variant==="matching"?"completed":"blocked",variant+": "+result.summary);assert.equal(launches,variant==="matching"?1:0);assert.equal(exchange.held(),0);await access(join(exchange.lease.nativeBinding.stagingRoot,"exchange.vhd"));
+  if(variant!=="matching")assert.deepEqual(await readdir(setup.destinationRoot),[]);
+ }
+});
+test("bounded output still rejects links and a revoked native volume before extraction",async context=>{
+ for(const failure of ["link","revoked"]){
+  const setup=await fixture(context),inputs=await reviewedInputFixture(setup),exchange=await reviewedExchangeFixture(setup,inputs.lease.operationId),inner=successfulRunner();
+  const runner=exactGuestRunner({async run(...args){const result=await inner.run(...args);if(failure==="revoked")exchange.revoke();else{const report=join(exchange.lease.root,"output/report.txt");await rm(report);await symlink(join(setup.targetRoot,"unselected.env"),report);}return result;}});
+  const backend=createBackend(setup,runner,[],{requireReviewedInputs:true,requireBoundedExchange:true});const result=await backend.run({...await sandboxRequest(setup),operationId:inputs.lease.operationId,reviewedInputs:inputs.lease,reviewedExchange:exchange.lease});assert.equal(result.status,"failed",result.summary);assert.equal((await readdir(setup.destinationRoot)).length,0);await access(join(exchange.lease.nativeBinding.stagingRoot,"exchange.vhd"));assert.equal(exchange.held(),0);
+ }
+});
+
+
+function failedGuestProgram(exitCode=7,change:(manifest:any)=>void=()=>{}):WindowsSandboxProcessRunner {
+ const inner=successfulRunner();return{async run(...args){const result=await inner.run(...args),spec=args[0],root=spec.reviewedExchangeBinding?join(spec.reviewedExchangeBinding.stagingRoot,"mount"):join(dirname(spec.args[0]!),"exchange"),manifest=JSON.parse(await readFile(join(root,"result-manifest.json"),"utf8"));manifest.outcome="failed";manifest.processExitCode=exitCode;manifest.outputs=[];
+ for(const [path,text] of [["process.stdout.txt","captured failing program output"],["process.stderr.txt","synthetic failure diagnostic"]]){const bytes=Buffer.from(text);await writeFile(join(root,"output",path),bytes);manifest.outputs.push({path,size:bytes.length,sha256:sha256(bytes)});}change(manifest);await writeFile(join(root,"result-manifest.json"),JSON.stringify(manifest));return{...result,exitCode:exitCode>>>0};}};
+}
+test("a failed reviewed guest retains only verified bounded logs while keeping a failed task result and the original volume owner",async context=>{
+ for(const exitCode of [7,-1073741515]){
+  const setup=await fixture(context),inputs=await reviewedInputFixture(setup),exchange=await reviewedExchangeFixture(setup,inputs.lease.operationId);let launches=0;
+  const inner=failedGuestProgram(exitCode),runner=exactGuestRunner({async run(...args){launches++;return inner.run(...args);}}),backend=createBackend(setup,runner,[],{requireReviewedInputs:true,requireBoundedExchange:true}),request={...await sandboxRequest(setup),operationId:inputs.lease.operationId,reviewedInputs:inputs.lease,reviewedExchange:exchange.lease};
+  const result=await backend.run(request);assert.equal(result.status,"failed",result.summary);assert.equal(result.resultRoot,undefined);assert.ok(result.diagnosticRoot);assert.equal(result.programExitCode,exitCode>>>0);assert.deepEqual((await readdir(result.diagnosticRoot!)).sort(),["process.stderr.txt","process.stdout.txt"]);assert.equal(await readFile(join(result.diagnosticRoot!,"process.stderr.txt"),"utf8"),"synthetic failure diagnostic");
+  const receipt=JSON.parse(await readFile(result.receiptPath!,"utf8"));assert.equal(receipt.state,"failed");assert.equal(receipt.diagnosticRoot,result.diagnosticRoot);assert.equal(receipt.cleanupVerified,true);await access(join(exchange.lease.nativeBinding.stagingRoot,"exchange.vhd"));
+  const duplicate=await backend.run(request);assert.equal(duplicate.replayed,true);assert.equal(duplicate.status,"failed");assert.equal(duplicate.diagnosticRoot,result.diagnosticRoot);assert.equal(duplicate.programExitCode,result.programExitCode);assert.equal(launches,1);
+ }
+});
+test("mismatched exit evidence, arbitrary artifacts, false resource claims and changed log hashes cannot be extracted as failure diagnostics",async context=>{
+ for(const invalid of ["exit","artifact","resource","digest","bound"]){
+  const setup=await fixture(context),inputs=await reviewedInputFixture(setup),exchange=await reviewedExchangeFixture(setup,inputs.lease.operationId);
+  const inner=failedGuestProgram(7,manifest=>{if(invalid==="exit")manifest.processExitCode=8;if(invalid==="artifact")manifest.outputs[0].path="report.txt";if(invalid==="resource")manifest.resourceEnforcement.noSurvivors=false;if(invalid==="digest")manifest.outputs[0].sha256="f".repeat(64);});
+  const backend=createBackend(setup,exactGuestRunner(inner),[],{requireReviewedInputs:true,requireBoundedExchange:true,...(invalid==="bound"?{maxProcessOutputBytes:4}:{})}),result=await backend.run({...await sandboxRequest(setup),operationId:inputs.lease.operationId,reviewedInputs:inputs.lease,reviewedExchange:exchange.lease});
+  assert.equal(result.status,"failed");assert.equal(result.diagnosticRoot,undefined);assert.equal(result.resultRoot,undefined);assert.equal((await readdir(setup.destinationRoot)).length,0);await access(join(exchange.lease.nativeBinding.stagingRoot,"exchange.vhd"));
+ }
+});
+test("a failed program still cannot release diagnostic bytes before independent exact VM exit",async context=>{
+ const setup=await fixture(context),inputs=await reviewedInputFixture(setup),exchange=await reviewedExchangeFixture(setup,inputs.lease.operationId),backend=createBackend(setup,failedGuestProgram(),[],{requireReviewedInputs:true,requireBoundedExchange:true});
+ const result=await backend.run({...await sandboxRequest(setup),operationId:inputs.lease.operationId,reviewedInputs:inputs.lease,reviewedExchange:exchange.lease});assert.equal(result.status,"failed");assert.equal(result.diagnosticRoot,undefined);assert.match(result.summary,/guest exit remains unconfirmed/i);assert.equal((await readdir(setup.destinationRoot)).length,0);await access(join(exchange.lease.root,"result-manifest.json"));
+});
+
+test("the reviewed Run recipe uses its supported full-sandbox profile and rejects quarantine before guest dispatch", async context => {
+  const setup = await fixture(context), inputs = await reviewedInputFixture(setup); let launches = 0;
+  const inner = successfulRunner(async spec => {
+    const xml = await readFile(spec.args[0]!, "utf8");
+    assert.match(xml, /<Networking>Disable<\/Networking>/); assert.match(xml, /<ClipboardRedirection>Disable<\/ClipboardRedirection>/);
+    assert.match(xml, /<MemoryInMB>4096<\/MemoryInMB>/); assert.doesNotMatch(xml, /persistent|<LogonCommand>/);
+  });
+  const runner: WindowsSandboxProcessRunner = { async run(...args) {
+    launches++; const identity = { schema: "switchyard-windows-sandbox-guest/v1" as const, sandboxId: "12345678-1234-4567-8123-123456789abc", ...args[0].reviewedGuest! };
+    await args[3]!(identity); return { ...await inner.run(...args), guestSessionExit: { ...identity, stopped: true } };
+  } };
+  const backend = createBackend(setup, runner, [], { requireReviewedInputs: true });
+  const base = { ...await sandboxRequest(setup), recipeId: "run_target", operationId: inputs.lease.operationId, reviewedInputs: inputs.lease };
+  const invalid = await backend.execute({ ...base, profile: "quarantine" }); assert.equal(invalid.status, "blocked"); assert.match(invalid.summary, /recipe\/profile mismatch/); assert.equal(launches, 0);
+  const valid = await backend.execute({ ...base, profile: "full_sandbox" }); assert.equal(valid.status, "completed", valid.summary); assert.equal(launches, 1);
+  const receipt = JSON.parse(await readFile(valid.receiptPath!, "utf8")); assert.equal(receipt.profile, "full_sandbox"); assert.equal(receipt.recipeId, "run_target"); assert.equal(receipt.guestExitVerified, true);
 });

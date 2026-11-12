@@ -1,0 +1,97 @@
+{
+  "schema": "switchyard-windows-pipe-text-source/v1",
+  "basis": "bc759cfa222f28bcc3c690d0bc64af56cd1a3908",
+  "sourceSha256": {
+    "apps/desktop-hotkeys/PipeTextProtocol.cs": "98c1cdb43f0c5993bfa7fad548178d5a469849c8d4b19b26e5ad5c29b655278d",
+    "apps/desktop-hotkeys/WindowsSandboxCli.cs": "8a8d428e0a4eadf56631b154edce9e95c0ea813e45d8bb8cf0522149046f1030",
+    "apps/desktop-hotkeys/WindowsStorageBroker.cs": "508e30ac285b1c029b39c8c2947aec7625d52e6fce8103c8e6a6f19381a386e4",
+    "apps/desktop-hotkeys/ReviewedInputStager.cs": "6645c1aaded54ae0e6c70f684f070c6a8c625f36e7525cc8f776335a7c6b7e24",
+    "apps/desktop-hotkeys/BoundedExchangeVolume.cs": "590f7e05811f0549e8657a76719cfbc024e9643ae0c44d6e980e696c676ec769",
+    "deployment/windows/test-support/storage-broker-protocol/PipeTextProtocolProof.cs": "20bab83445d3f9d985dd347c1981278f76e7c6a0641f0511831301fd7f191bff",
+    "deployment/windows/test-support/storage-broker-protocol/StorageBrokerProtocol.Proof.csproj": "e4325f3d851bdb696eee41ce060fb98749eee9f357dc73c1174ff2275f8b9299",
+    "deployment/windows/test-support/storage-broker-protocol/Program.cs": "6908a1eab3b8642de3e79cac2d920acab73a5096989f1c7e633d30283c80484c",
+    "scripts/verify-windows-storage-broker.mjs": "a7292fa3b87365fdc1e655def978ee6b64dad97bfb3df7581e6037c3cd18d796",
+    ".github/workflows/switchyard-windows-filesystem.yml": "c7eb2e5ea6ced04a4d5f6744b02e4b72bd5211fa5d6e54e92008bafa1de5c1f5"
+  },
+  "retainedNativeFailure": {
+    "headCommit": "8168d4e81b9b92ed13755e99cf5217c56ed4231a",
+    "executionCommit": "07f6e64530bf73d57f89869eb0046f7b9f3d5bb4",
+    "sourceAndExecutionTree": "17707822543462d29d29a623ff5bc40098a74356",
+    "mergeParents": [
+      "d8af73553de1b61402520aad1fe0c9fbad2e8c5a",
+      "8168d4e81b9b92ed13755e99cf5217c56ed4231a"
+    ],
+    "runId": 42216542527,
+    "artifactId": 13502166124,
+    "archiveSha256": "e0feef5d93f38f10994366f82269a57dda065eb1159b4f64da2c736a6b971d8b",
+    "archiveBytes": 721,
+    "privateReceipt": "windows-standalone-816-native.json",
+    "zipSavedLocally": false,
+    "helperSha256": "3296c55db8223a8e62de7c483c7b4e284a38fd60bc2189a90eeae08a6164070e",
+    "phase": "metadata",
+    "exitCode": 2,
+    "nativeOwnerReached": true,
+    "nativeExitVerified": false,
+    "isolatedCopyRemoved": false,
+    "restrictedOwnerJourneyReached": false,
+    "accepted": false
+  },
+  "sourceFinding": "Six pipe-command entry points set Console.InputEncoding/OutputEncoding. The .NET 8 implementation calls console code-page APIs and throws on failure. This dependency is incompatible with the non-console candidate; the retained native receipt does not expose the exact throwing operation.",
+  "correction": "Configure strict UTF-8 readers/writers over inherited streams, without console code-page changes. Preserve exact handles, native spawn, token restrictions and Job containment.",
+  "managed": {
+    "receipt": "pipe-text-managed-1793968216717.json",
+    "builds": [
+      {
+        "name": "helper",
+        "warnings": 0,
+        "errors": 0,
+        "managedAssemblySha256": "6e2bc06f9a3a378314eb444b53d37d32dc722eff3e8aa9797ba90d16457eb240",
+        "managedPeSubsystem": 2
+      },
+      {
+        "name": "proof",
+        "warnings": 0,
+        "errors": 0,
+        "managedAssemblySha256": "681fdffad15cf27634066a7a5d4ffde4a822ef03b02c30bb2d2df23389c00dd5",
+        "managedPeSubsystem": 3
+      }
+    ],
+    "portableChecks": 1985,
+    "pipeTextProtocolChecks": 10,
+    "ownedCleanup": {
+      "files": 124,
+      "bytes": 3184517,
+      "removed": true
+    },
+    "nativeWindowsApphostBuilt": false
+  },
+  "isolated": {
+    "receipt": "isolated-test-7e181109-85d3-4d78-9a67-e4970f71fb16.json",
+    "totals": {
+      "required": 4,
+      "passed": 4,
+      "failed": 0,
+      "tests": 42,
+      "passedTests": 42,
+      "failedTests": 0,
+      "skippedTests": 0,
+      "cancelledTests": 0,
+      "todoTests": 0
+    },
+    "allChildAndTreeCleanupVerified": true
+  },
+  "unchangedBoundarySha256": {
+    "tools/layout-studio/state-lock.mjs": "2030b5d03116231b62dd031de637bbf2d9466858ef097037371efb03e11edd7c",
+    "tools/layout-studio/keyless-lease-pool.mjs": "9a324867eec0c3568a5f2c57a2cdc73693ead6df7316bdfbb7fbee0ebf8aa153",
+    "apps/desktop-hotkeys/StateLeaseWorker.cs": "46c9eb654470a8a3c43b8c8851d0e7fd44be8f0938039a16b49b5b1c080a412a",
+    "deployment/windows/test-support/storage-broker-protocol/NativeRestrictedHostProof.cs": "3a64e18d82e0af11db1d1c4851f6a9a47a21a44384a2e2fad6569bc62afeb5b2",
+    "deployment/windows/test-support/storage-broker-protocol/RestrictedSelfTokenQuery.cs": "2f93772b6c6e762dfaf0727f89a679f4a87d425cc06b5095e799c939b58c9266"
+  },
+  "typecheckPassed": true,
+  "nativeCorrectionAccepted": false,
+  "limits": [
+    "The metadata regression and original eight-check restricted owner journey require actual Windows follow-up.",
+    "Neither console allocation/attachment nor broader token/default-DACL/SID/privilege/account/runtime fallback is introduced.",
+    "No installed updater, real provider, model, hardware or guest action ran."
+  ]
+}

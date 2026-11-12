@@ -1,0 +1,121 @@
+{
+  "schema": "switchyard-portability-ui-source-evidence/v1",
+  "scope": "Reviewed portable-profile v2 import/export and calibrated legend downloads",
+  "run": {
+    "receiptId": "eace1123-63e6-480e-92e9-25ad80b2dfd6",
+    "sha256": "99d67c4ab5b5d80a5aa8ae74d2d64cc9dfea2fba7aa1cd425cc2bc28144d7d1f",
+    "totals": {
+      "required": 12,
+      "passed": 12,
+      "failed": 0,
+      "tests": 141,
+      "passedTests": 141,
+      "failedTests": 0,
+      "skippedTests": 0,
+      "cancelledTests": 0,
+      "todoTests": 0
+    },
+    "files": [
+      "scripts/windows-complete-shards.test.mjs",
+      "scripts/run-isolated-tests.test.mjs",
+      "deployment/suite/release.test.mjs",
+      "tools/layout-studio/model.test.mjs",
+      "tools/layout-studio/configuration.test.mjs",
+      "tools/layout-studio/suite.test.mjs",
+      "tools/layout-studio/role-ui.test.mjs",
+      "tools/layout-studio/device-ui.test.mjs",
+      "tools/layout-studio/connection-ui.test.mjs",
+      "tools/layout-studio/portable-ui.test.mjs",
+      "tools/layout-studio/portable-package.test.mjs",
+      "tools/layout-studio/legend-export.test.mjs"
+    ],
+    "originalBoundsPreserved": true,
+    "ownedCleanupComplete": true
+  },
+  "sourceFiles": [
+    {
+      "file": "tools/layout-studio/portable-ui.mjs",
+      "sha256": "4839a1bc0f584c986c40468bf3a9cb5b7bdc43f769e5bd454611098766c0186a"
+    },
+    {
+      "file": "tools/layout-studio/portable-ui.test.mjs",
+      "sha256": "d14f04ff6c1ad17b577a63ba44787ef65c55c5c6e88e45dc32b244579e0432e2"
+    },
+    {
+      "file": "tools/layout-studio/test-support/browser-ui.mjs",
+      "sha256": "b610cbbf7ddf4dadd6eee2d745a511471c13e2dced0e61cd2b735a59778f2a13"
+    },
+    {
+      "file": "tools/layout-studio/suite-ui.mjs",
+      "sha256": "45aedadf6b1abc26254b888bac27dc3fe9b919cb5611a6d315f7f8ee945e2047"
+    },
+    {
+      "file": "tools/layout-studio/app.mjs",
+      "sha256": "bd6b2d7d353eac5345176095af431f41f04cbd3e1583fae8232a69fe8935b8c6"
+    },
+    {
+      "file": "tools/layout-studio/index.html",
+      "sha256": "78403dec2c25376947ffa33be62cfffac49e3a34c457fcae8957419be6289505"
+    },
+    {
+      "file": "tools/layout-studio/style.css",
+      "sha256": "2a1a077ed34f2ea9a4faaa9b4e66b05f93f9266a9f57b5853497bdd22b359589"
+    },
+    {
+      "file": "tools/layout-studio/serve.mjs",
+      "sha256": "648794c5c9cf09c0eb64bd5b551f7b88714c29e64f0b811b39bd85b78c820c30"
+    },
+    {
+      "file": "scripts/demo-switchyard-ui.mjs",
+      "sha256": "975f11c9801e09eec543765f3c16c645bc5299822e2f40afa05cd63b2be2be8e"
+    },
+    {
+      "file": "deployment/suite/release.mjs",
+      "sha256": "946af9240914df2e3c3c1b88967c136cc0ea89774d54b427ad86fe4b270f164b"
+    },
+    {
+      "file": "deployment/suite/release.test.mjs",
+      "sha256": "1dc357a8d3e523d306c082cd2704c88f4185d9a73d82700317cf3f33d0e69029"
+    },
+    {
+      "file": "scripts/run-isolated-tests.mjs",
+      "sha256": "952c28c272117d4ba3d6082df6d2485568e02224e29be1336fd61547cae14778"
+    }
+  ],
+  "demonstration": {
+    "schema": "switchyard-portability-ui-demo/v1",
+    "checks": [
+      "previous owned synthetic state removed",
+      "new frontend module served exactly",
+      "F77 Dvorak profile saved and exported as v2",
+      "portable profile reviewed and imported",
+      "review-html export digest verified",
+      "template-html export digest verified",
+      "template-svg export digest verified",
+      "physical keyboard operation refused",
+      "Work export refused"
+    ],
+    "passed": 9,
+    "browserAccepted": false,
+    "syntheticOnly": true,
+    "hardwareOperations": 0,
+    "realAccountOperations": 0
+  },
+  "preliminaryFailure": {
+    "failure": "One interaction fixture cleanup reported ENOTEMPTY after its assertions.",
+    "correction": "The HTTP fixture borrows Suite lifetime; only the outer fixture retires its store. Server cleanup is joined before removing state.",
+    "originalRecordRetained": true,
+    "exactOwnedStagingRemoved": true
+  },
+  "limitations": [
+    "Event/selection fixtures and authenticated HTTP demonstration are not browser visual acceptance.",
+    "No installed update, hardware, account, native-task, microphone or printer/cap-fit acceptance."
+  ],
+  "sourceCommit": "2689f764969c1e4c93b88027aa8a14e034433816",
+  "preparedFrontend": {
+    "digest": "a0b06b5de6453b682acaaaf6b13552b619e3e98bdae8f8f6ce3ff3f09508ce38",
+    "files": 21,
+    "installed": false,
+    "visualBrowserAccepted": false
+  }
+}

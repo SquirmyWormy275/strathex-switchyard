@@ -1,0 +1,33 @@
+{
+  "schema": "switchyard-setup-gui-source/v1",
+  "basis": "56d115efebbec5d70f6232a83a1c64fa76cf49d6",
+  "sourceSha256": {
+    "deployment/windows/Build-SwitchyardSetup.ps1": "37240895b0b6c95de91cb487a9ad9e573b0aed0f820df45007edb2967b48e1dd",
+    "scripts/windows-setup-image.mjs": "f2903a2d764250193f818211bb11922224b14d0e0c50c1a60e2762c611802471",
+    "scripts/windows-restricted-owner-report.test.mjs": "e66f1ff3270e760f60f196800e00f11cb32afadfaf53c664ec3652d2ba31fa44",
+    "scripts/verify-windows-native-setup.mjs": "a1b881865947c600162f9bd1bfd232f7f6ecb08bfd09becbbb91be42009eaff2"
+  },
+  "focused": {
+    "receipt": "isolated-test-105db7f7-b14c-472d-95dc-6e89711d4ade.json",
+    "totals": {
+      "required": 4,
+      "passed": 4,
+      "failed": 0,
+      "tests": 50,
+      "passedTests": 50,
+      "failedTests": 0,
+      "skippedTests": 0,
+      "cancelledTests": 0,
+      "todoTests": 0
+    },
+    "allChildAndTreeCleanupVerified": true
+  },
+  "imageSubsystem": "windows-gui",
+  "crtEntryPoint": "wmainCRTStartup",
+  "nativeBuildAccepted": false,
+  "originalOwnerAcceptedChecks": 0,
+  "specificFailingDllEstablished": false,
+  "processCreationChanged": false,
+  "permissionsChanged": false,
+  "installedChanged": false
+}

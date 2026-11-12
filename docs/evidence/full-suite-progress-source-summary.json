@@ -1,0 +1,29 @@
+{
+  "schema": "switchyard-full-suite-progress-summary/v1",
+  "baseCommit": "57af85939b47735daaaf47a6af47e54305f6163c",
+  "sourceFiles": {
+    "scripts/run-platform-tests.mjs": "0911c414591b7fbe373e8fded144ad44b2545f9bf4a4451e341a760b5b1c1b47",
+    "scripts/run-isolated-tests.mjs": "5b30e4c7e831b40933fc39f691d81323a7f51963552ce9a5896d0380cdee7c6e"
+  },
+  "receipt": {
+    "id": "a30fa932-0b8d-44f4-ac65-123a630ef5e5",
+    "sha256": "407cf30df698e81f4b19b47068ac3faae8f745fc097aea4234064d0b9f7db34b",
+    "totals": {
+      "required": 1,
+      "passed": 1,
+      "failed": 0,
+      "tests": 23,
+      "passedTests": 23,
+      "failedTests": 0,
+      "skippedTests": 0,
+      "cancelledTests": 0,
+      "todoTests": 0
+    }
+  },
+  "originalManifestCommandsDeadlinesSkipsAndCleanupVerified": true,
+  "scope": "Both complete-suite entry points now emit the existing bounded per-group progress before launch and after cleanup. Every event remains verificationComplete:false; original required groups, commands, deadlines and skip allowances remain unchanged.",
+  "limitations": [
+    "The cancelled e5a5781 run has no final receipt or exact active-group evidence. This reporting change does not identify or resolve its cause.",
+    "Corrected full native Windows acceptance remains pending. No manual dispatch, retry, cancellation or timeout increase was used."
+  ]
+}

@@ -1,0 +1,119 @@
+{
+  "schema": "switchyard-scanner-review-source-summary/v1",
+  "baseCommit": "6b09edfeaa59dec7c9e07cd44b441b6855bbebf3",
+  "sourceFiles": {
+    "tools/layout-studio/task-authority.mjs": "1516f4f62963c0300a4d6d4d9c7f1aef07a990a08f228d739a503845359d9a88",
+    "tools/layout-studio/suite.mjs": "b257ea89be17cae225373f606cf747e4f02aa4aa652d5a27e58a6a8ed9f1018e",
+    "tools/layout-studio/scanner-review.test.mjs": "4e38267c6568dd6d9f57f96cb8b8fbb622dd1dd59828e09d8080e5a093bfc1af",
+    "deployment/suite/release.mjs": "1f971189932f55826af403fc06e247d4292287484513ab8bfb9fb57e979917b8",
+    "deployment/suite/release.test.mjs": "91fb3aad09afa19da6d7edb558854ecd72c1a998491081e42a9f43ca66b031b7",
+    "scripts/run-isolated-tests.mjs": "e6f8e8cb6f3ce60505c2d15fe36faf059a6e8f36adad2b5b9bd781efd470e906",
+    "scripts/run-isolated-tests.test.mjs": "7d42131efc3342d68b454272b70f0cc98e1f1d1bcb8dc3953782c13017e2e8c6"
+  },
+  "initialFixtureAssertionFailure": {
+    "name": "isolated-test-dff8f2bb-0bed-4670-86a4-6ccd652e3a8f.json",
+    "sha256": "77d5dcd82721c5ceafd48df754af253d730c5cbeabab0991dd8530e8cf7e5c5b",
+    "success": false,
+    "totals": {
+      "required": 1,
+      "passed": 0,
+      "failed": 1,
+      "tests": 3,
+      "passedTests": 1,
+      "failedTests": 2,
+      "skippedTests": 0,
+      "cancelledTests": 0,
+      "todoTests": 0
+    }
+  },
+  "initialPackageAndHarnessFailures": {
+    "name": "isolated-test-fc6449ba-48c9-4786-9c7f-ba571cc0767f.json",
+    "sha256": "2d1b07e40f3c423d70ff3db8e2d0609eb803e6e7c9fab53473e449886e2e0458",
+    "success": false,
+    "totals": {
+      "required": 9,
+      "passed": 7,
+      "failed": 2,
+      "tests": 84,
+      "passedTests": 82,
+      "failedTests": 2,
+      "skippedTests": 0,
+      "cancelledTests": 0,
+      "todoTests": 0
+    }
+  },
+  "corrected": {
+    "name": "isolated-test-5951e152-9264-4e21-8cd5-5765d9a14fbb.json",
+    "sha256": "3443b100226dfe63b7539133815efb80bb5f6d558f202b12b926e19208774583",
+    "success": true,
+    "totals": {
+      "required": 25,
+      "passed": 25,
+      "failed": 0,
+      "tests": 100,
+      "passedTests": 100,
+      "failedTests": 0,
+      "skippedTests": 0,
+      "cancelledTests": 0,
+      "todoTests": 0
+    }
+  },
+  "composedFollowup": {
+    "name": "isolated-test-b6334c34-11ff-4237-9e72-1c04baddaeb6.json",
+    "sha256": "7f285885848a08f55164d79499db9f67143966d18c98bdfb23661e2d5313de4d",
+    "success": true,
+    "totals": {
+      "required": 1,
+      "passed": 1,
+      "failed": 0,
+      "tests": 5,
+      "passedTests": 5,
+      "failedTests": 0,
+      "skippedTests": 0,
+      "cancelledTests": 0,
+      "todoTests": 0
+    }
+  },
+  "finalManifestChecks": {
+    "name": "isolated-test-3b7270db-c7e4-4842-b8b3-3299445992c9.json",
+    "sha256": "ece08bfc5e6d011b257accb1565a818351902d025d4d2cc72fe18a4158b9a537",
+    "success": true,
+    "totals": {
+      "required": 2,
+      "passed": 2,
+      "failed": 0,
+      "tests": 26,
+      "passedTests": 26,
+      "failedTests": 0,
+      "skippedTests": 0,
+      "cancelledTests": 0,
+      "todoTests": 0
+    }
+  },
+  "distinctFocusedTests": 102,
+  "newReviewTests": 5,
+  "realLinuxScannerExecutions": 1,
+  "windowsGuestDoubleExecutions": 1,
+  "nativeTaskIdentityAndGitGuardianDoubled": true,
+  "realGitFileInspection": true,
+  "typecheckPassed": true,
+  "originalInstallationScenariosPassed": 16,
+  "failedFullPackageBytes": 5243290,
+  "correctedFullPackageBytes": 5228487,
+  "originalPackageBudgetBytes": 5242880,
+  "correctedPayloadFiles": 532,
+  "sourceOnlyDocumentationOmitted": [
+    "integrations/README.md",
+    "tools/layout-studio/README.md"
+  ],
+  "thirdPartyNoticesAndAttributionRetained": true,
+  "pinnedUpstreamFilesUnchanged": true,
+  "frontendChanged": false,
+  "allChildAndTreeCleanupVerified": true,
+  "ownedFocusedRootRemoved": true,
+  "installedChanged": false,
+  "nativeWindowsAccepted": false,
+  "liveTaskOrAccountChanges": 0,
+  "modelRequests": 0,
+  "hardwareOperations": 0
+}
