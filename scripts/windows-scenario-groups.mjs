@@ -65,7 +65,30 @@ export const windowsTaskOwnerLinuxScenarios = Object.freeze([
   "protected task registry composes the actual owned Unix listener and bridge while the provider is a controlled double",
   "the editor client authenticates the real Studio route and reads original protected target metadata without another native effect"
 ]);
+// Scanner UI journeys keep the original 45-second child bound. Each case owns
+// its fixture; one child running all seven exceeded that bound on Windows.
+export const scannerUiScenarios = Object.freeze([
+  "scanner preparation exposes exact new control bytes and can be cancelled without a write or permission",
+  "saved scanner setup crosses separate permission and execution reviews without automatically scanning",
+  "source drift before saving refuses writes and cannot enable a permission handoff",
+  "an interrupted save retains uncertain output and observational recovery never repeats writes",
+  "a lost successful save reply is recovered from its original history without another write",
+  "selection and workspace changes discard generated content and cannot carry a save approval",
+  "staged and bounded history selections reach the exact review without exposing source bytes"
+]);
+// Repository execution UI journeys: same original bound, one child per case.
+export const executionUiScenarios = Object.freeze([
+  "saved permission selection and local file hashing lead to an exact cancellable review without execution",
+  "one confirmed run retains admission separately from observed process exit and never replays on refresh",
+  "separate stop approval reaches only the selected owned run and preserves its original admission",
+  "changed inputs refuse execution and an unavailable result is retained without automatic retry",
+  "selection and workspace changes invalidate review and clear local permission data",
+  "a file read that settles after a workspace change cannot enable execution there",
+  "a lost successful apply reply preserves the saved operation and never repeats it"
+]);
 const scenarios = Object.freeze({
+  "tools/layout-studio/execution-ui.test.mjs": executionUiScenarios,
+  "tools/layout-studio/scanner-ui.test.mjs": scannerUiScenarios,
   "tools/layout-studio/coding-task-owners.test.mjs": windowsTaskOwnerScenarios,
   "deployment/suite/installation.test.mjs": windowsInstallationScenarios,
   "tools/layout-studio/repository-windows-shield.test.mjs": windowsShieldScenarios,
