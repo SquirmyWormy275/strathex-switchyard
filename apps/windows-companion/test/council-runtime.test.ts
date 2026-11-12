@@ -487,7 +487,9 @@ test("automatic Council bounds a never-settling initial cancellation read", asyn
       effectGuard: { async assertCurrent() { return { allowed: true, reason: "current" }; } },
       executionControl: {
         operationId: "operation-cancellation-hang",
-        deadline: new Date(now + 180).toISOString(),
+        // Measure the unchanged 180 ms from execution start, not from the
+        // durable session setup above (slow Windows runners spent it there).
+        deadline: new Date(Date.now() + 180).toISOString(),
         async isCancellationRequested() { checks += 1; return new Promise<boolean>(() => undefined); }
       }
     });
