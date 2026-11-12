@@ -178,14 +178,28 @@ submitted; probe processes/owned roots are retired. [Contract](codex-terminal-co
   `D:\a\...`. Links, junctions and identity drift still refuse. At e48e59f all
   four Windows scanner groups pass natively, including under the B122 subst
   drive (runs 43005306973, 43005306911).
-- Remaining red at e48e59f is not caused by these changes and is not accepted:
-  `scanner-ui.test.mjs` took 31–45 s on Windows at every commit since f48c1de
-  against its unchanged 45 s bound (45,120 and 45,145 ms failures); it needs a
-  faster test, not a larger bound. `council-runtime.test.ts` case 11 (f114750)
-  and `windows-host-action-consumer.test.ts` (e48e59f) each failed once and
-  passed on neighbouring commits. The same subst refusal remains in
-  `windows-reviewed-runner.mjs` `nativePins`; native tests inject pins, so it
-  is unexercised.
+- Remaining red at e48e59f was not caused by those changes. Follow-ups:
+  **56f0754** runs each of the seven `scanner-ui` and seven `execution-ui`
+  journeys in its own child with the unchanged 45 s default (the task-owner
+  pattern); they took 31–45 s together on Windows. Locally the slowest case is
+  6.6 s. The inventory test pins every case name exactly once.
+  **9c81a6a** shares the link-free drive-mapping check with
+  `windows-reviewed-runner.mjs` `nativePins`, now exported and exercised with
+  injected capture/resolver on every OS.
+  **e623329** starts the unchanged 180 ms deadline of `council-runtime` case
+  11 at executor invocation; run 42991132648 spent it in durable session setup
+  (checks 0 !== 1).
+  `windows-host-action-consumer` case 2 (run 43005306973, shard 9) yielded
+  because the queue authorization exceeded the fixture's 75 ms
+  `effectTimeoutMs` on a slow runner. Not changed: raising that bound needs
+  owner approval under the no-deadline-expansion rule.
+- Not fixable here: Linux Claude Desktop launch/focus (vendor app absent,
+  Omarchy unsupported); visual acceptance (the installed app's origin guard
+  rejects every Chrome-extension navigation, including reloads, with
+  "outside the local workspace origin"; the guard was not weakened). Installed
+  release fd13fd0 contains the current frontend. Evidence source pins for
+  task-authority, scanner-recipe-draft, windows-scanner-recipe-files and suite
+  have been stale since a7e6fe7 and refresh with the next installed update.
 - Continue observation,
   broader scanner coverage, managed-policy and later-platform scope in the
   requirement ledger. Separate unfinished software from hardware, tenant,
