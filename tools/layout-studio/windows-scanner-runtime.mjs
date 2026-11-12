@@ -19,17 +19,17 @@ export function assertWindowsScannerRuntime(value) {
 // links. A link or junction anywhere in the executable path stays refused: the
 // non-native resolver follows links but leaves drive mappings in place.
 const linkResolved = path => realpathSync(path);
+/** True when a native canonical path is the requested one or differs only by a link-free drive mapping. */
+export function sameLinkFreeExecutable(canonicalPath, executable, resolveLinks = linkResolved) {
+  const requested = win32.resolve(executable).toLowerCase();
+  if (canonicalPath.toLowerCase() === requested) return true;
+  try { return win32.resolve(resolveLinks(executable)).toLowerCase() === requested; } catch { return false; }
+}
 
 export async function captureWindowsScannerRuntime({ platform = process.platform, nodeVersion = process.versions.node, executable = process.execPath, capture = captureRepositoryExecutableIdentity, resolveLinks = linkResolved } = {}) {
   if (platform !== "win32" || nodeVersion !== "24.14.0") throw Error("Scanner generation requires the existing Windows Node 24.14.0 runtime; no substitute was selected.");
   const first = assertWindowsScannerRuntime({ nodeVersion, identity: await capture(executable) });
   const second = assertWindowsScannerRuntime({ nodeVersion, identity: await capture(executable) });
-  const requested = win32.resolve(executable).toLowerCase();
-  if (scopeHash(first) !== scopeHash(second)) throw Error("The original Windows scanner runtime identity changed.");
-  if (first.identity.canonicalPath.toLowerCase() !== requested) {
-    let linkFree;
-    try { linkFree = win32.resolve(resolveLinks(executable)).toLowerCase(); } catch { linkFree = null; }
-    if (linkFree !== requested) throw Error("The original Windows scanner runtime identity changed.");
-  }
+  if (scopeHash(first) !== scopeHash(second) || !sameLinkFreeExecutable(first.identity.canonicalPath, executable, resolveLinks)) throw Error("The original Windows scanner runtime identity changed.");
   return first;
 }

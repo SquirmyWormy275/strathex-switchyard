@@ -5,7 +5,7 @@ import { mkdtemp, mkdir, writeFile, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { createSuiteStore } from "./suite-store.mjs";
-import { createWindowsReviewedRunner } from "./windows-reviewed-runner.mjs";
+import { createWindowsReviewedRunner, nativePins } from "./windows-reviewed-runner.mjs";
 const sha = bytes => createHash("sha256").update(bytes).digest("hex");
 
 test("an empty Windows workspace opens without optional Run prerequisites, while retained ownership fails closed", async t => {
@@ -189,4 +189,17 @@ test("combined Windows runner settles both independent byte readers before guest
  assert.ok(f.calls.indexOf("index-verified")<f.calls.indexOf("history-read"));
  for(const stage of ["tools","images","volume","backend"])assert.ok(f.calls.indexOf("history-verified")<f.calls.indexOf(stage));
  for(const boundary of ["index-consumed","history-consumed"]){const changed=await fixture(t,{action:"shield_codebase_audit",indexed:true,historical:true});changed.hook(async stage=>{if(stage===boundary)throw Error("Synthetic combined source drift");});await assert.rejects(changed.run(),/combined source drift/);for(const stage of ["tools","images","volume","backend"])assert.equal(changed.calls.includes(stage),false);assert.equal((await changed.store.snapshot("personal")).repositoryWindowsRuns[0].cleanupPending,false);}
+});
+
+test("native Run pins accept only a link-free drive mapping and keep each canonical identity", async () => {
+  const canonical = { helper: "D:\\a\\release\\Switchyard.Hotkeys.exe", node: "D:\\a\\release\\node.exe" };
+  const identityOf = path => ({ canonicalPath: path.toLowerCase().includes("hotkeys") ? canonical.helper : canonical.node, sha256: (path.toLowerCase().includes("hotkeys") ? "a" : "b").repeat(64), size: 1, inode: "1", device: "2", modifiedMs: 3 });
+  const options = { platform: "win32", execPath: "B:\\release\\node.exe", capture: async path => identityOf(path) };
+  const pins = await nativePins("B:\\release\\Switchyard.Hotkeys.exe", { ...options, resolveLinks: path => path });
+  assert.deepEqual(pins, { helperSha256: "a".repeat(64), recipeRuntime: { path: canonical.node, sha256: "b".repeat(64) }, nodeVersion: process.versions.node });
+  assert.equal((await nativePins(canonical.helper, { ...options, execPath: canonical.node, resolveLinks: () => { throw Error("not consulted"); } })).recipeRuntime.path, canonical.node);
+  for (const resolveLinks of [path => path.replace("B:", "C:"), () => { throw Error("missing"); }]) await assert.rejects(nativePins("B:\\release\\Switchyard.Hotkeys.exe", { ...options, resolveLinks }), /prerequisite identity changed/);
+  let calls = 0;
+  await assert.rejects(nativePins("B:\\release\\Switchyard.Hotkeys.exe", { ...options, resolveLinks: path => path, capture: async path => ({ ...identityOf(path), inode: String(++calls) }) }), /prerequisite identity changed/);
+  await assert.rejects(nativePins(canonical.helper, { ...options, platform: "linux" }), /requires Windows/);
 });

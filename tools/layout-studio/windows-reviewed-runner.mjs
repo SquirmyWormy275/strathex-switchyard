@@ -1,11 +1,12 @@
 import { withShieldGitInputs } from "./shield-git-inputs.mjs";
 /** Host-only Windows Run orchestration; policy admission belongs to its caller. */
-import { join, resolve } from "node:path";
+import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { captureRepositoryExecutableIdentity } from "../../apps/windows-companion/src/repository-runtime.ts";
 import { WindowsSandboxBackend } from "../../apps/windows-companion/src/windows-sandbox.ts";
 import { privateDirectory } from "./private-fs.mjs";
 import { scopeHash } from "./confirmations.mjs";
+import { sameLinkFreeExecutable } from "./windows-scanner-runtime.mjs";
 import { connectedExecutionActions, windowsShieldActions } from "./repository-execution-actions.mjs";
 import { loadWindowsReviewedRun } from "./windows-reviewed-run.mjs";
 import { createWindowsReviewedInputs } from "./windows-reviewed-inputs.mjs";
@@ -20,14 +21,16 @@ const schema = "switchyard-windows-reviewed-runner/v1";
 const helperPath = fileURLToPath(new URL("../../runtime/hotkeys/Switchyard.Hotkeys.exe", import.meta.url));
 const uuid = value => typeof value === "string" && /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/.test(value);
 const digest = value => typeof value === "string" && /^[a-f0-9]{64}$/.test(value);
-async function nativePins(helper) {
-  if (process.platform !== "win32") throw Error("Native Windows Run requires Windows; no host execution substitute was selected.");
+// A link-free drive mapping (B122 runs from `subst B:`) reaches the same pinned
+// file; links, junctions and identity drift between captures still refuse.
+export async function nativePins(helper, { platform = process.platform, execPath = process.execPath, capture = captureRepositoryExecutableIdentity, resolveLinks } = {}) {
+  if (platform !== "win32") throw Error("Native Windows Run requires Windows; no host execution substitute was selected.");
   const pin = async path => {
-    const first = await captureRepositoryExecutableIdentity(path), second = await captureRepositoryExecutableIdentity(path);
-    if (scopeHash(first) !== scopeHash(second) || first.canonicalPath.toLowerCase() !== resolve(path).toLowerCase()) throw Error("The original native Run prerequisite identity changed.");
+    const first = await capture(path), second = await capture(path);
+    if (scopeHash(first) !== scopeHash(second) || !sameLinkFreeExecutable(first.canonicalPath, path, resolveLinks)) throw Error("The original native Run prerequisite identity changed.");
     return first;
   };
-  const worker = await pin(helper), node = await pin(process.execPath);
+  const worker = await pin(helper), node = await pin(execPath);
   return { helperSha256: worker.sha256, recipeRuntime: { path: node.canonicalPath, sha256: node.sha256 }, nodeVersion: process.versions.node };
 }
 
