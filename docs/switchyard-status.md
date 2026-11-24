@@ -179,6 +179,11 @@ with 13 passing local wrapper checks and unchanged execution/input/output bounds
 The native cause remains under investigation.
 [Exact failure and diagnostic evidence](evidence/shortcut-exit-diagnostic-summary.json).
 
+The `6e6a134` native follow-up reaches `shortcut-saved`. The readback now reports
+fixed stages for reopening, target and arguments, while preserving every exact
+comparison. Thirteen local checks pass; the differing native field remains open.
+[Field diagnostic evidence](evidence/shortcut-field-diagnostic-summary.json).
+
 The later complete Windows cohorts remain failed. At `c41807c`, worker 19 hits
 the host-action test's existing 75 ms recovery-settlement limit. At `87cfc30`,
 worker 11 reports a Suite handler accessing its test document after teardown.
@@ -189,6 +194,11 @@ all five workspace cases and fifteen unchanged host-action cases pass locally.
 Typechecking passes. No runtime code, assertion or deadline changes for this
 follow-up; the earlier intermittent settlement failure remains unresolved.
 [Failure and fixture evidence](evidence/workspace-fixture-followup-summary.json).
+
+Native Windows `86ca7cb` now passes all five workspace cases in the audited
+23-group worker: 163 passes and 10 declared skips, with original bounds and
+cleanup. The separate Unicode shortcut case still prevents complete acceptance.
+[Native workspace evidence](evidence/workspace-fixture-native-summary.json).
 
 - Linux Claude Desktop executable binding and launch/focus remain unfinished.
   Its vendor beta supports Ubuntu/Debian, while the pilot runs Omarchy and has no

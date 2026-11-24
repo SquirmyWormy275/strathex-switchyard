@@ -1,0 +1,60 @@
+{
+  "schema": "switchyard-shortcut-field-diagnostic-summary/v1",
+  "date": "2026-11-24",
+  "nativeFailure": {
+    "sourceCommit": "6e6a134e667d14e2a6ffd458a5ca2c0812a8c94c",
+    "mergeCommit": "50d37737d8d04c4370ee6ca3235f8f5326b84540",
+    "sourceTree": "656a9c26969ab7d394619444ccba36800e48a246",
+    "sourceTreeVerified": true,
+    "workflow": 45488706995,
+    "job": 138781563361,
+    "artifact": 14967116595,
+    "artifactSha256": "a04df392102a2d131bf83ac6b44fe276832db7629114acaa62381ded30187263",
+    "receiptSha256": "92983d12781104ff99a3e7ab05f64bb655ef34746577efe541095542dce6edb8",
+    "runId": "09bc87fd-895d-4101-9a9a-36ff6b3a4716",
+    "totals": {
+      "required": 18,
+      "passed": 17,
+      "failed": 1,
+      "tests": 307,
+      "passedTests": 301,
+      "failedTests": 1,
+      "skippedTests": 5,
+      "cancelledTests": 0,
+      "todoTests": 0
+    },
+    "failedTest": "the native shortcut writer preserves literal paths without importing a utility module",
+    "error": "Native shortcut creation or exact readback failed. Last observed stage: shortcut-saved.",
+    "originalCommandsBoundsSkipsAndCleanupVerified": true
+  },
+  "behavior": "The native writer reaches shortcut-saved before failing. Split exact readback into ordered reopen, target, arguments and directory checks, preserving each original comparison. Fixed stages reveal the failing boundary without raw values. The mismatch remains undiagnosed.",
+  "local": {
+    "receipt": "isolated-test-383ef86d-3490-442f-b224-0b3f01fec4ce.json",
+    "sha256": "72a6de59c0593345187476d6c3ca854d769ffa38b711408c856438c611166138",
+    "totals": {
+      "required": 1,
+      "passed": 1,
+      "failed": 0,
+      "tests": 13,
+      "passedTests": 13,
+      "failedTests": 0,
+      "skippedTests": 0,
+      "cancelledTests": 0,
+      "todoTests": 0
+    },
+    "cleanupVerified": true
+  },
+  "sourceFiles": {
+    "deployment/suite/shortcut-process.mjs": "b51df2b5c4367a169ef165c17424c8a216d3229e9df152f4c25ba06816489e96",
+    "deployment/suite/shortcut-process.test.mjs": "c78ccd1090a1f4bb501c43e82e9a36241e4402a2b74a3ce5570a2c4be1ae3a2c",
+    "deployment/suite/shortcut.ps1": "6468e4c98426bf6a92dc05d9b26e512346afd3f33745be5585352626bfe1d02d"
+  },
+  "limits": {
+    "deadlineMs": 10000,
+    "inputBytes": 8192,
+    "outputBytes": 1024,
+    "relaxedAssertions": false,
+    "nativeFollowup": "normal push pending",
+    "linuxReinstallRequired": false
+  }
+}

@@ -61,6 +61,14 @@ stage and raw-output refusal for both timeout and nonzero-exit paths. No native
 fix is claimed yet; inspect the next normal-push receipt's last stage before
 changing the shortcut logic. [Diagnostic evidence](evidence/shortcut-exit-diagnostic-summary.json).
 
+The `6e6a134` diagnostic worker **138781563361**, artifact **14967116595**,
+reaches **shortcut-saved** before failing the same Unicode case. Its exact
+18-group receipt is retained and audited. Exact native readback is now split
+into ordered reopen/target/arguments/directory checks with fixed stage names;
+all original comparisons and bounds remain. Thirteen local wrapper cases pass.
+The next normal-push native result must identify the field before a cause or
+repair is claimed. [Field diagnostic](evidence/shortcut-field-diagnostic-summary.json).
+
 Complete Windows `c41807c` also fails worker 19 at the unchanged 75 ms
 host-action recovery settlement. Complete Windows `87cfc30` fails worker 11
 because the workspace fixture tears down its document before an asynchronous
@@ -71,6 +79,13 @@ five workspace and fifteen unchanged host-action checks pass locally, with
 typechecking. This changes tests only, with no deadline/assertion relaxation or
 Linux reinstall. The earlier intermittent host-action timing failure remains
 unresolved. [Evidence](evidence/workspace-fixture-followup-summary.json).
+
+The joined fixture now passes on native Windows at `86ca7cb`: worker
+**138779540538**, artifact **14965288061**, all 23 groups / 163 passes / 10
+declared skips. All five workspace cases pass in 4,801 ms under their original
+45-second group bound. Exact source/merge tree, artifact digest, manifest,
+commands and cleanup verify. The cohort still fails its separate shortcut case.
+[Native workspace evidence](evidence/workspace-fixture-native-summary.json).
 
 ## Preserve the operating boundaries
 

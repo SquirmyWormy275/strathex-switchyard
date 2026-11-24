@@ -50,7 +50,12 @@ try {
     $shortcut = $null
     $read = $shell.CreateShortcut($v.path)
     try {
-        if ($read.TargetPath -ine $v.nodePath -or $read.Arguments -cne $arguments -or $read.WorkingDirectory -ine $v.directory) { throw 'Native shortcut target readback failed.' }
+        $outputPipe.WriteLine('SXSY-SHORTCUT/2 shortcut-reopened')
+        if ($read.TargetPath -ine $v.nodePath) { throw 'Native shortcut target readback failed.' }
+        $outputPipe.WriteLine('SXSY-SHORTCUT/2 target-verified')
+        if ($read.Arguments -cne $arguments) { throw 'Native shortcut arguments readback failed.' }
+        $outputPipe.WriteLine('SXSY-SHORTCUT/2 arguments-verified')
+        if ($read.WorkingDirectory -ine $v.directory) { throw 'Native shortcut directory readback failed.' }
     } finally { [void][Runtime.InteropServices.Marshal]::FinalReleaseComObject($read) }
     $outputPipe.WriteLine('SXSY-SHORTCUT/2 readback-verified')
     $outputPipe.WriteLine('VERIFIED')
