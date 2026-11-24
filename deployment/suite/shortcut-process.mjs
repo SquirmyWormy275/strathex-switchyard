@@ -51,7 +51,7 @@ export async function prepareWindowsShortcut(request, { spawnProcess = spawn, st
           clearTimeout(timer);
           const value = output().trim();
           if (code === 0 && length <= 1024 && ["VERIFIED", progressLines.join("\n") + "\nVERIFIED"].includes(value)) resolve();
-          else reject(Error("Native shortcut creation or exact readback failed."));
+          else reject(Error(`Native shortcut creation or exact readback failed. Last observed stage: ${stage}.`));
         });
         child.stdin.end(input);
       });

@@ -172,6 +172,13 @@ the complete cohort remain separate.
 
 ## Remaining implementation and defects
 
+The new Windows shortcut Unicode-path case fails at `cd770c0`; its audited
+18-group worker has one failure. The original generic exit diagnostic omitted
+the failing stage. Failed exits now retain only the existing closed stage names,
+with 13 passing local wrapper checks and unchanged execution/input/output bounds.
+The native cause remains under investigation.
+[Exact failure and diagnostic evidence](evidence/shortcut-exit-diagnostic-summary.json).
+
 The later complete Windows cohorts remain failed. At `c41807c`, worker 19 hits
 the host-action test's existing 75 ms recovery-settlement limit. At `87cfc30`,
 worker 11 reports a Suite handler accessing its test document after teardown.

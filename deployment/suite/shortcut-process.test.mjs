@@ -63,16 +63,17 @@ test("ordered native progress tolerates fragmented pipes while verified output s
   await assert.rejects(lstat(f.request.path), { code: "ENOENT" });
 });
 
-test("shortcut timeout diagnostics contain only the last ordered fixed stage and never raw native output", async t => {
-  for (let count = 0; count <= stages.length; count++) {
+test("shortcut timeout and exit diagnostics contain only the last ordered fixed stage and never raw native output", async t => {
+  for (const timeout of [true, false]) for (let count = 0; count <= stages.length; count++) {
     const f = await fixture(t); await writeFile(f.request.path, "owned output");
-    const pending = prepareWindowsShortcut(f.request, { spawnProcess: f.spawnProcess, timeoutMs: 10 });
+    const pending = prepareWindowsShortcut(f.request, { spawnProcess: f.spawnProcess, ...(timeout ? { timeoutMs: 10 } : {}) });
     const rejected = assert.rejects(pending, error => {
-      assert.equal(error.message, `Native shortcut creation timed out. Last observed stage: ${count ? stages[count - 1] : "not-observed"}.`);
+      assert.equal(error.message, `Native shortcut ${timeout ? "creation timed out" : "creation or exact readback failed"}. Last observed stage: ${count ? stages[count - 1] : "not-observed"}.`);
       assert.equal(error.message.includes("PRIVATE_DIAGNOSTIC"), false); return true;
     });
     f.child.stdout.write(progress(count) + "SXSY-SHORTCUT/2 PRIVATE_DIAGNOSTIC\n");
-    await f.killRequested; assert.equal(await readFile(f.request.path, "utf8"), "owned output");
+    if (timeout) await f.killRequested;
+    assert.equal(await readFile(f.request.path, "utf8"), "owned output");
     f.close(1); await rejected; await assert.rejects(lstat(f.request.path), { code: "ENOENT" });
   }
 });

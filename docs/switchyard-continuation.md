@@ -52,6 +52,15 @@ tests plus typecheck. Wait for the normal-push native checks. No Linux reinstall
 is needed for this Windows-only path.
 [Evidence](evidence/shortcut-startup-source-summary.json).
 
+The new native Unicode-path case fails at `cd770c0`, complete Windows run
+**45486273877**, worker **138773061196**, artifact **14964787684**. Its
+18-group receipt is audited (17 pass); the generic exit error does not identify
+the failing stage. Failed exits now retain only the same closed stage vocabulary
+already used for timeouts. All 13 local wrapper checks pass, including every
+stage and raw-output refusal for both timeout and nonzero-exit paths. No native
+fix is claimed yet; inspect the next normal-push receipt's last stage before
+changing the shortcut logic. [Diagnostic evidence](evidence/shortcut-exit-diagnostic-summary.json).
+
 Complete Windows `c41807c` also fails worker 19 at the unchanged 75 ms
 host-action recovery settlement. Complete Windows `87cfc30` fails worker 11
 because the workspace fixture tears down its document before an asynchronous

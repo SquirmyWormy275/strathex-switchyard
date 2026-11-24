@@ -1,0 +1,59 @@
+{
+  "schema": "switchyard-shortcut-exit-diagnostic-summary/v1",
+  "date": "2026-11-24",
+  "nativeFailure": {
+    "sourceCommit": "cd770c07106948bc37d285dc026e1d2f043ea4c7",
+    "mergeCommit": "c0100462edb1ab8b6f3e21d5ad2a46029912c960",
+    "sourceTree": "984155b69814d8b366644baa0b962f2a5d325e18",
+    "sourceTreeVerified": true,
+    "workflow": 45486273877,
+    "job": 138773061196,
+    "artifact": 14964787684,
+    "artifactSha256": "711cd94390afa8582e66bab3b73f78ce45fb3fda4899be1bf74e64f5d8667a0c",
+    "receiptSha256": "151cc52ed8ba82036a068827380c498f69f7c4e8ed338cc654dbf46b8759645f",
+    "runId": "bb54d2ec-9254-4ad1-ae7e-e6356607135e",
+    "totals": {
+      "required": 18,
+      "passed": 17,
+      "failed": 1,
+      "tests": 307,
+      "passedTests": 301,
+      "failedTests": 1,
+      "skippedTests": 5,
+      "cancelledTests": 0,
+      "todoTests": 0
+    },
+    "failedTest": "the native shortcut writer preserves literal paths without importing a utility module",
+    "error": "Native shortcut creation or exact readback failed.",
+    "originalCommandsBoundsSkipsAndCleanupVerified": true
+  },
+  "behavior": "Expose only the last ordered fixed stage on a failed native exit, matching the existing timeout diagnostic. Raw PowerShell output and paths never enter the message. The failure is not yet diagnosed or accepted.",
+  "local": {
+    "receipt": "isolated-test-2968a8dd-9158-4d21-ac84-c9be0a045cb5.json",
+    "sha256": "4c26643bbdb6c4441751f9e718bb5724da82f779f2777ba7ae6d4e263ee4eba6",
+    "totals": {
+      "required": 1,
+      "passed": 1,
+      "failed": 0,
+      "tests": 13,
+      "passedTests": 13,
+      "failedTests": 0,
+      "skippedTests": 0,
+      "cancelledTests": 0,
+      "todoTests": 0
+    },
+    "cleanupVerified": true
+  },
+  "sourceFiles": {
+    "deployment/suite/shortcut-process.mjs": "4687c3041f964d69338d8ae9b050814a8cca008be0f59fefe20aa06835fa25e3",
+    "deployment/suite/shortcut-process.test.mjs": "f4eb83813b646118934e51231dc6fddc9c91bfc635af64f59039967d4f952937"
+  },
+  "limits": {
+    "deadlineMs": 10000,
+    "inputBytes": 8192,
+    "outputBytes": 1024,
+    "relaxedAssertions": false,
+    "nativeFollowup": "normal push pending",
+    "linuxReinstallRequired": false
+  }
+}
