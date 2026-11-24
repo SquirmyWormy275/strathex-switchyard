@@ -172,6 +172,17 @@ the complete cohort remain separate.
 
 ## Remaining implementation and defects
 
+The later complete Windows cohorts remain failed. At `c41807c`, worker 19 hits
+the host-action test's existing 75 ms recovery-settlement limit. At `87cfc30`,
+worker 11 reports a Suite handler accessing its test document after teardown.
+Both original 23-group receipts retain exact source trees, commands, bounds,
+declared skips, serial order and cleanup. The workspace fixture now joins its
+selection/retry/refresh handlers before retiring the document and HTTP server;
+all five workspace cases and fifteen unchanged host-action cases pass locally.
+Typechecking passes. No runtime code, assertion or deadline changes for this
+follow-up; the earlier intermittent settlement failure remains unresolved.
+[Failure and fixture evidence](evidence/workspace-fixture-followup-summary.json).
+
 - Linux Claude Desktop executable binding and launch/focus remain unfinished.
   Its vendor beta supports Ubuntu/Debian, while the pilot runs Omarchy and has no
   vendor desktop installation. Windows controls and Linux host metadata do not

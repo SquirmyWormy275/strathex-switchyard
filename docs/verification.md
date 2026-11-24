@@ -8,6 +8,12 @@ for work that remains.
 
 ## Current evidence
 
+The November 24 workspace-fixture follow-up retains two failed native worker
+receipts and joins asynchronous UI handlers before fixture teardown. Two local
+groups pass 20 checks without skips or changed deadlines; typechecking passes.
+The earlier 75 ms host-action settlement failure remains unresolved.
+[Exact source and failure evidence](evidence/workspace-fixture-followup-summary.json).
+
 | Scope | Source | Accepted result and limits |
 | --- | --- | --- |
 | Current full-platform baseline | `8dd849e` | All six workflows pass. Complete Windows source and private release each pass 499 groups / 3,182 tests / 246 declared skips; exact receipts, original limits and cleanup verified. [Receipt](evidence/backend-capacity-native-summary.json). |

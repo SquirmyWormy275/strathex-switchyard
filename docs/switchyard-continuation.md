@@ -52,6 +52,17 @@ tests plus typecheck. Wait for the normal-push native checks. No Linux reinstall
 is needed for this Windows-only path.
 [Evidence](evidence/shortcut-startup-source-summary.json).
 
+Complete Windows `c41807c` also fails worker 19 at the unchanged 75 ms
+host-action recovery settlement. Complete Windows `87cfc30` fails worker 11
+because the workspace fixture tears down its document before an asynchronous
+Suite handler finishes. Both exact 23-group receipts and artifact digests are
+audited under private `development-maintenance/20261124-native-followups`.
+The fixture now joins its returned event-handler promises before teardown;
+five workspace and fifteen unchanged host-action checks pass locally, with
+typechecking. This changes tests only, with no deadline/assertion relaxation or
+Linux reinstall. The earlier intermittent host-action timing failure remains
+unresolved. [Evidence](evidence/workspace-fixture-followup-summary.json).
+
 ## Preserve the operating boundaries
 
 - Continue without delegation. Claude Code is a contingency for actual token
@@ -120,7 +131,8 @@ skips**. Run **853cc5ea-8dfa-43bd-89d8-84a8a8215e62** and its supervisor exited
 successfully. Manifest, commands, bounds, skips, serial order and cleanup verify.
 Private prefix **linux-a7958c4-**. The checkout, runner, temporary parent, nine
 aliases and **806 generated files / 12,507,506 bytes** are removed. All three
-original worktrees remain. **No complete Linux run remains active.** Do not replay
+original worktrees remain. **That historical run is retired.** The new `65b5aac`
+run above is separate. Do not replay
 setup, audit or cleanup. [Evidence](evidence/linux-a7958c4-complete-summary.json).
 
 Windows **a7958c4**, run **42612174584**, passes all 25 jobs. All 23 original

@@ -10,6 +10,21 @@ async function fixture(fn) {
     globalThis.window = new EventTarget();
     const main = { inert: false };
     c.document.querySelector = selector => { assert.equal(selector, ".app-main"); return main; };
+    // EventTarget dispatch does not join promises returned by listeners. Keep
+    // this fixture's document and HTTP host alive until its Suite handlers have
+    // finished, including refreshes emitted while an interaction is settling.
+    const pending = new Set();
+    for (const [target, types] of [[c.document, ["switchyard-local-connected", "switchyard-refresh-request"]], [c.$("compartment-picker"), ["change"]], [c.$("retry-workspace-connection"), ["click"]]]) {
+      const add = target.addEventListener.bind(target);
+      target.addEventListener = (type, listener, options) => add(type, types.includes(type) ? function (event) {
+        const result = listener.call(this, event);
+        if (result?.then) {
+          pending.add(result);
+          result.then(() => pending.delete(result), () => pending.delete(result));
+        }
+        return result;
+      } : listener, options);
+    }
     await c.store.initialize("work", "work");
     let profile = portableProfile(plan, "personal-draft", "Personal draft", (await c.store.snapshot("personal")).workflow);
     const original = structuredClone(profile), messages = [];
@@ -19,7 +34,10 @@ async function fixture(fn) {
       await until(() => /Private workspace connected/.test(c.$("suite-status").textContent) && !c.$("retry-workspace-connection").disabled);
       await fn({ ...c, ui, main, original, originalFetch, messages, profile: () => profile, edit: value => { profile = value; } });
       await Promise.all(c.responses.map(row => row.response));
-    } finally { globalThis.fetch = originalFetch; globalThis.window = previousWindow; }
+    } finally {
+      try { while (pending.size) await Promise.all([...pending]); }
+      finally { globalThis.fetch = originalFetch; globalThis.window = previousWindow; }
+    }
   });
 }
 
