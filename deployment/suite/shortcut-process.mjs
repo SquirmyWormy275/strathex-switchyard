@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
 import { stopOwnedChild } from "../../tools/layout-studio/owned-process.mjs";
 
 export const shortcutExecutionTimeoutMs = 10000;
-const stages = ["script-started", "runtime-ready", "input-read", "input-decoded", "input-validated", "com-created", "shortcut-saved", "shortcut-reopened", "target-verified", "arguments-verified", "readback-verified"];
+const stages = ["script-started", "runtime-ready", "input-read", "input-decoded", "input-validated", "com-created", "shortcut-saved", "shell-arguments-saved", "shortcut-reopened", "target-verified", "arguments-verified", "readback-verified"];
 const progressLines = stages.map(stage => `SXSY-SHORTCUT/2 ${stage}`);
 function shortcutInput(request) {
   if (Buffer.byteLength(JSON.stringify(request)) > 8192) throw Error("Native shortcut request exceeds its bound.");

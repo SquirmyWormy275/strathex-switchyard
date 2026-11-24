@@ -35,9 +35,12 @@ The workspace-boundary follow-up reproduces three UI failures before correction:
 reconnection to another window's selection, failed destination snapshot, and
 failed pre-switch saving. Five final regressions pass inside six groups / 83 tests;
 two runner/scheduling groups pass 30 tests. No original bounds or assertions were
-relaxed. The single changed frontend asset is pinned and normally installed. Complete
-Linux verification is running in an owned isolated checkout with existing
-dependency aliases; its source is 65b5aac. Platform checks remain separate.
+relaxed. The single changed frontend asset is pinned and normally installed. The isolated
+Linux run at 65b5aac was interrupted by a workstation restart at group 284 of
+495 and wrote no final receipt; it is unaccepted and its owned checkout is
+retired. Linux release CI at 6e6a134 passes 2,591 tests with 32 declared skips,
+packaging and a real Secret Service smoke check under the original workflow
+bounds. [Interruption and CI evidence](evidence/linux-ci-interruption-summary.json).
 [Evidence](evidence/workspace-boundary-source-summary.json).
 
 The `c41807c` Windows filesystem workflow **45482338622** fails only the
@@ -78,6 +81,16 @@ comparison; the native fixture also requires literal UTF-16 argument bytes in
 the saved link. Thirteen local wrapper cases pass. Native acceptance is pending;
 this does not yet establish whether the legacy getter or saved bytes differed.
 [Property readback evidence](evidence/shortcut-property-readback-summary.json).
+
+
+Native `ce240f4` worker **138804737062**, artifact **14968562418**, still
+fails after `target-verified`; property readback alone does not resolve the
+failure. The original 18-group receipt remains failed and audited. Arguments
+are now assigned using the documented ShellLinkObject `Arguments` / `Save`
+contract, followed by fresh exact property readback after releasing the writer.
+All 13 local wrapper cases pass, including each ordered stage; the literal
+UTF-16 file assertion and original limits remain. Native cause and acceptance
+remain open. [Shell writer evidence](evidence/shortcut-shell-writer-summary.json).
 
 Complete Windows `c41807c` also fails worker 19 at the unchanged 75 ms
 host-action recovery settlement. Complete Windows `87cfc30` fails worker 11
@@ -209,7 +222,8 @@ for both ports; no production branch or assertion changed. Two local groups pass
 
 ## Demonstration and acceptance limits
 
-The installed app runs at **http://127.0.0.1:43177/**. Its normal launcher supplies
+The installed app normally launches at **http://127.0.0.1:43177/** and reports
+ready after the November 24 workstation restart. Its normal launcher supplies
 the existing private access. On November 24, supported browser attachment fails
 before page loading: **Browser attachment requires a network policy. Update the
 Codex desktop app to the latest version and retry.** The built-in browser is also

@@ -170,6 +170,15 @@ every assertion. Two original local groups pass 24 checks. Native follow-up and
 the complete cohort remain separate.
 [Failure and fixture correction](evidence/client-platform-fixture-summary.json).
 
+Linux release CI at `6e6a134` passes 2,591 tests with 32 declared skips,
+source packaging and the real Secret Service installed smoke check. The local
+495-group run was interrupted by a workstation restart at group 284 and has no
+final receipt; it is not accepted. Its owned checkout is retired with the
+original three worktrees preserved. The normal installed app reports ready
+after restart. Saved-workspace readback then hits CREDENTIAL_PROCESS_TIMEOUT;
+OS keyring unlock is requested again after this new restart. No state reset or
+replacement key is used. [CI and interruption evidence](evidence/linux-ci-interruption-summary.json).
+
 ## Remaining implementation and defects
 
 The new Windows shortcut Unicode-path case fails at `cd770c0`; its audited
@@ -193,6 +202,16 @@ comparison; the native fixture also requires literal UTF-16 argument bytes in
 the saved link. Thirteen local wrapper cases pass. Native acceptance is pending;
 this does not yet establish whether the legacy getter or saved bytes differed.
 [Property readback evidence](evidence/shortcut-property-readback-summary.json).
+
+
+Native `ce240f4` worker **138804737062**, artifact **14968562418**, still
+fails after `target-verified`; property readback alone does not resolve the
+failure. The original 18-group receipt remains failed and audited. Arguments
+are now assigned using the documented ShellLinkObject `Arguments` / `Save`
+contract, followed by fresh exact property readback after releasing the writer.
+All 13 local wrapper cases pass, including each ordered stage; the literal
+UTF-16 file assertion and original limits remain. Native cause and acceptance
+remain open. [Shell writer evidence](evidence/shortcut-shell-writer-summary.json).
 
 The later complete Windows cohorts remain failed. At `c41807c`, worker 19 hits
 the host-action test's existing 75 ms recovery-settlement limit. At `87cfc30`,

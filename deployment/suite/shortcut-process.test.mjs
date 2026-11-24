@@ -7,7 +7,7 @@ import { mkdtemp, readFile, writeFile, lstat, realpath, rm } from "node:fs/promi
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { prepareWindowsShortcut, shortcutExecutionTimeoutMs } from "./shortcut-process.mjs";
-const stages = ["script-started", "runtime-ready", "input-read", "input-decoded", "input-validated", "com-created", "shortcut-saved", "shortcut-reopened", "target-verified", "arguments-verified", "readback-verified"];
+const stages = ["script-started", "runtime-ready", "input-read", "input-decoded", "input-validated", "com-created", "shortcut-saved", "shell-arguments-saved", "shortcut-reopened", "target-verified", "arguments-verified", "readback-verified"];
 const progress = count => stages.slice(0, count).map(stage => `SXSY-SHORTCUT/2 ${stage}\r\n`).join("");
 
 async function fixture(t) {

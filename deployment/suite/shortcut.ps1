@@ -40,7 +40,7 @@ $shortcut = $null
 try {
     $shortcut = $shell.CreateShortcut($v.path)
     $shortcut.TargetPath = $v.nodePath
-    $shortcut.Arguments = $arguments
+    $shortcut.Arguments = ''
     $shortcut.WorkingDirectory = $v.directory
     $shortcut.Description = 'Switchyard: return to the same task'
     $shortcut.WindowStyle = 7
@@ -48,6 +48,29 @@ try {
     $outputPipe.WriteLine('SXSY-SHORTCUT/2 shortcut-saved')
     [void][Runtime.InteropServices.Marshal]::FinalReleaseComObject($shortcut)
     $shortcut = $null
+    # ShellLinkObject uses the Shell scripting contract for literal arguments.
+    # WScript creates the owned link; do not use its legacy argument setter.
+    $writerShell = $null
+    $writerFolder = $null
+    $writerItem = $null
+    $writerLink = $null
+    try {
+        $writerShell = [Activator]::CreateInstance([type]::GetTypeFromProgID('Shell.Application', $true))
+        $writerFolder = $writerShell.NameSpace([IO.Path]::GetDirectoryName($v.path))
+        if ($null -eq $writerFolder) { throw 'Native shortcut writer folder is unavailable.' }
+        $writerItem = $writerFolder.ParseName([IO.Path]::GetFileName($v.path))
+        if ($null -eq $writerItem) { throw 'Native shortcut writer item is unavailable.' }
+        $writerLink = $writerItem.GetLink
+        if ($null -eq $writerLink) { throw 'Native Shell link writer is unavailable.' }
+        $writerLink.Arguments = $arguments
+        $writerLink.Save()
+    } finally {
+        if ($null -ne $writerLink) { [void][Runtime.InteropServices.Marshal]::FinalReleaseComObject($writerLink) }
+        if ($null -ne $writerItem) { [void][Runtime.InteropServices.Marshal]::FinalReleaseComObject($writerItem) }
+        if ($null -ne $writerFolder) { [void][Runtime.InteropServices.Marshal]::FinalReleaseComObject($writerFolder) }
+        if ($null -ne $writerShell) { [void][Runtime.InteropServices.Marshal]::FinalReleaseComObject($writerShell) }
+    }
+    $outputPipe.WriteLine('SXSY-SHORTCUT/2 shell-arguments-saved')
     $read = $shell.CreateShortcut($v.path)
     try {
         $outputPipe.WriteLine('SXSY-SHORTCUT/2 shortcut-reopened')
