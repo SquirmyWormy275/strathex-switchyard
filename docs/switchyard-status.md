@@ -45,23 +45,25 @@ acceptance and the follow-up's normal-push platform checks remain separate.
 
 ## Installed checkpoint
 
-The app uses source **fd13fd0**; the pilot VS Code extension remains at **42655aa**.
+The app uses source **56ca668**; the pilot VS Code extension remains at **42655aa**.
 The app release is
-`ea4ae48345d8fc658658d1074bfc553d6042bad3c0a4a384ba6d58e2c3679f85`;
-the frontend is `0d52f396a8e8`. Current plus one app rollback remain.
+`d355673fb2ac994f596a8d2a0f1d2bad3b5d3635f3e92428a1e216ac1c27773e`;
+the frontend is `d93938adc45f`. Current plus one app rollback remain.
 
-- All 36 served assets and twelve installation/API/state/presentation readbacks pass.
-- Nine installed verifiers pass 129 checks across 67 exact module hashes.
+- All 578 installed payload files and 36 served assets match the release manifest.
+- Two installed metadata/refusal verifiers pass 25 checks, including the exact
+  current source, signed editor refusals and offline advisory/license calculations.
 - All 54 workspace definitions, 57 workflows, Personal selection and three
   conversations are preserved, including the pending keyboard-only record.
-  53 semantic snapshots match exactly; Personal differs only by its expected
-  shutdown task-permission revocation counter, 81 → 82.
+  All 54 non-audit semantic snapshots match exactly. Personal appends four
+  expected shutdown/startup audit entries; its permission counter remains 83.
 - The extension's 53 payload files and eight installed module checks pass.
-  Actual graphical editor activation remains unaccepted.
-- Dated launcher/editor backups verify. The latest prepared app package of
-  5,203,957 bytes is removed; previous prepared editor staging was already removed.
+  This is the earlier extension checkpoint; graphical activation remains unaccepted.
+- Dated launcher and all 55 encrypted-state/selection backups verify. The latest
+  prepared app package of 579 files / 5,211,572 bytes is removed after independent
+  installed-payload verification. No user backup was removed.
 
-[App receipt](evidence/installed-removed-history-summary.json),
+[App receipt](evidence/workspace-recovery-installed-summary.json),
 [editor receipt](evidence/installed-editor-terminal-summary.json).
 
 ## Verification belongs to a source
