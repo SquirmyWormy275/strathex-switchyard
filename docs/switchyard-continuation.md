@@ -35,8 +35,9 @@ The workspace-boundary follow-up reproduces three UI failures before correction:
 reconnection to another window's selection, failed destination snapshot, and
 failed pre-switch saving. Five final regressions pass inside six groups / 83 tests;
 two runner/scheduling groups pass 30 tests. No original bounds or assertions were
-relaxed. The new source must receive a frontend pin, normal update and platform
-checks before claiming installed acceptance.
+relaxed. The single changed frontend asset is pinned and normally installed. Complete
+Linux verification is running in an owned isolated checkout with existing
+dependency aliases; its source is 65b5aac. Platform checks remain separate.
 [Evidence](evidence/workspace-boundary-source-summary.json).
 
 ## Preserve the operating boundaries
@@ -70,29 +71,29 @@ checks before claiming installed acceptance.
 
 ## Current installed checkpoint — completed, do not replay
 
-Source **56ca6685f8d94445abc214802e9ee89487e05757** is normally installed.
-Release: **d355673fb2ac994f596a8d2a0f1d2bad3b5d3635f3e92428a1e216ac1c27773e**.
-Rollback: **ea4ae48345d8fc658658d1074bfc553d6042bad3c0a4a384ba6d58e2c3679f85**.
-Frontend: **d93938adc45fb58d42d5838c18dfd301b9a928eecaf9a08ac5c6a2bbc15a8e09**,
-36 assets pinned to **f0a5510bc5355b91090afdfb79706d61ad3dd930**. Three changed
-assets are `index.html`, `suite-ui.mjs` and `style.css`. Never print private access.
+Source **65b5aacc8df8ebb1cb7f592eafff2d3c2000ba86** is normally installed.
+Release: **dd9cc05a13cada0f5585571374b8889cc7260576674fcc4955d5950c25a6d642**.
+Rollback: **d355673fb2ac994f596a8d2a0f1d2bad3b5d3635f3e92428a1e216ac1c27773e**.
+Frontend: **9accbd4c1ca31233c66cb00ffa28a151eee22647c70c61bfa7ce360dab297a17**,
+36 assets pinned to **c0ef04431eebb125eb2e7b3a1d766a5b692b7d01**. Only
+`suite-ui.mjs` changes from the previous pin. Never print private access.
 
 All 578 installed payload files, 36 served assets and 25 installed metadata/refusal
 checks verify. All 54 non-audit workspace snapshots, 57 workflow definitions,
 Personal selection, modes, three conversations and the pending keyboard-only
 record remain unchanged. Personal appends exactly four shutdown/startup audit
-entries; its permission counter remains **83**. The first verification incorrectly
-expected an increment: source inspection confirms shutdown increments only after
-task authority has been used. Preserve that original failed receipt.
+entries; its permission counter remains **83**. The earlier recovery update incorrectly expected an increment on its first
+readback; that failed receipt remains in its separate recovery evidence. Shutdown
+increments only after task authority has been used.
 
-Dated installer backup: **2026-11-24T20-27-08.734Z-8066a381-5333-4499-9bd6-11241af196ad**.
+Dated installer backup: **2026-11-24T20-46-11.659Z-4c1834e2-f28d-410f-8cd1-5ffd19ed9b44**.
 All 55 encrypted-state/selection backups independently verify. All **579 prepared
-files / 5,211,572 bytes** are removed after both canonical manifests and independent
+files / 5,213,246 bytes** are removed after both canonical manifests and independent
 installed payloads verify. The installer pretty-prints its manifest; serialized
 manifest bytes differ from compact staging while the release identity is equal.
 Current plus one rollback remain. Private evidence directory:
-`development-maintenance/20261124-workspace-recovery`. **Do not replay the install
-or cleanup.** [Installed evidence](evidence/workspace-recovery-installed-summary.json).
+`development-maintenance/20261124-workspace-boundaries`. **Do not replay the install
+or cleanup.** [Installed evidence](evidence/workspace-boundary-installed-summary.json).
 
 The two metadata verifiers bind Home to the committed frontend pin. Copilot passes
 seven checks; task-owner/editor/offline-advisory metadata passes eighteen. No

@@ -33,8 +33,8 @@ The next correction addresses interrupted workspace changes. Three regressions
 reproduce old-layout carryover and unsaved-edit loss. Five new cases now cover
 those failures, lost selection replies and subsequent reconnects; six integration
 groups pass 83 tests, and two scheduling/runner groups pass 30 tests with no skips.
-Original deadlines, child cleanup and typechecking pass. This follow-up still
-needs its own installed and normal-push acceptance.
+Original deadlines, child cleanup and typechecking pass. The normal update is verified below; complete Linux and normal-push checks
+are running separately.
 [Workspace-boundary evidence](evidence/workspace-boundary-source-summary.json).
 
 ## What is connected
@@ -53,10 +53,10 @@ needs its own installed and normal-push acceptance.
 
 ## Installed checkpoint
 
-The app uses source **56ca668**; the pilot VS Code extension remains at **42655aa**.
+The app uses source **65b5aac**; the pilot VS Code extension remains at **42655aa**.
 The app release is
-`d355673fb2ac994f596a8d2a0f1d2bad3b5d3635f3e92428a1e216ac1c27773e`;
-the frontend is `d93938adc45f`. Current plus one app rollback remain.
+`dd9cc05a13cada0f5585571374b8889cc7260576674fcc4955d5950c25a6d642`;
+the frontend is `9accbd4c1ca3`. Current plus one app rollback remain.
 
 - All 578 installed payload files and 36 served assets match the release manifest.
 - Two installed metadata/refusal verifiers pass 25 checks, including the exact
@@ -68,10 +68,10 @@ the frontend is `d93938adc45f`. Current plus one app rollback remain.
 - The extension's 53 payload files and eight installed module checks pass.
   This is the earlier extension checkpoint; graphical activation remains unaccepted.
 - Dated launcher and all 55 encrypted-state/selection backups verify. The latest
-  prepared app package of 579 files / 5,211,572 bytes is removed after independent
+  prepared app package of 579 files / 5,213,246 bytes is removed after independent
   installed-payload verification. No user backup was removed.
 
-[App receipt](evidence/workspace-recovery-installed-summary.json),
+[App receipt](evidence/workspace-boundary-installed-summary.json),
 [editor receipt](evidence/installed-editor-terminal-summary.json).
 
 ## Verification belongs to a source

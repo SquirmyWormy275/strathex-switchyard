@@ -22,10 +22,10 @@ software tests, not hardware, interactive desktop, live-provider or guest checks
 The source now provides a visible retry after an unavailable keyring or failed
 saved-workspace connection. Eight groups / 135 tests, eight verifier guards and
 typechecking pass. [Recovery evidence](evidence/workspace-recovery-source-summary.json).
-Normal installed source **56ca668** verifies all 578 payload files, 36 served
+Normal installed source **65b5aac** verifies all 578 payload files, 36 served
 assets and 25 metadata/refusal checks. All 54 non-audit workspace snapshots,
 57 workflow definitions and three conversations are preserved; Personal adds
-only four expected audit entries. [Installed evidence](evidence/workspace-recovery-installed-summary.json).
+only four expected audit entries. [Installed evidence](evidence/workspace-boundary-installed-summary.json).
 See [current status](switchyard-status.md) for the installed revision and current
 remaining implementation; [the earlier ledger](https://github.com/SquirmyWormy275/strathex-switchyard/blob/8dd849e9eb3ac7f15ff556c52e98298cc367c786/docs/switchyard-requirements.md)
 retains the complete previous checkpoint history.

@@ -70,22 +70,22 @@ accept later changes.
 
 | Scope | Verified result |
 | --- | --- |
-| Installed Linux application, `fd13fd0` | 48 served/state/presentation and 129 metadata checks. App, task, device, profile and role reviews clear cancelled context. All 54 workspace definitions are preserved; Personal retains its expected shutdown revocation increment. [Receipt](docs/evidence/installed-removed-history-summary.json) |
+| Installed Linux application, `65b5aac` | Keyring retry and interrupted-workspace recovery are installed. All 578 payload files, 36 served assets and 25 metadata/refusal checks verify. All 54 non-audit workspace snapshots, 57 workflows and three conversations are preserved. [Receipt](docs/evidence/workspace-boundary-installed-summary.json) |
+| Workspace recovery regressions | Three reproduced failures now pass alongside lost-reply and subsequent-reconnect cases. Six integration groups / 83 tests and two runner/scheduling groups / 30 tests pass with no skips. [Receipt](docs/evidence/workspace-boundary-source-summary.json) |
 | Running synthetic demonstration, `dfa40fb` | Nine checks: named connection, signed acknowledgement and stale-workspace refusal. [Receipt](docs/evidence/batched-inspection-running-demo-summary.json) |
 | Native Codex terminal, synthetic provider | Real 0.167 CLI renders legacy and paginated saved transcripts through the production relay; one narrowed resume, zero model prompts. [Receipt](docs/evidence/codex-native-paginated-history-summary.json) |
 | Native Linux repository inspection | Twelve real Git guardians, at most four concurrent reads, independent exit and unchanged repository bytes. [Receipt](docs/evidence/batched-inspection-source-summary.json) |
 | Complete Linux suite, `a7958c4` | 376 groups, 2,578 passing tests, 32 declared skips; original commands, limits and cleanup audited. Predates the later frontend. [Receipt](docs/evidence/linux-a7958c4-complete-summary.json) |
 | Windows client lane, `3222727` | 31 groups, 362 passing tests, zero skips; later lease correction and full-suite acceptance remain separate. [Receipt](docs/evidence/native-client-3222727-summary.json) |
-| Complete Windows source, `a7958c4` | 482 groups, 3,158 passing tests, 246 declared skips; all 23 workers and native collector pass with original limits and audited cleanup. Predates the readable-review frontend. [Receipt](docs/evidence/complete-windows-a7958c4-summary.json) |
-| Earlier Windows package, `7529718` | 462 groups, 2,910 passing tests, 246 declared skips; bundle construction and smoke checks pass. [Receipt](docs/evidence/windows-package-7529718-summary.json) |
+| Full platform baseline, `8dd849e` | All six workflows pass. Complete Windows source and Windows release each pass 499 groups, 3,182 tests and 246 declared skips, with original bounds and cleanup verified. This predates the workspace recovery follow-ups. [Receipt](docs/evidence/backend-capacity-native-summary.json) |
 
 **Unfinished software:** Linux Claude Desktop focus/launch and the broader
-observation and scanner capabilities tracked in the ledger. The Windows UI files
-now pass their original limits, though execution retains a narrow timing margin.
-Earlier repeated-focus and other intermittent native failures remain recorded.
+observation and scanner capabilities tracked in the ledger. Complete Linux and
+normal-push checks are running for the newer recovery changes. Earlier repeated-focus
+and other intermittent native failures remain recorded.
 [Retained Windows failures](docs/evidence/native-48bf450-results-summary.json).
-A later PowerShell bootstrap fixture hit counter-file contention; its bounded
-wait correction awaits native acceptance. [Current failure](docs/evidence/windows-bootstrap-contention-summary.json).
+The earlier PowerShell counter-file contention correction is included in the
+accepted baseline. [Historical failure](docs/evidence/windows-bootstrap-contention-summary.json).
 
 **Separate acceptance checks:** browser task/visual review, physical F77/B122
 changes, approved Microsoft tenant access, live native accounts/tasks, interactive
