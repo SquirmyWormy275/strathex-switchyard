@@ -10,6 +10,26 @@ and [verification](verification.md). Publish reviewable checkpoints to
 [draft PR 20](https://github.com/SquirmyWormy275/strathex-switchyard/pull/20).
 No merge, public release or visibility change is authorized.
 
+## Resumed checkpoint — November 24
+
+The current `fbbfbe0` checks fail the same preliminary backend scheduling assertion
+in Linux release, Windows release and complete Windows source verification.
+The eight-worker workload is 7,689,260 ms in total, beyond eight existing
+950,000 ms allowances. Complete Windows also has a cancelled assembly worker.
+
+Nine preliminary workers now carry all 274 original groups, with maximum
+estimated load 854,424 ms. Historical estimates, per-worker 20-minute limits,
+child commands/bounds, coverage and skips are preserved. The original failure
+was reproduced; four original scheduling/verifier groups pass 46 tests with no
+skips and verified cleanup. Typechecking passes. Normal-push platform checks
+remain pending; no app installation or hardware/account operation was performed.
+[Source evidence](evidence/backend-capacity-source-summary.json).
+
+Resume by inspecting the new normal-push checks and addressing any actual
+remaining failures. Keep the November 11 scanner implementation and native
+follow-ups below; the older PR description omitted those improvements. The
+installed checkpoint and its completed cleanup must not be replayed.
+
 ## Preserve the operating boundaries
 
 - Continue without delegation. Claude Code is a contingency for actual token

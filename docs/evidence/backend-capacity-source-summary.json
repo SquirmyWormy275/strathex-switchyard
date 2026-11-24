@@ -1,0 +1,93 @@
+{
+  "schema": "switchyard-backend-capacity-source/v1",
+  "date": "2026-11-24",
+  "basis": "fbbfbe055bc77d7115bfef8890b28d0240d1c16e",
+  "sourceSha256": {
+    "scripts/windows-backend-shards.mjs": "f29f3dea3da17bb1658853181fa10c31da333a067400d3bcaa5e0db58711620e",
+    "scripts/windows-backend-shards.test.mjs": "77a7460464115086b5521d0e7fd98e8c01f2fe82fbc4f7a357d1de5d7a67584c",
+    ".github/workflows/b122-windows.yml": "f2f03ab0910617eb3207fa1cfaf8914d6a01d5a756a3ca23a8a9229df979fd2c",
+    "scripts/fixtures/windows-backend-costs.json": "ccd08d945b4781b86690a87eabd351b7ead04e958b6151f49b828072e220e8a7",
+    "scripts/run-isolated-tests.mjs": "13acd544f58f3c049cb2fe6a80e4fcffa516ece3a2f99a822b9ca51aa7b4aa11"
+  },
+  "failure": "The expanded 274-group preliminary backend inventory exceeds the unchanged 950000 ms estimated workload ceiling on all eight workers.",
+  "priorHeadWorkflowFailures": [
+    {
+      "name": "B122 Linux release verification",
+      "url": "https://github.com/SquirmyWormy275/strathex-switchyard/actions/runs/43129743430"
+    },
+    {
+      "name": "B122 Windows release verification",
+      "url": "https://github.com/SquirmyWormy275/strathex-switchyard/actions/runs/43129743486"
+    },
+    {
+      "name": "Switchyard complete Windows source verification",
+      "url": "https://github.com/SquirmyWormy275/strathex-switchyard/actions/runs/43129743425"
+    }
+  ],
+  "reproducedFailure": {
+    "receipt": "isolated-test-64676fab-f924-445f-b6de-5ddb732ae0ea.json",
+    "sha256": "e88017ef3a35bdda714dfc52d5612eeffb6653c248f1366e8334f70427133e45",
+    "success": false,
+    "totals": {
+      "required": 1,
+      "passed": 0,
+      "failed": 1,
+      "tests": 3,
+      "passedTests": 2,
+      "failedTests": 1,
+      "skippedTests": 0,
+      "cancelledTests": 0,
+      "todoTests": 0
+    },
+    "allChildAndTreeCleanupVerified": true
+  },
+  "focusedCorrection": {
+    "receipt": "isolated-test-c310f774-ee7b-496a-9d27-58dd9e74c78d.json",
+    "sha256": "c3e4e89eba63fc8159a4a58470a9bb5990e050171095b794ca60609dac3db7db",
+    "success": true,
+    "totals": {
+      "required": 4,
+      "passed": 4,
+      "failed": 0,
+      "tests": 46,
+      "passedTests": 46,
+      "failedTests": 0,
+      "skippedTests": 0,
+      "cancelledTests": 0,
+      "todoTests": 0
+    },
+    "allChildAndTreeCleanupVerified": true
+  },
+  "estimatedTotalMs": 7689260,
+  "backendGroups": 274,
+  "previousEstimatedLoadsMs": [
+    961146,
+    961160,
+    961121,
+    961171,
+    961167,
+    961164,
+    961166,
+    961165
+  ],
+  "correctedEstimatedLoadsMs": [
+    854421,
+    854272,
+    854361,
+    854424,
+    854380,
+    854418,
+    854357,
+    854273,
+    854354
+  ],
+  "backendShards": 9,
+  "estimatedWorkloadCeilingMs": 950000,
+  "perShardCiMinutes": 20,
+  "historicalEstimatesUnchanged": true,
+  "originalCommandsBoundsSkipsAndCoveragePreserved": true,
+  "typecheckPassed": true,
+  "nativeSchedulingAcceptance": false,
+  "completePlatformAcceptance": false,
+  "installedChanged": false
+}

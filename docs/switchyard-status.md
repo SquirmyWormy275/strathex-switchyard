@@ -11,6 +11,29 @@ Start with the [product introduction](../README.md) and
 The [requirement ledger](switchyard-requirements.md) tracks the wider scope;
 [PR 20](https://github.com/SquirmyWormy275/strathex-switchyard/pull/20) remains a draft.
 
+## Current follow-up — November 24
+
+The latest published source before this correction, `fbbfbe0`, fails Linux
+release, Windows release and complete Windows source verification. Each run
+encounters the same scheduling assertion: the expanded 274-group preliminary
+backend inventory exceeds the existing estimated workload ceiling on eight
+workers. Complete Windows also has a cancelled assembly worker; the cohort is
+not accepted.
+
+The correction distributes those same groups across nine workers. Historical
+costs, the 950,000 ms estimated workload ceiling, 20-minute CI jobs, original child
+commands, deadlines and skip allowances remain unchanged. The largest estimate
+falls from 961,171 ms to 854,424 ms. The original failure is reproduced locally;
+four original scheduling/verifier groups pass all 46 tests with zero skips and
+verified child cleanup, and typechecking passes. Normal-push native and complete
+platform acceptance remain pending. The installed app is unchanged.
+[Source evidence](evidence/backend-capacity-source-summary.json).
+
+The [November 11 continuation](switchyard-continuation.md#continue-independent-work)
+records later scanner work than the older PR description: native Windows recipe
+generation is implemented, and its four scanner groups passed at `e48e59f`.
+That focused result does not establish complete release or installed acceptance.
+
 ## What is connected
 
 | Workflow | Current behavior and walkthrough |
@@ -142,11 +165,12 @@ the complete cohort remain separate.
   finds a synthetic deleted-file secret without recreating the file. The immutable
   frontend pin and normal installation are verified above.
   [Contract and demonstration](removed-history-permissions.md).
-- Automatic native Windows scanner recipe/catalog generation remains unfinished.
-  The Windows save boundary currently writes the portable process recipe; it
-  does not convert it into the separately required guest manifest/catalog. The
-  existing Windows guest-double evidence uses its explicit Windows recipe.
-  [Source evidence](evidence/history-path-discovery-source-summary.json).
+- Native Windows scanner recipe generation is implemented at `a7e6fe7`, with
+  runtime identity and link-free drive-mapping corrections through `e48e59f`.
+  All four scanner groups passed natively, including the B122 mapped-drive path.
+  Complete release and actual guest/installed acceptance remain separate;
+  broader history and scanner coverage remain unfinished.
+  [Continuation](switchyard-continuation.md#continue-independent-work).
 - Preserve the narrow Windows execution-UI margin and earlier intermittent native
   focus, host-action settlement and shortcut failures. Full source acceptance
   does not establish later-source or current package acceptance.

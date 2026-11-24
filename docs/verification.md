@@ -10,6 +10,7 @@ for work that remains.
 
 | Scope | Source | Accepted result and limits |
 | --- | --- | --- |
+| Preliminary Windows scheduling capacity | November 24 correction based on `fbbfbe0` | Original scheduling failure reproduced; four groups / 46 tests pass with zero skips, original child bounds and cleanup verified. Nine jobs preserve all 274 backend groups and the existing cost/setup limits. Native and complete-platform acceptance remain pending. [Receipt](evidence/backend-capacity-source-summary.json). |
 | Complete Linux source | `a7958c4` | 376 groups, 2,578 passes, 32 declared skips. Original commands, bounds, serial order and owned-tree cleanup audited. [Receipt](evidence/linux-a7958c4-complete-summary.json). |
 | Later legacy history account checks | `7317371` | Three regressions reproduced the omission; 13 integration groups pass 139 tests/one existing skip. Separate package and type checks pass. [Evidence](evidence/codex-legacy-read-account-summary.json). |
 | Installed Linux application | `fd13fd0` | 48 served/installation/API/state/presentation and 129 metadata checks, 67 exact module hashes. 54 workspace definitions and three conversations preserved; Personal has only the expected shutdown revocation increment. [Receipt](evidence/installed-removed-history-summary.json). |
