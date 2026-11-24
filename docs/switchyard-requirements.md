@@ -9,89 +9,27 @@ entry point, evidence and remaining work. A hardware/account check does not excu
 unfinished independent software. Read [current status](switchyard-status.md) for
 accepted checkpoints and [verification](verification.md) for reproducible checks.
 
-Installed Linux source `fd13fd0` includes the 36-asset guided frontend, permissions,
-scanner setup, signed-feed maintenance, reviewed execution, saved design
-conversations, coding-task text/background controls and approved-work account/
-recovery, exact native-app navigation, agent maintenance, saved voice notes,
-transcript import, Claude hook setup and direct client-to-native setup navigation. All served asset
-hashes, twelve installation/API/state/presentation checks and 129 metadata/refusal checks across 67 exact modules
-pass. All 54 workspace definitions and 57 workflows remain intact; 53 semantic
-snapshots match exactly and Personal differs only by its expected shutdown
-permission-revocation counter increment from 81 to 82.
-Current plus one rollback remain and the prepared package is removed.
-[Installed evidence](evidence/installed-removed-history-summary.json).
-Reviewed role dispatch carries the active and persisted workspace identity;
-the current synthetic running demonstration verifies acknowledgement and stale
-selection refusal. [Demonstration](evidence/claude-launch-running-demo-summary.json).
+## Current evidence — November 24
 
-The installed source also includes [saved design-conversation controls](saved-conversation-controls.md):
-exact history selection, reviewed legacy account binding, explicit native status
-and lost-reply handling. Dedicated coding-task creation and reviewed-text frontend
-flows and background-task controls are now connected; exact interactive attachment remains implementation work. Visual, hardware and live account acceptance
-remain separate.
+All six source/platform/private-package workflows pass at **8dd849e**. The two
+complete Windows receipts each cover 499 groups / 3,182 passing tests and 246
+declared skips, with original limits and cleanup preserved.
+[Accepted native results](evidence/backend-capacity-native-summary.json).
+Source-specific counts and pending statements in the historical entries below
+refer to those older revisions. The new complete result accepts the included
+software tests, not hardware, interactive desktop, live-provider or guest checks.
 
-The approved-work account UI now uses explicit sign-in/check/stop controls and
-separate one-use acknowledgement of uncertain delivery. Actual designer requests
-carry durable UUIDs; lost replies never cause automatic replay.
-[Account controls](copilot-account-controls.md). Normal installed adoption and
-approved-tenant acceptance remain separate.
+The source now provides a visible retry after an unavailable keyring or failed
+saved-workspace connection. Eight groups / 135 tests, eight verifier guards and
+typechecking pass. [Recovery evidence](evidence/workspace-recovery-source-summary.json).
+See [current status](switchyard-status.md) for the installed revision and current
+remaining implementation; [the earlier ledger](https://github.com/SquirmyWormy275/strathex-switchyard/blob/8dd849e9eb3ac7f15ff556c52e98298cc367c786/docs/switchyard-requirements.md)
+retains the complete previous checkpoint history.
 
-The latest backend feature lists eligible saved projects and distinct task counts
-through signed Linux/Windows clients, followed by existing exact-project task
-choices. Protected owner/load/task records and current workspace policy determine
-eligibility. Listing performs no native observation or write and grants no task
-authority; the selected task still requires fresh review. The encrypted-store-to-
-client demonstration uses an explicit provider double. The owner has lifted the frontend freeze. Named role/device setup is now connected; editor picker/command activation now uses the existing reviewed Linux/Windows launch path. Interactive IDE and native task attachment remain unaccepted. The real Codex 0.167 terminal now renders synthetic saved legacy and paginated transcripts through the production relay, including an older page fetched through its retained cursor; live-provider/actual IDE acceptance remains separate. [Native terminal evidence](codex-terminal-compatibility.md).
-[Contract](coding-task-owners.md#find-eligible-saved-projects),
-37 focused groups/117 tests, zero skips, and both TypeScript checks pass.
-[source evidence](evidence/editor-project-choices-source-summary.json).
-Three native Windows inventory/client groups pass 17 tests with zero skips.
-The `cf3bb4c` complete native cohort has a separate retained settlement failure;
-its 15-test consumer group passes at `90fa879` without changing the original bounds.
-[Scoped follow-up](evidence/host-action-settlement-native-followup-summary.json).
-[Native inventory evidence](evidence/editor-project-choices-native-summary.json).
-
-Complete Linux source 72e7c22 passes 376 groups/2,574 tests with 32 declared
-skips. Its owned checkout, nine aliases and 806 generated files are removed. It
-predates the legacy account-read correction, which has separate integration and
-installed verification. [Accepted Linux evidence](evidence/linux-72e7c22-complete-summary.json).
-
-Windows client source a351626 passes 31 groups/353 tests with zero skips under
-the original limits. Its exact receipt and source tree are audited.
-[Client evidence](evidence/client-native-a351626-summary.json). The newer atomic
-startup/shutdown correction passes ten local groups/147 tests with one original
-platform skip; its native Windows client follow-up passes 31 groups/356 tests with zero skips. Normal installation passes 69 served/API and 107 metadata checks.
-[Startup evidence](evidence/atomic-startup-source-summary.json).
-
-Full Windows package source 7529718 passes all eight jobs, including 462 test
-groups/2,910 tests with 246 declared skips.
-[Package evidence](evidence/windows-package-7529718-summary.json).
-The later complete-source run at 58ecd54 fails two UI file deadlines. Those
-failures are retained; later focused client success is not full-suite acceptance.
-[Full-source failures](evidence/full-native-58ecd54-ui-failures-summary.json).
-
-The earlier installed-source Linux `2c6497f` passes 351 groups/2,312 tests with 32 declared skips.
-It covers the installed guided role choices and external-agent consent corrections.
-The later guided frontend checkpoint connects the named role picker; visual acceptance is pending. Native Windows client `9d230ac` passes
-250 tests with no skips. Complete Windows releases `e5a5781` and `6727054`
-were interrupted without final receipts. A separate complete-source workflow
-now preserves every original group across bounded workers and requires a final
-receipt audit. Complete Windows source `90fa879` now passes all 462 groups,
-2,902 tests and 246 declared skips, with all 23 jobs and the native collector
-passing. The earlier `cf3bb4c` settlement failure remains unresolved despite the
-passing follow-up. The `90fa879` package run completes all 462 groups but fails two native fixture assertions. The original failures and exact cleanup are audited; local fixture corrections pass 29 tests with five declared platform skips. Both corrected files now pass 22 native Windows tests with zero skips at `4db5948`; the two complete worker receipts are audited. The alias assertions now pass in the full package test stage; release acceptance remains blocked by the later standalone-helper compiler failure. [Native fixture follow-up](evidence/windows-fixture-native-4db5948-summary.json), [Package failure](evidence/windows-package-90fa879-failure-summary.json), [fixture corrections](evidence/windows-package-fixture-corrections-summary.json).
-[Complete source evidence](evidence/complete-windows-90fa879-summary.json).
-These checkpoints do not establish live provider/task, interactive UI or
-physical-device acceptance.
-[Linux evidence](evidence/linux-2c6497f-complete-summary.json),
-[Windows source workflow](evidence/complete-windows-source-lane-summary.json),
-[Windows release interruption](evidence/windows-6727054-full-interruption-summary.json).
-
-Complete Windows source f4dcc79 passes 482 original groups: 3,157 passes and
-246 declared skips. All 23 workers and the native collector are receipt-audited.
-This accepts the lease correction; later history-discovery source and current
-package acceptance remain separate.
-[Full native evidence](evidence/complete-windows-f4dcc79-summary.json).
+On November 24 the owner confirmed that the B122, an interactive Windows host and
+an approved Microsoft 365 tenant are unavailable. Browser attachment also fails
+before page loading. These block their exact acceptance scenarios and do not
+change the required implementation scope.
 
 ## Requirement status
 

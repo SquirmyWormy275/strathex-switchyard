@@ -12,23 +12,24 @@ No merge, public release or visibility change is authorized.
 
 ## Resumed checkpoint — November 24
 
-The current `fbbfbe0` checks fail the same preliminary backend scheduling assertion
-in Linux release, Windows release and complete Windows source verification.
-The eight-worker workload is 7,689,260 ms in total, beyond eight existing
-950,000 ms allowances. Complete Windows also has a cancelled assembly worker.
+**8dd849e** passes all six normal-push workflows. Complete Windows source and
+Windows release each pass 499 groups / 3,182 tests with 246 declared skips;
+original commands, limits, source identities and cleanup are audited. Nine
+preliminary workers retain all 274 groups within the original workload ceiling.
+[Accepted evidence](evidence/backend-capacity-native-summary.json).
 
-Nine preliminary workers now carry all 274 original groups, with maximum
-estimated load 854,424 ms. Historical estimates, per-worker 20-minute limits,
-child commands/bounds, coverage and skips are preserved. The original failure
-was reproduced; four original scheduling/verifier groups pass 46 tests with no
-skips and verified cleanup. Typechecking passes. Normal-push platform checks
-remain pending; no app installation or hardware/account operation was performed.
-[Source evidence](evidence/backend-capacity-source-summary.json).
+The owner then requested finishing the remaining work and confirmed that no B122,
+interactive Windows host or approved Microsoft 365 tenant is available yet.
+Keep those exact checks blocked; do not ask again without new evidence.
 
-Resume by inspecting the new normal-push checks and addressing any actual
-remaining failures. Keep the November 11 scanner implementation and native
-follow-ups below; the older PR description omitted those improvements. The
-installed checkpoint and its completed cleanup must not be replayed.
+The next source adds conditional keyring guidance and a visible, single-flight
+workspace retry. Eight original groups pass 135 tests with zero skips; the eight
+installed-verifier guards and typecheck pass. The new immutable frontend pin
+contains only index.html, suite-ui.mjs and style.css changes.
+[Recovery evidence](evidence/workspace-recovery-source-summary.json).
+Normal installed adoption and platform acceptance are recorded in the latest
+[current status](switchyard-status.md). The old installation below is historical;
+never replay its completed cleanup. Frontend work remains authorized.
 
 ## Preserve the operating boundaries
 
@@ -94,7 +95,7 @@ Linux desktop vendor support reporting remains installed. Omarchy is unsupported
 by the official Claude Desktop beta; no executable/window authority is inferred.
 The real Linux binding and launch/focus adapter remain unfinished software.
 
-## Complete platform acceptance and current native failure
+## Historical platform checkpoints
 
 Linux **a7958c4** passes all 376 original groups: **2,578 tests / 32 declared
 skips**. Run **853cc5ea-8dfa-43bd-89d8-84a8a8215e62** and its supervisor exited

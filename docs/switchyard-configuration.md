@@ -40,8 +40,14 @@ native Windows profile correction acceptance remains separate.
 The [Studio guide](../tools/layout-studio/README.md) covers QMK imports, aggregate
 observations, direct editing and exports. The [portable-profile guide](portable-profiles.md)
 explains which preferences travel and which local bindings must be reviewed again.
-Home/catalog is frozen for review, and newer backend capabilities may not yet
-have UI controls.
+Guided role/device setup, saved conversations, task controls, scanner setup and
+reviewed execution share this interface. Browser task acceptance remains open.
+
+If saved workspaces cannot load because the desktop keyring is locked, unlock it
+in the system password prompt and choose **Retry workspace connection**. Keep
+the encrypted workspace files and their existing keys; resetting them is not a
+connection repair. The retry preserves an unsaved layout and does not replay
+previous keyboard, application or agent actions.
 
 This is a private development build, with no public installer or new release.
 See [current behavior and evidence](switchyard-status.md) before applying changes.

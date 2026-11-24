@@ -2,7 +2,7 @@
 
 Switchyard's new suite can now be built as a small, self-contained application
 directory. It starts independently of the checkout and VS Code, using an existing
-Node **24.14.0** installation. The current Linux package is approximately 4.5 MiB (552 files at `738c1f7`).
+Node **24.14.0** installation. The builder reports the exact selected file count and payload bytes.
 The packaged first-party catalog provenance index uses a declared, bounded
 gzip JSON encoding. Every field and all upstream source/notice bytes are retained;
 source checkouts continue using JSON. [Packaging evidence](evidence/design-observations-source-summary.json).
@@ -11,7 +11,7 @@ recovery records remain outside the bundle and are reused.
 
 This is a **private development package**, not a signed public release. The
 manifest verifies every file and binds the platform, source commit, Node version
-and frozen frontend. An independently obtained expected content identity detects
+and the committed immutable frontend. An independently obtained expected content identity detects
 replacement; the manifest alone does not authenticate a publisher. Updates are
 not downloaded or trusted automatically.
 
@@ -26,9 +26,9 @@ mise exec node@24.14.0 -- npm run suite:package
 The command prints the exact bundle directory, SHA-256 identity and byte count.
 It includes only selected tracked source, the required backend dependencies,
 examples, catalog source and licenses. It excludes tests, credentials, caches,
-installed dependencies, models and checkout history. The currently frozen morning
-frontend is reconstructed from committed bytes and its recorded hashes; the live
-review artifact is never regenerated or overwritten.
+installed dependencies, models and checkout history. The selected frontend is reconstructed from committed bytes and its recorded
+hashes in `deployment/suite/frontend-review.json`. Frontend changes receive a
+new immutable pin; an existing review artifact is never overwritten.
 
 Run the printed bundle, from any working directory:
 
@@ -37,7 +37,7 @@ Run the printed bundle, from any working directory:
 ```
 
 Open its private loopback link. `--port 43177` chooses the pilot review port and
-retains the same frozen review's private access only after its previous owner
+retains the same installed application's private access only after its previous owner
 has exited. A live owner is never displaced. The packaged frontend uses a separate
 directory so frozen browser modules cannot replace newer backend modules.
 

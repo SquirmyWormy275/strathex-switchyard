@@ -13,26 +13,21 @@ The [requirement ledger](switchyard-requirements.md) tracks the wider scope;
 
 ## Current follow-up — November 24
 
-The latest published source before this correction, `fbbfbe0`, fails Linux
-release, Windows release and complete Windows source verification. Each run
-encounters the same scheduling assertion: the expanded 274-group preliminary
-backend inventory exceeds the existing estimated workload ceiling on eight
-workers. Complete Windows also has a cancelled assembly worker; the cohort is
-not accepted.
+Source **8dd849e** passes all six normal-push workflows: Linux release, Windows
+release, complete Windows source, Windows filesystem boundaries, Windows policy
+admission and client platform checks. Both complete Windows receipts contain
+**499 groups / 3,182 passes / 246 declared skips**. The original commands,
+deadlines and skip inventory are preserved. The nine-worker scheduling fix is
+accepted; earlier failed runs remain historical evidence.
+[Native and release results](evidence/backend-capacity-native-summary.json).
 
-The correction distributes those same groups across nine workers. Historical
-costs, the 950,000 ms estimated workload ceiling, 20-minute CI jobs, original child
-commands, deadlines and skip allowances remain unchanged. The largest estimate
-falls from 961,171 ms to 854,424 ms. The original failure is reproduced locally;
-four original scheduling/verifier groups pass all 46 tests with zero skips and
-verified child cleanup, and typechecking passes. Normal-push native and complete
-platform acceptance remain pending. The installed app is unchanged.
-[Source evidence](evidence/backend-capacity-source-summary.json).
-
-The [November 11 continuation](switchyard-continuation.md#continue-independent-work)
-records later scanner work than the older PR description: native Windows recipe
-generation is implemented, and its four scanner groups passed at `e48e59f`.
-That focused result does not establish complete release or installed acceptance.
+The workspace recovery follow-up adds a visible retry control after a failed
+startup or saved-state read, and conditional keyring-unlock guidance. It preserves
+unsaved layout edits and joins concurrent retries without replaying a keyboard
+change, application launch or agent request. Eight existing groups pass 135 tests
+with no skips; eight verifier guards and typechecking also pass. Browser visual
+acceptance and the follow-up's normal-push platform checks remain separate.
+[Source evidence](evidence/workspace-recovery-source-summary.json).
 
 ## What is connected
 
@@ -157,37 +152,34 @@ the complete cohort remain separate.
 
 ## Remaining implementation and defects
 
-- Bounded historical-name discovery is implemented and normally installed. Its
-  native Windows follow-up passes in the complete a7958c4 cohort. Ten integration groups pass 80 tests/
-  one existing skip; package/installation groups pass 26 tests, and typechecking
-  passes. A new source checkpoint implements opted-in removed-path permission and
-  portable recipe assembly with 195 checks across 25 groups. Its Linux scan
-  finds a synthetic deleted-file secret without recreating the file. The immutable
-  frontend pin and normal installation are verified above.
-  [Contract and demonstration](removed-history-permissions.md).
-- Native Windows scanner recipe generation is implemented at `a7e6fe7`, with
-  runtime identity and link-free drive-mapping corrections through `e48e59f`.
-  All four scanner groups passed natively, including the B122 mapped-drive path.
-  Complete release and actual guest/installed acceptance remain separate;
-  broader history and scanner coverage remain unfinished.
-  [Continuation](switchyard-continuation.md#continue-independent-work).
-- Preserve the narrow Windows execution-UI margin and earlier intermittent native
-  focus, host-action settlement and shortcut failures. Full source acceptance
-  does not establish later-source or current package acceptance.
-- Finish the Linux Claude Desktop binding and launch/focus path for a verified
-  supported installation. Windows controls do not establish Linux support.
-- Resolve exact interactive attachment limits. Codex's reviewed terminal supports
-  saved history; arbitrary prompts/configuration effects remain refused. Claude's
-  attach command can restart a stopped session and has no verified live-only flag.
-  Existing-window focus must not be labelled task attachment.
-- Continue the broader observation, scanner coverage, managed-policy and later
-  platform work explicitly tracked in the [ledger](switchyard-requirements.md).
-  Optional incremental capabilities must not be described as complete.
+- Linux Claude Desktop executable binding and launch/focus remain unfinished.
+  Its vendor beta supports Ubuntu/Debian, while the pilot runs Omarchy and has no
+  vendor desktop installation. Windows controls and Linux host metadata do not
+  establish that adapter. [Vendor contract](https://code.claude.com/docs/en/desktop-linux).
+- Exact interactive task attachment remains limited. Codex's reviewed terminal
+  renders saved history; arbitrary prompts/configuration effects stay refused.
+  Claude's attach command can restart a stopped session and has no verified
+  live-only flag. Existing-window focus is a separate supported action.
+- Broader observation sources, complete scanner coverage/provenance and managed
+  provider containment remain tracked in the [ledger](switchyard-requirements.md).
+  The implemented bounded scanner is useful evidence, not a complete audit.
+- Earlier intermittent native focus, settlement and shortcut failures remain
+  retained. Current source/package tests pass; this does not prove that those
+  failures can never recur in an interactive environment.
+
+Native Windows scanner recipe generation, mapped-drive runtime identity and
+removed-history input assembly are implemented and included in the accepted
+8dd849e platform checks. Their actual guest and installed Windows acceptance is
+still separate. [Contract](removed-history-permissions.md).
 
 ## Separate acceptance dependencies
 
-Browser task/visual review is blocked by the browser-control connection failing
-before page inspection. Actual graphical IDE activation, live provider task and
+On November 24 the owner confirmed that the physical B122, an interactive
+Windows host and an approved Microsoft 365 tenant are not available.
+
+Browser task/visual review is blocked before page loading: the browser connector
+requires a network policy from a newer desktop client; the built-in browser is
+unavailable in this session. No browser protections were changed. Actual graphical IDE activation, live provider task and
 account changes, approved Microsoft tenant/license/consent, microphone capture,
 physical keyboard writes/readback and printed legend fit remain unaccepted.
 These checks do not excuse unfinished software. Current work uses synthetic
