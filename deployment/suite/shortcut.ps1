@@ -53,7 +53,24 @@ try {
         $outputPipe.WriteLine('SXSY-SHORTCUT/2 shortcut-reopened')
         if ($read.TargetPath -ine $v.nodePath) { throw 'Native shortcut target readback failed.' }
         $outputPipe.WriteLine('SXSY-SHORTCUT/2 target-verified')
-        if ($read.Arguments -cne $arguments) { throw 'Native shortcut arguments readback failed.' }
+        # Read the documented Shell property instead of WScript's legacy
+        # argument getter. The comparison still requires every literal character.
+        $propertyShell = $null
+        $folder = $null
+        $item = $null
+        try {
+            $propertyShell = [Activator]::CreateInstance([type]::GetTypeFromProgID('Shell.Application', $true))
+            $folder = $propertyShell.NameSpace([IO.Path]::GetDirectoryName($v.path))
+            if ($null -eq $folder) { throw 'Native shortcut property folder is unavailable.' }
+            $item = $folder.ParseName([IO.Path]::GetFileName($v.path))
+            if ($null -eq $item) { throw 'Native shortcut property item is unavailable.' }
+            $storedArguments = $item.ExtendedProperty('System.Link.Arguments')
+            if ($storedArguments -isnot [string] -or $storedArguments -cne $arguments) { throw 'Native shortcut arguments readback failed.' }
+        } finally {
+            if ($null -ne $item) { [void][Runtime.InteropServices.Marshal]::FinalReleaseComObject($item) }
+            if ($null -ne $folder) { [void][Runtime.InteropServices.Marshal]::FinalReleaseComObject($folder) }
+            if ($null -ne $propertyShell) { [void][Runtime.InteropServices.Marshal]::FinalReleaseComObject($propertyShell) }
+        }
         $outputPipe.WriteLine('SXSY-SHORTCUT/2 arguments-verified')
         if ($read.WorkingDirectory -ine $v.directory) { throw 'Native shortcut directory readback failed.' }
     } finally { [void][Runtime.InteropServices.Marshal]::FinalReleaseComObject($read) }

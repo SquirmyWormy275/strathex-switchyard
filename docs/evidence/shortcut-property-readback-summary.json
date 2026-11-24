@@ -1,0 +1,65 @@
+{
+  "schema": "switchyard-shortcut-property-readback-summary/v1",
+  "date": "2026-11-24",
+  "nativeFailure": {
+    "sourceCommit": "a7234c2ce25722fa5087746c013e4ac2a91473e2",
+    "mergeCommit": "48ed1ee8cd45bb622d5028b4b2034035e214e805",
+    "sourceTree": "6784befb59af86ac9c51a7577d24c604191232e7",
+    "sourceTreeVerified": true,
+    "workflow": 45491986831,
+    "job": 138793367313,
+    "artifact": 14967253688,
+    "artifactSha256": "3e8e1ab627d63dd42a7c2297281eb2d9cea8cb487e47ba614ef796a368b9b5e5",
+    "receiptSha256": "524576af5ee32801fa74ab227e997a59b47bbbe96760ce44b9d7527f0c829ba0",
+    "runId": "aedace16-d8f6-4e48-b0b7-3aef5d97ced8",
+    "totals": {
+      "required": 18,
+      "passed": 17,
+      "failed": 1,
+      "tests": 307,
+      "passedTests": 301,
+      "failedTests": 1,
+      "skippedTests": 5,
+      "cancelledTests": 0,
+      "todoTests": 0
+    },
+    "failedTest": "the native shortcut writer preserves literal paths without importing a utility module",
+    "error": "Native shortcut creation or exact readback failed. Last observed stage: target-verified.",
+    "originalCommandsBoundsSkipsAndCleanupVerified": true
+  },
+  "behavior": "The saved target matches but the WScript argument getter does not. Read exact arguments through the documented System.Link.Arguments Shell property; no fallback or partial comparison is accepted. The native fixture additionally requires the exact UTF-16 arguments in the saved file. Native acceptance remains pending.",
+  "local": {
+    "receipt": "isolated-test-62ec27a4-fb6e-4350-8ff4-27f2fdf52e69.json",
+    "sha256": "0d02307cc7ad709e4426ab64ec6ef16edae477ab595b08e5c77d65335edabae5",
+    "totals": {
+      "required": 1,
+      "passed": 1,
+      "failed": 0,
+      "tests": 13,
+      "passedTests": 13,
+      "failedTests": 0,
+      "skippedTests": 0,
+      "cancelledTests": 0,
+      "todoTests": 0
+    },
+    "cleanupVerified": true
+  },
+  "sourceFiles": {
+    "deployment/suite/shortcut-process.mjs": "b51df2b5c4367a169ef165c17424c8a216d3229e9df152f4c25ba06816489e96",
+    "deployment/suite/shortcut-process.test.mjs": "2c7821ffdc3acfd490441679843c36e38f7d5fa86b3ab7ea994e3b2bfc644279",
+    "deployment/suite/shortcut.ps1": "d9cde517200dabe0663e300855e59937b87b44919ed74774c35ac004ec676cc8"
+  },
+  "references": [
+    "https://learn.microsoft.com/en-us/windows/win32/api/shobjidl_core/nf-shobjidl_core-ishelllinkw-getarguments",
+    "https://learn.microsoft.com/en-us/windows/win32/properties/props-system-link-arguments",
+    "https://learn.microsoft.com/en-us/windows/win32/shell/shellfolderitem-extendedproperty"
+  ],
+  "limits": {
+    "deadlineMs": 10000,
+    "inputBytes": 8192,
+    "outputBytes": 1024,
+    "relaxedAssertions": false,
+    "nativeFollowup": "normal push pending",
+    "linuxReinstallRequired": false
+  }
+}

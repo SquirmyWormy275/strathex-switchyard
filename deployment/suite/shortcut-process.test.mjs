@@ -156,7 +156,9 @@ if (process.platform === "win32") {
     Object.assign(f.request, { nodePath: await realpath(process.execPath), directory: f.root, loader: join(f.root, "日本語 & 'literal' $launch`name.mjs") });
     await writeFile(f.request.loader, "// synthetic shortcut target, never launched\n");
     const bytes = await prepareWindowsShortcut(f.request);
-    assert.ok(bytes.length > 0); await assert.rejects(lstat(f.request.path), { code: "ENOENT" });
+    assert.ok(bytes.length > 0);
+    assert.ok(bytes.includes(Buffer.from(`"${f.request.loader}" launch`, "utf16le")), "the saved link must retain the literal Unicode arguments");
+    await assert.rejects(lstat(f.request.path), { code: "ENOENT" });
     assert.equal(await readFile(f.request.loader, "utf8"), "// synthetic shortcut target, never launched\n");
   });
 

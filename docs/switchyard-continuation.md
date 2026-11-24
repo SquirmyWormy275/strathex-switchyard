@@ -69,6 +69,16 @@ all original comparisons and bounds remain. Thirteen local wrapper cases pass.
 The next normal-push native result must identify the field before a cause or
 repair is claimed. [Field diagnostic](evidence/shortcut-field-diagnostic-summary.json).
 
+
+Native `a7234c2` worker **138793367313**, artifact **14967253688**, reaches
+`target-verified` and fails the exact arguments comparison. Its original
+18-group receipt, source tree and cleanup are audited. Argument readback now
+uses the documented `System.Link.Arguments` Shell property with an exact string
+comparison; the native fixture also requires literal UTF-16 argument bytes in
+the saved link. Thirteen local wrapper cases pass. Native acceptance is pending;
+this does not yet establish whether the legacy getter or saved bytes differed.
+[Property readback evidence](evidence/shortcut-property-readback-summary.json).
+
 Complete Windows `c41807c` also fails worker 19 at the unchanged 75 ms
 host-action recovery settlement. Complete Windows `87cfc30` fails worker 11
 because the workspace fixture tears down its document before an asynchronous
