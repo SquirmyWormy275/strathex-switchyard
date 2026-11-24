@@ -29,6 +29,14 @@ with no skips; eight verifier guards and typechecking also pass. Browser visual
 acceptance and the follow-up's normal-push platform checks remain separate.
 [Source evidence](evidence/workspace-recovery-source-summary.json).
 
+The next correction addresses interrupted workspace changes. Three regressions
+reproduce old-layout carryover and unsaved-edit loss. Five new cases now cover
+those failures, lost selection replies and subsequent reconnects; six integration
+groups pass 83 tests, and two scheduling/runner groups pass 30 tests with no skips.
+Original deadlines, child cleanup and typechecking pass. This follow-up still
+needs its own installed and normal-push acceptance.
+[Workspace-boundary evidence](evidence/workspace-boundary-source-summary.json).
+
 ## What is connected
 
 | Workflow | Current behavior and walkthrough |

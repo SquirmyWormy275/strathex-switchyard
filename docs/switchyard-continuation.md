@@ -31,6 +31,14 @@ Normal installed adoption and platform acceptance are recorded in the latest
 [current status](switchyard-status.md). The old installation below is historical;
 never replay its completed cleanup. Frontend work remains authorized.
 
+The workspace-boundary follow-up reproduces three UI failures before correction:
+reconnection to another window's selection, failed destination snapshot, and
+failed pre-switch saving. Five final regressions pass inside six groups / 83 tests;
+two runner/scheduling groups pass 30 tests. No original bounds or assertions were
+relaxed. The new source must receive a frontend pin, normal update and platform
+checks before claiming installed acceptance.
+[Evidence](evidence/workspace-boundary-source-summary.json).
+
 ## Preserve the operating boundaries
 
 - Continue without delegation. Claude Code is a contingency for actual token

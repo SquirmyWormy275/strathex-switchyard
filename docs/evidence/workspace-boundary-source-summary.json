@@ -1,0 +1,73 @@
+{
+  "schema": "switchyard-workspace-boundary-source-summary/v1",
+  "date": "2026-11-24",
+  "baseCommit": "c41807c7473f3d1908a4d68f8ee127c517f490fa",
+  "sourceFiles": {
+    "tools/layout-studio/suite-ui.mjs": "6d2e84c63de96428be411bdf75ff21f8979d7e1a867d8b13fbd325eda6158656",
+    "tools/layout-studio/workspace-ui.test.mjs": "361f5c490408ce452870fde1a1659eebdc5a46480a058963e86910e2cbdcb7d2",
+    "scripts/run-isolated-tests.mjs": "afdded59b6d84a9b297c843bb910b23417ed862f6e44dd6cacc7afbe48fed057"
+  },
+  "regression": "The first three new cases fail against c41807c: a different selected workspace is silently adopted, the previous layout survives a failed destination snapshot, and a failed pre-switch save replaces unsaved edits. Two further cases cover a lost selection acknowledgement and an unread destination followed by another selection.",
+  "runs": [
+    {
+      "receipt": "isolated-test-036107a4-0755-4729-816f-bb386dc97dc9.json",
+      "sha256": "0aab70273addb763150aaf7ee9ec39b44afadae5e87192635dc2d7239853a8be",
+      "success": false,
+      "totals": {
+        "required": 1,
+        "passed": 0,
+        "failed": 1,
+        "tests": 3,
+        "passedTests": 0,
+        "failedTests": 3,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "receipt": "isolated-test-a4911005-0ae9-48bb-a741-e76aec441f7d.json",
+      "sha256": "4e531a7c6e1db623594ab2446004ac009246c2b54230e953e73ea53c546ccee7",
+      "success": true,
+      "totals": {
+        "required": 6,
+        "passed": 6,
+        "failed": 0,
+        "tests": 83,
+        "passedTests": 83,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "receipt": "isolated-test-eca33dd0-744e-407a-8eb8-f95bd22e4600.json",
+      "sha256": "830631407212ebfc44bfc5ddf4504cbc708351aeedc898a7ea4a64b7361f1a52",
+      "success": true,
+      "totals": {
+        "required": 2,
+        "passed": 2,
+        "failed": 0,
+        "tests": 30,
+        "passedTests": 30,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    }
+  ],
+  "originalCommandsBoundsAndCleanupVerified": true,
+  "typecheck": true,
+  "behavior": [
+    "A reconnect cannot move an existing draft into a workspace selected by another window; the workspace menu makes that change deliberate.",
+    "The previous layout is saved before selection, then retired with its workflow, policy, profile choices and integration context before the destination is read.",
+    "A failed pre-switch save preserves the unsaved layout and does not select another workspace.",
+    "An acknowledged switch with a failed snapshot exposes retry and prevents saving old content into the destination. An unread destination retains its identity.",
+    "Lost acknowledgements are read back without repeating selection during connection retry."
+  ],
+  "visualAcceptance": false,
+  "nativeWindowsAcceptance": "pending normal-push checks",
+  "hardwareOrProviderOperationsPerformed": false
+}

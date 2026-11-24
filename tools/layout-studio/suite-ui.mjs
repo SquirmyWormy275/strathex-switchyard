@@ -15,7 +15,7 @@ const $ = (id) => document.getElementById(id);
 
 export function mountSuite({ getProfile, loadProfile, previewProposal, notify, saved, onPolicy, onWorkflow, download }) {
   let refreshGeneration = 0;
-  let compartment = "personal", state = null, proposedWorkflow = null, saveTimer;
+  let compartment = "personal", compartmentKnown = false, state = null, proposedWorkflow = null, saveTimer;
   const lines = (id) => $(id).value.split("\n").map((s) => s.trim()).filter(Boolean);
   async function run(fn) { try { return await fn(); } catch (e) { $("suite-status").textContent = e.message; notify(e.message); return null; } }
   function workflowForm(workflow) { $("workflow-name").value = workflow.name; $("workflow-steps").value = workflow.steps.map((s) => typeof s === "string" ? s : s.label).join("\n"); $("workflow-roles").value = workflow.roles.map((r) => typeof r === "string" ? r : r.label).join("\n"); }
@@ -43,7 +43,8 @@ export function mountSuite({ getProfile, loadProfile, previewProposal, notify, s
     $("profile-library-status").textContent = `${profiles.length} saved layouts · ${state.profileHistory?.length ?? 0} previous revisions. Opening a version changes the plan, not installed shortcuts or devices.`;
   }
   async function persist() {
-    const p = getProfile(); if (!p || !state) return;
+    const p = getProfile(); if (!p) return;
+    if (connecting || !state || state.id !== compartment) throw Error("Reconnect this workspace before saving. Your layout edits are preserved.");
     const serialized = JSON.stringify(p), target = compartment;
     await api("/api/suite/profile/save", { compartment: target, profile: p });
     if (target === compartment && JSON.stringify(getProfile()) === serialized) {
@@ -77,21 +78,39 @@ export function mountSuite({ getProfile, loadProfile, previewProposal, notify, s
   }));
   let switching = false;
   function workspaceBusy(value) {
-    switching = value; $("compartment-picker").disabled = value; $("operating-mode").disabled = value;
-    $("save-workspace").disabled = value; document.querySelector(".app-main").inert = value;
+    switching = value;
+    $("compartment-picker").disabled = value || !compartmentKnown;
+    for (const id of ["operating-mode", "save-workspace"]) $(id).disabled = value || !state;
+    document.querySelector(".app-main").inert = value;
   }
   $("compartment-picker").addEventListener("change", () => run(async () => {
     if (switching || connecting) return;
     const nextCompartment = $("compartment-picker").value;
+    let selectionAcknowledged = false;
     workspaceBusy(true);
     try {
       await voice.beforeWorkspaceChange(); document.dispatchEvent(new Event("switchyard-workspace-changing"));
-      clearTimeout(saveTimer); await persist();
+      clearTimeout(saveTimer);
+      if (!state) await refresh();
+      await persist();
       await api("/api/suite/compartment/select", { compartment: nextCompartment });
+      // The old layout is safely saved before selection. Retire it before the
+      // destination read: a failed read must never attach old content to a new ID.
+      document.dispatchEvent(new Event("switchyard-workspace-changing"));
+      state = null; refreshGeneration++; loadProfile(null); onPolicy(false);
+      const emptyWorkflow = { name: "", steps: [], roles: [] };
+      proposedWorkflow = null; workflowForm(emptyWorkflow); onWorkflow(emptyWorkflow);
+      $("saved-profile").replaceChildren(); $("profile-revision").replaceChildren();
+      $("policy-summary").textContent = "Connecting to the selected workspace…";
+      $("profile-library-status").textContent = "Saved layouts are unavailable until this workspace connects.";
       compartment = nextCompartment; setActiveCompartment(compartment);
+      selectionAcknowledged = true;
     } finally {
       $("compartment-picker").value = compartment;
-      try { await refresh(); workflowForm(state.workflow); loadProfile(state.profile ?? null); }
+      try {
+        await refresh();
+        if (selectionAcknowledged) { workflowForm(state.workflow); loadProfile(state.profile ?? null); clearConnectionRecovery(); }
+      } catch (error) { connectionFailure(error); throw error; }
       finally { workspaceBusy(false); }
     }
   }));
@@ -151,23 +170,33 @@ export function mountSuite({ getProfile, loadProfile, previewProposal, notify, s
   document.addEventListener("switchyard-refresh-request", () => run(refresh));
   let connecting = false;
   $("workspace-connection-recovery").hidden = true;
+  function connectionFailure(error) {
+    $("workspace-connection-recovery").hidden = false; $("workspace-connection-error").textContent = error.message;
+    $("suite-status").textContent = error.message;
+  }
+  function clearConnectionRecovery() {
+    $("workspace-connection-recovery").hidden = true; $("workspace-connection-error").textContent = "";
+  }
   async function bootstrapWorkspace() {
     if (connecting || switching) return;
+    clearTimeout(saveTimer);
     connecting = true; $("retry-workspace-connection").disabled = true;
     for (const id of ["compartment-picker", "operating-mode", "save-workspace"]) $(id).disabled = true;
     try {
       const bootstrap = await api("/api/suite/bootstrap", {});
+      if (compartmentKnown && bootstrap.activeCompartment !== compartment) throw Error("The selected workspace changed in another window. Use the workspace menu to switch deliberately; your current layout edits are preserved.");
       compartment = bootstrap.activeCompartment; setActiveCompartment(compartment); fillCompartments(bootstrap.compartments);
+      compartmentKnown = true;
       voice.setAvailability(bootstrap.voice); await refresh(); workflowForm(state.workflow);
       if (state.profile && !getProfile()) loadProfile(state.profile);
       document.dispatchEvent(new Event("switchyard-profile-loaded"));
-      $("workspace-connection-recovery").hidden = true; $("workspace-connection-error").textContent = "";
+      clearConnectionRecovery();
     } catch (error) {
-      $("workspace-connection-recovery").hidden = false; $("workspace-connection-error").textContent = error.message;
-      $("suite-status").textContent = error.message; notify(error.message);
+      connectionFailure(error); notify(error.message);
     } finally {
       connecting = false; $("retry-workspace-connection").disabled = false;
-      for (const id of ["compartment-picker", "operating-mode", "save-workspace"]) $(id).disabled = !state;
+      $("compartment-picker").disabled = !compartmentKnown;
+      for (const id of ["operating-mode", "save-workspace"]) $(id).disabled = !state;
     }
   }
   $("retry-workspace-connection").addEventListener("click", bootstrapWorkspace);

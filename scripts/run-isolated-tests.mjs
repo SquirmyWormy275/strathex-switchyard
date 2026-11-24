@@ -306,6 +306,7 @@ export const requiredGroups = [
   { file: "tools/layout-studio/history-scope-ui.test.mjs" },
   { file: "tools/layout-studio/feed-ui.test.mjs" },
   { file: "tools/layout-studio/conversation-ui.test.mjs" },
+  { file: "tools/layout-studio/workspace-ui.test.mjs" },
   { file: "tools/layout-studio/task-ui.test.mjs" },
   { file: "tools/layout-studio/copilot-ui.test.mjs" },
   { file: "tools/layout-studio/device-ui.test.mjs" },

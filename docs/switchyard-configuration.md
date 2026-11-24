@@ -49,5 +49,11 @@ the encrypted workspace files and their existing keys; resetting them is not a
 connection repair. The retry preserves an unsaved layout and does not replay
 previous keyboard, application or agent actions.
 
+Switching workspaces saves the current layout before opening the destination.
+If saving fails, your unsaved layout stays open. If the destination cannot load,
+retry its connection; the previous layout remains saved in its original workspace.
+When another window changes the selected workspace, use the workspace menu to
+choose deliberately. Reconnecting alone never moves your current draft there.
+
 This is a private development build, with no public installer or new release.
 See [current behavior and evidence](switchyard-status.md) before applying changes.
