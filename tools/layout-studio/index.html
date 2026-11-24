@@ -15,6 +15,12 @@
     <span id="recording-indicator" class="recording-indicator" role="status"></span>
   </nav>
   <main class="app-main">
+    <section id="workspace-connection-recovery" class="panel stack" aria-labelledby="workspace-connection-title" hidden>
+      <h2 id="workspace-connection-title">Your saved workspace is unavailable</h2>
+      <p id="workspace-connection-error" role="status"></p>
+      <div><button id="retry-workspace-connection" type="button" class="secondary">Retry workspace connection</button></div>
+      <p class="field-help">Retry loads your saved setup. It does not repeat an earlier keyboard change, launch, or agent request.</p>
+    </section>
     <p id="demo-banner" class="demo-banner" role="status" hidden>Interactive demonstration · Synthetic F77 and agent. Your real keyboard, accounts and saved workspaces are untouched.</p>
     <section class="workspace-view home-view" data-workspace-view="home" aria-labelledby="home-title">
       <div class="home-intro"><p class="eyebrow">A companion for your Model F keyboard</p><h1 id="home-title">Your keyboard.<br>Your next move.</h1><p class="home-description">Four familiar controls for the work you do with AI: return to a task, check progress, review the work, and leave a handoff. Start with a layout made for your Model F. Connect the tools you already use.</p></div>

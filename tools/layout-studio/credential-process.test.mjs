@@ -4,6 +4,7 @@ import { EventEmitter } from "node:events";
 import { PassThrough } from "node:stream";
 import { spawn } from "node:child_process";
 import { createCredentialProcessRunner } from "./credential-process.mjs";
+import { platformSecrets } from "./suite-store.mjs";
 
 function fixture(options = {}) {
   const children = []; let killed;
@@ -37,9 +38,35 @@ test("credential results require closed stdout and preserve exact input, trimmed
 
 test("credential timeout joins exact child exit and discards late secret output", async () => {
   const f = fixture(), { pending, child } = await started(f, "", 10); let settled = false;
-  const rejected = assert.rejects(pending, error => { assert.equal(error.message, "The platform credential store timed out."); return true; });
+  const rejected = assert.rejects(pending, error => { assert.equal(error.message, "The platform credential store timed out."); assert.equal(error.code, "CREDENTIAL_PROCESS_TIMEOUT"); return true; });
   pending.catch(() => { settled = true; }); await f.killRequested; assert.equal(settled, false);
   child.stdout.write("LATE_PRIVATE_SECRET"); f.close(child); await rejected;
+});
+
+test("Linux credential timeout gives conditional unlock guidance and retries only the requested lookup", async () => {
+  const calls = []; let unlocked = false;
+  const secrets = platformSecrets({ platform: "linux", command: async (executable, args, input) => {
+    calls.push({ executable, args, input });
+    if (!unlocked) throw Object.assign(Error("PRIVATE_NATIVE_DETAILS"), { code: "CREDENTIAL_PROCESS_TIMEOUT" });
+    return { code: 0, text: "synthetic-key", stderrBytes: 0 };
+  } });
+  await assert.rejects(secrets.get("personal", "storage-key"), error => {
+    assert.equal(error.code, "CREDENTIAL_PROCESS_TIMEOUT"); assert.match(error.message, /If it is locked/);
+    assert.match(error.message, /system password prompt/); assert.match(error.message, /retry the workspace connection/);
+    assert.equal(error.message.includes("PRIVATE"), false); return true;
+  });
+  assert.equal(calls.length, 1); unlocked = true;
+  assert.equal(await secrets.get("personal", "storage-key"), "synthetic-key");
+  assert.equal(calls.length, 2); assert.deepEqual(calls[0], calls[1]);
+  assert.equal(calls[0].executable, "/usr/bin/secret-tool"); assert.equal(calls[0].args[0], "lookup"); assert.equal(calls[0].input, "");
+});
+
+test("Linux credential recovery does not hide uncertain retirement or reinterpret a missing key", async () => {
+  const uncertain = Object.assign(Error("The platform credential worker exit is unconfirmed. No replacement was started."), { code: "CREDENTIAL_PROCESS_EXIT_UNCONFIRMED" });
+  const secrets = platformSecrets({ platform: "linux", command: async () => { throw uncertain; } });
+  await assert.rejects(secrets.get("personal", "storage-key"), error => error === uncertain);
+  const absent = platformSecrets({ platform: "linux", command: async () => ({ code: 1, text: "", stderrBytes: 0 }) });
+  assert.equal(await absent.get("personal", "storage-key"), null);
 });
 
 test("the original credential output ceiling is exact and overflow still joins retirement", async () => {

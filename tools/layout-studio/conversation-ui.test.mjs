@@ -1,13 +1,80 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createSuiteStore } from "./suite-store.mjs";
 import { createSuite } from "./suite.mjs";
 import { createAgentService } from "./agents.mjs";
 import { withBrowserSurface, browserSurfaceFixture, until } from "./test-support/browser-ui.mjs";
+
+test("workspace connection recovery retains the draft and retries once after the keyring becomes available", async () => {
+  const page = await readFile(new URL("./index.html", import.meta.url), "utf8");
+  assert.match(page, /<section id="workspace-connection-recovery"[^>]*aria-labelledby="workspace-connection-title"[^>]*hidden>/);
+  assert.match(page, /<p id="workspace-connection-error" role="status">/);
+  assert.match(page, /<button id="retry-workspace-connection" type="button"[^>]*>Retry workspace connection<\/button>/);
+  await browserSurfaceFixture(async c => {
+    const previousWindow = globalThis.window, originalFetch = globalThis.fetch;
+    globalThis.window = new EventTarget();
+    const { portableProfile } = await import("./workspace.mjs"), { plan } = await import("./test-support/copilot-fixture.mjs");
+    const originalState = await c.store.snapshot("personal");
+    const draft = portableProfile(plan, "unsaved-recovery-draft", "Keep this draft", originalState.workflow);
+    let attempts = 0, unlocked = false, loaded = 0, release;
+    const pending = new Promise(resolve => { release = resolve; });
+    globalThis.fetch = async (path, options) => {
+      if (path === "/api/suite/bootstrap") {
+        attempts++;
+        if (!unlocked) return new Response(JSON.stringify({ error: "The desktop keyring did not respond. If it is locked, unlock it in the system password prompt, then retry the workspace connection." }), { status: 409, headers: { "Content-Type": "application/json" } });
+        await pending;
+      }
+      return originalFetch(path, options);
+    };
+    try {
+      const { mountSuite } = await import("./suite-ui.mjs");
+      mountSuite({ getProfile: () => draft, loadProfile() { loaded++; }, previewProposal() {}, notify() {}, saved() {}, onPolicy() {}, onWorkflow() {}, download() {} });
+      await until(() => c.$("workspace-connection-recovery").hidden === false);
+      assert.match(c.$("workspace-connection-error").textContent, /system password prompt/);
+      assert.equal(attempts, 1); assert.equal(loaded, 0);
+      assert.equal(c.$("compartment-picker").disabled, true); assert.equal(c.$("save-workspace").disabled, true);
+      unlocked = true; c.click("retry-workspace-connection");
+      assert.equal(c.$("retry-workspace-connection").disabled, true);
+      c.$("retry-workspace-connection").dispatchEvent(new Event("click"));
+      c.document.dispatchEvent(new Event("switchyard-local-connected"));
+      assert.equal(attempts, 2); release();
+      await until(() => c.$("workspace-connection-recovery").hidden === true && !c.$("retry-workspace-connection").disabled);
+      assert.equal(c.$("workspace-connection-error").textContent, "");
+      assert.match(c.$("suite-status").textContent, /Private workspace connected/);
+      assert.equal(c.$("compartment-picker").disabled, false); assert.equal(c.$("save-workspace").disabled, false);
+      assert.equal(loaded, 0); assert.equal(draft.name, "Keep this draft");
+      const after = await c.store.snapshot("personal");
+      for (const key of ["workflow", "profile", "accounts", "mode", "taskAuthorityEpoch"]) assert.deepEqual(after[key], originalState[key]);
+      assert(c.calls.every(row => !/\/(submit|apply|design|create|launch|resume|configure|enroll|mode|save)$/.test(row.path)));
+      await Promise.all(c.responses.map(row => row.response));
+    } finally { release(); globalThis.fetch = originalFetch; globalThis.window = previousWindow; }
+  });
+});
+
+test("a failed workspace snapshot keeps recovery visible until the whole connection succeeds", async () => {
+  await browserSurfaceFixture(async c => {
+    const previousWindow = globalThis.window, originalFetch = globalThis.fetch;
+    globalThis.window = new EventTarget(); let failed = false;
+    globalThis.fetch = async (path, options) => {
+      if (path === "/api/suite/snapshot" && !failed) { failed = true; throw Error("Synthetic saved-workspace read failure"); }
+      return originalFetch(path, options);
+    };
+    try {
+      const { mountSuite } = await import("./suite-ui.mjs");
+      mountSuite({ getProfile: () => null, loadProfile() {}, previewProposal() {}, notify() {}, saved() {}, onPolicy() {}, onWorkflow() {}, download() {} });
+      await until(() => c.$("workspace-connection-recovery").hidden === false);
+      assert.match(c.$("workspace-connection-error").textContent, /read failure/);
+      c.click("retry-workspace-connection");
+      await until(() => c.$("workspace-connection-recovery").hidden === true && !c.$("retry-workspace-connection").disabled);
+      assert.match(c.$("suite-status").textContent, /Private workspace connected/);
+      await Promise.all(c.responses.map(row => row.response));
+    } finally { globalThis.fetch = originalFetch; globalThis.window = previousWindow; }
+  });
+});
 
 async function fixture(fn, provider = "codex") {
   const root = await mkdtemp(join(tmpdir(), "switchyard-conversation-ui-")), keys = new Map(), nativeCalls = [];

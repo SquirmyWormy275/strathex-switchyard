@@ -81,7 +81,7 @@ export function mountSuite({ getProfile, loadProfile, previewProposal, notify, s
     $("save-workspace").disabled = value; document.querySelector(".app-main").inert = value;
   }
   $("compartment-picker").addEventListener("change", () => run(async () => {
-    if (switching) return;
+    if (switching || connecting) return;
     const nextCompartment = $("compartment-picker").value;
     workspaceBusy(true);
     try {
@@ -96,7 +96,7 @@ export function mountSuite({ getProfile, loadProfile, previewProposal, notify, s
     }
   }));
   $("operating-mode").addEventListener("change", () => run(async () => {
-    if (switching) return;
+    if (switching || connecting) return;
     const mode = $("operating-mode").value;
     workspaceBusy(true);
     try {
@@ -149,7 +149,28 @@ export function mountSuite({ getProfile, loadProfile, previewProposal, notify, s
   mountPortable({ getProfile, persist: async () => { clearTimeout(saveTimer); await persist(); }, refresh, loadProfile, download, notify });
   document.addEventListener("switchyard-role-result", event => { if (event.detail.proposal) previewProposal(event.detail.proposal); });
   document.addEventListener("switchyard-refresh-request", () => run(refresh));
-  const bootstrapWorkspace = () => run(async () => { const bootstrap = await api("/api/suite/bootstrap", {}); compartment = bootstrap.activeCompartment; setActiveCompartment(compartment); fillCompartments(bootstrap.compartments); voice.setAvailability(bootstrap.voice); await refresh(); workflowForm(state.workflow); if (state.profile && !getProfile()) loadProfile(state.profile); document.dispatchEvent(new Event("switchyard-profile-loaded")); });
+  let connecting = false;
+  $("workspace-connection-recovery").hidden = true;
+  async function bootstrapWorkspace() {
+    if (connecting || switching) return;
+    connecting = true; $("retry-workspace-connection").disabled = true;
+    for (const id of ["compartment-picker", "operating-mode", "save-workspace"]) $(id).disabled = true;
+    try {
+      const bootstrap = await api("/api/suite/bootstrap", {});
+      compartment = bootstrap.activeCompartment; setActiveCompartment(compartment); fillCompartments(bootstrap.compartments);
+      voice.setAvailability(bootstrap.voice); await refresh(); workflowForm(state.workflow);
+      if (state.profile && !getProfile()) loadProfile(state.profile);
+      document.dispatchEvent(new Event("switchyard-profile-loaded"));
+      $("workspace-connection-recovery").hidden = true; $("workspace-connection-error").textContent = "";
+    } catch (error) {
+      $("workspace-connection-recovery").hidden = false; $("workspace-connection-error").textContent = error.message;
+      $("suite-status").textContent = error.message; notify(error.message);
+    } finally {
+      connecting = false; $("retry-workspace-connection").disabled = false;
+      for (const id of ["compartment-picker", "operating-mode", "save-workspace"]) $(id).disabled = !state;
+    }
+  }
+  $("retry-workspace-connection").addEventListener("click", bootstrapWorkspace);
   document.addEventListener("switchyard-local-connected", bootstrapWorkspace);
   void bootstrapWorkspace();
   return { persist, refresh: () => run(refresh) };

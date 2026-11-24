@@ -29,28 +29,35 @@ const templates = {
 };
 
 /** Secrets use a distinct OS-protected entry per compartment and purpose. */
-export function platformSecrets({ root }) {
+export function platformSecrets({ root, platform = process.platform, command = boundedProcess }) {
   async function windows(operation, id, purpose, value) {
     const executable = join(process.env.SystemRoot || "C:\\Windows", "System32/WindowsPowerShell/v1.0/powershell.exe");
     const script = fileURLToPath(new URL("./windows-protect.ps1", import.meta.url));
     const path = join(root, `${id}-${purpose}.dpapi`);
     if (operation === "lookup") {
       let sealed; try { sealed = await privateRead(path); } catch (error) { if (error.code === "ENOENT") return null; throw error; }
-      const r = await boundedProcess(executable, ["-NoProfile", "-NonInteractive", "-File", script], JSON.stringify({ operation: "unprotect", value: sealed }));
+      const r = await command(executable, ["-NoProfile", "-NonInteractive", "-File", script], JSON.stringify({ operation: "unprotect", value: sealed }));
       if (r.code || r.stderrBytes) throw new Error("Windows DPAPI could not open this credential.");
       return r.text;
     }
-    const r = await boundedProcess(executable, ["-NoProfile", "-NonInteractive", "-File", script], JSON.stringify({ operation: "protect", value }));
+    const r = await command(executable, ["-NoProfile", "-NonInteractive", "-File", script], JSON.stringify({ operation: "protect", value }));
     if (r.code || r.stderrBytes) throw new Error("Windows DPAPI could not protect this credential.");
     await privateWrite(path, r.text); return value;
   }
   async function run(operation, id, purpose, value) {
     if (!idPattern.test(id) || !idPattern.test(purpose)) throw new Error("Credential reference is invalid.");
-    if (process.platform === "win32") return windows(operation, id, purpose, value);
-    if (process.platform !== "linux") throw new Error("A supported platform credential store is required; there is no plaintext fallback.");
+    if (platform === "win32") return windows(operation, id, purpose, value);
+    if (platform !== "linux") throw new Error("A supported platform credential store is required; there is no plaintext fallback.");
     const args = operation === "lookup" ? ["lookup"] : ["store", "--label=Switchyard private compartment credential"];
     args.push("application", "switchyard-suite-v1", "compartment", id, "purpose", purpose);
-    const r = await boundedProcess("/usr/bin/secret-tool", args, operation === "store" ? value : "");
+    let r;
+    try { r = await command("/usr/bin/secret-tool", args, operation === "store" ? value : ""); }
+    catch (error) {
+      // A timeout is not proof of a locked keyring. Keep the recovery advice
+      // conditional, and never disguise an unconfirmed worker exit as retryable.
+      if (error.code !== "CREDENTIAL_PROCESS_TIMEOUT") throw error;
+      throw Object.assign(new Error("The desktop keyring did not respond. If it is locked, unlock it in the system password prompt, then retry the workspace connection. Do not reset your saved workspaces or replace their encryption keys."), { code: error.code });
+    }
     if (operation === "lookup" && r.code === 1 && !r.text && !r.stderrBytes) return null;
     if (r.code || r.stderrBytes) throw new Error("Secret Service is locked or unavailable. Unlock it before saving; no plaintext fallback was used.");
     return operation === "lookup" ? r.text : value;

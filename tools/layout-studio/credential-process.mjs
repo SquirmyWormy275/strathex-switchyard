@@ -31,7 +31,7 @@ export function createCredentialProcessRunner({ spawnProcess = spawn, stopChild 
         catch { throw Error("The platform credential store is unavailable."); }
         const chunks = []; let outputBytes = 0, stderrBytes = 0, settled = false;
         const finish = (error, value) => { if (settled) return; settled = true; clearTimeout(timer); if (error && !retired.has(child)) uncertain.add(child); error ? reject(error) : resolve(value); };
-        timer = setTimeout(() => finish(Error("The platform credential store timed out.")), timeout);
+        timer = setTimeout(() => finish(Object.assign(Error("The platform credential store timed out."), { code: "CREDENTIAL_PROCESS_TIMEOUT" })), timeout);
         child.on("error", () => finish(Error("The platform credential store is unavailable.")));
         child.stdout.on("data", chunk => {
           if (settled) return;

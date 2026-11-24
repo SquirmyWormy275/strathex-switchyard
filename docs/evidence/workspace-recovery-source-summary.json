@@ -1,0 +1,58 @@
+{
+  "schema": "switchyard-workspace-recovery-source-summary/v1",
+  "date": "2026-11-24",
+  "baseCommit": "8dd849e9eb3ac7f15ff556c52e98298cc367c786",
+  "sourceFiles": {
+    "tools/layout-studio/credential-process.mjs": "cd3c064cbfa3f184bd5019fe3fc9e30aa836a5840b20d4134ccb3721d41384d2",
+    "tools/layout-studio/suite-store.mjs": "658449886e6290af20765111793760e6174ee9450b821309e659e04c9f1b561a",
+    "tools/layout-studio/index.html": "dc8a2abe3fbd04c15e2e5f383ea182f8731ff2c8da554f80f740313bc407c034",
+    "tools/layout-studio/suite-ui.mjs": "02de090e4d39e7c98b86e81a31e8327e9e6120a5097fc39309319cc2ea2eb70f",
+    "tools/layout-studio/style.css": "3521a03c295c28ccfa88fa46ea847f867b894c18bea448c090e845216d5462f8",
+    "tools/layout-studio/credential-process.test.mjs": "180e9db62ee509d374a03ee03d7051240be2a0500829008851ded803ef4cbfe9",
+    "tools/layout-studio/conversation-ui.test.mjs": "086cc1b64f79ad046466dd165402fc7a107ddeee0f2dc964b428c1497b083f47",
+    "scripts/verify-copilot-journal-host.mjs": "253c3f257928e39a3f33c7fd1a03a6e8ae3d6f8ad1daa72f4eedb22a8c52fb0d",
+    "scripts/verify-task-owner-host.mjs": "d018e0bec87f32e65061bcdd7ef97337625b363c6996466916a4de5b7298d3bc"
+  },
+  "runs": [
+    {
+      "receipt": "isolated-test-833b204c-cf02-4d07-b18f-741928b37507.json",
+      "sha256": "4684872bf1f8dabb8cd8cc0225357273f319f3bca996633b0ff614635c3314ed",
+      "totals": {
+        "required": 8,
+        "passed": 8,
+        "failed": 0,
+        "tests": 135,
+        "passedTests": 135,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "receipt": "isolated-test-22003a68-b02b-4eea-9931-e8c8386910d9.json",
+      "sha256": "cee7efe28ff3fa913927ed33e3f3e6b2221dab2b01dbc0c1b33c9ef890272f4a",
+      "totals": {
+        "required": 1,
+        "passed": 1,
+        "failed": 0,
+        "tests": 8,
+        "passedTests": 8,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    }
+  ],
+  "typecheck": true,
+  "behavior": [
+    "Credential timeouts retain their original deadline and exact-child retirement; Linux gives conditional keyring unlock guidance without exposing native diagnostics.",
+    "The shared workspace UI exposes one retry action after startup or snapshot failure; concurrent retry/connection events join one attempt.",
+    "Retry preserves the unsaved layout, retained workspace definitions and mode; it does not replay an agent request, launch or keyboard transaction.",
+    "Installed metadata verifiers compare Home to the committed immutable frontend pin, rather than an obsolete historical evidence file."
+  ],
+  "visualAcceptance": false,
+  "nativeWindowsAcceptance": "pending normal-push checks",
+  "hardwareOrProviderOperationsPerformed": false
+}
