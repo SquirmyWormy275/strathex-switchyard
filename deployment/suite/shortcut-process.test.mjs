@@ -3,12 +3,12 @@ import assert from "node:assert/strict";
 import { EventEmitter } from "node:events";
 import { spawn } from "node:child_process";
 import { PassThrough } from "node:stream";
-import { mkdtemp, readFile, writeFile, lstat, rm } from "node:fs/promises";
+import { mkdtemp, readFile, writeFile, lstat, realpath, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { prepareWindowsShortcut, shortcutExecutionTimeoutMs } from "./shortcut-process.mjs";
-const stages = ["script-started", "utility-loaded", "input-read", "input-decoded", "input-validated", "com-created", "shortcut-saved", "readback-verified"];
-const progress = count => stages.slice(0, count).map(stage => `SXSY-SHORTCUT/1 ${stage}\r\n`).join("");
+const stages = ["script-started", "runtime-ready", "input-read", "input-decoded", "input-validated", "com-created", "shortcut-saved", "readback-verified"];
+const progress = count => stages.slice(0, count).map(stage => `SXSY-SHORTCUT/2 ${stage}\r\n`).join("");
 
 async function fixture(t) {
   const root = await mkdtemp(join(tmpdir(), "sx-shortcut-"));
@@ -33,7 +33,9 @@ test("verified shortcut bytes are returned only after the writer closes, then it
   const f = await fixture(t); await writeFile(f.request.path, "synthetic shortcut");
   let settled = false; const pending = prepareWindowsShortcut(f.request, { spawnProcess: f.spawnProcess });
   pending.then(() => { settled = true; }, () => { settled = true; });
-  assert.equal(f.child.stdin.read().toString(), JSON.stringify(f.request));
+  const lines = f.child.stdin.read().toString().split("\n");
+  assert.equal(lines.length, 6); assert.equal(lines[0], "SXSY-SHORTCUT/2"); assert.equal(lines.at(-1), "");
+  assert.deepEqual(lines.slice(1, -1).map(line => Buffer.from(line, "base64").toString("utf8")), [f.request.path, f.request.nodePath, f.request.loader, f.request.directory]);
   f.child.stdout.write("VER"); f.child.stdout.write("IFIED\r\n");
   await new Promise(resolve => setImmediate(resolve));
   assert.equal(settled, false); assert.equal(await readFile(f.request.path, "utf8"), "synthetic shortcut");
@@ -69,14 +71,14 @@ test("shortcut timeout diagnostics contain only the last ordered fixed stage and
       assert.equal(error.message, `Native shortcut creation timed out. Last observed stage: ${count ? stages[count - 1] : "not-observed"}.`);
       assert.equal(error.message.includes("PRIVATE_DIAGNOSTIC"), false); return true;
     });
-    f.child.stdout.write(progress(count) + "SXSY-SHORTCUT/1 PRIVATE_DIAGNOSTIC\n");
+    f.child.stdout.write(progress(count) + "SXSY-SHORTCUT/2 PRIVATE_DIAGNOSTIC\n");
     await f.killRequested; assert.equal(await readFile(f.request.path, "utf8"), "owned output");
     f.close(1); await rejected; await assert.rejects(lstat(f.request.path), { code: "ENOENT" });
   }
 });
 
 test("partial, reordered and forged progress cannot establish successful shortcut readback", async t => {
-  for (const output of [progress(1), progress(2).split("\r\n").reverse().join("\r\n"), progress(stages.length) + "PRIVATE_DIAGNOSTIC\n", "SXSY-SHORTCUT/1 readback-verified\n"]) {
+  for (const output of [progress(1), progress(2).split("\r\n").reverse().join("\r\n"), progress(stages.length) + "PRIVATE_DIAGNOSTIC\n", "SXSY-SHORTCUT/2 readback-verified\n"]) {
     const f = await fixture(t); await writeFile(f.request.path, "owned output");
     const pending = prepareWindowsShortcut(f.request, { spawnProcess: f.spawnProcess }), rejected = assert.rejects(pending, /exact readback failed/);
     f.child.stdout.write(output + "VERIFIED\n"); f.close(0); await rejected;
@@ -126,13 +128,50 @@ test("oversized requests refuse before starting a writer or changing any file", 
   assert.equal(await readFile(f.request.path, "utf8"), "unchanged");
 });
 
+test("shortcut requests keep four literal Unicode paths and refuse malformed fields before starting a writer", async t => {
+  const f = await fixture(t); await writeFile(f.request.path, "unchanged");
+  for (const invalid of [null, [], { ...f.request, extra: "never" }, { ...f.request, loader: null }, { ...f.request, loader: "C:\\bad\npath" }, { ...f.request, loader: "C:\\bad\"path" }, { ...f.request, loader: "C:\\bad\ud800" }]) {
+    await assert.rejects(prepareWindowsShortcut(invalid, { spawnProcess: () => { throw Error("Unexpected writer start"); } }), /four owned paths|exact UTF-8 paths/);
+    assert.equal(await readFile(f.request.path, "utf8"), "unchanged");
+  }
+  f.request.loader = "C:\\日本語 & 'literal'\\$launch`name.mjs";
+  const pending = prepareWindowsShortcut(f.request, { spawnProcess: f.spawnProcess });
+  const lines = f.child.stdin.read().toString().split("\n");
+  assert.equal(Buffer.from(lines[3], "base64").toString("utf8"), f.request.loader);
+  f.child.stdout.write(progress(stages.length) + "VERIFIED\n"); f.close(0); assert.equal((await pending).toString(), "unchanged");
+});
+
 test("an actual controlled writer exits before its generated bytes are returned and removed", async t => {
   const f = await fixture(t); let native;
-  const program = 'let input="";process.stdin.on("data",b=>input+=b);process.stdin.on("end",async()=>{const{writeFile}=await import("node:fs/promises");await writeFile(JSON.parse(input).path,"actual controlled output");process.stdout.write("VERIFIED\\n");setTimeout(()=>process.exit(0),40);});';
+  const program = 'let input="";process.stdin.on("data",b=>input+=b);process.stdin.on("end",async()=>{const{writeFile}=await import("node:fs/promises");await writeFile(Buffer.from(input.split("\\n")[1],"base64").toString("utf8"),"actual controlled output");process.stdout.write("VERIFIED\\n");setTimeout(()=>process.exit(0),40);});';
   const bytes = await prepareWindowsShortcut(f.request, { spawnProcess: () => native = spawn(process.execPath, ["-e", program], { shell: false, stdio: ["pipe", "pipe", "ignore"] }) });
   assert.equal(bytes.toString(), "actual controlled output"); assert.equal(native.exitCode, 0);
   await assert.rejects(lstat(f.request.path), { code: "ENOENT" });
 });
+
+if (process.platform === "win32") {
+  test("the native shortcut writer preserves literal paths without importing a utility module", async t => {
+    const f = await fixture(t);
+    Object.assign(f.request, { nodePath: await realpath(process.execPath), directory: f.root, loader: join(f.root, "日本語 & 'literal' $launch`name.mjs") });
+    await writeFile(f.request.loader, "// synthetic shortcut target, never launched\n");
+    const bytes = await prepareWindowsShortcut(f.request);
+    assert.ok(bytes.length > 0); await assert.rejects(lstat(f.request.path), { code: "ENOENT" });
+    assert.equal(await readFile(f.request.loader, "utf8"), "// synthetic shortcut target, never launched\n");
+  });
+
+  test("the native shortcut parser refuses extra fields, invalid UTF-8 and noncanonical encoding before COM output", async t => {
+    const f = await fixture(t);
+    Object.assign(f.request, { nodePath: await realpath(process.execPath), directory: f.root, loader: join(f.root, "launch.mjs") });
+    const mutations = [text => text + "extra\n", text => text.replace("SXSY-SHORTCUT/2", "SXSY-SHORTCUT/1"), text => { const lines = text.split("\n"); lines[1] = "/w=="; return lines.join("\n"); }, text => { const lines = text.split("\n"); lines[1] = "Q==="; return lines.join("\n"); }];
+    for (const mutate of mutations) {
+      await assert.rejects(prepareWindowsShortcut(f.request, { spawnProcess(exe, args, options) {
+        const child = spawn(exe, args, options), end = child.stdin.end.bind(child.stdin);
+        child.stdin.end = input => end(mutate(input)); return child;
+      } }), /creation or exact readback failed/);
+      await assert.rejects(lstat(f.request.path), { code: "ENOENT" });
+    }
+  });
+}
 
 test("an actual controlled hung writer is independently observed exited after timeout", async t => {
   const f = await fixture(t); let native, observed = "";

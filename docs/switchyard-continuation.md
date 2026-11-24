@@ -40,6 +40,18 @@ Linux verification is running in an owned isolated checkout with existing
 dependency aliases; its source is 65b5aac. Platform checks remain separate.
 [Evidence](evidence/workspace-boundary-source-summary.json).
 
+The `c41807c` Windows filesystem workflow **45482338622** fails only the
+suite-installation contract job **138758927469**: its first installation case
+times out inside the native shortcut writer after `script-started`. All 17
+recorded groups retain original commands/bounds and verified cleanup; 16 pass.
+The exact artifact **14964381042** is retained as JSON only under private
+`development-maintenance/20261124-shortcut-startup`; no ZIP remains. The source
+correction removes the utility-module import without increasing the 10-second
+deadline, adds native framing/readback cases, and passes 18 local groups / 34
+tests plus typecheck. Wait for the normal-push native checks. No Linux reinstall
+is needed for this Windows-only path.
+[Evidence](evidence/shortcut-startup-source-summary.json).
+
 ## Preserve the operating boundaries
 
 - Continue without delegation. Claude Code is a contingency for actual token

@@ -1,0 +1,70 @@
+{
+  "schema": "switchyard-shortcut-startup-source-summary/v1",
+  "date": "2026-11-24",
+  "baseCommit": "87cfc307743e2705c1d424763096ec20e6d4e40b",
+  "nativeFailure": {
+    "sourceCommit": "c41807c7473f3d1908a4d68f8ee127c517f490fa",
+    "mergeCommit": "5cc7cb2704245d1507f4180165e803c2da6e5664",
+    "sourceTree": "49a6dc4fec5d5ec698edef0a167e89d5eb57b50d",
+    "sameSourceTreeVerified": true,
+    "workflowRun": 45482338622,
+    "job": 138758927469,
+    "artifact": 14964381042,
+    "artifactSha256": "3758fd5c8b950d47891ae8fce90c8a1894288d28f0074942308b17cd5d30054e",
+    "receiptSha256": "3e1ea052a1f27c44ddab7de7fe389b5b14c25011aa8aa41563b916cc9eb3b658",
+    "totals": {
+      "required": 17,
+      "passed": 16,
+      "failed": 1,
+      "tests": 28,
+      "passedTests": 27,
+      "failedTests": 1,
+      "skippedTests": 0,
+      "cancelledTests": 0,
+      "todoTests": 0
+    },
+    "error": "Native shortcut creation timed out. Last observed stage: script-started.",
+    "originalCommandsBoundsAndCleanupVerified": true
+  },
+  "sourceFiles": {
+    "deployment/suite/shortcut-process.mjs": "94a3d1e52940f9164b9060a44b740e01c193050622ad05b1a7b4d2a18798d3ac",
+    "deployment/suite/shortcut-process.test.mjs": "4e853d444eb29ccf223100f1155d853f60ba82412e66cdf515eaaf7ce6cc63f4",
+    "deployment/suite/shortcut.ps1": "45bf7076e95016548a15c780f1daacbae9da2c944cbcbdea62342c1b095ebb14"
+  },
+  "local": {
+    "receipt": "isolated-test-9e80bac3-2540-484f-938c-629c5f767492.json",
+    "sha256": "9055e2ba550b8e8ba8bef09a23716a0d0808291815e4edbedd81d9e7d825e00b",
+    "totals": {
+      "required": 18,
+      "passed": 18,
+      "failed": 0,
+      "tests": 34,
+      "passedTests": 34,
+      "failedTests": 0,
+      "skippedTests": 0,
+      "cancelledTests": 0,
+      "todoTests": 0
+    },
+    "originalCommandsBoundsAndCleanupVerified": true,
+    "typecheck": true
+  },
+  "behavior": [
+    "Replace the startup utility-module import and JSON/New-Object commands with a bounded, canonical four-path Base64 protocol and built-in .NET decoding/COM activation.",
+    "Retain the 10,000 ms execution deadline, 8,192-byte input bound, 1,024-byte output bound, exact target/arguments/directory readback, owned-child retirement and staging preservation on uncertain exit.",
+    "Reject extra fields, control characters, invalid UTF-8, wrong framing and noncanonical Base64; paths remain literal data.",
+    "Add Windows-native valid-path/readback and malformed-wire cases without introducing skips or extending any existing allowance."
+  ],
+  "nativeWindowsAcceptance": "pending normal-push checks",
+  "installedLinuxSource": "65b5aacc8df8ebb1cb7f592eafff2d3c2000ba86",
+  "linuxReinstallRequired": false,
+  "limits": [
+    "The previous native failure occurred between script-started and utility-loaded; local tests do not prove Windows startup timing.",
+    "The installed Linux path does not invoke this Windows writer. Its complete source run remains bound to 65b5aac.",
+    "No desktop shortcut, live account, provider task or keyboard was changed by local tests."
+  ],
+  "references": [
+    "https://learn.microsoft.com/en-us/dotnet/api/system.type.gettypefromprogid",
+    "https://learn.microsoft.com/en-us/dotnet/api/system.activator.createinstance",
+    "https://learn.microsoft.com/en-us/dotnet/api/system.text.utf8encoding.-ctor?view=netframework-4.8"
+  ]
+}

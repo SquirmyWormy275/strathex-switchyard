@@ -37,6 +37,16 @@ Original deadlines, child cleanup and typechecking pass. The normal update is ve
 are running separately.
 [Workspace-boundary evidence](evidence/workspace-boundary-source-summary.json).
 
+The `c41807c` Windows filesystem run exposes an intermittent installation
+failure: the shortcut writer times out after `script-started`, before its utility
+module finishes loading. Sixteen of seventeen groups pass; the failed original
+receipt, exact source tree, commands, bounds and cleanup are retained. The
+follow-up removes that module import using a bounded four-path protocol and
+built-in .NET COM activation. Eighteen local groups pass 34 checks with no skips;
+the original ten-second limit and exact shortcut readback remain. Native Windows
+acceptance is pending. The installed Linux writer is not invoked on Linux.
+[Failure and correction](evidence/shortcut-startup-source-summary.json).
+
 ## What is connected
 
 | Workflow | Current behavior and walkthrough |

@@ -6,11 +6,25 @@ import { fileURLToPath } from "node:url";
 import { stopOwnedChild } from "../../tools/layout-studio/owned-process.mjs";
 
 export const shortcutExecutionTimeoutMs = 10000;
-const stages = ["script-started", "utility-loaded", "input-read", "input-decoded", "input-validated", "com-created", "shortcut-saved", "readback-verified"];
-const progressLines = stages.map(stage => `SXSY-SHORTCUT/1 ${stage}`);
+const stages = ["script-started", "runtime-ready", "input-read", "input-decoded", "input-validated", "com-created", "shortcut-saved", "readback-verified"];
+const progressLines = stages.map(stage => `SXSY-SHORTCUT/2 ${stage}`);
+function shortcutInput(request) {
+  if (Buffer.byteLength(JSON.stringify(request)) > 8192) throw Error("Native shortcut request exceeds its bound.");
+  const fields = ["path", "nodePath", "loader", "directory"];
+  if (!request || typeof request !== "object" || Array.isArray(request) || Object.keys(request).length !== fields.length || fields.some(key => !Object.hasOwn(request, key))) throw Error("Native shortcut needs exactly its four owned paths.");
+  const values = fields.map(key => {
+    const value = request[key];
+    if (typeof value !== "string" || !value || /[\0\r\n"]/.test(value) || Buffer.from(value).toString("utf8") !== value) throw Error("Native shortcut requires exact UTF-8 paths.");
+    return Buffer.from(value).toString("base64");
+  });
+  // A closed four-field wire avoids loading PowerShell's general JSON/utility
+  // module on every install. Base64 carries literal paths, never script text.
+  const wire = "SXSY-SHORTCUT/2\n" + values.join("\n") + "\n";
+  if (Buffer.byteLength(wire) > 8192) throw Error("Native shortcut request exceeds its bound.");
+  return wire;
+}
 export async function prepareWindowsShortcut(request, { spawnProcess = spawn, stopChild = stopOwnedChild, timeoutMs = shortcutExecutionTimeoutMs } = {}) {
-  const input = JSON.stringify(request);
-  if (Buffer.byteLength(input) > 8192) throw Error("Native shortcut request exceeds its bound.");
+  const input = shortcutInput(request);
   let child, timer, removable = true;
   try {
     try {
